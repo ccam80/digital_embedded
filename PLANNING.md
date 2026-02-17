@@ -25,6 +25,10 @@ This document guides design and implementation sessions for the native JS circui
 
 Replace the CheerpJ-based Digital.jar wrapper with a **native JavaScript/TypeScript circuit simulator** that runs purely as static files. The simulator must support the full interactive workflow used in university course tutorials: place components, draw wires, build subcircuits, run tests, import hex into memory, and load/save .dig files.
 
+### Implementation Language
+
+The simulator is a **full port to JavaScript/TypeScript**. The reference codebases (CircuitJS, hneemann/Digital) are Java — agents read the Java source and write JS/TS equivalents. We do not use GWT, TeaVM, CheerpJ, or any Java-to-JS compilation toolchain. The output is hand-written JS/TS that runs natively in the browser.
+
 ### Non-Goals
 
 - Analog simulation (no SPICE, no continuous-time)
