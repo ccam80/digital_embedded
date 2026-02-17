@@ -29,9 +29,19 @@ Replace the CheerpJ-based Digital.jar wrapper with a **native JavaScript/TypeScr
 
 The simulator is a **full port to JavaScript/TypeScript**. The reference codebases (CircuitJS, hneemann/Digital) are Java — agents read the Java source and write JS/TS equivalents. We do not use GWT, TeaVM, CheerpJ, or any Java-to-JS compilation toolchain. The output is hand-written JS/TS that runs natively in the browser.
 
-### Non-Goals
+### Engine-Agnostic Editor (Architectural Constraint)
 
-- Analog simulation (no SPICE, no continuous-time)
+The editor/renderer/interaction layer MUST be engine-agnostic. The same canvas, grid, component placement, wire routing, selection, undo/redo, and property editing code must work with **any** simulation backend. The immediate backend is an event-driven digital engine. The author also maintains a GWT-compiled CircuitJS fork with an analog MNA engine — the TS editor layer should be reusable as a shared frontend for that analog backend in future, without forking the editor code.
+
+Concretely:
+- No simulation logic in canvas/editor code
+- Simulation engine is a pluggable interface (start, stop, step, read/write signal values)
+- Components declare which engine type they target
+- Editor calls engine through the interface, never directly
+
+### Non-Goals (this phase)
+
+- Porting the MNA analog simulation engine (stays in GWT for now)
 - VHDL/Verilog export
 - Circuit analysis / Quine-McCluskey minimization
 - Replicating Digital's exact UI pixel-for-pixel
