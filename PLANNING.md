@@ -43,12 +43,15 @@ Replace the CheerpJ-based Digital.jar wrapper with a **native JavaScript/TypeScr
 
 ## 2. Source Material
 
-Two reference codebases provide the implementation spec. Agents porting components or designing subsystems should read the relevant source directly.
+Three reference codebases provide the implementation spec. Agents porting components or designing subsystems should read the relevant source directly.
 
 | Source | What to take | What to discard |
 |--------|-------------|-----------------|
 | **[hneemann/Digital](https://github.com/hneemann/Digital)** (Java, GPLv3) | `.dig` XML format, simulation semantics, component behaviour, test framework, ModelCreator compilation logic | Swing GUI, XStream serialization, VHDL/Verilog export, circuit analysis |
 | **[sharpie7/circuitjs1](https://github.com/sharpie7/circuitjs1)** (Java/GWT, GPL-2.0) | Canvas editor interaction (grid, place, wire, select, move, undo/redo), gate/chip rendering, `ChipElm` pin layout system, digital component `execute()` logic, subcircuit system (`CustomCompositeElm`) | Analog MNA simulation engine, all analog components, GWT framework code, voltage-based visualization |
+| **Author's CircuitJS fork** (local, GPL-2.0) | Already-customized editor, known codebase. Primary port reference for editor and components — use this fork, not upstream, so existing customizations carry over. | Same as upstream CircuitJS |
+
+The author already maintains a CircuitJS fork in another project. This fork is the primary reference for porting the editor and digital components. Digital (hneemann) is the reference for simulation semantics, .dig file format, and test execution.
 
 ### CircuitJS Editor Assets (port targets)
 
@@ -60,7 +63,22 @@ Two reference codebases provide the implementation spec. Agents porting componen
 | `CirSim` (partial) | Grid snap, pan/zoom, placement modes, selection model, undo/redo, context menus | **Critical** (extract interaction, discard simulation) |
 | `Graphics` | Canvas 2D wrapper (`drawLine`, `fillPolygon`, `drawString`) | **Useful** (thin, ~200 lines) |
 
-### Digital Simulation Assets (port targets)
+### CircuitJS Digital Components Already Present
+
+| Category | Components |
+|----------|-----------|
+| Gates | AND, OR, XOR, NAND, NOR, Inverter (2-8 inputs, US/Euro styles) |
+| Flip-flops | D, JK, T flip-flops (with set/reset), Latch |
+| Counters | Counter (configurable bits, modulus, up/down), Ring counter |
+| Shift registers | SIPO, PISO |
+| MUX/routing | Multiplexer, Demultiplexer |
+| Arithmetic | Half adder, Full adder |
+| Memory | SRAM (configurable address/data bits) |
+| I/O & display | Logic input, Logic output, Clock, LED, 7-seg, 7-seg decoder |
+| Misc | Tri-state buffer, Delay buffer, Custom logic (truth table) |
+| Subcircuits | CustomCompositeElm (hierarchical, model-referenced) |
+
+### Digital (hneemann) Simulation Assets (port targets)
 
 | Digital class | What it provides | Port priority |
 |---------------|-----------------|---------------|
