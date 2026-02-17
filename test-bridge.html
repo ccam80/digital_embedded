@@ -269,6 +269,11 @@
         });
         break;
 
+      case 'digital-hot-reload-failed':
+        log('#' + messageCount + ' HOT-RELOAD FAILED (cheerpjRunLibrary conflict): ' + d.error, 'log-error');
+        log('  Fallback: reload the iframe with ?dig= param instead', 'log-info');
+        break;
+
       case 'digital-error':
         log('#' + messageCount + ' ERROR: ' + d.error, 'log-error');
         break;

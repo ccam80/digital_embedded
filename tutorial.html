@@ -292,11 +292,13 @@
       url: checkpointUrl
     }, '*');
 
-    // Set a timeout in case the hot-load fails silently
+    // Set a timeout in case the hot-load fails silently — fall back to iframe reload
     var timeout = setTimeout(function() {
-      if (btnEl) { btnEl.textContent = 'Retry'; btnEl.disabled = false; }
-      statusEl.textContent = 'Checkpoint load timed out — Digital may not support hot-reload yet. Try clicking again.';
-      statusEl.className = 'error';
+      statusEl.textContent = 'Hot-reload timed out, restarting simulator...';
+      statusEl.className = '';
+      digitalReady = false;
+      simFrame.src = 'digital.html?dig=' + encodeURIComponent(checkpointUrl);
+      if (btnEl) { btnEl.textContent = 'Reloading...'; btnEl.disabled = true; }
     }, 15000);
 
     // Listen for success/error
@@ -335,6 +337,17 @@
     if (event.data.type === 'digital-error' && !digitalReady) {
       statusEl.textContent = 'Error: ' + event.data.error;
       statusEl.className = 'error';
+    }
+    // Hot-reload failed (cheerpjRunLibrary + cheerpjRunJar conflict) —
+    // fall back to reloading the iframe with the checkpoint URL.
+    if (event.data.type === 'digital-hot-reload-failed') {
+      var step = steps[currentStep];
+      if (step && step.checkpoint) {
+        statusEl.textContent = 'Hot-reload unavailable, restarting simulator...';
+        statusEl.className = '';
+        digitalReady = false;
+        simFrame.src = 'digital.html?dig=' + encodeURIComponent(step.checkpoint);
+      }
     }
   });
 

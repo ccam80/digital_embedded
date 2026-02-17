@@ -80,6 +80,10 @@
     0, window.location.pathname.lastIndexOf('/')
   );
   const jarPath = '/app' + basePath + '/Digital.jar';
+  // Shim JAR goes first on classpath — contains a patched XStream JVM class
+  // that catches Throwable (not just LinkageError) in loadClassForName().
+  const shimPath = '/app' + basePath + '/xstream-shim.jar';
+  const classPath = shimPath + ':' + jarPath;
 
   // Counter for unique virtual file paths (avoids overwriting cached files)
   let fileCounter = 0;
@@ -101,7 +105,7 @@
       cheerpOSAddStringFile(vpath, digBytes);
 
       if (!lib) {
-        lib = await cheerpjRunLibrary(jarPath);
+        lib = await cheerpjRunLibrary(classPath);
       }
 
       // Find the running Main frame via AWT's Frame.getFrames()
@@ -135,8 +139,12 @@
       sendToParent({ type: 'digital-loaded' });
 
     } catch (e) {
-      console.error('[digital] Hot-reload failed:', e);
-      sendToParent({ type: 'digital-error', error: 'Hot-reload failed: ' + e });
+      console.error('[digital] Hot-reload failed, signalling fallback:', e);
+      sendToParent({
+        type: 'digital-hot-reload-failed',
+        vpath: vpath,
+        error: String(e)
+      });
     }
   }
 
@@ -177,6 +185,16 @@
     await cheerpjInit({
       clipboardMode: "system",
       status: "none",
+      // XStream 1.4.20 (bundled in Digital.jar) calls System.getProperty()
+      // for these during static init of JVM class. CheerpJ doesn't set them
+      // by default, so they return null, causing NPE in JVM.isAndroid().
+      javaProperties: [
+        "java.vm.vendor=CheerpJ",
+        "java.specification.version=1.8",
+        "java.version=1.8.0",
+        "java.vendor=CheerpJ",
+        "java.vm.name=CheerpJ"
+      ],
       overrideShortcuts: (e) => {
         if (e.ctrlKey && (e.key === 's' || e.key === 'z' || e.key === 'y')) return true;
         if (e.ctrlKey && e.key === 'a') return true;
@@ -218,18 +236,21 @@
     setStatus('Starting Digital...');
     document.getElementById('loading-overlay').classList.add('hidden');
 
-    // Launch Digital — runs in the background, cheerpjRunJar resolves when
-    // the app exits (which for a Swing app means "never" during normal use)
-    const runPromise = circuitArg
-      ? cheerpjRunJar(jarPath, circuitArg)
-      : cheerpjRunJar(jarPath);
+    // Use cheerpjRunMain instead of cheerpjRunJar to bypass MANIFEST processing.
+    // Digital.jar's MANIFEST declares SplashScreen-Image and a Class-Path with
+    // 6 external JARs that don't exist (they're bundled in the fat JAR).
+    // cheerpjRunJar tries to process these, which can hang CheerpJ.
+    const mainClass = 'de.neemann.digital.gui.Main';
+    const args = circuitArg ? [circuitArg] : [];
+    const runPromise = cheerpjRunMain(mainClass, classPath, args);
 
-    // Signal ready after a short delay to let the Swing frame initialize
-    // (cheerpjRunJar doesn't resolve until the app exits, so we can't await it)
+    // Signal ready after a delay to let the Swing frame initialize.
+    // cheerpjRunJar doesn't resolve until the app exits, so we can't await it.
+    // 4s accommodates slower first loads (CheerpJ downloads ~10 MB runtime).
     setTimeout(() => {
       sendToParent({ type: 'digital-ready' });
       console.log('[digital] Ready signal sent');
-    }, 2000);
+    }, 4000);
 
     await runPromise;
 

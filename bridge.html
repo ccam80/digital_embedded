@@ -79,6 +79,8 @@ const basePath  = window.location.pathname.substring(
   0, window.location.pathname.lastIndexOf('/')
 );
 const jarPath   = '/app' + basePath + '/Digital.jar';
+const shimPath  = '/app' + basePath + '/xstream-shim.jar';
+const classPath = shimPath + ':' + jarPath;
 
 function sendToParent(data) {
   try { window.parent.postMessage(data, '*'); } catch(e) { /* cross-origin */ }
@@ -242,7 +244,7 @@ async function runGui(circuitBytes) {
         // For now, we re-grade the ORIGINAL circuit (not student modifications).
         // This is a known limitation of the MVP.
         if (circuitBytes) {
-          const lib = await cheerpjRunLibrary(jarPath);
+          const lib = await cheerpjRunLibrary(classPath);
           await runHeadless(lib, circuitBytes);
         } else {
           sendToParent({ type: 'digital-error', error: 'No circuit data to grade' });
@@ -260,12 +262,17 @@ async function runGui(circuitBytes) {
     }
   });
 
-  // Launch the Swing application
-  if (args.length > 0) {
-    await cheerpjRunJar(jarPath, ...args);
-  } else {
-    await cheerpjRunJar(jarPath);
-  }
+  // Use cheerpjRunMain to bypass MANIFEST processing (SplashScreen-Image
+  // and Class-Path entries for non-existent external JARs cause hangs).
+  const mainClass = 'de.neemann.digital.gui.Main';
+  const runPromise = cheerpjRunMain(mainClass, classPath, args);
+
+  setTimeout(() => {
+    sendToParent({ type: 'digital-ready' });
+    console.log('[bridge] GUI ready signal sent');
+  }, 3000);
+
+  await runPromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,16 +289,26 @@ async function runGui(circuitBytes) {
 
     console.log('[bridge] Initializing CheerpJ (mode=' + mode + ')...');
 
+    // XStream 1.4.20 needs these properties to avoid NPE in JVM.isAndroid()
+    const javaProperties = [
+      "java.vm.vendor=CheerpJ",
+      "java.specification.version=1.8",
+      "java.version=1.8.0",
+      "java.vendor=CheerpJ",
+      "java.vm.name=CheerpJ"
+    ];
+
     if (mode === 'headless') {
       // Headless mode — no display needed, faster startup
-      await cheerpjInit({ status: "none" });
-      const lib = await cheerpjRunLibrary(jarPath);
+      await cheerpjInit({ status: "none", javaProperties });
+      const lib = await cheerpjRunLibrary(classPath);
       await runHeadless(lib, circuitBytes);
     } else {
       // GUI mode — full Swing app
       await cheerpjInit({
         clipboardMode: "system",
         status: "none",
+        javaProperties,
         overrideShortcuts: (e) => {
           if (e.ctrlKey && (e.key === 's' || e.key === 'z' || e.key === 'y')) return true;
           return false;
@@ -300,7 +317,11 @@ async function runGui(circuitBytes) {
       await runGui(circuitBytes);
     }
 
-    sendToParent({ type: 'digital-ready' });
+    // In headless mode, send ready after work completes.
+    // In GUI mode, ready is sent via setTimeout inside runGui().
+    if (mode === 'headless') {
+      sendToParent({ type: 'digital-ready' });
+    }
 
   } catch (e) {
     console.error('[bridge] Fatal error:', e);
