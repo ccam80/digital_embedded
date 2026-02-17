@@ -8,17 +8,19 @@ This is a browser-based port of [hneemann/Digital](https://github.com/hneemann/D
 
 ~~~
 tutorial.html  <-  primary entry point, loads tutorial.json
-    | iframe
+    | iframe (src reload to switch circuits)
 digital.html   <-  CheerpJ Swing loader, runs Digital.jar in browser
-    | postMessage (hot-reload checkpoints)
-    | cheerpjRunJar() for GUI
+    | cheerpjRunMain() for GUI
 bridge.html    <-  headless CheerpJ library mode (future grading)
 ~~~
 
-- `tutorial.html` fetches `tutorial.json`, renders step-by-step instructions in a left panel, embeds `digital.html` in an iframe on the right
-- `digital.html` loads CheerpJ 4.2 from CDN, runs `Digital.jar` as a full Swing app, listens for `postMessage` to hot-load `.dig` checkpoint files
+- `tutorial.html` fetches `tutorial.json`, renders step-by-step instructions in a left panel, embeds `digital.html` in an iframe on the right. Checkpoint loading reloads the iframe with a new `?dig=` URL.
+- `digital.html` loads CheerpJ 4.2 from CDN, runs `Digital.jar` as a full Swing app via `cheerpjRunMain()`. Sends `digital-ready` to parent via postMessage.
 - `bridge.html` runs Digital.jar in headless library mode for simulation/test grading (future STACK/Moodle integration)
 - `test-bridge.html` is an integration test harness for both modes
+- `xstream-shim.jar` patches XStream's JVM class to catch `Throwable` (not just `LinkageError`) — required for CheerpJ compatibility
+
+**Why no hot-reload:** CheerpJ's `cheerpjRunLibrary()` creates an isolated JVM from `cheerpjRunMain()`. `Frame.getFrames()` returns 0 frames in library mode — there is no way to call methods on the running Swing app from JavaScript. Checkpoint loading therefore reloads the iframe (~3-5s, CheerpJ runtime is cached).
 
 ## Files
 
@@ -27,7 +29,8 @@ bridge.html    <-  headless CheerpJ library mode (future grading)
 | `Digital.jar` | hneemann/Digital v0.31 (3.7 MB Swing app) |
 | `tutorial.html` | Split-pane tutorial viewer (instructions + live sim) |
 | `tutorial.json` | Tutorial step definitions (title, HTML content, checkpoint .dig path) |
-| `digital.html` | CheerpJ Swing loader, embeddable in iframe, postMessage API |
+| `digital.html` | CheerpJ Swing loader, embeddable in iframe, `?dig=` URL param |
+| `xstream-shim.jar` | Patched XStream JVM class for CheerpJ (catches Throwable) |
 | `bridge.html` | Headless simulation bridge (CheerpJ library mode) |
 | `test-bridge.html` | Integration test harness with GUI and headless tabs |
 | `stack-question-template.txt` | Template for future Moodle/STACK grading |
@@ -79,23 +82,11 @@ Then open: `http://localhost:8080/tutorial.html`
 
 **Debug approach:** Open browser console, launch `digital.html` standalone (not via tutorial.html), watch for Java exceptions in the console. CheerpJ logs Java stack traces to the browser console. Fix each one that prevents the Swing window from appearing.
 
-### 3. Hot-reload checkpoints via postMessage
+### 3. ~~Hot-reload checkpoints via postMessage~~ RESOLVED
 
-**How it works:** `digital.html` listens for `{ type: 'digital-load-url', url: '...' }` messages. It fetches the .dig file, injects it into CheerpJ's virtual filesystem via `cheerpOSAddStringFile('/str/checkpoint_N.dig', bytes)`, then uses `cheerpjRunLibrary()` to get a library handle, calls `Frame.getFrames()` to find the running `Main` instance, and calls `main.loadFile(file, false, false)`.
+**Conclusion:** Hot-reload is not possible. `cheerpjRunLibrary()` creates an isolated JVM context from the running `cheerpjRunMain()` app. `Frame.getFrames()` returns 0 frames in library mode — there is no cross-context visibility. Confirmed via diagnostic logging.
 
-**What will likely go wrong:**
-- `cheerpjRunLibrary()` may conflict with the already-running `cheerpjRunJar()` — CheerpJ may not support both in the same page. If this fails, the fallback is to reload the iframe with a new `?dig=` URL parameter (slower, restarts the JVM).
-- `Frame.getFrames()` may return the frame but casting/method resolution on `Main.loadFile()` may fail if CheerpJ's proxy doesn't resolve the method signature. `loadFile(File, boolean, boolean)` is a public method on `de.neemann.digital.gui.Main`.
-- The `/str/` virtual path may confuse Digital's `loadFile()` which calls `file.getParentFile()` to set the library root for subcircuit resolution.
-
-**Fallback if hot-reload doesn't work:** In `tutorial.html`, change the checkpoint loading to reload the iframe instead:
-
-~~~javascript
-// Replace the postMessage approach with iframe reload:
-simFrame.src = 'digital.html?dig=' + encodeURIComponent(checkpointUrl);
-~~~
-
-This restarts the JVM (~5s) but is 100% reliable.
+**Solution:** `tutorial.html` reloads the iframe with `?dig=<url>` to load new circuits. This restarts the JVM (~3-5s, CheerpJ runtime cached after first load). Simple and reliable.
 
 ### 4. Headless bridge (bridge.html, lower priority)
 
@@ -126,10 +117,12 @@ await cheerpjInit({ clipboardMode: "system", status: "none" });
 // Create Swing display (before running JAR)
 cheerpjCreateDisplay(-1, -1, document.getElementById("container"));
 
-// Run a JAR (blocks until app exits — for Swing, effectively forever)
-await cheerpjRunJar("/app/Digital.jar", "/str/circuit.dig");
+// Run a main class (blocks until app exits — for Swing, effectively forever)
+// Use cheerpjRunMain instead of cheerpjRunJar to bypass MANIFEST processing.
+await cheerpjRunMain("com.example.Main", "/app/my.jar", ["arg1"]);
 
-// Library mode (call Java methods from JS)
+// Library mode (call Java methods from JS) — ISOLATED from cheerpjRunMain!
+// Frame.getFrames() returns 0 frames; cannot interact with running Swing app.
 const lib = await cheerpjRunLibrary("/app/Digital.jar");
 const MyClass = await lib.com.example.MyClass;
 const obj = await new MyClass("arg");
