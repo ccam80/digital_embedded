@@ -1,0 +1,6 @@
+# Minimal java.security for CheerpJ browser environment
+# Provides security provider config that JDK reads from {java.home}/lib/security/
+security.provider.1=sun.security.provider.Sun
+
+# Seed source
+securerandom.source=file:/dev/urandom

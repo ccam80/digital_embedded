@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:cheerpj.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:cheerp.io)",
+      "WebFetch(domain:labs.leaningtech.com)",
+      "Bash",
+      "Edit",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:kazuhikoarase.github.io)",
+      "WebFetch(domain:simulator-docs.circuitverse.org)",
+      "WebFetch(domain:wcours.gel.ulaval.ca)"
+    ]
+  }
+}
