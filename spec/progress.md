@@ -38,3 +38,9 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - `src/test-utils/infrastructure.test.ts` — 30 smoke tests covering all mock functionality
 - **Files modified**: none
 - **Tests**: 30/30 passing
+
+---
+## Wave 1.1 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1

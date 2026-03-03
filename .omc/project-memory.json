@@ -101,9 +101,15 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 19,
-      "lastAccessed": 1772569905716,
+      "accessCount": 20,
+      "lastAccessed": 1772570384748,
       "type": "directory"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 16,
+      "lastAccessed": 1772570388569,
+      "type": "file"
     },
     {
       "path": "spec\\plan.md",
@@ -112,15 +118,51 @@
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 13,
-      "lastAccessed": 1772570317828,
-      "type": "file"
-    },
-    {
       "path": "CLAUDE.md",
       "accessCount": 11,
       "lastAccessed": 1772570098137,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 7,
+      "lastAccessed": 1772570378865,
+      "type": "file"
+    },
+    {
+      "path": "spec\\author_instructions.md",
+      "accessCount": 7,
+      "lastAccessed": 1772570384451,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 6,
+      "lastAccessed": 1772570379084,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-1-foundation.md",
+      "accessCount": 6,
+      "lastAccessed": 1772570382579,
+      "type": "file"
+    },
+    {
+      "path": "spec\\shared-decisions.md",
+      "accessCount": 6,
+      "lastAccessed": 1772570384240,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\mock-engine.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772571504692,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772571540495,
       "type": "file"
     },
     {
@@ -136,33 +178,39 @@
       "type": "file"
     },
     {
-      "path": "spec\\author_instructions.md",
-      "accessCount": 4,
-      "lastAccessed": 1772569916660,
+      "path": "spec\\test-baseline.md",
+      "accessCount": 5,
+      "lastAccessed": 1772570388219,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 4,
-      "lastAccessed": 1772570091922,
+      "path": "src\\core\\properties.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772570621313,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
+      "path": "src\\core\\__tests__\\pin.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772571552668,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
       "accessCount": 3,
-      "lastAccessed": 1772570092076,
+      "lastAccessed": 1772570391327,
       "type": "file"
     },
     {
-      "path": "spec\\phase-1-foundation.md",
+      "path": "src\\core\\engine-interface.ts",
       "accessCount": 3,
-      "lastAccessed": 1772570097433,
+      "lastAccessed": 1772570406018,
       "type": "file"
     },
     {
-      "path": "spec\\shared-decisions.md",
+      "path": "src\\test-utils\\infrastructure.test.ts",
       "accessCount": 3,
-      "lastAccessed": 1772570097798,
+      "lastAccessed": 1772570611069,
       "type": "file"
     },
     {
@@ -178,9 +226,9 @@
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "spec\\.hybrid-state.json",
       "accessCount": 2,
-      "lastAccessed": 1772570105171,
+      "lastAccessed": 1772570354466,
       "type": "file"
     },
     {
@@ -199,12 +247,6 @@
       "path": "spec\\.context\\reviewer.md",
       "accessCount": 1,
       "lastAccessed": 1772523726081,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 1,
-      "lastAccessed": 1772523728639,
       "type": "file"
     },
     {
@@ -250,27 +292,9 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772570168098,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\engine-interface.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772570180915,
-      "type": "file"
-    },
-    {
       "path": "src\\test-utils\\mock-render-context.ts",
       "accessCount": 1,
       "lastAccessed": 1772570199964,
-      "type": "file"
-    },
-    {
-      "path": "src\\test-utils\\mock-engine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772570219289,
       "type": "file"
     },
     {
@@ -280,9 +304,63 @@
       "type": "file"
     },
     {
-      "path": "src\\test-utils\\infrastructure.test.ts",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\ObservableValue.java",
       "accessCount": 1,
-      "lastAccessed": 1772570256935,
+      "lastAccessed": 1772570378272,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\IntFormat.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570378475,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\PinDescription.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570384498,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\PinInfo.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570387856,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\elements\\Pin.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570388281,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\Keys.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570389556,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\ElementAttributes.java",
+      "accessCount": 1,
+      "lastAccessed": 1772570393280,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\properties.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570477100,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\signal.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570478196,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\signal.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570552349,
       "type": "file"
     }
   ],

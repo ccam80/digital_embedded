@@ -193,7 +193,7 @@ describe("MockEngine", () => {
 
   it("setSignalValue stores the value and is readable via getSignalRaw", () => {
     engine.init(circuit);
-    const bv = engine.getSignalValue(0); // get a BitVector to pass back
+    engine.getSignalValue(0); // verify it doesn't throw
     engine.setSignalRaw(0, 7);
     const bvSeven = engine.getSignalValue(0);
     engine.setSignalValue(1, bvSeven);

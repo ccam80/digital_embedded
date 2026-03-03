@@ -53,7 +53,7 @@ export class MockEngine implements SimulationEngine {
   private _state: EngineState = "STOPPED";
   private _signals: Uint32Array = new Uint32Array(0);
   private _signalWidth = 1;
-  private _circuit: CompiledCircuit | null = null;
+  private _circuit: CompiledCircuit | null = null; // retained for future use
   private readonly _listeners: Set<EngineChangeListener> = new Set();
 
   /** Directly set a raw signal value for test setup. */
@@ -66,6 +66,11 @@ export class MockEngine implements SimulationEngine {
   /** Expose the raw signal array for direct inspection in tests. */
   get signals(): Uint32Array {
     return this._signals;
+  }
+
+  /** Expose the circuit passed to init() for test assertions. */
+  get circuit(): CompiledCircuit | null {
+    return this._circuit;
   }
 
   private _notifyListeners(): void {
