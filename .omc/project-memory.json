@@ -1,0 +1,164 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1772487537470,
+  "projectRoot": "C:\\local_working_projects\\digital_in_browser",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "spec"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "circuits": {
+      "path": "circuits",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1772487537442,
+      "keyFiles": [
+        "and-gate.dig",
+        "half-adder.dig",
+        "sr-latch.dig"
+      ]
+    },
+    "jdk-shim": {
+      "path": "jdk-shim",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1772487537443,
+      "keyFiles": []
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 3,
+      "lastAccessed": 1772487537443,
+      "keyFiles": [
+        "phase-0-dead-code-removal.md",
+        "plan.md",
+        "progress.md"
+      ]
+    },
+    "specs": {
+      "path": "specs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1772487537444,
+      "keyFiles": []
+    },
+    "xstream-patch": {
+      "path": "xstream-patch",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1772487537444,
+      "keyFiles": []
+    },
+    "jdk-shim\\lib": {
+      "path": "jdk-shim\\lib",
+      "purpose": "Library code",
+      "fileCount": 1,
+      "lastAccessed": 1772487537445,
+      "keyFiles": [
+        "calendars.properties"
+      ]
+    },
+    "xstream-patch\\build": {
+      "path": "xstream-patch\\build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1772487537446,
+      "keyFiles": []
+    },
+    "xstream-patch\\src": {
+      "path": "xstream-patch\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1772487537446,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 13,
+      "lastAccessed": 1772498232764,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\plan.md",
+      "accessCount": 10,
+      "lastAccessed": 1772508332534,
+      "type": "file"
+    },
+    {
+      "path": "PLANNING.md",
+      "accessCount": 5,
+      "lastAccessed": 1772498218740,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 4,
+      "lastAccessed": 1772508340108,
+      "type": "file"
+    },
+    {
+      "path": "circuits\\half-adder.dig",
+      "accessCount": 2,
+      "lastAccessed": 1772498236137,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-0-dead-code-removal.md",
+      "accessCount": 2,
+      "lastAccessed": 1772501461977,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 1,
+      "lastAccessed": 1772487569194,
+      "type": "file"
+    },
+    {
+      "path": "circuits\\and-gate.dig",
+      "accessCount": 1,
+      "lastAccessed": 1772496416057,
+      "type": "file"
+    },
+    {
+      "path": "circuits\\sr-latch.dig",
+      "accessCount": 1,
+      "lastAccessed": 1772496416706,
+      "type": "file"
+    },
+    {
+      "path": "spec\\author_instructions.md",
+      "accessCount": 1,
+      "lastAccessed": 1772508295763,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

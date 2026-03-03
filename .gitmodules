@@ -1,0 +1,3 @@
+[submodule "ref/Digital"]
+	path = ref/Digital
+	url = https://github.com/hneemann/Digital.git

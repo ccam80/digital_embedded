@@ -2,49 +2,54 @@
 
 ## Project Overview
 
-A browser-based digital logic circuit simulator for embedding in university course tutorials. The project is transitioning from a CheerpJ wrapper around hneemann/Digital.jar to a **native JavaScript/TypeScript implementation** — purely static files, no server, no licensing dependencies.
+A browser-based digital logic circuit simulator for embedding in university course tutorials. The project is a **native TypeScript port of [hneemann/Digital](https://github.com/hneemann/Digital)** — purely static files, no server, no licensing dependencies.
 
-**For all design and planning work, read `PLANNING.md` first.** It defines the session structure, spec tree, and design dependencies.
+**For all design and planning work, read `spec/plan.md` first.** It defines phases, tasks, dependencies, performance architecture, and verification criteria.
+
+**Before writing any code, read `spec/author_instructions.md`.** It defines the TS idiom guide, priority order (architectural consistency > performance > ease), review checkpoints, and the component implementation template.
 
 ## Current State
 
-### Working (CheerpJ prototype, `main` branch)
+The CheerpJ prototype files (`Digital.jar`, `digital.html`, `bridge.html`, `xstream-shim.jar`, `xstream-patch/`, `jdk-shim/`) are still in the repo pending Phase 0 cleanup. No native TS code has been written yet.
 
-The CheerpJ prototype is functional: Digital.jar runs in-browser with hot-reload via a native method bridge (`Launcher.java`). This will be superseded by the native JS simulator.
-
-| File | Purpose |
+| File/Dir | Purpose |
 |---|---|
-| `Digital.jar` | hneemann/Digital v0.31 (3.7 MB Swing app) |
-| `tutorial.html` | Split-pane tutorial viewer (instructions + live sim) |
-| `tutorial.json` | Tutorial step definitions (title, HTML content, checkpoint .dig path) |
-| `digital.html` | CheerpJ Swing loader with native method bridge for hot-reload |
-| `xstream-shim.jar` | Patched XStream JVM class + Launcher bridge (Java 8 bytecode) |
-| `bridge.html` | Headless simulation bridge (CheerpJ library mode) |
+| `spec/plan.md` | Authoritative implementation plan — 12 phases, ~160 tasks |
+| `spec/progress.md` | Task completion tracking |
+| `spec/phase-0-dead-code-removal.md` | Phase 0 detailed spec |
 | `circuits/*.dig` | Example checkpoint circuits (AND gate, half adder, SR latch) |
-| `xstream-patch/` | Java source for xstream-shim.jar (JVM.java, Launcher.java) |
 
-### Planned (native JS simulator)
+## Reference Codebase
 
-Replacing the CheerpJ stack with a native Canvas-based circuit editor and event-driven simulation engine. Ported from two reference codebases:
+**hneemann/Digital** is the sole reference for porting. It is checked in as a git submodule at `ref/Digital/` (pinned to a specific commit for reproducibility). Agents read the Java source and write TypeScript equivalents.
 
-- **[hneemann/Digital](https://github.com/hneemann/Digital)** — simulation semantics, .dig file format, component behaviour, test framework
-- **[sharpie7/circuitjs1](https://github.com/sharpie7/circuitjs1)** — canvas editor interaction, gate/chip rendering, digital component logic
-
-See `PLANNING.md` for the full session plan and `specs/` for design specifications.
-
-## Reference Codebases
-
-When porting components or designing subsystems, read the relevant Java source directly:
+To initialize: `git submodule update --init`
 
 | What | Where to look |
 |---|---|
-| Component simulation behaviour | `Digital/src/main/java/de/neemann/digital/core/` |
+| Component simulation behaviour | `ref/Digital/src/main/java/de/neemann/digital/core/` |
 | .dig XML format | Any `.dig` file + Digital's XStream annotations |
-| Circuit compilation (ModelCreator) | `Digital/src/main/java/de/neemann/digital/draw/model/` |
-| Test execution | `Digital/src/main/java/de/neemann/digital/testing/` |
-| Canvas editor interaction | `circuitjs1/src/com/lushprojects/circuitjava/CirSim.java` |
-| Gate rendering / chip layout | `circuitjs1/src/com/lushprojects/circuitjava/GateElm.java`, `ChipElm.java` |
-| Digital component execute() | `circuitjs1/src/com/lushprojects/circuitjava/*Elm.java` |
+| Circuit compilation (ModelCreator) | `ref/Digital/src/main/java/de/neemann/digital/draw/model/` |
+| Test execution | `ref/Digital/src/main/java/de/neemann/digital/testing/` |
+| Component shapes / rendering specs | `ref/Digital/src/main/java/de/neemann/digital/draw/shapes/` |
+| HGS scripting interpreter | `ref/Digital/src/main/java/de/neemann/digital/hdl/hgs/` |
+| Generic circuit resolution | `ref/Digital/src/main/java/de/neemann/digital/draw/library/ResolveGenerics.java` |
+| Bus resolution subsystem | `ref/Digital/src/main/java/de/neemann/digital/core/wiring/bus/` |
+| Analysis & synthesis | `ref/Digital/src/main/java/de/neemann/digital/analyse/` |
+| FSM editor | `ref/Digital/src/main/java/de/neemann/digital/fsm/` |
+| Element library (component registry) | `ref/Digital/src/main/java/de/neemann/digital/draw/library/ElementLibrary.java` |
+| Example circuits (processors, 74xx) | `ref/Digital/src/main/dig/` |
+
+### Engine-Agnostic Editor (Architectural Constraint)
+
+The editor/renderer/interaction layer MUST be engine-agnostic. The same canvas, grid, component placement, wire routing, selection, undo/redo, and property editing code must work with **any** simulation backend. The immediate backend is an event-driven digital engine. The author also maintains a GWT-compiled CircuitJS fork with an analog MNA engine — the TS editor layer should be reusable as a shared frontend for that analog backend in future, without forking the editor code.
+
+Concretely:
+- No simulation logic in canvas/editor code
+- Simulation engine is a pluggable interface (start, stop, step, read/write signal values)
+- Components declare which engine type they target
+- Editor calls engine through the interface, never directly
+- Components program against abstract `RenderContext` and engine interfaces, not Canvas2D or engine implementations
 
 ## Serving Locally
 
@@ -52,29 +57,9 @@ When porting components or designing subsystems, read the relevant Java source d
 
 ~~~bash
 python3 -m http.server 8080
-# Then open: http://localhost:8080/tutorial.html
 ~~~
 
-## Tutorial Authoring Format
-
-`tutorial.json`:
-
-~~~json
-{
-  "title": "Your Tutorial Title",
-  "steps": [
-    {
-      "title": "Step Title",
-      "content": "<p>HTML instructions — supports full HTML</p>",
-      "checkpoint": "circuits/filename.dig"
-    }
-  ]
-}
-~~~
-
-URL params: `tutorial.html?tutorial=my-tutorial.json&step=3`
-
-## postMessage API (tutorial.html ↔ simulator iframe)
+## postMessage API (tutorial host ↔ simulator iframe)
 
 This API must be preserved by the native JS simulator:
 
