@@ -1,44 +1,35 @@
 {
   "agents": [
     {
-      "agent_id": "a8efe8517436996c3",
-      "agent_type": "oh-my-claudecode:analyst",
-      "started_at": "2026-03-02T21:49:25.033Z",
+      "agent_id": "a804835be4303f019",
+      "agent_type": "Explore",
+      "started_at": "2026-03-03T09:44:12.216Z",
       "parent_mode": "none",
       "status": "completed",
-      "completed_at": "2026-03-02T21:56:32.799Z",
-      "duration_ms": 427766
+      "completed_at": "2026-03-03T09:47:06.926Z",
+      "duration_ms": 174710
     },
     {
-      "agent_id": "a2bc968a29a12f689",
-      "agent_type": "oh-my-claudecode:analyst",
-      "started_at": "2026-03-02T22:27:05.177Z",
+      "agent_id": "a3b83f8ead6ca013a",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-03T20:34:45.864Z",
       "parent_mode": "none",
       "status": "completed",
-      "completed_at": "2026-03-03T00:06:46.255Z",
-      "duration_ms": 5981078
+      "completed_at": "2026-03-03T20:36:54.422Z",
+      "duration_ms": 128558
     },
     {
-      "agent_id": "a1f7684408517ea80",
-      "agent_type": "oh-my-claudecode:explore",
-      "started_at": "2026-03-03T00:36:39.384Z",
+      "agent_id": "a3a82eb282b6126ec",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-03T20:34:48.997Z",
       "parent_mode": "none",
       "status": "completed",
-      "completed_at": "2026-03-03T00:39:37.078Z",
-      "duration_ms": 177694
-    },
-    {
-      "agent_id": "a1db23ea59ebed039",
-      "agent_type": "oh-my-claudecode:architect",
-      "started_at": "2026-03-03T00:36:53.968Z",
-      "parent_mode": "none",
-      "status": "completed",
-      "completed_at": "2026-03-03T00:41:00.230Z",
-      "duration_ms": 246262
+      "completed_at": "2026-03-03T20:38:33.328Z",
+      "duration_ms": 224331
     }
   ],
-  "total_spawned": 4,
-  "total_completed": 4,
+  "total_spawned": 3,
+  "total_completed": 3,
   "total_failed": 0,
-  "last_updated": "2026-03-03T00:41:00.339Z"
+  "last_updated": "2026-03-03T20:38:33.442Z"
 }

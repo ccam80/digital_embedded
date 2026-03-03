@@ -10,7 +10,7 @@ A browser-based digital logic circuit simulator for embedding in university cour
 
 ## Current State
 
-The CheerpJ prototype files (`Digital.jar`, `digital.html`, `bridge.html`, `xstream-shim.jar`, `xstream-patch/`, `jdk-shim/`) are still in the repo pending Phase 0 cleanup. No native TS code has been written yet.
+Phase 0 (dead code removal) is complete. All legacy prototype artifacts have been removed. No native TS code has been written yet.
 
 | File/Dir | Purpose |
 |---|---|

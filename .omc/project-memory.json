@@ -101,14 +101,26 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 13,
-      "lastAccessed": 1772498232764,
+      "accessCount": 19,
+      "lastAccessed": 1772569905716,
       "type": "directory"
     },
     {
       "path": "spec\\plan.md",
-      "accessCount": 10,
-      "lastAccessed": 1772508332534,
+      "accessCount": 15,
+      "lastAccessed": 1772524397357,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 13,
+      "lastAccessed": 1772570317828,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 11,
+      "lastAccessed": 1772570098137,
       "type": "file"
     },
     {
@@ -118,9 +130,39 @@
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
+      "path": "spec\\phase-0-dead-code-removal.md",
+      "accessCount": 5,
+      "lastAccessed": 1772523729576,
+      "type": "file"
+    },
+    {
+      "path": "spec\\author_instructions.md",
       "accessCount": 4,
-      "lastAccessed": 1772508340108,
+      "lastAccessed": 1772569916660,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 4,
+      "lastAccessed": 1772570091922,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 3,
+      "lastAccessed": 1772570092076,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-1-foundation.md",
+      "accessCount": 3,
+      "lastAccessed": 1772570097433,
+      "type": "file"
+    },
+    {
+      "path": "spec\\shared-decisions.md",
+      "accessCount": 3,
+      "lastAccessed": 1772570097798,
       "type": "file"
     },
     {
@@ -130,15 +172,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-dead-code-removal.md",
+      "path": "spec\\phase-0-verify.sh",
       "accessCount": 2,
-      "lastAccessed": 1772501461977,
+      "lastAccessed": 1772523743456,
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 1,
-      "lastAccessed": 1772487569194,
+      "path": "spec\\test-baseline.md",
+      "accessCount": 2,
+      "lastAccessed": 1772570105171,
       "type": "file"
     },
     {
@@ -154,9 +196,93 @@
       "type": "file"
     },
     {
-      "path": "spec\\author_instructions.md",
+      "path": "spec\\.context\\reviewer.md",
       "accessCount": 1,
-      "lastAccessed": 1772508295763,
+      "lastAccessed": 1772523726081,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 1,
+      "lastAccessed": 1772523728639,
+      "type": "file"
+    },
+    {
+      "path": "spec\\reviews\\wave-0.1.md",
+      "accessCount": 1,
+      "lastAccessed": 1772523811371,
+      "type": "file"
+    },
+    {
+      "path": "spec\\reviews\\phase-0-combined.md",
+      "accessCount": 1,
+      "lastAccessed": 1772523817286,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1772570129398,
+      "type": "file"
+    },
+    {
+      "path": "tsconfig.json",
+      "accessCount": 1,
+      "lastAccessed": 1772570131787,
+      "type": "file"
+    },
+    {
+      "path": "vite.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570136346,
+      "type": "file"
+    },
+    {
+      "path": "eslint.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1772570138658,
+      "type": "file"
+    },
+    {
+      "path": "src\\main.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570143844,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570168098,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\engine-interface.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570180915,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\mock-render-context.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570199964,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\mock-engine.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570219289,
+      "type": "file"
+    },
+    {
+      "path": "vitest.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570222650,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\infrastructure.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772570256935,
       "type": "file"
     }
   ],
