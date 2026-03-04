@@ -112,3 +112,24 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Total tests**: 421 passing across 10 files
 - **Typecheck**: clean (tsc --noEmit passes)
 - **CHECKPOINT**: Author review required before Phases 2-5 can begin
+
+## Task 4.1.1: .dig XML Schema Types
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/dig-schema.ts, src/io/__tests__/dig-schema.test.ts
+- **Files modified**: (none)
+- **Tests**: 33/33 passing
+
+## Task 3.1.2: Timing Wheel Event Queue
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/event-pool.ts, src/engine/timing-wheel.ts, src/engine/__tests__/timing-wheel.test.ts
+- **Files modified**: (none)
+- **Tests**: 22/22 passing (all timing-wheel and event-pool tests pass)
+
+## Task 5.1.1: And Gate (Exemplar Component)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/gates/and.ts, src/components/gates/__tests__/and.test.ts
+- **Files modified**: (none)
+- **Tests**: 47/47 passing

@@ -35,6 +35,13 @@ This project runs on Windows with Git Bash. All bash commands MUST be Windows-sa
 - **Quote variable expansions.** Write `"${TASK_ID}"` not `${TASK_ID}` when the value could contain spaces or special characters.
 - **Use `bash` explicitly when invoking scripts.** Write `bash "path/to/script.sh"`, not `./path/to/script.sh` or `sh "path/to/script.sh"`.
 
+## Git Safety
+- Never use `git stash`. Test baselines are provided in `spec/test-baseline.md`.
+- Never use `git checkout` to discard or switch changes.
+- Never use `git reset` to undo changes.
+- Never use `git clean` to remove untracked files.
+- If you need to understand pre-existing test state, read `spec/test-baseline.md`.
+
 ## Agent Discipline
 - Never soften, reinterpret, or "pragmatically adjust" these rules.
 - If a rule seems to conflict with the task, flag it to the orchestrator. Do not resolve the conflict yourself.

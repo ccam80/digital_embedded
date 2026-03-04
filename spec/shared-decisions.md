@@ -146,6 +146,9 @@ interface ComponentDefinition {
   propertyDefs: PropertyDefinition[];    // for the property panel
   attributeMap: AttributeMapping[];      // .dig XML → PropertyBag converters
   category: ComponentCategory;           // for palette grouping
+  defaultDelay: number;                  // gate delay in ns for timed mode (default: 10)
+  internalStateCount: number;            // extra Uint32Array slots for component state (default: 0)
+  backingStoreType?: 'datafield';        // if set, component needs a DataField side-car (RAM/ROM)
 }
 ```
 
@@ -153,12 +156,20 @@ interface ComponentDefinition {
 
 Type IDs are **auto-assigned** by the registry at registration time (incrementing counter). They are never serialized — they exist only at runtime for function-table dispatch. This avoids maintaining a central ID list.
 
+### Internal state allocation
+
+Stateful components (flip-flops, counters, registers) declare `internalStateCount > 0`. The compiler allocates that many extra pseudo-net slots in the `Uint32Array` per component instance, after the real signal nets. The executeFn accesses internal state via `layout.stateOffset(index)`. This keeps the engine's inner loop uniform — everything is Uint32Array reads/writes.
+
+### RAM/ROM backing store
+
+Memory components (RAM, ROM, EEPROM) need large data stores that don't fit efficiently in the Uint32Array. These declare `backingStoreType: 'datafield'`. The engine provides a `Map<number, DataField>` side-car indexed by component index. The executeFn looks up `backingStores.get(index)` to access the DataField. This lookup only happens for memory-type components (typically 1-5 per circuit) — gates and logic are unaffected.
+
 ### Who uses what
 
 | Consumer | Fields used |
 |---|---|
 | Phase 4 (parser) | `name`, `factory`, `attributeMap` |
-| Phase 3 (compiler) | `name`, `typeId`, `executeFn`, `pinLayout` |
+| Phase 3 (compiler) | `name`, `typeId`, `executeFn`, `pinLayout`, `internalStateCount`, `backingStoreType`, `defaultDelay` |
 | Phase 2 (editor) | `name`, `factory`, `pinLayout`, `propertyDefs`, `category` |
 
 ### Registration

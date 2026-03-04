@@ -16,18 +16,17 @@ import {
 
 describe('PropertyType enum', () => {
   it('has all required variants', () => {
-    const expected = [
-      'INT', 'STRING', 'ENUM', 'BOOLEAN', 'BIT_WIDTH',
-      'HEX_DATA', 'COLOR', 'LONG', 'FILE', 'ROTATION', 'INTFORMAT',
-    ];
-    for (const variant of expected) {
-      expect(PropertyType[variant as keyof typeof PropertyType]).toBe(variant);
-    }
-  });
-
-  it('has exactly 11 variants', () => {
-    const count = Object.keys(PropertyType).length;
-    expect(count).toBe(11);
+    expect(PropertyType.INT).toBe('INT');
+    expect(PropertyType.STRING).toBe('STRING');
+    expect(PropertyType.ENUM).toBe('ENUM');
+    expect(PropertyType.BOOLEAN).toBe('BOOLEAN');
+    expect(PropertyType.BIT_WIDTH).toBe('BIT_WIDTH');
+    expect(PropertyType.HEX_DATA).toBe('HEX_DATA');
+    expect(PropertyType.COLOR).toBe('COLOR');
+    expect(PropertyType.LONG).toBe('LONG');
+    expect(PropertyType.FILE).toBe('FILE');
+    expect(PropertyType.ROTATION).toBe('ROTATION');
+    expect(PropertyType.INTFORMAT).toBe('INTFORMAT');
   });
 });
 

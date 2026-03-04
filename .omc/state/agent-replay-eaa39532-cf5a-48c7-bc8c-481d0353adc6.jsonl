@@ -1,0 +1,10 @@
+{"t":0,"agent":"a2047d9","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a2047d9","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":157988}
+{"t":0,"agent":"ad94aa0","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a51ac1d","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a4e215b","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a51ac1d","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":90337}
+{"t":0,"agent":"a4e215b","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":85759}
+{"t":0,"agent":"system","event":"keyword_detected","keyword":"pipeline"}
+{"t":0,"agent":"a819ce3","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a819ce3","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":69274}

@@ -1,31 +1,67 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1772487537470,
-  "projectRoot": "C:\\local_working_projects\\digital_in_browser",
+  "lastScanned": 1772586509253,
+  "projectRoot": "C:\\local_working_projects\\digital_js",
   "techStack": {
-    "languages": [],
-    "frameworks": [],
-    "packageManager": null,
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vite",
+        "version": "5.4.0",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "2.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
     "runtime": null
   },
   "build": {
-    "buildCommand": null,
-    "testCommand": null,
-    "lintCommand": null,
-    "devCommand": null,
-    "scripts": {}
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "lint": "eslint src",
+      "typecheck": "tsc --noEmit"
+    }
   },
   "conventions": {
     "namingStyle": null,
     "importStyle": null,
     "testPattern": null,
-    "fileOrganization": null
+    "fileOrganization": "type-based"
   },
   "structure": {
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
-      "spec"
+      "spec",
+      "src"
     ],
     "gitBranches": null
   },
@@ -35,368 +71,358 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1772487537442,
+      "lastAccessed": 1772586509206,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
         "sr-latch.dig"
       ]
     },
-    "jdk-shim": {
-      "path": "jdk-shim",
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1772586509207,
+      "keyFiles": [
+        "main.js"
+      ]
+    },
+    "ref": {
+      "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1772487537443,
+      "lastAccessed": 1772586509232,
       "keyFiles": []
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 3,
-      "lastAccessed": 1772487537443,
+      "fileCount": 9,
+      "lastAccessed": 1772586509233,
       "keyFiles": [
+        "author_instructions.md",
         "phase-0-dead-code-removal.md",
-        "plan.md",
-        "progress.md"
+        "phase-0-verify.sh",
+        "phase-1-foundation.md",
+        "plan.md"
       ]
     },
-    "specs": {
-      "path": "specs",
-      "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1772487537444,
-      "keyFiles": []
-    },
-    "xstream-patch": {
-      "path": "xstream-patch",
-      "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1772487537444,
-      "keyFiles": []
-    },
-    "jdk-shim\\lib": {
-      "path": "jdk-shim\\lib",
-      "purpose": "Library code",
-      "fileCount": 1,
-      "lastAccessed": 1772487537445,
-      "keyFiles": [
-        "calendars.properties"
-      ]
-    },
-    "xstream-patch\\build": {
-      "path": "xstream-patch\\build",
-      "purpose": "Build output",
-      "fileCount": 0,
-      "lastAccessed": 1772487537446,
-      "keyFiles": []
-    },
-    "xstream-patch\\src": {
-      "path": "xstream-patch\\src",
+    "src": {
+      "path": "src",
       "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1772586509233,
+      "keyFiles": [
+        "main.ts"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
       "fileCount": 0,
-      "lastAccessed": 1772487537446,
+      "lastAccessed": 1772586509234,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "spec\\progress.md",
-      "accessCount": 28,
-      "lastAccessed": 1772582566087,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 24,
-      "lastAccessed": 1772582665879,
-      "type": "directory"
-    },
-    {
       "path": "spec\\plan.md",
-      "accessCount": 15,
-      "lastAccessed": 1772524397357,
+      "accessCount": 53,
+      "lastAccessed": 1772616735610,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 12,
-      "lastAccessed": 1772582559242,
-      "type": "file"
-    },
-    {
-      "path": "spec\\author_instructions.md",
-      "accessCount": 12,
-      "lastAccessed": 1772582566087,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 11,
-      "lastAccessed": 1772570098137,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-1-foundation.md",
-      "accessCount": 11,
-      "lastAccessed": 1772582565103,
-      "type": "file"
-    },
-    {
-      "path": "spec\\shared-decisions.md",
-      "accessCount": 11,
-      "lastAccessed": 1772582565612,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 11,
-      "lastAccessed": 1772585272536,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 10,
-      "lastAccessed": 1772574141725,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 10,
-      "lastAccessed": 1772582613442,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 9,
-      "lastAccessed": 1772574146256,
-      "type": "file"
-    },
-    {
-      "path": "src\\test-utils\\mock-engine.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772582591386,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772582935561,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 8,
-      "lastAccessed": 1772582574300,
-      "type": "file"
-    },
-    {
-      "path": "src\\test-utils\\infrastructure.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1772582591917,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\element.ts",
-      "accessCount": 8,
-      "lastAccessed": 1772582902819,
+      "path": "src\\core\\__tests__\\engine-interface.test.ts",
+      "accessCount": 25,
+      "lastAccessed": 1772587863447,
       "type": "file"
     },
     {
       "path": "src\\core\\engine-interface.ts",
-      "accessCount": 7,
-      "lastAccessed": 1772582573776,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\__tests__\\pin.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1772582581600,
-      "type": "file"
-    },
-    {
-      "path": "PLANNING.md",
-      "accessCount": 5,
-      "lastAccessed": 1772498218740,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-0-dead-code-removal.md",
-      "accessCount": 5,
-      "lastAccessed": 1772523729576,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\__tests__\\element.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772585299828,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 3,
-      "lastAccessed": 1772574052172,
+      "accessCount": 22,
+      "lastAccessed": 1772616877292,
       "type": "file"
     },
     {
       "path": "src\\core\\signal.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772582572355,
+      "accessCount": 17,
+      "lastAccessed": 1772617444624,
       "type": "file"
     },
     {
-      "path": "src\\test-utils\\mock-render-context.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772582590995,
+      "path": "src\\core\\pin.ts",
+      "accessCount": 15,
+      "lastAccessed": 1772616881531,
       "type": "file"
     },
     {
-      "path": "circuits\\half-adder.dig",
-      "accessCount": 2,
-      "lastAccessed": 1772498236137,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-0-verify.sh",
-      "accessCount": 2,
-      "lastAccessed": 1772523743456,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 2,
-      "lastAccessed": 1772582559117,
+      "path": "spec\\shared-decisions.md",
+      "accessCount": 14,
+      "lastAccessed": 1772616859773,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772582574773,
+      "accessCount": 14,
+      "lastAccessed": 1772616874750,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\mock-engine.ts",
+      "accessCount": 14,
+      "lastAccessed": 1772616875578,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 14,
+      "lastAccessed": 1772617412419,
+      "type": "file"
+    },
+    {
+      "path": "spec\\author_instructions.md",
+      "accessCount": 13,
+      "lastAccessed": 1772616860023,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-3-simulation-engine.md",
+      "accessCount": 12,
+      "lastAccessed": 1772616854047,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\element.ts",
+      "accessCount": 12,
+      "lastAccessed": 1772616877917,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\properties.ts",
+      "accessCount": 12,
+      "lastAccessed": 1772616893318,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\pin.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1772587844936,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 9,
+      "lastAccessed": 1772587452252,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 8,
+      "lastAccessed": 1772616872043,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\__tests__\\registry.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772587727207,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-2-canvas-editor.md",
+      "accessCount": 6,
+      "lastAccessed": 1772616829521,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\errors.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772616875156,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 5,
+      "lastAccessed": 1772617374967,
+      "type": "file"
+    },
+    {
+      "path": "src\\core",
+      "accessCount": 4,
+      "lastAccessed": 1772587501155,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\__tests__\\element.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772616875312,
       "type": "file"
     },
     {
       "path": "src\\core\\__tests__\\signal.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772582581162,
+      "accessCount": 3,
+      "lastAccessed": 1772587747116,
       "type": "file"
     },
     {
       "path": "src\\core\\__tests__\\properties.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772582581943,
+      "accessCount": 3,
+      "lastAccessed": 1772587859214,
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\renderer-interface.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772582582840,
+      "path": "circuits\\and-gate.dig",
+      "accessCount": 3,
+      "lastAccessed": 1772616872624,
+      "type": "file"
+    },
+    {
+      "path": "circuits\\sr-latch.dig",
+      "accessCount": 3,
+      "lastAccessed": 1772616877448,
       "type": "file"
     },
     {
       "path": "src\\core\\__tests__\\circuit.test.ts",
       "accessCount": 2,
-      "lastAccessed": 1772582583590,
+      "lastAccessed": 1772587442628,
       "type": "file"
     },
     {
-      "path": "package.json",
+      "path": "spec\\phase-1-foundation.md",
       "accessCount": 2,
-      "lastAccessed": 1772582592245,
+      "lastAccessed": 1772590035289,
       "type": "file"
     },
     {
-      "path": "tsconfig.json",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\model\\ModelCreator.java",
       "accessCount": 2,
-      "lastAccessed": 1772582592730,
+      "lastAccessed": 1772610522168,
       "type": "file"
     },
     {
-      "path": "vite.config.ts",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\elements\\Circuit.java",
       "accessCount": 2,
-      "lastAccessed": 1772582593052,
+      "lastAccessed": 1772610537225,
       "type": "file"
     },
     {
-      "path": "eslint.config.js",
+      "path": "spec",
       "accessCount": 2,
-      "lastAccessed": 1772582593587,
-      "type": "file"
+      "lastAccessed": 1772616713037,
+      "type": "directory"
     },
     {
-      "path": "src\\main.ts",
+      "path": "circuits\\half-adder.dig",
       "accessCount": 2,
-      "lastAccessed": 1772582593697,
+      "lastAccessed": 1772616872656,
       "type": "file"
     },
     {
-      "path": "vitest.config.ts",
+      "path": "src\\core\\renderer-interface.ts",
       "accessCount": 2,
-      "lastAccessed": 1772582671090,
+      "lastAccessed": 1772616874828,
       "type": "file"
     },
     {
-      "path": "circuits\\and-gate.dig",
+      "path": "spec\\reviews\\phase-1-combined.md",
       "accessCount": 1,
-      "lastAccessed": 1772496416057,
+      "lastAccessed": 1772586572047,
       "type": "file"
     },
     {
-      "path": "circuits\\sr-latch.dig",
+      "path": "src\\test-utils\\infrastructure.test.ts",
       "accessCount": 1,
-      "lastAccessed": 1772496416706,
+      "lastAccessed": 1772587408529,
       "type": "file"
     },
     {
-      "path": "spec\\reviews\\wave-0.1.md",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\Model.java",
       "accessCount": 1,
-      "lastAccessed": 1772523811371,
+      "lastAccessed": 1772593868142,
       "type": "file"
     },
     {
-      "path": "spec\\reviews\\phase-0-combined.md",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\Node.java",
       "accessCount": 1,
-      "lastAccessed": 1772523817286,
+      "lastAccessed": 1772593874365,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\CommonBusValue.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593874927,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\AbstractBusHandler.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593875339,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\DataBus.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593875812,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\SingleBusHandler.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593886466,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\ConnectedBusHandler.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593891582,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\wiring\\bus\\BusModelStateObserver.java",
+      "accessCount": 1,
+      "lastAccessed": 1772593891629,
       "type": "file"
     },
     {
       "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\ObservableValue.java",
       "accessCount": 1,
-      "lastAccessed": 1772570378272,
+      "lastAccessed": 1772593891707,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\IntFormat.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\model\\Net.java",
       "accessCount": 1,
-      "lastAccessed": 1772570378475,
+      "lastAccessed": 1772593895785,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\PinDescription.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\Observable.java",
       "accessCount": 1,
-      "lastAccessed": 1772570384498,
+      "lastAccessed": 1772593896644,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\PinInfo.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\Element.java",
       "accessCount": 1,
-      "lastAccessed": 1772570387856,
+      "lastAccessed": 1772593896910,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\elements\\Pin.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\NodeInterface.java",
       "accessCount": 1,
-      "lastAccessed": 1772570388281,
+      "lastAccessed": 1772593897379,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\Keys.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\elements\\VisualElement.java",
       "accessCount": 1,
-      "lastAccessed": 1772570389556,
+      "lastAccessed": 1772610517579,
       "type": "file"
     },
     {
-      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\core\\element\\ElementAttributes.java",
+      "path": "ref\\Digital\\src\\main\\java\\de\\neemann\\digital\\draw\\elements\\Wire.java",
       "accessCount": 1,
-      "lastAccessed": 1772570393280,
+      "lastAccessed": 1772610517720,
       "type": "file"
     }
   ],

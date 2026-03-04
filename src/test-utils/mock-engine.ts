@@ -11,11 +11,12 @@
  */
 
 import { BitVector, bitVectorToRaw, rawToBitVector } from "@/core/signal";
+import { EngineState } from "@/core/engine-interface";
 import type {
   SimulationEngine,
   CompiledCircuit,
-  EngineState,
   EngineChangeListener,
+  MeasurementObserver,
 } from "@/core/engine-interface";
 
 export type { BitVector };
@@ -33,18 +34,21 @@ export type EngineCall =
   | { method: "getSignalValue"; netId: number }
   | { method: "setSignalValue"; netId: number; value: BitVector }
   | { method: "addChangeListener" }
-  | { method: "removeChangeListener" };
+  | { method: "removeChangeListener" }
+  | { method: "addMeasurementObserver" }
+  | { method: "removeMeasurementObserver" };
 
 export class MockEngine implements SimulationEngine {
   readonly calls: EngineCall[] = [];
 
-  private _state: EngineState = "STOPPED";
+  private _state: EngineState = EngineState.STOPPED;
   private _values: Uint32Array = new Uint32Array(0);
   private _highZs: Uint32Array = new Uint32Array(0);
   private _netWidths: Map<number, number> = new Map();
   private _defaultWidth = 8;
   private _circuit: CompiledCircuit | null = null;
   private readonly _listeners: Set<EngineChangeListener> = new Set();
+  private readonly _measurementObservers: Set<MeasurementObserver> = new Set();
 
   /** Directly set a raw signal value for test setup. No call recorded. */
   setSignalRaw(netId: number, value: number): void {
@@ -90,20 +94,20 @@ export class MockEngine implements SimulationEngine {
     this._values = new Uint32Array(circuit.netCount);
     this._highZs = new Uint32Array(circuit.netCount);
     this._netWidths.clear();
-    this._state = "STOPPED";
+    this._state = EngineState.STOPPED;
   }
 
   reset(): void {
     this.calls.push({ method: "reset" });
     this._values.fill(0);
     this._highZs.fill(0);
-    this._state = "STOPPED";
+    this._state = EngineState.STOPPED;
     this._notifyListeners();
   }
 
   dispose(): void {
     this.calls.push({ method: "dispose" });
-    this._state = "STOPPED";
+    this._state = EngineState.STOPPED;
     this._circuit = null;
     this._listeners.clear();
   }
@@ -122,13 +126,13 @@ export class MockEngine implements SimulationEngine {
 
   start(): void {
     this.calls.push({ method: "start" });
-    this._state = "RUNNING";
+    this._state = EngineState.RUNNING;
     this._notifyListeners();
   }
 
   stop(): void {
     this.calls.push({ method: "stop" });
-    this._state = "PAUSED";
+    this._state = EngineState.PAUSED;
     this._notifyListeners();
   }
 
@@ -164,6 +168,16 @@ export class MockEngine implements SimulationEngine {
   removeChangeListener(listener: EngineChangeListener): void {
     this.calls.push({ method: "removeChangeListener" });
     this._listeners.delete(listener);
+  }
+
+  addMeasurementObserver(observer: MeasurementObserver): void {
+    this.calls.push({ method: "addMeasurementObserver" });
+    this._measurementObservers.add(observer);
+  }
+
+  removeMeasurementObserver(observer: MeasurementObserver): void {
+    this.calls.push({ method: "removeMeasurementObserver" });
+    this._measurementObservers.delete(observer);
   }
 
   /** Reset call log without affecting signal state or circuit. */

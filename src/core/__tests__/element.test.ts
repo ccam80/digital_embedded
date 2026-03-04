@@ -229,10 +229,8 @@ describe("CircuitElement interface via AbstractCircuitElement", () => {
 
   // --- Help text ---
 
-  it("getHelpText returns a non-empty string", () => {
-    const text = el.getHelpText();
-    expect(typeof text).toBe("string");
-    expect(text.length).toBeGreaterThan(0);
+  it("getHelpText returns the expected text", () => {
+    expect(el.getHelpText()).toBe("A test component.");
   });
 
   // --- Serialization ---

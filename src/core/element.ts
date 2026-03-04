@@ -17,10 +17,6 @@ import type { Rotation } from "./pin.js";
 import type { PropertyBag, PropertyValue } from "./properties.js";
 import { propertyBagToJson } from "./properties.js";
 
-export type { Point, Rect, RenderContext };
-export type { Pin, Rotation };
-export type { PropertyBag, PropertyValue };
-
 // ---------------------------------------------------------------------------
 // SerializedElement — shape for JSON save/load
 // ---------------------------------------------------------------------------

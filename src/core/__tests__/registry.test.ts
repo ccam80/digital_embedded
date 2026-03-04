@@ -10,7 +10,7 @@ import type {
   ExecuteFunction,
 } from "../registry.js";
 import { PropertyBag } from "../properties.js";
-import type { CircuitElement, SerializedElement } from "../circuit.js";
+import type { CircuitElement, SerializedElement } from "../element.js";
 import type { PropertyValue } from "../properties.js";
 import type { Pin } from "../pin.js";
 import type { RenderContext, Rect } from "../renderer-interface.js";
@@ -103,8 +103,7 @@ describe("ComponentRegistry", () => {
       const def = makeDefinition("And");
       registry.register(def);
       const result = registry.get("And");
-      expect(result).toBeDefined();
-      expect(result!.name).toBe("And");
+      expect(result?.name).toBe("And");
     });
 
     it("throws when registering the same name twice", () => {
@@ -117,8 +116,8 @@ describe("ComponentRegistry", () => {
     it("registers multiple definitions with distinct names", () => {
       registry.register(makeDefinition("And"));
       registry.register(makeDefinition("Or"));
-      expect(registry.get("And")).toBeDefined();
-      expect(registry.get("Or")).toBeDefined();
+      expect(registry.get("And")?.name).toBe("And");
+      expect(registry.get("Or")?.name).toBe("Or");
     });
   });
 

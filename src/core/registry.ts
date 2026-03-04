@@ -6,7 +6,7 @@
  * time (incrementing counter). They are never serialized.
  */
 
-import type { CircuitElement } from "./circuit.js";
+import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
 
@@ -14,7 +14,7 @@ import type { PropertyBag, PropertyDefinition, PropertyValue } from "./propertie
 // ComponentCategory
 // ---------------------------------------------------------------------------
 
-export enum ComponentCategory {
+export const enum ComponentCategory {
   LOGIC = "LOGIC",
   IO = "IO",
   FLIP_FLOPS = "FLIP_FLOPS",

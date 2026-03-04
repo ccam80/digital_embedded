@@ -15,7 +15,6 @@
 5. **PropertyBag is the universal property format.** `.dig` attribute mappings convert XML → PropertyBag. Components only see PropertyBag.
 6. **Pins are visual-only.** No simulation state on Pin. The compiler assigns net IDs.
 
-> **Note**: The component template in `spec/author_instructions.md` shows `execute()` on CircuitElement. This is superseded by Decision 1 in `spec/shared-decisions.md` — the author approved this change. CircuitElement has `draw()` but NOT `execute()`. Simulation logic lives in standalone flat functions registered in the ComponentDefinition.
 
 ## Reference Source
 

@@ -5,7 +5,7 @@ import {
   Net,
   defaultCircuitMetadata,
 } from "../circuit.js";
-import type { CircuitElement, SerializedElement } from "../circuit.js";
+import type { CircuitElement, SerializedElement } from "../element.js";
 import type { Point, Rect } from "../renderer-interface.js";
 import type { Pin } from "../pin.js";
 import type { PropertyBag, PropertyValue } from "../properties.js";

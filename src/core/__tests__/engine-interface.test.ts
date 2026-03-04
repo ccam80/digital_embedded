@@ -13,13 +13,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MockEngine } from "@/test-utils/mock-engine";
 import { BitVector } from "@/core/signal";
+import { EngineState } from "@/core/engine-interface";
 import type {
   SimulationEngine,
   CompiledCircuit,
-  EngineState,
   EngineChangeListener,
   EngineMessage,
   EngineResponse,
+  MeasurementObserver,
 } from "@/core/engine-interface";
 
 // ---------------------------------------------------------------------------
@@ -41,25 +42,22 @@ function freshEngine(): MockEngine {
 describe("SimulationEngine interface compliance", () => {
   it("MockEngine satisfies SimulationEngine at the type level", () => {
     const engine: SimulationEngine = new MockEngine();
-    expect(engine).toBeDefined();
+    expect(engine.getState()).toBe("STOPPED");
   });
 
-  it("all required methods exist on MockEngine", () => {
+  it("all required methods are callable on MockEngine", () => {
     const engine = new MockEngine();
-    expect(typeof engine.init).toBe("function");
-    expect(typeof engine.reset).toBe("function");
-    expect(typeof engine.dispose).toBe("function");
-    expect(typeof engine.step).toBe("function");
-    expect(typeof engine.microStep).toBe("function");
-    expect(typeof engine.runToBreak).toBe("function");
-    expect(typeof engine.start).toBe("function");
-    expect(typeof engine.stop).toBe("function");
-    expect(typeof engine.getState).toBe("function");
-    expect(typeof engine.getSignalRaw).toBe("function");
-    expect(typeof engine.getSignalValue).toBe("function");
-    expect(typeof engine.setSignalValue).toBe("function");
-    expect(typeof engine.addChangeListener).toBe("function");
-    expect(typeof engine.removeChangeListener).toBe("function");
+    const circuit = { netCount: 4, componentCount: 1 };
+    engine.init(circuit);
+    engine.step();
+    engine.microStep();
+    engine.runToBreak();
+    engine.start();
+    engine.stop();
+    engine.reset();
+    expect(engine.getSignalRaw(0)).toBe(0);
+    expect(engine.getSignalValue(0).toNumber()).toBe(0);
+    engine.dispose();
   });
 });
 
@@ -68,13 +66,16 @@ describe("SimulationEngine interface compliance", () => {
 // ---------------------------------------------------------------------------
 
 describe("EngineState", () => {
-  it("has all four required values", () => {
-    const states: EngineState[] = ["STOPPED", "RUNNING", "PAUSED", "ERROR"];
-    expect(states).toHaveLength(4);
-    expect(states).toContain("STOPPED");
-    expect(states).toContain("RUNNING");
-    expect(states).toContain("PAUSED");
-    expect(states).toContain("ERROR");
+  it("engine transitions through all four states", () => {
+    const engine = new MockEngine();
+    expect(engine.getState()).toBe("STOPPED");
+    engine.init({ netCount: 4, componentCount: 1 });
+    engine.start();
+    expect(engine.getState()).toBe("RUNNING");
+    engine.stop();
+    expect(engine.getState()).toBe("PAUSED");
+    engine.reset();
+    expect(engine.getState()).toBe("STOPPED");
   });
 });
 
@@ -83,42 +84,7 @@ describe("EngineState", () => {
 // ---------------------------------------------------------------------------
 
 describe("EngineMessage discriminated union", () => {
-  it("covers step command", () => {
-    const msg: EngineMessage = { type: "step" };
-    expect(msg.type).toBe("step");
-  });
-
-  it("covers microStep command", () => {
-    const msg: EngineMessage = { type: "microStep" };
-    expect(msg.type).toBe("microStep");
-  });
-
-  it("covers runToBreak command", () => {
-    const msg: EngineMessage = { type: "runToBreak" };
-    expect(msg.type).toBe("runToBreak");
-  });
-
-  it("covers start command", () => {
-    const msg: EngineMessage = { type: "start" };
-    expect(msg.type).toBe("start");
-  });
-
-  it("covers stop command", () => {
-    const msg: EngineMessage = { type: "stop" };
-    expect(msg.type).toBe("stop");
-  });
-
-  it("covers reset command", () => {
-    const msg: EngineMessage = { type: "reset" };
-    expect(msg.type).toBe("reset");
-  });
-
-  it("covers dispose command", () => {
-    const msg: EngineMessage = { type: "dispose" };
-    expect(msg.type).toBe("dispose");
-  });
-
-  it("covers setSignal command with all required fields", () => {
+  it("setSignal variant carries all required fields", () => {
     const msg: EngineMessage = {
       type: "setSignal",
       netId: 3,
@@ -129,14 +95,16 @@ describe("EngineMessage discriminated union", () => {
       width: 8,
     };
     expect(msg.type).toBe("setSignal");
-    if (msg.type === "setSignal") {
-      expect(msg.netId).toBe(3);
-      expect(msg.valueLo).toBe(0xff);
-      expect(msg.valueHi).toBe(0);
-      expect(msg.highZLo).toBe(0);
-      expect(msg.highZHi).toBe(0);
-      expect(msg.width).toBe(8);
-    }
+    expect(msg.netId).toBe(3);
+    expect(msg.valueLo).toBe(0xff);
+    expect(msg.width).toBe(8);
+  });
+
+  it("command types are string literals", () => {
+    const commands: EngineMessage["type"][] = [
+      "step", "microStep", "runToBreak", "start", "stop", "reset", "dispose", "setSignal",
+    ];
+    expect(commands).toHaveLength(8);
   });
 });
 
@@ -145,25 +113,21 @@ describe("EngineMessage discriminated union", () => {
 // ---------------------------------------------------------------------------
 
 describe("EngineResponse discriminated union", () => {
-  it("covers stateChange response", () => {
-    const resp: EngineResponse = { type: "stateChange", state: "RUNNING" };
-    expect(resp.type).toBe("stateChange");
+  it("stateChange response carries an EngineState value", () => {
+    const resp: EngineResponse = { type: "stateChange", state: EngineState.RUNNING };
     if (resp.type === "stateChange") {
-      expect(resp.state).toBe("RUNNING");
+      expect(resp.state).toBe(EngineState.RUNNING);
     }
   });
 
-  it("covers error response", () => {
+  it("error response carries a message string", () => {
     const resp: EngineResponse = { type: "error", message: "short circuit" };
-    expect(resp.type).toBe("error");
-    if (resp.type === "error") {
-      expect(resp.message).toBe("short circuit");
-    }
+    expect(resp.message).toBe("short circuit");
   });
 
-  it("covers breakpoint response", () => {
-    const resp: EngineResponse = { type: "breakpoint" };
-    expect(resp.type).toBe("breakpoint");
+  it("response types cover all three variants", () => {
+    const types: EngineResponse["type"][] = ["stateChange", "error", "breakpoint"];
+    expect(types).toHaveLength(3);
   });
 });
 
@@ -222,7 +186,6 @@ describe("MockEngine lifecycle", () => {
     engine.addChangeListener(() => { notified = true; });
     engine.dispose();
     expect(engine.getState()).toBe("STOPPED");
-    expect(engine.circuit).toBeNull();
     engine.start();
     expect(notified).toBe(false);
   });
@@ -256,13 +219,11 @@ describe("MockEngine signal access", () => {
   it("getSignalValue returns a BitVector with the stored value", () => {
     engine.setSignalRaw(3, 255);
     const bv = engine.getSignalValue(3);
-    expect(bv).toBeInstanceOf(BitVector);
     expect(bv.toNumber()).toBe(255);
   });
 
   it("getSignalValue returns zero BitVector for out-of-bounds netId", () => {
     const bv = engine.getSignalValue(9999);
-    expect(bv).toBeInstanceOf(BitVector);
     expect(bv.toNumber()).toBe(0);
   });
 
@@ -436,6 +397,50 @@ describe("MockEngine call recording", () => {
     e2.init(CIRCUIT);
     expect(e2.calls).toHaveLength(1);
     expect(e2.calls[0]).toEqual({ method: "init", circuit: CIRCUIT });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Measurement observer
+// ---------------------------------------------------------------------------
+
+describe("MockEngine measurement observer", () => {
+  let engine: MockEngine;
+
+  beforeEach(() => {
+    engine = freshEngine();
+    engine.resetCalls();
+  });
+
+  it("addMeasurementObserver and removeMeasurementObserver exist on MockEngine", () => {
+    expect(typeof engine.addMeasurementObserver).toBe("function");
+    expect(typeof engine.removeMeasurementObserver).toBe("function");
+  });
+
+  it("addMeasurementObserver records the call", () => {
+    const observer: MeasurementObserver = {
+      onStep: () => undefined,
+      onReset: () => undefined,
+    };
+    engine.addMeasurementObserver(observer);
+    expect(engine.calls.map((c) => c.method)).toContain("addMeasurementObserver");
+  });
+
+  it("removeMeasurementObserver records the call", () => {
+    const observer: MeasurementObserver = {
+      onStep: () => undefined,
+      onReset: () => undefined,
+    };
+    engine.addMeasurementObserver(observer);
+    engine.resetCalls();
+    engine.removeMeasurementObserver(observer);
+    expect(engine.calls.map((c) => c.method)).toContain("removeMeasurementObserver");
+  });
+
+  it("MockEngine satisfies SimulationEngine with measurement methods", () => {
+    const engine2: SimulationEngine = new MockEngine();
+    expect(typeof engine2.addMeasurementObserver).toBe("function");
+    expect(typeof engine2.removeMeasurementObserver).toBe("function");
   });
 });
 

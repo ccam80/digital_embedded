@@ -3,6 +3,7 @@ import {
   PinDirection,
   createInverterConfig,
   isPinInverted,
+  createClockConfig,
   makePin,
   rotatePoint,
   translatePoint,
@@ -68,7 +69,7 @@ describe("makePin", () => {
 
   it("creates a Pin with expected fields", () => {
     const config = createInverterConfig([]);
-    const pin = makePin(decl, { x: 5, y: 6 }, config);
+    const pin = makePin(decl, { x: 5, y: 6 }, config, createClockConfig([]));
 
     expect(pin.direction).toBe(PinDirection.INPUT);
     expect(pin.label).toBe("A");
@@ -80,40 +81,47 @@ describe("makePin", () => {
 
   it("isNegated is true when pin label is in inverter config and pin is negatable", () => {
     const config = createInverterConfig(["A"]);
-    const pin = makePin(decl, { x: 0, y: 0 }, config);
+    const pin = makePin(decl, { x: 0, y: 0 }, config, createClockConfig([]));
     expect(pin.isNegated).toBe(true);
   });
 
   it("isNegated is false even if label is inverted when isNegatable is false", () => {
     const nonNegatableDecl: PinDeclaration = { ...decl, isNegatable: false };
     const config = createInverterConfig(["A"]);
-    const pin = makePin(nonNegatableDecl, { x: 0, y: 0 }, config);
+    const pin = makePin(nonNegatableDecl, { x: 0, y: 0 }, config, createClockConfig([]));
     expect(pin.isNegated).toBe(false);
   });
 
   it("uses provided bitWidth over defaultBitWidth", () => {
     const config = createInverterConfig([]);
-    const pin = makePin(decl, { x: 0, y: 0 }, config, 8);
+    const pin = makePin(decl, { x: 0, y: 0 }, config, createClockConfig([]), 8);
     expect(pin.bitWidth).toBe(8);
   });
 
   it("falls back to defaultBitWidth when bitWidth is not provided", () => {
     const decl4bit: PinDeclaration = { ...decl, defaultBitWidth: 4 };
     const config = createInverterConfig([]);
-    const pin = makePin(decl4bit, { x: 0, y: 0 }, config);
+    const pin = makePin(decl4bit, { x: 0, y: 0 }, config, createClockConfig([]));
     expect(pin.bitWidth).toBe(4);
   });
 
-  it("isClock reflects isClockCapable from declaration", () => {
+  it("isClock is true when pin is clock-capable and label is in clock config", () => {
     const clockDecl: PinDeclaration = { ...decl, isClockCapable: true };
     const config = createInverterConfig([]);
-    const pin = makePin(clockDecl, { x: 0, y: 0 }, config);
+    const pin = makePin(clockDecl, { x: 0, y: 0 }, config, createClockConfig(["A"]));
     expect(pin.isClock).toBe(true);
+  });
+
+  it("isClock is false when pin is clock-capable but label is not in clock config", () => {
+    const clockDecl: PinDeclaration = { ...decl, isClockCapable: true };
+    const config = createInverterConfig([]);
+    const pin = makePin(clockDecl, { x: 0, y: 0 }, config, createClockConfig([]));
+    expect(pin.isClock).toBe(false);
   });
 
   it("Pin has no netId or signalValue properties (Decision 6)", () => {
     const config = createInverterConfig([]);
-    const pin = makePin(decl, { x: 0, y: 0 }, config) as Pin & Record<string, unknown>;
+    const pin = makePin(decl, { x: 0, y: 0 }, config, createClockConfig([])) as Pin & Record<string, unknown>;
     expect("netId" in pin).toBe(false);
     expect("signalValue" in pin).toBe(false);
   });
@@ -201,7 +209,7 @@ describe("resolvePins", () => {
 
   it("resolves pins with identity rotation at given origin", () => {
     const config = createInverterConfig([]);
-    const pins = resolvePins(decls, { x: 10, y: 20 }, 0, config);
+    const pins = resolvePins(decls, { x: 10, y: 20 }, 0, config, createClockConfig([]));
     expect(pins).toHaveLength(2);
     expect(pins[0].position).toEqual({ x: 10, y: 21 });
     expect(pins[1].position).toEqual({ x: 12, y: 21 });
@@ -209,7 +217,7 @@ describe("resolvePins", () => {
 
   it("resolves pins with 180° rotation", () => {
     const config = createInverterConfig([]);
-    const pins = resolvePins(decls, { x: 10, y: 20 }, 2, config);
+    const pins = resolvePins(decls, { x: 10, y: 20 }, 2, config, createClockConfig([]));
     // decl[0] pos (0,1) rotated 180° → (0,-1), translated to (10, 19)
     expect(pins[0].position).toEqual({ x: 10, y: 19 });
     // decl[1] pos (2,1) rotated 180° → (-2,-1), translated to (8, 19)
@@ -218,21 +226,21 @@ describe("resolvePins", () => {
 
   it("applies inverter config to resolved pins", () => {
     const config = createInverterConfig(["A"]);
-    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config);
+    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config, createClockConfig([]));
     expect(pins[0].isNegated).toBe(true);
     expect(pins[1].isNegated).toBe(false);
   });
 
   it("applies custom bitWidth to all pins", () => {
     const config = createInverterConfig([]);
-    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config, 4);
+    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config, createClockConfig([]), 4);
     expect(pins[0].bitWidth).toBe(4);
     expect(pins[1].bitWidth).toBe(4);
   });
 
   it("returns empty array for empty declarations", () => {
     const config = createInverterConfig([]);
-    const pins = resolvePins([], { x: 0, y: 0 }, 0, config);
+    const pins = resolvePins([], { x: 0, y: 0 }, 0, config, createClockConfig([]));
     expect(pins).toHaveLength(0);
   });
 });
@@ -373,7 +381,7 @@ describe("Pin system integration", () => {
     const decls = standardGatePinLayout(["A", "B"], "Q", 4, 4);
     const config = createInverterConfig(["A"]);
     const origin = { x: 10, y: 10 };
-    const pins = resolvePins(decls, origin, 0, config);
+    const pins = resolvePins(decls, origin, 0, config, createClockConfig([]));
 
     const pinA = pins.find((p) => p.label === "A")!;
     const pinB = pins.find((p) => p.label === "B")!;
@@ -396,8 +404,8 @@ describe("Pin system integration", () => {
     const config = createInverterConfig([]);
     const origin = { x: 5, y: 5 };
 
-    const pins0 = resolvePins(decls, origin, 0, config);
-    const pins2 = resolvePins(decls, origin, 2, config);
+    const pins0 = resolvePins(decls, origin, 0, config, createClockConfig([]));
+    const pins2 = resolvePins(decls, origin, 2, config, createClockConfig([]));
 
     const inputAt0 = pins0.find((p) => p.label === "A")!;
     const inputAt2 = pins2.find((p) => p.label === "A")!;

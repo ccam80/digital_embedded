@@ -39,7 +39,12 @@ export interface CompiledCircuit {
 // ---------------------------------------------------------------------------
 
 /** Current execution state of a SimulationEngine. */
-export type EngineState = "STOPPED" | "RUNNING" | "PAUSED" | "ERROR";
+export const enum EngineState {
+  STOPPED = "STOPPED",
+  RUNNING = "RUNNING",
+  PAUSED = "PAUSED",
+  ERROR = "ERROR",
+}
 
 // ---------------------------------------------------------------------------
 // EngineChangeListener — observation callback
@@ -52,6 +57,46 @@ export type EngineState = "STOPPED" | "RUNNING" | "PAUSED" | "ERROR";
 export type EngineChangeListener = (state: EngineState) => void;
 
 // ---------------------------------------------------------------------------
+// SimulationEvent — event in the event-driven engine's priority queue
+// ---------------------------------------------------------------------------
+
+/**
+ * A scheduled event in the event-driven simulation engine.
+ *
+ * Events are ordered by timestamp in a priority queue. When multiple events
+ * share the same timestamp, they are processed in insertion order (stable).
+ *
+ * Java reference: de.neemann.digital.core.Model.Event
+ */
+export interface SimulationEvent {
+  /** Simulation time at which this event fires (nanoseconds). */
+  readonly timestamp: bigint;
+  /** Net ID whose value changes when this event fires. */
+  readonly netId: number;
+  /** New value for the net. */
+  readonly value: number;
+}
+
+// ---------------------------------------------------------------------------
+// MeasurementObserver — observation interface for data table / measurement panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Observer interface for measurement data collection during simulation.
+ *
+ * Registered observers are notified after each simulation step completes,
+ * allowing the data table and measurement panel to capture signal snapshots.
+ *
+ * Java reference: de.neemann.digital.core.ModelStateObserverTyped
+ */
+export interface MeasurementObserver {
+  /** Called after each simulation step with the current step count. */
+  onStep(stepCount: number): void;
+  /** Called when the simulation is reset. */
+  onReset(): void;
+}
+
+// ---------------------------------------------------------------------------
 // EngineMessage — Worker-safe command envelope
 // ---------------------------------------------------------------------------
 
@@ -59,10 +104,6 @@ export type EngineChangeListener = (state: EngineState) => void;
  * Discriminated union of all commands that can be sent to an engine running
  * inside a Web Worker. All fields must be structured-clone-compatible
  * (no functions, no class instances, no DOM references).
- *
- * The Worker-mode engine implementation receives these via `onmessage` and
- * dispatches to the appropriate method. The main-thread fallback engine
- * ignores this type entirely — callers invoke methods directly.
  */
 export type EngineMessage =
   | { type: "step" }
@@ -232,4 +273,19 @@ export interface SimulationEngine {
    * registered.
    */
   removeChangeListener(listener: EngineChangeListener): void;
+
+  // -------------------------------------------------------------------------
+  // Measurement
+  // -------------------------------------------------------------------------
+
+  /**
+   * Register an observer for measurement data collection.
+   * Called after each simulation step completes.
+   */
+  addMeasurementObserver(observer: MeasurementObserver): void;
+
+  /**
+   * Remove a previously registered measurement observer.
+   */
+  removeMeasurementObserver(observer: MeasurementObserver): void;
 }

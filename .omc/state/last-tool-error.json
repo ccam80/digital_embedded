@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_js\\\" && npm run typecheck 2>&1\",\"description\":\"Typecheck after critical fixes\"}",
-  "error": "Exit code 2\n\n> digital-sim@0.1.0 typecheck\n> tsc --noEmit\n\nsrc/core/element.ts(206,7): error TS2322: Type 'Record<string, PropertyValue>' is not assignable to type 'Record<string, string | number | boolean | number[]>'.\r\n  'string' index signatures are incompatible.\r\n    Type 'PropertyValue' is not assignable to type 'string | number | boolean | number[]'.\r\n      Type 'bigint' is not assignable to type 'string | number | boolean | number[]'.\r\n\n\n> digital-sim@0.1.0 typecheck\n> tsc --noEmit\n\nsrc/c...",
-  "timestamp": "2026-03-04T00:09:02.389Z",
+  "tool_input_preview": "{\"command\":\"cd /c/local_working_projects/digital_js && npm test -- src/headless 2>&1 | grep \\\"×\\\\|✓\\\" | head -20\",\"description\":\"List test results\"}",
+  "error": "Exit code 127\n/usr/bin/bash: source /c/Users/cca78/.claude/shell-snapshots/snapshot-bash-1772616690735-sgk0o2.sh && shopt -u extglob 2>/dev/null || true && eval \"cd /c/local_working_projects/digital_js && npm test -- src/headless 2>&1 < /dev/null | grep '×\\|✓' | head -20\" && pwd -P >| /c/Users/cca78/AppData/Local/Temp/claude-e979-cwd: No such file or directory\n\n/usr/bin/bash: source /c/Users/cca78/.claude/shell-snapshots/snapshot-bash-1772616690735-sgk0o2.sh && shopt -u extglob 2>/dev/null || tr...",
+  "timestamp": "2026-03-04T09:42:45.256Z",
   "retry_count": 1
 }

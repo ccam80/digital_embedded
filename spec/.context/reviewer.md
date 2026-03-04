@@ -26,6 +26,7 @@ Regard all implementations with extreme suspicion. Agents under context pressure
 
 Specific red flags:
 - Any comment containing words like "workaround", "temporary", "for now", "legacy", "backwards compatible", "previously", "migrated from", "replaced", "fallback", "shim"
+- Use of `git stash`, `git checkout` (to discard changes), `git reset`, or `git clean` in bash commands or scripts
 - `pytest.skip`, `pytest.xfail`, `unittest.skip`, soft assertions, `pytest.approx` with loose tolerances
 - `pass`, `raise NotImplementedError`, `# TODO`, `# FIXME`, `# HACK`
 - Imports of modules or references to symbols that were removed in Phase 0

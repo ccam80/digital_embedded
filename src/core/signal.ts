@@ -161,8 +161,7 @@ export class BitVector {
     // High-Z bits must be zero in the value field (Digital's invariant)
     valueBig = valueBig & ~highZBig;
 
-    const isFullZ = highZBig === mask;
-    return new BitVector(width, valueBig, highZBig, isFullZ && isAllUndefined(rawValue, rawHighZ, width));
+    return new BitVector(width, valueBig, highZBig, false);
   }
 
   // -------------------------------------------------------------------------
@@ -486,18 +485,6 @@ function assertCompatible(a: BitVector, b: BitVector): void {
   }
 }
 
-/**
- * Determine if a raw signal slot encodes UNDEFINED (all HIGH_Z bits set).
- * In the flat representation we cannot distinguish HIGH_Z from UNDEFINED —
- * that distinction only exists in BitVector. This function returns false;
- * the caller sets isUndefined based on context.
- */
-function isAllUndefined(_rawValue: number, _rawHighZ: number, _width: number): boolean {
-  // In the flat representation, UNDEFINED and HIGH_Z are identical.
-  // The engine sets isUndefined=false when writing HIGH_Z, true when writing UNDEFINED.
-  // When reading back via fromRaw we cannot recover the distinction, so we default to false.
-  return false;
-}
 
 function formatMixed(value: bigint, highZMask: bigint, width: number): string {
   let result = "";

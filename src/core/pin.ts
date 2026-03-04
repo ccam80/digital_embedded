@@ -9,7 +9,7 @@ import type { Point } from "./renderer-interface.js";
 
 export type { Point };
 
-export enum PinDirection {
+export const enum PinDirection {
   INPUT = "INPUT",
   OUTPUT = "OUTPUT",
   BIDIRECTIONAL = "BIDIRECTIONAL",
@@ -58,13 +58,30 @@ export function isPinInverted(config: InverterConfig, label: string): boolean {
 }
 
 /**
+ * Per-pin clock designation configuration.
+ * A set of pin labels that are designated as clock inputs.
+ */
+export interface ClockConfig {
+  readonly clockPins: ReadonlySet<string>;
+}
+
+export function createClockConfig(clockPinLabels: readonly string[]): ClockConfig {
+  return { clockPins: new Set(clockPinLabels) };
+}
+
+export function isPinClock(config: ClockConfig, label: string): boolean {
+  return config.clockPins.has(label);
+}
+
+/**
  * Construct a Pin from a PinDeclaration, applying a concrete position and
- * resolving the isNegated flag from the component's InverterConfig.
+ * resolving the isNegated and isClock flags from the component's configs.
  */
 export function makePin(
   decl: PinDeclaration,
   position: Point,
   inverterConfig: InverterConfig,
+  clockConfig: ClockConfig,
   bitWidth?: number,
 ): Pin {
   return {
@@ -73,7 +90,7 @@ export function makePin(
     label: decl.label,
     bitWidth: bitWidth ?? decl.defaultBitWidth,
     isNegated: decl.isNegatable && isPinInverted(inverterConfig, decl.label),
-    isClock: decl.isClockCapable,
+    isClock: decl.isClockCapable && isPinClock(clockConfig, decl.label),
   };
 }
 
@@ -123,12 +140,13 @@ export function resolvePins(
   origin: Point,
   rotation: Rotation,
   inverterConfig: InverterConfig,
+  clockConfig: ClockConfig,
   bitWidth?: number,
 ): Pin[] {
   return declarations.map((decl) => {
     const rotated = rotatePoint(decl.position, rotation);
     const worldPos = translatePoint(rotated, origin);
-    return makePin(decl, worldPos, inverterConfig, bitWidth);
+    return makePin(decl, worldPos, inverterConfig, clockConfig, bitWidth);
   });
 }
 

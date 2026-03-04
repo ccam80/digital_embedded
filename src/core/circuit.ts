@@ -6,11 +6,9 @@
  * CompiledModel, which is what the engine runs.
  */
 
-import type { Point, Rect } from "./renderer-interface.js";
-import type { Pin, PinDeclaration, Rotation } from "./pin.js";
-import type { CircuitElement, SerializedElement } from "./element.js";
-
-export type { Point, Rect, CircuitElement, SerializedElement };
+import type { Point } from "./renderer-interface.js";
+import type { Pin } from "./pin.js";
+import type { CircuitElement } from "./element.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -146,5 +144,3 @@ export class Circuit {
   }
 }
 
-// Re-export types needed by consumers of this module
-export type { Pin, PinDeclaration, Rotation };

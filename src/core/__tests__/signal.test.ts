@@ -345,7 +345,6 @@ describe("Arithmetic", () => {
     expect(a.or(z).isUndefined).toBe(true);
     expect(a.xor(z).isUndefined).toBe(true);
     expect(BitVector.allHighZ(8).not().isUndefined).toBe(true);
-    expect(a.shiftLeft.bind(a)(1));
     expect(BitVector.allHighZ(8).shiftLeft(1).isUndefined).toBe(true);
     expect(BitVector.allHighZ(8).shiftRight(1).isUndefined).toBe(true);
     expect(BitVector.allHighZ(8).shiftRightArithmetic(1).isUndefined).toBe(true);
