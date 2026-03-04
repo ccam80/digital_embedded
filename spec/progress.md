@@ -544,3 +544,157 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files modified**: none
 - **Tests**: 50/50 passing
 - **Notes**: Pre-existing failure in integration.test.ts (oscillatingCircuitDetected) not introduced by this work.
+
+## Task 2.5.8: Settings Dialog
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/settings.ts, src/editor/settings-ui.ts, src/editor/__tests__/settings.test.ts
+- **Files modified**: (none)
+- **Tests**: 4/4 passing (2521 total, all passing, 1 pre-existing skip)
+
+## Task 2.5.4: Auto Power Supply
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/auto-power.ts, src/editor/__tests__/auto-power.test.ts
+- **Files modified**: none
+- **Tests**: 15/15 passing
+
+## Task 2.5.9: File History
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/file-history.ts, src/editor/__tests__/file-history.test.ts
+- **Files modified**: (none)
+- **Tests**: 4/4 passing (2540 total, all passing, 1 pre-existing skip)
+
+## Task 5.2.24: Text & Rectangle Annotations
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/misc/text.ts (TextElement, executeText, TextDefinition, TEXT_ATTRIBUTE_MAPPINGS)
+  - src/components/misc/rectangle.ts (RectangleElement, executeRectangle, RectangleDefinition, RECTANGLE_ATTRIBUTE_MAPPINGS)
+  - src/components/misc/__tests__/text-rectangle.test.ts
+- **Files modified**: none
+- **Tests**: 58/58 passing
+
+## Task 5.2.28: Terminal & Keyboard
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/terminal/terminal.ts, src/components/terminal/keyboard.ts, src/components/terminal/__tests__/terminal.test.ts
+- **Files modified**: (none)
+- **Tests**: 72/72 passing
+
+## Task 2.5.5: Element Help Dialog
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/element-help.ts, src/editor/element-help-ui.ts, src/editor/__tests__/element-help.test.ts
+- **Files modified**: none
+- **Tests**: 17/17 passing
+
+## Task 2.5.10: Locked Mode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/locked-mode.ts, src/editor/__tests__/locked-mode.test.ts
+- **Files modified**: src/core/circuit.ts (added isLocked: boolean to CircuitMetadata interface and defaultCircuitMetadata)
+- **Tests**: 4/4 passing (2720 total, all passing, 1 pre-existing skip)
+
+## Task 5.2.25: LED Matrix
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/graphics/led-matrix.ts (LedMatrixElement, executeLedMatrix, LedMatrixDefinition, LED_MATRIX_ATTRIBUTE_MAPPINGS)
+  - src/components/graphics/__tests__/led-matrix.test.ts
+- **Files modified**: none
+- **Tests**: 39/39 passing
+
+## Task 5.2.10: ROM & EEPROM
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/memory/rom.ts, src/components/memory/eeprom.ts, src/components/memory/__tests__/rom.test.ts, src/components/memory/__tests__/eeprom.test.ts
+- **Files modified**: (none)
+- **Tests**: 41/41 passing (ROM: 20 tests, EEPROM: 21 tests; previously 2887 tests, now 2928 passing)
+
+## Task 2.5.6: Presentation Mode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/presentation.ts, src/editor/__tests__/presentation.test.ts
+- **Files modified**: none
+- **Tests**: 26/26 passing
+
+## Task 5.2.29: Testcase Element
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/misc/testcase.ts, src/components/misc/__tests__/testcase.test.ts
+- **Files modified**: (none)
+- **Tests**: 39/39 passing
+
+## Task 5.2.16: PLD Components
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/pld/diode.ts (DiodeElement, DiodeForwardElement, DiodeBackwardElement, executeDiode, executeDiodeForward, executeDiodeBackward, DiodeDefinition, DiodeForwardDefinition, DiodeBackwardDefinition)
+  - src/components/pld/pull-up.ts (PullUpElement, executePullUp, PullUpDefinition)
+  - src/components/pld/pull-down.ts (PullDownElement, executePullDown, PullDownDefinition)
+  - src/components/pld/__tests__/pld.test.ts (135 tests covering all 5 components)
+- **Files modified**: none
+- **Tests**: 135/135 passing
+- **Notes**: 2 pre-existing EEPROM failures (isClockPin) are not caused by this task.
+
+## Task 2.5.11: Actual-to-Default and Fuse Reset
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/runtime-to-defaults.ts, src/editor/__tests__/runtime-to-defaults.test.ts
+- **Files modified**: (none)
+- **Tests**: 3/3 passing (2996 total, all passing, 1 pre-existing skip)
+
+## Task 2.5.7: Color Scheme Framework
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/color-scheme.ts, src/editor/__tests__/color-scheme.test.ts
+- **Files modified**: none
+- **Tests**: 26/26 passing
+- **Note**: resolve-generics test failure is pre-existing from another parallel agent, not caused by this work
+
+## Task 5.2.22: MIDI
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/io/midi.ts (MidiElement, executeMidi, MidiDefinition, MIDI_ATTRIBUTE_MAPPINGS, MidiOutputManager)
+  - src/components/io/__tests__/midi.test.ts (54 tests)
+- **Files modified**: none
+- **Tests**: 54/54 passing
+
+## Task 5.2.11: Specialty Memory (Lookup Table, Program Counter, Program Memory)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/memory/lookup-table.ts, src/components/memory/program-counter.ts, src/components/memory/program-memory.ts, src/components/memory/__tests__/lookup-table.test.ts, src/components/memory/__tests__/program-counter.test.ts, src/components/memory/__tests__/program-memory.test.ts
+- **Files modified**: (none)
+- **Tests**: 52/52 passing (LookUpTable: 15, ProgramCounter: 18, ProgramMemory: 19)
+- **Note**: 4 pre-existing failures in vga.test.ts and resolve-generics.test.ts (other agents' work, not introduced by this task)
+
+## Task 5.2.23: Boolean Function
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/basic/function.ts, src/components/basic/__tests__/function.test.ts
+- **Files modified**: none
+- **Tests**: 73/73 passing
+
+## Task 5.2.13: Relays (Relay, RelayDT)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/switching/relay.ts, src/components/switching/relay-dt.ts, src/components/switching/__tests__/relay.test.ts
+- **Files modified**: (none)
+- **Tests**: 28/28 passing
+
+## Task 5.2.14: FETs & Transmission Gate
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/switching/nfet.ts, src/components/switching/pfet.ts, src/components/switching/fgnfet.ts, src/components/switching/fgpfet.ts, src/components/switching/trans-gate.ts, src/components/switching/__tests__/fets.test.ts
+- **Files modified**: none
+- **Tests**: 56/56 passing
+
+## Task 5.2.15: Fuse
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/switching/fuse.ts, src/components/switching/__tests__/fuse.test.ts
+- **Files modified**: none
+- **Tests**: 20/20 passing

@@ -135,18 +135,28 @@ function applyAllMappings(
 
   const bag = applyAttributeMappings(ve.elementAttributes, digMappings);
 
-  if (plainMappings.length > 0) {
-    const entryByKey = new Map<string, DigValue>();
-    for (const entry of ve.elementAttributes) {
-      entryByKey.set(entry.key, entry.value);
-    }
+  const entryByKey = new Map<string, DigValue>();
+  for (const entry of ve.elementAttributes) {
+    entryByKey.set(entry.key, entry.value);
+  }
 
+  if (plainMappings.length > 0) {
     for (const mapping of plainMappings) {
       const digValue = entryByKey.get(mapping.xmlName);
       if (digValue !== undefined) {
         const strValue = digValueToString(digValue);
         bag.set(mapping.propertyKey, mapping.convert(strValue));
       }
+    }
+  }
+
+  // Pass through built-in attributes used by generic circuit resolution.
+  // These are not component-specific and may be present on any element.
+  for (const key of ["generic", "enabled"] as const) {
+    if (!bag.has(key) && entryByKey.has(key)) {
+      const digValue = entryByKey.get(key)!;
+      const strValue = digValueToString(digValue);
+      bag.set(key, key === "enabled" ? strValue === "true" : strValue);
     }
   }
 
@@ -250,6 +260,9 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
   for (const entry of parsed.attributes) {
     if (entry.key === "Description" && entry.value.type === "string") {
       metadata.description = entry.value.value;
+    }
+    if (entry.key === "isGeneric" && entry.value.type === "boolean") {
+      metadata.isGeneric = entry.value.value;
     }
   }
 

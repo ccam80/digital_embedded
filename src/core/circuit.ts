@@ -74,6 +74,8 @@ export interface CircuitMetadata {
   measurementOrdering: string[];
   /** Whether this circuit uses generic (parameterised) resolution. */
   isGeneric: boolean;
+  /** When true, users may not add, move, delete, or edit elements or wires. */
+  isLocked: boolean;
 }
 
 export function defaultCircuitMetadata(): CircuitMetadata {
@@ -83,6 +85,7 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     testDataRefs: [],
     measurementOrdering: [],
     isGeneric: false,
+    isLocked: false,
   };
 }
 
