@@ -138,7 +138,7 @@ const PropertyValueSchema = z.union([
  */
 export const PropertyBagSchema = z.record(z.string(), PropertyValueSchema);
 
-export type SerializedPropertyBag = z.input<typeof PropertyBagSchema>;
+export type SerializedPropertyBag = Record<string, number | string | boolean | number[]>;
 
 /**
  * Deserialize a raw JSON object into a PropertyBag.

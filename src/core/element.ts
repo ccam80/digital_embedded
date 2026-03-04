@@ -15,6 +15,7 @@ import type { Point, Rect, RenderContext } from "./renderer-interface.js";
 import type { Pin } from "./pin.js";
 import type { Rotation } from "./pin.js";
 import type { PropertyBag, PropertyValue } from "./properties.js";
+import { propertyBagToJson } from "./properties.js";
 
 export type { Point, Rect, RenderContext };
 export type { Pin, Rotation };
@@ -196,21 +197,13 @@ export abstract class AbstractCircuitElement implements CircuitElement {
   }
 
   serialize(): SerializedElement {
-    const properties: Record<string, number | string | boolean | number[]> = {};
-    for (const [k, v] of this._properties.entries()) {
-      // bigint is not JSON-safe; skip it here — callers that need bigint
-      // serialization must use propertyBagToJson() from properties.ts directly.
-      if (typeof v !== "bigint") {
-        properties[k] = v;
-      }
-    }
     return {
       typeId: this.typeId,
       instanceId: this.instanceId,
       position: { x: this.position.x, y: this.position.y },
       rotation: this.rotation,
       mirror: this.mirror,
-      properties,
+      properties: propertyBagToJson(this._properties),
     };
   }
 

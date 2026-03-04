@@ -87,3 +87,28 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: `src/core/errors.ts`, `src/core/__tests__/errors.test.ts`
 - **Files modified**: none
 - **Tests**: 49/49 passing (421/421 total suite)
+
+## Task 1.3.2 — Engine Interface
+- **Status**: complete
+- **Files modified**: src/core/engine-interface.ts (replaced placeholder with full interface), src/test-utils/mock-engine.ts (updated to implement real interface with BitVector)
+- **Tests**: passing
+
+## Task 1.3.4 — Circuit Model and Component Registry
+- **Status**: complete
+- **Files created**: src/core/circuit.ts, src/core/registry.ts, src/core/__tests__/circuit.test.ts, src/core/__tests__/registry.test.ts
+- **Tests**: passing
+
+---
+## Wave 1.3 Summary
+- **Status**: complete
+- **Tasks completed**: 5/5
+- **Rounds**: 1
+
+---
+## Phase 1 Summary
+- **Status**: complete
+- **Waves completed**: 3/3 (1.1, 1.2, 1.3)
+- **Total tasks**: 10/10
+- **Total tests**: 421 passing across 10 files
+- **Typecheck**: clean (tsc --noEmit passes)
+- **CHECKPOINT**: Author review required before Phases 2-5 can begin

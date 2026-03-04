@@ -8,73 +8,9 @@
 
 import type { Point, Rect } from "./renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "./pin.js";
-import type { PropertyBag, PropertyValue } from "./properties.js";
-import type { RenderContext } from "./renderer-interface.js";
+import type { CircuitElement, SerializedElement } from "./element.js";
 
-export type { Point, Rect };
-
-// ---------------------------------------------------------------------------
-// CircuitElement interface
-// ---------------------------------------------------------------------------
-
-/**
- * Serialized form of a single circuit element as stored in JSON save files.
- */
-export interface SerializedElement {
-  typeId: string;
-  instanceId: string;
-  position: Point;
-  rotation: Rotation;
-  mirror: boolean;
-  properties: Record<string, PropertyValue>;
-}
-
-/**
- * A placed component on the circuit canvas.
- *
- * Per Decision 1: No execute() method. Simulation logic lives in standalone
- * flat functions registered in ComponentDefinition.executeFn.
- *
- * Per Decision 6: getPins() returns visual-only Pin objects. No netId or
- * signalValue on any pin.
- */
-export interface CircuitElement {
-  /** Component type name — matches .dig elementName and ComponentDefinition.name. */
-  readonly typeId: string;
-  /** Unique identifier for this placed instance within a circuit. */
-  readonly instanceId: string;
-
-  /** Position on the circuit grid (top-left corner in default orientation). */
-  position: Point;
-  /** Quarter-turn rotation (0=0°, 1=90°, 2=180°, 3=270°). */
-  rotation: Rotation;
-  /** Whether the component is mirrored on its vertical axis. */
-  mirror: boolean;
-
-  /** Resolved pin instances with world-space positions. Visual only. */
-  getPins(): readonly Pin[];
-
-  /** Component property values for this instance. */
-  getProperties(): PropertyBag;
-
-  /** Render the component using the engine-agnostic context. */
-  draw(ctx: RenderContext): void;
-
-  /** Axis-aligned bounding box in grid coordinates. */
-  getBoundingBox(): Rect;
-
-  /** Produce the serialized form for JSON save/load. */
-  serialize(): SerializedElement;
-
-  /** Human-readable help text for this component type. */
-  getHelpText(): string;
-
-  /**
-   * Map-like attribute access for HGS scripting and generic circuit resolution.
-   * Returns undefined when the attribute is not defined for this component.
-   */
-  getAttribute(name: string): PropertyValue | undefined;
-}
+export type { Point, Rect, CircuitElement, SerializedElement };
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment

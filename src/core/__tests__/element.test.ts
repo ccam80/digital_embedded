@@ -266,14 +266,14 @@ describe("CircuitElement interface via AbstractCircuitElement", () => {
     expect(s.properties).toHaveProperty("bitWidth", 1);
   });
 
-  it("serialize excludes bigint properties (not JSON-safe)", () => {
+  it("serialize encodes bigint properties as '0n<digits>' strings", () => {
     const props = new PropertyBag([
       ["bitWidth", 1],
       ["largeVal", BigInt(999)],
     ]);
     const elWithBigInt = makeElement({ properties: props });
     const s = elWithBigInt.serialize();
-    expect(Object.keys(s.properties)).not.toContain("largeVal");
+    expect(s.properties["largeVal"]).toBe("0n999");
     expect(s.properties["bitWidth"]).toBe(1);
   });
 

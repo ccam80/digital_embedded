@@ -89,10 +89,19 @@
       "status": "completed",
       "completed_at": "2026-03-03T21:45:22.914Z",
       "duration_ms": 185571
+    },
+    {
+      "agent_id": "a64f1f37c87c05fb0",
+      "agent_type": "claude-orchestrator:reviewer",
+      "started_at": "2026-03-04T00:02:35.760Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-04T00:07:06.240Z",
+      "duration_ms": 270480
     }
   ],
-  "total_spawned": 10,
-  "total_completed": 10,
+  "total_spawned": 11,
+  "total_completed": 11,
   "total_failed": 0,
-  "last_updated": "2026-03-03T21:46:28.507Z"
+  "last_updated": "2026-03-04T00:07:06.355Z"
 }
