@@ -87,3 +87,85 @@ export interface RenderContext {
   setFont(font: FontSpec): void;
   setLineDash(pattern: number[]): void;
 }
+
+type ColorMap = Record<ThemeColor, string>;
+
+function makeScheme(map: ColorMap): ColorScheme {
+  return {
+    resolve(color: ThemeColor): string {
+      return map[color];
+    },
+  };
+}
+
+const DEFAULT_COLORS: ColorMap = {
+  WIRE: "#000000",
+  WIRE_HIGH: "#00bb00",
+  WIRE_LOW: "#006600",
+  WIRE_Z: "#aaaaaa",
+  WIRE_UNDEFINED: "#ff4444",
+  COMPONENT: "#000000",
+  COMPONENT_FILL: "#ffffff",
+  PIN: "#0000cc",
+  TEXT: "#000000",
+  GRID: "#dddddd",
+  BACKGROUND: "#f8f8f8",
+  SELECTION: "#0066cc",
+};
+
+const HIGH_CONTRAST_COLORS: ColorMap = {
+  WIRE: "#ffffff",
+  WIRE_HIGH: "#00ff00",
+  WIRE_LOW: "#007700",
+  WIRE_Z: "#cccccc",
+  WIRE_UNDEFINED: "#ff0000",
+  COMPONENT: "#ffffff",
+  COMPONENT_FILL: "#000000",
+  PIN: "#4488ff",
+  TEXT: "#ffffff",
+  GRID: "#333333",
+  BACKGROUND: "#000000",
+  SELECTION: "#ffff00",
+};
+
+const MONOCHROME_COLORS: ColorMap = {
+  WIRE: "#000000",
+  WIRE_HIGH: "#000000",
+  WIRE_LOW: "#888888",
+  WIRE_Z: "#888888",
+  WIRE_UNDEFINED: "#444444",
+  COMPONENT: "#000000",
+  COMPONENT_FILL: "#ffffff",
+  PIN: "#000000",
+  TEXT: "#000000",
+  GRID: "#cccccc",
+  BACKGROUND: "#ffffff",
+  SELECTION: "#000000",
+};
+
+export const defaultColorScheme: ColorScheme = makeScheme(DEFAULT_COLORS);
+export const highContrastColorScheme: ColorScheme = makeScheme(HIGH_CONTRAST_COLORS);
+export const monochromeColorScheme: ColorScheme = makeScheme(MONOCHROME_COLORS);
+
+/** All available built-in color schemes, keyed by name. */
+export const COLOR_SCHEMES: Record<string, ColorScheme> = {
+  default: defaultColorScheme,
+  "high-contrast": highContrastColorScheme,
+  monochrome: monochromeColorScheme,
+};
+
+/** All ThemeColor values as a readonly array, useful for exhaustiveness checks and tests. */
+export const THEME_COLORS: readonly ThemeColor[] = [
+  "WIRE",
+  "WIRE_HIGH",
+  "WIRE_LOW",
+  "WIRE_Z",
+  "WIRE_UNDEFINED",
+  "COMPONENT",
+  "COMPONENT_FILL",
+  "PIN",
+  "TEXT",
+  "GRID",
+  "BACKGROUND",
+  "SELECTION",
+] as const;

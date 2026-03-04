@@ -44,3 +44,46 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 1
+
+---
+## Task 1.2.1 — Signal Value Types
+- **Status**: complete
+- **Files created**: src/core/signal.ts, src/core/__tests__/signal.test.ts
+- **Tests**: passing
+
+## Task 1.2.2 — Pin System
+- **Status**: complete
+- **Files created**: src/core/pin.ts, src/core/__tests__/pin.test.ts
+- **Tests**: passing
+
+## Task 1.2.3 — Component Property System
+- **Status**: complete
+- **Files created**: src/core/properties.ts, src/core/__tests__/properties.test.ts
+- **Tests**: passing
+
+---
+## Wave 1.2 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1
+
+## Task 1.3.1 — CircuitElement Interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/core/element.ts`, `src/core/__tests__/element.test.ts`
+- **Files modified**: none
+- **Tests**: 32/32 passing (232/232 total suite)
+
+## Task 1.3.3 — Renderer Interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/core/__tests__/renderer-interface.test.ts`
+- **Files modified**: `src/core/renderer-interface.ts` (added built-in ColorScheme implementations: defaultColorScheme, highContrastColorScheme, monochromeColorScheme; added COLOR_SCHEMES registry; added THEME_COLORS constant array)
+- **Tests**: 42/42 passing (272/272 total across all test files)
+
+## Task 1.3.5 — Error Type Taxonomy
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/core/errors.ts`, `src/core/__tests__/errors.test.ts`
+- **Files modified**: none
+- **Tests**: 49/49 passing (421/421 total suite)

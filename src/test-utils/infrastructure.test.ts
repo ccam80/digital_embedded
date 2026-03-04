@@ -188,7 +188,7 @@ describe("MockEngine", () => {
     const bv = engine.getSignalValue(2);
     expect(bv.toNumber()).toBe(42);
     expect(bv.toBigInt()).toBe(42n);
-    expect(bv.toString(16)).toBe("2a");
+    expect(bv.toString("hex")).toBe("0x2A");
   });
 
   it("setSignalValue stores the value and is readable via getSignalRaw", () => {

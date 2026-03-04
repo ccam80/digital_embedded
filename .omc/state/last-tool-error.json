@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_js\\\" && git add -A && git commit -m \\\"$(cat <<'EOF'\\nWave 1.2: Core type system — signals, pins, properties\\n\\n- BitVector class with arbitrary-width...",
-  "error": "Exit code 1\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file\n\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file",
-  "timestamp": "2026-03-03T20:59:31.365Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_js\\\" && npm run typecheck 2>&1\",\"description\":\"Run typecheck\"}",
+  "error": "Exit code 2\n\n> digital-sim@0.1.0 typecheck\n> tsc --noEmit\n\nsrc/core/__tests__/registry.test.ts(16,36): error TS6196: 'Point' is declared but never used.\r\nsrc/core/__tests__/registry.test.ts(76,15): error TS6133: 'props' is declared but its value is never read.\r\n\n\n> digital-sim@0.1.0 typecheck\n> tsc --noEmit\n\nsrc/core/__tests__/registry.test.ts(16,36): error TS6196: 'Point' is declared but never used.\r\nsrc/core/__tests__/registry.test.ts(76,15): error TS6133: 'props' is declared but its value is ...",
+  "timestamp": "2026-03-03T21:46:36.614Z",
   "retry_count": 1
 }
