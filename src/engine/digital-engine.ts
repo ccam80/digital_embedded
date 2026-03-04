@@ -28,6 +28,8 @@ import type {
 import { EngineState } from "@/core/engine-interface";
 import { BitVector, bitVectorToRaw, rawToBitVector } from "@/core/signal";
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
+import type { CircuitElement } from "@/core/element";
+import type { Wire } from "@/core/circuit";
 import type { EvaluationMode } from "./evaluation-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -77,6 +79,12 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly sccSnapshotBuffer: Uint32Array;
   /** Per-component gate delay in nanoseconds (for timed mode). */
   readonly delays: Uint32Array;
+  /** Maps component index to its CircuitElement for debugging and micro-step UI. */
+  readonly componentToElement: Map<number, CircuitElement>;
+  /** Maps label string to net ID for facade's label-based signal access. */
+  readonly labelToNetId: Map<string, number>;
+  /** Maps Wire instance to net ID for the renderer's wire coloring. */
+  readonly wireToNetId: Map<Wire, number>;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -426,7 +434,6 @@ export class DigitalEngine implements SimulationEngine {
     state: Uint32Array,
   ): void {
     const indices = group.componentIndices;
-    const netCount = state.length;
 
     // Collect all output net IDs touched by this SCC for change detection
     const outputNets = this._collectOutputNets(indices, layout);

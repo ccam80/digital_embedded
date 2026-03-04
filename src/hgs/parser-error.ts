@@ -18,24 +18,23 @@ export class ParserError extends Error {
  */
 export class HGSEvalError extends Error {
   private _line: number = 0;
+  private readonly _baseMessage: string;
 
   constructor(message: string, cause?: unknown) {
     super(message, cause !== undefined ? { cause } : undefined);
     this.name = "HGSEvalError";
+    this._baseMessage = message;
   }
 
   setLine(line: number): void {
-    if (this._line === 0) {
+    if (this._line === 0 && line > 0) {
       this._line = line;
+      // Update message property directly since Error.message is a data property
+      this.message = `${this._baseMessage}; line ${this._line}`;
     }
   }
 
   get line(): number {
     return this._line;
-  }
-
-  override get message(): string {
-    if (this._line === 0) return super.message;
-    return `${super.message}; line ${this._line}`;
   }
 }

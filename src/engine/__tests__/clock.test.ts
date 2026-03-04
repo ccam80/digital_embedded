@@ -9,13 +9,14 @@
 
 import { describe, it, expect } from "vitest";
 import { ClockManager } from "../clock.js";
-import type { ClockInfo } from "../clock.js";
 import type { ConcreteCompiledCircuit, EvaluationGroup } from "../digital-engine.js";
-import type { CircuitElement } from "@/core/element";
+import type { CircuitElement, SerializedElement } from "@/core/element";
 import type { ComponentLayout } from "@/core/registry";
 import type { Pin } from "@/core/pin";
+import type { Rotation } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
-import type { PropertyBag } from "@/core/properties";
+import type { PropertyBag, PropertyValue } from "@/core/properties";
+import type { Wire } from "@/core/circuit";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement stub for tests
@@ -27,30 +28,40 @@ import type { PropertyBag } from "@/core/properties";
  */
 class StubElement implements CircuitElement {
   readonly typeId: string;
-  private readonly _attrs: Record<string, unknown>;
+  readonly instanceId: string = "stub-0";
+  position: { x: number; y: number } = { x: 0, y: 0 };
+  rotation: Rotation = 0;
+  mirror: boolean = false;
+  private readonly _attrs: Record<string, PropertyValue>;
 
-  constructor(typeId: string, attrs: Record<string, unknown> = {}) {
+  constructor(typeId: string, attrs: Record<string, PropertyValue> = {}) {
     this.typeId = typeId;
     this._attrs = attrs;
   }
 
-  get instanceId(): string { return "stub-0"; }
-  get position(): { x: number; y: number } { return { x: 0, y: 0 }; }
-  get rotation(): number { return 0; }
-  get mirror(): boolean { return false; }
-
-  getAttribute(key: string): unknown {
+  getAttribute(key: string): PropertyValue | undefined {
     return this._attrs[key];
   }
 
   getProperties(): PropertyBag {
-    throw new Error("not implemented in stub");
+    throw new Error("not used in stub");
   }
 
   getPins(): readonly Pin[] { return []; }
   getBoundingBox(): Rect { return { x: 0, y: 0, width: 1, height: 1 }; }
   draw(_ctx: RenderContext): void {}
   getHelpText(): string { return ""; }
+
+  serialize(): SerializedElement {
+    return {
+      typeId: this.typeId,
+      instanceId: this.instanceId,
+      position: this.position,
+      rotation: this.rotation,
+      mirror: this.mirror,
+      properties: {},
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -58,18 +69,17 @@ class StubElement implements CircuitElement {
 // ---------------------------------------------------------------------------
 
 /**
- * ComponentLayout where each component has explicit output net IDs.
+ * ComponentLayout where each component has an explicit output net ID.
  * outputOffsets[i] is the net ID of the first output of component i.
  */
 class StubLayout implements ComponentLayout {
   constructor(
     private readonly _outputOffsets: number[],
-    private readonly _outputCounts: number[] = [],
   ) {}
 
   inputCount(_i: number): number { return 0; }
   inputOffset(_i: number): number { return 0; }
-  outputCount(i: number): number { return this._outputCounts[i] ?? 1; }
+  outputCount(_i: number): number { return 1; }
   outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
 }
 
@@ -82,15 +92,17 @@ class StubLayout implements ComponentLayout {
  *
  * clocks: array of { componentIndex, netId, frequency }
  * netCount: total number of nets in the circuit
+ * sequentialComponents: indices of sequential elements (default empty)
  */
 function buildClockCircuit(
   clocks: Array<{ componentIndex: number; netId: number; frequency: number }>,
   netCount: number,
   sequentialComponents: number[] = [],
 ): ConcreteCompiledCircuit {
-  const componentCount = clocks.length === 0 ? 0 : Math.max(...clocks.map((c) => c.componentIndex)) + 1;
+  const componentCount = clocks.length === 0
+    ? 0
+    : Math.max(...clocks.map((c) => c.componentIndex)) + 1;
 
-  // Build componentToElement map
   const componentToElement = new Map<number, CircuitElement>();
   for (const c of clocks) {
     componentToElement.set(
@@ -99,7 +111,6 @@ function buildClockCircuit(
     );
   }
 
-  // Build output offsets: index maps component index → net ID
   const outputOffsets: number[] = new Array(componentCount).fill(0);
   for (const c of clocks) {
     outputOffsets[c.componentIndex] = c.netId;
@@ -125,7 +136,7 @@ function buildClockCircuit(
     delays: new Uint32Array(componentCount).fill(10),
     componentToElement,
     labelToNetId: new Map(),
-    wireToNetId: new Map(),
+    wireToNetId: new Map<Wire, number>(),
   };
 }
 
@@ -152,7 +163,6 @@ describe("ClockManager", () => {
 
     expect(clocks).toHaveLength(2);
 
-    // Both clocks should be present; order matches componentToElement iteration
     const sorted = [...clocks].sort((a, b) => a.componentIndex - b.componentIndex);
 
     expect(sorted[0]!.componentIndex).toBe(0);
@@ -205,12 +215,12 @@ describe("ClockManager", () => {
     const mgr = new ClockManager(compiled);
     const state = new Uint32Array(1);
 
-    // Step 1: counter=1, not yet at half-period
+    // Step 1: counter reaches 1, not yet at half-period (2)
     const edges1 = mgr.advanceClocks(state);
     expect(state[0]).toBe(0);
     expect(edges1).toHaveLength(0);
 
-    // Step 2: counter=2 >= frequency=2, toggle fires
+    // Step 2: counter reaches 2 >= frequency=2, toggle fires
     const edges2 = mgr.advanceClocks(state);
     expect(state[0]).toBe(1);
     expect(edges2).toHaveLength(1);
@@ -239,7 +249,7 @@ describe("ClockManager", () => {
     const mgr = new ClockManager(compiled);
     const state = new Uint32Array(1);
 
-    // Start at 0 (false phase). First toggle: 0 → 1 = rising
+    // Start at phase=false (0). First toggle: 0 → 1 = rising
     const edges = mgr.advanceClocks(state);
     expect(edges).toHaveLength(1);
     expect(edges[0]!.edge).toBe("rising");
@@ -286,8 +296,8 @@ describe("ClockManager", () => {
 
     // Step 1: A toggles (0→1), B counter=1 (no toggle)
     mgr.advanceClocks(state);
-    expect(state[0]).toBe(1); // A toggled
-    expect(state[1]).toBe(0); // B not yet
+    expect(state[0]).toBe(1);
+    expect(state[1]).toBe(0);
 
     // Step 2: A toggles (1→0), B counter=2 (no toggle)
     mgr.advanceClocks(state);
@@ -323,7 +333,7 @@ describe("ClockManager", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       2,
-      [2, 3], // sequential components at indices 2 and 3
+      [2, 3],
     );
 
     const mgr = new ClockManager(compiled);
@@ -369,7 +379,7 @@ describe("ClockManager", () => {
 
   it("findClocks — opaque CompiledCircuit without componentToElement returns empty list", () => {
     const opaque = { netCount: 2, componentCount: 1 };
-    const mgr = new ClockManager(opaque as unknown as Parameters<typeof ClockManager.prototype.findClocks>[0] extends never ? never : Parameters<typeof ClockManager>[0]);
+    const mgr = new ClockManager(opaque as unknown as ConcreteCompiledCircuit);
     expect(mgr.findClocks()).toHaveLength(0);
   });
 });

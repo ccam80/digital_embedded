@@ -78,6 +78,9 @@ function buildCircuit(
     netWidths,
     sccSnapshotBuffer,
     delays: defaultDelays,
+    componentToElement: new Map(),
+    labelToNetId: new Map(),
+    wireToNetId: new Map(),
   };
 }
 

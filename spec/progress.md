@@ -302,3 +302,62 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: src/editor/wire-signal-access.ts, src/editor/wire-renderer.ts, src/editor/__tests__/wire-renderer.test.ts
 - **Files modified**: none
 - **Tests**: 7/7 passing
+
+## Task 3.3.2: Feedback and Oscillation Detection
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/oscillation.ts, src/engine/__tests__/oscillation.test.ts
+- **Files modified**: none
+- **Tests**: 3/3 passing
+
+## Task 2.3.1: Hit-Testing
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/hit-test.ts, src/editor/__tests__/hit-test.test.ts
+- **Files modified**: none
+- **Tests**: 14/14 passing (1126 total, all passing)
+
+## Task 5.2.5: Basic Arithmetic (Add, Sub, Mul, Div)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/arithmetic/add.ts, src/components/arithmetic/sub.ts, src/components/arithmetic/mul.ts, src/components/arithmetic/div.ts, src/components/arithmetic/__tests__/arithmetic.test.ts
+- **Files modified**: (none)
+- **Tests**: 114/114 passing
+
+## Task 3.3.3: Clock Management
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/clock.ts, src/engine/__tests__/clock.test.ts
+- **Files modified**: src/engine/digital-engine.ts (added componentToElement, labelToNetId, wireToNetId to ConcreteCompiledCircuit interface; added CircuitElement and Wire imports), src/engine/__tests__/digital-engine.test.ts (added componentToElement, labelToNetId, wireToNetId to buildCircuit helper to match updated interface)
+- **Tests**: 11/11 passing (1503 total, all passing)
+
+## Task 2.3.2: Selection Model
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/selection.ts, src/editor/__tests__/selection.test.ts
+- **Files modified**: none
+- **Tests**: 10/10 passing
+
+## Task 5.2.1: Multiplexer & Routing (Multiplexer, Demultiplexer, Decoder, BitSelector, PriorityEncoder)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/wiring/mux.ts — MuxElement, executeMux, MuxDefinition, MUX_ATTRIBUTE_MAPPINGS
+  - src/components/wiring/demux.ts — DemuxElement, executeDemux, DemuxDefinition, DEMUX_ATTRIBUTE_MAPPINGS
+  - src/components/wiring/decoder.ts — DecoderElement, executeDecoder, DecoderDefinition, DECODER_ATTRIBUTE_MAPPINGS
+  - src/components/wiring/bit-selector.ts — BitSelectorElement, executeBitSelector, BitSelectorDefinition, BIT_SELECTOR_ATTRIBUTE_MAPPINGS
+  - src/components/wiring/priority-encoder.ts — PriorityEncoderElement, executePriorityEncoder, PriorityEncoderDefinition, PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS
+  - src/components/wiring/__tests__/mux.test.ts
+  - src/components/wiring/__tests__/demux.test.ts
+  - src/components/wiring/__tests__/decoder.test.ts
+  - src/components/wiring/__tests__/bit-selector.test.ts
+  - src/components/wiring/__tests__/priority-encoder.test.ts
+- **Files modified**: none
+- **Tests**: 146/146 passing
+
+## Task 3.4.1: Standard Controls
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/controls.ts, src/engine/__tests__/controls.test.ts
+- **Files modified**: none
+- **Tests**: 14/14 passing

@@ -240,8 +240,8 @@ export class Tokenizer {
           }
           return this.tok(TokenType.LESS, c, startLine);
         case ">":
-          if (this.src[this.pos] === ">") {
-            this.pos++;
+          if (this.src[this.pos] === ">" && this.src[this.pos + 1] === ">") {
+            this.pos += 2;
             return this.tok(TokenType.SHIFTRIGHT, ">>>", startLine);
           }
           if (this.src[this.pos] === "=") {

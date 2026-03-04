@@ -188,17 +188,13 @@ export class ClockManager {
       // returns the net ID of the first output.
       const netId = layout.outputOffset(componentIndex);
 
-      // Read the Frequency property from the element.
-      // ClockElement exposes a frequency getter; fall back to getAttribute.
+      // Read the Frequency property from the element via the standard
+      // getAttribute interface. ClockElement stores frequency as the
+      // "Frequency" property key (matching the .dig XML attribute name).
       let frequency = 1;
       const freqAttr = element.getAttribute("Frequency");
       if (typeof freqAttr === "number" && freqAttr > 0) {
         frequency = freqAttr;
-      } else if (
-        typeof (element as { frequency?: unknown }).frequency === "number" &&
-        (element as { frequency?: unknown }).frequency as number > 0
-      ) {
-        frequency = (element as { frequency: number }).frequency;
       }
 
       clocks.push({
@@ -251,7 +247,6 @@ export class ClockManager {
   }
 
   private _toggleClock(clock: ClockInfo, state: Uint32Array, fired: FiredEdge[]): void {
-    const wasHigh = clock.currentPhase;
     clock.currentPhase = !clock.currentPhase;
 
     if (clock.netId < state.length) {

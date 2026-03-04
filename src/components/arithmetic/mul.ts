@@ -208,13 +208,20 @@ export function makeExecuteMul(
 
     const product = bigA * bigB;
 
+    // Mask product to 2*bitWidth bits (handles negative BigInt results correctly)
+    const outBits = bitWidth * 2;
+    const outMask = outBits >= 64
+      ? (BigInt(1) << BigInt(64)) - BigInt(1)
+      : (BigInt(1) << BigInt(outBits)) - BigInt(1);
+    const maskedProduct = ((product % (outMask + BigInt(1))) + (outMask + BigInt(1))) % (outMask + BigInt(1));
+
     // Store lower 32 bits in outBase
-    state[outBase] = Number(product & BigInt(0xFFFFFFFF)) >>> 0;
+    state[outBase] = Number(maskedProduct & BigInt(0xFFFFFFFF)) >>> 0;
 
     // Store upper 32 bits in outBase+1 if layout has 2 output slots
     const outCount = layout.outputCount(index);
     if (outCount >= 2) {
-      state[outBase + 1] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF)) >>> 0;
+      state[outBase + 1] = Number((maskedProduct >> BigInt(32)) & BigInt(0xFFFFFFFF)) >>> 0;
     }
   };
 }
