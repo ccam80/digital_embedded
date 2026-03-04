@@ -1,0 +1,620 @@
+/**
+ * Tests for Segment Display components: SevenSeg, SevenSegHex, SixteenSeg.
+ *
+ * Covers:
+ *   - Correct segment mapping for all hex digits (SevenSegHex)
+ *   - Direct segment drive (SevenSeg)
+ *   - Decimal point input
+ *   - Common anode vs cathode polarity
+ *   - 16-segment packing (SixteenSeg)
+ *   - Pin layout
+ *   - Attribute mapping
+ *   - ComponentDefinition completeness
+ */
+
+import { describe, it, expect } from "vitest";
+import {
+  SevenSegElement,
+  executeSevenSeg,
+  SevenSegDefinition,
+  SEVEN_SEG_ATTRIBUTE_MAPPINGS,
+} from "../seven-seg.js";
+import {
+  SevenSegHexElement,
+  executeSevenSegHex,
+  SevenSegHexDefinition,
+  SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS,
+  HEX_SEGMENT_TABLE,
+} from "../seven-seg-hex.js";
+import {
+  SixteenSegElement,
+  executeSixteenSeg,
+  SixteenSegDefinition,
+  SIXTEEN_SEG_ATTRIBUTE_MAPPINGS,
+} from "../sixteen-seg.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { PinDirection } from "../../../core/pin.js";
+import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
+import type { ComponentLayout } from "../../../core/registry.js";
+import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
+import type { ThemeColor } from "../../../core/renderer-interface.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayout {
+  return {
+    inputCount: () => inputCount,
+    inputOffset: () => 0,
+    outputCount: () => outputCount,
+    outputOffset: () => inputCount,
+  };
+}
+
+function makeState(inputs: number[], extraSlots: number = 1): Uint32Array {
+  const arr = new Uint32Array(inputs.length + extraSlots);
+  for (let i = 0; i < inputs.length; i++) {
+    arr[i] = inputs[i] >>> 0;
+  }
+  return arr;
+}
+
+interface DrawCall {
+  method: string;
+  args: unknown[];
+}
+
+function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
+  const calls: DrawCall[] = [];
+  const record = (method: string) => (...args: unknown[]): void => { calls.push({ method, args }); };
+  const ctx: RenderContext = {
+    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
+    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
+    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
+    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
+    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
+    drawPath: record("drawPath") as (path: PathData) => void,
+    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
+    save: record("save") as () => void,
+    restore: record("restore") as () => void,
+    translate: record("translate") as (dx: number, dy: number) => void,
+    rotate: record("rotate") as (angle: number) => void,
+    scale: record("scale") as (sx: number, sy: number) => void,
+    setColor: record("setColor") as (color: ThemeColor) => void,
+    setLineWidth: record("setLineWidth") as (w: number) => void,
+    setFont: record("setFont") as (font: FontSpec) => void,
+    setLineDash: record("setLineDash") as (pattern: number[]) => void,
+  };
+  return { ctx, calls };
+}
+
+function makeSevenSeg(overrides?: { commonCathode?: boolean; color?: string }): SevenSegElement {
+  const props = new PropertyBag();
+  props.set("commonCathode", overrides?.commonCathode ?? true);
+  props.set("color", overrides?.color ?? "red");
+  return new SevenSegElement("test-7seg-001", { x: 0, y: 0 }, 0, false, props);
+}
+
+function makeSevenSegHex(overrides?: { commonCathode?: boolean }): SevenSegHexElement {
+  const props = new PropertyBag();
+  props.set("commonCathode", overrides?.commonCathode ?? true);
+  props.set("color", "red");
+  return new SevenSegHexElement("test-7seghex-001", { x: 0, y: 0 }, 0, false, props);
+}
+
+function makeSixteenSeg(overrides?: { commonCathode?: boolean }): SixteenSegElement {
+  const props = new PropertyBag();
+  props.set("commonCathode", overrides?.commonCathode ?? true);
+  props.set("color", "red");
+  return new SixteenSegElement("test-16seg-001", { x: 0, y: 0 }, 0, false, props);
+}
+
+// ---------------------------------------------------------------------------
+// SevenSeg tests
+// ---------------------------------------------------------------------------
+
+describe("SevenSeg", () => {
+  describe("directSegmentDrive", () => {
+    it("all segments off → output=0", () => {
+      const layout = makeLayout(8, 1);
+      const state = makeState([0, 0, 0, 0, 0, 0, 0, 0], 1);
+      executeSevenSeg(0, state, layout);
+      expect(state[8]).toBe(0);
+    });
+
+    it("segment a (index 0) on → bit 0 set in output", () => {
+      const layout = makeLayout(8, 1);
+      // a=1, rest=0
+      const state = makeState([1, 0, 0, 0, 0, 0, 0, 0], 1);
+      executeSevenSeg(0, state, layout);
+      expect(state[8] & 1).toBe(1);
+    });
+
+    it("segment dp (index 7) on → bit 7 set in output", () => {
+      const layout = makeLayout(8, 1);
+      // a=0,...,g=0,dp=1
+      const state = makeState([0, 0, 0, 0, 0, 0, 0, 1], 1);
+      executeSevenSeg(0, state, layout);
+      expect((state[8] >> 7) & 1).toBe(1);
+    });
+
+    it("all segments on → output=0xFF", () => {
+      const layout = makeLayout(8, 1);
+      const state = makeState([1, 1, 1, 1, 1, 1, 1, 1], 1);
+      executeSevenSeg(0, state, layout);
+      expect(state[8]).toBe(0xFF);
+    });
+
+    it("segments a, g on → bits 0 and 6 set", () => {
+      const layout = makeLayout(8, 1);
+      // a=1, b=0, c=0, d=0, e=0, f=0, g=1, dp=0
+      const state = makeState([1, 0, 0, 0, 0, 0, 1, 0], 1);
+      executeSevenSeg(0, state, layout);
+      expect(state[8] & 0b1000001).toBe(0b1000001);
+    });
+  });
+
+  describe("decimalPoint", () => {
+    it("dp input on → bit 7 set", () => {
+      const layout = makeLayout(8, 1);
+      const state = makeState([0, 0, 0, 0, 0, 0, 0, 1], 1);
+      executeSevenSeg(0, state, layout);
+      expect((state[8] & 0x80) !== 0).toBe(true);
+    });
+
+    it("dp input off → bit 7 clear", () => {
+      const layout = makeLayout(8, 1);
+      const state = makeState([1, 1, 1, 1, 1, 1, 1, 0], 1);
+      executeSevenSeg(0, state, layout);
+      expect((state[8] & 0x80)).toBe(0);
+    });
+  });
+
+  describe("pinLayout", () => {
+    it("SevenSeg has 8 input pins", () => {
+      const el = makeSevenSeg();
+      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs).toHaveLength(8);
+    });
+
+    it("SevenSeg input pins include 'a' and 'dp'", () => {
+      const el = makeSevenSeg();
+      const labels = el.getPins().map((p) => p.label);
+      expect(labels).toContain("a");
+      expect(labels).toContain("dp");
+    });
+
+    it("SevenSegDefinition.pinLayout has 8 input pins", () => {
+      const inputs = SevenSegDefinition.pinLayout.filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs).toHaveLength(8);
+    });
+  });
+
+  describe("rendering", () => {
+    it("draw calls save and restore", () => {
+      const el = makeSevenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      expect(calls.some((c) => c.method === "save")).toBe(true);
+      expect(calls.some((c) => c.method === "restore")).toBe(true);
+    });
+
+    it("draw calls drawLine (segment outlines)", () => {
+      const el = makeSevenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const lines = calls.filter((c) => c.method === "drawLine");
+      expect(lines.length).toBeGreaterThanOrEqual(7);
+    });
+
+    it("draw renders component background rect", () => {
+      const el = makeSevenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const rects = calls.filter((c) => c.method === "drawRect");
+      expect(rects.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("commonAnodeVsCathode", () => {
+    it("commonCathode=true stored correctly", () => {
+      const el = makeSevenSeg({ commonCathode: true });
+      expect(el.commonCathode).toBe(true);
+    });
+
+    it("commonCathode=false stored correctly", () => {
+      const el = makeSevenSeg({ commonCathode: false });
+      expect(el.commonCathode).toBe(false);
+    });
+  });
+
+  describe("attributeMapping", () => {
+    it("CommonCathode=true maps to boolean true", () => {
+      const mapping = SEVEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("true")).toBe(true);
+    });
+
+    it("CommonCathode=false maps to boolean false", () => {
+      const mapping = SEVEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
+      expect(mapping!.convert("false")).toBe(false);
+    });
+
+    it("Color attribute maps to color property", () => {
+      const mapping = SEVEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("green")).toBe("green");
+    });
+  });
+
+  describe("definitionComplete", () => {
+    it("SevenSegDefinition has name='SevenSeg'", () => {
+      expect(SevenSegDefinition.name).toBe("SevenSeg");
+    });
+
+    it("SevenSegDefinition has typeId=-1", () => {
+      expect(SevenSegDefinition.typeId).toBe(-1);
+    });
+
+    it("SevenSegDefinition factory produces SevenSegElement", () => {
+      const props = new PropertyBag();
+      props.set("commonCathode", true);
+      props.set("color", "red");
+      const el = SevenSegDefinition.factory(props);
+      expect(el.typeId).toBe("SevenSeg");
+    });
+
+    it("SevenSegDefinition executeFn is executeSevenSeg", () => {
+      expect(SevenSegDefinition.executeFn).toBe(executeSevenSeg);
+    });
+
+    it("SevenSegDefinition category is IO", () => {
+      expect(SevenSegDefinition.category).toBe(ComponentCategory.IO);
+    });
+
+    it("SevenSegDefinition has non-empty helpText", () => {
+      expect(SevenSegDefinition.helpText.length).toBeGreaterThan(0);
+    });
+
+    it("SevenSegDefinition can be registered without error", () => {
+      const registry = new ComponentRegistry();
+      expect(() => registry.register(SevenSegDefinition)).not.toThrow();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SevenSegHex tests
+// ---------------------------------------------------------------------------
+
+describe("SevenSegHex", () => {
+  describe("hexDigitDecoding", () => {
+    it("digit 0 → segment pattern for '0' (a,b,c,d,e,f on, g off)", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([0], 1);
+      executeSevenSegHex(0, state, layout);
+      // 0 = 0b0111111 = segments a,b,c,d,e,f (no g)
+      expect(state[1]).toBe(0b0111111);
+    });
+
+    it("digit 1 → segment pattern for '1' (b,c on)", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([1], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(0b0000110);
+    });
+
+    it("digit 7 → segment pattern for '7' (a,b,c on)", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([7], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(0b0000111);
+    });
+
+    it("digit 8 → all segments on", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([8], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(0b1111111);
+    });
+
+    it("digit 0xA → segment pattern for 'A'", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([0xA], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(0b1110111);
+    });
+
+    it("digit 0xF → segment pattern for 'F'", () => {
+      const layout = makeLayout(1, 1);
+      const state = makeState([0xF], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(0b1110001);
+    });
+
+    it("only lower 4 bits of input used (mask 0xF)", () => {
+      const layout = makeLayout(1, 1);
+      // Input 0x10 → digit 0 (lower 4 bits = 0)
+      const state = makeState([0x10], 1);
+      executeSevenSegHex(0, state, layout);
+      expect(state[1]).toBe(HEX_SEGMENT_TABLE[0]);
+    });
+
+    it("HEX_SEGMENT_TABLE has 16 entries", () => {
+      expect(HEX_SEGMENT_TABLE.length).toBe(16);
+    });
+
+    it("all 16 hex digits produce distinct segment patterns", () => {
+      const patterns = new Set(HEX_SEGMENT_TABLE);
+      expect(patterns.size).toBe(16);
+    });
+  });
+
+  describe("pinLayout", () => {
+    it("SevenSegHex has 1 input pin with bitWidth=4", () => {
+      const el = makeSevenSegHex();
+      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs).toHaveLength(1);
+      expect(inputs[0].bitWidth).toBe(4);
+    });
+
+    it("input pin is labeled 'in'", () => {
+      const el = makeSevenSegHex();
+      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs[0].label).toBe("in");
+    });
+  });
+
+  describe("rendering", () => {
+    it("draw calls save and restore", () => {
+      const el = makeSevenSegHex();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      expect(calls.some((c) => c.method === "save")).toBe(true);
+      expect(calls.some((c) => c.method === "restore")).toBe(true);
+    });
+
+    it("draw renders component rect", () => {
+      const el = makeSevenSegHex();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const rects = calls.filter((c) => c.method === "drawRect");
+      expect(rects.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("draw renders 'hex' label text", () => {
+      const el = makeSevenSegHex();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const textCalls = calls.filter((c) => c.method === "drawText");
+      expect(textCalls.some((c) => c.args[0] === "hex")).toBe(true);
+    });
+  });
+
+  describe("commonAnodeVsCathode", () => {
+    it("commonCathode=true stored correctly", () => {
+      const el = makeSevenSegHex({ commonCathode: true });
+      expect(el.commonCathode).toBe(true);
+    });
+
+    it("commonCathode=false stored correctly", () => {
+      const el = makeSevenSegHex({ commonCathode: false });
+      expect(el.commonCathode).toBe(false);
+    });
+  });
+
+  describe("attributeMapping", () => {
+    it("CommonCathode maps correctly", () => {
+      const mapping = SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("true")).toBe(true);
+      expect(mapping!.convert("false")).toBe(false);
+    });
+
+    it("Color attribute maps to color property", () => {
+      const mapping = SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("green")).toBe("green");
+    });
+  });
+
+  describe("definitionComplete", () => {
+    it("SevenSegHexDefinition has name='SevenSegHex'", () => {
+      expect(SevenSegHexDefinition.name).toBe("SevenSegHex");
+    });
+
+    it("SevenSegHexDefinition has typeId=-1", () => {
+      expect(SevenSegHexDefinition.typeId).toBe(-1);
+    });
+
+    it("SevenSegHexDefinition factory produces SevenSegHexElement", () => {
+      const props = new PropertyBag();
+      props.set("commonCathode", true);
+      props.set("color", "red");
+      const el = SevenSegHexDefinition.factory(props);
+      expect(el.typeId).toBe("SevenSegHex");
+    });
+
+    it("SevenSegHexDefinition executeFn is executeSevenSegHex", () => {
+      expect(SevenSegHexDefinition.executeFn).toBe(executeSevenSegHex);
+    });
+
+    it("SevenSegHexDefinition category is IO", () => {
+      expect(SevenSegHexDefinition.category).toBe(ComponentCategory.IO);
+    });
+
+    it("SevenSegHexDefinition has non-empty helpText", () => {
+      expect(SevenSegHexDefinition.helpText.length).toBeGreaterThan(0);
+    });
+
+    it("SevenSegHexDefinition can be registered without error", () => {
+      const registry = new ComponentRegistry();
+      expect(() => registry.register(SevenSegHexDefinition)).not.toThrow();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SixteenSeg tests
+// ---------------------------------------------------------------------------
+
+describe("SixteenSeg", () => {
+  describe("segmentPacking", () => {
+    it("all segments off → output=0", () => {
+      const layout = makeLayout(16, 1);
+      const state = makeState(new Array(16).fill(0), 1);
+      executeSixteenSeg(0, state, layout);
+      expect(state[16]).toBe(0);
+    });
+
+    it("segment a1 (index 0) on → bit 0 set", () => {
+      const layout = makeLayout(16, 1);
+      const inputs = new Array(16).fill(0);
+      inputs[0] = 1; // a1
+      const state = makeState(inputs, 1);
+      executeSixteenSeg(0, state, layout);
+      expect(state[16] & 1).toBe(1);
+    });
+
+    it("segment dp (index 15) on → bit 15 set", () => {
+      const layout = makeLayout(16, 1);
+      const inputs = new Array(16).fill(0);
+      inputs[15] = 1; // dp
+      const state = makeState(inputs, 1);
+      executeSixteenSeg(0, state, layout);
+      expect((state[16] >> 15) & 1).toBe(1);
+    });
+
+    it("all segments on → output has all 16 bits set", () => {
+      const layout = makeLayout(16, 1);
+      const state = makeState(new Array(16).fill(1), 1);
+      executeSixteenSeg(0, state, layout);
+      expect(state[16]).toBe(0xFFFF);
+    });
+
+    it("non-zero inputs treated as on", () => {
+      const layout = makeLayout(16, 1);
+      const inputs = new Array(16).fill(0);
+      inputs[0] = 0xFF; // non-zero but not 1
+      const state = makeState(inputs, 1);
+      executeSixteenSeg(0, state, layout);
+      expect(state[16] & 1).toBe(1);
+    });
+  });
+
+  describe("pinLayout", () => {
+    it("SixteenSeg has 16 input pins", () => {
+      const el = makeSixteenSeg();
+      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs).toHaveLength(16);
+    });
+
+    it("SixteenSeg input pins include 'a1', 'dp', 'g1', 'g2'", () => {
+      const el = makeSixteenSeg();
+      const labels = el.getPins().map((p) => p.label);
+      expect(labels).toContain("a1");
+      expect(labels).toContain("dp");
+      expect(labels).toContain("g1");
+      expect(labels).toContain("g2");
+    });
+
+    it("SixteenSegDefinition.pinLayout has 16 input pins", () => {
+      const inputs = SixteenSegDefinition.pinLayout.filter((p) => p.direction === PinDirection.INPUT);
+      expect(inputs).toHaveLength(16);
+    });
+  });
+
+  describe("rendering", () => {
+    it("draw calls save and restore", () => {
+      const el = makeSixteenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      expect(calls.some((c) => c.method === "save")).toBe(true);
+      expect(calls.some((c) => c.method === "restore")).toBe(true);
+    });
+
+    it("draw renders component rect", () => {
+      const el = makeSixteenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const rects = calls.filter((c) => c.method === "drawRect");
+      expect(rects.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("draw calls drawLine for segment outlines", () => {
+      const el = makeSixteenSeg();
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const lines = calls.filter((c) => c.method === "drawLine");
+      expect(lines.length).toBeGreaterThanOrEqual(10);
+    });
+  });
+
+  describe("commonAnodeVsCathode", () => {
+    it("commonCathode=true stored correctly", () => {
+      const el = makeSixteenSeg({ commonCathode: true });
+      expect(el.commonCathode).toBe(true);
+    });
+
+    it("commonCathode=false stored correctly", () => {
+      const el = makeSixteenSeg({ commonCathode: false });
+      expect(el.commonCathode).toBe(false);
+    });
+  });
+
+  describe("attributeMapping", () => {
+    it("CommonCathode maps correctly", () => {
+      const mapping = SIXTEEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("true")).toBe(true);
+      expect(mapping!.convert("false")).toBe(false);
+    });
+
+    it("Color attribute maps to color property", () => {
+      const mapping = SIXTEEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
+      expect(mapping).toBeDefined();
+      expect(mapping!.convert("blue")).toBe("blue");
+    });
+  });
+
+  describe("definitionComplete", () => {
+    it("SixteenSegDefinition has name='SixteenSeg'", () => {
+      expect(SixteenSegDefinition.name).toBe("SixteenSeg");
+    });
+
+    it("SixteenSegDefinition has typeId=-1", () => {
+      expect(SixteenSegDefinition.typeId).toBe(-1);
+    });
+
+    it("SixteenSegDefinition factory produces SixteenSegElement", () => {
+      const props = new PropertyBag();
+      props.set("commonCathode", true);
+      props.set("color", "red");
+      const el = SixteenSegDefinition.factory(props);
+      expect(el.typeId).toBe("SixteenSeg");
+    });
+
+    it("SixteenSegDefinition executeFn is executeSixteenSeg", () => {
+      expect(SixteenSegDefinition.executeFn).toBe(executeSixteenSeg);
+    });
+
+    it("SixteenSegDefinition category is IO", () => {
+      expect(SixteenSegDefinition.category).toBe(ComponentCategory.IO);
+    });
+
+    it("SixteenSegDefinition has non-empty helpText", () => {
+      expect(SixteenSegDefinition.helpText.length).toBeGreaterThan(0);
+    });
+
+    it("SixteenSegDefinition can be registered without error", () => {
+      const registry = new ComponentRegistry();
+      expect(() => registry.register(SixteenSegDefinition)).not.toThrow();
+    });
+
+    it("SixteenSegElement.getHelpText() contains 'SixteenSeg'", () => {
+      const el = makeSixteenSeg();
+      expect(el.getHelpText()).toContain("SixteenSeg");
+    });
+  });
+});

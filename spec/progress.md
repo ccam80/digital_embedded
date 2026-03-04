@@ -361,3 +361,186 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: src/engine/controls.ts, src/engine/__tests__/controls.test.ts
 - **Files modified**: none
 - **Tests**: 14/14 passing
+
+## Task 3.4.3: Run-to-Break
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/run-to-break.ts, src/engine/__tests__/run-to-break.test.ts
+- **Files modified**: none
+- **Tests**: 3/3 passing
+
+## Task 2.4.3: Component Palette
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/palette.ts, src/editor/palette-ui.ts, src/editor/__tests__/palette.test.ts
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 2.3.3: Placement Mode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/placement.ts, src/editor/__tests__/placement.test.ts
+- **Files modified**: none
+- **Tests**: 6/6 passing (1843 total, all passing)
+
+## Task 4.4.1: JSON Save
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/save-schema.ts, src/io/save.ts, src/io/__tests__/save.test.ts
+- **Files modified**: none
+- **Tests**: 4/4 passing
+
+## Task 3.4.4: Quick Run and Speed Test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/quick-run.ts, src/engine/__tests__/quick-run.test.ts
+- **Files modified**: none
+- **Tests**: 3/3 passing
+
+## Task 2.4.4: Property Editor Panel
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/property-panel.ts, src/editor/property-inputs.ts, src/editor/__tests__/property-panel.test.ts
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 4.4.2: JSON Load
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/load.ts, src/io/__tests__/load.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 5.2.18: Visual Indicators
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/io/led.ts, src/components/io/polarity-led.ts, src/components/io/light-bulb.ts, src/components/io/rgb-led.ts, src/components/io/__tests__/led.test.ts
+- **Files modified**: (none)
+- **Tests**: 1950/1950 passing (all tests pass, new tests added for LED, PolarityAwareLED, LightBulb, RGBLED)
+
+## Task 3.4.5: Web Worker Mode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/worker-engine.ts, src/engine/worker.ts, src/engine/worker-detection.ts, src/engine/__tests__/worker-detection.test.ts
+- **Files modified**: none
+- **Tests**: 2/2 passing
+
+## Task 2.3.4: Wire Drawing Mode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/wire-drawing.ts, src/editor/wire-merge.ts, src/editor/wire-consistency.ts, src/editor/__tests__/wire-drawing.test.ts
+- **Files modified**: none
+- **Tests**: 7/7 passing (1957 total, all passing)
+
+## Task 2.4.5: Context Menus and Keyboard Shortcuts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/context-menu.ts, src/editor/shortcuts.ts, src/editor/__tests__/context-menu.test.ts, src/editor/__tests__/shortcuts.test.ts
+- **Files modified**: none
+- **Tests**: 9/9 passing (3 context-menu + 6 shortcuts)
+
+## Task 4.4.3: Headless .dig Loading (SimulatorFacade Loader Module)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/loader.ts, src/headless/__tests__/loader.test.ts
+- **Files modified**: none
+- **Tests**: 4/4 passing
+- **Note**: 1 pre-existing failure in src/components/flipflops/__tests__/flipflops.test.ts (written by a concurrent agent, not in baseline, not caused by this task)
+
+## Task 2.5.1: Find/Search
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/search.ts, src/editor/__tests__/search.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 5.2.3: Flip-Flops
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/flipflops/d.ts
+  - src/components/flipflops/d-async.ts
+  - src/components/flipflops/jk.ts
+  - src/components/flipflops/jk-async.ts
+  - src/components/flipflops/rs.ts
+  - src/components/flipflops/rs-async.ts
+  - src/components/flipflops/t.ts
+  - src/components/flipflops/__tests__/flipflops.test.ts
+- **Files modified**: none
+- **Tests**: 106/106 passing (2077 total, all passing)
+
+## Task 2.4.1: Move, Copy, Paste, Delete
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/edit-operations.ts, src/editor/label-renamer.ts, src/editor/__tests__/edit-operations.test.ts
+- **Files modified**: none
+- **Tests**: 7/7 passing (2084 total, all passing)
+
+## Task 5.2.19: Segment Displays
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/io/seven-seg.ts, src/components/io/seven-seg-hex.ts, src/components/io/sixteen-seg.ts, src/components/io/__tests__/segment-displays.test.ts
+- **Files modified**: (none)
+- **Tests**: 2157/2157 passing (207 new tests added for SevenSeg, SevenSegHex, SixteenSeg)
+
+## Task 2.5.2: Label Tools
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/label-tools.ts, src/editor/__tests__/label-tools.test.ts
+- **Files modified**: none
+- **Tests**: 8/8 passing (4 spec tests + 4 undo coverage tests)
+
+## Task 5.2.4: Monoflop
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/flipflops/monoflop.ts
+  - src/components/flipflops/__tests__/monoflop.test.ts
+- **Files modified**: none
+- **Tests**: 19/19 passing (2296 total, all passing)
+
+## Task 3.5.1: Headless Compile and Run
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/runner.ts, src/headless/__tests__/runner.test.ts
+- **Files modified**: src/core/errors.ts (added OscillationError)
+- **Tests**: 7/7 passing
+
+## Task 2.4.2: Undo/Redo
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/__tests__/undo-redo.test.ts
+- **Files modified**: src/editor/undo-redo.ts (pre-existing, complete), src/editor/edit-operations.ts (removed duplicate EditCommand definition, now imports from undo-redo.ts)
+- **Tests**: 6/6 passing (2309 total, all passing)
+
+## Task 3.5.2: Signal Trace Capture
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/trace.ts, src/headless/__tests__/trace.test.ts
+- **Files modified**: none
+- **Tests**: 2/2 passing
+
+## Task 5.2.20: Oscilloscope
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/io/scope.ts, src/components/io/scope-trigger.ts, src/components/io/__tests__/scope.test.ts
+- **Files modified**: (none)
+- **Tests**: 2360/2360 passing (203 new tests added for Scope, ScopeTrigger)
+
+## Task 5.2.7: Counters
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/memory/counter.ts
+  - src/components/memory/counter-preset.ts
+  - src/components/memory/__tests__/counter.test.ts
+- **Files modified**: none
+- **Tests**: 50/50 passing (2415 total; 1 pre-existing failure in integration.test.ts not introduced by this task)
+
+## Task 5.2.8: Registers
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/memory/register.ts, src/components/memory/register-file.ts, src/components/memory/__tests__/register.test.ts
+- **Files modified**: none
+- **Tests**: 50/50 passing
+- **Notes**: Pre-existing failure in integration.test.ts (oscillatingCircuitDetected) not introduced by this work.

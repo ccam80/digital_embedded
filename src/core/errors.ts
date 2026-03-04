@@ -161,6 +161,36 @@ export class NodeException extends SimulationError {
 }
 
 // ---------------------------------------------------------------------------
+// OscillationError — circuit did not stabilize within iteration limit
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a circuit fails to reach a stable state within the allowed
+ * number of iterations. Indicates a combinational feedback loop that never
+ * converges (e.g. a ring oscillator or improperly initialized SR latch).
+ *
+ * Java reference: de.neemann.digital.core.NodeException (oscillation variant)
+ */
+export class OscillationError extends SimulationError {
+  /** Number of iterations attempted before giving up. */
+  readonly iterations: number;
+
+  constructor(
+    message: string,
+    options?: {
+      componentId?: string;
+      netId?: number;
+      iterations?: number;
+      cause?: unknown;
+    },
+  ) {
+    super(message, options);
+    this.name = "OscillationError";
+    this.iterations = options?.iterations ?? 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PinException — unconnected or misconfigured pin
 // ---------------------------------------------------------------------------
 
