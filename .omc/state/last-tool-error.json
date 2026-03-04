@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"PROJECT=\\\"C:/local_working_projects/digital_js\\\"\\nFILES=(\\n  \\\"src/components/wiring/driver.ts\\\"\\n  \\\"src/components/wiring/driver-inv.ts\\\"\\n  \\\"src/components/wiring/splitter.ts\\\"\\n  \\\"sr...",
-  "error": "Exit code 127\nsed: -e expression #1, char 26: unknown option to `s'\n/usr/bin/bash: line 31: source /c/Users/cca78/.claude/shell-snapshots/snapshot-bash-1772616690735-sgk0o2.sh && shopt -u extglob 2>/dev/null || true && eval 'PROJECT=\"C:/local_working_projects/digital_js\"\nFILES=(\n  \"src/components/wiring/driver.ts\"\n  \"src/components/wiring/driver-inv.ts\"\n  \"src/components/wiring/splitter.ts\"\n  \"src/components/wiring/bus-splitter.ts\"\n  \"src/components/wiring/tunnel.ts\"\n  \"src/components/wiring/__t...",
-  "timestamp": "2026-03-04T09:59:30.401Z",
+  "tool_input_preview": "{\"command\":\"cd /c/local_working_projects/digital_js && git commit -m \\\"$(cat <<'EOF'\\nComplete Phases 2-5: graphic card, lock cleanup, state update\\n\\nAdd graphic card component (5.2.27) — final missi...",
+  "error": "Exit code 1\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file\n\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file",
+  "timestamp": "2026-03-04T21:50:42.352Z",
   "retry_count": 1
 }
