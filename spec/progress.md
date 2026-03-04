@@ -281,3 +281,24 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - src/components/gates/__tests__/xnor.test.ts
 - **Files modified**: none
 - **Tests**: 977/977 passing (558 new tests added, all pass; 419 pre-existing tests continue to pass)
+
+## Task 3.3.1: Propagation Delay Model
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/delay.ts, src/engine/__tests__/delay.test.ts
+- **Files modified**: none (defaultDelay?: number was already present on ComponentDefinition in registry.ts)
+- **Tests**: 3/3 passing
+
+## Task 2.2.1: Component Rendering Dispatch
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/element-renderer.ts, src/editor/__tests__/element-renderer.test.ts
+- **Files modified**: (none)
+- **Tests**: 5/5 passing (1062 total, all passing)
+
+## Task 2.2.2: Wire Rendering
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/wire-signal-access.ts, src/editor/wire-renderer.ts, src/editor/__tests__/wire-renderer.test.ts
+- **Files modified**: none
+- **Tests**: 7/7 passing
