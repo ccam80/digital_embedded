@@ -133,3 +133,151 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: src/components/gates/and.ts, src/components/gates/__tests__/and.test.ts
 - **Files modified**: (none)
 - **Tests**: 47/47 passing
+
+## Task 2.0.1: SimulatorFacade Interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/facade.ts, src/headless/types.ts, src/headless/__tests__/facade-types.test.ts
+- **Tests**: 8/8 passing
+
+## Task 2.0.2: Circuit Builder Implementation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/builder.ts, src/headless/__tests__/builder.test.ts
+- **Tests**: 8/8 passing
+
+## Task 2.0.3: Headless Entry Point and Browser-Dep Fence
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/index.ts, src/headless/__tests__/fence.test.ts, src/headless/__tests__/fence-violation.lint.ts
+- **Files modified**: eslint.config.js
+- **Tests**: 1/1 passing
+
+## Task 2.0.4: Builder Smoke Tests
+- **Status**: complete
+- **Agent**: implementer (via self-continuation from 2.0.3)
+- **Tests**: covered by builder.test.ts (8 tests)
+
+## Task 3.1.1: Compiled Evaluation Engine
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/digital-engine.ts, src/engine/evaluation-mode.ts, src/engine/__tests__/digital-engine.test.ts
+- **Tests**: 8/8 passing
+
+## Task 3.1.3: Noise Mode and Initialization
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/noise-mode.ts, src/engine/init-sequence.ts, src/engine/__tests__/noise-mode.test.ts
+- **Tests**: 4/4 passing
+
+## Task 4.1.2: .dig XML Parser
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/dig-parser.ts, src/io/dom-parser.ts, src/io/__tests__/dig-parser.test.ts
+- **Tests**: passing
+
+---
+## Wave 2.0 Summary
+- **Status**: complete
+- **Tasks completed**: 4/4
+- **Rounds**: 1
+
+---
+## Wave 3.1 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1
+
+---
+## Wave 4.1 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+---
+## Wave 5.1 Summary (partial — exemplar only)
+- **Status**: partial
+- **Tasks completed**: 1/4 (5.1.1 exemplar done, 5.1.2-5.1.4 pending)
+- **Rounds**: 1
+
+## Task 2.1.1: Canvas 2D Renderer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/canvas-renderer.ts, src/editor/__tests__/canvas-renderer.test.ts
+- **Files modified**: (none)
+- **Tests**: 4/4 passing
+
+## Task 2.1.2: Coordinate System and Grid
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/coordinates.ts, src/editor/grid.ts, src/editor/__tests__/coordinates.test.ts, src/editor/__tests__/grid.test.ts
+- **Files modified**: (none)
+- **Tests**: 14/14 passing
+
+## Task 4.2.1: Attribute Mapping Framework
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/attribute-map.ts, src/io/__tests__/attribute-map.test.ts
+- **Files modified**: none
+- **Tests**: 37/37 passing (total suite: 610/610 passing)
+- **Notes**: 
+  - Defined `DigAttributeMapping` extending `AttributeMapping` (registry.ts) with `convertDigValue(v: DigValue): PropertyValue` for typed conversion from parsed DigEntry objects.
+  - `applyAttributeMappings` converts DigEntry[] to PropertyBag using registered mappings; unmapped entries preserved via `getUnmapped()` helper.
+  - `inverterConfig` (string[]) and `color` ({r,g,b,a}) stored as JSON-encoded strings since `PropertyValue = number | string | boolean | bigint | number[]` has no string[] or object variant.
+  - `inValue` stored as JSON-encoded string with bigint serialized as decimal string.
+  - All 11 converter factory functions implemented: stringConverter, intConverter, bigintConverter, boolConverter, rotationConverter, inverterConfigConverter, colorConverter, testDataConverter, dataFieldConverter, inValueConverter, enumConverter.
+
+## Task 2.1.3: Pan and Zoom
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/viewport.ts, src/editor/__tests__/viewport.test.ts
+- **Files modified**: (none)
+- **Tests**: 13/13 passing
+
+## Task 3.2.2: Net Resolution
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/net-resolver.ts, src/engine/__tests__/net-resolver.test.ts
+- **Files modified**: none
+- **Tests**: 10/10 passing
+
+## Task 5.1.3: Basic I/O Components (In, Out, Clock, Const, Ground, VDD, NotConnected)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/io/in.ts (InElement, executeIn, InDefinition, IN_ATTRIBUTE_MAPPINGS)
+  - src/components/io/out.ts (OutElement, executeOut, OutDefinition, OUT_ATTRIBUTE_MAPPINGS, formatValue)
+  - src/components/io/clock.ts (ClockElement, executeClock, ClockDefinition, CLOCK_ATTRIBUTE_MAPPINGS)
+  - src/components/io/const.ts (ConstElement, executeConst, ConstDefinition, CONST_ATTRIBUTE_MAPPINGS)
+  - src/components/io/ground.ts (GroundElement, executeGround, GroundDefinition, GROUND_ATTRIBUTE_MAPPINGS)
+  - src/components/io/vdd.ts (VddElement, executeVdd, VddDefinition, VDD_ATTRIBUTE_MAPPINGS)
+  - src/components/io/not-connected.ts (NotConnectedElement, executeNotConnected, NotConnectedDefinition, NOT_CONNECTED_ATTRIBUTE_MAPPINGS)
+  - src/components/io/__tests__/io.test.ts
+- **Files modified**: none
+- **Tests**: 402/402 passing (821 total, 419 baseline)
+
+## Task 3.2.3: Bus Resolution Subsystem
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/bus-resolution.ts, src/engine/__tests__/bus-resolution.test.ts
+- **Files modified**: none
+- **Tests**: 16/16 passing
+
+## Task 5.1.2: Remaining Standard Logic Gates (Or, Not, NAnd, NOr, XOr, XNOr)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/gates/or.ts
+  - src/components/gates/not.ts
+  - src/components/gates/nand.ts
+  - src/components/gates/nor.ts
+  - src/components/gates/xor.ts
+  - src/components/gates/xnor.ts
+  - src/components/gates/__tests__/or.test.ts
+  - src/components/gates/__tests__/not.test.ts
+  - src/components/gates/__tests__/nand.test.ts
+  - src/components/gates/__tests__/nor.test.ts
+  - src/components/gates/__tests__/xor.test.ts
+  - src/components/gates/__tests__/xnor.test.ts
+- **Files modified**: none
+- **Tests**: 977/977 passing (558 new tests added, all pass; 419 pre-existing tests continue to pass)

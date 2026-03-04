@@ -1,0 +1,341 @@
+/**
+ * Tests for dig-loader.ts — Circuit construction from parsed .dig XML.
+ */
+
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { parseDigXml } from "../dig-parser.js";
+import { loadDigCircuit, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
+import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
+import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext } from "../../core/renderer-interface.js";
+import type { Rect } from "../../core/renderer-interface.js";
+import type { Pin } from "../../core/pin.js";
+import { PinDirection, createInverterConfig, makePin } from "../../core/pin.js";
+import { PropertyBag } from "../../core/properties.js";
+import type { DigCircuit, DigVisualElement } from "../dig-schema.js";
+import { stringConverter, boolConverter, intConverter, testDataConverter } from "../attribute-map.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function readCircuit(name: string): string {
+  return readFileSync(join(process.cwd(), "circuits", name), "utf-8");
+}
+
+// ---------------------------------------------------------------------------
+// Minimal test CircuitElement
+// ---------------------------------------------------------------------------
+
+class TestElement extends AbstractCircuitElement {
+  getPins(): readonly Pin[] { return []; }
+  draw(_ctx: RenderContext): void { /* no-op */ }
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
+  }
+  getHelpText(): string { return "test"; }
+}
+
+// ---------------------------------------------------------------------------
+// Factory helper — creates a TestElement from props, recording label
+// ---------------------------------------------------------------------------
+
+function makeFactory(typeName: string) {
+  return (props: PropertyBag) =>
+    new TestElement(
+      typeName,
+      crypto.randomUUID(),
+      { x: 0, y: 0 },
+      0,
+      false,
+      props,
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Common attribute mappings for test components
+// ---------------------------------------------------------------------------
+
+const LABEL_MAPPING: AttributeMapping = stringConverter("Label", "label");
+const WIDE_SHAPE_MAPPING: AttributeMapping = boolConverter("wideShape", "wideShape");
+const INPUTS_MAPPING: AttributeMapping = intConverter("Inputs", "inputCount");
+const BITS_MAPPING: AttributeMapping = intConverter("Bits", "bitWidth");
+const TEST_DATA_MAPPING: AttributeMapping = testDataConverter();
+
+function noopExecute(): void { /* no-op */ }
+
+function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): ComponentDefinition {
+  return {
+    name,
+    typeId: -1,
+    factory: makeFactory(name),
+    executeFn: noopExecute,
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [LABEL_MAPPING, WIDE_SHAPE_MAPPING, INPUTS_MAPPING, BITS_MAPPING, TEST_DATA_MAPPING, ...extraMappings],
+    category: ComponentCategory.LOGIC,
+    helpText: name,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Registry builder
+// ---------------------------------------------------------------------------
+
+function buildRegistry(names: string[]): ComponentRegistry {
+  const registry = new ComponentRegistry();
+  for (const name of names) {
+    registry.register(makeDefinition(name));
+  }
+  return registry;
+}
+
+function buildAndGateRegistry(): ComponentRegistry {
+  return buildRegistry(["In", "And", "Out", "Testcase"]);
+}
+
+function buildHalfAdderRegistry(): ComponentRegistry {
+  return buildRegistry(["In", "And", "XOr", "Out", "Testcase"]);
+}
+
+function buildSrLatchRegistry(): ComponentRegistry {
+  return buildRegistry(["In", "NOr", "Out"]);
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("DigLoader", () => {
+
+  it("loadsAndGate", () => {
+    const xml = readCircuit("and-gate.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildAndGateRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    expect(circuit.elements).toHaveLength(5);
+    expect(circuit.wires).toHaveLength(5);
+
+    // In elements have correct labels
+    const inElements = circuit.elements.filter((el) => el.typeId === "In");
+    expect(inElements).toHaveLength(2);
+
+    const labelA = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "A");
+    expect(labelA).toBeDefined();
+
+    const labelB = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "B");
+    expect(labelB).toBeDefined();
+
+    // And element has wideShape: true in properties
+    const andElements = circuit.elements.filter((el) => el.typeId === "And");
+    expect(andElements).toHaveLength(1);
+    expect(andElements[0].getProperties().getOrDefault("wideShape", false)).toBe(true);
+  });
+
+  it("elementsPositionedCorrectly", () => {
+    const xml = readCircuit("and-gate.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildAndGateRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    // In "A" is at (200, 200) per the dig file
+    const inElements = circuit.elements.filter((el) => el.typeId === "In");
+    const inA = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "A");
+    expect(inA).toBeDefined();
+    expect(inA!.position).toEqual({ x: 200, y: 200 });
+
+    // And gate is at (300, 200) per the dig file
+    const andElement = circuit.elements.find((el) => el.typeId === "And");
+    expect(andElement).toBeDefined();
+    expect(andElement!.position).toEqual({ x: 300, y: 200 });
+  });
+
+  it("wiresCreatedCorrectly", () => {
+    const xml = readCircuit("and-gate.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildAndGateRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    expect(circuit.wires).toHaveLength(5);
+
+    // First wire: p1=(200,200), p2=(300,200)
+    const wire0 = circuit.wires[0];
+    expect(wire0.start).toEqual({ x: 200, y: 200 });
+    expect(wire0.end).toEqual({ x: 300, y: 200 });
+
+    // Last wire: p1=(380,220), p2=(420,220)
+    const wire4 = circuit.wires[4];
+    expect(wire4.start).toEqual({ x: 380, y: 220 });
+    expect(wire4.end).toEqual({ x: 420, y: 220 });
+  });
+
+  it("unknownElementThrows", () => {
+    const parsed: DigCircuit = {
+      version: 2,
+      attributes: [],
+      visualElements: [
+        {
+          elementName: "FutureComponent",
+          elementAttributes: [],
+          pos: { x: 100, y: 200 },
+        },
+      ],
+      wires: [],
+    };
+
+    const registry = new ComponentRegistry();
+
+    expect(() => loadDigCircuit(parsed, registry)).toThrow(DigParserError);
+    expect(() => loadDigCircuit(parsed, registry)).toThrow("FutureComponent");
+  });
+
+  it("inverterConfigApplied", () => {
+    class PinnedElement extends AbstractCircuitElement {
+      private readonly _testPin: Pin;
+      constructor(props: PropertyBag) {
+        super("And", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+        this._testPin = makePin(
+          {
+            direction: PinDirection.INPUT,
+            label: "in0",
+            defaultBitWidth: 1,
+            position: { x: 0, y: 1 },
+            isNegatable: true,
+            isClockCapable: false,
+          },
+          { x: 0, y: 1 },
+          createInverterConfig([]),
+          { clockPins: new Set<string>() },
+        );
+      }
+      getPins(): readonly Pin[] { return [this._testPin]; }
+      draw(_ctx: RenderContext): void { /* no-op */ }
+      getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; }
+      getHelpText(): string { return ""; }
+    }
+
+    const element = new PinnedElement(new PropertyBag());
+    const pinsBefore = element.getPins();
+    expect(pinsBefore[0].isNegated).toBe(false);
+
+    applyInverterConfig(element, ["in0"]);
+    const pinsAfter = element.getPins();
+    expect(pinsAfter[0].isNegated).toBe(true);
+  });
+
+  it("rotationApplied", () => {
+    const parsed: DigCircuit = {
+      version: 2,
+      attributes: [],
+      visualElements: [
+        {
+          elementName: "And",
+          elementAttributes: [
+            { key: "rotation", value: { type: "rotation", value: 1 } },
+          ],
+          pos: { x: 100, y: 100 },
+        },
+      ],
+      wires: [],
+    };
+
+    const registry = buildRegistry(["And"]);
+    const circuit = loadDigCircuit(parsed, registry);
+
+    expect(circuit.elements).toHaveLength(1);
+    expect(circuit.elements[0].rotation).toBe(1);
+  });
+
+  it("testDataExtracted", () => {
+    const xml = readCircuit("and-gate.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildAndGateRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    const testcaseEl = circuit.elements.find((el) => el.typeId === "Testcase");
+    expect(testcaseEl).toBeDefined();
+
+    const testData = testcaseEl!.getProperties().getOrDefault<string>("testData", "");
+    expect(testData).toContain("A B Y");
+  });
+
+  it("circuitMetadataExtracted", () => {
+    const parsed: DigCircuit = {
+      version: 2,
+      attributes: [
+        { key: "Description", value: { type: "string", value: "My test circuit" } },
+      ],
+      visualElements: [],
+      wires: [],
+    };
+
+    const metadata = extractCircuitMetadata(parsed);
+    expect(metadata.description).toBe("My test circuit");
+  });
+
+  it("createWireFromDig", () => {
+    const dw = { p1: { x: 10, y: 20 }, p2: { x: 30, y: 40 } };
+    const wire = createWireFromDig(dw);
+    expect(wire.start).toEqual({ x: 10, y: 20 });
+    expect(wire.end).toEqual({ x: 30, y: 40 });
+  });
+
+  it("extractCircuitMetadataWithMeasurementOrdering", () => {
+    const parsed: DigCircuit = {
+      version: 2,
+      attributes: [],
+      visualElements: [],
+      wires: [],
+      measurementOrdering: ["A", "B", "Y"],
+    };
+
+    const metadata = extractCircuitMetadata(parsed);
+    expect(metadata.measurementOrdering).toEqual(["A", "B", "Y"]);
+  });
+
+  it("createElementFromDig_throwsForUnknown", () => {
+    const ve: DigVisualElement = {
+      elementName: "UnknownGate",
+      elementAttributes: [],
+      pos: { x: 50, y: 60 },
+    };
+    const registry = new ComponentRegistry();
+
+    expect(() => createElementFromDig(ve, registry)).toThrow(DigParserError);
+
+    let thrown: DigParserError | undefined;
+    try {
+      createElementFromDig(ve, registry);
+    } catch (e) {
+      thrown = e as DigParserError;
+    }
+    expect(thrown).toBeDefined();
+    expect(thrown!.elementName).toBe("UnknownGate");
+    expect(thrown!.position).toEqual({ x: 50, y: 60 });
+    expect(thrown!.message).toContain("UnknownGate");
+  });
+
+  it("loadsHalfAdder", () => {
+    const xml = readCircuit("half-adder.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildHalfAdderRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    expect(circuit.elements).toHaveLength(7);
+    expect(circuit.wires).toHaveLength(12);
+  });
+
+  it("loadsSrLatch", () => {
+    const xml = readCircuit("sr-latch.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildSrLatchRegistry();
+    const circuit = loadDigCircuit(parsed, registry);
+
+    expect(circuit.elements).toHaveLength(6);
+    expect(circuit.wires.length).toBeGreaterThan(0);
+  });
+});

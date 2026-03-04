@@ -127,6 +127,12 @@ export interface ComponentDefinition {
   category: ComponentCategory;
   /** Help text displayed to the user. */
   helpText: string;
+  /**
+   * Default propagation delay in nanoseconds for timed simulation mode.
+   * Individual component instances can override via a "delay" property.
+   * Defaults to 10ns when not specified.
+   */
+  defaultDelay?: number;
 }
 
 // ---------------------------------------------------------------------------

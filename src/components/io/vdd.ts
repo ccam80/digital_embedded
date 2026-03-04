@@ -1,0 +1,185 @@
+/**
+ * VDD component — always outputs all bits set to 1.
+ *
+ * executeFn writes a mask of all ones (based on bitWidth) to its output.
+ */
+
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext } from "../../core/renderer-interface.js";
+import type { Rect } from "../../core/renderer-interface.js";
+import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import {
+  PinDirection,
+  createInverterConfig,
+  resolvePins,
+  layoutPinsOnFace,
+} from "../../core/pin.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
+import type { PropertyDefinition } from "../../core/properties.js";
+import {
+  ComponentCategory,
+  type AttributeMapping,
+  type ComponentDefinition,
+  type ComponentLayout,
+} from "../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Layout constants
+// ---------------------------------------------------------------------------
+
+const COMP_WIDTH = 2;
+const COMP_HEIGHT = 2;
+
+// ---------------------------------------------------------------------------
+// Pin layout
+// ---------------------------------------------------------------------------
+
+function buildVddPinDeclarations(bitWidth: number): PinDeclaration[] {
+  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
+  return [
+    {
+      direction: PinDirection.OUTPUT,
+      label: "out",
+      defaultBitWidth: bitWidth,
+      position: outputPositions[0],
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// VddElement — CircuitElement implementation
+// ---------------------------------------------------------------------------
+
+export class VddElement extends AbstractCircuitElement {
+  private readonly _bitWidth: number;
+  private readonly _pins: readonly Pin[];
+
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("VDD", instanceId, position, rotation, mirror, props);
+
+    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
+
+    const decls = buildVddPinDeclarations(this._bitWidth);
+    this._pins = resolvePins(
+      decls,
+      position,
+      rotation,
+      createInverterConfig([]),
+      { clockPins: new Set<string>() },
+      this._bitWidth,
+    );
+  }
+
+  getPins(): readonly Pin[] {
+    return this._pins;
+  }
+
+  getBoundingBox(): Rect {
+    return {
+      x: this.position.x,
+      y: this.position.y,
+      width: COMP_WIDTH,
+      height: COMP_HEIGHT,
+    };
+  }
+
+  draw(ctx: RenderContext): void {
+    const { x, y } = this.position;
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    const cx = COMP_WIDTH / 2;
+    const cy = COMP_HEIGHT / 2;
+
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+    // Vertical stem
+    ctx.drawLine(cx, cy + 0.5, cx, cy - 0.3);
+    // Horizontal bar at top (VDD symbol)
+    ctx.drawLine(cx - 0.5, cy - 0.3, cx + 0.5, cy - 0.3);
+
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7, weight: "bold" });
+    ctx.drawText("VDD", cx, cy - 0.5, { horizontal: "center", vertical: "bottom" });
+
+    ctx.restore();
+  }
+
+  getHelpText(): string {
+    return (
+      "VDD — always outputs logic 1 (all bits set).\n" +
+      "Connects the net to the supply voltage in the simulation.\n" +
+      "Configurable bit width."
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// executeVdd — writes all-ones mask to output (bit-width masked)
+// ---------------------------------------------------------------------------
+
+export function executeVdd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  // Output all ones. The bit-width mask is applied by the net resolver;
+  // writing 0xFFFFFFFF is correct for any width up to 32 bits.
+  state[layout.outputOffset(index)] = 0xFFFFFFFF;
+}
+
+// ---------------------------------------------------------------------------
+// VDD_ATTRIBUTE_MAPPINGS
+// ---------------------------------------------------------------------------
+
+export const VDD_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  {
+    xmlName: "Bits",
+    propertyKey: "bitWidth",
+    convert: (v) => parseInt(v, 10),
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Property definitions
+// ---------------------------------------------------------------------------
+
+const VDD_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "bitWidth",
+    type: PropertyType.BIT_WIDTH,
+    label: "Bits",
+    defaultValue: 1,
+    min: 1,
+    max: 32,
+    description: "Bit width of the output signal",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// VddDefinition
+// ---------------------------------------------------------------------------
+
+function vddFactory(props: PropertyBag): VddElement {
+  return new VddElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+}
+
+export const VddDefinition: ComponentDefinition = {
+  name: "VDD",
+  typeId: -1,
+  factory: vddFactory,
+  executeFn: executeVdd,
+  pinLayout: buildVddPinDeclarations(1),
+  propertyDefs: VDD_PROPERTY_DEFS,
+  attributeMap: VDD_ATTRIBUTE_MAPPINGS,
+  category: ComponentCategory.IO,
+  helpText:
+    "VDD — always outputs logic 1 (all bits set).\n" +
+    "Connects the net to the supply voltage in the simulation.\n" +
+    "Configurable bit width.",
+};
