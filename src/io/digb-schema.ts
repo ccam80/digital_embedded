@@ -83,6 +83,11 @@ export interface DigbDocument {
    * Absent when the main circuit has no subcircuit references.
    */
   subcircuitDefinitions?: Record<string, DigbCircuit>;
+  /**
+   * Embedded FSM (finite state machine) definition.
+   * Present when the document contains an FSM editor state.
+   */
+  fsm?: object;
 }
 
 // ---------------------------------------------------------------------------

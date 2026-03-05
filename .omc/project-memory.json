@@ -127,14 +127,14 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 75,
-      "lastAccessed": 1772702224186,
+      "accessCount": 77,
+      "lastAccessed": 1772703567331,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 44,
-      "lastAccessed": 1772702215896,
+      "accessCount": 46,
+      "lastAccessed": 1772703163364,
       "type": "file"
     },
     {
@@ -192,27 +192,27 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 10,
+      "lastAccessed": 1772703180344,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 10,
+      "lastAccessed": 1772703188529,
+      "type": "file"
+    },
+    {
       "path": "src\\test-utils\\mock-engine.ts",
       "accessCount": 9,
       "lastAccessed": 1772689457575,
       "type": "file"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772689462755,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\signal.ts",
       "accessCount": 9,
       "lastAccessed": 1772689735160,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 9,
-      "lastAccessed": 1772699832507,
       "type": "file"
     },
     {
@@ -264,6 +264,18 @@
       "type": "file"
     },
     {
+      "path": "src\\test-utils\\mock-render-context.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772703198082,
+      "type": "file"
+    },
+    {
+      "path": "vitest.config.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772703205951,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-2-canvas-editor.md",
       "accessCount": 4,
       "lastAccessed": 1772685171546,
@@ -273,18 +285,6 @@
       "path": "src\\headless\\__tests__\\facade-types.test.ts",
       "accessCount": 4,
       "lastAccessed": 1772688724988,
-      "type": "file"
-    },
-    {
-      "path": "vitest.config.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772699856647,
-      "type": "file"
-    },
-    {
-      "path": "src\\test-utils\\mock-render-context.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772700796210,
       "type": "file"
     },
     {
@@ -300,6 +300,12 @@
       "type": "file"
     },
     {
+      "path": "tsconfig.json",
+      "accessCount": 3,
+      "lastAccessed": 1772703205935,
+      "type": "file"
+    },
+    {
       "path": "src\\core\\errors.ts",
       "accessCount": 2,
       "lastAccessed": 1772685220155,
@@ -312,15 +318,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-1-foundation.md",
-      "accessCount": 1,
-      "lastAccessed": 1772685147187,
+      "path": "src\\core\\__tests__\\signal.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772703195504,
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\signal.test.ts",
+      "path": "spec\\phase-1-foundation.md",
       "accessCount": 1,
-      "lastAccessed": 1772685161218,
+      "lastAccessed": 1772685147187,
       "type": "file"
     },
     {
@@ -411,12 +417,6 @@
       "path": "src\\engine\\evaluation-mode.ts",
       "accessCount": 1,
       "lastAccessed": 1772685175890,
-      "type": "file"
-    },
-    {
-      "path": "tsconfig.json",
-      "accessCount": 1,
-      "lastAccessed": 1772685177280,
       "type": "file"
     },
     {

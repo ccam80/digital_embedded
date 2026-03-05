@@ -74,3 +74,8 @@
 {"t":0,"agent":"a273543","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a273543","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
 {"t":0,"agent":"ae0f46c","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
+{"t":0,"agent":"a776fb1","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a1a998b","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"abd1c8e","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"abd1c8e","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
+{"t":0,"agent":"a1a998b","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
