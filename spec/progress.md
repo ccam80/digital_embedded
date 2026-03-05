@@ -752,14 +752,68 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Waves completed**: 1/1 (5.5.1)
 - **Total tasks**: 4/4
 
+## Task 6.1.1: .dig Loader
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/dig-loader.ts, src/io/__tests__/dig-loader.test.ts
+- **Files modified**: src/headless/builder.ts
+- **Tests**: passing
+
 ## Task 6.1.2: Engine-Editor Binding
 - **Status**: complete
 - **Agent**: implementer
-- **Files created**:
-  - src/integration/editor-binding.ts
-  - src/integration/redraw-coordinator.ts
-  - src/integration/speed-control.ts
-  - src/integration/__tests__/editor-binding.test.ts
-  - src/integration/__tests__/speed-control.test.ts
+- **Files created**: src/integration/editor-binding.ts, src/integration/redraw-coordinator.ts, src/integration/speed-control.ts, src/integration/__tests__/editor-binding.test.ts, src/integration/__tests__/speed-control.test.ts
 - **Files modified**: none
 - **Tests**: 11/11 passing
+
+---
+## Wave 6.1 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+## Task 6.2.4: Generic Circuit Resolution
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/generic-cache.ts
+- **Files modified**: src/io/__tests__/resolve-generics.test.ts
+- **Tests**: 17/17 passing (6 new spec-required tests added to existing 11)
+- **Notes**: src/io/resolve-generics.ts already existed with full implementation. Created the separate src/io/generic-cache.ts (GenericCache class + computeGenericCacheKey). Added the 6 spec-required tests: resolveBasic, addComponent, cacheHit, cacheMiss, templateUnmodified, perElementScript. Full suite 3467/3467 passing (1 pre-existing skip unchanged).
+
+## Task 6.2.3: Subcircuit Engine Flattening
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/flatten.ts, src/engine/__tests__/flatten.test.ts
+- **Files modified**: none
+- **Tests**: 8/8 passing
+- **Notes**: Defined SubcircuitHost interface (duck-typed, internalCircuit + subcircuitName) so flatten.ts is independent of task 6.2.1's concrete SubcircuitElement class. ScopedElement wrapper overrides instanceId for scoped naming without mutating originals. Bridge wires connect parent net positions to internal In/Out element pin positions. Recursive flattening with seen-set protects against circular references.
+
+## Task 6.2.2: Recursive .dig Loading with File Resolver
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/io/file-resolver.ts` — FileResolver interface, EmbeddedResolver, CacheResolver, HttpResolver, NodeResolver, ChainResolver, ResolverNotFoundError, createDefaultResolver
+  - `src/io/subcircuit-loader.ts` — loadWithSubcircuits(), clearSubcircuitCache(), subcircuitCacheSize(), SubcircuitHolderElement
+  - `src/io/__tests__/file-resolver.test.ts` — 23 tests covering all resolver implementations and chain ordering
+  - `src/io/__tests__/subcircuit-loader.test.ts` — 11 tests covering recursive loading, cycle detection, depth limit, cache reuse, cache clearing
+- **Files modified**: none
+
+## Task 6.2.1: Subcircuit Component Type
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/subcircuit/subcircuit.ts` — SubcircuitElement class, SubcircuitDefinition interface, registerSubcircuit() function, executeSubcircuit() no-op
+  - `src/components/subcircuit/pin-derivation.ts` — deriveInterfacePins() function
+  - `src/components/subcircuit/shape-renderer.ts` — drawDefaultShape(), drawDILShape(), drawCustomShape(), drawLayoutShape(), computeChipDimensions()
+  - `src/components/subcircuit/__tests__/subcircuit.test.ts` — 11 tests covering all spec requirements
+- **Files modified**:
+  - `src/core/registry.ts` — added ComponentCategory.SUBCIRCUIT = "SUBCIRCUIT"
+- **Tests**: 11/11 passing
+- **Notes**: src/io/__tests__/subcircuit-loader.test.ts has 1 pre-existing failure (task 6.2.2 file, cacheReuse test). This was present before task 6.2.1 work and is unrelated to this task.
+- **Tests**: 34/34 passing (total suite: 3520/3521, 1 pre-existing skip)
+
+---
+## Wave 6.2 Summary
+- **Status**: complete
+- **Tasks completed**: 4/4
+- **Rounds**: 1

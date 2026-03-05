@@ -10,6 +10,7 @@ import {
   isGenericCircuit,
   GenericResolutionCache,
 } from "../resolve-generics.js";
+import { GenericCache, computeGenericCacheKey } from "../generic-cache.js";
 import { Circuit } from "../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
@@ -370,3 +371,173 @@ function makeTestDef(name: string): ComponentDefinition {
     helpText: name,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Task 6.2.4 spec-required tests
+// ---------------------------------------------------------------------------
+
+describe("resolveGeneric", () => {
+  it("resolveBasic", async () => {
+    // Generic circuit with args.bits = 8; script sets element bit widths.
+    // We use an And gate whose Inputs attribute gets set to args.bits.
+    const registry = makeRegistry(
+      makeGenericCodeDef("GenericInitCode"),
+      { ...AndDefinition, name: "And" },
+    );
+
+    const circuit = new Circuit({ isGeneric: true });
+
+    const initProps = new PropertyBag();
+    initProps.set("generic", "bits:=8;");
+    initProps.set("enabled", true);
+    circuit.addElement(buildElement("GenericInitCode", initProps));
+
+    const andProps = new PropertyBag();
+    andProps.set("generic", "this.Inputs=args.bits;");
+    andProps.set("inputCount", 2);
+    circuit.addElement(buildElement("And", andProps));
+
+    const resolved = await resolveGenericCircuit(circuit, new Map(), registry);
+
+    expect(resolved.metadata.isGeneric).toBe(false);
+    const andEl = resolved.elements.find((e) => e.typeId === "And");
+    expect(andEl).toBeDefined();
+    expect(andEl!.getProperties().getOrDefault<number>("inputCount", 2)).toBe(8);
+  });
+
+  it("addComponent", async () => {
+    // Generic script calls addComponent() → extra component appears in resolved circuit.
+    const registry = makeRegistry(
+      makeGenericCodeDef("GenericCode"),
+      { ...InDefinition, name: "In" },
+    );
+
+    const circuit = new Circuit({ isGeneric: true });
+
+    const codeProps = new PropertyBag();
+    codeProps.set("generic", 'addComponent("In", 2, 4);');
+    circuit.addElement(buildElement("GenericCode", codeProps));
+
+    const externalArgs = new Map<string, HGSValue>([["n", 1n]]);
+    const resolved = await resolveGenericCircuit(circuit, externalArgs, registry);
+
+    const inEls = resolved.elements.filter((e) => e.typeId === "In");
+    expect(inEls).toHaveLength(1);
+    expect(inEls[0].position).toEqual({ x: 2, y: 4 });
+  });
+
+  it("cacheHit", async () => {
+    // Resolve the same generic with the same args twice.
+    // The GenericCache should return the same object reference on the second call.
+    const registry = makeRegistry(
+      makeGenericCodeDef("GenericInitCode"),
+    );
+    const circuit = buildInitCodeCircuit("bits:=4;");
+
+    const cache = new GenericCache();
+    const args = new Map<string, HGSValue>();
+    const key = computeGenericCacheKey("myCircuit", args);
+
+    const resolved1 = await resolveGenericCircuit(circuit, args, registry);
+    cache.set(key, resolved1);
+
+    const hit = cache.get(key);
+    expect(hit).toBeDefined();
+    expect(hit).toBe(resolved1);
+  });
+
+  it("cacheMiss", async () => {
+    // Resolve the same generic with different args → different results, different keys.
+    const registry = makeRegistry(
+      makeGenericCodeDef("GenericInitCode"),
+      { ...AndDefinition, name: "And" },
+    );
+
+    const circuit = new Circuit({ isGeneric: true });
+
+    const initProps = new PropertyBag();
+    initProps.set("generic", "bits:=4;");
+    initProps.set("enabled", true);
+    circuit.addElement(buildElement("GenericInitCode", initProps));
+
+    const andProps = new PropertyBag();
+    andProps.set("generic", "this.Inputs=args.bits;");
+    andProps.set("inputCount", 2);
+    circuit.addElement(buildElement("And", andProps));
+
+    const args4 = new Map<string, HGSValue>([["bits", 4n]]);
+    const args8 = new Map<string, HGSValue>([["bits", 8n]]);
+
+    const key4 = computeGenericCacheKey("myCircuit", args4);
+    const key8 = computeGenericCacheKey("myCircuit", args8);
+
+    const resolved4 = await resolveGenericCircuit(circuit, args4, registry);
+    const resolved8 = await resolveGenericCircuit(circuit, args8, registry);
+
+    expect(key4).not.toBe(key8);
+    expect(resolved4).not.toBe(resolved8);
+
+    const andEl4 = resolved4.elements.find((e) => e.typeId === "And");
+    const andEl8 = resolved8.elements.find((e) => e.typeId === "And");
+    expect(andEl4!.getProperties().getOrDefault<number>("inputCount", 2)).toBe(4);
+    expect(andEl8!.getProperties().getOrDefault<number>("inputCount", 2)).toBe(8);
+  });
+
+  it("templateUnmodified", async () => {
+    // After resolution, the original template circuit must be unchanged.
+    const registry = makeRegistry(
+      makeGenericCodeDef("GenericInitCode"),
+      { ...AndDefinition, name: "And" },
+    );
+
+    const circuit = new Circuit({ isGeneric: true });
+
+    const initProps = new PropertyBag();
+    initProps.set("generic", "n:=3;");
+    initProps.set("enabled", true);
+    circuit.addElement(buildElement("GenericInitCode", initProps));
+
+    const andProps = new PropertyBag();
+    andProps.set("generic", "this.Inputs=args.n;");
+    andProps.set("inputCount", 2);
+    circuit.addElement(buildElement("And", andProps));
+
+    const originalElementCount = circuit.elements.length;
+    const originalAndInputCount = circuit.elements
+      .find((e) => e.typeId === "And")!
+      .getProperties()
+      .getOrDefault<number>("inputCount", 2);
+
+    await resolveGenericCircuit(circuit, new Map(), registry);
+
+    expect(circuit.metadata.isGeneric).toBe(true);
+    expect(circuit.elements).toHaveLength(originalElementCount);
+    const andAfter = circuit.elements
+      .find((e) => e.typeId === "And")!
+      .getProperties()
+      .getOrDefault<number>("inputCount", 2);
+    expect(andAfter).toBe(originalAndInputCount);
+  });
+
+  it("perElementScript", async () => {
+    // An element with a `generic` attribute script modifies that element's properties.
+    // Uses external args to bypass needing a GenericInitCode.
+    const registry = makeRegistry(
+      { ...AndDefinition, name: "And" },
+    );
+
+    const circuit = new Circuit({ isGeneric: true });
+
+    const andProps = new PropertyBag();
+    andProps.set("generic", "this.Inputs=args.count;");
+    andProps.set("inputCount", 2);
+    circuit.addElement(buildElement("And", andProps));
+
+    const externalArgs = new Map<string, HGSValue>([["count", 5n]]);
+    const resolved = await resolveGenericCircuit(circuit, externalArgs, registry);
+
+    const andEl = resolved.elements.find((e) => e.typeId === "And");
+    expect(andEl).toBeDefined();
+    expect(andEl!.getProperties().getOrDefault<number>("inputCount", 2)).toBe(5);
+  });
+});

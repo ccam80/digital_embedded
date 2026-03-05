@@ -27,6 +27,7 @@ export const enum ComponentCategory {
   GRAPHICS = "GRAPHICS",
   TERMINAL = "TERMINAL",
   SEVENTY_FOUR_XX = "74XX",
+  SUBCIRCUIT = "SUBCIRCUIT",
 }
 
 // ---------------------------------------------------------------------------
