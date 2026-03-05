@@ -127,20 +127,20 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 41,
-      "lastAccessed": 1772688604870,
+      "accessCount": 48,
+      "lastAccessed": 1772688896283,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 20,
-      "lastAccessed": 1772688365436,
+      "accessCount": 24,
+      "lastAccessed": 1772688643373,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 18,
-      "lastAccessed": 1772688371049,
+      "accessCount": 21,
+      "lastAccessed": 1772688644060,
       "type": "file"
     },
     {
@@ -168,15 +168,21 @@
       "type": "file"
     },
     {
+      "path": "src\\headless\\types.ts",
+      "accessCount": 10,
+      "lastAccessed": 1772688665270,
+      "type": "file"
+    },
+    {
       "path": "src\\core\\properties.ts",
       "accessCount": 8,
       "lastAccessed": 1772687453543,
       "type": "file"
     },
     {
-      "path": "src\\headless\\types.ts",
+      "path": "src\\headless\\facade.ts",
       "accessCount": 8,
-      "lastAccessed": 1772688378033,
+      "lastAccessed": 1772688704325,
       "type": "file"
     },
     {
@@ -228,12 +234,6 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\facade.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772687908471,
-      "type": "file"
-    },
-    {
       "path": "spec\\phase-2-canvas-editor.md",
       "accessCount": 4,
       "lastAccessed": 1772685171546,
@@ -252,15 +252,15 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\circuit.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772686635966,
+      "path": "src\\headless\\__tests__\\facade-types.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772688724988,
       "type": "file"
     },
     {
-      "path": "src\\headless\\__tests__\\facade-types.test.ts",
+      "path": "src\\core\\__tests__\\circuit.test.ts",
       "accessCount": 3,
-      "lastAccessed": 1772686681841,
+      "lastAccessed": 1772686635966,
       "type": "file"
     },
     {
@@ -276,6 +276,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 3,
+      "lastAccessed": 1772688715122,
+      "type": "file"
+    },
+    {
       "path": "src\\core\\errors.ts",
       "accessCount": 2,
       "lastAccessed": 1772685220155,
@@ -288,12 +294,6 @@
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 2,
-      "lastAccessed": 1772686527091,
-      "type": "file"
-    },
-    {
       "path": "src\\test-utils\\mock-render-context.ts",
       "accessCount": 2,
       "lastAccessed": 1772687373496,
@@ -303,6 +303,12 @@
       "path": "vitest.config.ts",
       "accessCount": 2,
       "lastAccessed": 1772687868957,
+      "type": "file"
+    },
+    {
+      "path": "vite.config.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772688704465,
       "type": "file"
     },
     {
@@ -411,12 +417,6 @@
       "path": "tsconfig.json",
       "accessCount": 1,
       "lastAccessed": 1772685177280,
-      "type": "file"
-    },
-    {
-      "path": "vite.config.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772685177577,
       "type": "file"
     },
     {

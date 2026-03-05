@@ -861,3 +861,35 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Status**: complete
 - **Tasks completed**: 6/6
 - **Rounds**: 2 (6.3.5 required retry)
+
+## Task 6.4.1: Simulator HTML Page
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: simulator.html, src/app/url-params.ts, src/app/app-init.ts, src/app/__tests__/url-params.test.ts
+- **Files modified**: src/main.ts
+- **Tests**: 12/12 passing
+- **Notes**: parser.test.ts > bitsExpansion failure in full suite is pre-existing from another parallel agent work on src/testing/parser.ts, not introduced by this task.
+
+## Task 6.4.2: postMessage API
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/postmessage-adapter.ts, src/io/__tests__/postmessage-adapter.test.ts
+- **Tests**: passing
+
+## Task 6.4.3: Tutorial Host Page
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: tutorial.html, src/tutorial/tutorial-host.ts, src/tutorial/markdown-renderer.ts, src/tutorial/__tests__/tutorial-host.test.ts
+- **Tests**: passing
+
+---
+## Wave 6.4 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1
+
+---
+## Phase 6 Summary
+- **Status**: complete
+- **Waves completed**: 4/4 (6.1, 6.2, 6.3, 6.4)
+- **Total tasks**: 15/15
