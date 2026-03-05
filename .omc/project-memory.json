@@ -127,14 +127,14 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 77,
-      "lastAccessed": 1772703567331,
+      "accessCount": 78,
+      "lastAccessed": 1772703668285,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 46,
-      "lastAccessed": 1772703163364,
+      "accessCount": 47,
+      "lastAccessed": 1772703662253,
       "type": "file"
     },
     {
@@ -145,20 +145,20 @@
     },
     {
       "path": "src\\core\\element.ts",
-      "accessCount": 21,
-      "lastAccessed": 1772702415224,
+      "accessCount": 22,
+      "lastAccessed": 1772703860269,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 20,
-      "lastAccessed": 1772702479912,
+      "accessCount": 21,
+      "lastAccessed": 1772703698035,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 18,
-      "lastAccessed": 1772702414739,
+      "accessCount": 20,
+      "lastAccessed": 1772703842019,
       "type": "file"
     },
     {
@@ -180,15 +180,15 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\types.ts",
-      "accessCount": 10,
-      "lastAccessed": 1772688665270,
+      "path": "src\\core\\properties.ts",
+      "accessCount": 11,
+      "lastAccessed": 1772703860502,
       "type": "file"
     },
     {
-      "path": "src\\core\\properties.ts",
+      "path": "src\\headless\\types.ts",
       "accessCount": 10,
-      "lastAccessed": 1772702438114,
+      "lastAccessed": 1772688665270,
       "type": "file"
     },
     {

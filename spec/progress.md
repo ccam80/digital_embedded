@@ -1167,3 +1167,24 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files modified**: src/io/digb-schema.ts (added optional `fsm?: object` field to DigbDocument)
 - **Tests**: 9/9 passing
 - **Notes**: The `addState()` signature was changed from positional `isInitial: boolean` to an options object `{ outputs?, isInitial?, radius? }` to support the full FSMState interface per the spec. Task 10.1.2 files (editor.ts, fsm-renderer.ts, and their tests) have type errors because they use the old positional signature and need updating to the options object form.
+
+## Task 10.2.1: FSM -> State Transition Table
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/fsm/table-creator.ts, src/fsm/state-encoding.ts, src/fsm/__tests__/table-creator.test.ts
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 10.2.2: FSM -> Circuit
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/fsm/circuit-gen.ts, src/fsm/__tests__/circuit-gen.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 10.2.3: FSM Optimizer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/fsm/optimizer.ts, src/fsm/__tests__/optimizer.test.ts
+- **Files modified**: none
+- **Tests**: 4/4 passing
