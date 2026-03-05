@@ -127,14 +127,14 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 74,
-      "lastAccessed": 1772700742618,
+      "accessCount": 75,
+      "lastAccessed": 1772702224186,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 42,
-      "lastAccessed": 1772700721398,
+      "accessCount": 44,
+      "lastAccessed": 1772702215896,
       "type": "file"
     },
     {
@@ -145,20 +145,20 @@
     },
     {
       "path": "src\\core\\element.ts",
-      "accessCount": 20,
-      "lastAccessed": 1772700049512,
+      "accessCount": 21,
+      "lastAccessed": 1772702415224,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 18,
-      "lastAccessed": 1772689474989,
+      "accessCount": 20,
+      "lastAccessed": 1772702479912,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 17,
-      "lastAccessed": 1772699716811,
+      "accessCount": 18,
+      "lastAccessed": 1772702414739,
       "type": "file"
     },
     {
@@ -186,6 +186,12 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\properties.ts",
+      "accessCount": 10,
+      "lastAccessed": 1772702438114,
+      "type": "file"
+    },
+    {
       "path": "src\\test-utils\\mock-engine.ts",
       "accessCount": 9,
       "lastAccessed": 1772689457575,
@@ -210,12 +216,6 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772700083635,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\__tests__\\renderer-interface.test.ts",
       "accessCount": 7,
       "lastAccessed": 1772686703403,
@@ -223,8 +223,14 @@
     },
     {
       "path": "src\\components\\io\\in.ts",
+      "accessCount": 7,
+      "lastAccessed": 1772702433262,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\and.ts",
       "accessCount": 6,
-      "lastAccessed": 1772700182164,
+      "lastAccessed": 1772702427083,
       "type": "file"
     },
     {
@@ -252,9 +258,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\and.ts",
+      "path": "src\\core\\pin.ts",
       "accessCount": 5,
-      "lastAccessed": 1772689081787,
+      "lastAccessed": 1772702420146,
       "type": "file"
     },
     {
@@ -267,12 +273,6 @@
       "path": "src\\headless\\__tests__\\facade-types.test.ts",
       "accessCount": 4,
       "lastAccessed": 1772688724988,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772688974325,
       "type": "file"
     },
     {
