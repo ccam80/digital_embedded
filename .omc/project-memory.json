@@ -127,20 +127,20 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 60,
-      "lastAccessed": 1772694776423,
+      "accessCount": 65,
+      "lastAccessed": 1772695032594,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 32,
-      "lastAccessed": 1772689438799,
+      "accessCount": 35,
+      "lastAccessed": 1772694843923,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 28,
-      "lastAccessed": 1772689443396,
+      "accessCount": 30,
+      "lastAccessed": 1772694844485,
       "type": "file"
     },
     {
@@ -163,8 +163,8 @@
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 14,
-      "lastAccessed": 1772689468435,
+      "accessCount": 15,
+      "lastAccessed": 1772694875204,
       "type": "file"
     },
     {
@@ -213,6 +213,12 @@
       "path": "src\\core\\__tests__\\renderer-interface.test.ts",
       "accessCount": 7,
       "lastAccessed": 1772686703403,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 7,
+      "lastAccessed": 1772695016860,
       "type": "file"
     },
     {
@@ -267,12 +273,6 @@
       "path": "src\\core\\pin.ts",
       "accessCount": 4,
       "lastAccessed": 1772688974325,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 4,
-      "lastAccessed": 1772689478256,
       "type": "file"
     },
     {
