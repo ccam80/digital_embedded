@@ -120,9 +120,7 @@ export function detectCycles(circuit: Circuit): CycleInfo[] {
         // Find all components that consume this net
         const consumers = collectNetConsumers(nid, netId, netConsumers, elements);
         for (const consumer of consumers) {
-          if (consumer.instanceId !== el.instanceId) {
-            adjacency.get(el.instanceId)?.add(consumer.instanceId);
-          }
+          adjacency.get(el.instanceId)?.add(consumer.instanceId);
         }
       }
     }

@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_js\\\" && npx vitest run \\\"src/io/__tests__/postmessage-adapter.test.ts\\\" 2>&1\",\"timeout\":60000,\"description\":\"Run postmessage-adapter tests\"}",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_js\u001b[39m\n\n \u001b[31m❯\u001b[39m src/io/__tests__/postmessage-adapter.test.ts \u001b[2m(\u001b[22m\u001b[2m20 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m2 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 26\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m PostMessageAdapter — digital-load-json\u001b[2m > \u001b[22mloadJson — valid digb JSON loads circuit and compiles engine, digital-loaded sent\u001b[90m 7\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → expected [ { type: 'digital-error', …(1) } ] t...",
-  "timestamp": "2026-03-05T05:34:10.451Z",
-  "retry_count": 3
+  "tool_input_preview": "{\"command\":\"cd /c/local_working_projects/digital_js && rm -rf spec/.locks/tasks/* spec/.locks/files/* 2>/dev/null && git add -A && git commit -m \\\"Complete Waves 7.1, 7.2; partial 8.1, 9.1 — fix scope...",
+  "error": "Exit code 127\n/usr/bin/bash: line 2: source /c/Users/cca78/.claude/shell-snapshots/snapshot-bash-1772686510651-b4u4mh.sh && shopt -u extglob 2>/dev/null || true && eval 'cd /c/local_working_projects/digital_js && rm -rf spec/.locks/tasks/* spec/.locks/files/* 2>/dev/null && git add -A && git commit -m \"Complete Waves 7.1, 7.2; partial 8.1, 9.1 — fix scope-trigger, gif, cycle-detector\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\"' && pwd -P >| /c/Users/cca78/AppData/Local/Temp/claude-...",
+  "timestamp": "2026-03-05T07:13:02.236Z",
+  "retry_count": 1
 }
