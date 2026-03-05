@@ -125,10 +125,10 @@ describe("DigLoader", () => {
     expect(inElements).toHaveLength(2);
 
     const labelA = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "A");
-    expect(labelA).toBeDefined();
+    expect(labelA).not.toBeUndefined();
 
     const labelB = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "B");
-    expect(labelB).toBeDefined();
+    expect(labelB).not.toBeUndefined();
 
     // And element has wideShape: true in properties
     const andElements = circuit.elements.filter((el) => el.typeId === "And");
@@ -257,7 +257,7 @@ describe("DigLoader", () => {
     const circuit = loadDigCircuit(parsed, registry);
 
     const testcaseEl = circuit.elements.find((el) => el.typeId === "Testcase");
-    expect(testcaseEl).toBeDefined();
+    expect(testcaseEl).not.toBeUndefined();
 
     const testData = testcaseEl!.getProperties().getOrDefault<string>("testData", "");
     expect(testData).toContain("A B Y");
@@ -336,6 +336,6 @@ describe("DigLoader", () => {
     const circuit = loadDigCircuit(parsed, registry);
 
     expect(circuit.elements).toHaveLength(6);
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    expect(circuit.wires).toHaveLength(14);
   });
 });

@@ -345,21 +345,21 @@ describe("Terminal", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = TERMINAL_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("UART")).toBe("UART");
     });
 
     it("Columns attribute maps to columns property", () => {
       const mapping = TERMINAL_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Columns");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("columns");
       expect(mapping!.convert("40")).toBe(40);
     });
 
     it("Rows attribute maps to rows property", () => {
       const mapping = TERMINAL_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Rows");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("rows");
       expect(mapping!.convert("12")).toBe(12);
     });
@@ -392,7 +392,7 @@ describe("Terminal", () => {
     });
 
     it("TerminalDefinition has non-empty helpText", () => {
-      expect(TerminalDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof TerminalDefinition.helpText).toBe("string"); expect(TerminalDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("TerminalDefinition can be registered without error", () => {
@@ -605,7 +605,7 @@ describe("Keyboard", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = KEYBOARD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("KBD")).toBe("KBD");
     });
@@ -636,7 +636,7 @@ describe("Keyboard", () => {
     });
 
     it("KeyboardDefinition has non-empty helpText", () => {
-      expect(KeyboardDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof KeyboardDefinition.helpText).toBe("string"); expect(KeyboardDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("KeyboardDefinition can be registered without error", () => {

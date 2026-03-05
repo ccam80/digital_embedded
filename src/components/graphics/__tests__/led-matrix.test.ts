@@ -187,7 +187,7 @@ describe("LedMatrix", () => {
       const layout = makeLayout();
       const state = makeState(0xAB, 3);
       executeLedMatrix(0, state, layout);
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
       // Output encodes both values
       const colAddr = state[2] & 0xFFFF;
       const rowData = (state[2] >>> 16) & 0xFFFF;
@@ -210,7 +210,7 @@ describe("LedMatrix", () => {
         state[1] = i & 0x7;
         executeLedMatrix(0, state, layout);
       }
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -328,8 +328,8 @@ describe("LedMatrix", () => {
     it("bounding box has positive dimensions", () => {
       const el = makeLedMatrix();
       const box = el.getBoundingBox();
-      expect(box.width).toBeGreaterThan(0);
-      expect(box.height).toBeGreaterThan(0);
+      expect(box.width).toBeGreaterThanOrEqual(2);
+      expect(box.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -340,21 +340,21 @@ describe("LedMatrix", () => {
   describe("attributeMapping", () => {
     it("rowDataBits xmlName maps to rowDataBits propertyKey as integer", () => {
       const mapping = LED_MATRIX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "rowDataBits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("rowDataBits");
       expect(mapping!.convert("16")).toBe(16);
     });
 
     it("colAddrBits xmlName maps to colAddrBits propertyKey as integer", () => {
       const mapping = LED_MATRIX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "colAddrBits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("colAddrBits");
       expect(mapping!.convert("4")).toBe(4);
     });
 
     it("Label xmlName maps to label propertyKey", () => {
       const mapping = LED_MATRIX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("Display")).toBe("Display");
     });
@@ -429,7 +429,7 @@ describe("LedMatrix", () => {
 
     it("LedMatrixDefinition has a non-empty helpText", () => {
       expect(typeof LedMatrixDefinition.helpText).toBe("string");
-      expect(LedMatrixDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof LedMatrixDefinition.helpText).toBe("string"); expect(LedMatrixDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("LedMatrixElement.getHelpText() returns relevant text", () => {
@@ -446,7 +446,7 @@ describe("LedMatrix", () => {
       const registry = new ComponentRegistry();
       registry.register(LedMatrixDefinition);
       const registered = registry.get("LedMatrix");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

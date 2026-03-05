@@ -200,14 +200,14 @@ describe("Button", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = BUTTON_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("START")).toBe("START");
     });
 
     it("ActiveLow=true maps to boolean true", () => {
       const mapping = BUTTON_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "ActiveLow");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
     });
 
@@ -247,7 +247,7 @@ describe("Button", () => {
     });
 
     it("ButtonDefinition has non-empty helpText", () => {
-      expect(ButtonDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof ButtonDefinition.helpText).toBe("string"); expect(ButtonDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("ButtonDefinition can be registered without error", () => {

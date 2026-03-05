@@ -263,8 +263,8 @@ describe("Fuse — ComponentDefinition", () => {
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(4);
     expect(bb.y).toBe(6);
-    expect(bb.width).toBeGreaterThan(0);
-    expect(bb.height).toBeGreaterThan(0);
+    expect(bb.width).toBeGreaterThanOrEqual(2);
+    expect(bb.height).toBeGreaterThanOrEqual(2);
   });
 
   it("defaultDelay — is zero (combinational)", () => {

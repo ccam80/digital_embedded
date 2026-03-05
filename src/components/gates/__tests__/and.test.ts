@@ -210,7 +210,7 @@ describe("AndGate", () => {
         executeAnd(0, state, layout);
       }
 
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -294,14 +294,14 @@ describe("AndGate", () => {
 
     it("Label attribute maps to label property key", () => {
       const mapping = AND_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("MyGate")).toBe("MyGate");
     });
 
     it("inverterConfig attribute maps to _inverterLabels property key", () => {
       const mapping = AND_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "inverterConfig");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("_inverterLabels");
       expect(mapping!.convert("in0,in2")).toBe("in0,in2");
     });
@@ -502,7 +502,7 @@ describe("AndGate", () => {
 
     it("AndDefinition has a non-empty helpText", () => {
       expect(typeof AndDefinition.helpText).toBe("string");
-      expect(AndDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof AndDefinition.helpText).toBe("string"); expect(AndDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("AndElement.getHelpText() returns the expected text", () => {
@@ -519,7 +519,7 @@ describe("AndGate", () => {
       const registry = new ComponentRegistry();
       registry.register(AndDefinition);
       const registered = registry.get("And");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

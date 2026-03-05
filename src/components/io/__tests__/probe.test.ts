@@ -122,7 +122,7 @@ describe("Probe", () => {
         state[0] = i & 0xFFFFFFFF;
         executeProbe(0, state, layout);
       }
-      expect(state[1]).toBeDefined();
+      expect(typeof state[1]).toBe("number");
     });
   });
 
@@ -331,7 +331,7 @@ describe("Probe", () => {
     });
 
     it("ProbeDefinition has non-empty helpText", () => {
-      expect(ProbeDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof ProbeDefinition.helpText).toBe("string"); expect(ProbeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("ProbeDefinition can be registered without error", () => {

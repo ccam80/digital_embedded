@@ -44,20 +44,20 @@ describe("DigParser", () => {
 
     // And element has wideShape: true
     const andEl = circuit.visualElements.find((ve) => ve.elementName === "And");
-    expect(andEl).toBeDefined();
+    expect(andEl).not.toBeUndefined();
     const wideShapeEntry = andEl!.elementAttributes.find((e) => e.key === "wideShape");
-    expect(wideShapeEntry).toBeDefined();
+    expect(wideShapeEntry).not.toBeUndefined();
     expect(wideShapeEntry!.value).toEqual({ type: "boolean", value: true });
 
-    // First In element has Label: "A"
+    // In elements have exact count and include label "A"
     const inElements = circuit.visualElements.filter((ve) => ve.elementName === "In");
-    expect(inElements.length).toBeGreaterThanOrEqual(1);
+    expect(inElements).toHaveLength(2);
     const inA = inElements.find((ve) =>
       ve.elementAttributes.some(
         (e) => e.key === "Label" && e.value.type === "string" && e.value.value === "A",
       ),
     );
-    expect(inA).toBeDefined();
+    expect(inA).not.toBeUndefined();
   });
 
   it("parsesHalfAdder", () => {
@@ -95,8 +95,8 @@ describe("DigParser", () => {
     const outCount = circuit.visualElements.filter((ve) => ve.elementName === "Out").length;
     expect(outCount).toBe(2);
 
-    // SR latch has feedback wires — verify wires are present
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    // SR latch has exactly 14 feedback wires
+    expect(circuit.wires).toHaveLength(14);
   });
 
   it("parsesTestData", () => {
@@ -104,28 +104,26 @@ describe("DigParser", () => {
     const circuit = parseDigXml(xml);
 
     const testcase = circuit.visualElements.find((ve) => ve.elementName === "Testcase");
-    expect(testcase).toBeDefined();
+    expect(testcase).not.toBeUndefined();
 
     const testDataEntry = testcase!.elementAttributes.find((e) => e.key === "Testdata");
-    expect(testDataEntry).toBeDefined();
+    expect(testDataEntry).not.toBeUndefined();
     expect(testDataEntry!.value.type).toBe("testData");
-
-    if (testDataEntry!.value.type === "testData") {
-      expect(testDataEntry!.value.value).toContain("A B Y");
-    }
+    // Assert unconditionally — type was already verified above
+    expect((testDataEntry!.value as { type: "testData"; value: string }).value).toContain("A B Y");
   });
 
   it("parsesRotation", () => {
     const xml = readRefCircuit("combinatorial/mux.dig");
     const circuit = parseDigXml(xml);
 
-    // First Not element has rotation 3
+    // mux.dig has exactly 2 Not elements; first has rotation 3
     const notElements = circuit.visualElements.filter((ve) => ve.elementName === "Not");
-    expect(notElements.length).toBeGreaterThanOrEqual(1);
+    expect(notElements).toHaveLength(2);
 
     const firstNot = notElements[0];
     const rotEntry = firstNot.elementAttributes.find((e) => e.key === "rotation");
-    expect(rotEntry).toBeDefined();
+    expect(rotEntry).not.toBeUndefined();
     expect(rotEntry!.value).toEqual({ type: "rotation", value: 3 });
   });
 
@@ -136,11 +134,11 @@ describe("DigParser", () => {
     // mux.dig version 1 → gets migrated to 2, but we check the reference was resolved.
     // The second Not element uses XStream reference to the first Not's rotation.
     const notElements = circuit.visualElements.filter((ve) => ve.elementName === "Not");
-    expect(notElements.length).toBeGreaterThanOrEqual(2);
+    expect(notElements).toHaveLength(2);
 
     const secondNot = notElements[1];
     const rotEntry = secondNot.elementAttributes.find((e) => e.key === "rotation");
-    expect(rotEntry).toBeDefined();
+    expect(rotEntry).not.toBeUndefined();
     // Should resolve to the same value as the first Not — rotation 3
     expect(rotEntry!.value).toEqual({ type: "rotation", value: 3 });
   });
@@ -150,12 +148,13 @@ describe("DigParser", () => {
     const circuit = parseDigXml(xml);
 
     // And gates in mux.dig have Inputs: 3
+    // mux.dig has exactly 4 And elements, each with Inputs: 3
     const andElements = circuit.visualElements.filter((ve) => ve.elementName === "And");
-    expect(andElements.length).toBeGreaterThan(0);
+    expect(andElements).toHaveLength(4);
 
     for (const andEl of andElements) {
       const inputsEntry = andEl.elementAttributes.find((e) => e.key === "Inputs");
-      expect(inputsEntry).toBeDefined();
+      expect(inputsEntry).not.toBeUndefined();
       expect(inputsEntry!.value).toEqual({ type: "int", value: 3 });
     }
   });
@@ -188,14 +187,13 @@ describe("DigParser", () => {
 
     const circuit = parseDigXml(xml);
     const led = circuit.visualElements.find((ve) => ve.elementName === "LED");
-    expect(led).toBeDefined();
+    expect(led).not.toBeUndefined();
 
     const colorEntry = led!.elementAttributes.find((e) => e.key === "Color");
-    expect(colorEntry).toBeDefined();
+    expect(colorEntry).not.toBeUndefined();
     expect(colorEntry!.value.type).toBe("color");
-    if (colorEntry!.value.type === "color") {
-      expect(colorEntry!.value.value).toEqual({ r: 255, g: 0, b: 128, a: 255 });
-    }
+    // Assert unconditionally — type was verified above
+    expect((colorEntry!.value as { type: "color"; value: { r: number; g: number; b: number; a: number } }).value).toEqual({ r: 255, g: 0, b: 128, a: 255 });
   });
 
   it("migratesVersion0", () => {
@@ -254,7 +252,7 @@ describe("DigParser", () => {
     expect(typeof parser.parse).toBe("function");
 
     const doc = parser.parse("<root><child>hello</child></root>");
-    expect(doc).toBeDefined();
+    expect(doc).not.toBeNull();
 
     const root = doc.documentElement;
     expect(root.tagName).toBe("root");

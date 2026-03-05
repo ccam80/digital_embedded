@@ -130,7 +130,9 @@ export function makeExecuteComparator(
 }
 
 export function executeComparator(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteComparator(1, false)(index, state, layout);
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
+  makeExecuteComparator(bitWidth, signed)(index, state, layout);
 }
 
 export const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

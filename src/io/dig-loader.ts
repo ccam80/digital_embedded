@@ -150,8 +150,6 @@ function applyAllMappings(
     }
   }
 
-  // Pass through built-in attributes used by generic circuit resolution.
-  // These are not component-specific and may be present on any element.
   for (const key of ["generic", "enabled"] as const) {
     if (!bag.has(key) && entryByKey.has(key)) {
       const digValue = entryByKey.get(key)!;
@@ -216,9 +214,7 @@ function extractRotationFromEntries(
 /**
  * Set `isNegated = true` on each Pin whose label is listed in the config.
  *
- * Pin is declared readonly so we cast through unknown to set the flag.
- * This is intentional: the negation state comes from the .dig file, not
- * the component definition, so it must be applied post-construction.
+ * Apply negation flags from the .dig file's inverter configuration.
  */
 export function applyInverterConfig(
   element: CircuitElement,

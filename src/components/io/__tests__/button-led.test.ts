@@ -267,7 +267,7 @@ describe("ButtonLED", () => {
     });
 
     it("ButtonLEDDefinition has non-empty helpText", () => {
-      expect(ButtonLEDDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof ButtonLEDDefinition.helpText).toBe("string"); expect(ButtonLEDDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("ButtonLEDDefinition can be registered without error", () => {

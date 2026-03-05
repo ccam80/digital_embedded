@@ -705,3 +705,49 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: src/components/graphics/graphic-card.ts, src/components/graphics/__tests__/graphic-card.test.ts
 - **Files modified**: none
 - **Tests**: 57/57 passing
+
+---
+
+## Task 5.5.2: i18n Pass-Through Function
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/i18n/index.ts, src/i18n/__tests__/i18n.test.ts
+- **Files modified**: none
+- **Tests**: 4/4 passing
+- **Summary**: Implemented minimal internationalization function with pass-through implementation. `i18n()` returns keys unchanged. `setLocale()` stores locale for future use. `getLocale()` returns current locale (default 'en'). No browser dependencies. All new tests passing, no regressions introduced (3422/3423 total tests passing vs baseline 3419/3420)
+
+## Task 5.5.1: Dark Mode Default Color Scheme
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/renderer-interface.ts`
+  - `src/core/__tests__/renderer-interface.test.ts`
+  - `src/editor/__tests__/color-scheme.test.ts`
+- **Tests**: 50/50 passing (45 in renderer-interface.test.ts + 5 new DarkMode tests; 2 updated in color-scheme.test.ts)
+
+## Task 5.5.3: Engine Snapshot API
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/snapshot.test.ts
+- **Files modified**: src/core/engine-interface.ts, src/engine/digital-engine.ts, src/test-utils/mock-engine.ts
+- **Tests**: 6/6 passing
+
+## Task 5.5.4: .digb JSON Format Schema and Serializer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/digb-schema.ts, src/io/digb-serializer.ts, src/io/digb-deserializer.ts, src/io/__tests__/digb-schema.test.ts
+- **Files modified**: src/io/digb-deserializer.ts (instanceId round-trip fix)
+- **Tests**: 8/8 passing
+
+---
+## Wave 5.5.1 Summary
+- **Status**: complete
+- **Tasks completed**: 4/4
+- **Rounds**: 1
+
+---
+## Phase 5.5 Summary
+- **Status**: complete
+- **Waves completed**: 1/1 (5.5.1)
+- **Total tasks**: 4/4

@@ -34,12 +34,6 @@ function makeElement(
     getBoundingBox(): Rect {
       return { x: 0, y: 0, width: 10, height: 10 };
     },
-    getProperty<T extends PropertyValue>(key: string): T {
-      return bag.get<T>(key);
-    },
-    setProperty<T extends PropertyValue>(key: string, value: T): void {
-      bag.set(key, value);
-    },
     getProperties(): PropertyBag {
       return bag;
     },
@@ -53,9 +47,6 @@ function makeElement(
         mirror: false,
         properties: {},
       };
-    },
-    clone(): CircuitElement {
-      return makeElement(typeId, properties);
     },
     getHelpText(): string {
       return "";

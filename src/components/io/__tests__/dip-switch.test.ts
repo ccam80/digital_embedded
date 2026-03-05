@@ -265,7 +265,7 @@ describe("DipSwitch", () => {
     });
 
     it("DipSwitchDefinition has non-empty helpText", () => {
-      expect(DipSwitchDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DipSwitchDefinition.helpText).toBe("string"); expect(DipSwitchDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DipSwitchDefinition can be registered without error", () => {

@@ -227,7 +227,9 @@ export function makeExecuteMul(
 }
 
 export function executeMul(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteMul(1, false)(index, state, layout);
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
+  makeExecuteMul(bitWidth, signed)(index, state, layout);
 }
 
 // ---------------------------------------------------------------------------

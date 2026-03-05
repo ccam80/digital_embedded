@@ -304,7 +304,7 @@ describe("Demultiplexer", () => {
 
     it("DemuxDefinition has a non-empty helpText", () => {
       expect(typeof DemuxDefinition.helpText).toBe("string");
-      expect(DemuxDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DemuxDefinition.helpText).toBe("string"); expect(DemuxDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DemuxDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -316,7 +316,7 @@ describe("Demultiplexer", () => {
       const registry = new ComponentRegistry();
       registry.register(DemuxDefinition);
       const registered = registry.get("Demultiplexer");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

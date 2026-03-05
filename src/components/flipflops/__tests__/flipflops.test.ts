@@ -210,13 +210,13 @@ describe("FlipflopD", () => {
   describe("attribute mapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = D_FF_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("Label maps to label key", () => {
       const mapping = D_FF_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
     });
   });
@@ -267,7 +267,7 @@ describe("FlipflopD", () => {
     });
 
     it("DDefinition.helpText is non-empty", () => {
-      expect(DDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DDefinition.helpText).toBe("string"); expect(DDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
   });
 });
@@ -465,7 +465,7 @@ describe("FlipflopJK", () => {
   describe("attribute mapping", () => {
     it("Label maps to label key", () => {
       const mapping = JK_FF_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("myFF")).toBe("myFF");
     });
   });
@@ -923,7 +923,7 @@ describe("FlipflopT", () => {
   describe("attribute mapping", () => {
     it("withEnable=true maps to boolean true", () => {
       const mapping = T_FF_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "withEnable");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
       expect(mapping!.convert("false")).toBe(false);
     });

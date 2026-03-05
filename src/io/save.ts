@@ -42,7 +42,7 @@ export function encodeBigint(value: bigint): string {
 }
 
 /**
- * Decode a previously encoded bigint string back to bigint.
+ * Decode an encoded bigint string back to bigint.
  * Returns null if the string does not carry the sentinel prefix.
  */
 export function decodeBigint(s: string): bigint | null {

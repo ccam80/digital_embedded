@@ -232,7 +232,7 @@ describe("SevenSeg", () => {
   describe("attributeMapping", () => {
     it("CommonCathode=true maps to boolean true", () => {
       const mapping = SEVEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
     });
 
@@ -243,7 +243,7 @@ describe("SevenSeg", () => {
 
     it("Color attribute maps to color property", () => {
       const mapping = SEVEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("green")).toBe("green");
     });
   });
@@ -274,7 +274,7 @@ describe("SevenSeg", () => {
     });
 
     it("SevenSegDefinition has non-empty helpText", () => {
-      expect(SevenSegDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof SevenSegDefinition.helpText).toBe("string"); expect(SevenSegDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("SevenSegDefinition can be registered without error", () => {
@@ -407,14 +407,14 @@ describe("SevenSegHex", () => {
   describe("attributeMapping", () => {
     it("CommonCathode maps correctly", () => {
       const mapping = SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
       expect(mapping!.convert("false")).toBe(false);
     });
 
     it("Color attribute maps to color property", () => {
       const mapping = SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("green")).toBe("green");
     });
   });
@@ -445,7 +445,7 @@ describe("SevenSegHex", () => {
     });
 
     it("SevenSegHexDefinition has non-empty helpText", () => {
-      expect(SevenSegHexDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof SevenSegHexDefinition.helpText).toBe("string"); expect(SevenSegHexDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("SevenSegHexDefinition can be registered without error", () => {
@@ -566,14 +566,14 @@ describe("SixteenSeg", () => {
   describe("attributeMapping", () => {
     it("CommonCathode maps correctly", () => {
       const mapping = SIXTEEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "CommonCathode");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
       expect(mapping!.convert("false")).toBe(false);
     });
 
     it("Color attribute maps to color property", () => {
       const mapping = SIXTEEN_SEG_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("blue")).toBe("blue");
     });
   });
@@ -604,7 +604,7 @@ describe("SixteenSeg", () => {
     });
 
     it("SixteenSegDefinition has non-empty helpText", () => {
-      expect(SixteenSegDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof SixteenSegDefinition.helpText).toBe("string"); expect(SixteenSegDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("SixteenSegDefinition can be registered without error", () => {

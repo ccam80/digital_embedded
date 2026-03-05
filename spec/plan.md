@@ -366,8 +366,24 @@ All ~110 component types. Each component: `CircuitElement` class (rendering via 
 
 ---
 
+## Phase 5.5: Cross-Cutting Modifications
+**Depends on**: Phases 1–5 (all implemented)
+**Blocks**: Phase 6
+
+Modifications to already-implemented code required by Phase 6+ design decisions. See `spec/phase-5.5-cross-cutting-modifications.md` for the full spec.
+
+### Wave 5.5.1: Foundation Modifications
+| Task | Description | Complexity | Key Files |
+|------|-------------|------------|-----------|
+| 5.5.1 | Dark mode default color scheme: rename existing light scheme, create dark scheme (black background), make it the default. Add semantic wire color ThemeColor keys. | S | src/core/renderer-interface.ts |
+| 5.5.2 | i18n pass-through function: `i18n(key, params?)` returns key unchanged. `setLocale()` / `getLocale()` stubs. All Phase 2+ UI code calls `i18n()` from the start; Phase 9 adds real translations. | S | src/i18n/index.ts |
+| 5.5.3 | Engine snapshot API: add `saveSnapshot()`, `restoreSnapshot()`, `clearSnapshots()`, `setSnapshotBudget()` to `SimulationEngine` interface and `DigitalEngine`. Ring buffer with 512KB budget. For timing diagram time-travel (Phase 7). | M | src/core/engine-interface.ts, src/engine/digital-engine.ts, src/test-utils/mock-engine.ts |
+| 5.5.4 | `.digb` JSON format schema and serializer: define the `.digb` (Digital-in-Browser) native JSON circuit format with embedded subcircuit definitions. Validation, serialization, deserialization. | M | src/io/digb-schema.ts, src/io/digb-serializer.ts, src/io/digb-deserializer.ts |
+
+---
+
 ## Phase 6: Core Integration
-**Depends on**: Phase 2 + Phase 3 + Phase 4 + Phase 5
+**Depends on**: Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 5.5
 
 Wire all subsystems together into a working simulator.
 
@@ -391,14 +407,16 @@ Wire all subsystems together into a working simulator.
 | 6.3.1 | Truth table parser: parse Digital's test syntax from .dig files (embedded in `Testcase` components) — signal names, input/output values, don't-care, clock directives, repeat/loop, comments | M | src/testing/parser.ts |
 | 6.3.2 | Test executor: drive inputs per vector, run to stable, compare outputs, collect pass/fail per vector | M | src/testing/executor.ts |
 | 6.3.3 | Test results display: table with pass/fail, highlight mismatches, summary, run/re-run | M | src/testing/results-ui.ts |
-| 6.3.4 | **Headless test runner**: Implement `runTests(engine)` in the SimulatorFacade. Finds all `Testcase` components in the source circuit, parses their embedded test data (via 6.3.1 truth table parser), executes test vectors (via 6.3.2 test executor), returns structured `TestResults`: `{ passed: number, failed: number, total: number, vectors: { inputs: Record<string, string>, expectedOutputs: Record<string, string>, actualOutputs: Record<string, string>, pass: boolean }[] }`. Runnable from Node.js — no browser deps. Full integration test: `facade.loadDig('circuits/half-adder.dig')` → `facade.compile()` → `facade.runTests()` → all vectors pass. | M | src/headless/test-runner.ts, src/headless/\_\_tests\_\_/test-runner.test.ts |
+| 6.3.4 | **Headless test runner**: Implement `runTests(engine, circuit, testData?)` in the SimulatorFacade. Supports embedded Testcase components AND external test vectors (instructor-provided string). Runnable from Node.js — no browser deps. Full integration test: `facade.loadDig('circuits/half-adder.dig')` → `facade.compile()` → `facade.runTests()` → all vectors pass. | M | src/headless/test-runner.ts, src/headless/\_\_tests\_\_/test-runner.test.ts |
+| 6.3.5 | Test results CSV export: export pass/fail table as RFC 4180 CSV with status, input values, expected/actual output values per row. | S | src/testing/export.ts |
+| 6.3.6 | Circuit comparison: run same test vectors against two circuits (reference + student), diff results. Two modes: test-based (instructor-provided vectors) and exhaustive (auto-generate all 2^N input combinations if N ≤ 20). Auto-selects mode. | M | src/testing/comparison.ts |
 
 ### Wave 6.4: Tutorial Integration
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 6.4.1 | Simulator HTML page: standalone page with canvas, palette, property panel, toolbar (file ops, sim controls, test runner). Responsive layout. Works standalone and in iframe. | M | simulator.html, src/main.ts |
-| 6.4.2 | postMessage API: receive `digital-load-url` / `digital-load-data`, send `digital-ready` / `digital-loaded` / `digital-error` | M | src/io/postmessage.ts |
-| 6.4.3 | Tutorial host page: new tutorial host page with split-pane layout (instructions + live sim iframe). Point iframe to new simulator. URL params for tutorial selection and step navigation. | M | tutorial.html |
+| 6.4.1 | Simulator HTML page: standalone page with canvas, palette, property panel, toolbar (file ops, sim controls, test runner). Responsive layout. Works standalone and in iframe. URL params: `base`, `file`, `dark`, `locked`, `panels`. Dark mode default. | M | simulator.html, src/main.ts, src/app/url-params.ts, src/app/app-init.ts |
+| 6.4.2 | **postMessage API (consolidated with former 9.3.2)**: Full extended protocol. Parent→sim: `digital-load-url`, `digital-load-data`, `digital-load-json` (.digb), `digital-set-input`, `digital-step`, `digital-run-tests`, `digital-read-output`, `digital-read-all-signals`, `digital-set-base` (checkpoint jump — clears subcircuit cache), `digital-set-locked`, `digital-load-memory`. Sim→parent: `digital-ready`, `digital-loaded`, `digital-error`, `digital-output`, `digital-signals`, `digital-test-results`. | M | src/io/postmessage-adapter.ts |
+| 6.4.3 | Tutorial host page: split-pane layout (markdown instructions + simulator iframe). Loads instruction markdown dynamically per checkpoint. Multiple simulator iframes supported. Checkpoint navigation via buttons. URL params: `tutorial`, `step`. | M | tutorial.html, src/tutorial/tutorial-host.ts, src/tutorial/markdown-renderer.ts |
 
 ---
 
@@ -486,14 +504,15 @@ Image export, localization, 74xx library, and application infrastructure.
 ### Wave 9.2: Localization
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 9.2.1 | i18n framework: string extraction system, locale switching, fallback to English. All UI strings go through i18n lookup. Multilingual component label support (component descriptions with multiple language versions). | M | src/i18n/framework.ts |
-| 9.2.2 | Translation files: port Digital's translations for English, German, Spanish, Portuguese, French, Italian, simplified Chinese. Map Digital's `lang_XX.xml` keys to our i18n keys. | M | src/i18n/locales/\*.json |
+| 9.2.1 | i18n framework (full implementation): replace Phase 5.5 pass-through with locale-aware lookup, parameter interpolation, fallback chain (active locale → English → key), locale change events for re-rendering. | M | src/i18n/index.ts, src/i18n/locale-loader.ts, src/i18n/locales/en.json |
+| 9.2.2 | Translation files: port Digital's translations for English (complete), simplified Chinese, German. Map Digital's `lang_XX.xml` keys to our i18n keys. Deferred to end of Phase 9. | M | src/i18n/locales/zh.json, src/i18n/locales/de.json |
 
-### Wave 9.3: 74xx Library & Remote Interface
+### Wave 9.3: 74xx Library
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 9.3.1 | 74xx IC library: port Digital's 74xx series subcircuit library. Ship as .dig files bundled with the app. Register in component palette under "74xx" category. Include: 74xx availability list in help. | M | lib/74xx/\*.dig, src/components/library-74xx.ts |
-| 9.3.2 | **postMessage adapter over SimulatorFacade**: Thin browser-side adapter that translates `postMessage` events to SimulatorFacade calls. The facade (2.0.1) is the shared core — this task is only the message transport layer. Receives `digital-load-url` → `facade.loadDig(fetch(url))`. Receives `digital-load-data` → `facade.loadDig(atob(data))`. Sends `digital-ready`, `digital-loaded`, `digital-error`. Extended protocol for tutorial control: `digital-set-input { label, value }` → `facade.setInput()`, `digital-step` → `facade.step()`, `digital-read-output { label }` → responds with `{ type: 'digital-output', label, value }`, `digital-run-tests` → `facade.runTests()` → responds with `{ type: 'digital-test-results', results }`. | S | src/remote/postmessage-adapter.ts |
+| 9.3.1 | 74xx IC library: port all ~60 Digital 74xx series subcircuit .dig files. Ship bundled with app. Register in component palette under "74xx" category. On-demand loading via file resolver. | M | lib/74xx/\*.dig, src/components/library-74xx.ts |
+
+*Note: Task 9.3.2 (postMessage adapter) has been consolidated into Phase 6 task 6.4.2.*
 
 ---
 

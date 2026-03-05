@@ -256,7 +256,7 @@ describe("PowerSupply", () => {
     });
 
     it("PowerSupplyDefinition has non-empty helpText", () => {
-      expect(PowerSupplyDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PowerSupplyDefinition.helpText).toBe("string"); expect(PowerSupplyDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PowerSupplyDefinition can be registered without error", () => {

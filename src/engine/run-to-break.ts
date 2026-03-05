@@ -82,7 +82,7 @@ export function run(
 function findBreakComponents(compiled: ConcreteCompiledCircuit): number[] {
   const indices: number[] = [];
   for (const [index, element] of compiled.componentToElement) {
-    if (element.type === "Break") {
+    if (element.typeId === "Break") {
       indices.push(index);
     }
   }

@@ -225,8 +225,8 @@ describe("Text", () => {
     it("bounding box has positive width and height", () => {
       const el = makeText();
       const box = el.getBoundingBox();
-      expect(box.width).toBeGreaterThan(0);
-      expect(box.height).toBeGreaterThan(0);
+      expect(box.width).toBeGreaterThanOrEqual(2);
+      expect(box.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -237,14 +237,14 @@ describe("Text", () => {
   describe("attributeMapping", () => {
     it("text xmlName maps to text propertyKey", () => {
       const mapping = TEXT_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "text");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("text");
       expect(mapping!.convert("Hello World")).toBe("Hello World");
     });
 
     it("fontSize xmlName maps to fontSize propertyKey as float", () => {
       const mapping = TEXT_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "fontSize");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("fontSize");
       expect(mapping!.convert("1.5")).toBe(1.5);
     });
@@ -313,7 +313,7 @@ describe("Text", () => {
 
     it("TextDefinition has a non-empty helpText", () => {
       expect(typeof TextDefinition.helpText).toBe("string");
-      expect(TextDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof TextDefinition.helpText).toBe("string"); expect(TextDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("TextElement.getHelpText() returns relevant text", () => {
@@ -330,7 +330,7 @@ describe("Text", () => {
       const registry = new ComponentRegistry();
       registry.register(TextDefinition);
       const registered = registry.get("Text");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });
@@ -486,28 +486,28 @@ describe("Rectangle", () => {
   describe("attributeMapping", () => {
     it("Label xmlName maps to label propertyKey", () => {
       const mapping = RECTANGLE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("My Group")).toBe("My Group");
     });
 
     it("rectWidth xmlName maps to rectWidth propertyKey as integer", () => {
       const mapping = RECTANGLE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "rectWidth");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("rectWidth");
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("rectHeight xmlName maps to rectHeight propertyKey as integer", () => {
       const mapping = RECTANGLE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "rectHeight");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("rectHeight");
       expect(mapping!.convert("5")).toBe(5);
     });
 
     it("lineWidth xmlName maps to lineWidth propertyKey as integer", () => {
       const mapping = RECTANGLE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "lineWidth");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("lineWidth");
       expect(mapping!.convert("2")).toBe(2);
     });
@@ -588,7 +588,7 @@ describe("Rectangle", () => {
 
     it("RectangleDefinition has a non-empty helpText", () => {
       expect(typeof RectangleDefinition.helpText).toBe("string");
-      expect(RectangleDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RectangleDefinition.helpText).toBe("string"); expect(RectangleDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("RectangleElement.getHelpText() returns relevant text", () => {
@@ -605,7 +605,7 @@ describe("Rectangle", () => {
       const registry = new ComponentRegistry();
       registry.register(RectangleDefinition);
       const registered = registry.get("Rectangle");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

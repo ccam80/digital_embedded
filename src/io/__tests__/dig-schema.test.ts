@@ -147,95 +147,85 @@ describe('DigSchema', () => {
       const entry: DigEntry = { key: 'Label', value: { type: 'string', value: 'A' } };
       expect(entry.key).toBe('Label');
       expect(entry.value.type).toBe('string');
-      if (isStringValue(entry.value)) {
-        expect(entry.value.value).toBe('A');
-      }
+      expect(isStringValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'string'; value: string }).value).toBe('A');
     });
 
     it('constructs DigEntry with int value', () => {
       const entry: DigEntry = { key: 'Bits', value: { type: 'int', value: 8 } };
       expect(entry.key).toBe('Bits');
-      if (isIntValue(entry.value)) {
-        expect(entry.value.value).toBe(8);
-      }
+      expect(isIntValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'int'; value: number }).value).toBe(8);
     });
 
     it('constructs DigEntry with long value preserving bigint precision', () => {
       const bigVal = 0xFFFFFFFFFFFFFFFFn;
       const entry: DigEntry = { key: 'Value', value: { type: 'long', value: bigVal } };
-      if (isLongValue(entry.value)) {
-        expect(entry.value.value).toBe(bigVal);
-        // Verify it exceeds Number.MAX_SAFE_INTEGER to confirm bigint is required
-        expect(Number(entry.value.value) > Number.MAX_SAFE_INTEGER).toBe(true);
-      }
+      expect(isLongValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'long'; value: bigint }).value).toBe(bigVal);
+      // Verify it exceeds Number.MAX_SAFE_INTEGER to confirm bigint is required
+      expect(Number((entry.value as { type: 'long'; value: bigint }).value) > Number.MAX_SAFE_INTEGER).toBe(true);
     });
 
     it('constructs DigEntry with boolean value', () => {
       const entry: DigEntry = { key: 'wideShape', value: { type: 'boolean', value: true } };
-      if (isBooleanValue(entry.value)) {
-        expect(entry.value.value).toBe(true);
-      }
+      expect(isBooleanValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'boolean'; value: boolean }).value).toBe(true);
     });
 
     it('constructs DigEntry with rotation value 0', () => {
       const entry: DigEntry = { key: 'rotation', value: { type: 'rotation', value: 0 } };
-      if (isRotationValue(entry.value)) {
-        expect(entry.value.value).toBe(0);
-      }
+      expect(isRotationValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'rotation'; value: number }).value).toBe(0);
     });
 
     it('constructs DigEntry with rotation value 3', () => {
       const entry: DigEntry = { key: 'rotation', value: { type: 'rotation', value: 3 } };
-      if (isRotationValue(entry.value)) {
-        expect(entry.value.value).toBe(3);
-      }
+      expect(isRotationValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'rotation'; value: number }).value).toBe(3);
     });
 
     it('constructs DigEntry with color value', () => {
       const color = { r: 255, g: 128, b: 0, a: 200 };
       const entry: DigEntry = { key: 'Color', value: { type: 'color', value: color } };
-      if (isColorValue(entry.value)) {
-        expect(entry.value.value.r).toBe(255);
-        expect(entry.value.value.g).toBe(128);
-        expect(entry.value.value.b).toBe(0);
-        expect(entry.value.value.a).toBe(200);
-      }
+      expect(isColorValue(entry.value)).toBe(true);
+      const colorVal = (entry.value as { type: 'color'; value: typeof color }).value;
+      expect(colorVal.r).toBe(255);
+      expect(colorVal.g).toBe(128);
+      expect(colorVal.b).toBe(0);
+      expect(colorVal.a).toBe(200);
     });
 
     it('constructs DigEntry with testData value', () => {
       const entry: DigEntry = { key: 'Testdata', value: { type: 'testData', value: 'A B Y\n0 0 0\n1 1 1' } };
-      if (isTestDataValue(entry.value)) {
-        expect(entry.value.value).toContain('A B Y');
-      }
+      expect(isTestDataValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'testData'; value: string }).value).toContain('A B Y');
     });
 
     it('constructs DigEntry with inverterConfig value', () => {
       const entry: DigEntry = { key: 'inverterConfig', value: { type: 'inverterConfig', value: ['In_1', 'In_2'] } };
-      if (isInverterConfigValue(entry.value)) {
-        expect(entry.value.value).toEqual(['In_1', 'In_2']);
-      }
+      expect(isInverterConfigValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'inverterConfig'; value: string[] }).value).toEqual(['In_1', 'In_2']);
     });
 
     it('constructs DigEntry with data value', () => {
       const entry: DigEntry = { key: 'Data', value: { type: 'data', value: '0,1,FF,3(0)' } };
-      if (isDataValue(entry.value)) {
-        expect(entry.value.value).toBe('0,1,FF,3(0)');
-      }
+      expect(isDataValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'data'; value: string }).value).toBe('0,1,FF,3(0)');
     });
 
     it('constructs DigEntry with inValue (non-highZ)', () => {
       const entry: DigEntry = { key: 'InDefault', value: { type: 'inValue', value: { value: 5n, highZ: false } } };
-      if (isInValueValue(entry.value)) {
-        expect(entry.value.value.value).toBe(5n);
-        expect(entry.value.value.highZ).toBe(false);
-      }
+      expect(isInValueValue(entry.value)).toBe(true);
+      const inVal = (entry.value as { type: 'inValue'; value: { value: bigint; highZ: boolean } }).value;
+      expect(inVal.value).toBe(5n);
+      expect(inVal.highZ).toBe(false);
     });
 
     it('constructs DigEntry with inValue (highZ)', () => {
       const entry: DigEntry = { key: 'InDefault', value: { type: 'inValue', value: { value: 0n, highZ: true } } };
-      if (isInValueValue(entry.value)) {
-        expect(entry.value.value.highZ).toBe(true);
-      }
+      expect(isInValueValue(entry.value)).toBe(true);
+      expect((entry.value as { type: 'inValue'; value: { value: bigint; highZ: boolean } }).value.highZ).toBe(true);
     });
 
     it('constructs DigEntry with romList value', () => {
@@ -246,11 +236,11 @@ describe('DigSchema', () => {
         ],
       };
       const entry: DigEntry = { key: 'romContent', value: { type: 'romList', value: romData } };
-      if (isRomListValue(entry.value)) {
-        expect(entry.value.value.files).toHaveLength(2);
-        expect(entry.value.value.files[0].name).toBe('rom0.hex');
-        expect(entry.value.value.files[1].data).toBe('FF,FE');
-      }
+      expect(isRomListValue(entry.value)).toBe(true);
+      const romVal = (entry.value as { type: 'romList'; value: RomListData }).value;
+      expect(romVal.files).toHaveLength(2);
+      expect(romVal.files[0].name).toBe('rom0.hex');
+      expect(romVal.files[1].data).toBe('FF,FE');
     });
 
     it('constructs DigEntry with enum value', () => {
@@ -258,10 +248,10 @@ describe('DigSchema', () => {
         key: 'Direction',
         value: { type: 'enum', xmlTag: 'direction', value: 'left' },
       };
-      if (isEnumValue(entry.value)) {
-        expect(entry.value.xmlTag).toBe('direction');
-        expect(entry.value.value).toBe('left');
-      }
+      expect(isEnumValue(entry.value)).toBe(true);
+      const enumVal = entry.value as { type: 'enum'; xmlTag: string; value: string };
+      expect(enumVal.xmlTag).toBe('direction');
+      expect(enumVal.value).toBe('left');
     });
 
     it('constructs a complete DigCircuit', () => {

@@ -7,30 +7,28 @@ describe('BrowserDepFence', () => {
       const headless = await import('../index.js');
 
       // Facade and types
-      expect(headless.FacadeError).toBeDefined();
       expect(typeof headless.FacadeError).toBe('function');
 
       // Builder
-      expect(headless.CircuitBuilder).toBeDefined();
       expect(typeof headless.CircuitBuilder).toBe('function');
 
       // Core types
-      expect(headless.Circuit).toBeDefined();
-      expect(headless.Wire).toBeDefined();
-      expect(headless.Net).toBeDefined();
-      expect(headless.ComponentRegistry).toBeDefined();
+      expect(typeof headless.Circuit).toBe('function');
+      expect(typeof headless.Wire).toBe('function');
+      expect(typeof headless.Net).toBe('function');
+      expect(typeof headless.ComponentRegistry).toBe('function');
 
-      // Render context types
-      expect(headless.defaultColorScheme).toBeDefined();
-      expect(headless.highContrastColorScheme).toBeDefined();
-      expect(headless.monochromeColorScheme).toBeDefined();
-      expect(headless.COLOR_SCHEMES).toBeDefined();
-      expect(headless.THEME_COLORS).toBeDefined();
+      // Render context types — these are objects, not constructors
+      expect(typeof headless.defaultColorScheme).toBe('object');
+      expect(typeof headless.highContrastColorScheme).toBe('object');
+      expect(typeof headless.monochromeColorScheme).toBe('object');
+      expect(typeof headless.COLOR_SCHEMES).toBe('object');
+      expect(Array.isArray(headless.THEME_COLORS)).toBe(true);
 
       // Error types
-      expect(headless.SimulationError).toBeDefined();
-      expect(headless.BitsException).toBeDefined();
-      expect(headless.BurnException).toBeDefined();
+      expect(typeof headless.SimulationError).toBe('function');
+      expect(typeof headless.BitsException).toBe('function');
+      expect(typeof headless.BurnException).toBe('function');
     });
   });
 });

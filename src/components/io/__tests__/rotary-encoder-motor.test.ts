@@ -217,7 +217,7 @@ describe("RotaryEncoder", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = ROTARY_ENCODER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("ENC1")).toBe("ENC1");
     });
   });
@@ -247,7 +247,7 @@ describe("RotaryEncoder", () => {
     });
 
     it("RotaryEncoderDefinition has non-empty helpText", () => {
-      expect(RotaryEncoderDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RotaryEncoderDefinition.helpText).toBe("string"); expect(RotaryEncoderDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("RotaryEncoderDefinition can be registered without error", () => {
@@ -443,7 +443,7 @@ describe("StepperMotorUnipolar", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = STEPPER_MOTOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("M1")).toBe("M1");
     });
   });

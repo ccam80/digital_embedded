@@ -240,20 +240,20 @@ describe("Scope", () => {
   describe("attributeMapping", () => {
     it("Channels attribute maps to channelCount", () => {
       const mapping = SCOPE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Channels");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("channelCount");
       expect(mapping!.convert("3")).toBe(3);
     });
 
     it("Bits attribute maps to bitWidth", () => {
       const mapping = SCOPE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("TimeScale attribute maps to timeScale", () => {
       const mapping = SCOPE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "TimeScale");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("10")).toBe(10);
     });
   });
@@ -285,7 +285,7 @@ describe("Scope", () => {
     });
 
     it("ScopeDefinition has non-empty helpText", () => {
-      expect(ScopeDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof ScopeDefinition.helpText).toBe("string"); expect(ScopeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("ScopeDefinition can be registered without error", () => {
@@ -398,7 +398,7 @@ describe("ScopeTrigger", () => {
   describe("attributeMapping", () => {
     it("TriggerMode attribute maps to triggerMode property", () => {
       const mapping = SCOPE_TRIGGER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "TriggerMode");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("triggerMode");
       expect(mapping!.convert("falling")).toBe("falling");
     });
@@ -429,7 +429,7 @@ describe("ScopeTrigger", () => {
     });
 
     it("ScopeTriggerDefinition has non-empty helpText", () => {
-      expect(ScopeTriggerDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof ScopeTriggerDefinition.helpText).toBe("string"); expect(ScopeTriggerDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("ScopeTriggerDefinition can be registered without error", () => {

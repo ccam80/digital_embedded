@@ -15,6 +15,7 @@ import type { CompiledCircuit } from "@/core/engine-interface";
 import type { CircuitElement } from "@/core/element";
 import type { Wire } from "@/core/circuit";
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
+import type { PropertyValue } from "@/core/properties";
 import type { EvaluationGroup } from "./digital-engine.js";
 
 // ---------------------------------------------------------------------------
@@ -34,12 +35,17 @@ import type { EvaluationGroup } from "./digital-engine.js";
  * outputCounts[i]  = number of output pins for component i
  */
 export class FlatComponentLayout implements ComponentLayout {
+  private readonly _componentProperties: ReadonlyArray<ReadonlyMap<string, PropertyValue>>;
+
   constructor(
     private readonly _inputOffsets: Int32Array,
     private readonly _outputOffsets: Int32Array,
     private readonly _inputCounts: Uint8Array,
     private readonly _outputCounts: Uint8Array,
-  ) {}
+    componentProperties?: ReadonlyArray<ReadonlyMap<string, PropertyValue>>,
+  ) {
+    this._componentProperties = componentProperties ?? [];
+  }
 
   inputCount(componentIndex: number): number {
     return this._inputCounts[componentIndex] ?? 0;
@@ -55,6 +61,14 @@ export class FlatComponentLayout implements ComponentLayout {
 
   outputOffset(componentIndex: number): number {
     return this._outputOffsets[componentIndex] ?? 0;
+  }
+
+  stateOffset(_componentIndex: number): number {
+    return 0;
+  }
+
+  getProperty(componentIndex: number, key: string): PropertyValue | undefined {
+    return this._componentProperties[componentIndex]?.get(key);
   }
 }
 

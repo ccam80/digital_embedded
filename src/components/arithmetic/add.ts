@@ -203,7 +203,8 @@ export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32A
 }
 
 export function executeAdd(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteAdd(1)(index, state, layout);
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  makeExecuteAdd(bitWidth)(index, state, layout);
 }
 
 // ---------------------------------------------------------------------------

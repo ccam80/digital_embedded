@@ -233,9 +233,7 @@ export function inverterConfigConverter(): DigAttributeMapping {
     xmlName: "inverterConfig",
     propertyKey: "inverterConfig",
     convert(_xmlValue: string): PropertyValue {
-      // The string form is not used for inverterConfig — it's always converted
-      // from a typed DigValue in normal parsing flow.
-      return [];
+      throw new Error("inverterConfigConverter: string form not supported; use convertDigValue");
     },
     convertDigValue(v: DigValue): PropertyValue {
       if (v.type !== "inverterConfig") {

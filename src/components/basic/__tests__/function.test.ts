@@ -369,8 +369,8 @@ describe("BooleanFunctionElement", () => {
     it("getBoundingBox returns non-zero dimensions", () => {
       const fn = makeFunction();
       const bb = fn.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 });
@@ -595,26 +595,26 @@ describe("executeBooleanFunction", () => {
 describe("attributeMapping", () => {
   it("Inputs=3 maps to inputCount=3", () => {
     const mapping = BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Inputs");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.convert("3")).toBe(3);
   });
 
   it("Outputs=2 maps to outputCount=2", () => {
     const mapping = BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Outputs");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.convert("2")).toBe(2);
   });
 
   it("Label maps to label property", () => {
     const mapping = BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.propertyKey).toBe("label");
     expect(mapping!.convert("F1")).toBe("F1");
   });
 
   it("TruthTable comma-separated string maps to number array", () => {
     const mapping = BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "TruthTable");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     const result = mapping!.convert("0,0,0,1") as number[];
     expect(result).toEqual([0, 0, 0, 1]);
   });
@@ -668,7 +668,7 @@ describe("BooleanFunctionDefinition", () => {
 
   it("has non-empty helpText", () => {
     expect(typeof BooleanFunctionDefinition.helpText).toBe("string");
-    expect(BooleanFunctionDefinition.helpText.length).toBeGreaterThan(0);
+    expect(typeof BooleanFunctionDefinition.helpText).toBe("string"); expect(BooleanFunctionDefinition.helpText.length).toBeGreaterThanOrEqual(3);
   });
 
   it("helpText mentions truth table", () => {

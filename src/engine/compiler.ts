@@ -494,6 +494,22 @@ export function compileCircuit(
   // When Phase 5 components are implemented, they should use layout.inputOffset
   // as a net ID (not a wiring array index).
 
+  // Build per-component property maps so executeFns can read bitWidth etc.
+  const componentPropertiesList: ReadonlyMap<string, import("@/core/properties").PropertyValue>[] = [];
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const propMap = new Map<string, import("@/core/properties").PropertyValue>();
+    // Collect all known property keys from the element's attribute getter
+    const def = registry.get(el.typeId)!;
+    for (const propDef of def.propertyDefs) {
+      const val = el.getAttribute(propDef.key);
+      if (val !== undefined) {
+        propMap.set(propDef.key, val as import("@/core/properties").PropertyValue);
+      }
+    }
+    componentPropertiesList.push(propMap);
+  }
+
   const layout = new FlatComponentLayout(
     // inputOffsets here store the first INPUT NET ID for each component
     buildNetIdOffsets(componentInputNets),
@@ -501,6 +517,7 @@ export function compileCircuit(
     buildNetIdOffsets(componentOutputNets),
     inputCounts,
     outputCounts,
+    componentPropertiesList,
   );
 
   // -----------------------------------------------------------------------

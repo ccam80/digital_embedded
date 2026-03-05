@@ -407,7 +407,7 @@ describe("RAMSinglePort", () => {
     });
 
     it("has non-empty helpText", () => {
-      expect(RAMSinglePortDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RAMSinglePortDefinition.helpText).toBe("string"); expect(RAMSinglePortDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("can be registered", () => {
@@ -426,8 +426,8 @@ describe("RAMSinglePort", () => {
       const props = new PropertyBag();
       const el = new RAMSinglePortElement("id", { x: 0, y: 0 }, 0, false, props);
       const bb = el.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 });
@@ -960,7 +960,7 @@ describe("RAMAsync", () => {
         state[2] = 1;
         executeRAMAsync(INDEX, state, layout);
       }
-      expect(state[3]).toBeDefined();
+      expect(typeof state[3]).toBe("number");
     });
   });
 

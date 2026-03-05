@@ -142,6 +142,16 @@ export type EngineResponse =
   | { type: "breakpoint" };
 
 // ---------------------------------------------------------------------------
+// Snapshot API — time-travel state capture
+// ---------------------------------------------------------------------------
+
+/**
+ * Opaque identifier for a saved engine snapshot.
+ * Returned by saveSnapshot() and passed to restoreSnapshot().
+ */
+export type SnapshotId = number;
+
+// ---------------------------------------------------------------------------
 // SimulationEngine — pluggable simulation contract
 // ---------------------------------------------------------------------------
 
@@ -288,4 +298,41 @@ export interface SimulationEngine {
    * Remove a previously registered measurement observer.
    */
   removeMeasurementObserver(observer: MeasurementObserver): void;
+
+  // -------------------------------------------------------------------------
+  // Snapshot API — state capture and time-travel restore
+  // -------------------------------------------------------------------------
+
+  /**
+   * Capture the full engine state (signal values, highZ masks, undefined flags,
+   * step count) and store it in an internal ring buffer.
+   *
+   * Returns a SnapshotId that can later be passed to restoreSnapshot().
+   * Oldest snapshots are evicted when the memory budget is exceeded.
+   */
+  saveSnapshot(): SnapshotId;
+
+  /**
+   * Restore the engine to the state captured by saveSnapshot(id).
+   * Transitions the engine to PAUSED after restoring.
+   *
+   * Throws if id does not correspond to a currently stored snapshot.
+   */
+  restoreSnapshot(id: SnapshotId): void;
+
+  /** Return the number of snapshots currently stored in the ring buffer. */
+  getSnapshotCount(): number;
+
+  /**
+   * Discard all stored snapshots and free associated memory.
+   * getSnapshotCount() will return 0 after this call.
+   */
+  clearSnapshots(): void;
+
+  /**
+   * Set the maximum number of bytes the snapshot ring buffer may occupy.
+   * Defaults to 512 * 1024 (512 KB). When a new snapshot would exceed the
+   * budget, the oldest snapshot is evicted.
+   */
+  setSnapshotBudget(bytes: number): void;
 }

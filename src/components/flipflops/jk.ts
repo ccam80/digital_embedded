@@ -178,7 +178,7 @@ export class JKElement extends AbstractCircuitElement {
 export function executeJK(index: number, state: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const stBase = (layout as unknown as { stateOffset(i: number): number }).stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const j = state[inBase];
   const clock = state[inBase + 1];

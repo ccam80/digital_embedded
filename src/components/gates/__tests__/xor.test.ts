@@ -306,7 +306,7 @@ describe("XOrGate", () => {
 
     it("Label attribute maps to label property key", () => {
       const mapping = XOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
     });
   });
@@ -368,7 +368,7 @@ describe("XOrGate", () => {
 
     it("XOrDefinition has a non-empty helpText", () => {
       expect(typeof XOrDefinition.helpText).toBe("string");
-      expect(XOrDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof XOrDefinition.helpText).toBe("string"); expect(XOrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("XOrDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -380,7 +380,7 @@ describe("XOrGate", () => {
       const registry = new ComponentRegistry();
       registry.register(XOrDefinition);
       const registered = registry.get("XOr");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

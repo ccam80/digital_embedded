@@ -104,7 +104,12 @@ describe("EngineMessage discriminated union", () => {
     const commands: EngineMessage["type"][] = [
       "step", "microStep", "runToBreak", "start", "stop", "reset", "dispose", "setSignal",
     ];
-    expect(commands).toHaveLength(8);
+    // Verify each command type is a distinct string literal
+    const uniqueTypes = new Set(commands);
+    expect(uniqueTypes.size).toBe(commands.length);
+    // Verify all expected types are present
+    expect(uniqueTypes).toContain("step");
+    expect(uniqueTypes).toContain("setSignal");
   });
 });
 
@@ -127,7 +132,11 @@ describe("EngineResponse discriminated union", () => {
 
   it("response types cover all three variants", () => {
     const types: EngineResponse["type"][] = ["stateChange", "error", "breakpoint"];
-    expect(types).toHaveLength(3);
+    const uniqueTypes = new Set(types);
+    expect(uniqueTypes.size).toBe(types.length);
+    expect(uniqueTypes).toContain("stateChange");
+    expect(uniqueTypes).toContain("error");
+    expect(uniqueTypes).toContain("breakpoint");
   });
 });
 
@@ -412,35 +421,30 @@ describe("MockEngine measurement observer", () => {
     engine.resetCalls();
   });
 
-  it("addMeasurementObserver and removeMeasurementObserver exist on MockEngine", () => {
-    expect(typeof engine.addMeasurementObserver).toBe("function");
-    expect(typeof engine.removeMeasurementObserver).toBe("function");
-  });
-
-  it("addMeasurementObserver records the call", () => {
+  it("addMeasurementObserver registers observer and removeMeasurementObserver unregisters it", () => {
     const observer: MeasurementObserver = {
       onStep: () => undefined,
       onReset: () => undefined,
     };
     engine.addMeasurementObserver(observer);
-    expect(engine.calls.map((c) => c.method)).toContain("addMeasurementObserver");
-  });
+    expect(engine.calls).toHaveLength(1);
+    expect(engine.calls[0].method).toBe("addMeasurementObserver");
 
-  it("removeMeasurementObserver records the call", () => {
-    const observer: MeasurementObserver = {
-      onStep: () => undefined,
-      onReset: () => undefined,
-    };
-    engine.addMeasurementObserver(observer);
     engine.resetCalls();
     engine.removeMeasurementObserver(observer);
-    expect(engine.calls.map((c) => c.method)).toContain("removeMeasurementObserver");
+    expect(engine.calls).toHaveLength(1);
+    expect(engine.calls[0].method).toBe("removeMeasurementObserver");
   });
 
   it("MockEngine satisfies SimulationEngine with measurement methods", () => {
     const engine2: SimulationEngine = new MockEngine();
-    expect(typeof engine2.addMeasurementObserver).toBe("function");
-    expect(typeof engine2.removeMeasurementObserver).toBe("function");
+    // Verify methods are callable, not just present
+    const observer: MeasurementObserver = {
+      onStep: () => undefined,
+      onReset: () => undefined,
+    };
+    engine2.addMeasurementObserver(observer);
+    engine2.removeMeasurementObserver(observer);
   });
 });
 

@@ -325,13 +325,13 @@ describe("PlainSwitch", () => {
   describe("attributeMapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = PLAIN_SWITCH_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("closed=true maps to boolean true", () => {
       const mapping = PLAIN_SWITCH_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "closed");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
     });
 
@@ -342,13 +342,13 @@ describe("PlainSwitch", () => {
 
     it("Poles=2 maps to poles=2", () => {
       const mapping = PLAIN_SWITCH_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Poles");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("2")).toBe(2);
     });
 
     it("Label maps to label property", () => {
       const mapping = PLAIN_SWITCH_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("SW1")).toBe("SW1");
     });
@@ -390,7 +390,7 @@ describe("PlainSwitch", () => {
 
     it("PlainSwitchDefinition has non-empty helpText", () => {
       expect(typeof PlainSwitchDefinition.helpText).toBe("string");
-      expect(PlainSwitchDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PlainSwitchDefinition.helpText).toBe("string"); expect(PlainSwitchDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PlainSwitchDefinition can be registered without throwing", () => {
@@ -698,7 +698,7 @@ describe("Switch", () => {
   describe("attributeMapping", () => {
     it("SwitchActsAsInput=true maps to switchActsAsInput=true", () => {
       const mapping = SWITCH_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "SwitchActsAsInput");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
     });
 

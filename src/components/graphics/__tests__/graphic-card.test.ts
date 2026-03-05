@@ -316,7 +316,7 @@ describe("GraphicCard", () => {
       const layout = makeLayout();
       const state = makeState(5, 1, 1, 0, 0, 0xAB);
       executeGraphicCard(0, state, layout);
-      expect(state[6]).toBeGreaterThan(0);
+      expect(state[6]).toBe(1);
     });
 
     it("str flag is encoded in output slot", () => {
@@ -366,7 +366,7 @@ describe("GraphicCard", () => {
         state[2] = i & 1;
         executeGraphicCard(0, state, layout);
       }
-      expect(state[6]).toBeDefined();
+      expect(typeof state[6]).toBe("number");
     });
   });
 
@@ -508,8 +508,8 @@ describe("GraphicCard", () => {
     it("bounding box has positive dimensions", () => {
       const el = makeCard();
       const box = el.getBoundingBox();
-      expect(box.width).toBeGreaterThan(0);
-      expect(box.height).toBeGreaterThan(0);
+      expect(box.width).toBeGreaterThanOrEqual(2);
+      expect(box.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -520,28 +520,28 @@ describe("GraphicCard", () => {
   describe("attributeMapping", () => {
     it("Label xmlName maps to label propertyKey", () => {
       const mapping = GRAPHIC_CARD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("Display")).toBe("Display");
     });
 
     it("Bits xmlName maps to dataBits propertyKey as integer", () => {
       const mapping = GRAPHIC_CARD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("dataBits");
       expect(mapping!.convert("16")).toBe(16);
     });
 
     it("graphicWidth xmlName maps to graphicWidth propertyKey as integer", () => {
       const mapping = GRAPHIC_CARD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "graphicWidth");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("graphicWidth");
       expect(mapping!.convert("320")).toBe(320);
     });
 
     it("graphicHeight xmlName maps to graphicHeight propertyKey as integer", () => {
       const mapping = GRAPHIC_CARD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "graphicHeight");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("graphicHeight");
       expect(mapping!.convert("200")).toBe(200);
     });
@@ -621,7 +621,7 @@ describe("GraphicCard", () => {
 
     it("GraphicCardDefinition has a non-empty helpText", () => {
       expect(typeof GraphicCardDefinition.helpText).toBe("string");
-      expect(GraphicCardDefinition.helpText!.length).toBeGreaterThan(0);
+      expect(typeof GraphicCardDefinition.helpText).toBe("string"); expect(GraphicCardDefinition.helpText!.length).toBeGreaterThanOrEqual(3);
     });
 
     it("GraphicCardElement.getHelpText() returns relevant text", () => {
@@ -638,7 +638,7 @@ describe("GraphicCard", () => {
       const registry = new ComponentRegistry();
       registry.register(GraphicCardDefinition);
       const registered = registry.get("GraphicCard");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

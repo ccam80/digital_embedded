@@ -24,6 +24,7 @@ import type {
   CompiledCircuit,
   EngineChangeListener,
   MeasurementObserver,
+  SnapshotId,
 } from "@/core/engine-interface";
 import { EngineState } from "@/core/engine-interface";
 import { BitVector, bitVectorToRaw, rawToBitVector } from "@/core/signal";
@@ -122,6 +123,23 @@ interface TimedEvent {
 
 const MAX_FEEDBACK_ITERATIONS = 1000;
 
+// Default snapshot memory budget: 512 KB
+const DEFAULT_SNAPSHOT_BUDGET = 512 * 1024;
+
+// ---------------------------------------------------------------------------
+// EngineSnapshot — one captured state entry in the ring buffer
+// ---------------------------------------------------------------------------
+
+interface EngineSnapshot {
+  readonly id: SnapshotId;
+  readonly values: Uint32Array;
+  readonly highZs: Uint32Array;
+  readonly undefinedFlags: Uint8Array;
+  readonly stepCount: number;
+  /** Byte size of this snapshot's data arrays. */
+  readonly byteSize: number;
+}
+
 // ---------------------------------------------------------------------------
 // DigitalEngine
 // ---------------------------------------------------------------------------
@@ -165,6 +183,12 @@ export class DigitalEngine implements SimulationEngine {
 
   // Continuous run handle (requestAnimationFrame id or -1)
   private _rafHandle = -1;
+
+  // Snapshot ring buffer
+  private _snapshots: EngineSnapshot[] = [];
+  private _nextSnapshotId = 0;
+  private _snapshotBudget = DEFAULT_SNAPSHOT_BUDGET;
+  private _snapshotBytesUsed = 0;
 
   constructor(mode: EvaluationMode = "level") {
     this._mode = mode;
@@ -265,14 +289,32 @@ export class DigitalEngine implements SimulationEngine {
     if (this._compiled === null) return;
 
     this._setState(EngineState.RUNNING);
-    // Run up to a safety limit to avoid infinite loops in tests
+
+    // Collect indices of all Break components in the circuit.
+    const breakIndices: number[] = [];
+    for (const [index, element] of this._compiled.componentToElement) {
+      if (element.typeId === "Break") {
+        breakIndices.push(index);
+      }
+    }
+
     const MAX_STEPS = 100_000;
     for (let i = 0; i < MAX_STEPS; i++) {
       this.step();
-      // Break components would set a flag via their executeFn; for now
-      // there is no Break component mechanism — just run one full pass.
-      break;
+
+      // If no Break components exist, one full pass is sufficient.
+      if (breakIndices.length === 0) break;
+
+      // Check whether any Break component's input net is asserted.
+      for (const componentIndex of breakIndices) {
+        const inputOffset = this._compiled.layout.inputOffset(componentIndex);
+        if (this._values[inputOffset] !== 0) {
+          this._setState(EngineState.STOPPED);
+          return;
+        }
+      }
     }
+
     this._setState(EngineState.STOPPED);
   }
 
@@ -345,6 +387,74 @@ export class DigitalEngine implements SimulationEngine {
 
   removeMeasurementObserver(observer: MeasurementObserver): void {
     this._measurementObservers.delete(observer);
+  }
+
+  // -------------------------------------------------------------------------
+  // Snapshot API
+  // -------------------------------------------------------------------------
+
+  saveSnapshot(): SnapshotId {
+    const id = this._nextSnapshotId++;
+    const values = this._values.slice();
+    const highZs = this._highZs.slice();
+    const undefinedFlags = this._undefinedFlags.slice();
+    const byteSize =
+      values.byteLength + highZs.byteLength + undefinedFlags.byteLength;
+
+    const snapshot: EngineSnapshot = {
+      id,
+      values,
+      highZs,
+      undefinedFlags,
+      stepCount: this._stepCount,
+      byteSize,
+    };
+
+    // Evict oldest snapshots until adding this one fits within budget
+    while (
+      this._snapshots.length > 0 &&
+      this._snapshotBytesUsed + byteSize > this._snapshotBudget
+    ) {
+      const evicted = this._snapshots.shift()!;
+      this._snapshotBytesUsed -= evicted.byteSize;
+    }
+
+    this._snapshots.push(snapshot);
+    this._snapshotBytesUsed += byteSize;
+    return id;
+  }
+
+  restoreSnapshot(id: SnapshotId): void {
+    const snapshot = this._snapshots.find((s) => s.id === id);
+    if (snapshot === undefined) {
+      throw new Error(`Snapshot ${id} not found — it may have been evicted or never saved`);
+    }
+    this._values.set(snapshot.values);
+    this._highZs.set(snapshot.highZs);
+    this._undefinedFlags.set(snapshot.undefinedFlags);
+    this._stepCount = snapshot.stepCount;
+    this._setState(EngineState.PAUSED);
+  }
+
+  getSnapshotCount(): number {
+    return this._snapshots.length;
+  }
+
+  clearSnapshots(): void {
+    this._snapshots = [];
+    this._snapshotBytesUsed = 0;
+  }
+
+  setSnapshotBudget(bytes: number): void {
+    this._snapshotBudget = bytes;
+    // Evict oldest snapshots until current usage fits within new budget
+    while (
+      this._snapshots.length > 0 &&
+      this._snapshotBytesUsed > this._snapshotBudget
+    ) {
+      const evicted = this._snapshots.shift()!;
+      this._snapshotBytesUsed -= evicted.byteSize;
+    }
   }
 
   // -------------------------------------------------------------------------

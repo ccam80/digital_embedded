@@ -249,9 +249,9 @@ describe("VGA", () => {
       const layout = makeLayout();
       const state = makeState(0xF, 0xA, 0x5, 1, 0, 1);
       executeVga(0, state, layout);
-      expect(state[6]).toBeDefined();
+      expect(typeof state[6]).toBe("number");
       // Output should be non-zero given non-zero inputs
-      expect(state[6]).toBeGreaterThan(0);
+      expect(state[6]).toBe(1);
     });
 
     it("all-zero inputs produce output=0", () => {
@@ -269,7 +269,7 @@ describe("VGA", () => {
         state[5] = i & 1;
         executeVga(0, state, layout);
       }
-      expect(state[6]).toBeDefined();
+      expect(typeof state[6]).toBe("number");
     });
 
     it("H and V flags are encoded in output slot", () => {
@@ -416,8 +416,8 @@ describe("VGA", () => {
     it("bounding box has positive dimensions", () => {
       const el = makeVga();
       const box = el.getBoundingBox();
-      expect(box.width).toBeGreaterThan(0);
-      expect(box.height).toBeGreaterThan(0);
+      expect(box.width).toBeGreaterThanOrEqual(2);
+      expect(box.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -428,28 +428,28 @@ describe("VGA", () => {
   describe("attributeMapping", () => {
     it("Label xmlName maps to label propertyKey", () => {
       const mapping = VGA_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("Screen")).toBe("Screen");
     });
 
     it("colorBits xmlName maps to colorBits propertyKey as integer", () => {
       const mapping = VGA_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "colorBits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("colorBits");
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("frameWidth xmlName maps to frameWidth propertyKey as integer", () => {
       const mapping = VGA_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "frameWidth");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("frameWidth");
       expect(mapping!.convert("640")).toBe(640);
     });
 
     it("frameHeight xmlName maps to frameHeight propertyKey as integer", () => {
       const mapping = VGA_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "frameHeight");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("frameHeight");
       expect(mapping!.convert("480")).toBe(480);
     });
@@ -529,7 +529,7 @@ describe("VGA", () => {
 
     it("VGADefinition has a non-empty helpText", () => {
       expect(typeof VGADefinition.helpText).toBe("string");
-      expect(VGADefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof VGADefinition.helpText).toBe("string"); expect(VGADefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("VGAElement.getHelpText() returns relevant text", () => {
@@ -546,7 +546,7 @@ describe("VGA", () => {
       const registry = new ComponentRegistry();
       registry.register(VGADefinition);
       const registered = registry.get("VGA");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

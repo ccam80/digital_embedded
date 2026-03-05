@@ -243,7 +243,7 @@ describe("Add", () => {
         state[2] = i & 1;
         exec(0, state, layout);
       }
-      expect(state[3]).toBeDefined();
+      expect(typeof state[3]).toBe("number");
     });
   });
 
@@ -277,14 +277,14 @@ describe("Add", () => {
   describe("attribute mapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = ADD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
       expect(mapping!.propertyKey).toBe("bitWidth");
     });
 
     it("Label maps to label", () => {
       const mapping = ADD_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("MyAdder")).toBe("MyAdder");
     });
@@ -349,7 +349,7 @@ describe("Add", () => {
     });
 
     it("AddDefinition has non-empty helpText", () => {
-      expect(AddDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof AddDefinition.helpText).toBe("string"); expect(AddDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("AddDefinition can be registered", () => {
@@ -371,8 +371,8 @@ describe("Add", () => {
     it("getBoundingBox returns correct dimensions", () => {
       const el = makeAddElement();
       const bb = el.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 });
@@ -474,7 +474,7 @@ describe("Sub", () => {
         state[2] = 0;
         exec(0, state, layout);
       }
-      expect(state[3]).toBeDefined();
+      expect(typeof state[3]).toBe("number");
     });
   });
 
@@ -633,7 +633,7 @@ describe("Mul", () => {
         state[1] = (255 - i) & 0xFF;
         exec(0, state, layout);
       }
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -853,7 +853,7 @@ describe("Div", () => {
         state[1] = Math.max(1, i & 0xF);
         exec(0, state, layout);
       }
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -1035,7 +1035,7 @@ describe("Div", () => {
     });
 
     it("DivDefinition has non-empty helpText", () => {
-      expect(DivDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DivDefinition.helpText).toBe("string"); expect(DivDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DivElement.getHelpText() mentions Div", () => {

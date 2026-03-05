@@ -3,7 +3,8 @@ import { LockedModeGuard } from "../locked-mode.js";
 import type { CircuitElement } from "@/core/element";
 import type { Rect } from "@/core/renderer-interface";
 import type { Pin } from "@/core/pin";
-import type { PropertyBag } from "@/core/properties";
+import { PropertyBag } from "@/core/properties";
+import type { PropertyValue } from "@/core/properties";
 import type { RenderContext } from "@/core/renderer-interface";
 
 // ---------------------------------------------------------------------------
@@ -23,16 +24,8 @@ function makeElement(typeId: string): CircuitElement {
     getBoundingBox(): Rect {
       return { x: 0, y: 0, width: 10, height: 10 };
     },
-    getProperty<T>(key: string): T {
-      void key;
-      return undefined as T;
-    },
-    setProperty<T>(key: string, value: T): void {
-      void key;
-      void value;
-    },
     getProperties(): PropertyBag {
-      return {};
+      return new PropertyBag();
     },
     draw(_ctx: RenderContext): void {},
     serialize() {
@@ -45,8 +38,11 @@ function makeElement(typeId: string): CircuitElement {
         properties: {},
       };
     },
-    clone(): CircuitElement {
-      return makeElement(typeId);
+    getHelpText(): string {
+      return "";
+    },
+    getAttribute(_name: string): PropertyValue | undefined {
+      return undefined;
     },
   };
 }

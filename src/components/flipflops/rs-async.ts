@@ -172,7 +172,7 @@ export class RSAsyncElement extends AbstractCircuitElement {
 export function executeRSAsync(index: number, state: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const stBase = (layout as unknown as { stateOffset(i: number): number }).stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const s = state[inBase] !== 0;
   const r = state[inBase + 1] !== 0;

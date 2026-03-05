@@ -245,14 +245,14 @@ describe("OrGate", () => {
 
     it("Label attribute maps to label property key", () => {
       const mapping = OR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("MyOrGate")).toBe("MyOrGate");
     });
 
     it("inverterConfig attribute maps to _inverterLabels", () => {
       const mapping = OR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "inverterConfig");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("_inverterLabels");
       expect(mapping!.convert("in0,in1")).toBe("in0,in1");
     });
@@ -401,7 +401,7 @@ describe("OrGate", () => {
 
     it("OrDefinition has a non-empty helpText", () => {
       expect(typeof OrDefinition.helpText).toBe("string");
-      expect(OrDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof OrDefinition.helpText).toBe("string"); expect(OrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("OrElement.getHelpText() returns the expected text", () => {
@@ -418,7 +418,7 @@ describe("OrGate", () => {
       const registry = new ComponentRegistry();
       registry.register(OrDefinition);
       const registered = registry.get("Or");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

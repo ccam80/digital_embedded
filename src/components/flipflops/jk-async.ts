@@ -194,7 +194,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
 export function executeJKAsync(index: number, state: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const stBase = (layout as unknown as { stateOffset(i: number): number }).stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const setIn = state[inBase];
   const j = state[inBase + 1];

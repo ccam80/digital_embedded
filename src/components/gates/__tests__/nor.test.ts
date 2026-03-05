@@ -283,7 +283,7 @@ describe("NOrGate", () => {
 
     it("inverterConfig attribute maps to _inverterLabels", () => {
       const mapping = NOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "inverterConfig");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("_inverterLabels");
     });
   });
@@ -345,7 +345,7 @@ describe("NOrGate", () => {
 
     it("NOrDefinition has a non-empty helpText", () => {
       expect(typeof NOrDefinition.helpText).toBe("string");
-      expect(NOrDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof NOrDefinition.helpText).toBe("string"); expect(NOrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("NOrDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -357,7 +357,7 @@ describe("NOrGate", () => {
       const registry = new ComponentRegistry();
       registry.register(NOrDefinition);
       const registered = registry.get("NOr");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

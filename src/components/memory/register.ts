@@ -171,8 +171,7 @@ export class RegisterElement extends AbstractCircuitElement {
 export function executeRegister(index: number, state: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const extLayout = layout as unknown as { stateOffset(i: number): number };
-  const stBase = extLayout.stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const d = state[inBase];
   const clock = state[inBase + 1];

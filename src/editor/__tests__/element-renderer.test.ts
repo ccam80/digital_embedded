@@ -185,7 +185,7 @@ describe("ElementRenderer", () => {
       .callsOfKind("circle")
       .filter((c) => !c.filled && c.cx === 3 && c.cy === 2);
 
-    expect(unfilledCircles.length).toBeGreaterThanOrEqual(1);
+    expect(unfilledCircles).toHaveLength(1);
   });
 
   // -------------------------------------------------------------------------
@@ -220,7 +220,7 @@ describe("ElementRenderer", () => {
           (c as { kind: "rect"; width: number }).width === 4 &&
           (c as { kind: "rect"; height: number }).height === 4,
       );
-    expect(selectionRect).toBeDefined();
+    expect(selectionRect).not.toBeUndefined();
   });
 
   // -------------------------------------------------------------------------

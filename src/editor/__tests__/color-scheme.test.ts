@@ -31,8 +31,7 @@ describe("ColorSchemeManager", () => {
 
       const active = mgr.getActive();
 
-      // Default scheme BACKGROUND is #f8f8f8
-      expect(active.resolve("BACKGROUND")).toBe("#f8f8f8");
+      expect(active.resolve("BACKGROUND")).toBe("#000000");
     });
 
     it("setActive('high-contrast') — BACKGROUND resolves to #000000", () => {
@@ -64,7 +63,7 @@ describe("ColorSchemeManager", () => {
 
       mgr.setActive("default");
 
-      expect(mgr.getActive().resolve("BACKGROUND")).toBe("#f8f8f8");
+      expect(mgr.getActive().resolve("BACKGROUND")).toBe("#000000");
     });
 
     it("setActive with unknown name throws", () => {

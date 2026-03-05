@@ -71,6 +71,14 @@ export interface ComponentLayout {
   outputCount(componentIndex: number): number;
   /** Starting index in the signal array for component's outputs. */
   outputOffset(componentIndex: number): number;
+  /** Starting index in the state array for component's persistent state slots. */
+  stateOffset(componentIndex: number): number;
+  /**
+   * Read a per-instance property value for a component at the given index.
+   * Returns undefined when the layout has no property data (e.g. test stubs).
+   * ExecuteFunctions use this to read bitWidth, signed, etc. at runtime.
+   */
+  getProperty?(componentIndex: number, key: string): PropertyValue | undefined;
 }
 
 // ---------------------------------------------------------------------------

@@ -88,8 +88,6 @@ export class ShortcutManager {
 /**
  * Create a ShortcutManager pre-loaded with Digital's default key bindings.
  *
- * Each action callback is a no-op placeholder. Callers replace them with real
- * handlers via register() after construction, or pass the callbacks object.
  */
 export function createDefaultShortcuts(callbacks: {
   undo?: () => void;

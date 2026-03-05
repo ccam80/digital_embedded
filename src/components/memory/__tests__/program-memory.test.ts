@@ -316,7 +316,7 @@ describe("ProgramMemory", () => {
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(1);
     expect(bb.y).toBe(2);
-    expect(bb.width).toBeGreaterThan(0);
-    expect(bb.height).toBeGreaterThan(0);
+    expect(bb.width).toBeGreaterThanOrEqual(2);
+    expect(bb.height).toBeGreaterThanOrEqual(2);
   });
 });

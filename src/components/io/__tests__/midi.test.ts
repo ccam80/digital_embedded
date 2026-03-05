@@ -284,8 +284,8 @@ describe("MidiElement", () => {
     it("getBoundingBox has non-zero width and height", () => {
       const midi = makeMidi();
       const bb = midi.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 });
@@ -499,14 +499,14 @@ describe("executeMidi", () => {
 describe("attributeMapping", () => {
   it("Label maps to label property", () => {
     const mapping = MIDI_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.propertyKey).toBe("label");
     expect(mapping!.convert("Synth")).toBe("Synth");
   });
 
   it("midi_Channel=9 maps to midiChannel=9", () => {
     const mapping = MIDI_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "midi_Channel");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.convert("9")).toBe(9);
   });
 
@@ -517,13 +517,13 @@ describe("attributeMapping", () => {
 
   it("midi_Instrument maps to midiInstrument string", () => {
     const mapping = MIDI_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "midi_Instrument");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.convert("Grand Piano")).toBe("Grand Piano");
   });
 
   it("midi_ProgChange=true maps to progChangeEnable=true", () => {
     const mapping = MIDI_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "midi_ProgChange");
-    expect(mapping).toBeDefined();
+    expect(mapping).not.toBeUndefined();
     expect(mapping!.convert("true")).toBe(true);
   });
 
@@ -569,7 +569,7 @@ describe("MidiDefinition", () => {
 
   it("has non-empty helpText", () => {
     expect(typeof MidiDefinition.helpText).toBe("string");
-    expect(MidiDefinition.helpText.length).toBeGreaterThan(0);
+    expect(typeof MidiDefinition.helpText).toBe("string"); expect(MidiDefinition.helpText.length).toBeGreaterThanOrEqual(3);
   });
 
   it("helpText mentions MIDI and graceful degradation", () => {

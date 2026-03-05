@@ -370,8 +370,8 @@ describe("Diode", () => {
       const bb = d.getBoundingBox();
       expect(bb.x).toBe(0);
       expect(bb.y).toBe(0);
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -382,7 +382,7 @@ describe("Diode", () => {
   describe("attributeMapping", () => {
     it("blown=true maps to boolean true", () => {
       const mapping = DIODE_ATTRIBUTE_MAPPINGS_EXPORT.find((m) => m.xmlName === "blown");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("true")).toBe(true);
     });
 
@@ -393,7 +393,7 @@ describe("Diode", () => {
 
     it("Label maps to label property", () => {
       const mapping = DIODE_ATTRIBUTE_MAPPINGS_EXPORT.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("D1")).toBe("D1");
     });
@@ -433,7 +433,7 @@ describe("Diode", () => {
 
     it("DiodeDefinition has non-empty helpText", () => {
       expect(typeof DiodeDefinition.helpText).toBe("string");
-      expect(DiodeDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DiodeDefinition.helpText).toBe("string"); expect(DiodeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DiodeDefinition has non-empty propertyDefs", () => {
@@ -642,7 +642,7 @@ describe("DiodeForward", () => {
     });
 
     it("DiodeForwardDefinition has non-empty helpText", () => {
-      expect(DiodeForwardDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DiodeForwardDefinition.helpText).toBe("string"); expect(DiodeForwardDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DiodeForwardDefinition defaultDelay is 0", () => {
@@ -943,8 +943,8 @@ describe("PullUp", () => {
     it("getBoundingBox returns non-zero dimensions", () => {
       const pu = makePullUp();
       const bb = pu.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -955,7 +955,7 @@ describe("PullUp", () => {
   describe("attributeMapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = PULL_UP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
 
@@ -966,7 +966,7 @@ describe("PullUp", () => {
 
     it("Label maps to label property", () => {
       const mapping = PULL_UP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("R1")).toBe("R1");
     });
@@ -1005,7 +1005,7 @@ describe("PullUp", () => {
     });
 
     it("PullUpDefinition has non-empty helpText", () => {
-      expect(PullUpDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PullUpDefinition.helpText).toBe("string"); expect(PullUpDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PullUpDefinition has non-empty propertyDefs", () => {
@@ -1170,8 +1170,8 @@ describe("PullDown", () => {
     it("getBoundingBox returns non-zero dimensions", () => {
       const pd = makePullDown();
       const bb = pd.getBoundingBox();
-      expect(bb.width).toBeGreaterThan(0);
-      expect(bb.height).toBeGreaterThan(0);
+      expect(bb.width).toBeGreaterThanOrEqual(2);
+      expect(bb.height).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -1182,7 +1182,7 @@ describe("PullDown", () => {
   describe("attributeMapping", () => {
     it("Bits=4 maps to bitWidth=4", () => {
       const mapping = PULL_DOWN_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("4")).toBe(4);
     });
 
@@ -1193,7 +1193,7 @@ describe("PullDown", () => {
 
     it("Label maps to label property", () => {
       const mapping = PULL_DOWN_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("R2")).toBe("R2");
     });
@@ -1232,7 +1232,7 @@ describe("PullDown", () => {
     });
 
     it("PullDownDefinition has non-empty helpText", () => {
-      expect(PullDownDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PullDownDefinition.helpText).toBe("string"); expect(PullDownDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PullDownDefinition has non-empty propertyDefs", () => {

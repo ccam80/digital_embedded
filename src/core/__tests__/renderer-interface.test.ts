@@ -14,6 +14,8 @@ import { describe, it, expect } from "vitest";
 import {
   THEME_COLORS,
   defaultColorScheme,
+  lightColorScheme,
+  darkColorScheme,
   highContrastColorScheme,
   monochromeColorScheme,
   COLOR_SCHEMES,
@@ -40,6 +42,7 @@ describe("THEME_COLORS", () => {
       "WIRE_HIGH",
       "WIRE_LOW",
       "WIRE_Z",
+      "WIRE_ERROR",
       "WIRE_UNDEFINED",
       "COMPONENT",
       "COMPONENT_FILL",
@@ -54,8 +57,8 @@ describe("THEME_COLORS", () => {
     }
   });
 
-  it("has exactly 12 entries", () => {
-    expect(THEME_COLORS).toHaveLength(12);
+  it("has exactly 13 entries", () => {
+    expect(THEME_COLORS).toHaveLength(13);
   });
 
   it("contains no duplicates", () => {
@@ -89,9 +92,9 @@ describe("defaultColorScheme", () => {
     );
   });
 
-  it("BACKGROUND is light (not black)", () => {
+  it("BACKGROUND is dark (black)", () => {
     const bg = defaultColorScheme.resolve("BACKGROUND");
-    expect(bg).not.toBe("#000000");
+    expect(bg).toBe("#000000");
   });
 });
 
@@ -151,16 +154,18 @@ describe("monochromeColorScheme", () => {
 // ---------------------------------------------------------------------------
 
 describe("COLOR_SCHEMES", () => {
-  it("contains 'default', 'high-contrast', and 'monochrome' keys", () => {
+  it("contains 'default', 'dark', 'light', 'high-contrast', and 'monochrome' keys", () => {
     expect(Object.keys(COLOR_SCHEMES)).toContain("default");
+    expect(Object.keys(COLOR_SCHEMES)).toContain("dark");
+    expect(Object.keys(COLOR_SCHEMES)).toContain("light");
     expect(Object.keys(COLOR_SCHEMES)).toContain("high-contrast");
     expect(Object.keys(COLOR_SCHEMES)).toContain("monochrome");
   });
 
   it("schemes are switchable at runtime — resolving same color through different schemes gives different results", () => {
     const schemes: ColorScheme[] = [
-      COLOR_SCHEMES["default"]!,
-      COLOR_SCHEMES["high-contrast"]!,
+      COLOR_SCHEMES["dark"]!,
+      COLOR_SCHEMES["light"]!,
       COLOR_SCHEMES["monochrome"]!,
     ];
     for (const scheme of schemes) {
@@ -177,6 +182,61 @@ describe("COLOR_SCHEMES", () => {
         expect(() => scheme.resolve(color)).not.toThrow();
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DarkMode — new dark default color scheme
+// ---------------------------------------------------------------------------
+
+describe("DarkMode", () => {
+  it("darkIsDefault — defaultColorScheme has background #000000", () => {
+    expect(defaultColorScheme.resolve("BACKGROUND")).toBe("#000000");
+  });
+
+  it("wireColorDistinct — dark scheme wire colors for logic-1, logic-0, high-Z, error, undefined are all distinct", () => {
+    const colors = [
+      darkColorScheme.resolve("WIRE_HIGH"),
+      darkColorScheme.resolve("WIRE_LOW"),
+      darkColorScheme.resolve("WIRE_Z"),
+      darkColorScheme.resolve("WIRE_ERROR"),
+      darkColorScheme.resolve("WIRE_UNDEFINED"),
+    ];
+    const unique = new Set(colors);
+    expect(unique.size).toBe(colors.length);
+  });
+
+  it("lightPreserved — lightColorScheme exists with non-black background", () => {
+    const bg = lightColorScheme.resolve("BACKGROUND");
+    expect(bg).not.toBe("#000000");
+    expect(bg).toMatch(/^#[0-9a-fA-F]{6}$/);
+  });
+
+  it("registryHasBoth — COLOR_SCHEMES has entries for 'dark' and 'light'", () => {
+    expect(COLOR_SCHEMES["dark"]).toBeDefined();
+    expect(COLOR_SCHEMES["light"]).toBeDefined();
+  });
+
+  it("contrastCheck — text color has sufficient luminance contrast against background (ratio >= 4.5:1)", () => {
+    function relativeLuminance(hex: string): number {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const linearize = (c: number): number =>
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+    }
+    function contrastRatio(hex1: string, hex2: string): number {
+      const l1 = relativeLuminance(hex1);
+      const l2 = relativeLuminance(hex2);
+      const lighter = Math.max(l1, l2);
+      const darker = Math.min(l1, l2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+    const text = darkColorScheme.resolve("TEXT");
+    const bg = darkColorScheme.resolve("BACKGROUND");
+    const ratio = contrastRatio(text, bg);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 });
 

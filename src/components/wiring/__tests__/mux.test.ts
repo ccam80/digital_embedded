@@ -249,7 +249,7 @@ describe("Multiplexer", () => {
 
     it("Label maps to label property key", () => {
       const mapping = MUX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("MuxLabel")).toBe("MuxLabel");
     });
@@ -336,7 +336,7 @@ describe("Multiplexer", () => {
 
     it("MuxDefinition has a non-empty helpText", () => {
       expect(typeof MuxDefinition.helpText).toBe("string");
-      expect(MuxDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof MuxDefinition.helpText).toBe("string"); expect(MuxDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("MuxDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -348,7 +348,7 @@ describe("Multiplexer", () => {
       const registry = new ComponentRegistry();
       registry.register(MuxDefinition);
       const registered = registry.get("Multiplexer");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

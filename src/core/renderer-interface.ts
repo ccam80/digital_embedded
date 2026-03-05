@@ -32,6 +32,7 @@ export type ThemeColor =
   | "WIRE_HIGH"
   | "WIRE_LOW"
   | "WIRE_Z"
+  | "WIRE_ERROR"
   | "WIRE_UNDEFINED"
   | "COMPONENT"
   | "COMPONENT_FILL"
@@ -98,11 +99,12 @@ function makeScheme(map: ColorMap): ColorScheme {
   };
 }
 
-const DEFAULT_COLORS: ColorMap = {
+const LIGHT_COLORS: ColorMap = {
   WIRE: "#000000",
   WIRE_HIGH: "#00bb00",
   WIRE_LOW: "#006600",
   WIRE_Z: "#aaaaaa",
+  WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff4444",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
@@ -113,12 +115,29 @@ const DEFAULT_COLORS: ColorMap = {
   SELECTION: "#0066cc",
 };
 
+const DARK_COLORS: ColorMap = {
+  WIRE: "#888888",
+  WIRE_HIGH: "#00ff00",
+  WIRE_LOW: "#006600",
+  WIRE_Z: "#4444ff",
+  WIRE_ERROR: "#ff0000",
+  WIRE_UNDEFINED: "#ff8800",
+  COMPONENT: "#cccccc",
+  COMPONENT_FILL: "#333333",
+  PIN: "#4444ff",
+  TEXT: "#ffffff",
+  GRID: "#222222",
+  BACKGROUND: "#000000",
+  SELECTION: "#ffff00",
+};
+
 const HIGH_CONTRAST_COLORS: ColorMap = {
   WIRE: "#ffffff",
   WIRE_HIGH: "#00ff00",
   WIRE_LOW: "#007700",
   WIRE_Z: "#cccccc",
-  WIRE_UNDEFINED: "#ff0000",
+  WIRE_ERROR: "#ff0000",
+  WIRE_UNDEFINED: "#ff4444",
   COMPONENT: "#ffffff",
   COMPONENT_FILL: "#000000",
   PIN: "#4488ff",
@@ -133,6 +152,7 @@ const MONOCHROME_COLORS: ColorMap = {
   WIRE_HIGH: "#000000",
   WIRE_LOW: "#888888",
   WIRE_Z: "#888888",
+  WIRE_ERROR: "#444444",
   WIRE_UNDEFINED: "#444444",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
@@ -143,13 +163,18 @@ const MONOCHROME_COLORS: ColorMap = {
   SELECTION: "#000000",
 };
 
-export const defaultColorScheme: ColorScheme = makeScheme(DEFAULT_COLORS);
+export const lightColorScheme: ColorScheme = makeScheme(LIGHT_COLORS);
+export const darkColorScheme: ColorScheme = makeScheme(DARK_COLORS);
 export const highContrastColorScheme: ColorScheme = makeScheme(HIGH_CONTRAST_COLORS);
 export const monochromeColorScheme: ColorScheme = makeScheme(MONOCHROME_COLORS);
+
+export const defaultColorScheme: ColorScheme = darkColorScheme;
 
 /** All available built-in color schemes, keyed by name. */
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
   default: defaultColorScheme,
+  dark: darkColorScheme,
+  light: lightColorScheme,
   "high-contrast": highContrastColorScheme,
   monochrome: monochromeColorScheme,
 };
@@ -160,6 +185,7 @@ export const THEME_COLORS: readonly ThemeColor[] = [
   "WIRE_HIGH",
   "WIRE_LOW",
   "WIRE_Z",
+  "WIRE_ERROR",
   "WIRE_UNDEFINED",
   "COMPONENT",
   "COMPONENT_FILL",

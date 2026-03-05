@@ -314,7 +314,7 @@ describe("NAndGate", () => {
 
     it("NAndDefinition has a non-empty helpText", () => {
       expect(typeof NAndDefinition.helpText).toBe("string");
-      expect(NAndDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof NAndDefinition.helpText).toBe("string"); expect(NAndDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("NAndDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -326,7 +326,7 @@ describe("NAndGate", () => {
       const registry = new ComponentRegistry();
       registry.register(NAndDefinition);
       const registered = registry.get("NAnd");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

@@ -28,8 +28,8 @@ describe('FacadeTypes', () => {
         vectors: [
           {
             inputs: { A: 1, B: 0 },
-            expected: { Q: 1 },
-            actual: { Q: 1 },
+            expectedOutputs: { Q: 1 },
+            actualOutputs: { Q: 1 },
             passed: true,
           },
         ],

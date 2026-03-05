@@ -318,7 +318,7 @@ describe("PriorityEncoder", () => {
 
     it("PriorityEncoderDefinition has a non-empty helpText", () => {
       expect(typeof PriorityEncoderDefinition.helpText).toBe("string");
-      expect(PriorityEncoderDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PriorityEncoderDefinition.helpText).toBe("string"); expect(PriorityEncoderDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PriorityEncoderDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -330,7 +330,7 @@ describe("PriorityEncoder", () => {
       const registry = new ComponentRegistry();
       registry.register(PriorityEncoderDefinition);
       const registered = registry.get("PriorityEncoder");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

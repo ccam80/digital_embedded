@@ -299,7 +299,7 @@ describe("BitSelector", () => {
 
     it("BitSelectorDefinition has a non-empty helpText", () => {
       expect(typeof BitSelectorDefinition.helpText).toBe("string");
-      expect(BitSelectorDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof BitSelectorDefinition.helpText).toBe("string"); expect(BitSelectorDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("BitSelectorDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -311,7 +311,7 @@ describe("BitSelector", () => {
       const registry = new ComponentRegistry();
       registry.register(BitSelectorDefinition);
       const registered = registry.get("BitSelector");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

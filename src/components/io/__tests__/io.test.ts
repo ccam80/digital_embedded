@@ -925,7 +925,7 @@ describe("NotConnectedComponent", () => {
     });
 
     it("NotConnectedDefinition has non-empty helpText", () => {
-      expect(NotConnectedDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof NotConnectedDefinition.helpText).toBe("string"); expect(NotConnectedDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
   });
 });

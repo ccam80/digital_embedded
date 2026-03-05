@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /c/local_working_projects/digital_js && git commit -m \\\"$(cat <<'EOF'\\nComplete Phases 2-5: graphic card, lock cleanup, state update\\n\\nAdd graphic card component (5.2.27) — final missi...",
-  "error": "Exit code 1\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file\n\n/usr/bin/bash: -c: line 0: unexpected EOF while looking for matching `)'\n/usr/bin/bash: -c: line 11: syntax error: unexpected end of file",
-  "timestamp": "2026-03-04T21:50:42.352Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_js\\\" && npm test -- --reporter=verbose --run src/io/__tests__/digb-schema.test.ts 2>&1\",\"timeout\":60000,\"description\":\"Run the new digb tests\"}",
+  "error": "Exit code 1\n\n> digital-sim@0.1.0 test\n> vitest run --reporter=verbose --run src/io/__tests__/digb-schema.test.ts\n\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_js\u001b[39m\n\n \u001b[32m✓\u001b[39m src/io/__tests__/digb-schema.test.ts\u001b[2m > \u001b[22mvalidate\u001b[2m > \u001b[22mvalidDocument\n \u001b[32m✓\u001b[39m src/io/__tests__/digb-schema.test.ts\u001b[2m > \u001b[22mvalidate\u001b[2m > \u001b[22mmissingFormat\n \u001b[32m✓\u001b[39m src/io/__tests__/digb-schema.test.ts\u001b[2m > \u001b[22mvalidate\u001b[2m > \u001b[22mwrongVersion\n \u001b...",
+  "timestamp": "2026-03-05T04:59:25.044Z",
   "retry_count": 1
 }

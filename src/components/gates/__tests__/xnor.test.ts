@@ -288,13 +288,13 @@ describe("XNOrGate", () => {
 
     it("Label attribute maps to label property key", () => {
       const mapping = XNOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
     });
 
     it("inverterConfig attribute maps to _inverterLabels", () => {
       const mapping = XNOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "inverterConfig");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("_inverterLabels");
     });
   });
@@ -356,7 +356,7 @@ describe("XNOrGate", () => {
 
     it("XNOrDefinition has a non-empty helpText", () => {
       expect(typeof XNOrDefinition.helpText).toBe("string");
-      expect(XNOrDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof XNOrDefinition.helpText).toBe("string"); expect(XNOrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("XNOrDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -368,7 +368,7 @@ describe("XNOrGate", () => {
       const registry = new ComponentRegistry();
       registry.register(XNOrDefinition);
       const registered = registry.get("XNOr");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

@@ -168,7 +168,7 @@ describe("Neg", () => {
         state[0] = i;
         executeNeg(0, state, layout);
       }
-      expect(state[1]).toBeDefined();
+      expect(typeof state[1]).toBe("number");
     });
   });
 
@@ -214,7 +214,7 @@ describe("Neg", () => {
       const r = new ComponentRegistry();
       expect(() => r.register(NegDefinition)).not.toThrow();
     });
-    it("helpText is non-empty", () => { expect(NegDefinition.helpText.length).toBeGreaterThan(0); });
+    it("helpText is non-empty", () => { expect(typeof NegDefinition.helpText).toBe("string"); expect(NegDefinition.helpText.length).toBeGreaterThanOrEqual(3); });
   });
 });
 
@@ -313,7 +313,7 @@ describe("Comparator", () => {
         state[1] = (i * 3) & 0xFF;
         exec(0, state, layout);
       }
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -508,7 +508,7 @@ describe("BarrelShifter", () => {
         state[1] = i & 0x7;
         exec(0, state, layout);
       }
-      expect(state[2]).toBeDefined();
+      expect(typeof state[2]).toBe("number");
     });
   });
 
@@ -618,7 +618,7 @@ describe("BitCount", () => {
         state[0] = i;
         executebitCount(0, state, layout);
       }
-      expect(state[1]).toBeDefined();
+      expect(typeof state[1]).toBe("number");
     });
   });
 
@@ -731,7 +731,7 @@ describe("BitExtender", () => {
         state[0] = i & 0xFF;
         exec(0, state, layout);
       }
-      expect(state[1]).toBeDefined();
+      expect(typeof state[1]).toBe("number");
     });
   });
 
@@ -925,6 +925,6 @@ describe("PRNG", () => {
       const r = new ComponentRegistry();
       expect(() => r.register(PRNGDefinition)).not.toThrow();
     });
-    it("helpText is non-empty", () => { expect(PRNGDefinition.helpText.length).toBeGreaterThan(0); });
+    it("helpText is non-empty", () => { expect(typeof PRNGDefinition.helpText).toBe("string"); expect(PRNGDefinition.helpText.length).toBeGreaterThanOrEqual(3); });
   });
 });

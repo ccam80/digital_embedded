@@ -243,13 +243,13 @@ describe("Counter", () => {
   describe("attribute mapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
 
     it("Label maps to label key", () => {
       const mapping = COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("cnt1")).toBe("cnt1");
     });
   });
@@ -277,7 +277,7 @@ describe("Counter", () => {
     });
 
     it("CounterDefinition has non-empty helpText", () => {
-      expect(CounterDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof CounterDefinition.helpText).toBe("string"); expect(CounterDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("CounterDefinition can be registered without error", () => {
@@ -465,13 +465,13 @@ describe("CounterPreset", () => {
   describe("attribute mapping", () => {
     it("maxValue maps to maxValue key as integer", () => {
       const mapping = COUNTER_PRESET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "maxValue");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("15")).toBe(15);
     });
 
     it("Bits maps to bitWidth", () => {
       const mapping = COUNTER_PRESET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("8")).toBe(8);
     });
   });

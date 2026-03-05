@@ -91,67 +91,6 @@ export function evaluateWithNoise(
  * SCC. In practice, the buffer is sized to netCount (pre-allocated by the
  * engine at compile time).
  *
- * Implementation: we snapshot the entire state array into snapshotBuffer
- * before evaluation, then restore only the net slots that are inputs to this
- * SCC's components before each individual execute call, using the snapshotted
- * values. Because the executeFn reads via layout.inputOffset and writes via
- * layout.outputOffset, we redirect reads by temporarily writing snapshot
- * values into the input slots, executing, then leaving outputs in state.
- *
- * Simpler approach used here: copy all state to snapshotBuffer, let all
- * components read from snapshotBuffer (via a wrapper that redirects reads),
- * then copy outputs back to state. Since executeFns write directly to state[]
- * and read from state[], we instead run in two passes:
- *   Pass 1: capture output values for all components in this SCC before executing.
- *   Pass 2: execute each component; their reads of other SCC members see pre-step values.
- *
- * The correct approach: copy input net values for SCC members into snapshot,
- * then for each component, temporarily place snapshot values into input slots,
- * call executeFn, restore. But executeFns are designed to read state[] directly.
- *
- * Adopted strategy: copy the entire signal state slice into snapshotBuffer,
- * evaluate all components reading from state (unchanged snapshot state since
- * we haven't written yet in this round), but prevent writes from affecting
- * subsequent reads by writing outputs only to snapshotBuffer during the
- * evaluation pass, then copying snapshotBuffer outputs back to state once all
- * components have been evaluated.
- *
- * Actual implementation: Pre-copy input-net values for SCC components into
- * snapshotBuffer. Then for each component: write snapshot-sourced values into
- * the component's input net slots in state, call executeFn (which reads those
- * slots and writes output slots), then capture output values back into
- * snapshotBuffer. Restore all input slots from snapshot at end.
- *
- * This is complex and fragile. The simplest correct approach is:
- *   1. Copy all state to snapshotBuffer.
- *   2. Run all executeFns using snapshotBuffer as the read source and state as
- *      the write target. Since executeFns take a single state array parameter,
- *      we instead: run each fn against a temp copy, capture outputs.
- *
- * Given the executeFn signature `(index, state, layout) => void`, the cleanest
- * snapshot implementation is:
- *   1. Copy state → snapshotBuffer (full array copy).
- *   2. For each component: call executeFn(index, snapshotBuffer, layout) to
- *      get the result, then copy only the output nets from snapshotBuffer back
- *      to a separate output accumulator.
- *   3. After all components run, copy output accumulator → state.
- *
- * But we cannot easily distinguish which slots are outputs without layout info.
- * Instead: use a two-array approach:
- *   1. snapshotBuffer = copy of state (inputs frozen).
- *   2. Evaluate each component against snapshotBuffer (writes go to snapshotBuffer).
- *   3. After all done, detect which slots changed in snapshotBuffer vs original
- *      snapshot, copy changes to state.
- *
- * The cleanest approach given our constraints: take a full snapshot of state,
- * run all executeFns against snapshotBuffer (so each fn reads pre-step values
- * and writes to snapshotBuffer — all in the same array but none see each
- * other's writes since reads come from their own input net positions which were
- * all captured before anyone wrote), then copy snapshotBuffer back to state.
- *
- * This works because within a single SCC step, no component sees another
- * component's output from THIS step — they all see the pre-step state snapshot.
- * After the step, state reflects all outputs simultaneously.
  *
  * @param components     Uint32Array of component indices in this SCC
  * @param start          Start index within components

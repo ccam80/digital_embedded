@@ -250,7 +250,7 @@ describe("Decoder", () => {
 
     it("Label maps to label property key", () => {
       const mapping = DECODER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("MyDecoder")).toBe("MyDecoder");
     });
   });
@@ -321,7 +321,7 @@ describe("Decoder", () => {
 
     it("DecoderDefinition has a non-empty helpText", () => {
       expect(typeof DecoderDefinition.helpText).toBe("string");
-      expect(DecoderDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof DecoderDefinition.helpText).toBe("string"); expect(DecoderDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("DecoderDefinition can be registered in ComponentRegistry without throwing", () => {
@@ -333,7 +333,7 @@ describe("Decoder", () => {
       const registry = new ComponentRegistry();
       registry.register(DecoderDefinition);
       const registered = registry.get("Decoder");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

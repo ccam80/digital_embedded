@@ -204,7 +204,8 @@ export function makeExecuteSub(bitWidth: number): (index: number, state: Uint32A
 }
 
 export function executeSub(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteSub(1)(index, state, layout);
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  makeExecuteSub(bitWidth)(index, state, layout);
 }
 
 // ---------------------------------------------------------------------------

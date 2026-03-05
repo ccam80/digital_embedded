@@ -130,8 +130,19 @@ describe("Net", () => {
 
   it("returns a read-only set from getPins()", () => {
     const net = new Net();
+    const pin: Pin = {
+      direction: "INPUT" as Pin["direction"],
+      position: { x: 0, y: 0 },
+      label: "A",
+      bitWidth: 1,
+      isNegated: false,
+      isClock: false,
+    };
+    net.addPin(pin);
     const pins = net.getPins();
     expect(pins).toBeInstanceOf(Set);
+    expect(pins.size).toBe(1);
+    expect(pins.has(pin)).toBe(true);
   });
 
   it("has no signal value property", () => {

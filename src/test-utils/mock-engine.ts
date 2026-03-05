@@ -17,6 +17,7 @@ import type {
   CompiledCircuit,
   EngineChangeListener,
   MeasurementObserver,
+  SnapshotId,
 } from "@/core/engine-interface";
 
 export type { BitVector };
@@ -36,7 +37,12 @@ export type EngineCall =
   | { method: "addChangeListener" }
   | { method: "removeChangeListener" }
   | { method: "addMeasurementObserver" }
-  | { method: "removeMeasurementObserver" };
+  | { method: "removeMeasurementObserver" }
+  | { method: "saveSnapshot"; id: SnapshotId }
+  | { method: "restoreSnapshot"; id: SnapshotId }
+  | { method: "getSnapshotCount"; count: number }
+  | { method: "clearSnapshots" }
+  | { method: "setSnapshotBudget"; bytes: number };
 
 export class MockEngine implements SimulationEngine {
   readonly calls: EngineCall[] = [];
@@ -49,6 +55,10 @@ export class MockEngine implements SimulationEngine {
   private _circuit: CompiledCircuit | null = null;
   private readonly _listeners: Set<EngineChangeListener> = new Set();
   private readonly _measurementObservers: Set<MeasurementObserver> = new Set();
+
+  // Snapshot storage — simple array, no budget enforcement
+  private _mockSnapshots: Map<SnapshotId, { values: Uint32Array; highZs: Uint32Array }> = new Map();
+  private _nextMockSnapshotId = 0;
 
   /** Directly set a raw signal value for test setup. No call recorded. */
   setSignalRaw(netId: number, value: number): void {
@@ -178,6 +188,44 @@ export class MockEngine implements SimulationEngine {
   removeMeasurementObserver(observer: MeasurementObserver): void {
     this.calls.push({ method: "removeMeasurementObserver" });
     this._measurementObservers.delete(observer);
+  }
+
+  saveSnapshot(): SnapshotId {
+    const id = this._nextMockSnapshotId++;
+    this._mockSnapshots.set(id, {
+      values: this._values.slice(),
+      highZs: this._highZs.slice(),
+    });
+    this.calls.push({ method: "saveSnapshot", id });
+    return id;
+  }
+
+  restoreSnapshot(id: SnapshotId): void {
+    this.calls.push({ method: "restoreSnapshot", id });
+    const snapshot = this._mockSnapshots.get(id);
+    if (snapshot === undefined) {
+      throw new Error(`Snapshot ${id} not found`);
+    }
+    this._values.set(snapshot.values);
+    this._highZs.set(snapshot.highZs);
+    this._state = EngineState.PAUSED;
+    this._notifyListeners();
+  }
+
+  getSnapshotCount(): number {
+    const count = this._mockSnapshots.size;
+    this.calls.push({ method: "getSnapshotCount", count });
+    return count;
+  }
+
+  clearSnapshots(): void {
+    this.calls.push({ method: "clearSnapshots" });
+    this._mockSnapshots.clear();
+  }
+
+  setSnapshotBudget(bytes: number): void {
+    this.calls.push({ method: "setSnapshotBudget", bytes });
+    // No budget enforcement in mock — all snapshots are retained
   }
 
   /** Reset call log without affecting signal state or circuit. */

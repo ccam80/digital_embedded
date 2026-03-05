@@ -316,14 +316,14 @@ describe("Testcase", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = TESTCASE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("MyTest")).toBe("MyTest");
     });
 
     it("testData attribute maps to testData property", () => {
       const mapping = TESTCASE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "testData");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("testData");
       expect(mapping!.convert("A B | Y\n0 0 0")).toBe("A B | Y\n0 0 0");
     });
@@ -355,7 +355,7 @@ describe("Testcase", () => {
     });
 
     it("TestcaseDefinition has non-empty helpText", () => {
-      expect(TestcaseDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof TestcaseDefinition.helpText).toBe("string"); expect(TestcaseDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("TestcaseDefinition can be registered without error", () => {

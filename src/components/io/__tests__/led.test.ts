@@ -209,14 +209,14 @@ describe("LED", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = LED_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
       expect(mapping!.convert("D1")).toBe("D1");
     });
 
     it("Color attribute maps to color property", () => {
       const mapping = LED_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("color");
       expect(mapping!.convert("green")).toBe("green");
     });
@@ -248,7 +248,7 @@ describe("LED", () => {
     });
 
     it("LedDefinition has non-empty helpText", () => {
-      expect(LedDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof LedDefinition.helpText).toBe("string"); expect(LedDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("LedDefinition can be registered without error", () => {
@@ -339,13 +339,13 @@ describe("PolarityAwareLED", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = POLARITY_LED_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("LED1")).toBe("LED1");
     });
 
     it("Color attribute maps to color property", () => {
       const mapping = POLARITY_LED_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Color");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("blue")).toBe("blue");
     });
   });
@@ -376,7 +376,7 @@ describe("PolarityAwareLED", () => {
     });
 
     it("PolarityLedDefinition has non-empty helpText", () => {
-      expect(PolarityLedDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof PolarityLedDefinition.helpText).toBe("string"); expect(PolarityLedDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("PolarityLedDefinition can be registered without error", () => {
@@ -468,7 +468,7 @@ describe("LightBulb", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = LIGHT_BULB_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("L1")).toBe("L1");
     });
   });
@@ -498,7 +498,7 @@ describe("LightBulb", () => {
     });
 
     it("LightBulbDefinition has non-empty helpText", () => {
-      expect(LightBulbDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof LightBulbDefinition.helpText).toBe("string"); expect(LightBulbDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("LightBulbDefinition can be registered without error", () => {
@@ -630,7 +630,7 @@ describe("RGBLED", () => {
   describe("attributeMapping", () => {
     it("Label attribute maps to label property", () => {
       const mapping = RGB_LED_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("RGB1")).toBe("RGB1");
     });
   });
@@ -660,7 +660,7 @@ describe("RGBLED", () => {
     });
 
     it("RgbLedDefinition has non-empty helpText", () => {
-      expect(RgbLedDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RgbLedDefinition.helpText).toBe("string"); expect(RgbLedDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("RgbLedDefinition can be registered without error", () => {

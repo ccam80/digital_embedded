@@ -229,7 +229,10 @@ export function makeExecuteDiv(
 }
 
 export function executeDiv(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteDiv(1, false, false)(index, state, layout);
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
+  const remainderPositive = (layout.getProperty?.(index, "remainderPositive") as boolean | undefined) ?? false;
+  makeExecuteDiv(bitWidth, signed, remainderPositive)(index, state, layout);
 }
 
 // ---------------------------------------------------------------------------

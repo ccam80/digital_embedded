@@ -265,14 +265,14 @@ describe("Monoflop", () => {
   describe("attribute mapping", () => {
     it("Delay maps to timerDelay as integer", () => {
       const mapping = MONOFLOP_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Delay");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("timerDelay");
       expect(mapping!.convert("5")).toBe(5);
     });
 
     it("Label maps to label key", () => {
       const mapping = MONOFLOP_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("mono1")).toBe("mono1");
     });
   });
@@ -300,7 +300,7 @@ describe("Monoflop", () => {
     });
 
     it("MonoflopDefinition has non-empty helpText", () => {
-      expect(MonoflopDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof MonoflopDefinition.helpText).toBe("string"); expect(MonoflopDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("MonoflopDefinition can be registered without error", () => {

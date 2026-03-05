@@ -58,8 +58,14 @@ describe("WireRenderer", () => {
 
     renderer.render(ctx, [wire], new Set(), access);
 
-    const lineWidths = ctx.callsOfKind("setLineWidth");
-    expect(lineWidths.some((c) => c.width === 3)).toBe(true);
+    // Verify setLineWidth(3) is called BEFORE the drawLine call
+    const calls = ctx.calls;
+    const busWidthIdx = calls.findIndex(
+      (c) => c.kind === "setLineWidth" && (c as { kind: "setLineWidth"; width: number }).width === 3,
+    );
+    const lineIdx = calls.findIndex((c) => c.kind === "line");
+    expect(busWidthIdx).toBeGreaterThanOrEqual(0);
+    expect(lineIdx).toBeGreaterThan(busWidthIdx);
   });
 
   it("junctionDotAtThreeWayJoin", () => {
@@ -97,16 +103,28 @@ describe("WireRenderer", () => {
 
     renderer.render(ctx, [wire], new Set(), access);
 
-    const colorCalls = ctx.callsOfKind("setColor");
-    expect(colorCalls.some((c) => c.color === "WIRE_HIGH")).toBe(true);
+    // Verify WIRE_HIGH color is set BEFORE the drawLine call
+    const calls = ctx.calls;
+    const colorIdx = calls.findIndex(
+      (c) => c.kind === "setColor" && (c as { kind: "setColor"; color: string }).color === "WIRE_HIGH",
+    );
+    const lineIdx = calls.findIndex((c) => c.kind === "line");
+    expect(colorIdx).toBeGreaterThanOrEqual(0);
+    expect(lineIdx).toBeGreaterThan(colorIdx);
   });
 
   it("defaultColorWhenNoEngine", () => {
     const wire = makeWire(0, 0, 10, 0);
     renderer.render(ctx, [wire], new Set());
 
-    const colorCalls = ctx.callsOfKind("setColor");
-    expect(colorCalls.some((c) => c.color === "WIRE")).toBe(true);
+    // Verify WIRE color is set BEFORE the drawLine call
+    const calls = ctx.calls;
+    const colorIdx = calls.findIndex(
+      (c) => c.kind === "setColor" && (c as { kind: "setColor"; color: string }).color === "WIRE",
+    );
+    const lineIdx = calls.findIndex((c) => c.kind === "line");
+    expect(colorIdx).toBeGreaterThanOrEqual(0);
+    expect(lineIdx).toBeGreaterThan(colorIdx);
   });
 
   it("selectedWireHighlighted", () => {
@@ -115,7 +133,13 @@ describe("WireRenderer", () => {
 
     renderer.render(ctx, [wire], selection);
 
-    const colorCalls = ctx.callsOfKind("setColor");
-    expect(colorCalls.some((c) => c.color === "SELECTION")).toBe(true);
+    // Verify SELECTION color is set BEFORE the drawLine call
+    const calls = ctx.calls;
+    const colorIdx = calls.findIndex(
+      (c) => c.kind === "setColor" && (c as { kind: "setColor"; color: string }).color === "SELECTION",
+    );
+    const lineIdx = calls.findIndex((c) => c.kind === "line");
+    expect(colorIdx).toBeGreaterThanOrEqual(0);
+    expect(lineIdx).toBeGreaterThan(colorIdx);
   });
 });

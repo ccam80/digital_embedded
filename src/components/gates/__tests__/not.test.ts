@@ -214,7 +214,7 @@ describe("NotGate", () => {
 
     it("Label attribute maps to label property key", () => {
       const mapping = NOT_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("label");
     });
 
@@ -368,7 +368,7 @@ describe("NotGate", () => {
 
     it("NotDefinition has a non-empty helpText", () => {
       expect(typeof NotDefinition.helpText).toBe("string");
-      expect(NotDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof NotDefinition.helpText).toBe("string"); expect(NotDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("NotElement.getHelpText() returns the expected text", () => {
@@ -385,7 +385,7 @@ describe("NotGate", () => {
       const registry = new ComponentRegistry();
       registry.register(NotDefinition);
       const registered = registry.get("Not");
-      expect(registered).toBeDefined();
+      expect(registered).not.toBeUndefined();
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });

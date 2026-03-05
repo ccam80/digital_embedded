@@ -243,14 +243,14 @@ describe("Register", () => {
   describe("attribute mapping", () => {
     it("Bits maps to bitWidth as integer", () => {
       const mapping = REGISTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("bitWidth");
       expect(mapping!.convert("16")).toBe(16);
     });
 
     it("Label maps to label key", () => {
       const mapping = REGISTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("reg1")).toBe("reg1");
     });
   });
@@ -278,7 +278,7 @@ describe("Register", () => {
     });
 
     it("RegisterDefinition has non-empty helpText", () => {
-      expect(RegisterDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RegisterDefinition.helpText).toBe("string"); expect(RegisterDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("RegisterDefinition can be registered without error", () => {
@@ -502,21 +502,21 @@ describe("RegisterFile", () => {
   describe("attribute mapping", () => {
     it("Bits maps to bitWidth as integer", () => {
       const mapping = REGISTER_FILE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("bitWidth");
       expect(mapping!.convert("16")).toBe(16);
     });
 
     it("AddrBits maps to addrBits as integer", () => {
       const mapping = REGISTER_FILE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "AddrBits");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("addrBits");
       expect(mapping!.convert("3")).toBe(3);
     });
 
     it("Label maps to label key", () => {
       const mapping = REGISTER_FILE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).toBeDefined();
+      expect(mapping).not.toBeUndefined();
       expect(mapping!.convert("rf1")).toBe("rf1");
     });
   });
@@ -545,7 +545,7 @@ describe("RegisterFile", () => {
     });
 
     it("RegisterFileDefinition has non-empty helpText", () => {
-      expect(RegisterFileDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof RegisterFileDefinition.helpText).toBe("string"); expect(RegisterFileDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
     it("RegisterFileDefinition can be registered without error", () => {

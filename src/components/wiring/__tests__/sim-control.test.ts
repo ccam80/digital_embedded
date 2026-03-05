@@ -625,7 +625,7 @@ describe("AsyncSeq", () => {
     });
 
     it("AsyncSeqDefinition has a non-empty helpText", () => {
-      expect(AsyncSeqDefinition.helpText.length).toBeGreaterThan(0);
+      expect(typeof AsyncSeqDefinition.helpText).toBe("string"); expect(AsyncSeqDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
   });
 });

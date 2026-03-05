@@ -19,7 +19,7 @@ import type { Pin } from "@/core/pin";
 import type { Point, Rect } from "@/core/renderer-interface";
 import { Wire, Circuit } from "@/core/circuit";
 import type { RenderContext } from "@/core/renderer-interface";
-import type { PropertyBag } from "@/core/properties";
+import { PropertyBag } from "@/core/properties";
 import type { SerializedElement } from "@/core/element";
 import type { PropertyValue } from "@/core/properties";
 import { PinDirection } from "@/core/pin";
@@ -36,7 +36,7 @@ function makeElement(bb: Rect, pins: Pin[] = []): CircuitElement {
     rotation: 0,
     mirror: false,
     getPins: () => pins,
-    getProperties: () => ({} as PropertyBag),
+    getProperties: () => new PropertyBag(),
     draw: (_ctx: RenderContext) => {},
     getBoundingBox: () => bb,
     serialize: () => ({} as SerializedElement),

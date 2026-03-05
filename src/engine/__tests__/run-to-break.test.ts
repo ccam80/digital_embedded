@@ -103,7 +103,7 @@ describe("RunToBreak", () => {
       [driverFn, breakFn],
       new Uint8Array([0, 1]),
       [singleGroup([0, 1])],
-      new Map([[1, { type: "Break" }]]),
+      new Map([[1, { typeId: "Break" } as unknown as CircuitElement]]),
     );
 
     const engine = new DigitalEngine("level");
@@ -130,7 +130,7 @@ describe("RunToBreak", () => {
       [noopFn, noopFn],
       new Uint8Array([0, 1]),
       [singleGroup([0, 1])],
-      new Map([[1, { type: "Break" }]]),
+      new Map([[1, { typeId: "Break" } as unknown as CircuitElement]]),
     );
 
     const engine = new DigitalEngine("level");
@@ -168,8 +168,8 @@ describe("RunToBreak", () => {
       new Uint8Array([0, 1, 2]),
       [singleGroup([0, 1, 2])],
       new Map([
-        [1, { type: "NotBreak" }],
-        [2, { type: "Break" }],
+        [1, { typeId: "NotBreak" } as unknown as CircuitElement],
+        [2, { typeId: "Break" } as unknown as CircuitElement],
       ]),
     );
 
