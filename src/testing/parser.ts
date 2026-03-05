@@ -609,11 +609,12 @@ function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): 
       continue;
     }
 
-    // regular data row — starts with NUMBER, IDENT (X/C/Z), or OPEN (expr)
+    // regular data row — starts with NUMBER, IDENT (X/C/Z), OPEN (expr), or BITS
     if (
       t.type === TK.NUMBER ||
       t.type === TK.IDENT ||
-      t.type === TK.OPEN
+      t.type === TK.OPEN ||
+      t.type === TK.KW_BITS
     ) {
       const row = parseDataRow(tok, columnCount);
       blocks.push({ kind: 'row', row });

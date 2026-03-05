@@ -213,7 +213,8 @@ describe("PostMessageAdapter — digital-load-json", () => {
   it("loadJson — valid digb JSON loads circuit and compiles engine, digital-loaded sent", async () => {
     // A minimal .digb document that satisfies the schema validator.
     const digbJson = JSON.stringify({
-      version: "1",
+      format: "digb",
+      version: 1,
       circuit: {
         name: "test",
         elements: [],

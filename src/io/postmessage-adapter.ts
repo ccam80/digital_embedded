@@ -34,7 +34,7 @@
 import type { SimulatorFacade } from '../headless/facade.js';
 import type { EditorBinding } from '../integration/editor-binding.js';
 import type { FileResolver } from './file-resolver.js';
-import { CacheResolver, HttpResolver } from './file-resolver.js';
+import { CacheResolver, ChainResolver, HttpResolver } from './file-resolver.js';
 import { deserializeDigb } from './digb-deserializer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
@@ -360,24 +360,36 @@ export class PostMessageAdapter {
   }
 
   private _clearCaches(): void {
-    if (this._resolver instanceof CacheResolver) {
-      this._resolver.clear();
-    } else if (
-      typeof (this._resolver as unknown as { clear?: () => void }).clear === 'function'
-    ) {
-      (this._resolver as unknown as { clear(): void }).clear();
+    for (const r of this._flattenResolvers()) {
+      if (r instanceof CacheResolver) {
+        r.clear();
+      } else if (
+        typeof (r as unknown as { clear?: () => void }).clear === 'function'
+      ) {
+        (r as unknown as { clear(): void }).clear();
+      }
     }
   }
 
   private _updateResolverBasePath(basePath: string): void {
-    if (this._resolver instanceof HttpResolver) {
-      this._resolver.setBasePath(basePath);
-    } else if (
-      typeof (this._resolver as unknown as { setBasePath?: (p: string) => void }).setBasePath ===
-      'function'
-    ) {
-      (this._resolver as unknown as { setBasePath(p: string): void }).setBasePath(basePath);
+    for (const r of this._flattenResolvers()) {
+      if (r instanceof HttpResolver) {
+        r.setBasePath(basePath);
+      } else if (
+        typeof (r as unknown as { setBasePath?: (p: string) => void }).setBasePath ===
+        'function'
+      ) {
+        (r as unknown as { setBasePath(p: string): void }).setBasePath(basePath);
+      }
     }
+  }
+
+  /** Unwrap ChainResolver to access inner resolvers; otherwise return singleton. */
+  private _flattenResolvers(): readonly FileResolver[] {
+    if (this._resolver instanceof ChainResolver) {
+      return this._resolver.resolvers;
+    }
+    return [this._resolver];
   }
 
   private _post(msg: unknown): void {

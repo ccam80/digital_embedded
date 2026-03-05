@@ -240,6 +240,11 @@ export class ChainResolver implements FileResolver {
     this._resolvers = resolvers;
   }
 
+  /** Access the inner resolvers (e.g. for cache clearing or base-path updates). */
+  get resolvers(): readonly FileResolver[] {
+    return this._resolvers;
+  }
+
   async resolve(name: string, relativeTo?: string): Promise<string> {
     for (const resolver of this._resolvers) {
       try {

@@ -319,9 +319,11 @@ function buildExprFromRows(rows: Row[], varNames: string[]): BoolExpr {
 function rowToExpr(row: Row, varNames: string[]): BoolExpr {
   const literals: BoolExpr[] = [];
   for (let i = 0; i < row.numVars; i++) {
-    if ((row.eliminated >> i) & 1) continue;
+    // Variable i (MSB-first) maps to bit position (numVars - 1 - i) in state
+    const bitPos = row.numVars - 1 - i;
+    if ((row.eliminated >> bitPos) & 1) continue;
     const name = varNames[i]!;
-    const isOne = (row.state >> i) & 1;
+    const isOne = (row.state >> bitPos) & 1;
     literals.push(isOne ? variable(name) : negatedVariable(name));
   }
   return and(literals);
@@ -330,9 +332,11 @@ function rowToExpr(row: Row, varNames: string[]): BoolExpr {
 function rowToImplicant(row: Row, varNames: string[]): Implicant {
   const literals = new Map<string, boolean>();
   for (let i = 0; i < row.numVars; i++) {
-    if ((row.eliminated >> i) & 1) continue;
+    // Variable i (MSB-first) maps to bit position (numVars - 1 - i) in state
+    const bitPos = row.numVars - 1 - i;
+    if ((row.eliminated >> bitPos) & 1) continue;
     const name = varNames[i]!;
-    const isOne = Boolean((row.state >> i) & 1);
+    const isOne = Boolean((row.state >> bitPos) & 1);
     literals.set(name, isOne);
   }
   return { literals, minterms: new Set(row.source) };

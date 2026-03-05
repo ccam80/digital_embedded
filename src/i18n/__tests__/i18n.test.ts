@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { i18n, setLocale, getLocale } from '../index';
+import { i18n, setLocale, getLocale, resetI18n } from '../index';
 
 describe('i18n', () => {
   beforeEach(() => {
-    // Reset locale to default before each test
-    setLocale('en');
+    resetI18n();
   });
 
   describe('passThrough', () => {
@@ -25,9 +24,16 @@ describe('i18n', () => {
       expect(locale).toBe('en');
     });
 
-    it('setNoOp', () => {
-      setLocale('de');
-      expect(getLocale()).toBe('de');
+    it('setLocaleUpdatesCurrentLocale', async () => {
+      // 'en' locale file exists, so setLocale should succeed
+      await setLocale('en');
+      expect(getLocale()).toBe('en');
+    });
+
+    it('setLocaleWithMissingLocaleKeepsCurrent', async () => {
+      // 'xx' locale file does not exist, so setLocale keeps current locale
+      await setLocale('xx');
+      expect(getLocale()).toBe('en');
     });
   });
 });

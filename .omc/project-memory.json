@@ -127,20 +127,20 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 72,
-      "lastAccessed": 1772700692132,
+      "accessCount": 74,
+      "lastAccessed": 1772700742618,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 40,
-      "lastAccessed": 1772699697915,
+      "accessCount": 42,
+      "lastAccessed": 1772700721398,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 31,
-      "lastAccessed": 1772695092711,
+      "accessCount": 32,
+      "lastAccessed": 1772700721804,
       "type": "file"
     },
     {
@@ -282,15 +282,15 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\circuit.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772686635966,
+      "path": "src\\test-utils\\mock-render-context.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772700796210,
       "type": "file"
     },
     {
-      "path": "src\\test-utils\\mock-render-context.ts",
+      "path": "src\\core\\__tests__\\circuit.test.ts",
       "accessCount": 3,
-      "lastAccessed": 1772689497649,
+      "lastAccessed": 1772686635966,
       "type": "file"
     },
     {

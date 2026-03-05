@@ -131,18 +131,25 @@ describe('dontCareExploited', () => {
   });
 
   it('without don\'t-care, needs 2 terms; with it, needs 1', () => {
-    // With don't-care (row 2 = X):
-    const tableWithDC = makeTable(['A', 'B'], 'Y', [0n, 1n, -1n, 1n]);
+    // A B | Y                A B | Y
+    // 0 0 | 1  minterm       0 0 | 1  minterm
+    // 0 1 | 0                0 1 | 0
+    // 1 0 | X  don't-care    1 0 | 0  (no DC)
+    // 1 1 | 0                1 1 | 0
+    //
+    // With DC: m0(00) + dc2(10) combine (differ in A) → !B (1 literal)
+    // Without DC: only m0(00) → !A & !B (2 literals)
+
+    const tableWithDC = makeTable(['A', 'B'], 'Y', [1n, 0n, -1n, 0n]);
     const resultWithDC = minimize(tableWithDC, 0);
 
-    // Without don't-care (row 2 = 0):
-    const tableNoDC = makeTable(['A', 'B'], 'Y', [0n, 1n, 0n, 1n]);
+    const tableNoDC = makeTable(['A', 'B'], 'Y', [1n, 0n, 0n, 0n]);
     const resultNoDC = minimize(tableNoDC, 0);
 
     const strWithDC = exprToString(resultWithDC.selectedCover);
     const strNoDC = exprToString(resultNoDC.selectedCover);
 
-    // With DC should be simpler (shorter)
+    // With DC should be simpler (shorter): "!B" vs "!A & !B"
     expect(strWithDC.length).toBeLessThan(strNoDC.length);
   });
 });
@@ -150,37 +157,36 @@ describe('dontCareExploited', () => {
 // ---------------------------------------------------------------------------
 // allSolutions: function with multiple minimal covers
 //
+// f(A,B,C) = Σm(1,2,3,4,5,6)
+//
 // A B C | Y
 // 0 0 0 | 0
 // 0 0 1 | 1   m1
-// 0 1 0 | 0
+// 0 1 0 | 1   m2
 // 0 1 1 | 1   m3
 // 1 0 0 | 1   m4
 // 1 0 1 | 1   m5
-// 1 1 0 | 0
+// 1 1 0 | 1   m6
 // 1 1 1 | 0
 //
-// Prime implicants:
-//   m1&m3: !A & C  (rows 1,3 differ in B)
-//   m4&m5: A & !B  (rows 4,5 differ in C)
-//   m1&m5: !B & C  (rows 1,5 differ in A)
+// 6 prime implicants (none combinable in round 2):
+//   !A&C, !B&C, !A&B, B&!C, A&!B, A&!C
 //
-// Two minimal covers:
-//   Cover 1: {!A&C, A&!B}
-//   Cover 2: {!B&C, A&!B}
-// Both use 2 primes.
+// No prime is essential — each minterm is covered by exactly 2 primes.
+// Two minimal covers of size 3:
+//   Cover 1: {!A&C, B&!C, A&!B}
+//   Cover 2: {!B&C, !A&B, A&!C}
 // ---------------------------------------------------------------------------
 
 describe('allSolutions', () => {
   it('returns multiple minimal covers for a function with two solutions', () => {
-    //   A B C → Y
-    const table = makeTable(['A', 'B', 'C'], 'Y', [0n, 1n, 0n, 1n, 1n, 1n, 0n, 0n]);
+    const table = makeTable(['A', 'B', 'C'], 'Y', [0n, 1n, 1n, 1n, 1n, 1n, 1n, 0n]);
     const result = minimize(table, 0);
     expect(result.minimalCovers.length).toBeGreaterThan(1);
   });
 
   it('all covers are equivalent boolean expressions', () => {
-    const table = makeTable(['A', 'B', 'C'], 'Y', [0n, 1n, 0n, 1n, 1n, 1n, 0n, 0n]);
+    const table = makeTable(['A', 'B', 'C'], 'Y', [0n, 1n, 1n, 1n, 1n, 1n, 1n, 0n]);
     const result = minimize(table, 0);
     // At minimum, we have 2+ covers
     expect(result.minimalCovers.length).toBeGreaterThanOrEqual(2);
@@ -277,7 +283,7 @@ describe('primeImplicants', () => {
     expect(result.selectedCover).toEqual({ kind: 'constant', value: false });
   });
 
-  it('all-ones output has one prime implicant (tautology)', () => {
+  it('all-ones output has one prime implicant (tautology)', async () => {
     const table = makeTable(['A', 'B'], 'Y', [1n, 1n, 1n, 1n]);
     const result = minimize(table, 0);
     // All four minterms combine: 0&1 combine (A eliminated) → !B group,
