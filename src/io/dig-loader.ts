@@ -25,6 +25,7 @@ import { PropertyBag } from "../core/properties.js";
 import type { Rotation } from "../core/pin.js";
 import { applyAttributeMappings } from "./attribute-map.js";
 import type { DigAttributeMapping } from "./attribute-map.js";
+import { parseDigXml } from "./dig-parser.js";
 
 // ---------------------------------------------------------------------------
 // DigParserError
@@ -82,6 +83,33 @@ export function loadDigCircuit(
   }
 
   return circuit;
+}
+
+/**
+ * Parse a .dig XML string and load it into a Circuit.
+ *
+ * Convenience entry point that chains parseDigXml() and loadDigCircuit().
+ * Identical to calling parseDigXml(xml) then loadDigCircuit(parsed, registry).
+ *
+ * @throws DigParserError if any elementName is not registered.
+ * @throws Error if the XML is malformed.
+ */
+export function loadDig(xml: string, registry: ComponentRegistry): Circuit {
+  const parsed = parseDigXml(xml);
+  return loadDigCircuit(parsed, registry);
+}
+
+/**
+ * Load a pre-parsed DigCircuit into a Circuit.
+ *
+ * Accepts a DigCircuit produced by parseDigXml() and delegates directly to
+ * loadDigCircuit(). Provided for callers that already hold a parsed structure
+ * and want to avoid re-parsing.
+ *
+ * @throws DigParserError if any elementName is not registered.
+ */
+export function loadDigFromParsed(parsed: DigCircuit, registry: ComponentRegistry): Circuit {
+  return loadDigCircuit(parsed, registry);
 }
 
 /**

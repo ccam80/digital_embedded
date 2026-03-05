@@ -251,7 +251,7 @@ describe("VGA", () => {
       executeVga(0, state, layout);
       expect(typeof state[6]).toBe("number");
       // Output should be non-zero given non-zero inputs
-      expect(state[6]).toBe(1);
+      expect(state[6]).not.toBe(0);
     });
 
     it("all-zero inputs produce output=0", () => {

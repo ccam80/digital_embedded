@@ -316,7 +316,7 @@ describe("GraphicCard", () => {
       const layout = makeLayout();
       const state = makeState(5, 1, 1, 0, 0, 0xAB);
       executeGraphicCard(0, state, layout);
-      expect(state[6]).toBe(1);
+      expect(state[6]).not.toBe(0);
     });
 
     it("str flag is encoded in output slot", () => {

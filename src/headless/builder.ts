@@ -10,6 +10,7 @@ import type { Pin } from '../core/pin.js';
 import type { CircuitElement } from '../core/element.js';
 import { FacadeError } from './types.js';
 import type { CircuitBuildOptions } from './types.js';
+import { loadDig as loadDigFromXml } from '../io/dig-loader.js';
 
 const AUTO_POSITION_Y_STEP = 4;
 
@@ -73,6 +74,21 @@ export class CircuitBuilder {
   private elementPositionCounter = 0;
 
   constructor(private registry: ComponentRegistry) {}
+
+  /**
+   * Load a .dig XML string and produce a populated Circuit.
+   *
+   * Accepts a raw .dig XML string (starts with "<") and delegates to the
+   * dig-loader pipeline: parseDigXml → loadDigCircuit → Circuit.
+   *
+   * @param xml - Raw .dig XML content
+   * @returns Populated Circuit with all elements and wires
+   * @throws DigParserError if any elementName is not registered in this builder's registry
+   * @throws Error if the XML is malformed
+   */
+  loadDig(xml: string): Circuit {
+    return loadDigFromXml(xml, this.registry);
+  }
 
   /**
    * Create a new empty circuit

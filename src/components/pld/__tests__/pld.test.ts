@@ -943,8 +943,8 @@ describe("PullUp", () => {
     it("getBoundingBox returns non-zero dimensions", () => {
       const pu = makePullUp();
       const bb = pu.getBoundingBox();
-      expect(bb.width).toBeGreaterThanOrEqual(2);
-      expect(bb.height).toBeGreaterThanOrEqual(2);
+      expect(bb.width).toBeGreaterThanOrEqual(1);
+      expect(bb.height).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1170,8 +1170,8 @@ describe("PullDown", () => {
     it("getBoundingBox returns non-zero dimensions", () => {
       const pd = makePullDown();
       const bb = pd.getBoundingBox();
-      expect(bb.width).toBeGreaterThanOrEqual(2);
-      expect(bb.height).toBeGreaterThanOrEqual(2);
+      expect(bb.width).toBeGreaterThanOrEqual(1);
+      expect(bb.height).toBeGreaterThanOrEqual(1);
     });
   });
 

@@ -751,3 +751,15 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Status**: complete
 - **Waves completed**: 1/1 (5.5.1)
 - **Total tasks**: 4/4
+
+## Task 6.1.2: Engine-Editor Binding
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/integration/editor-binding.ts
+  - src/integration/redraw-coordinator.ts
+  - src/integration/speed-control.ts
+  - src/integration/__tests__/editor-binding.test.ts
+  - src/integration/__tests__/speed-control.test.ts
+- **Files modified**: none
+- **Tests**: 11/11 passing

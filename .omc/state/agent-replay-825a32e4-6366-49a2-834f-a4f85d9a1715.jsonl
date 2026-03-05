@@ -21,3 +21,4 @@
 {"t":0,"agent":"ae23952","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":93921}
 {"t":0,"agent":"a2eb40e","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":384343}
 {"t":0,"agent":"ad33336","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"afac359","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":618302}

@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { parseDigXml } from "../dig-parser.js";
-import { loadDigCircuit, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
+import { loadDigCircuit, loadDig, loadDigFromParsed, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -17,6 +17,7 @@ import { PinDirection, createInverterConfig, makePin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { DigCircuit, DigVisualElement } from "../dig-schema.js";
 import { stringConverter, boolConverter, intConverter, testDataConverter } from "../attribute-map.js";
+import { CircuitBuilder } from "../../headless/builder.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -337,5 +338,216 @@ describe("DigLoader", () => {
 
     expect(circuit.elements).toHaveLength(6);
     expect(circuit.wires).toHaveLength(14);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 6.1.1 spec-named tests
+  // ---------------------------------------------------------------------------
+
+  it("loadAndGate", () => {
+    const xml = readCircuit("and-gate.dig");
+    const registry = buildAndGateRegistry();
+    const circuit = loadDig(xml, registry);
+
+    // 2 In, 1 And, 1 Out, 1 Testcase
+    expect(circuit.elements).toHaveLength(5);
+    const inEls = circuit.elements.filter((el) => el.typeId === "In");
+    const andEls = circuit.elements.filter((el) => el.typeId === "And");
+    const outEls = circuit.elements.filter((el) => el.typeId === "Out");
+    expect(inEls).toHaveLength(2);
+    expect(andEls).toHaveLength(1);
+    expect(outEls).toHaveLength(1);
+    expect(circuit.wires).toHaveLength(5);
+  });
+
+  it("loadHalfAdder", () => {
+    const xml = readCircuit("half-adder.dig");
+    const registry = buildHalfAdderRegistry();
+    const circuit = loadDig(xml, registry);
+
+    // 2 In, 1 XOr, 1 And, 2 Out, 1 Testcase = 7 elements
+    expect(circuit.elements).toHaveLength(7);
+    const inEls = circuit.elements.filter((el) => el.typeId === "In");
+    const xorEls = circuit.elements.filter((el) => el.typeId === "XOr");
+    const andEls = circuit.elements.filter((el) => el.typeId === "And");
+    const outEls = circuit.elements.filter((el) => el.typeId === "Out");
+    expect(inEls).toHaveLength(2);
+    expect(xorEls).toHaveLength(1);
+    expect(andEls).toHaveLength(1);
+    expect(outEls).toHaveLength(2);
+    expect(circuit.wires).toHaveLength(12);
+  });
+
+  it("loadSrLatch", () => {
+    const xml = readCircuit("sr-latch.dig");
+    const registry = buildSrLatchRegistry();
+    const circuit = loadDig(xml, registry);
+
+    expect(circuit.elements).toHaveLength(6);
+    expect(circuit.wires).toHaveLength(14);
+    const inEls = circuit.elements.filter((el) => el.typeId === "In");
+    const norEls = circuit.elements.filter((el) => el.typeId === "NOr");
+    const outEls = circuit.elements.filter((el) => el.typeId === "Out");
+    expect(inEls).toHaveLength(2);
+    expect(norEls).toHaveLength(2);
+    expect(outEls).toHaveLength(2);
+  });
+
+  it("attributeMapping", () => {
+    // Build a .dig XML snippet with Inputs=3, Bits=8, wideShape=true
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>TestGate</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Inputs</string>
+          <int>3</int>
+        </entry>
+        <entry>
+          <string>Bits</string>
+          <int>8</int>
+        </entry>
+        <entry>
+          <string>wideShape</string>
+          <boolean>true</boolean>
+        </entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
+
+    const registry = new ComponentRegistry();
+    registry.register(makeDefinition("TestGate", [
+      intConverter("Inputs", "inputCount"),
+      intConverter("Bits", "bitWidth"),
+      boolConverter("wideShape", "wideShape"),
+    ]));
+
+    const circuit = loadDig(xml, registry);
+    expect(circuit.elements).toHaveLength(1);
+    const el = circuit.elements[0];
+    expect(el.getProperties().getOrDefault("inputCount", 0)).toBe(3);
+    expect(el.getProperties().getOrDefault("bitWidth", 0)).toBe(8);
+    expect(el.getProperties().getOrDefault("wideShape", false)).toBe(true);
+  });
+
+  it("positionAndRotation", () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="2"/>
+        </entry>
+      </elementAttributes>
+      <pos x="400" y="320"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
+
+    const registry = buildRegistry(["And"]);
+    const circuit = loadDig(xml, registry);
+    expect(circuit.elements).toHaveLength(1);
+    const el = circuit.elements[0];
+    expect(el.position).toEqual({ x: 400, y: 320 });
+    expect(el.rotation).toBe(2);
+  });
+
+  it("unknownElementThrows", () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>Bogus</elementName>
+      <elementAttributes/>
+      <pos x="0" y="0"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
+
+    const registry = new ComponentRegistry();
+    expect(() => loadDig(xml, registry)).toThrow("Bogus");
+  });
+
+  it("missingAttributeUsesDefault", () => {
+    // Element without a Bits attribute — factory should receive PropertyBag
+    // without "bitWidth" and use its own default
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>GateWithDefault</elementName>
+      <elementAttributes/>
+      <pos x="0" y="0"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
+
+    const DEFAULT_BIT_WIDTH = 1;
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "GateWithDefault",
+      typeId: -1,
+      factory: (props: PropertyBag) => {
+        // If bitWidth not in props, use default of 1
+        const bitWidth = props.has("bitWidth")
+          ? (props.get("bitWidth") as number)
+          : DEFAULT_BIT_WIDTH;
+        const bag = new PropertyBag([["bitWidth", bitWidth]]);
+        return new TestElement("GateWithDefault", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, bag);
+      },
+      executeFn: noopExecute,
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [intConverter("Bits", "bitWidth")],
+      category: ComponentCategory.LOGIC,
+      helpText: "GateWithDefault",
+    });
+
+    const circuit = loadDig(xml, registry);
+    expect(circuit.elements).toHaveLength(1);
+    const el = circuit.elements[0];
+    expect(el.getProperties().getOrDefault("bitWidth", 0)).toBe(DEFAULT_BIT_WIDTH);
+  });
+
+  it("facadeIntegration", () => {
+    const xml = readCircuit("and-gate.dig");
+    const registry = buildAndGateRegistry();
+    const builder = new CircuitBuilder(registry);
+    const circuit = builder.loadDig(xml);
+
+    expect(circuit).toBeDefined();
+    expect(circuit.elements).toHaveLength(5);
+    expect(circuit.wires).toHaveLength(5);
+    const andEls = circuit.elements.filter((el) => el.typeId === "And");
+    expect(andEls).toHaveLength(1);
+  });
+
+  it("loadDigFromParsed", () => {
+    const xml = readCircuit("and-gate.dig");
+    const parsed = parseDigXml(xml);
+    const registry = buildAndGateRegistry();
+    const circuit = loadDigFromParsed(parsed, registry);
+
+    expect(circuit.elements).toHaveLength(5);
+    expect(circuit.wires).toHaveLength(5);
   });
 });
