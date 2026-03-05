@@ -4,7 +4,7 @@
  * Handles:
  * - XML string → DOM via browser DOMParser or @xmldom/xmldom (Node.js)
  * - Version extraction and migration (v0→1→2)
- * - XStream reference resolution (reference="../../../../..." paths)
+ * - XML reference resolution (reference="../../../../..." paths)
  * - Attribute value parsing for all .dig value types
  * - Visual element and wire extraction
  * - Measurement ordering extraction
@@ -58,9 +58,9 @@ export function parseDigXml(xml: string): DigCircuit {
 }
 
 /**
- * Resolve an XStream reference path relative to a context element in the DOM.
+ * Resolve a Digital XML reference path relative to a context element in the DOM.
  *
- * XStream uses paths like:
+ * Digital's XML serialization uses paths like:
  *   "../../../../visualElement[3]/elementAttributes/entry/rotation"
  *
  * Each `..` steps to the parent. Segments with [N] index into child elements
@@ -72,7 +72,7 @@ export function parseDigXml(xml: string): DigCircuit {
  * @returns The resolved target Element.
  * @throws Error if the path cannot be resolved.
  */
-export function resolveXStreamReference(
+export function resolveDigReference(
   refPath: string,
   contextElement: Element,
   _rootElement: Element,
@@ -85,7 +85,7 @@ export function resolveXStreamReference(
       const parent = current.parentElement ?? (current.parentNode as Element | null);
       if (!parent || parent.nodeType !== 1 /* ELEMENT_NODE */) {
         throw new Error(
-          `resolveXStreamReference: cannot navigate to parent from <${current.tagName}> at segment ".."`,
+          `resolveDigReference: cannot navigate to parent from <${current.tagName}> at segment ".."`,
         );
       }
       current = parent;
@@ -100,7 +100,7 @@ export function resolveXStreamReference(
         const matches = getChildElementsByTagName(current, tagName);
         if (index < 1 || index > matches.length) {
           throw new Error(
-            `resolveXStreamReference: index [${index}] out of range for <${tagName}> (found ${matches.length}) in <${current.tagName}>`,
+            `resolveDigReference: index [${index}] out of range for <${tagName}> (found ${matches.length}) in <${current.tagName}>`,
           );
         }
         current = matches[index - 1];
@@ -109,7 +109,7 @@ export function resolveXStreamReference(
         const child = getChildElement(current, segment);
         if (!child) {
           throw new Error(
-            `resolveXStreamReference: child <${segment}> not found in <${current.tagName}>`,
+            `resolveDigReference: child <${segment}> not found in <${current.tagName}>`,
           );
         }
         current = child;
@@ -130,13 +130,13 @@ export function resolveXStreamReference(
  * Unknown tag names are preserved as `{ type: 'enum'; xmlTag; value }`.
  *
  * @param valueElement  The XML element representing the value (e.g. `<int>`, `<boolean>`).
- * @param rootElement   The document root, used for XStream reference resolution.
+ * @param rootElement   The document root, used for XML reference resolution.
  */
 export function parseAttributeValue(valueElement: Element, rootElement: Element): DigValue {
-  // Resolve XStream reference before parsing.
+  // Resolve XML reference before parsing.
   const refAttr = valueElement.getAttribute("reference");
   if (refAttr !== null) {
-    valueElement = resolveXStreamReference(refAttr, valueElement, rootElement);
+    valueElement = resolveDigReference(refAttr, valueElement, rootElement);
   }
 
   const tag = valueElement.tagName;

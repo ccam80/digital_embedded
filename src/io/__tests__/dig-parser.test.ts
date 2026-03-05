@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   parseDigXml,
-  resolveXStreamReference,
+  resolveDigReference,
   parseAttributeValue,
   migrateVersion,
 } from "../dig-parser.js";
@@ -132,7 +132,7 @@ describe("DigParser", () => {
     const circuit = parseDigXml(xml);
 
     // mux.dig version 1 → gets migrated to 2, but we check the reference was resolved.
-    // The second Not element uses XStream reference to the first Not's rotation.
+    // The second Not element uses an XML reference to the first Not's rotation.
     const notElements = circuit.visualElements.filter((ve) => ve.elementName === "Not");
     expect(notElements).toHaveLength(2);
 

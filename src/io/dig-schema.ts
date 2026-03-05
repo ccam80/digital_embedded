@@ -116,7 +116,7 @@ export interface DigWire {
 /**
  * The root parse tree produced by the .dig XML parser.
  * Contains all structural information from a .dig file after
- * version migration and XStream reference resolution.
+ * version migration and XML reference resolution.
  */
 export interface DigCircuit {
   /** File format version (0, 1, or 2). Always 2 after migration. */

@@ -1,7 +1,7 @@
 /**
  * Import Digital's .fsm XML format into our FSM model.
  *
- * Digital stores FSMs as XStream-serialized XML with `<fsm>` root,
+ * Digital stores FSMs as Digital XML-serialized XML with `<fsm>` root,
  * `<state>` elements with number/name/position/values/isInitial,
  * and `<transition>` elements with fromState/toState references and conditions.
  */
@@ -155,11 +155,11 @@ function parseTransition(
 }
 
 /**
- * Resolve XStream state references.
+ * Resolve Digital XML state references.
  *
- * Digital uses XStream reference paths like:
+ * Digital uses Digital XML reference paths like:
  *   `../../../states/state`       -> index 0
- *   `../../../states/state[2]`    -> index 1 (XStream uses 1-based [n] but first is bare)
+ *   `../../../states/state[2]`    -> index 1 (Digital XML uses 1-based [n] but first is bare)
  *   `../../../states/state[10]`   -> index 9
  */
 function resolveStateReference(el: Element | null): number {

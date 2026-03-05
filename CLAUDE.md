@@ -28,7 +28,7 @@ To initialize: `git submodule update --init`
 | What | Where to look |
 |---|---|
 | Component simulation behaviour | `ref/Digital/src/main/java/de/neemann/digital/core/` |
-| .dig XML format | Any `.dig` file + Digital's XStream annotations |
+| .dig XML format | Any `.dig` file + Digital's XML serialization annotations |
 | Circuit compilation (ModelCreator) | `ref/Digital/src/main/java/de/neemann/digital/draw/model/` |
 | Test execution | `ref/Digital/src/main/java/de/neemann/digital/testing/` |
 | Component shapes / rendering specs | `ref/Digital/src/main/java/de/neemann/digital/draw/shapes/` |
