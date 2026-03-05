@@ -9,8 +9,13 @@ import { PropertyBag } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
 import type { CircuitElement } from '../core/element.js';
 import { FacadeError } from './types.js';
-import type { CircuitBuildOptions } from './types.js';
+import type { CircuitBuildOptions, TestResults } from './types.js';
 import { loadDig as loadDigFromXml } from '../io/dig-loader.js';
+import type { SimulationEngine } from '../core/engine-interface.js';
+import { SimulationRunner } from './runner.js';
+import { extractEmbeddedTestData } from './test-runner.js';
+import { parseTestData } from '../testing/parser.js';
+import { executeTests } from '../testing/executor.js';
 
 const AUTO_POSITION_Y_STEP = 4;
 
@@ -216,6 +221,37 @@ export class CircuitBuilder {
 
     circuit.wires.push(wire);
     return wire;
+  }
+
+  /**
+   * Run all test vectors against the compiled engine.
+   *
+   * If testData is provided it is used as the test vector source.
+   * Otherwise test data is extracted from Testcase components in the circuit.
+   * Throws FacadeError if no test data is available from either source.
+   *
+   * @param engine    The compiled SimulationEngine.
+   * @param circuit   The circuit (searched for Testcase components when testData absent).
+   * @param testData  Optional external test vector string in Digital test format.
+   * @returns         TestResults with per-vector pass/fail details.
+   * @throws FacadeError if no test data is available.
+   */
+  runTests(
+    engine: SimulationEngine,
+    circuit: Circuit,
+    testData?: string,
+  ): TestResults {
+    const resolvedData = testData ?? extractEmbeddedTestData(circuit);
+
+    if (resolvedData === null || resolvedData.trim().length === 0) {
+      throw new FacadeError(
+        "No test data available: circuit contains no Testcase components and no external test data was provided.",
+      );
+    }
+
+    const parsed = parseTestData(resolvedData);
+    const runner = new SimulationRunner(this.registry);
+    return executeTests(runner, engine, circuit, parsed);
   }
 
   /**

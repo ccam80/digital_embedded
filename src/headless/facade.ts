@@ -145,14 +145,18 @@ export interface SimulatorFacade {
   // ============================================
 
   /**
-   * Execute all test vectors defined in the circuit
-   * Test data comes from CircuitMetadata.testData.
+   * Execute all test vectors defined in the circuit.
+   *
+   * If testData is provided, it is used as the test vector source instead of
+   * the circuit's embedded Testcase components.
    *
    * @param engine - The compiled engine
-   * @param circuit - The circuit (contains test data)
+   * @param circuit - The circuit (searched for Testcase components when testData is absent)
+   * @param testData - Optional external test vector string in Digital test format
    * @returns TestResults with pass/fail counts and per-vector details
+   * @throws FacadeError if no test data is available from either source
    */
-  runTests(engine: SimulationEngine, circuit: Circuit): TestResults;
+  runTests(engine: SimulationEngine, circuit: Circuit, testData?: string): TestResults;
 
   // ============================================
   // File I/O: Load and save circuits
