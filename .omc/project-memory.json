@@ -127,20 +127,20 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 65,
-      "lastAccessed": 1772695032594,
+      "accessCount": 67,
+      "lastAccessed": 1772699659251,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 35,
-      "lastAccessed": 1772694843923,
+      "accessCount": 36,
+      "lastAccessed": 1772695087971,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 30,
-      "lastAccessed": 1772694844485,
+      "accessCount": 31,
+      "lastAccessed": 1772695092711,
       "type": "file"
     },
     {
@@ -156,15 +156,15 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\digital-engine.ts",
-      "accessCount": 15,
-      "lastAccessed": 1772686809528,
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 16,
+      "lastAccessed": 1772695116528,
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
+      "path": "src\\engine\\digital-engine.ts",
       "accessCount": 15,
-      "lastAccessed": 1772694875204,
+      "lastAccessed": 1772686809528,
       "type": "file"
     },
     {
