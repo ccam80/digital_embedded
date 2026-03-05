@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/view": "^6.39.16",
     "@xmldom/xmldom": "^0.8.11",
     "fflate": "^0.8.2",
     "gifenc": "^1.0.3",
