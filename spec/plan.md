@@ -9,7 +9,7 @@ Native TypeScript port of hneemann/Digital: a complete circuit editor, compiled 
 ## Goals
 
 - A Canvas-based circuit editor with all of Digital's editing features: placement, wiring, selection, undo/redo, property editing, component palette, bus value annotations, search, label tools, presentation mode, locked mode, color schemes, settings
-- A pluggable simulation engine with two modes: levelized compiled evaluation (default, high-throughput) and event-driven propagation (micro-step, timing analysis). Noise mode for non-deterministic startup. Bus resolution subsystem for tri-state nets. Web Worker-compatible architecture.
+- A pluggable simulation engine with three modes: level-by-level (default, SCC-aware topological sweep), timed (per-component propagation delays via timing wheel), and micro-step (one gate per step for teaching). SCC decomposition handles combinational feedback. Noise mode for non-deterministic startup. Bus resolution subsystem for tri-state nets. Web Worker-compatible architecture.
 - The full Digital component library (~110 types) including display components, custom SVG shapes, Tunnel named connections, and parameterized generic circuits via HGS scripting
 - Runtime inspection tools: live data table, timing diagram, measurement ordering, wire tooltips, memory hex editor, live memory viewer, program loader
 - .dig XML import with full component coverage, InverterConfig support, and native JSON save/load
@@ -80,11 +80,11 @@ Component evaluations grouped by type at compile time. Function table indexed by
 
 - **Phase 0**: No CheerpJ artifacts remain. `git status` shows only removals and modified `CLAUDE.md`.
 - **Phase 1**: `tsc --noEmit` passes. Vitest runs. Mock contexts work. `vite build` produces static output. Dual signal representation round-trips correctly. Error types are well-formed.
-- **Phase 2**: Automated tests for all interaction modes. Bus annotations display mock values. Search finds elements. Label tools rename correctly. Color schemes switch rendering. Locked mode prevents editing.
-- **Phase 3**: Levelized evaluation matches event-driven results for all test circuits. Noise mode resolves RS flip-flop startup without oscillation. Bus resolution detects shorted outputs (BurnException). Micro-step advances one gate. Run-to-break halts at Break component. Quick-run completes without rendering. Web Worker mode produces identical results to main-thread mode.
-- **Phase 4**: Parser reads all tutorial .dig files. Attribute mapping framework works. InverterConfig applies correctly. HGS interpreter passes ported ParserTest suite. JSON round-trip is lossless.
-- **Phase 5**: Each component has unit tests for logic and rendering. All ~110 types registered with .dig attribute mappings. Display components produce output to their display interfaces. Tunnel components share signal by name.
-- **Phase 6**: End-to-end .dig load → render → simulate → subcircuits work. Generic circuit resolution produces correct concrete circuits (verified against Digital's output). Engine-editor binding updates canvas live. postMessage API works with tutorial host.
+- **Phase 2**: SimulatorFacade builds circuits headlessly — builder smoke tests pass in Node.js (no browser). Browser-dep fence lint rule catches violations. Automated tests for all interaction modes. Bus annotations display mock values. Search finds elements. Label tools rename correctly. Color schemes switch rendering. Locked mode prevents editing.
+- **Phase 3**: Levelized evaluation matches event-driven results for all test circuits. Noise mode resolves RS flip-flop startup without oscillation. Bus resolution detects shorted outputs (BurnException). Micro-step advances one gate. Run-to-break halts at Break component. Quick-run completes without rendering. Web Worker mode produces identical results to main-thread mode. **Headless runner**: `facade.compile()` + `facade.step()` + `facade.readOutput()` produces correct results for `and-gate.dig`, `half-adder.dig`, `sr-latch.dig` checkpoint circuits.
+- **Phase 4**: Parser reads all tutorial .dig files. Attribute mapping framework works. InverterConfig applies correctly. HGS interpreter passes ported ParserTest suite. JSON round-trip is lossless. **Headless .dig loading**: `facade.loadDig(path)` loads checkpoint circuits in Node.js without a browser.
+- **Phase 5**: Each component has unit tests for logic and rendering. All ~110 types registered with .dig attribute mappings. Display components produce output to their display interfaces. Tunnel components share signal by name. Each component can be instantiated via `facade.addComponent()`, compiled, and exercised headlessly.
+- **Phase 6**: End-to-end .dig load → compile → simulate works both headlessly (via facade) and in browser (via editor binding). `facade.runTests()` passes for all checkpoint circuits. Generic circuit resolution produces correct concrete circuits (verified against Digital's output). Engine-editor binding updates canvas live. postMessage adapter works with tutorial host.
 - **Phase 7**: Data table shows live values. Timing diagram records signals. Wire tooltips show values on hover. Memory editor views/edits RAM contents during simulation. Test case editor creates and runs new tests. Hex/Logisim/binary file loads into memory components.
 - **Phase 8**: Analyze circuit produces correct truth table. Expression minimization matches known results. Karnaugh map highlights prime implicants. Synthesis generates working circuit from truth table. Expression modifiers produce NAND-only/NOR-only circuits. Cycle detector identifies feedback loops.
 - **Phase 9**: SVG export produces valid SVG. PNG renders at correct resolution. Settings persist across sessions. i18n strings switch correctly. 74xx library circuits load as subcircuits. Truth table exports to CSV/LaTeX.
@@ -152,7 +152,7 @@ Complete type system, interface contracts, error taxonomy, and project infrastru
 ### Wave 1.3: Interface Contracts
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 1.3.1 | `CircuitElement` interface: identity, type ID (numeric, for function-table dispatch), pin declarations, property declarations, bounding box, rotation/mirror. Rendering: `draw(ctx: RenderContext)`. Simulation: `init()`, `execute()`, `getOutput(pin)`. Serialization: `serialize()` / `deserialize()`. Help text declaration. HGS-compatible attribute access (map-like interface for generic resolution). | L | src/core/element.ts |
+| 1.3.1 | `CircuitElement` interface: identity, type ID (string, matches registry name), pin declarations, property declarations, bounding box, rotation/mirror. Rendering: `draw(ctx: RenderContext)`. Serialization: `serialize()`. Help text declaration. HGS-compatible attribute access (map-like interface for generic resolution). **No `execute()` method** — simulation logic lives in standalone flat functions per Decision 1. | L | src/core/element.ts |
 | 1.3.2 | Engine interface: pluggable simulation contract — `init`, `start`, `stop`, `step`, `microStep`, `runToBreak`, `reset`, `getSignalValue(netId): BitVector`, `getSignalRaw(netId): number`, `setSignalValue`, `addChangeListener`. `EngineState` enum. `SimulationEvent` type. Measurement observation interface. **Must be Web Worker-compatible**: no DOM references, signal state backed by `SharedArrayBuffer`-compatible typed arrays, control via message-passable commands. | L | src/core/engine-interface.ts |
 | 1.3.3 | Renderer interface: drawing context abstraction — lines, rects, polygons, arcs, text, paths, fill/stroke. Style state (color, lineWidth, font). Coordinate types (Point, Rect, Transform). Color scheme interface (theme-switchable colors). | L | src/core/renderer-interface.ts |
 | 1.3.4 | Circuit model: `Circuit` class (elements + nets), `Net` class (connected pins), `Wire` class (visual segments), component registry (type name → constructor + numeric type ID). Measurement ordering (which signals to observe, in what order). | L | src/core/circuit.ts, src/core/registry.ts |
@@ -165,7 +165,15 @@ Complete type system, interface contracts, error taxonomy, and project infrastru
 **Parallel with**: Phase 3, Phase 4, Phase 5
 **CHECKPOINT**: Author must provide UI layout wireframe before Wave 2.4 begins. Waves 2.1–2.3 can proceed without it. See `spec/author_instructions.md` § Checkpoint 3.
 
-The complete interactive circuit editor with all of Digital's editing features.
+The complete interactive circuit editor with all of Digital's editing features. SimulatorFacade composed from modules (builder, runner, loader, tester). Clone Digital's UI layout — tree palette left, property panel right, toolbar top, all collapsible for iframe embedding. See `spec/phase-2-canvas-editor.md` for the full spec.
+
+### Wave 2.0: Headless Simulator Facade
+| Task | Description | Complexity | Key Files |
+|------|-------------|------------|-----------|
+| 2.0.1 | **SimulatorFacade interface**: Define the headless API contract — the single programmatic surface for AI agents and the postMessage bridge. `createCircuit(opts?)` → `CircuitHandle`. `addComponent(circuit, typeName, props?)` → `ComponentHandle`. `connect(circuit, srcHandle, srcPin, dstHandle, dstPin)`. `compile(circuit)` → `EngineHandle`. `step(engine)`, `run(engine, cycles)`, `runToStable(engine, maxIterations?)`. `setInput(engine, label, value)`, `readOutput(engine, label)` → `BitVector`. `readAllSignals(engine)` → `Map<string, BitVector>`. `runTests(engine)` → `TestResults`. `loadDig(pathOrXml)` → `CircuitHandle`. `serialize(circuit)` → JSON string. Handles are opaque — the facade manages the mapping to real `Circuit`, `CompiledCircuit`, and `SimulationEngine` instances. Also re-export all low-level core types (`BitVector`, `Circuit`, `Net`, `Wire`, `Pin`, `PropertyBag`, `ComponentRegistry`, `SimulationEngine`, error types) for agents that need direct access. | M | src/headless/facade.ts, src/headless/types.ts, src/headless/index.ts |
+| 2.0.2 | **Circuit builder implementation**: Implement `createCircuit`, `addComponent`, `connect` portion of the facade. `addComponent` looks up `ComponentDefinition` in the registry, calls `factory(props)`, auto-assigns grid-snapped position (auto-layout by insertion order, or caller-specified via optional `position` property), adds to `Circuit`, returns handle. `connect` resolves pin labels on source/destination components to `Pin` instances, creates `Wire` segments between pin world-space positions. Validates: unknown component type → clear error naming the type, unknown pin label → clear error naming the label and listing valid pins, bit-width mismatch → `BitsException`. Zero browser dependencies — pure Node.js compatible. | M | src/headless/builder.ts |
+| 2.0.3 | **Headless entry point and browser-dep fence**: Create `src/headless/index.ts` that re-exports facade, builder, and all core types. Add ESLint rule (`no-restricted-globals` or custom rule) enforcing that files under `src/headless/`, `src/core/`, `src/engine/`, `src/io/`, and `src/testing/` cannot import from `src/editor/` or reference DOM globals (`window`, `document`, `HTMLCanvasElement`, `CanvasRenderingContext2D`). This fence is enforced at lint/CI time — violations fail the build. | S | src/headless/index.ts, eslint.config.js |
+| 2.0.4 | **Builder smoke tests**: Vitest tests exercising the circuit builder in Node.js (no browser). Create a half-adder programmatically: add `In`, `Out`, `And`, `XOr` components, connect pins, verify `Circuit` model has correct elements/wires/pin connections. Verify error cases: unknown component type, unknown pin label, duplicate connection, bit-width mismatch. Verify the browser-dep fence: attempt to import `src/editor/` from `src/headless/` → lint error. | M | src/headless/\_\_tests\_\_/builder.test.ts |
 
 ### Wave 2.1: Canvas Foundation
 | Task | Description | Complexity | Key Files |
@@ -218,37 +226,44 @@ The complete interactive circuit editor with all of Digital's editing features.
 **Depends on**: Phase 1
 **Parallel with**: Phase 2, Phase 4, Phase 5
 
-Compiled and event-driven digital simulation engine. Levelized compiled evaluation is the default mode for throughput. Event-driven propagation is the secondary mode for micro-step teaching and timing analysis.
+One simulation engine with three evaluation modes (level-by-level, timed, micro-step) sharing the same flat `Uint32Array` signal storage. SCC-based compilation handles combinational feedback (SR latches from gates). See `spec/phase-3-simulation-engine.md` for the full spec.
 
 ### Wave 3.1: Core Engine
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 3.1.1 | Levelized compiled evaluation engine (default mode): implement engine interface. At compile time, topologically sort combinational gates. On each clock edge: evaluate all sequential elements, then sweep the combinational array in order. Signal state stored in flat `Uint32Array`. Component evaluations grouped by type for monomorphic dispatch (function table indexed by numeric type ID). Zero allocation in the inner loop. | L | src/engine/compiled-engine.ts |
-| 3.1.2 | Event-driven propagation engine (secondary mode): event priority queue (min-heap by timestamp, O(log n) insert/extract, batch simultaneous events, stable ordering), evaluate → schedule → propagate → repeat until stable. Pre-allocated event ring buffer (no allocation per event). Multi-bit signals. Initial state resolution. | L | src/engine/event-queue.ts, src/engine/event-engine.ts |
-| 3.1.3 | Noise mode (random evaluation order): randomize the order of gate evaluation within each propagation step to prevent deterministic oscillation on startup. Digital defaults to this mode. Without it, RS flip-flop circuits oscillate. Configurable: noise mode (default) vs synchronized (deterministic, for testing). | M | src/engine/noise-mode.ts |
+| 3.1.1 | Single engine implementation with three evaluation modes: (1) **Level-by-level** (default) — SCC-aware topological sweep, one pass for non-feedback gates, iterate on feedback SCCs until stable. (2) **Timed** — per-component propagation delays, timing wheel event queue, glitch-visible. (3) **Micro-step** — one gate per step, reports which component fired. All modes share flat `Uint32Array` signal state, same compiled wiring tables, same function table. Zero allocation in level-by-level inner loop. | L | src/engine/digital-engine.ts |
+| 3.1.2 | Timing wheel event queue: O(1) amortized circular-buffer queue indexed by timestamp modulo wheel size. Pre-allocated event pool (zero allocation). Same-net replacement (latest schedule wins). For timed evaluation mode. | L | src/engine/timing-wheel.ts, src/engine/event-pool.ts |
+| 3.1.3 | Noise mode and initialization: port Digital's init sequence. Noise mode shuffles evaluation order within feedback SCCs and interleaves reads/writes to break symmetry. Reset component protocol (held low during init, released after). Synchronized (non-noise) mode snapshots SCC inputs for order-independent evaluation. | M | src/engine/noise-mode.ts, src/engine/init-sequence.ts |
 
 ### Wave 3.2: Circuit Compilation & Net Resolution
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 3.2.1 | Circuit compiler: visual Circuit → executable graph. Port Digital's `ModelCreator`: topological ordering, sequential element identification, clock domain assignment. Build flat typed-array layout for signal state. Assign numeric component IDs and type IDs. Group components by type for monomorphic dispatch. | L | src/engine/compiler.ts |
-| 3.2.2 | Net resolution: trace wire connections to nets (including Tunnel name-matching), validate bus width consistency, detect errors (unconnected inputs, shorted outputs, width mismatches). Port `WireConsistencyChecker` validation. | M | src/engine/net-resolver.ts |
-| 3.2.3 | Bus resolution subsystem: port Digital's `core/wiring/bus/` (6 classes). Resolve multiple tri-state drivers on shared nets: pull-up/pull-down resolution, high-Z arbitration, conflict detection → `BurnException`. Handles bidirectional pins, floating-gate FETs, relay networks. `CommonBusValue`, `ConnectedBusHandler`, `DataBus`, `SingleBusHandler`, `BusModelStateObserver`. | L | src/engine/bus-resolution.ts |
+| 3.2.1 | Circuit compiler: visual Circuit → executable graph. Pipeline: enumerate components → trace nets (3.2.2) → build wiring tables (ComponentLayout) → SCC decomposition via Tarjan's algorithm → topological sort of condensation DAG → build function table (executeFns indexed by type ID) → allocate signal arrays (Uint32Array for values + highZ) → pre-allocate SCC snapshot buffer → classify sequential elements → produce `CompiledCircuit` with `evaluationOrder: EvaluationGroup[]` where each group is `{ componentIndices: Uint32Array; isFeedback: boolean }`. Also produces `labelToNetId` (for facade label-based access) and `wireToNetId` (for renderer wire coloring). | L | src/engine/compiler.ts, src/engine/compiled-circuit.ts, src/engine/tarjan.ts, src/engine/topological-sort.ts |
+| 3.2.2 | Net resolution: trace wire connections to nets by matching endpoints to pin positions and wire-to-wire junctions. Union-Find for efficient merging. Tunnel name-matching (same label = same net). Validate bit-width consistency within nets (`BitsException` on mismatch). Classify nets: single-driver vs multi-driver (→ bus resolution). Detect unconnected input pins (warning, not error). Returns `NetResolution` with typed `ResolvedNet[]`. | M | src/engine/net-resolver.ts |
+| 3.2.3 | Bus resolution subsystem: port Digital's `core/wiring/bus/`. Resolve multi-driver nets: high-Z only if ALL drivers assert high-Z (AND of masks), value = OR of non-high-Z drivers, burn detection if non-high-Z drivers disagree. Burn is deferred to post-step (transient conflicts tolerated). Pull-up/pull-down resolves floating bits. Switch-driven net merging: close → merge two bus nets, open → split. Runtime-dynamic reconfiguration. | L | src/engine/bus-resolution.ts |
 
 ### Wave 3.3: Advanced Features
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 3.3.1 | Propagation delay model: configurable gate delay, delay accumulation, setup/hold checking for flip-flops | M | src/engine/delay.ts |
-| 3.3.2 | Feedback & oscillation detection: compile-time feedback warnings, runtime oscillation detection (net toggling > N times per step), force UNDEFINED and halt | M | src/engine/oscillation.ts |
-| 3.3.3 | Clock management: identify clock sources, configurable frequency, edge scheduling, multi-clock domains with independent frequencies. Real-time clock mode (clock runs at actual wall-clock frequency for demos). `AsyncSequentialClock` mode for asynchronous sequential circuits. | M | src/engine/clock.ts |
+| 3.3.1 | Propagation delay model: per-component configurable gate delay for timed mode. `ComponentDefinition.defaultDelay` (default 10ns), overridable per instance via `delay` property. Compiler builds flat `Uint32Array` of delays indexed by component index. Resolution priority: instance property > definition default > global default (10ns). Modifies `src/core/registry.ts` to add `defaultDelay` to `ComponentDefinition`. | M | src/engine/delay.ts, src/core/registry.ts |
+| 3.3.2 | Feedback & oscillation detection: runtime detection after configurable limit (default 1000 micro-steps). On limit: collect still-toggling components for 100 more steps to confirm pattern, then throw `NodeException` with oscillating component list. Compile-time warning when SCC decomposition finds feedback loops (informational, not error). | M | src/engine/oscillation.ts |
+| 3.3.3 | Clock management: identify Clock components after compilation, manage clock edge toggling at configured frequencies, multi-clock domains with independent frequencies. On clock edge: evaluate sequential elements sampling on that edge, then sweep combinational. Real-time clock mode (wall-clock pacing for demos). `AsyncSequentialClock` mode for circuits with no explicit clock. | M | src/engine/clock.ts |
 
 ### Wave 3.4: Simulation Modes
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 3.4.1 | Standard controls: state machine (STOPPED/RUNNING/PAUSED/ERROR), step (full propagation cycle), run (rAF-driven, configurable speed), pause, reset | M | src/engine/controls.ts |
-| 3.4.2 | Micro-step mode: advance one single gate evaluation (not a full propagation cycle). Show which gate just evaluated. Uses event-driven engine. For teaching signal propagation order. | M | src/engine/micro-step.ts |
-| 3.4.3 | Run-to-break: run simulation until a Break component fires, then halt. Support both normal-speed and micro-step run-to-break. | M | src/engine/run-to-break.ts |
-| 3.4.4 | Quick run: run simulation at maximum speed with no rendering callbacks (suppress change listeners). For computation-heavy circuits. Speed test benchmark mode (report max kHz, matching Digital's `SpeedTest` metric). | S | src/engine/quick-run.ts |
-| 3.4.5 | Web Worker mode: run the compiled engine in a Web Worker. Signal state in `SharedArrayBuffer`, main thread reads via `Atomics` for rendering. Control messages via `postMessage`. Fallback to main-thread if `Cross-Origin-Isolation` unavailable. | L | src/engine/worker-engine.ts, src/engine/worker.ts |
+| 3.4.1 | Standard controls: state machine (STOPPED → RUNNING → PAUSED → ERROR), step (full propagation cycle), continuous run (rAF-driven, configurable steps-per-frame), pause, reset. Error handler registration. | M | src/engine/controls.ts |
+| 3.4.2 | Micro-step mode: advance one single component evaluation, update output nets, schedule affected downstream, stop. Reports which component was evaluated via `MicroStepResult { componentIndex, typeId, changedNets }`. For teaching signal propagation order. | M | src/engine/micro-step.ts |
+| 3.4.3 | Run-to-break: run until a Break component fires (input asserted), then halt. Returns `BreakResult { reason: 'break' \| 'maxSteps', breakComponent?, stepsExecuted }`. Max steps safety limit. | M | src/engine/run-to-break.ts |
+| 3.4.4 | Quick run: suppress all change listeners and measurement observers, run N steps in tight loop, restore listeners. Speed test benchmark mode (report steps/sec, kHz, matching Digital's `SpeedTest` metric). | S | src/engine/quick-run.ts |
+| 3.4.5 | Web Worker mode: `WorkerEngine` proxy implementing `SimulationEngine`. Signal state in `SharedArrayBuffer`, main thread reads via `Atomics.load()`. Control messages via `postMessage`. `DigitalEngine` runs identically in both modes (reads/writes Uint32Array — only the backing buffer differs). Factory function: returns `WorkerEngine` if SAB available, else `DigitalEngine` on main thread. | L | src/engine/worker-engine.ts, src/engine/worker.ts, src/engine/worker-detection.ts |
+
+### Wave 3.5: Headless Simulation Runner
+| Task | Description | Complexity | Key Files |
+|------|-------------|------------|-----------|
+| 3.5.1 | **Headless compile + run**: `SimulationRunner` module for the SimulatorFacade. `compile(circuit)` calls compiler (3.2.1) → `CompiledCircuit`, initializes `DigitalEngine` (level-by-level default), runs init sequence. `setInput(engine, label, value)` resolves via `compiledCircuit.labelToNetId`. `readOutput(engine, label)` resolves Out/Probe by label. `readAllSignals(engine)` → `Map<string, BitVector>`. `runToStable(engine, maxIterations=1000)` loops step until stable or throws `OscillationError`. No browser dependencies. | M | src/headless/runner.ts |
+| 3.5.2 | **Signal trace capture**: `captureTrace(runner, engine, labels, steps)` → runs N steps, samples named signals after each, returns `Map<string, BitVector[]>`. For verifying sequential circuit timing (e.g., counter over N clock cycles). | S | src/headless/trace.ts |
+| 3.5.3 | **Headless runner smoke tests**: Half-adder: build via circuit builder, compile, test all 4 input combinations. `runToStable` on combinational (stabilizes in 1 step). Signal trace on sequential circuit. Error: oscillating circuit throws `OscillationError`. | M | src/headless/\_\_tests\_\_/runner.test.ts |
 
 ---
 
@@ -256,31 +271,41 @@ Compiled and event-driven digital simulation engine. Levelized compiled evaluati
 **Depends on**: Phase 1
 **Parallel with**: Phase 2, Phase 3, Phase 5
 
+Parse Digital's .dig XML format with XStream reference resolution, attribute mapping to PropertyBag, HGS scripting for parameterized circuits, hex file import (Intel HEX, Logisim raw, binary), and native JSON save/load. HGS evaluator is async to support browser file I/O. See `spec/phase-4-dig-parser.md` for the full spec.
+
 ### Wave 4.1: .dig XML Parser
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 4.1.1 | .dig XML schema documentation: analyze Digital's format from XStream annotations and fixture files. Document complete structure. TypeScript type definitions for parsed tree. | M | src/io/dig-schema.ts |
-| 4.1.2 | .dig XML parser: DOMParser-based. Extract visual elements, wires, measurement ordering, test data, embedded subcircuit definitions, `InverterConfig` data, generic attributes. Strongly-typed parse tree. | L | src/io/dig-parser.ts |
+| 4.1.1 | .dig XML schema types: TypeScript types for the complete .dig parse tree. Discriminated union `DigValue` covering all attribute value types (string, int, long→bigint, boolean, rotation, awt-color, testData, inverterConfig, data, inValue, romList, enum). | M | src/io/dig-schema.ts |
+| 4.1.2 | .dig XML parser: DOMParser-based (browser native or `@xmldom/xmldom` for Node.js). XStream reference resolution (XPath-like traversal for shared objects). Version migration (0→1 doubles coordinates, 1→2 updates ROM format). Extracts visual elements, wires, measurement ordering, all typed attribute values. | L | src/io/dig-parser.ts, src/io/dom-parser.ts |
 
 ### Wave 4.2: Attribute Mapping & Circuit Construction
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 4.2.1 | Attribute mapping framework: mechanism for components to register their own .dig XML attribute mappings. Reusable converters for common patterns (Bits→width, Value→initial, Label→label, enum mapping, coordinate transform, boolean, InverterConfig). Individual mappings registered by components in Phase 5. | M | src/io/attribute-map.ts |
-| 4.2.2 | Circuit construction from parsed XML: look up component type in registry, create instance, apply registered attribute mappings, position element. Create wires. Construct Circuit model. Fail hard on unknown component types with diagnostic (component name + position). | M | src/io/dig-loader.ts |
+| 4.2.1 | Attribute mapping framework: reusable converter functions (stringConverter, intConverter, bigintConverter, boolConverter, rotationConverter, inverterConfigConverter, colorConverter, testDataConverter, dataFieldConverter, inValueConverter, enumConverter). Unmapped attributes preserved in `_unmapped` field. Individual mappings registered by components in Phase 5. | M | src/io/attribute-map.ts |
+| 4.2.2 | Circuit construction from parsed XML: look up `elementName` in registry, apply attribute mappings to produce PropertyBag, call factory, position element. Create wires. Apply InverterConfig (set `isNegated` on specified pins). Extract circuit metadata. Fail hard on unknown component types with diagnostic. | M | src/io/dig-loader.ts |
 
 ### Wave 4.3: HGS Interpreter
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 4.3.1 | HGS tokenizer & parser: port Digital's `hdl/hgs/Tokenizer.java` and `hdl/hgs/Parser.java`. Recursive descent parser. Supports: `:=` declaration, `=` assignment (and equality in expressions), `if/else`, `for`, `while`, `repeat/until`, `func` (first-class functions with closures), arrays `[]`, maps `{}`, dot access, template mode (`<? ?>`), `export`, string/number/hex literals, bitwise/arithmetic/comparison operators. | L | src/hgs/tokenizer.ts, src/hgs/parser.ts |
-| 4.3.2 | HGS evaluator & runtime: port `Context.java`, `Value.java`, `Expression.java`, `Statement.java`, `Statements.java`. Type-checked variable reassignment. Built-in functions: `bitsNeededFor`, `ceil`, `floor`, `round`, `min`, `max`, `abs`, `print`, `printf`, `format`, `isPresent`, `panic`, `sizeOf`, `splitString`, `identifier`, `output`. Stub `loadHex`/`loadFile` to throw "not supported in browser" (defer to fetch-based alternative). | L | src/hgs/context.ts, src/hgs/value.ts, src/hgs/evaluator.ts |
-| 4.3.3 | HGS reference system: port `refs/` subpackage — `ReferenceToStruct`, `ReferenceToArray`, `ReferenceToVar`, `ReferenceChain`. Enables dot-notation access to component attributes (`this.Bits`, `args.dataBits`). Port `HGSMap` and `HGSArray` interfaces. | M | src/hgs/refs.ts |
-| 4.3.4 | HGS test suite: port Digital's `ParserTest.java` — comprehensive tests covering variables, control flow, functions, closures, recursion, arrays, maps, template mode, built-in functions, error cases. Ensure behavioral parity with the Java implementation. | M | src/hgs/\_\_tests\_\_/parser.test.ts |
+| 4.3.1 | HGS tokenizer: port `Tokenizer.java`. All token types including `:=` declaration, `=` assignment/equality, template delimiters (`<? ?>`), hex literals, string escapes, line number tracking. | M | src/hgs/tokenizer.ts |
+| 4.3.2 | HGS parser: port `Parser.java`. Recursive descent, operator precedence climbing. AST nodes for all expressions and statements. Template mode (text + `<? ?>` code blocks). Line number tracking on all nodes. | L | src/hgs/parser.ts, src/hgs/ast.ts |
+| 4.3.3 | HGS evaluator & runtime: **async** evaluator (`async/await` throughout). `bigint` for all integer operations. Scope chain with lexical scoping. ~25 built-in functions. `loadHex(filename, dataBits, bigEndian?)` and `loadFile(filename)` fully implemented via `FileResolver` interface (browser: pre-loaded file map from `<input type="file">`; Node.js: `fs.readFile`). Return via `ReturnValue` sentinel. | L | src/hgs/context.ts, src/hgs/value.ts, src/hgs/evaluator.ts, src/hgs/builtins.ts |
+| 4.3.4 | HGS reference system: `ReferenceToVar`, `ReferenceToArray`, `ReferenceToStruct`, `ReferenceToFunc`. Composable l-value abstractions for chained access (`obj.field[i]`). All async. | M | src/hgs/refs.ts |
+| 4.3.5 | File I/O and hex import: `FileResolver` interface with `NodeFileResolver` and `BrowserFileResolver`. `DataField` class for memory contents. Hex format importers: Logisim raw hex (with RLE), Intel HEX (with extended address records), raw binary (with endianness). DataField serialization for .dig `Data` attribute round-trip. | L | src/hgs/file-resolver.ts, src/io/data-field.ts, src/io/hex-import.ts |
+| 4.3.6 | HGS test suite: port Digital's `ParserTest.java`. Variables, control flow, functions, closures, recursion, arrays, maps, template mode, built-in functions, error cases. Behavioral parity with Java. | M | src/hgs/\_\_tests\_\_/hgs-parity.test.ts |
 
 ### Wave 4.4: Native Save/Load Format
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 4.4.1 | JSON save: serialize Circuit to JSON (elements, properties, positions, wires, metadata, format version). Stable key ordering. | M | src/io/save.ts |
-| 4.4.2 | JSON load: deserialize with Zod validation, format version checking, migration support | M | src/io/load.ts |
+| 4.4.1 | JSON save: serialize Circuit to JSON. Elements with type name, properties, position, rotation. Wires with endpoints. Metadata. Format version 1. Stable key ordering. bigint serialized as `"_bigint:"` prefixed strings. | M | src/io/save.ts, src/io/save-schema.ts |
+| 4.4.2 | JSON load: deserialize with Zod validation, format version checking, migration support. bigint restoration from `"_bigint:"` prefix. | M | src/io/load.ts |
+| 4.4.3 | **Headless .dig loading**: `SimulationLoader` module for SimulatorFacade. `loadDig(pathOrXml)` — async, auto-detects XML string vs file path/URL. Browser: native `DOMParser` + `fetch()`. Node.js: `@xmldom/xmldom` (runtime dependency) + `fs.readFile()`. Chains: XML → parseDigXml → loadDigCircuit → Circuit. | M | src/headless/loader.ts |
+
+### Wave 4.5: Generic Circuit Resolution
+| Task | Description | Complexity | Key Files |
+|------|-------------|------------|-----------|
+| 4.5.1 | HGS generic circuit resolution: port `ResolveGenerics.java`. Execute `GenericInitCode` to produce parameter context. Execute `generic` attribute code on components with `args` and `this` context. Execute `GenericCode` with `addComponent()`/`addWire()` circuit-building functions. Cache resolved circuits by argument hash. | L | src/io/resolve-generics.ts |
 
 ---
 
@@ -289,7 +314,7 @@ Compiled and event-driven digital simulation engine. Levelized compiled evaluati
 **Parallel with**: Phase 2, Phase 3, Phase 4
 **CHECKPOINT**: Task 5.1.1 (`And` gate) is the exemplar component. It must be implemented first and reviewed by the author before the remaining ~109 components begin. See `spec/author_instructions.md` § Checkpoint 2.
 
-All ~110 component types. Each component: rendering via `RenderContext`, simulation logic via engine interface (both OOP `execute()` for correctness and flat function for compiled engine), .dig attribute mapping registration, unit tests with mock contexts. Reference: hneemann/Digital Java source exclusively (`ref/Digital/`). Follow the component implementation template in `spec/author_instructions.md`.
+All ~110 component types. Each component: `CircuitElement` class (rendering via `RenderContext`, properties, serialization), standalone flat `executeFn` (simulation logic on `Uint32Array`), `.dig` attribute mapping registration, complete `ComponentDefinition` (including `defaultDelay`, `internalStateCount`, `backingStoreType`), unit tests with mock contexts. Stateful components use extra Uint32Array pseudo-net slots. RAM/ROM use `DataField` side-car. Interactive components use `engine.setSignalValue()`. All gates render both IEEE/US and IEC/DIN shapes. See `spec/phase-5-component-library.md` for the full spec.
 
 ### Wave 5.1: Foundation Components (validate interfaces, establish patterns)
 | Task | Description | Complexity | Key Files |
@@ -341,8 +366,24 @@ All ~110 component types. Each component: rendering via `RenderContext`, simulat
 
 ---
 
+## Phase 5.5: Cross-Cutting Modifications
+**Depends on**: Phases 1–5 (all implemented)
+**Blocks**: Phase 6
+
+Modifications to already-implemented code required by Phase 6+ design decisions. See `spec/phase-5.5-cross-cutting-modifications.md` for the full spec.
+
+### Wave 5.5.1: Foundation Modifications
+| Task | Description | Complexity | Key Files |
+|------|-------------|------------|-----------|
+| 5.5.1 | Dark mode default color scheme: rename existing light scheme, create dark scheme (black background), make it the default. Add semantic wire color ThemeColor keys. | S | src/core/renderer-interface.ts |
+| 5.5.2 | i18n pass-through function: `i18n(key, params?)` returns key unchanged. `setLocale()` / `getLocale()` stubs. All Phase 2+ UI code calls `i18n()` from the start; Phase 9 adds real translations. | S | src/i18n/index.ts |
+| 5.5.3 | Engine snapshot API: add `saveSnapshot()`, `restoreSnapshot()`, `clearSnapshots()`, `setSnapshotBudget()` to `SimulationEngine` interface and `DigitalEngine`. Ring buffer with 512KB budget. For timing diagram time-travel (Phase 7). | M | src/core/engine-interface.ts, src/engine/digital-engine.ts, src/test-utils/mock-engine.ts |
+| 5.5.4 | `.digb` JSON format schema and serializer: define the `.digb` (Digital-in-Browser) native JSON circuit format with embedded subcircuit definitions. Validation, serialization, deserialization. | M | src/io/digb-schema.ts, src/io/digb-serializer.ts, src/io/digb-deserializer.ts |
+
+---
+
 ## Phase 6: Core Integration
-**Depends on**: Phase 2 + Phase 3 + Phase 4 + Phase 5
+**Depends on**: Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 5.5
 
 Wire all subsystems together into a working simulator.
 
@@ -366,13 +407,16 @@ Wire all subsystems together into a working simulator.
 | 6.3.1 | Truth table parser: parse Digital's test syntax from .dig files (embedded in `Testcase` components) — signal names, input/output values, don't-care, clock directives, repeat/loop, comments | M | src/testing/parser.ts |
 | 6.3.2 | Test executor: drive inputs per vector, run to stable, compare outputs, collect pass/fail per vector | M | src/testing/executor.ts |
 | 6.3.3 | Test results display: table with pass/fail, highlight mismatches, summary, run/re-run | M | src/testing/results-ui.ts |
+| 6.3.4 | **Headless test runner**: Implement `runTests(engine, circuit, testData?)` in the SimulatorFacade. Supports embedded Testcase components AND external test vectors (instructor-provided string). Runnable from Node.js — no browser deps. Full integration test: `facade.loadDig('circuits/half-adder.dig')` → `facade.compile()` → `facade.runTests()` → all vectors pass. | M | src/headless/test-runner.ts, src/headless/\_\_tests\_\_/test-runner.test.ts |
+| 6.3.5 | Test results CSV export: export pass/fail table as RFC 4180 CSV with status, input values, expected/actual output values per row. | S | src/testing/export.ts |
+| 6.3.6 | Circuit comparison: run same test vectors against two circuits (reference + student), diff results. Two modes: test-based (instructor-provided vectors) and exhaustive (auto-generate all 2^N input combinations if N ≤ 20). Auto-selects mode. | M | src/testing/comparison.ts |
 
 ### Wave 6.4: Tutorial Integration
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 6.4.1 | Simulator HTML page: standalone page with canvas, palette, property panel, toolbar (file ops, sim controls, test runner). Responsive layout. Works standalone and in iframe. | M | simulator.html, src/main.ts |
-| 6.4.2 | postMessage API: receive `digital-load-url` / `digital-load-data`, send `digital-ready` / `digital-loaded` / `digital-error` | M | src/io/postmessage.ts |
-| 6.4.3 | Tutorial host page: new tutorial host page with split-pane layout (instructions + live sim iframe). Point iframe to new simulator. URL params for tutorial selection and step navigation. | M | tutorial.html |
+| 6.4.1 | Simulator HTML page: standalone page with canvas, palette, property panel, toolbar (file ops, sim controls, test runner). Responsive layout. Works standalone and in iframe. URL params: `base`, `file`, `dark`, `locked`, `panels`. Dark mode default. | M | simulator.html, src/main.ts, src/app/url-params.ts, src/app/app-init.ts |
+| 6.4.2 | **postMessage API (consolidated with former 9.3.2)**: Full extended protocol. Parent→sim: `digital-load-url`, `digital-load-data`, `digital-load-json` (.digb), `digital-set-input`, `digital-step`, `digital-run-tests`, `digital-read-output`, `digital-read-all-signals`, `digital-set-base` (checkpoint jump — clears subcircuit cache), `digital-set-locked`, `digital-load-memory`. Sim→parent: `digital-ready`, `digital-loaded`, `digital-error`, `digital-output`, `digital-signals`, `digital-test-results`. | M | src/io/postmessage-adapter.ts |
+| 6.4.3 | Tutorial host page: split-pane layout (markdown instructions + simulator iframe). Loads instruction markdown dynamically per checkpoint. Multiple simulator iframes supported. Checkpoint navigation via buttons. URL params: `tutorial`, `step`. | M | tutorial.html, src/tutorial/tutorial-host.ts, src/tutorial/markdown-renderer.ts |
 
 ---
 
@@ -460,14 +504,15 @@ Image export, localization, 74xx library, and application infrastructure.
 ### Wave 9.2: Localization
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 9.2.1 | i18n framework: string extraction system, locale switching, fallback to English. All UI strings go through i18n lookup. Multilingual component label support (component descriptions with multiple language versions). | M | src/i18n/framework.ts |
-| 9.2.2 | Translation files: port Digital's translations for English, German, Spanish, Portuguese, French, Italian, simplified Chinese. Map Digital's `lang_XX.xml` keys to our i18n keys. | M | src/i18n/locales/\*.json |
+| 9.2.1 | i18n framework (full implementation): replace Phase 5.5 pass-through with locale-aware lookup, parameter interpolation, fallback chain (active locale → English → key), locale change events for re-rendering. | M | src/i18n/index.ts, src/i18n/locale-loader.ts, src/i18n/locales/en.json |
+| 9.2.2 | Translation files: port Digital's translations for English (complete), simplified Chinese, German. Map Digital's `lang_XX.xml` keys to our i18n keys. Deferred to end of Phase 9. | M | src/i18n/locales/zh.json, src/i18n/locales/de.json |
 
-### Wave 9.3: 74xx Library & Remote Interface
+### Wave 9.3: 74xx Library
 | Task | Description | Complexity | Key Files |
 |------|-------------|------------|-----------|
-| 9.3.1 | 74xx IC library: port Digital's 74xx series subcircuit library. Ship as .dig files bundled with the app. Register in component palette under "74xx" category. Include: 74xx availability list in help. | M | lib/74xx/\*.dig, src/components/library-74xx.ts |
-| 9.3.2 | Remote control interface: JavaScript API (or extended postMessage protocol) for external tools to control the simulator — load circuit, set inputs, read outputs, step, run, query state. For IDE integration and automated testing. | M | src/remote/interface.ts |
+| 9.3.1 | 74xx IC library: port all ~60 Digital 74xx series subcircuit .dig files. Ship bundled with app. Register in component palette under "74xx" category. On-demand loading via file resolver. | M | lib/74xx/\*.dig, src/components/library-74xx.ts |
+
+*Note: Task 9.3.2 (postMessage adapter) has been consolidated into Phase 6 task 6.4.2.*
 
 ---
 

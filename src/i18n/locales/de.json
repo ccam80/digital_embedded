@@ -1,0 +1,172 @@
+{
+  "menu": {
+    "file": {
+      "open": "Öffnen",
+      "save": "Speichern",
+      "saveAs": "Speichern unter",
+      "export": "Exportieren",
+      "close": "Schließen",
+      "exit": "Beenden"
+    },
+    "edit": {
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "cut": "Ausschneiden",
+      "copy": "Kopieren",
+      "paste": "Einfügen",
+      "delete": "Löschen",
+      "selectAll": "Alles auswählen"
+    },
+    "view": {
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern",
+      "resetZoom": "Zoom zurücksetzen",
+      "fitToWindow": "An Fenster anpassen"
+    },
+    "simulation": {
+      "run": "Simulation starten",
+      "stop": "Stoppen",
+      "step": "Schritt",
+      "reset": "Zurücksetzen"
+    }
+  },
+  "toolbar": {
+    "step": "Schritt",
+    "run": "Simulation starten",
+    "stop": "Stoppen",
+    "reset": "Zurücksetzen",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen"
+  },
+  "components": {
+    "gates": {
+      "and": "Und",
+      "or": "Oder",
+      "not": "Nicht",
+      "nand": "Nicht Und",
+      "nor": "Nicht Oder",
+      "xor": "Exklusiv Oder",
+      "xnor": "Nicht Exklusiv Oder"
+    },
+    "arithmetic": {
+      "add": "Addierer",
+      "subtract": "Subtrahierer",
+      "multiply": "Multiplizierer",
+      "divide": "Dividierer",
+      "comparator": "Komparator"
+    },
+    "flipflops": {
+      "srLatch": "SR-Latch",
+      "dFlipFlop": "D-Flipflop",
+      "jkFlipFlop": "JK-Flipflop",
+      "tFlipFlop": "T-Flipflop"
+    },
+    "memory": {
+      "ram": "RAM",
+      "rom": "ROM",
+      "sram": "SRAM"
+    },
+    "io": {
+      "input": "Eingang",
+      "output": "Ausgang",
+      "button": "Taster",
+      "clock": "Takteingang",
+      "led": "LED",
+      "switch": "Schalter"
+    },
+    "display": {
+      "sevenSegment": "7-Segment-Anzeige",
+      "hexDisplay": "Hex-Anzeige",
+      "ledMatrix": "LED-Matrix"
+    },
+    "wiring": {
+      "wire": "Leitung",
+      "label": "Bezeichnung",
+      "splitter": "Splitter",
+      "merge": "Zusammenführen"
+    }
+  },
+  "dialogs": {
+    "export": {
+      "title": "Schaltung exportieren",
+      "format": "Format",
+      "scale": "Skalierung",
+      "resolution": "Auflösung",
+      "background": "Hintergrund einbeziehen",
+      "cancel": "Abbrechen",
+      "export": "Exportieren"
+    },
+    "import": {
+      "title": "Schaltung importieren",
+      "selectFile": "Datei auswählen",
+      "cancel": "Abbrechen",
+      "import": "Importieren"
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "language": "Sprache",
+      "theme": "Erscheinungsbild",
+      "grid": "Gitter anzeigen",
+      "snapToGrid": "Am Gitter einrasten",
+      "cancel": "Abbrechen",
+      "apply": "Setzen"
+    },
+    "properties": {
+      "title": "Eigenschaften",
+      "name": "Name",
+      "value": "Wert",
+      "description": "Beschreibung",
+      "close": "Schließen"
+    }
+  },
+  "errors": {
+    "unknownComponent": "Unbekanntes Bauteil: {name}",
+    "cyclicReference": "Zyklische Referenz erkannt: {name}",
+    "notFound": "Bauteil '{name}' nicht gefunden",
+    "invalidFormat": "Ungültiges Dateiformat",
+    "loadFailed": "Datei konnte nicht geladen werden: {error}",
+    "saveFailed": "Datei konnte nicht gespeichert werden: {error}",
+    "parseError": "Analysefehler: {error}",
+    "missingRequired": "Pflichtfeld fehlt: {field}"
+  },
+  "messages": {
+    "loading": "Wird geladen...",
+    "saved": "Datei erfolgreich gespeichert",
+    "exported": "Schaltung erfolgreich exportiert",
+    "imported": "Schaltung erfolgreich importiert",
+    "ready": "Bereit"
+  },
+  "properties": {
+    "name": "Name",
+    "label": "Bezeichnung",
+    "description": "Beschreibung",
+    "delay": "Verzögerung",
+    "frequency": "Frequenz",
+    "width": "Breite",
+    "height": "Höhe",
+    "color": "Farbe",
+    "orientation": "Ausrichtung"
+  },
+  "keyboard": {
+    "delete": "Entfernen",
+    "escape": "Escape",
+    "enter": "Eingabe",
+    "space": "Leertaste",
+    "ctrl": "Strg",
+    "shift": "Umschalt",
+    "alt": "Alt"
+  },
+  "analysis": {
+    "truthTable": "Wahrheitstabelle",
+    "stateTransition": "Zustandsübergang",
+    "analyze": "Analysieren",
+    "export": "Exportieren",
+    "import": "Importieren"
+  },
+  "library": {
+    "title": "Bauteilbibliothek",
+    "builtin": "Eingebaut",
+    "custom": "Benutzerdefiniert",
+    "standard74xx": "Standard 74xx"
+  }
+}

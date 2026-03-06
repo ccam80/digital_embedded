@@ -10,7 +10,7 @@ A browser-based digital logic circuit simulator for embedding in university cour
 
 ## Current State
 
-The CheerpJ prototype files (`Digital.jar`, `digital.html`, `bridge.html`, `xstream-shim.jar`, `xstream-patch/`, `jdk-shim/`) are still in the repo pending Phase 0 cleanup. No native TS code has been written yet.
+Phase 0 (dead code removal) is complete. All legacy prototype artifacts have been removed. No native TS code has been written yet.
 
 | File/Dir | Purpose |
 |---|---|
@@ -28,7 +28,7 @@ To initialize: `git submodule update --init`
 | What | Where to look |
 |---|---|
 | Component simulation behaviour | `ref/Digital/src/main/java/de/neemann/digital/core/` |
-| .dig XML format | Any `.dig` file + Digital's XStream annotations |
+| .dig XML format | Any `.dig` file + Digital's XML serialization annotations |
 | Circuit compilation (ModelCreator) | `ref/Digital/src/main/java/de/neemann/digital/draw/model/` |
 | Test execution | `ref/Digital/src/main/java/de/neemann/digital/testing/` |
 | Component shapes / rendering specs | `ref/Digital/src/main/java/de/neemann/digital/draw/shapes/` |

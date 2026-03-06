@@ -54,7 +54,7 @@ Task 5.1.1 (`And` gate) is the **exemplar component**. It must be implemented fi
 
 The `And` gate implementation must demonstrate:
 - Correct `CircuitElement` interface implementation
-- Both OOP `execute()` method AND flat function for the compiled engine's function table
+- Standalone flat `executeFn` function for the compiled engine's function table (NOT a method on CircuitElement — see Decision 1)
 - .dig attribute mapping registration (read `wideShape`, `Inputs`, `inverterConfig` from XML)
 - Rendering with `RenderContext` — both IEEE/US and IEC/DIN gate shapes
 - Complete unit tests: logic correctness (all input combinations, multi-bit, HIGH_Z, UNDEFINED propagation) and rendering (mock context records correct draw calls)
@@ -75,11 +75,17 @@ Layout decisions to resolve:
 - Locked mode presentation
 - How display components (Terminal, VGA, LED Matrix) present their output panels
 
-The author will provide a wireframe or layout description. Until then, Phase 2 Wave 2.1 (canvas foundation, grid, pan/zoom) can proceed — it doesn't depend on layout decisions. Waves 2.3–2.5 (interaction, edit operations, extended features) also don't depend on panel layout. Only Wave 2.4 tasks 2.4.3 (palette) and 2.4.4 (property panel) are blocked.
-
 ## UI Layout
 
-*To be provided by the author before Phase 2 Wave 2.4.*
+Clone Digital's layout:
+
+- **Left panel**: Tree-based component palette with collapsible category nodes. Search/filter at top. Recently-placed history section.
+- **Right panel**: Collapsible property editor showing selected element's properties with type-appropriate inputs.
+- **Top**: Toolbar with file operations, simulation controls, tools.
+- **Center**: Canvas with grid, pan/zoom.
+- **Display components** (Terminal, LED Matrix, VGA, Scope): Separate floating panels.
+- **All panels are collapsible** for iframe-embedded mode. Full functionality is preserved — panels hide but can be re-shown. No functionality is removed in embedded mode.
+- **Presentation mode** (F4): Fullscreen canvas, minimal sim-only toolbar, all panels hidden.
 
 ## Component Implementation Template
 
@@ -96,7 +102,7 @@ import type { Pin } from '../../core/pin';
 // 2. Component class implementing CircuitElement
 //    - All properties declared with types
 //    - draw() uses RenderContext abstraction, never Canvas2D directly
-//    - execute() contains simulation logic
+//    - NO execute() method — simulation logic is in the standalone flat function below
 //    - serialize()/deserialize() for persistence
 //    - help() returns documentation text
 
