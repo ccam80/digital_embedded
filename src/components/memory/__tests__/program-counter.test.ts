@@ -41,7 +41,9 @@ function makeLayout(): {
   // Total: 4 inputs + 2 outputs + 2 state = 8 slots
   const state = new Uint32Array(8);
   const layout: ComponentLayout & ProgramCounterLayout = {
+    inputCount: (_i: number) => 4,
     inputOffset: (_i: number) => 0,
+    outputCount: (_i: number) => 2,
     outputOffset: (_i: number) => 4,
     stateOffset: (_i: number) => 6,
   };

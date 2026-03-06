@@ -128,7 +128,7 @@ export class FGNFETElement extends AbstractCircuitElement {
 
     // Blown indicator: X mark
     if (this._blown) {
-      ctx.setColor("ERROR");
+      ctx.setColor("WIRE_ERROR");
       ctx.drawLine(0.5, 0.5, 1.0, 1.0);
       ctx.drawLine(1.0, 0.5, 0.5, 1.0);
     }

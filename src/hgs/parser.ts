@@ -468,7 +468,7 @@ class Parser {
     return { kind: "struct", fields, line };
   }
 
-  private parseFunction(line: number): { params: string[]; body: Statement } {
+  private parseFunction(_line: number): { params: string[]; body: Statement } {
     this.tok.expect(TokenType.OPEN);
     const params: string[] = [];
     if (this.tok.peek().type !== TokenType.CLOSE) {

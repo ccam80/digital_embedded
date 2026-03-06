@@ -14,7 +14,8 @@ import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition } from "@/core/registry";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
-import type { PropertyBag, PropertyValue } from "@/core/properties";
+import { PropertyBag } from "@/core/properties";
+import type { PropertyValue } from "@/core/properties";
 import type { Point, Rect, RenderContext } from "@/core/renderer-interface";
 import type { Rotation } from "@/core/pin";
 
@@ -30,13 +31,17 @@ class MockElement implements CircuitElement {
   readonly rotation: Rotation = 0;
   readonly mirror = false;
 
-  constructor(typeId: string, props: PropertyBag = new Map()) {
+  constructor(typeId: string, props: PropertyBag = new PropertyBag()) {
     this.typeId = typeId;
     this._props = props;
   }
 
   getAttribute(key: string): PropertyValue | undefined {
     return this._props.get(key);
+  }
+
+  getProperties(): PropertyBag {
+    return this._props;
   }
 
   getPins(): Pin[] {
@@ -47,7 +52,7 @@ class MockElement implements CircuitElement {
     return { x: 0, y: 0, width: 0, height: 0 };
   }
 
-  render(_ctx: RenderContext): void {}
+  draw(_ctx: RenderContext): void {}
 
   getHelpText(): string {
     return "";
@@ -62,22 +67,6 @@ class MockElement implements CircuitElement {
       mirror: this.mirror,
       properties: {},
     };
-  }
-
-  withPosition(_pos: Point): CircuitElement {
-    return this;
-  }
-
-  withRotation(_rot: Rotation): CircuitElement {
-    return this;
-  }
-
-  withMirror(_mirror: boolean): CircuitElement {
-    return this;
-  }
-
-  withProperty(_key: string, _value: PropertyValue): CircuitElement {
-    return this;
   }
 }
 
@@ -110,6 +99,7 @@ function buildCompiled(
     componentToElement,
     labelToNetId: new Map(),
     wireToNetId: new Map(),
+    pinNetMap: new Map(),
   });
 }
 
@@ -160,7 +150,7 @@ describe("Delays", () => {
   it("instanceOverridesDefault", () => {
     // Component with delay: 20 in its property bag.
     // resolveDelays should return 20, ignoring definition default and global default.
-    const props: PropertyBag = new Map([["delay", 20]]);
+    const props: PropertyBag = new PropertyBag([["delay", 20]]);
     const element = new MockElement("And", props);
     const componentToElement = new Map<number, CircuitElement>([[0, element]]);
     const compiled = buildCompiled(1, componentToElement);

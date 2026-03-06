@@ -6,7 +6,6 @@ import {
   resetIdCounter,
 } from '../model.js';
 import { optimizeFSM } from '../optimizer.js';
-import { fsmToTransitionTable } from '../table-creator.js';
 
 beforeEach(() => {
   resetIdCounter();

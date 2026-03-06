@@ -131,7 +131,6 @@ export function buildSplitterPinDeclarations(
 // ---------------------------------------------------------------------------
 
 export class SplitterElement extends AbstractCircuitElement {
-  private readonly _inputSplitting: string;
   private readonly _outputSplitting: string;
   private readonly _parts: number[];
   private readonly _totalBits: number;
@@ -146,7 +145,6 @@ export class SplitterElement extends AbstractCircuitElement {
   ) {
     super("Splitter", instanceId, position, rotation, mirror, props);
 
-    this._inputSplitting = props.getOrDefault<string>("input splitting", "");
     this._outputSplitting = props.getOrDefault<string>("output splitting", "4,4");
 
     // Use the output splitting pattern for pin layout

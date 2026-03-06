@@ -55,57 +55,143 @@
       width: 100%;
       height: 100%;
     }
-    #toolbar {
+    /* ---- Menu bar ---- */
+    #menubar {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
       background: var(--toolbar-bg);
       border-bottom: 1px solid var(--toolbar-border);
       flex-shrink: 0;
-      height: 36px;
+      height: 28px;
+      font-size: 12px;
+      user-select: none;
     }
-    #toolbar button {
-      padding: 3px 8px;
+    .menu-item {
+      position: relative;
+      padding: 4px 10px;
+      cursor: pointer;
+      color: var(--fg);
+    }
+    .menu-item:hover, .menu-item.open {
+      background: var(--panel-border);
+    }
+    .menu-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      min-width: 180px;
+      z-index: 200;
+      padding: 4px 0;
+    }
+    .menu-item.open .menu-dropdown {
+      display: block;
+    }
+    .menu-action {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 16px;
+      cursor: pointer;
+      color: var(--fg);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .menu-action:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+    .menu-shortcut {
+      margin-left: 24px;
+      opacity: 0.5;
+      font-size: 11px;
+    }
+    .menu-separator {
+      height: 1px;
+      background: var(--panel-border);
+      margin: 4px 8px;
+    }
+    .menu-submenu {
+      position: relative;
+    }
+    .menu-submenu > .menu-action::after {
+      content: "▶";
+      font-size: 9px;
+      opacity: 0.5;
+    }
+    .menu-submenu > .menu-dropdown {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: -4px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      min-width: 160px;
+      z-index: 201;
+      padding: 4px 0;
+    }
+    .menu-submenu.open > .menu-dropdown {
+      display: block;
+    }
+    #circuit-name {
+      margin-left: 12px;
+      padding: 2px 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--fg);
+      font-size: 12px;
+      border-radius: 3px;
+      width: 150px;
+      opacity: 0.8;
+    }
+    #circuit-name:hover {
+      border-color: var(--panel-border);
+    }
+    #circuit-name:focus {
+      border-color: var(--accent);
+      opacity: 1;
+      outline: none;
+      background: var(--panel-bg);
+    }
+    .menubar-spacer { flex: 1; }
+    .menubar-speed {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-right: 8px;
+    }
+    .menubar-speed button {
+      padding: 1px 5px;
       background: transparent;
       border: 1px solid var(--toolbar-border);
       color: var(--fg);
       cursor: pointer;
       border-radius: 3px;
-      font-size: 12px;
+      font-size: 11px;
     }
-    #toolbar button:hover {
-      background: var(--panel-border);
-    }
-    #toolbar .separator {
-      width: 1px;
-      height: 20px;
-      background: var(--toolbar-border);
-      margin: 0 4px;
-    }
-    #toolbar .speed-control {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      margin-left: auto;
-    }
-    #toolbar .speed-control input {
-      width: 60px;
-      padding: 2px 4px;
+    .menubar-speed button:hover { background: var(--panel-border); }
+    .menubar-speed input {
+      width: 50px;
+      padding: 1px 3px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       color: var(--fg);
       border-radius: 3px;
-      font-size: 12px;
+      font-size: 11px;
       text-align: center;
     }
+    /* ---- Workspace ---- */
     #workspace {
       display: flex;
       flex: 1;
       overflow: hidden;
     }
     #palette-panel {
-      width: 180px;
+      width: 200px;
       background: var(--panel-bg);
       border-right: 1px solid var(--panel-border);
       overflow-y: auto;
@@ -134,27 +220,48 @@
       cursor: default;
     }
     #property-panel {
-      width: 200px;
+      display: none;
+    }
+    /* ---- Prop popup ---- */
+    .prop-popup {
+      position: absolute;
       background: var(--panel-bg);
-      border-left: 1px solid var(--panel-border);
-      overflow-y: auto;
-      flex-shrink: 0;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      padding: 8px;
+      min-width: 180px;
+      max-width: 280px;
+      z-index: 100;
     }
-    #property-panel .panel-header {
-      padding: 6px 8px;
-      font-weight: 600;
+    .prop-popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0 6px 0;
       border-bottom: 1px solid var(--panel-border);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--fg);
-      opacity: 0.7;
+      margin-bottom: 4px;
     }
+    .prop-popup-title {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--fg);
+    }
+    .prop-popup-close {
+      background: none;
+      border: none;
+      color: var(--fg);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      opacity: 0.6;
+    }
+    .prop-popup-close:hover { opacity: 1; }
     .panels-none #palette-panel,
     .panels-none #property-panel {
       display: none;
     }
-    /* Palette styles */
+    /* ---- Palette ---- */
     .palette-search {
       padding: 4px 6px;
       border-bottom: 1px solid var(--panel-border);
@@ -169,7 +276,10 @@
       font-size: 12px;
     }
     .palette-category-header {
-      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
       font-size: 11px;
       font-weight: 600;
       color: var(--fg);
@@ -182,25 +292,52 @@
     .palette-category-header:hover {
       background: var(--toolbar-bg);
     }
+    .palette-category-arrow {
+      display: inline-block;
+      width: 10px;
+      font-size: 10px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
     .palette-component-list {
       list-style: none;
       padding: 0;
       margin: 0;
     }
     .palette-component-item {
-      padding: 3px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px 3px 18px;
       font-size: 12px;
       cursor: pointer;
       user-select: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     .palette-component-item:hover {
       background: var(--accent);
       color: #fff;
     }
-    /* Property panel styles */
+    .palette-component-icon {
+      display: block;
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      border-radius: 2px;
+    }
+    .palette-component-icon--placeholder {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--panel-border);
+      border-radius: 2px;
+      background: transparent;
+    }
+    .palette-component-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    /* ---- Property rows ---- */
     .prop-row {
       display: flex;
       flex-direction: column;
@@ -229,19 +366,47 @@
 </head>
 <body>
   <div id="app">
-    <div id="toolbar">
-      <button id="btn-step" title="Step (single propagation cycle)">Step</button>
-      <button id="btn-run" title="Run / Pause simulation">Run</button>
-      <button id="btn-stop" title="Stop and reset simulation">Stop</button>
-      <div class="separator"></div>
-      <button id="btn-open" title="Open circuit file">Open</button>
-      <button id="btn-save" title="Save circuit">Save</button>
-      <div class="speed-control">
-        <button id="btn-speed-div10" title="Speed ÷ 10">/10</button>
-        <button id="btn-speed-div2" title="Speed ÷ 2">/2</button>
+    <div id="menubar">
+      <div class="menu-item" data-menu="file">File
+        <div class="menu-dropdown">
+          <div class="menu-action" id="btn-new">New<span class="menu-shortcut"></span></div>
+          <div class="menu-action" id="btn-open">Open<span class="menu-shortcut">Ctrl+O</span></div>
+          <div class="menu-separator"></div>
+          <div class="menu-action" id="btn-save">Save<span class="menu-shortcut">Ctrl+S</span></div>
+          <div class="menu-action" id="btn-save-as">Save As...</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="edit">Edit
+        <div class="menu-dropdown">
+          <div class="menu-action" id="btn-undo">Undo<span class="menu-shortcut">Ctrl+Z</span></div>
+          <div class="menu-action" id="btn-redo">Redo<span class="menu-shortcut">Ctrl+Y</span></div>
+          <div class="menu-separator"></div>
+          <div class="menu-action" id="btn-delete">Delete<span class="menu-shortcut">Del</span></div>
+          <div class="menu-action" id="btn-select-all">Select All<span class="menu-shortcut">Ctrl+A</span></div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="insert">Insert
+        <div class="menu-dropdown" id="insert-menu-dropdown">
+        </div>
+      </div>
+      <div class="menu-item" data-menu="sim">Simulation
+        <div class="menu-dropdown">
+          <div class="menu-action" id="btn-step">Step</div>
+          <div class="menu-action" id="btn-run">Run</div>
+          <div class="menu-action" id="btn-stop">Stop</div>
+        </div>
+      </div>
+      <input id="circuit-name" type="text" value="Untitled" title="Circuit name" />
+      <div class="menubar-spacer"></div>
+      <div class="menubar-speed">
+        <button id="btn-tb-run" title="Start simulation">&#9654;</button>
+        <button id="btn-tb-step" title="Single step">&#9205;</button>
+        <button id="btn-tb-stop" title="Stop simulation">&#9632;</button>
+        <button id="btn-speed-div10" title="Speed / 10">/10</button>
+        <button id="btn-speed-div2" title="Speed / 2">/2</button>
         <input id="speed-input" type="text" value="1000" title="Steps per second" />
-        <button id="btn-speed-mul2" title="Speed × 2">×2</button>
-        <button id="btn-speed-mul10" title="Speed × 10">×10</button>
+        <button id="btn-speed-mul2" title="Speed x 2">x2</button>
+        <button id="btn-speed-mul10" title="Speed x 10">x10</button>
       </div>
     </div>
     <div id="workspace">
@@ -258,7 +423,60 @@
       </div>
     </div>
   </div>
-  <input id="file-input" type="file" accept=".dig,.digb" style="display:none" />
+  <input id="file-input" type="file" accept=".dig,.digb,.json,.digj" style="display:none" />
   <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Menu bar dropdown logic
+    document.querySelectorAll('.menu-item[data-menu]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const tgt = e.target instanceof Element ? e.target : null;
+        if (tgt && tgt.closest('.menu-action')) return;
+        const wasOpen = item.classList.contains('open');
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        if (!wasOpen) item.classList.add('open');
+      });
+      item.addEventListener('mouseenter', () => {
+        if (document.querySelector('.menu-item.open') && !item.classList.contains('open')) {
+          document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+          item.classList.add('open');
+        }
+      });
+    });
+    document.querySelectorAll('.menu-action').forEach(action => {
+      action.addEventListener('click', () => {
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+      });
+    });
+    document.addEventListener('click', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el || !el.closest('.menu-item')) {
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+      }
+    });
+    // Submenu hover management: only one submenu open at a time
+    document.addEventListener('mouseenter', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el) return;
+      const sub = el.closest('.menu-submenu');
+      if (!sub) return;
+      const parent = sub.parentElement;
+      if (parent) {
+        parent.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
+      }
+      sub.classList.add('open');
+    }, true);
+    document.addEventListener('mouseleave', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el) return;
+      const sub = el.closest('.menu-submenu');
+      if (!sub) return;
+      // Delay removal so mouse can move into the dropdown
+      setTimeout(() => {
+        if (!sub.matches(':hover')) {
+          sub.classList.remove('open');
+        }
+      }, 100);
+    }, true);
+  </script>
 </body>
 </html>

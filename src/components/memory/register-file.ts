@@ -118,7 +118,6 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
 
 export class RegisterFileElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
-  private readonly _addrBits: number;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -130,7 +129,6 @@ export class RegisterFileElement extends AbstractCircuitElement {
   ) {
     super("RegisterFile", instanceId, position, rotation, mirror, props);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
-    this._addrBits = props.getOrDefault<number>("addrBits", 2);
     this._pins = resolvePins(
       REGISTER_FILE_PIN_DECLARATIONS,
       position,

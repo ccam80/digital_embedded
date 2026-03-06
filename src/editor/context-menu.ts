@@ -29,7 +29,7 @@ export interface MenuAction {
  * Build a context menu action list for a selected element.
  */
 export function buildMenuForElement(
-  element: CircuitElement,
+  _element: CircuitElement,
   callbacks: {
     rotate?: () => void;
     mirror?: () => void;
@@ -81,7 +81,7 @@ export function buildMenuForElement(
  * Build a context menu action list for a selected wire.
  */
 export function buildMenuForWire(
-  wire: Wire,
+  _wire: Wire,
   callbacks: {
     delete?: () => void;
     split?: () => void;

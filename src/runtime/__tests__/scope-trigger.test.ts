@@ -48,7 +48,7 @@ describe("ScopeTrigger", () => {
 
       // Signal starts at 0, then stays at 1
       trigger.onStep(1, makeReader({ 0: 1 })); // rising edge — fires
-      const status1 = trigger.status;
+      trigger.status; // side-effect read
 
       // If recording window is 0 it transitions to triggered immediately
       // Reset and test sustained high without edge

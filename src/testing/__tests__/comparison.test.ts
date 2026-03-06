@@ -22,6 +22,7 @@ import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
 import type { Rect, RenderContext } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
+import type { PropertyValue } from "@/core/properties";
 import type { ParsedTestData } from "../parser.js";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +60,7 @@ class MockElement implements CircuitElement {
     };
   }
   getHelpText(): string { return ""; }
-  getAttribute(_name: string): unknown { return undefined; }
+  getAttribute(_name: string): PropertyValue | undefined { return undefined; }
 }
 
 // ---------------------------------------------------------------------------

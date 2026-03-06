@@ -45,7 +45,6 @@ function buildComparatorPinDeclarations(bitWidth: number): PinDeclaration[] {
 
 export class ComparatorElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
-  private readonly _signed: boolean;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -57,7 +56,6 @@ export class ComparatorElement extends AbstractCircuitElement {
   ) {
     super("Comparator", instanceId, position, rotation, mirror, props);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._signed = props.getOrDefault<boolean>("signed", false);
     const decls = buildComparatorPinDeclarations(this._bitWidth);
     this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });
   }

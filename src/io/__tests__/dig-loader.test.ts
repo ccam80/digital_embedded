@@ -125,10 +125,10 @@ describe("DigLoader", () => {
     const inElements = circuit.elements.filter((el) => el.typeId === "In");
     expect(inElements).toHaveLength(2);
 
-    const labelA = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "A");
+    const labelA = inElements.find((el) => String(el.getProperties().getOrDefault("label", "")) === "A");
     expect(labelA).not.toBeUndefined();
 
-    const labelB = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "B");
+    const labelB = inElements.find((el) => String(el.getProperties().getOrDefault("label", "")) === "B");
     expect(labelB).not.toBeUndefined();
 
     // And element has wideShape: true in properties
@@ -145,7 +145,7 @@ describe("DigLoader", () => {
 
     // In "A" is at (200, 200) per the dig file
     const inElements = circuit.elements.filter((el) => el.typeId === "In");
-    const inA = inElements.find((el) => el.getProperties().getOrDefault("label", "") === "A");
+    const inA = inElements.find((el) => String(el.getProperties().getOrDefault("label", "")) === "A");
     expect(inA).toBeDefined();
     expect(inA!.position).toEqual({ x: 200, y: 200 });
 

@@ -3,7 +3,9 @@ import { CircuitBuilder } from '../builder.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import type { CircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
+import type { PropertyValue } from '../../core/properties.js';
 import type { Pin } from '../../core/pin.js';
+import { PinDirection } from '../../core/pin.js';
 import { FacadeError } from '../types.js';
 
 // Simple mock CircuitElement for testing
@@ -51,6 +53,9 @@ class MockCircuitElement implements CircuitElement {
   getHelpText() {
     return '';
   }
+  getAttribute(_name: string): PropertyValue | undefined {
+    return this.getProperties().has(_name) ? this.getProperties().get(_name) : undefined;
+  }
 }
 
 describe('CircuitBuilder', () => {
@@ -63,15 +68,14 @@ describe('CircuitBuilder', () => {
     // Register a simple mock component
     registry.register({
       name: 'Mock',
+      typeId: -1,
       factory: (props: PropertyBag) => {
-        const position = (props.get('position') as { x: number; y: number }) || {
-          x: 0,
-          y: 0,
-        };
+        const pos = props.has('position') ? (props.get('position') as number[]) : [0, 0];
+        const position = { x: pos[0] ?? 0, y: pos[1] ?? 0 };
         const pins: Pin[] = [
           {
             label: 'in',
-            direction: 'INPUT',
+            direction: PinDirection.INPUT,
             position: { x: -2, y: 0 },
             bitWidth: 1,
             isNegated: false,
@@ -79,7 +83,7 @@ describe('CircuitBuilder', () => {
           },
           {
             label: 'out',
-            direction: 'OUTPUT',
+            direction: PinDirection.OUTPUT,
             position: { x: 2, y: 0 },
             bitWidth: 1,
             isNegated: false,
@@ -93,20 +97,20 @@ describe('CircuitBuilder', () => {
       propertyDefs: [],
       attributeMap: [],
       category: 'LOGIC' as any,
+      helpText: 'Mock',
     });
 
     // Register And gate mock
     registry.register({
       name: 'And',
+      typeId: -1,
       factory: (props: PropertyBag) => {
-        const position = (props.get('position') as { x: number; y: number }) || {
-          x: 0,
-          y: 0,
-        };
+        const pos = props.has('position') ? (props.get('position') as number[]) : [0, 0];
+        const position = { x: pos[0] ?? 0, y: pos[1] ?? 0 };
         const pins: Pin[] = [
           {
             label: 'A',
-            direction: 'INPUT',
+            direction: PinDirection.INPUT,
             position: { x: -2, y: -1 },
             bitWidth: 1,
             isNegated: false,
@@ -114,7 +118,7 @@ describe('CircuitBuilder', () => {
           },
           {
             label: 'B',
-            direction: 'INPUT',
+            direction: PinDirection.INPUT,
             position: { x: -2, y: 1 },
             bitWidth: 1,
             isNegated: false,
@@ -122,7 +126,7 @@ describe('CircuitBuilder', () => {
           },
           {
             label: 'Y',
-            direction: 'OUTPUT',
+            direction: PinDirection.OUTPUT,
             position: { x: 2, y: 0 },
             bitWidth: 1,
             isNegated: false,
@@ -136,6 +140,7 @@ describe('CircuitBuilder', () => {
       propertyDefs: [],
       attributeMap: [],
       category: 'LOGIC' as any,
+      helpText: 'And',
     });
 
     builder = new CircuitBuilder(registry);
@@ -228,15 +233,14 @@ describe('CircuitBuilder', () => {
     it('connect pins with different bit widths throws error', () => {
       registry.register({
         name: 'Wide',
+        typeId: -1,
         factory: (props: PropertyBag) => {
-          const position = (props.get('position') as { x: number; y: number }) || {
-            x: 0,
-            y: 0,
-          };
+          const pos = props.has('position') ? (props.get('position') as number[]) : [0, 0];
+          const position = { x: pos[0] ?? 0, y: pos[1] ?? 0 };
           const pins: Pin[] = [
             {
               label: 'in',
-              direction: 'INPUT',
+              direction: PinDirection.INPUT,
               position: { x: -2, y: 0 },
               bitWidth: 8,
               isNegated: false,
@@ -250,6 +254,7 @@ describe('CircuitBuilder', () => {
         propertyDefs: [],
         attributeMap: [],
         category: 'LOGIC' as any,
+        helpText: 'Wide',
       });
 
       const circuit = builder.createCircuit();

@@ -29,7 +29,6 @@ import {
   type ComponentRegistry,
 } from "../../core/registry.js";
 import type { Circuit } from "../../core/circuit.js";
-import { deriveInterfacePins } from "./pin-derivation.js";
 import type { ShapeMode } from "./shape-renderer.js";
 import {
   computeChipDimensions,

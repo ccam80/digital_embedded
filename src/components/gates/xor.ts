@@ -94,7 +94,7 @@ export class XOrElement extends AbstractCircuitElement {
 
     this._inputCount = props.getOrDefault<number>("inputCount", 2);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
+    this._wideShape = props.getOrDefault<boolean>("wideShape", true);
     this._invertedPins = parseInvertedPins(props, this._inputCount);
 
     const inverterConfig = createInverterConfig(this._invertedPins);

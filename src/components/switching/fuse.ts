@@ -28,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { FETLayout } from "./nfet.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -113,7 +112,7 @@ export class FuseElement extends AbstractCircuitElement {
 
     if (this._blown) {
       // Blown: X mark inside the body
-      ctx.setColor("ERROR");
+      ctx.setColor("WIRE_ERROR");
       ctx.drawLine(0.7, cy - 0.2, 1.3, cy + 0.2);
       ctx.drawLine(1.3, cy - 0.2, 0.7, cy + 0.2);
     } else {

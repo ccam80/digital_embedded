@@ -26,10 +26,12 @@ import { GridRenderer } from '../editor/grid.js';
 import { UndoRedoStack } from '../editor/undo-redo.js';
 import { SpeedControl } from '../integration/speed-control.js';
 import { darkColorScheme, lightColorScheme } from '../core/renderer-interface.js';
-import { screenToWorld, GRID_SPACING } from '../editor/coordinates.js';
+import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.js';
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
+import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
 import { deleteSelection } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
+import { deserializeCircuit } from '../io/load.js';
 import { serializeCircuit } from '../io/save.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
 import { compileCircuit } from '../engine/compiler.js';
@@ -75,12 +77,59 @@ export function initApp(search?: string): void {
 
   const palette = new ComponentPalette(registry);
   const paletteContainer = document.getElementById('palette-content')!;
-  const paletteUI = new PaletteUI(palette, paletteContainer);
+  const paletteUI = new PaletteUI(palette, paletteContainer, colorScheme);
 
   paletteUI.onPlace((def) => {
     placement.start(def);
   });
   paletteUI.render();
+
+  // -------------------------------------------------------------------------
+  // Insert menu — full component set with hierarchical submenus
+  // -------------------------------------------------------------------------
+  const insertMenuDropdown = document.getElementById('insert-menu-dropdown');
+  if (insertMenuDropdown) {
+    const categoryLabels: Record<string, string> = {
+      LOGIC: "Logic",
+      IO: "I/O",
+      FLIP_FLOPS: "Flip-Flops",
+      MEMORY: "Memory",
+      ARITHMETIC: "Arithmetic",
+      WIRING: "Wiring",
+      SWITCHING: "Switching",
+      PLD: "PLD",
+      MISC: "Miscellaneous",
+      GRAPHICS: "Graphics",
+      TERMINAL: "Terminal",
+      "74XX": "74xx",
+    };
+    const reg = palette.getRegistry();
+    for (const catKey of Object.keys(categoryLabels)) {
+      const defs = reg.getByCategory(catKey as any);
+      if (defs.length === 0) continue;
+      const sub = document.createElement("div");
+      sub.className = "menu-submenu";
+      const trigger = document.createElement("div");
+      trigger.className = "menu-action";
+      trigger.textContent = categoryLabels[catKey] ?? catKey;
+      sub.appendChild(trigger);
+
+      const subDropdown = document.createElement("div");
+      subDropdown.className = "menu-dropdown";
+      for (const def of defs) {
+        const item = document.createElement("div");
+        item.className = "menu-action";
+        item.textContent = def.name;
+        item.addEventListener("click", () => {
+          placement.start(def);
+          document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        });
+        subDropdown.appendChild(item);
+      }
+      sub.appendChild(subDropdown);
+      insertMenuDropdown.appendChild(sub);
+    }
+  }
 
   const propertyContainer = document.getElementById('property-content')!;
   const propertyPanel = new PropertyPanel(propertyContainer);
@@ -197,7 +246,9 @@ export function initApp(search?: string): void {
 
     ctx2d.save();
     ctx2d.translate(viewport.pan.x, viewport.pan.y);
-    ctx2d.scale(viewport.zoom * GRID_SPACING, viewport.zoom * GRID_SPACING);
+    const worldScale = viewport.zoom * GRID_SPACING;
+    ctx2d.scale(worldScale, worldScale);
+    canvasRenderer.setWorldScale(worldScale);
 
     const worldRect = viewport.getVisibleWorldRect({ width: w, height: h });
     elementRenderer.render(canvasRenderer, circuit, selection.getSelectedElements(), worldRect);
@@ -229,13 +280,14 @@ export function initApp(search?: string): void {
       const preview = wireDrawing.getPreviewSegments();
       if (preview) {
         canvasRenderer.setColor('WIRE');
-        canvasRenderer.setLineWidth(1);
+        canvasRenderer.setLineWidth(2);
         for (const seg of preview) {
           canvasRenderer.drawLine(seg.start.x, seg.start.y, seg.end.x, seg.end.y);
         }
       }
     }
 
+    canvasRenderer.setWorldScale(1);
     ctx2d.restore();
 
     if (boxSelect.active) {
@@ -322,7 +374,26 @@ export function initApp(search?: string): void {
           wireDrawing.cancel();
         }
       } else {
-        wireDrawing.addWaypoint();
+        // Check if cursor lands on an existing wire — split interior or connect at endpoint
+        const snappedPt = snapToGrid(worldPt, 1);
+        const tappedPoint = splitWiresAtPoint(snappedPt, circuit);
+        if (tappedPoint !== undefined) {
+          try {
+            wireDrawing.completeToPoint(tappedPoint, circuit);
+            invalidateCompiled();
+          } catch {
+            wireDrawing.cancel();
+          }
+        } else if (isWireEndpoint(snappedPt, circuit)) {
+          try {
+            wireDrawing.completeToPoint(snappedPt, circuit);
+            invalidateCompiled();
+          } catch {
+            wireDrawing.cancel();
+          }
+        } else {
+          wireDrawing.addWaypoint();
+        }
       }
       scheduleRender();
       return;
@@ -371,9 +442,24 @@ export function initApp(search?: string): void {
     if (wireHit) {
       if (e.shiftKey) {
         selection.toggleSelect(wireHit);
-      } else {
-        selection.select(wireHit);
+        scheduleRender();
+        return;
       }
+      // Split wire at tap point or start from endpoint/corner
+      const snappedWirePt = snapToGrid(worldPt, 1);
+      const tappedPoint = splitWiresAtPoint(snappedWirePt, circuit);
+      if (tappedPoint !== undefined) {
+        invalidateCompiled();
+        wireDrawing.startFromPoint(tappedPoint);
+        scheduleRender();
+        return;
+      }
+      if (isWireEndpoint(snappedWirePt, circuit)) {
+        wireDrawing.startFromPoint(snappedWirePt);
+        scheduleRender();
+        return;
+      }
+      selection.select(wireHit);
       scheduleRender();
       return;
     }
@@ -414,13 +500,15 @@ export function initApp(search?: string): void {
     }
 
     if (dragMode === 'select-drag') {
-      const dx = worldPt.x - dragStart.x;
-      const dy = worldPt.y - dragStart.y;
-      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+      const snappedWorld = snapToGrid(worldPt, 1);
+      const snappedStart = snapToGrid(dragStart, 1);
+      const dx = snappedWorld.x - snappedStart.x;
+      const dy = snappedWorld.y - snappedStart.y;
+      if (dx !== 0 || dy !== 0) {
         for (const el of selection.getSelectedElements()) {
           el.position = { x: el.position.x + dx, y: el.position.y + dy };
         }
-        dragStart = worldPt;
+        dragStart = snappedWorld;
         invalidateCompiled();
       }
       return;
@@ -472,6 +560,66 @@ export function initApp(search?: string): void {
     viewport.zoomAt(screenPt, factor);
     scheduleRender();
   }, { passive: false });
+
+  // -------------------------------------------------------------------------
+  // Double-click → property popup
+  // -------------------------------------------------------------------------
+
+  let activePopup: HTMLElement | null = null;
+
+  function closePopup(): void {
+    if (activePopup) {
+      activePopup.remove();
+      activePopup = null;
+    }
+  }
+
+  canvas.addEventListener('dblclick', (e: MouseEvent) => {
+    const worldPt = canvasToWorld(e);
+    const elementHit = hitTestElements(worldPt, circuit.elements);
+    if (!elementHit) return;
+
+    const def = registry.get(elementHit.typeId);
+    if (!def || def.propertyDefs.length === 0) return;
+
+    closePopup();
+
+    const popup = document.createElement('div');
+    popup.className = 'prop-popup';
+
+    const header = document.createElement('div');
+    header.className = 'prop-popup-header';
+    const title = document.createElement('span');
+    title.className = 'prop-popup-title';
+    title.textContent = elementHit.typeId;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'prop-popup-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', closePopup);
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    popup.appendChild(header);
+
+    const tempPanel = new PropertyPanel(popup);
+    tempPanel.showProperties(elementHit, def.propertyDefs);
+    tempPanel.onPropertyChange(() => {
+      invalidateCompiled();
+      scheduleRender();
+    });
+
+    const screenPt = canvasToScreen(e);
+    const container = canvas.parentElement!;
+    popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
+    popup.style.top = `${Math.min(screenPt.y + 10, container.clientHeight - 200)}px`;
+
+    container.appendChild(popup);
+    activePopup = popup;
+  });
+
+  // Close popup when clicking elsewhere on canvas
+  canvas.addEventListener('mousedown', () => {
+    closePopup();
+  }, true);
 
   // -------------------------------------------------------------------------
   // Keyboard shortcuts
@@ -573,6 +721,43 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
+  // Continuous run loop — steps engine at speed-control rate and repaints
+  // -------------------------------------------------------------------------
+
+  let runRafHandle = -1;
+
+  function startContinuousRun(): void {
+    engine.start();
+    let lastTime = performance.now();
+
+    const tick = (now: number): void => {
+      if (engine.getState() !== EngineState.RUNNING) {
+        runRafHandle = -1;
+        scheduleRender();
+        return;
+      }
+      const dt = (now - lastTime) / 1000; // seconds elapsed
+      lastTime = now;
+      const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
+      for (let i = 0; i < stepsThisFrame; i++) {
+        engine.step();
+      }
+      scheduleRender();
+      runRafHandle = requestAnimationFrame(tick);
+    };
+    runRafHandle = requestAnimationFrame(tick);
+  }
+
+  function stopContinuousRun(): void {
+    if (runRafHandle !== -1) {
+      cancelAnimationFrame(runRafHandle);
+      runRafHandle = -1;
+    }
+    engine.stop();
+    scheduleRender();
+  }
+
+  // -------------------------------------------------------------------------
   // Toolbar: Step / Run / Stop
   // -------------------------------------------------------------------------
 
@@ -586,13 +771,23 @@ export function initApp(search?: string): void {
   document.getElementById('btn-run')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     if (engine.getState() === EngineState.RUNNING) return;
-    engine.start();
+    startContinuousRun();
   });
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
     if (!binding.isBound) return;
-    engine.stop();
-    scheduleRender();
+    stopContinuousRun();
+  });
+
+  // Toolbar Start/Step/Stop buttons (mirror the menu actions)
+  document.getElementById('btn-tb-step')?.addEventListener('click', () => {
+    document.getElementById('btn-step')?.click();
+  });
+  document.getElementById('btn-tb-run')?.addEventListener('click', () => {
+    document.getElementById('btn-run')?.click();
+  });
+  document.getElementById('btn-tb-stop')?.addEventListener('click', () => {
+    document.getElementById('btn-stop')?.click();
   });
 
   // -------------------------------------------------------------------------
@@ -611,8 +806,14 @@ export function initApp(search?: string): void {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const xml = reader.result as string;
-        const loaded = loadDig(xml, registry);
+        const text = reader.result as string;
+        let loaded: Circuit;
+        const firstChar = text.replace(/^\s+/, '').charAt(0);
+        if (firstChar === '{' || firstChar === '[') {
+          loaded = deserializeCircuit(text, registry);
+        } else {
+          loaded = loadDig(text, registry);
+        }
         circuit.elements.length = 0;
         circuit.wires.length = 0;
         for (const el of loaded.elements) circuit.addElement(el);
@@ -624,6 +825,7 @@ export function initApp(search?: string): void {
           height: canvas.clientHeight,
         });
         invalidateCompiled();
+        updateCircuitName();
         if (isIframe) {
           window.parent.postMessage({ type: 'digital-loaded' }, '*');
         }
@@ -645,11 +847,87 @@ export function initApp(search?: string): void {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = (circuit.metadata.name || 'circuit') + '.json';
+      a.download = (circuit.metadata.name || 'circuit') + '.digj';
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to save:', err);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Menu: New, Save As, Edit actions, Circuit name
+  // -------------------------------------------------------------------------
+
+  const circuitNameInput = document.getElementById('circuit-name') as HTMLInputElement | null;
+
+  function updateCircuitName(): void {
+    if (circuitNameInput) {
+      circuitNameInput.value = circuit.metadata.name || 'Untitled';
+    }
+  }
+
+  circuitNameInput?.addEventListener('change', () => {
+    circuit.metadata.name = circuitNameInput.value.trim() || 'Untitled';
+  });
+
+  document.getElementById('btn-new')?.addEventListener('click', () => {
+    circuit.elements.length = 0;
+    circuit.wires.length = 0;
+    circuit.metadata = { ...circuit.metadata, name: 'Untitled' };
+    selection.clear();
+    invalidateCompiled();
+    updateCircuitName();
+  });
+
+  document.getElementById('btn-save-as')?.addEventListener('click', () => {
+    const suggested = circuit.metadata.name || 'circuit';
+    const name = prompt('Save as:', suggested);
+    if (name !== null && name.trim() !== '') {
+      circuit.metadata.name = name.trim();
+      updateCircuitName();
+      document.getElementById('btn-save')?.click();
+    }
+  });
+
+  document.getElementById('btn-undo')?.addEventListener('click', () => {
+    undoStack.undo();
+    invalidateCompiled();
+  });
+
+  document.getElementById('btn-redo')?.addEventListener('click', () => {
+    undoStack.redo();
+    invalidateCompiled();
+  });
+
+  document.getElementById('btn-delete')?.addEventListener('click', () => {
+    if (!selection.isEmpty()) {
+      const elements = [...selection.getSelectedElements()];
+      const wires: Wire[] = [...selection.getSelectedWires()];
+      const cmd = deleteSelection(circuit, elements, wires);
+      undoStack.push(cmd);
+      selection.clear();
+      invalidateCompiled();
+    }
+  });
+
+  document.getElementById('btn-select-all')?.addEventListener('click', () => {
+    selection.selectAll(circuit);
+    scheduleRender();
+  });
+
+  // -------------------------------------------------------------------------
+  // Keyboard: Ctrl+S save, Ctrl+O open
+  // -------------------------------------------------------------------------
+
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      document.getElementById('btn-save')?.click();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+      e.preventDefault();
+      fileInput?.click();
     }
   });
 

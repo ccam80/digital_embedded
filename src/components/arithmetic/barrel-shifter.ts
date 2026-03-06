@@ -68,7 +68,6 @@ export type ShiftDirection = "left" | "right";
 export class BarrelShifterElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
   private readonly _signed: boolean;
-  private readonly _mode: BarrelShifterMode;
   private readonly _direction: ShiftDirection;
   private readonly _pins: readonly Pin[];
 
@@ -82,7 +81,6 @@ export class BarrelShifterElement extends AbstractCircuitElement {
     super("BarrelShifter", instanceId, position, rotation, mirror, props);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
     this._signed = props.getOrDefault<boolean>("signed", false);
-    this._mode = props.getOrDefault<string>("mode", "logical") as BarrelShifterMode;
     this._direction = props.getOrDefault<string>("direction", "left") as ShiftDirection;
     const decls = buildBarrelShifterPinDeclarations(this._bitWidth, this._signed);
     this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });

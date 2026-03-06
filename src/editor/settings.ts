@@ -110,8 +110,8 @@ export class AppSettings {
       const parsed = JSON.parse(raw) as Partial<SettingTypeMap>;
       for (const key of Object.values(SettingKey)) {
         if (key in parsed) {
-          (this._values as Record<string, unknown>)[key] = (
-            parsed as Record<string, unknown>
+          (this._values as unknown as Record<string, unknown>)[key] = (
+            parsed as unknown as Record<string, unknown>
           )[key];
         }
       }

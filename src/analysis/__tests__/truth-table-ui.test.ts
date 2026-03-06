@@ -80,7 +80,7 @@ describe('TruthTableTab', () => {
     // All output cells should show X
     const outputCells = container.querySelectorAll('.tt-output-cell');
     expect(outputCells).toHaveLength(16); // 8 rows × 2 outputs
-    for (const cell of outputCells) {
+    for (const cell of Array.from(outputCells)) {
       expect(cell.textContent).toBe('X');
     }
   });

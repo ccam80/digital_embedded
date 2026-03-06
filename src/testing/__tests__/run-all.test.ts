@@ -117,14 +117,6 @@ const BUFFER_TEST = `A Y
 1 1`;
 
 /**
- * A 1-input, 1-output test where all expected outputs are 0.
- * All rows pass when readOutput('Y') returns 0.
- */
-const ALL_ZERO_TEST = `A Y
-0 0
-1 0`;
-
-/**
  * A 1-input test with 5 rows, all expecting output 1.
  * Passes when readOutput('Y') returns 1.
  */
@@ -134,18 +126,6 @@ const FIVE_ROW_PASS_TEST = `A Y
 0 1
 1 1
 0 1`;
-
-/**
- * A 1-input test with 5 rows, expecting alternating 1/0 outputs.
- * Fails on rows 2, 4, 5 when readOutput('Y') always returns 1.
- * → 3 pass, 2 fail (rows expecting 0).
- */
-const THREE_OF_FIVE_PASS_TEST = `A Y
-0 1
-1 0
-0 1
-1 0
-0 0`;
 
 // ---------------------------------------------------------------------------
 // Tests

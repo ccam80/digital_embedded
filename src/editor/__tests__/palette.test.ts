@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ComponentPalette } from "../palette.js";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition } from "@/core/registry";
-import { PropertyBag } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
 // Test helpers

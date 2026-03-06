@@ -5,7 +5,7 @@
  * and loadFile() file I/O built-ins.
  */
 
-import type { ASTNode, Expression, Statement } from "./ast";
+import type { BinaryExpr, Expression, Statement } from "./ast";
 import { HGSContext } from "./context";
 import {
   type HGSValue,
@@ -32,8 +32,6 @@ import {
   hgsLogicalNot,
   hgsToString,
   toBigint,
-  toArray,
-  toMap,
   toFunction,
 } from "./value";
 import { HGSEvalError } from "./parser-error";
@@ -171,7 +169,7 @@ async function evalExprInner(expr: Expression, ctx: HGSContext): Promise<HGSValu
 // ---------------------------------------------------------------------------
 
 function applyBinary(
-  op: Expression extends { kind: "binary" } ? Expression["op"] : never,
+  op: BinaryExpr["op"],
   left: HGSValue,
   right: HGSValue,
 ): HGSValue {
@@ -208,6 +206,8 @@ function applyBinary(
       return hgsLess(right, left);
     case ">=":
       return hgsLessEqual(right, left);
+    default:
+      throw new HGSEvalError(`unknown operator: ${op as string}`);
   }
 }
 

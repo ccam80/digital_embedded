@@ -17,7 +17,7 @@ import {
   isNandOnly,
   isNorOnly,
 } from '../expression-modifiers.js';
-import { and, constant, evaluate, exprToString, not, or, variable } from '../expression.js';
+import { and, constant, evaluate, not, or, variable } from '../expression.js';
 import type { BoolExpr } from '../expression.js';
 
 // ---------------------------------------------------------------------------

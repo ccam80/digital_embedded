@@ -63,8 +63,8 @@ const parser: StreamParser<DigitalTestState> = {
   token(stream, state): DigitalTestToken {
     // At start of non-blank, non-comment line: if header not yet seen, mark it
     if (stream.sol() && !state.headerSeen) {
-      const firstChar = stream.peek();
-      if (firstChar !== null && firstChar !== '#' && firstChar.trim() !== '') {
+      const firstChar: string | null | undefined = stream.peek();
+      if (firstChar != null && firstChar !== '#' && firstChar.trim() !== '') {
         state.onHeaderLine = true;
       }
     }

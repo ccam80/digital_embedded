@@ -58,10 +58,10 @@ describe("WireRenderer", () => {
 
     renderer.render(ctx, [wire], new Set(), access);
 
-    // Verify setLineWidth(3) is called BEFORE the drawLine call
+    // Verify setLineWidth(4) is called BEFORE the drawLine call
     const calls = ctx.calls;
     const busWidthIdx = calls.findIndex(
-      (c) => c.kind === "setLineWidth" && (c as { kind: "setLineWidth"; width: number }).width === 3,
+      (c) => c.kind === "setLineWidth" && (c as { kind: "setLineWidth"; width: number }).width === 4,
     );
     const lineIdx = calls.findIndex((c) => c.kind === "line");
     expect(busWidthIdx).toBeGreaterThanOrEqual(0);

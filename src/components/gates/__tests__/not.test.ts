@@ -33,6 +33,7 @@ function makeLayout(): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => 1,
+    stateOffset: () => 0,
   };
 }
 

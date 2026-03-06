@@ -28,18 +28,10 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => inputCount + outputCount,
   };
 }
 
-function makePRNGLayout(inputCount: number, outputCount: number, stateBase: number): PRNGLayout {
-  return {
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => stateBase,
-  };
-}
 
 function makeState(inputs: number[], outputCount: number, extraSlots: number = 0): Uint32Array {
   const arr = new Uint32Array(inputs.length + outputCount + extraSlots);

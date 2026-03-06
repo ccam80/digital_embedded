@@ -94,8 +94,8 @@ function buildRegistry(): ComponentRegistry {
     ], props),
     executeFn: executePassThrough,
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
-    attributeMap: [], category: "IO" as any,
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    attributeMap: [], category: "IO" as any, helpText: "In",
   });
 
   registry.register({
@@ -105,8 +105,8 @@ function buildRegistry(): ComponentRegistry {
     ], props),
     executeFn: executeNoop,
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
-    attributeMap: [], category: "IO" as any,
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    attributeMap: [], category: "IO" as any, helpText: "Out",
   });
 
   registry.register({
@@ -116,7 +116,7 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeXor2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any,
+    executeFn: executeXor2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "XOR",
   });
 
   registry.register({
@@ -126,7 +126,7 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeAnd2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any,
+    executeFn: executeAnd2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "AND",
   });
 
   return registry;

@@ -16,7 +16,7 @@ import {
 } from "@/editor/hit-test";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
-import type { Point, Rect } from "@/core/renderer-interface";
+import type { Rect } from "@/core/renderer-interface";
 import { Wire, Circuit } from "@/core/circuit";
 import type { RenderContext } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { serializeCircuit } from "../save.js";
-import { deserializeCircuit, SavedCircuitSchema } from "../load.js";
+import { deserializeCircuit } from "../load.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import { PropertyBag } from "../../core/properties.js";

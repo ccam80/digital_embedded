@@ -184,7 +184,7 @@ describe("TestResultsPanel", () => {
   });
 
   it("rendersTable", () => {
-    const panel = new TestResultsPanel(container);
+    const panel = new TestResultsPanel(container as unknown as HTMLElement);
 
     const results: TestResults = {
       passed: 3,
@@ -228,7 +228,7 @@ describe("TestResultsPanel", () => {
   });
 
   it("summaryText", () => {
-    const panel = new TestResultsPanel(container);
+    const panel = new TestResultsPanel(container as unknown as HTMLElement);
 
     const results: TestResults = {
       passed: 3,
@@ -270,7 +270,7 @@ describe("TestResultsPanel", () => {
   });
 
   it("failedCellsMarked", () => {
-    const panel = new TestResultsPanel(container);
+    const panel = new TestResultsPanel(container as unknown as HTMLElement);
 
     const results: TestResults = {
       passed: 1,
@@ -306,7 +306,7 @@ describe("TestResultsPanel", () => {
   });
 
   it("allPassStyling", () => {
-    const panel = new TestResultsPanel(container);
+    const panel = new TestResultsPanel(container as unknown as HTMLElement);
 
     const results: TestResults = {
       passed: 2,
@@ -335,7 +335,7 @@ describe("TestResultsPanel", () => {
   });
 
   it("emptyResults", () => {
-    const panel = new TestResultsPanel(container);
+    const panel = new TestResultsPanel(container as unknown as HTMLElement);
 
     const results: TestResults = {
       passed: 0,

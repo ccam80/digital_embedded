@@ -184,33 +184,46 @@ export function layoutPinsOnFace(
 
   if (count <= 0) return positions;
 
+  // Distribute pins evenly along the face. For count==1, centre.
+  // For count>1 with enough room, use margin=1 from each edge.
+  // When too dense (count > dim-1), fall back to 1-apart centered packing.
+  function distribute(dim: number, n: number): number[] {
+    if (n === 1) return [Math.floor(dim / 2)];
+    if (n > dim - 1) {
+      const start = Math.floor((dim - n + 1) / 2);
+      return Array.from({ length: n }, (_, i) => start + i);
+    }
+    const margin = 1;
+    const step = (dim - 2 * margin) / (n - 1);
+    const result: number[] = [];
+    for (let i = 0; i < n; i++) {
+      result.push(Math.round(margin + i * step));
+    }
+    return result;
+  }
+
   switch (face) {
     case "west": {
-      // Pins distributed along left edge, y from 1 to count (1-indexed row)
-      const startY = Math.floor((componentH - count) / 2) + 1;
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: 0, y: startY + i });
+      for (const y of distribute(componentH, count)) {
+        positions.push({ x: 0, y });
       }
       break;
     }
     case "east": {
-      const startY = Math.floor((componentH - count) / 2) + 1;
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: componentW, y: startY + i });
+      for (const y of distribute(componentH, count)) {
+        positions.push({ x: componentW, y });
       }
       break;
     }
     case "north": {
-      const startX = Math.floor((componentW - count) / 2) + 1;
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: startX + i, y: 0 });
+      for (const x of distribute(componentW, count)) {
+        positions.push({ x, y: 0 });
       }
       break;
     }
     case "south": {
-      const startX = Math.floor((componentW - count) / 2) + 1;
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: startX + i, y: componentH });
+      for (const x of distribute(componentW, count)) {
+        positions.push({ x, y: componentH });
       }
       break;
     }
@@ -235,9 +248,13 @@ export function standardGatePinLayout(
   componentW: number,
   componentH: number,
   defaultBitWidth: number = 1,
+  outputXOffset: number = 0,
 ): PinDeclaration[] {
   const inputPositions = layoutPinsOnFace("west", inputLabels.length, componentW, componentH);
-  const outputPositions = layoutPinsOnFace("east", 1, componentW, componentH);
+  const rawOutputPositions = layoutPinsOnFace("east", 1, componentW, componentH);
+  const outputPositions = outputXOffset === 0
+    ? rawOutputPositions
+    : rawOutputPositions.map(p => ({ x: p.x + outputXOffset, y: p.y }));
 
   const inputs: PinDeclaration[] = inputLabels.map((label, i) => ({
     direction: PinDirection.INPUT,

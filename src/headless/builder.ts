@@ -100,10 +100,10 @@ export class CircuitBuilder {
    */
   createCircuit(opts?: CircuitBuildOptions): Circuit {
     this.elementPositionCounter = 0;
-    return new Circuit({
-      name: opts?.name,
-      description: opts?.description,
-    });
+    const meta: Partial<import('../core/circuit.js').CircuitMetadata> = {};
+    if (opts?.name !== undefined) meta.name = opts.name;
+    if (opts?.description !== undefined) meta.description = opts.description;
+    return new Circuit(meta);
   }
 
   /**
@@ -134,11 +134,9 @@ export class CircuitBuilder {
     }
 
     // Auto-position unless caller specified position
+    // Position stored as [x, y] number array (PropertyValue supports number[])
     if (!bag.has('position')) {
-      bag.set('position', {
-        x: 0,
-        y: this.elementPositionCounter * AUTO_POSITION_Y_STEP,
-      });
+      bag.set('position', [0, this.elementPositionCounter * AUTO_POSITION_Y_STEP]);
     }
 
     const element = definition.factory(bag);

@@ -234,6 +234,6 @@ export function exportGif(
   gif.finish();
   const bytes = gif.bytes();
 
-  const blob = new Blob([bytes], { type: "image/gif" });
+  const blob = new Blob([bytes as unknown as Uint8Array<ArrayBuffer>], { type: "image/gif" });
   return Promise.resolve(blob);
 }

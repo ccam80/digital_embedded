@@ -100,7 +100,6 @@ export function buildIframeSrc(
 export class TutorialHost {
   private contentContainer: HTMLElement | null;
   private iframes: HTMLIFrameElement[] = [];
-  private currentCheckpoint: CheckpointConfig | null = null;
 
   constructor(contentContainerId: string) {
     this.contentContainer = document.getElementById(contentContainerId);
@@ -121,12 +120,8 @@ export class TutorialHost {
     const basePath = buildCheckpointPath(tutorial, step);
     const instructionsUrl = buildInstructionsUrl(basePath);
 
-    this.currentCheckpoint = {
-      tutorial,
-      step,
-      basePath,
-      instructionsUrl,
-    };
+    // checkpoint data captured locally (not stored)
+    void { tutorial, step, basePath, instructionsUrl };
 
     // Load and render instructions
     await this.loadInstructions(instructionsUrl);

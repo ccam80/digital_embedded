@@ -21,7 +21,7 @@ import {
   type BoolExpr,
   and,
   constant,
-  negatedVariable,
+  negatedVariable as _negatedVariable,
   not,
   or,
   variable,

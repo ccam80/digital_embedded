@@ -58,6 +58,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
   };
 }
 
@@ -71,6 +72,7 @@ function makeLayoutWithProps(
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
     getProperty: (_index: number, key: string) => props[key] as (number | boolean | string | undefined),
   };
 }

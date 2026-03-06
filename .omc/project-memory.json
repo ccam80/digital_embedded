@@ -145,10 +145,28 @@
   },
   "hotPaths": [
     {
-      "path": "src",
-      "accessCount": 17,
-      "lastAccessed": 1772782671287,
+      "path": "",
+      "accessCount": 34,
+      "lastAccessed": 1772838762847,
       "type": "directory"
+    },
+    {
+      "path": "src",
+      "accessCount": 33,
+      "lastAccessed": 1772838742952,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 18,
+      "lastAccessed": 1772840913083,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 17,
+      "lastAccessed": 1772838634341,
+      "type": "file"
     },
     {
       "path": "spec\\fix-spec.md",
@@ -157,22 +175,16 @@
       "type": "file"
     },
     {
-      "path": "",
+      "path": "src\\hgs\\evaluator.ts",
       "accessCount": 15,
-      "lastAccessed": 1772782237065,
+      "lastAccessed": 1772831175059,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 15,
+      "lastAccessed": 1772839286885,
       "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 15,
-      "lastAccessed": 1772782438382,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 15,
-      "lastAccessed": 1772782708278,
-      "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
@@ -199,6 +211,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\arithmetic\\__tests__\\arithmetic.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1772831169264,
+      "type": "file"
+    },
+    {
       "path": "src\\export\\zip.ts",
       "accessCount": 7,
       "lastAccessed": 1772781987034,
@@ -211,16 +229,10 @@
       "type": "file"
     },
     {
-      "path": "src\\hgs\\evaluator.ts",
+      "path": "src\\core\\properties.ts",
       "accessCount": 6,
-      "lastAccessed": 1772782506281,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\__tests__\\arithmetic.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772781282601,
-      "type": "file"
+      "lastAccessed": 1772831754176,
+      "type": "directory"
     },
     {
       "path": "src\\fsm\\circuit-gen.ts",
@@ -244,6 +256,30 @@
       "path": "src\\i18n\\__tests__\\i18n-full.test.ts",
       "accessCount": 5,
       "lastAccessed": 1772782037407,
+      "type": "file"
+    },
+    {
+      "path": "spec\\plan.md",
+      "accessCount": 5,
+      "lastAccessed": 1772828451135,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772831058023,
+      "type": "file"
+    },
+    {
+      "path": "src\\fsm\\__tests__\\fsm-renderer.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772831079571,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\div.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772831281646,
       "type": "file"
     },
     {
@@ -283,15 +319,15 @@
       "type": "file"
     },
     {
-      "path": "src\\hgs\\value.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772780991597,
+      "path": "src\\analysis\\state-transition.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772831107733,
       "type": "file"
     },
     {
-      "path": "src\\fsm\\__tests__\\fsm-renderer.test.ts",
+      "path": "src\\hgs\\value.ts",
       "accessCount": 3,
-      "lastAccessed": 1772781284745,
+      "lastAccessed": 1772780991597,
       "type": "file"
     },
     {
@@ -301,22 +337,10 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772781318226,
-      "type": "directory"
-    },
-    {
       "path": "src\\fsm",
       "accessCount": 3,
       "lastAccessed": 1772781380357,
       "type": "directory"
-    },
-    {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772781951588,
-      "type": "file"
     },
     {
       "path": "spec\\.context\\reviewer.md",
@@ -331,15 +355,9 @@
       "type": "file"
     },
     {
-      "path": "spec\\plan.md",
-      "accessCount": 2,
-      "lastAccessed": 1772780839217,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\arithmetic",
-      "accessCount": 2,
-      "lastAccessed": 1772781298394,
+      "accessCount": 3,
+      "lastAccessed": 1772838751161,
       "type": "directory"
     },
     {
@@ -355,21 +373,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\properties.ts",
+      "path": "src\\hgs\\ast.ts",
       "accessCount": 2,
-      "lastAccessed": 1772781626983,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analysis\\state-transition.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772782280224,
+      "lastAccessed": 1772831167350,
       "type": "file"
     },
     {
       "path": "package.json",
-      "accessCount": 1,
-      "lastAccessed": 1772780841705,
+      "accessCount": 2,
+      "lastAccessed": 1772840925519,
       "type": "file"
     },
     {
@@ -397,12 +409,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\arithmetic\\div.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780933419,
-      "type": "file"
-    },
-    {
       "path": "src\\analysis\\expression.ts",
       "accessCount": 1,
       "lastAccessed": 1772780935165,
@@ -418,12 +424,6 @@
       "path": "src\\hgs\\__tests__\\parser.test.ts",
       "accessCount": 1,
       "lastAccessed": 1772780946757,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\ast.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780950880,
       "type": "file"
     },
     {

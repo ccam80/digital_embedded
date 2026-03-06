@@ -144,7 +144,7 @@ export class CacheResolver implements FileResolver {
  * global fetch function (available in browsers and Node.js >= 18).
  */
 export class HttpResolver implements FileResolver {
-  private readonly _basePath: string;
+  private _basePath: string;
   private _fetchFn: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
 
   /**
@@ -156,7 +156,7 @@ export class HttpResolver implements FileResolver {
     fetchFn?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>,
   ) {
     this._basePath = basePath;
-    this._fetchFn = fetchFn ?? (globalThis.fetch as typeof fetchFn);
+    this._fetchFn = fetchFn ?? (globalThis.fetch as unknown as typeof this._fetchFn);
   }
 
   /**

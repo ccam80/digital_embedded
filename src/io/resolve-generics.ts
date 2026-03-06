@@ -341,7 +341,7 @@ class GenericResolver {
   }
 
   private makeRootContext(): HGSContext {
-    const ctx = createRootContext({ fileResolver: this.fileResolver });
+    const ctx = createRootContext(this.fileResolver !== undefined ? { fileResolver: this.fileResolver } : {});
     registerBuiltins(ctx);
     return ctx;
   }

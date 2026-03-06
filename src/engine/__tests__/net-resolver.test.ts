@@ -16,10 +16,10 @@ import type { NetResolution } from "../net-resolver.js";
 import { Circuit, Wire } from "@/core/circuit.js";
 import { AbstractCircuitElement } from "@/core/element.js";
 import { PinDirection, type Pin, type Rotation } from "@/core/pin.js";
-import type { PropertyBag, PropertyValue } from "@/core/properties.js";
+import type { PropertyBag } from "@/core/properties.js";
 import { PropertyBag as PropBag } from "@/core/properties.js";
 import { ComponentRegistry } from "@/core/registry.js";
-import type { ComponentDefinition, ComponentLayout } from "@/core/registry.js";
+import type { ComponentDefinition } from "@/core/registry.js";
 import { ComponentCategory } from "@/core/registry.js";
 import type { RenderContext, Rect } from "@/core/renderer-interface.js";
 import { BitsException } from "@/core/errors.js";
@@ -28,24 +28,6 @@ import { BitsException } from "@/core/errors.js";
 // Minimal stub RenderContext (draw calls not tested here)
 // ---------------------------------------------------------------------------
 
-const STUB_CTX: RenderContext = {
-  drawLine: () => {},
-  drawRect: () => {},
-  drawCircle: () => {},
-  drawArc: () => {},
-  drawPolygon: () => {},
-  drawPath: () => {},
-  drawText: () => {},
-  save: () => {},
-  restore: () => {},
-  translate: () => {},
-  rotate: () => {},
-  scale: () => {},
-  setColor: () => {},
-  setLineWidth: () => {},
-  setFont: () => {},
-  setLineDash: () => {},
-};
 
 // ---------------------------------------------------------------------------
 // TestElement — minimal CircuitElement for tests
@@ -110,12 +92,6 @@ function outputPin(x: number, y: number, label = "out", bitWidth = 1): Pin {
 // ---------------------------------------------------------------------------
 
 const NOOP_EXECUTE = () => {};
-const NOOP_LAYOUT: ComponentLayout = {
-  inputCount: () => 0,
-  inputOffset: () => 0,
-  outputCount: () => 0,
-  outputOffset: () => 0,
-};
 
 function makeRegistry(...names: string[]): ComponentRegistry {
   const registry = new ComponentRegistry();

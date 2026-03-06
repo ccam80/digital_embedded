@@ -15,11 +15,11 @@
 
 import { describe, it, expect } from "vitest";
 import { DElement, executeD, DDefinition, D_FF_ATTRIBUTE_MAPPINGS } from "../d.js";
-import { DAsyncElement, executeDAsync, DAsyncDefinition, D_FF_AS_ATTRIBUTE_MAPPINGS } from "../d-async.js";
+import { DAsyncElement, executeDAsync, DAsyncDefinition } from "../d-async.js";
 import { JKElement, executeJK, JKDefinition, JK_FF_ATTRIBUTE_MAPPINGS } from "../jk.js";
-import { JKAsyncElement, executeJKAsync, JKAsyncDefinition, JK_FF_AS_ATTRIBUTE_MAPPINGS } from "../jk-async.js";
+import { JKAsyncElement, executeJKAsync, JKAsyncDefinition } from "../jk-async.js";
 import { RSElement, executeRS, RSDefinition, RS_FF_ATTRIBUTE_MAPPINGS } from "../rs.js";
-import { RSAsyncElement, executeRSAsync, RSAsyncDefinition, RS_FF_AS_ATTRIBUTE_MAPPINGS } from "../rs-async.js";
+import { RSAsyncElement, executeRSAsync, RSAsyncDefinition } from "../rs-async.js";
 import { TElement, executeT, TDefinition, T_FF_ATTRIBUTE_MAPPINGS } from "../t.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
@@ -40,7 +40,7 @@ interface LayoutWithState extends ComponentLayout {
  * Build a layout for a component with given input/output/state counts.
  * Layout: [inputs..., outputs..., state...]
  */
-function makeLayout(inputCount: number, outputCount: number, stateCount: number): LayoutWithState {
+function makeLayout(inputCount: number, outputCount: number, _stateCount: number): LayoutWithState {
   const inputStart = 0;
   const outputStart = inputCount;
   const stateStart = inputCount + outputCount;

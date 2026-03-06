@@ -85,6 +85,8 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly labelToNetId: Map<string, number>;
   /** Maps Wire instance to net ID for the renderer's wire coloring. */
   readonly wireToNetId: Map<Wire, number>;
+  /** Maps "{instanceId}:{pinLabel}" keys to net IDs for pin-level signal access. */
+  readonly pinNetMap: Map<string, number>;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -322,6 +324,19 @@ export class DigitalEngine implements SimulationEngine {
   // -------------------------------------------------------------------------
 
   start(): void {
+    if (this._engineState === EngineState.RUNNING) return;
+    this._setState(EngineState.RUNNING);
+    // Note: the caller (app-init) manages the rAF stepping loop externally
+    // so it can integrate speed control and render scheduling. The engine
+    // only sets state here. _scheduleContinuousRun() is retained for
+    // headless/test use via startSelfClocked().
+  }
+
+  /**
+   * Start a self-clocked continuous run loop (headless/test use).
+   * In browser, prefer calling start() + managing the rAF loop externally.
+   */
+  startSelfClocked(): void {
     if (this._engineState === EngineState.RUNNING) return;
     this._setState(EngineState.RUNNING);
     this._scheduleContinuousRun();

@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { synthesizeCircuit } from '../synthesis.js';
-import { and, not, or, variable, negatedVariable, constant } from '../expression.js';
+import { and, or, variable, negatedVariable, constant } from '../expression.js';
 import type { BoolExpr } from '../expression.js';
 import { toNandOnly } from '../expression-modifiers.js';
 import { ComponentRegistry } from '../../core/registry.js';

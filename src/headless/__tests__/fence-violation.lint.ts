@@ -7,7 +7,7 @@
  */
 
 // VIOLATION 1: Import from editor (headless cannot import editor code)
-// @ts-expect-error - Intentional fence violation for lint testing
+// @ts-ignore - Intentional fence violation for lint testing
 import { CanvasRenderer } from '../../editor/canvas-renderer.js';
 
 // VIOLATION 2: Use DOM globals (headless must be Node.js compatible)

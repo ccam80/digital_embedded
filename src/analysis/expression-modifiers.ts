@@ -23,7 +23,7 @@
  * Port of Digital's NAnd.java, NOr.java, NInputs.java.
  */
 
-import { type BoolExpr, and, constant, not, or, variable } from './expression.js';
+import { type BoolExpr, and, constant, not, or } from './expression.js';
 
 // ---------------------------------------------------------------------------
 // NAND-only conversion

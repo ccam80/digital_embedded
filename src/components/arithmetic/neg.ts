@@ -13,7 +13,6 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  PinDirection,
   createInverterConfig,
   resolvePins,
   standardGatePinLayout,

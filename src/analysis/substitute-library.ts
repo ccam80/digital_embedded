@@ -21,7 +21,7 @@
 import { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import { AbstractCircuitElement } from '../core/element.js';
-import type { Pin, PinDeclaration, Rotation } from '../core/pin.js';
+import type { Pin, Rotation } from '../core/pin.js';
 import { PinDirection } from '../core/pin.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { RenderContext, Rect } from '../core/renderer-interface.js';
@@ -56,13 +56,6 @@ const BASIC_GATE_TYPES = new Set([
   'In', 'Out',
   'Const', 'Ground', 'VDD',
   'Tunnel',
-]);
-
-/** Component types that require substitution. */
-const SUBSTITUTABLE_TYPES = new Set([
-  'Multiplexer', 'Mux',
-  'Demultiplexer', 'Demux',
-  'Decoder',
 ]);
 
 /** Component types that block analysis entirely. */
@@ -212,9 +205,9 @@ export function substituteForAnalysis(
 
 function isSubcircuitElement(el: CircuitElement): boolean {
   // SubcircuitElement exposes a `definition` getter with a `circuit` property
-  return typeof (el as Record<string, unknown>)['definition'] === 'object' &&
-    (el as Record<string, unknown>)['definition'] !== null &&
-    typeof ((el as Record<string, unknown>)['definition'] as Record<string, unknown>)['circuit'] === 'object';
+  return typeof (el as unknown as Record<string, unknown>)['definition'] === 'object' &&
+    (el as unknown as Record<string, unknown>)['definition'] !== null &&
+    typeof ((el as unknown as Record<string, unknown>)['definition'] as Record<string, unknown>)['circuit'] === 'object';
 }
 
 // ---------------------------------------------------------------------------

@@ -88,7 +88,6 @@ function buildDivPinDeclarations(bitWidth: number): PinDeclaration[] {
 export class DivElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
   private readonly _signed: boolean;
-  private readonly _remainderPositive: boolean;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -101,7 +100,6 @@ export class DivElement extends AbstractCircuitElement {
     super("Div", instanceId, position, rotation, mirror, props);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
     this._signed = props.getOrDefault<boolean>("signed", false);
-    this._remainderPositive = props.getOrDefault<boolean>("remainderPositive", false);
     const decls = buildDivPinDeclarations(this._bitWidth);
     this._pins = resolvePins(
       decls,

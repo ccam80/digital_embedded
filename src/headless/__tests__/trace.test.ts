@@ -69,9 +69,10 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     ], props),
     executeFn: () => {},
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
+    helpText: "In",
   });
 
   registry.register({
@@ -82,9 +83,10 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     ], props),
     executeFn: () => {},
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
+    helpText: "Out",
   });
 
   registry.register({
@@ -99,9 +101,10 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
       state[layout.outputOffset(_index)] = val;
     },
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "LOGIC" as any,
+    helpText: "Counter",
   });
 
   return registry;

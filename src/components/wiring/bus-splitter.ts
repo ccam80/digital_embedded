@@ -9,7 +9,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import type { Pin, Rotation } from "../../core/pin.js";
 import {
   createInverterConfig,
   resolvePins,

@@ -10,7 +10,7 @@ import { parse, parseTemplate } from "../parser";
 import { createRootContext } from "../context";
 import { registerBuiltins } from "../builtins";
 import { evaluate } from "../evaluator";
-import { HGSEvalError } from "../parser-error";
+
 
 // ---------------------------------------------------------------------------
 // Helper: run HGS code and return the root context (to inspect variables)

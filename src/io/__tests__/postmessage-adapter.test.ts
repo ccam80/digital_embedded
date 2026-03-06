@@ -17,7 +17,7 @@
  *   readyOnInit     — digital-ready sent when adapter is initialized
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { PostMessageAdapter } from "../postmessage-adapter.js";
 import type { PostMessageAdapterOptions } from "../postmessage-adapter.js";
 import type { SimulatorFacade } from "@/headless/facade";
@@ -25,7 +25,7 @@ import type { EditorBinding } from "@/integration/editor-binding";
 import type { SimulationEngine } from "@/core/engine-interface";
 import { CacheResolver, HttpResolver, ChainResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
-import { Circuit, Wire } from "@/core/circuit";
+import { Circuit } from "@/core/circuit";
 import type { ComponentRegistry } from "@/core/registry";
 import type { TestResults } from "@/headless/types";
 
@@ -131,7 +131,7 @@ function makeAdapter(
     registry,
     target,
     eventSource,
-    fetchFn: fetchOverride,
+    ...(fetchOverride !== undefined ? { fetchFn: fetchOverride } : {}),
   };
 
   const adapter = new PostMessageAdapter(opts);
@@ -222,7 +222,6 @@ describe("PostMessageAdapter — digital-load-json", () => {
       },
     });
 
-    const circuit = makeStubCircuit();
     const { sent, dispatch, facade } = makeAdapter({
       compile: vi.fn().mockReturnValue(stubEngine),
     });
@@ -292,7 +291,7 @@ describe("PostMessageAdapter — digital-run-tests", () => {
       total: 4,
       vectors: [],
     };
-    const { sent, dispatch, facade } = makeAdapter({
+    const { sent, dispatch } = makeAdapter({
       runTests: vi.fn().mockReturnValue(expectedResults),
     });
 
@@ -337,7 +336,7 @@ describe("PostMessageAdapter — digital-set-base", () => {
     expect(cache.size).toBe(1);
 
     const resolver = new ChainResolver([cache]);
-    const { dispatch } = makeAdapter({}, resolver);
+    const { dispatch: _dispatch } = makeAdapter({}, resolver);
 
     // setBase clears the cache when the resolver directly is a CacheResolver.
     // Use a CacheResolver directly as the resolver (not chained) to test that path.
@@ -357,7 +356,7 @@ describe("PostMessageAdapter — digital-set-base", () => {
 
 describe("PostMessageAdapter — error handling", () => {
   it("errorHandling — message that causes an error sends digital-error response", async () => {
-    const { sent, dispatch, facade } = makeAdapter({
+    const { sent, dispatch } = makeAdapter({
       loadDig: vi.fn().mockImplementation(() => {
         throw new Error("parse failure");
       }),

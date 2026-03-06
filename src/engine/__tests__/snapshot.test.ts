@@ -35,6 +35,10 @@ class StaticLayout implements ComponentLayout {
   outputOffset(idx: number): number {
     return this._outputNets[idx]?.[0] ?? 0;
   }
+
+  stateOffset(_idx: number): number {
+    return 0;
+  }
 }
 
 function buildCircuit(
@@ -65,6 +69,7 @@ function buildCircuit(
     componentToElement: new Map(),
     labelToNetId: new Map(),
     wireToNetId: new Map(),
+    pinNetMap: new Map(),
   };
 }
 

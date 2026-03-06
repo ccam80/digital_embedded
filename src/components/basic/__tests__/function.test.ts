@@ -43,6 +43,7 @@ function makeLayout(
     inputOffset: () => inputOffset,
     outputCount: () => outputCount,
     outputOffset: () => outputOffset,
+    stateOffset: () => 0,
   };
 }
 

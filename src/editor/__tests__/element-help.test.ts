@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { buildHelpContent } from "@/editor/element-help";
 import type { HelpContent } from "@/editor/element-help";
 import { AbstractCircuitElement } from "@/core/element";
-import { PinDirection, PinDeclaration } from "@/core/pin";
+import { PinDirection } from "@/core/pin";
 import { PropertyBag, PropertyType } from "@/core/properties";
 import type { Pin, Rotation } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
@@ -78,7 +78,7 @@ function makeDefinition(
   return {
     name,
     typeId: -1,
-    factory: (props) =>
+    factory: (_props) =>
       makeElementWithPins(helpText, []) as unknown as ReturnType<ComponentDefinition["factory"]>,
     executeFn: (_index: number, _state: Uint32Array, _layout: ComponentLayout) => {},
     pinLayout: [],
@@ -96,7 +96,9 @@ function makePropDef(
   defaultValue: number | string | boolean = 0,
   description?: string,
 ): PropertyDefinition {
-  return { key, label, type, defaultValue, description };
+  return description !== undefined
+    ? { key, label, type, defaultValue, description }
+    : { key, label, type, defaultValue };
 }
 
 // ---------------------------------------------------------------------------

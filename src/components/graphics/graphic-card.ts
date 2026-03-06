@@ -236,7 +236,7 @@ export class GraphicCardElement extends AbstractCircuitElement {
     str: boolean,
     clk: boolean,
     ld: boolean,
-    bank: boolean,
+    _bank: boolean,
     dataIn: number,
   ): void {
     const risingClk = clk && !this._lastClk;

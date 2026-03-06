@@ -16,7 +16,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
-import { EmbeddedResolver, CacheResolver, ChainResolver } from "../file-resolver.js";
+import { EmbeddedResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
 
 // ---------------------------------------------------------------------------

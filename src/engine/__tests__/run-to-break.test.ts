@@ -11,7 +11,6 @@ import { DigitalEngine, type ConcreteCompiledCircuit, type EvaluationGroup } fro
 import type { ComponentLayout } from "@/core/registry";
 import type { CircuitElement } from "@/core/element";
 import type { Wire } from "@/core/circuit";
-import { BitVector } from "@/core/signal";
 
 // ---------------------------------------------------------------------------
 // StaticLayout — same pattern as other engine tests
@@ -27,6 +26,7 @@ class StaticLayout implements ComponentLayout {
   inputOffset(i: number): number { return this._inputNets[i]?.[0] ?? 0; }
   outputCount(i: number): number { return this._outputNets[i]?.length ?? 0; }
   outputOffset(i: number): number { return this._outputNets[i]?.[0] ?? 0; }
+  stateOffset(_i: number): number { return 0; }
 }
 
 function singleGroup(indices: number[]): EvaluationGroup {
@@ -64,6 +64,7 @@ function buildCircuit(
     componentToElement: componentElements as Map<number, CircuitElement>,
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
+    pinNetMap: new Map(),
   };
 }
 

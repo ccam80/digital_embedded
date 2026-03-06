@@ -104,8 +104,8 @@ function buildRegistry(): ComponentRegistry {
     executeFn: executePassThrough,
     pinLayout: [],
     propertyDefs: [
-      { key: 'label', type: PropertyType.STRING, defaultValue: '', description: '' },
-      { key: 'bitWidth', type: PropertyType.INT, defaultValue: 1, description: '' },
+      { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '', description: '' },
+      { key: 'bitWidth', type: PropertyType.INT, label: 'Bit Width', defaultValue: 1, description: '' },
     ],
     attributeMap: [],
     category: 'IO' as any,
@@ -121,8 +121,8 @@ function buildRegistry(): ComponentRegistry {
     executeFn: executeNoop,
     pinLayout: [],
     propertyDefs: [
-      { key: 'label', type: PropertyType.STRING, defaultValue: '', description: '' },
-      { key: 'bitWidth', type: PropertyType.INT, defaultValue: 1, description: '' },
+      { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '', description: '' },
+      { key: 'bitWidth', type: PropertyType.INT, label: 'Bit Width', defaultValue: 1, description: '' },
     ],
     attributeMap: [],
     category: 'IO' as any,

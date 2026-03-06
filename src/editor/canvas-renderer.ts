@@ -20,10 +20,20 @@ import type {
 export class CanvasRenderer implements RenderContext {
   private _ctx: CanvasRenderingContext2D;
   private _scheme: ColorScheme;
+  private _worldScale: number = 1;
 
   constructor(ctx: CanvasRenderingContext2D, scheme: ColorScheme) {
     this._ctx = ctx;
     this._scheme = scheme;
+  }
+
+  /**
+   * Set the current world-to-pixel scale factor. When non-1, setLineWidth()
+   * compensates so that width values (e.g. 1) produce pixel-sized lines
+   * regardless of the canvas transform.
+   */
+  setWorldScale(scale: number): void {
+    this._worldScale = scale;
   }
 
   setColorScheme(scheme: ColorScheme): void {
@@ -152,7 +162,7 @@ export class CanvasRenderer implements RenderContext {
   }
 
   setLineWidth(width: number): void {
-    this._ctx.lineWidth = width;
+    this._ctx.lineWidth = width / this._worldScale;
   }
 
   setFont(font: FontSpec): void {

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { shuffleArray, evaluateWithNoise, evaluateSynchronized } from "../noise-mode.js";
+import { shuffleArray, evaluateSynchronized } from "../noise-mode.js";
 import { initializeCircuit } from "../init-sequence.js";
 import type { EvaluationGroup, InitializableEngine } from "../init-sequence.js";
 import type { ExecuteFunction, ComponentLayout } from "../../core/registry.js";
@@ -29,6 +29,7 @@ function makeLayout(
     inputOffset: (i: number) => inputOffsets[i],
     outputCount: (i: number) => outputCounts[i],
     outputOffset: (i: number) => outputOffsets[i],
+    stateOffset: (_i: number) => 0,
   };
 }
 
@@ -81,12 +82,6 @@ describe("NoiseMode", () => {
     //
     // Component 0 (NOR_Q):  inputs = [net 1 (R), net 3 (Q̄)], output = [net 2 (Q)]
     // Component 1 (NOR_Qbar): inputs = [net 0 (S), net 2 (Q)], output = [net 3 (Q̄)]
-
-    const NET_S = 0;
-    const NET_R = 1;
-    const NET_Q = 2;
-    const NET_QBAR = 3;
-    const NET_COUNT = 4;
 
     // Layout: [comp0: inputs@[R,Qbar]=nets[1,3], output@[Q]=net[2]]
     //         [comp1: inputs@[S,Q]=nets[0,2], output@[Qbar]=net[3]]

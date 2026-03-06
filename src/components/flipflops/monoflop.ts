@@ -89,7 +89,6 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class MonoflopElement extends AbstractCircuitElement {
-  private readonly _timerDelay: number;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -100,7 +99,6 @@ export class MonoflopElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Monoflop", instanceId, position, rotation, mirror, props);
-    this._timerDelay = props.getOrDefault<number>("timerDelay", 1);
     this._pins = resolvePins(
       MONOFLOP_PIN_DECLARATIONS,
       position,

@@ -38,7 +38,6 @@ import type { EvaluationMode } from "./evaluation-mode.js";
  */
 export class WorkerEngine implements SimulationEngine {
   private readonly _netCount: number;
-  private readonly _mode: EvaluationMode;
 
   // Shared signal storage — readable from the main thread via Atomics.load()
   private readonly _sharedBuffer: SharedArrayBuffer;
@@ -57,7 +56,7 @@ export class WorkerEngine implements SimulationEngine {
 
   constructor(netCount: number, mode: EvaluationMode) {
     this._netCount = netCount;
-    this._mode = mode;
+    void mode;
 
     // Allocate two Int32Array slots per net (value + highZ), packed into
     // one SharedArrayBuffer.
@@ -164,7 +163,7 @@ export class WorkerEngine implements SimulationEngine {
       Atomics.store(this._sharedHighZs, netId, highZs[0]!);
     });
     // Post message to Worker to propagate on next step
-    const valueLo = value.getBit(0) ? 1 : 0;
+    const valueLo = Number(value.valueBits & 1n);
     this._postMessage({
       type: "setSignal",
       netId,
@@ -194,6 +193,31 @@ export class WorkerEngine implements SimulationEngine {
 
   removeMeasurementObserver(observer: MeasurementObserver): void {
     this._measurementObservers.delete(observer);
+  }
+
+  // -------------------------------------------------------------------------
+  // Snapshot API — not supported in WorkerEngine (Worker owns state)
+  // -------------------------------------------------------------------------
+
+  saveSnapshot(): number {
+    this._postMessage({ type: "step" }); // no-op placeholder
+    return -1;
+  }
+
+  restoreSnapshot(_id: number): void {
+    // not supported
+  }
+
+  getSnapshotCount(): number {
+    return 0;
+  }
+
+  clearSnapshots(): void {
+    // not supported
+  }
+
+  setSnapshotBudget(_bytes: number): void {
+    // not supported
   }
 
   // -------------------------------------------------------------------------

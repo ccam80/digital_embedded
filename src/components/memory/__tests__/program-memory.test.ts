@@ -44,7 +44,9 @@ function makeLayout(): {
 } {
   const state = new Uint32Array(3 + 1 + 2); // 6 slots
   const layout: ComponentLayout & ProgramMemoryLayout = {
+    inputCount: (_i: number) => 3,
     inputOffset: (_i: number) => 0,
+    outputCount: (_i: number) => 1,
     outputOffset: (_i: number) => 3,
     stateOffset: (_i: number) => 4,
   };

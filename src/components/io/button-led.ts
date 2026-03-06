@@ -69,7 +69,6 @@ function buildButtonLEDPinDeclarations(): PinDeclaration[] {
 export class ButtonLEDElement extends AbstractCircuitElement {
   private readonly _label: string;
   private readonly _activeLow: boolean;
-  private readonly _color: string;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -83,7 +82,6 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 
     this._label = props.getOrDefault<string>("label", "");
     this._activeLow = props.getOrDefault<boolean>("activeLow", false);
-    this._color = props.getOrDefault<string>("color", "red");
 
     const decls = buildButtonLEDPinDeclarations();
     this._pins = resolvePins(
@@ -127,7 +125,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
     ctx.drawRect(0.4, 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
 
     // LED indicator: small circle in top-right area
-    ctx.setColor("LED_OFF");
+    ctx.setColor("WIRE_Z");
     ctx.drawCircle(COMP_WIDTH - 0.4, 0.4, 0.25, true);
     ctx.setColor("COMPONENT");
     ctx.drawCircle(COMP_WIDTH - 0.4, 0.4, 0.25, false);

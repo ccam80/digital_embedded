@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { DataTablePanel } from "../data-table.js";
 import type { SignalDescriptor } from "../data-table.js";
 import { MockEngine } from "@/test-utils/mock-engine";
@@ -240,7 +240,7 @@ describe("DataTablePanel", () => {
       // Find the row for signal A and check its value cell
       const rows = container.querySelectorAll(".data-table-row");
       let foundHex = false;
-      for (const row of rows) {
+      for (const row of Array.from(rows)) {
         if ((row as HTMLElement).dataset["signalName"] === "A") {
           const valueCell = row.querySelector(".data-table-cell-value");
           expect(valueCell?.textContent).toBe("0xFF");

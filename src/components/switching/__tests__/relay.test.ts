@@ -43,7 +43,9 @@ function makeRelayLayout(inputCount: number, stateCount: number): {
 } {
   const state = new Uint32Array(inputCount + stateCount);
   const layout: ComponentLayout & RelayLayout = {
+    inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
+    outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
   };
@@ -56,7 +58,9 @@ function makeRelayDTLayout(inputCount: number, stateCount: number): {
 } {
   const state = new Uint32Array(inputCount + stateCount);
   const layout: ComponentLayout & RelayDTLayout = {
+    inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
+    outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
   };

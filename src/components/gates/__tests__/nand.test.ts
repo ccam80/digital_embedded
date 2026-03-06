@@ -14,10 +14,8 @@ import {
   NAndElement,
   executeNAnd,
   NAndDefinition,
-  NAND_ATTRIBUTE_MAPPINGS,
 } from "../nand.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
@@ -33,6 +31,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
   };
 }
 

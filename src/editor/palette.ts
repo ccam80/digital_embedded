@@ -37,7 +37,25 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   [ComponentCategory.GRAPHICS]: "Graphics",
   [ComponentCategory.TERMINAL]: "Terminal",
   [ComponentCategory.SEVENTY_FOUR_XX]: "74xx",
+  [ComponentCategory.SUBCIRCUIT]: "Subcircuits",
 };
+
+/** All ComponentCategory values in display order. Used instead of Object.values() which doesn't work with const enums. */
+const ALL_CATEGORIES: readonly ComponentCategory[] = [
+  ComponentCategory.LOGIC,
+  ComponentCategory.IO,
+  ComponentCategory.FLIP_FLOPS,
+  ComponentCategory.MEMORY,
+  ComponentCategory.ARITHMETIC,
+  ComponentCategory.WIRING,
+  ComponentCategory.SWITCHING,
+  ComponentCategory.PLD,
+  ComponentCategory.MISC,
+  ComponentCategory.GRAPHICS,
+  ComponentCategory.TERMINAL,
+  ComponentCategory.SEVENTY_FOUR_XX,
+  ComponentCategory.SUBCIRCUIT,
+];
 
 const MAX_RECENT_HISTORY = 10;
 
@@ -49,6 +67,16 @@ const MAX_RECENT_HISTORY = 10;
  * Palette state: tree of categories, search filter, recent history, and
  * collapsed flag for iframe-embedded mode.
  */
+/** Categories hidden from the sidebar palette (available via Insert menu). */
+const PALETTE_HIDDEN_CATEGORIES: ReadonlySet<ComponentCategory> = new Set([
+  ComponentCategory.GRAPHICS,
+  ComponentCategory.TERMINAL,
+  ComponentCategory.PLD,
+  ComponentCategory.SEVENTY_FOUR_XX,
+  ComponentCategory.MISC,
+  ComponentCategory.SUBCIRCUIT,
+]);
+
 export class ComponentPalette {
   private readonly _registry: ComponentRegistry;
   /** Per-category expanded state. True = expanded (showing children). */
@@ -61,9 +89,14 @@ export class ComponentPalette {
     this._registry = registry;
 
     // All categories start expanded.
-    for (const category of Object.values(ComponentCategory)) {
+    for (const category of ALL_CATEGORIES) {
       this._expandedCategories.set(category as ComponentCategory, true);
     }
+  }
+
+  /** Returns the underlying registry for Insert menu building. */
+  getRegistry(): ComponentRegistry {
+    return this._registry;
   }
 
   // ---------------------------------------------------------------------------
@@ -78,17 +111,17 @@ export class ComponentPalette {
   getTree(): PaletteNode[] {
     const nodes: PaletteNode[] = [];
 
-    for (const category of Object.values(ComponentCategory)) {
-      const cat = category as ComponentCategory;
-      const children = this._registry.getByCategory(cat);
+    for (const category of ALL_CATEGORIES) {
+      if (PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
+      const children = this._registry.getByCategory(category);
       if (children.length === 0) {
         continue;
       }
       nodes.push({
-        category: cat,
-        label: CATEGORY_LABELS[cat] ?? cat,
+        category,
+        label: CATEGORY_LABELS[category] ?? category,
         children: [...children],
-        expanded: this._expandedCategories.get(cat) ?? true,
+        expanded: this._expandedCategories.get(category) ?? true,
       });
     }
 
@@ -110,7 +143,7 @@ export class ComponentPalette {
     const lowerQuery = query.toLowerCase();
     const nodes: PaletteNode[] = [];
 
-    for (const category of Object.values(ComponentCategory)) {
+    for (const category of ALL_CATEGORIES) {
       const cat = category as ComponentCategory;
       const all = this._registry.getByCategory(cat);
       const matched = all.filter((def) =>

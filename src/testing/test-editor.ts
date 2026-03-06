@@ -42,6 +42,11 @@ export class TestEditorPanel {
   private _testcase: TestcaseElement | null = null;
   private readonly _container: HTMLElement | null;
 
+  /** Returns the associated Testcase element, or null if none is set. */
+  get testcase(): TestcaseElement | null { return this._testcase; }
+  /** Returns the container element this panel is mounted in, or null in buffer mode. */
+  get container(): HTMLElement | null { return this._container; }
+
   /**
    * Create a TestEditorPanel.
    *

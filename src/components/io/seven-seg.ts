@@ -67,7 +67,6 @@ function buildSevenSegPinDeclarations(): PinDeclaration[] {
 
 export class SevenSegElement extends AbstractCircuitElement {
   private readonly _commonCathode: boolean;
-  private readonly _color: string;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -80,7 +79,6 @@ export class SevenSegElement extends AbstractCircuitElement {
     super("SevenSeg", instanceId, position, rotation, mirror, props);
 
     this._commonCathode = props.getOrDefault<boolean>("commonCathode", true);
-    this._color = props.getOrDefault<string>("color", "red");
 
     const decls = buildSevenSegPinDeclarations();
     this._pins = resolvePins(

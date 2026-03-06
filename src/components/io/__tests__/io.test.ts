@@ -76,6 +76,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
   };
 }
 
@@ -85,6 +86,7 @@ function makeLayoutNoInputs(): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => 0,
+    stateOffset: () => 0,
   };
 }
 

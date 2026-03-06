@@ -156,7 +156,6 @@ export interface PostMessageAdapterOptions {
  */
 export class PostMessageAdapter {
   private readonly _facade: SimulatorFacade;
-  private readonly _binding: EditorBinding;
   private readonly _resolver: FileResolver;
   private readonly _registry: ComponentRegistry;
   private readonly _target: { postMessage(msg: unknown, origin: string): void };
@@ -168,7 +167,7 @@ export class PostMessageAdapter {
 
   constructor(opts: PostMessageAdapterOptions) {
     this._facade = opts.facade;
-    this._binding = opts.binding;
+    void opts.binding; // binding not stored; reserved for future use
     this._resolver = opts.resolver;
     this._registry = opts.registry;
     this._target = opts.target;

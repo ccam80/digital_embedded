@@ -75,8 +75,8 @@ export function hitTestPins(
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     for (const pin of el.getPins()) {
-      const dx = point.x - pin.position.x;
-      const dy = point.y - pin.position.y;
+      const dx = point.x - (el.position.x + pin.position.x);
+      const dy = point.y - (el.position.y + pin.position.y);
       if (Math.sqrt(dx * dx + dy * dy) <= threshold) {
         return { element: el, pin };
       }

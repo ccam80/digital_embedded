@@ -10,7 +10,6 @@ import { quickRun, speedTest } from "../quick-run.js";
 import { DigitalEngine, type ConcreteCompiledCircuit, type EvaluationGroup } from "../digital-engine.js";
 import type { ComponentLayout } from "@/core/registry";
 import type { Wire } from "@/core/circuit";
-import { EngineState } from "@/core/engine-interface";
 
 // ---------------------------------------------------------------------------
 // StaticLayout and buildCircuit helpers
@@ -26,6 +25,7 @@ class StaticLayout implements ComponentLayout {
   inputOffset(i: number): number { return this._inputNets[i]?.[0] ?? 0; }
   outputCount(i: number): number { return this._outputNets[i]?.length ?? 0; }
   outputOffset(i: number): number { return this._outputNets[i]?.[0] ?? 0; }
+  stateOffset(_i: number): number { return 0; }
 }
 
 function singleGroup(indices: number[]): EvaluationGroup {
@@ -49,6 +49,7 @@ function buildMinimalCircuit(): ConcreteCompiledCircuit {
     componentToElement: new Map(),
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
+    pinNetMap: new Map(),
   };
 }
 

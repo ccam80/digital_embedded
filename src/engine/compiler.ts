@@ -161,9 +161,7 @@ export function compileCircuit(
 
   // Total number of "slots" = sum of all pins across all components.
   // We assign each pin a unique slot index and then union-find merge them.
-  const pinSlots: number[] = []; // pinSlots[elementIndex * MAX_PINS + pinIndex] — but we use a map
   const slotCount = allPinRefs.reduce((sum, refs) => sum + refs.length, 0);
-  const uf = new UnionFind(slotCount);
 
   // Build slot index: element i, pin j → slot
   const slotOf = (elemIdx: number, pinIdx: number): number => {
@@ -189,9 +187,6 @@ export function compileCircuit(
       list.push(slotOf(i, j));
     }
   }
-
-  // Track wire-to-net mapping (built after net IDs are assigned)
-  const wireToSlot = new Map<Wire, number[]>();
 
   // Process wires: build adjacency between endpoints
   // Wire endpoints that land on pin positions merge those pins into one net.
@@ -321,7 +316,6 @@ export function compileCircuit(
   for (let k = 0; k < wires.length; k++) {
     const wire = wires[k]!;
     const startNode = wireVirtualBase + k * 2;
-    const root = uf2.find(startNode);
     // Map wire node root to net ID — find which net root it's connected to
     // by checking if any pin slot shares this root
     let netId = -1;
@@ -556,7 +550,7 @@ export function compileCircuit(
   const sccs = findSCCs(adjacency);
 
   // Classify SCCs: feedback (size > 1 or self-loop) vs. non-feedback
-  const sccIsFeedback: boolean[] = sccs.map((scc, idx) => {
+  const sccIsFeedback: boolean[] = sccs.map((scc, _idx) => {
     if (scc.length > 1) return true;
     // Singleton: check for self-loop
     const node = scc[0]!;

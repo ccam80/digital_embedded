@@ -107,8 +107,8 @@ function buildRegistry(): ComponentRegistry {
     executeFn: executePassThrough,
     pinLayout: [],
     propertyDefs: [
-      { key: 'label', type: PropertyType.STRING, defaultValue: '', description: '' },
-      { key: 'bitWidth', type: PropertyType.INT, defaultValue: 1, description: '' },
+      { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '', description: '' },
+      { key: 'bitWidth', type: PropertyType.INT, label: 'Bit Width', defaultValue: 1, description: '' },
     ],
     attributeMap: [],
     category: 'IO' as any,
@@ -124,8 +124,8 @@ function buildRegistry(): ComponentRegistry {
     executeFn: executeNoop,
     pinLayout: [],
     propertyDefs: [
-      { key: 'label', type: PropertyType.STRING, defaultValue: '', description: '' },
-      { key: 'bitWidth', type: PropertyType.INT, defaultValue: 1, description: '' },
+      { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '', description: '' },
+      { key: 'bitWidth', type: PropertyType.INT, label: 'Bit Width', defaultValue: 1, description: '' },
     ],
     attributeMap: [],
     category: 'IO' as any,
@@ -290,9 +290,9 @@ function buildSubcircuitCircuit(): { circuit: Circuit; nestedCircuit: Circuit } 
   const subcircuitDef: SubcircuitDefinition = {
     circuit: nestedCircuit,
     pinLayout: [
-      { label: 'A', direction: PinDirection.INPUT, position: { x: 0, y: 1 }, bitWidth: 1, isNegated: false, isClock: false },
-      { label: 'B', direction: PinDirection.INPUT, position: { x: 0, y: 2 }, bitWidth: 1, isNegated: false, isClock: false },
-      { label: 'Y', direction: PinDirection.OUTPUT, position: { x: 4, y: 1 }, bitWidth: 1, isNegated: false, isClock: false },
+      { label: 'A', direction: PinDirection.INPUT, position: { x: 0, y: 1 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false },
+      { label: 'B', direction: PinDirection.INPUT, position: { x: 0, y: 2 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false },
+      { label: 'Y', direction: PinDirection.OUTPUT, position: { x: 4, y: 1 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false },
     ],
     shapeMode: 'DEFAULT',
     name: 'AndSubcircuit',
@@ -322,14 +322,6 @@ function buildSubcircuitCircuit(): { circuit: Circuit; nestedCircuit: Circuit } 
 
 function collectTypeIds(circuit: Circuit): string[] {
   return circuit.elements.map((el) => el.typeId);
-}
-
-const BASIC_TYPES = new Set(['And', 'Or', 'Not', 'Xor', 'Nand', 'Nor', 'Xnor',
-  'AND', 'OR', 'NOT', 'XOR', 'NAND', 'NOR', 'XNOR', 'In', 'Out',
-  'Const', 'Ground', 'VDD', 'Tunnel']);
-
-function allBasicGates(circuit: Circuit): boolean {
-  return circuit.elements.every((el) => BASIC_TYPES.has(el.typeId));
 }
 
 // ---------------------------------------------------------------------------

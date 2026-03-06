@@ -260,7 +260,7 @@ export class DiodeElement extends AbstractCircuitElement {
     drawDiodeBody(ctx, label);
 
     if (this._blown) {
-      ctx.setColor("ERROR");
+      ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);
     }
@@ -331,7 +331,7 @@ export class DiodeForwardElement extends AbstractCircuitElement {
     drawDiodeBody(ctx, label);
 
     if (this._blown) {
-      ctx.setColor("ERROR");
+      ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);
     }
@@ -398,7 +398,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     drawDiodeBodyBackward(ctx, label);
 
     if (this._blown) {
-      ctx.setColor("ERROR");
+      ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);
     }

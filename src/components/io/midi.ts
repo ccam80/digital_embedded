@@ -115,7 +115,7 @@ class MidiOutputManager {
     (navigator as Navigator & { requestMIDIAccess(): Promise<MIDIAccess> })
       .requestMIDIAccess()
       .then((access) => {
-        this._access = access;
+        this._access = access as unknown as typeof this._access;
       })
       .catch(() => {
         // Graceful degradation: no MIDI access

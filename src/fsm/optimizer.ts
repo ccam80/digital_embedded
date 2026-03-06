@@ -183,7 +183,7 @@ function refineGroup(
   group: FSMState[],
   partition: FSMState[][],
   transitionMap: TransitionLookup,
-  inputCombinations: InputCombination[],
+  _inputCombinations: InputCombination[],
 ): FSMState[][] {
   if (group.length <= 1) {
     return [group];
@@ -216,7 +216,7 @@ function buildMergedFSM(
   original: FSM,
   partition: FSMState[][],
   transitionMap: TransitionLookup,
-  inputCombinations: InputCombination[],
+  _inputCombinations: InputCombination[],
 ): FSM {
   const result = createFSM(original.name);
   result.inputSignals = [...original.inputSignals];
@@ -257,7 +257,7 @@ function buildMergedFSM(
 
   for (let gi = 0; gi < partition.length; gi++) {
     const rep = representatives[gi]!;
-    const targets = transitionMap.get(rep.id)!;
+    void transitionMap.get(rep.id);
     const sourceState = newStates[gi]!;
 
     // Find original transitions from the representative
@@ -274,7 +274,7 @@ function buildMergedFSM(
       addedTransitions.add(transKey);
 
       addTransition(result, sourceState.id, targetState.id, origTransition.condition, {
-        actions: origTransition.actions ? { ...origTransition.actions } : undefined,
+        ...(origTransition.actions !== undefined ? { actions: { ...origTransition.actions } } : {}),
       });
     }
   }
@@ -311,7 +311,7 @@ function cloneFSM(fsm: FSM): FSM {
       idMap.get(t.targetStateId)!,
       t.condition,
       {
-        actions: t.actions ? { ...t.actions } : undefined,
+        ...(t.actions !== undefined ? { actions: { ...t.actions } } : {}),
         controlPoints: t.controlPoints.map((p) => ({ ...p })),
       },
     );

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { TruthTable } from '../truth-table.js';
-import type { SignalSpec, TernaryValue } from '../truth-table.js';
+import type { SignalSpec } from '../truth-table.js';
 
 const A: SignalSpec = { name: 'A', bitWidth: 1 };
 const B: SignalSpec = { name: 'B', bitWidth: 1 };

@@ -9,7 +9,7 @@
  * to actual input elements.
  */
 
-import { type BoolExpr, evaluate, exprToString } from './expression.js';
+import { type BoolExpr, evaluate } from './expression.js';
 import { parseExpression, ParseError } from './expression-parser.js';
 import { TruthTable, type SignalSpec, type TernaryValue } from './truth-table.js';
 

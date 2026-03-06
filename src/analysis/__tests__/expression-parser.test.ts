@@ -13,7 +13,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseExpression, ParseError } from '../expression-parser.js';
 import { exprToString, evaluate } from '../expression.js';
-import type { BoolExpr } from '../expression.js';
 
 // ---------------------------------------------------------------------------
 // simpleAnd — "A & B" → correct BoolExpr tree

@@ -35,9 +35,6 @@ export class MemoryEditorDialog implements MeasurementObserver {
   private readonly _container: HTMLElement;
   private readonly _grid: HexGrid;
 
-  /** Currently selected cell address for keyboard editing. */
-  private _selectedAddress: number = 0;
-
   /** DOM elements keyed by word address for visible rows. */
   private _cellElements: Map<number, HTMLElement> = new Map();
 
@@ -252,7 +249,7 @@ export class MemoryEditorDialog implements MeasurementObserver {
       this._cellElements.set(addr, cellEl);
 
       cellEl.addEventListener("click", () => {
-        this._selectedAddress = addr;
+        void addr; // addr used below in _openCellEditor
         this._openCellEditor(cellEl, addr);
       });
 

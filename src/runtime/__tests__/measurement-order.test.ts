@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { MeasurementOrderPanel } from "../measurement-order.js";
 import type { MeasurementOrderState } from "../measurement-order.js";
 import type { SignalDescriptor } from "../data-table.js";

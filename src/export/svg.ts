@@ -139,5 +139,5 @@ export function exportSvg(circuit: Circuit, options?: SvgExportOptions): string 
 
   const bgColor = includeBackground ? scheme.resolve("BACKGROUND") : undefined;
 
-  return ctx.finishDocument(0, 0, contentW, contentH, { background: bgColor });
+  return ctx.finishDocument(0, 0, contentW, contentH, ...(bgColor !== undefined ? [{ background: bgColor }] : []));
 }

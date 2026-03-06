@@ -10,7 +10,7 @@
  *   grayCodeOrder — verify row/column labels follow Gray code sequence
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   KarnaughMap,
   KarnaughMapTab,
@@ -18,7 +18,6 @@ import {
   grayCodeIndex,
   cycleValue,
   type KMapRenderContext,
-  type ImplicantLoop,
 } from '../karnaugh-map.js';
 import { TruthTable, type TernaryValue } from '../truth-table.js';
 import type { Implicant } from '../quine-mccluskey.js';

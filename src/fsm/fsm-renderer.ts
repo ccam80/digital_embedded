@@ -179,7 +179,7 @@ export function renderSelfLoop(
   ctx: RenderContext,
   state: FSMState,
   transition: FSMTransition,
-  selected: boolean,
+  _selected: boolean,
 ): void {
   const arcCx = state.position.x;
   const arcCy = state.position.y - state.radius + SELF_LOOP_OFFSET_Y;

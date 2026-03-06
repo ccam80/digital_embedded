@@ -41,8 +41,6 @@ export class TimingWheel {
   /** The simulation timestamp corresponding to slot 0 of the current wheel rotation. */
   private _currentBase: bigint = 0n;
 
-  /** Slot index the wheel cursor currently sits at. */
-  private _cursor: number = 0;
 
   /** Total count of events (wheel + overflow). */
   private _size: number = 0;
@@ -133,10 +131,8 @@ export class TimingWheel {
       // Advance base if we consumed an entire revolution or moved forward.
       if (wheelEnd >= BigInt(this._wheelSize)) {
         this._currentBase = toTimestamp + 1n;
-        this._cursor = 0;
       } else {
         this._currentBase += BigInt(maxSlots);
-        this._cursor = Number(this._currentBase & BigInt(this._mask));
       }
     }
 
@@ -220,7 +216,6 @@ export class TimingWheel {
 
     this._pendingByNet.clear();
     this._currentBase = 0n;
-    this._cursor = 0;
     this._size = 0;
   }
 

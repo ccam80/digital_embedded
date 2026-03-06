@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { TimingDiagramPanel } from "../timing-diagram.js";
 import { MockEngine } from "@/test-utils/mock-engine";
 

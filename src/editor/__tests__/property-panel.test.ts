@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PropertyType, PropertyBag } from "@/core/properties";
-import type { PropertyDefinition, PropertyValue } from "@/core/properties";
+import type { PropertyDefinition } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stub

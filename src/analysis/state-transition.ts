@@ -6,7 +6,7 @@
  * and records the next-state and output values.
  */
 
-import type { Circuit } from '../core/circuit.js';
+import type { Circuit as _Circuit } from '../core/circuit.js';
 
 // ---------------------------------------------------------------------------
 // Types

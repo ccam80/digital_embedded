@@ -119,7 +119,7 @@ class UnionFind {
  */
 export function resolveNets(
   circuit: Circuit,
-  registry: ComponentRegistry,
+  _registry: ComponentRegistry,
 ): NetResolution {
   // -------------------------------------------------------------------------
   // Step 1: assign a node index to every pin instance

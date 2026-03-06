@@ -216,7 +216,7 @@ function longestPath(
   elements: CircuitElement[],
   adjacency: Map<string, Set<string>>,
   delayMap: Map<string, number>,
-  registry: ComponentRegistry,
+  _registry: ComponentRegistry,
 ): CriticalPath {
   const idToEl = new Map<string, CircuitElement>();
   for (const el of elements) idToEl.set(el.instanceId, el);
@@ -249,7 +249,6 @@ function longestPath(
     const id = queue.shift()!;
     topoOrder.push(id);
 
-    const el = idToEl.get(id)!;
     const myDelay = delayMap.get(id) ?? DEFAULT_DELAY_NS;
     const incoming = best.get(id)!;
     const newDelay = incoming.totalDelay + myDelay;

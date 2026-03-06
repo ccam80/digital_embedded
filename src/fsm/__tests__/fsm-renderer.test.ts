@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MockRenderContext } from "@/test-utils/mock-render-context";
 import { renderState, renderTransition, renderSelfLoop } from "@/fsm/fsm-renderer";
-import type { FSM, FSMState, FSMTransition } from "@/fsm/model";
+import type { FSMState, FSMTransition } from "@/fsm/model";
 import { createFSM, addState, addTransition, resetIdCounter } from "@/fsm/model";
 
 describe("FSMRenderer", () => {

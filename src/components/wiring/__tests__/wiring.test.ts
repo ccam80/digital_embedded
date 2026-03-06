@@ -36,7 +36,6 @@ import {
   totalBitsFromPattern,
   extractBits,
   insertBits,
-  buildSplitterPinDeclarations,
 } from "../splitter.js";
 import {
   BusSplitterElement,
@@ -72,6 +71,7 @@ function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
   };
 }
 
@@ -82,6 +82,7 @@ function makeDriverLayout(): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => 2,       // value + highZ
     outputOffset: () => 2,
+    stateOffset: () => 4,
   };
 }
 

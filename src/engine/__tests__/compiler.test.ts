@@ -6,13 +6,13 @@
  * they do not depend on Phase 4 (.dig parser) or Phase 5 (full components).
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { compileCircuit } from "../compiler.js";
 import { findSCCs } from "../tarjan.js";
 import { topologicalSort } from "../topological-sort.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction, ComponentLayout } from "@/core/registry";
+import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
@@ -82,15 +82,6 @@ function twoInputPins(): PinDeclaration[] {
   ];
 }
 
-/** Two-input, single-output component with 8-bit pins. */
-function twoInputPins8bit(): PinDeclaration[] {
-  return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 8, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
-  ];
-}
-
 /** Input pin only (e.g. In component). */
 function inputOnlyPin(label: string, position: { x: number; y: number }): PinDeclaration[] {
   return [
@@ -128,7 +119,7 @@ function makeDefinition(
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    defaultDelay,
+    ...(defaultDelay !== undefined ? { defaultDelay } : {}),
   };
 }
 

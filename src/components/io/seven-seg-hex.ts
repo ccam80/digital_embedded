@@ -86,7 +86,6 @@ function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
 
 export class SevenSegHexElement extends AbstractCircuitElement {
   private readonly _commonCathode: boolean;
-  private readonly _color: string;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -99,7 +98,6 @@ export class SevenSegHexElement extends AbstractCircuitElement {
     super("SevenSegHex", instanceId, position, rotation, mirror, props);
 
     this._commonCathode = props.getOrDefault<boolean>("commonCathode", true);
-    this._color = props.getOrDefault<string>("color", "red");
 
     const decls = buildSevenSegHexPinDeclarations();
     this._pins = resolvePins(

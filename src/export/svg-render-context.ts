@@ -134,9 +134,6 @@ export class SVGRenderContext implements RenderContext {
   /** Current draw state. */
   private _state: DrawState = defaultDrawState();
 
-  /** Unique ID counter for defs. */
-  private _idCounter = 0;
-
   constructor(options: SVGRenderContextOptions) {
     this._scheme = options.scheme;
     this._textFormat = options.textFormat ?? "plain";
@@ -151,7 +148,6 @@ export class SVGRenderContext implements RenderContext {
     this._elements = [];
     this._stateStack = [];
     this._state = defaultDrawState();
-    this._idCounter = 0;
     return this;
   }
 

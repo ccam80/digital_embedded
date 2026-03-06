@@ -97,8 +97,6 @@ describe("Presentation", () => {
       const { panels } = makePanelSet();
       const mode = new PresentationMode(panels, DEFAULT_CANVAS);
       const vp = new Viewport(1.0);
-      const originalZoom = vp.zoom;
-
       // fitToContent with empty elements resets to zoom=1 and pan=(0,0)
       // but we set a custom zoom/pan first to detect it was called
       vp.zoom = 3.5;

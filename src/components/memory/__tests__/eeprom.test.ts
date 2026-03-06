@@ -47,7 +47,9 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
 } {
   const state = new Uint32Array(inputCount + outputCount + stateCount);
   const layout: ComponentLayout & EEPROMLayout = {
+    inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
+    outputCount: (_i: number) => outputCount,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount + outputCount,
   };

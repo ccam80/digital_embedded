@@ -205,7 +205,7 @@ function buildNetMap(
 function collectNetConsumers(
   nid: string,
   netId: Map<string, string>,
-  netConsumers: Map<string, CircuitElement[]>,
+  _netConsumers: Map<string, CircuitElement[]>,
   elements: CircuitElement[],
 ): CircuitElement[] {
   const result: CircuitElement[] = [];

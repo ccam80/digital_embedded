@@ -54,6 +54,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => inputCount + outputCount,
   };
 }
 

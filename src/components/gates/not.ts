@@ -39,8 +39,11 @@ const COMP_HEIGHT = 4;
 // Pin layout
 // ---------------------------------------------------------------------------
 
+/** Output pin offset past the inversion bubble (2 * bubbleRadius). */
+const OUTPUT_BUBBLE_OFFSET = 0.6;
+
 function buildPinDeclarations(bitWidth: number): PinDeclaration[] {
-  return standardGatePinLayout(["in"], "out", COMP_WIDTH, COMP_HEIGHT, bitWidth);
+  return standardGatePinLayout(["in"], "out", COMP_WIDTH, COMP_HEIGHT, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +65,7 @@ export class NotElement extends AbstractCircuitElement {
     super("Not", instanceId, position, rotation, mirror, props);
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
+    this._wideShape = props.getOrDefault<boolean>("wideShape", true);
 
     const decls = buildPinDeclarations(this._bitWidth);
     this._pins = resolvePins(

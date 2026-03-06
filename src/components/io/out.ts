@@ -119,9 +119,9 @@ export class OutElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y + 0.5,
       width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      height: 1,
     };
   }
 
@@ -130,23 +130,26 @@ export class OutElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const size = 1;
+    const yOff = 0.5;
+    const centerY = yOff + size / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, size, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, size, false);
 
-    if (this._label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, COMP_HEIGHT / 2, {
-        horizontal: "center",
-        vertical: "middle",
-      });
-    }
+    // Draw label inside the component body (or type name if no label)
+    const displayText = this._label.length > 0 ? this._label : "Out";
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: size * 0.6 });
+    ctx.drawText(displayText, COMP_WIDTH / 2, centerY, {
+      horizontal: "center",
+      vertical: "middle",
+    });
 
     ctx.restore();
   }

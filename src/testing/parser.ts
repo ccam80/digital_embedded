@@ -491,7 +491,7 @@ class ParseError extends Error {
 function expectToken(tok: Tokenizer, expected: TK, contextLine: number): TokenInfo {
   const t = tok.next();
   if (t.type !== expected) {
-    throw new ParseError(`Unexpected token '${t.text}' (expected ${TK[expected]})`, t.line || contextLine);
+    throw new ParseError(`Unexpected token '${t.text}' (expected token type ${expected})`, t.line || contextLine);
   }
   return t;
 }

@@ -49,9 +49,12 @@ function buildInputLabels(inputCount: number): string[] {
   return labels;
 }
 
+/** Output pin offset past the inversion bubble (2 * bubbleRadius). */
+const OUTPUT_BUBBLE_OFFSET = 0.6;
+
 function buildPinDeclarations(inputCount: number, bitWidth: number): PinDeclaration[] {
   const h = componentHeight(inputCount);
-  return standardGatePinLayout(buildInputLabels(inputCount), "out", COMP_WIDTH, h, bitWidth);
+  return standardGatePinLayout(buildInputLabels(inputCount), "out", COMP_WIDTH, h, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
 function parseInvertedPins(props: PropertyBag, inputCount: number): string[] {
@@ -94,7 +97,7 @@ export class NAndElement extends AbstractCircuitElement {
 
     this._inputCount = props.getOrDefault<number>("inputCount", 2);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
+    this._wideShape = props.getOrDefault<boolean>("wideShape", true);
     this._invertedPins = parseInvertedPins(props, this._inputCount);
 
     const inverterConfig = createInverterConfig(this._invertedPins);

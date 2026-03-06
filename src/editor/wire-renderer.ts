@@ -11,13 +11,13 @@ import type { Wire } from "@/core/circuit";
 import type { WireSignalAccess } from "./wire-signal-access";
 
 /** Radius (in world units) of a junction dot. */
-const JUNCTION_RADIUS = 3;
+const JUNCTION_RADIUS = 0.15;
 
-/** Line width for single-bit wires. */
-const WIRE_WIDTH_SINGLE = 1;
+/** Line width for single-bit wires (pixels, compensated by worldScale). */
+const WIRE_WIDTH_SINGLE = 2;
 
-/** Line width for bus wires (width > 1). */
-const WIRE_WIDTH_BUS = 3;
+/** Line width for bus wires (width > 1) (pixels, compensated by worldScale). */
+const WIRE_WIDTH_BUS = 4;
 
 export class WireRenderer {
   /**

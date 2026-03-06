@@ -24,10 +24,9 @@ import { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import { AbstractCircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import type { Pin, PinDeclaration, Rotation } from "../core/pin.js";
+import type { Pin } from "../core/pin.js";
 import { PinDirection } from "../core/pin.js";
 import type { RenderContext, Rect } from "../core/renderer-interface.js";
-import { PropertyBag } from "../core/properties.js";
 import type { SerializedElement } from "../core/element.js";
 
 // ---------------------------------------------------------------------------
@@ -187,7 +186,7 @@ interface InlineResult {
 function inlineSubcircuit(
   subcircuitEl: SubcircuitHost,
   instanceName: string,
-  parentCircuit: Circuit,
+  _parentCircuit: Circuit,
   registry: ComponentRegistry,
   seen: Set<Circuit>,
 ): InlineResult {

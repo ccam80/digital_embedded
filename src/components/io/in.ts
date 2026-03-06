@@ -57,7 +57,6 @@ function buildInPinDeclarations(bitWidth: number): PinDeclaration[] {
 export class InElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
   private readonly _label: string;
-  private readonly _defaultValue: number;
   private readonly _small: boolean;
   private readonly _pins: readonly Pin[];
 
@@ -72,8 +71,7 @@ export class InElement extends AbstractCircuitElement {
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
     this._label = props.getOrDefault<string>("label", "");
-    this._defaultValue = props.getOrDefault<number>("defaultValue", 0);
-    this._small = props.getOrDefault<boolean>("small", false);
+    this._small = props.getOrDefault<boolean>("small", true);
 
     const decls = buildInPinDeclarations(this._bitWidth);
     this._pins = resolvePins(
@@ -92,9 +90,10 @@ export class InElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const size = this._small ? 1 : COMP_HEIGHT;
+    const yOff = this._small ? 0.5 : 0;
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y + yOff,
       width: COMP_WIDTH,
       height: size,
     };
@@ -102,23 +101,25 @@ export class InElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const size = this._small ? 1 : COMP_HEIGHT;
+    const yOff = this._small ? 0.5 : 0;
+    const centerY = yOff + size / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, size, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, size, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, size, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, size, false);
 
-    if (this._label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, size / 2, {
-        horizontal: "center",
-        vertical: "middle",
-      });
-    }
+    // Draw label inside the component body (or type name if no label)
+    const displayText = this._label.length > 0 ? this._label : "In";
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: size * 0.6 });
+    ctx.drawText(displayText, COMP_WIDTH / 2, centerY, {
+      horizontal: "center",
+      vertical: "middle",
+    });
 
     ctx.restore();
   }
@@ -200,7 +201,7 @@ const IN_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "small",
     type: PropertyType.BOOLEAN,
     label: "Small",
-    defaultValue: false,
+    defaultValue: true,
     description: "Use compact rendering size",
   },
 ];

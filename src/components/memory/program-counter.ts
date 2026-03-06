@@ -113,7 +113,6 @@ const PROGRAM_COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
 
 export class ProgramCounterElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
-  private readonly _maxValue: number;
   private readonly _isProgramCounter: boolean;
   private readonly _pins: readonly Pin[];
 
@@ -126,7 +125,6 @@ export class ProgramCounterElement extends AbstractCircuitElement {
   ) {
     super("ProgramCounter", instanceId, position, rotation, mirror, props);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
-    this._maxValue = props.getOrDefault<number>("maxValue", (1 << this._bitWidth) - 1);
     this._isProgramCounter = props.getOrDefault<boolean>("isProgramCounter", true);
     this._pins = resolvePins(
       PROGRAM_COUNTER_PIN_DECLARATIONS,

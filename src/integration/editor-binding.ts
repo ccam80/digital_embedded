@@ -69,7 +69,6 @@ export interface EditorBinding {
 // ---------------------------------------------------------------------------
 
 class EditorBindingImpl implements EditorBinding {
-  private _circuit: Circuit | null = null;
   private _engine: SimulationEngine | null = null;
   private _wireNetMap: Map<Wire, number> = new Map();
   private _pinNetMap: Map<string, number> = new Map();
@@ -80,14 +79,13 @@ class EditorBindingImpl implements EditorBinding {
     wireNetMap: Map<Wire, number>,
     pinNetMap: Map<string, number>,
   ): void {
-    this._circuit = circuit;
+    void circuit; // circuit reference not stored; engine manages state
     this._engine = engine;
     this._wireNetMap = wireNetMap;
     this._pinNetMap = pinNetMap;
   }
 
   unbind(): void {
-    this._circuit = null;
     this._engine = null;
     this._wireNetMap = new Map();
     this._pinNetMap = new Map();

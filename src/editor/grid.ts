@@ -17,10 +17,10 @@ const MAJOR_GRID_INTERVAL = 5;
 const MINOR_GRID_MIN_ZOOM = 0.5;
 
 /** Line width for minor grid lines. */
-const MINOR_LINE_WIDTH = 0.5;
+const MINOR_LINE_WIDTH = 1;
 
 /** Line width for major grid lines. */
-const MAJOR_LINE_WIDTH = 1;
+const MAJOR_LINE_WIDTH = 2;
 
 export class GridRenderer {
   /**

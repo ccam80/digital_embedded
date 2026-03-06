@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { ColorSchemeManager, buildColorMap } from "@/editor/color-scheme";
-import type { GateShapeStyle } from "@/editor/color-scheme";
 import { THEME_COLORS, defaultColorScheme, highContrastColorScheme } from "@/core/renderer-interface";
 import type { ThemeColor } from "@/core/renderer-interface";
 

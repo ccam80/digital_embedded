@@ -81,6 +81,7 @@ class StubLayout implements ComponentLayout {
   inputOffset(_i: number): number { return 0; }
   outputCount(_i: number): number { return 1; }
   outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
+  stateOffset(_i: number): number { return 0; }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +138,7 @@ function buildClockCircuit(
     componentToElement,
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
+    pinNetMap: new Map(),
   };
 }
 

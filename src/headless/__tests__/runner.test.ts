@@ -198,9 +198,10 @@ function buildRegistry(): ComponentRegistry {
     ], props),
     executeFn: executePassThrough,
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
+    helpText: "In",
   });
 
   registry.register({
@@ -211,9 +212,10 @@ function buildRegistry(): ComponentRegistry {
     ], props),
     executeFn: executeNoop,
     pinLayout: [],
-    propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+    propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
+    helpText: "Out",
   });
 
   registry.register({
@@ -229,6 +231,7 @@ function buildRegistry(): ComponentRegistry {
     propertyDefs: [],
     attributeMap: [],
     category: "LOGIC" as any,
+    helpText: "XOR",
   });
 
   registry.register({
@@ -244,6 +247,7 @@ function buildRegistry(): ComponentRegistry {
     propertyDefs: [],
     attributeMap: [],
     category: "LOGIC" as any,
+    helpText: "AND",
   });
 
   return registry;
@@ -315,9 +319,10 @@ describe("Runner", () => {
       ], props),
       executeFn: executePassThrough,
       pinLayout: [],
-      propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+      propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
       attributeMap: [],
       category: "IO" as any,
+      helpText: "In",
     });
 
     registry.register({
@@ -328,9 +333,10 @@ describe("Runner", () => {
       ], props),
       executeFn: executeNoop,
       pinLayout: [],
-      propertyDefs: [{ key: "label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
+      propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
       attributeMap: [],
       category: "IO" as any,
+      helpText: "Out",
     });
 
     const circuit = new Circuit();
@@ -375,6 +381,7 @@ describe("Runner", () => {
       propertyDefs: [],
       attributeMap: [],
       category: "LOGIC" as any,
+      helpText: "Osc",
     });
 
     const circuit = new Circuit();

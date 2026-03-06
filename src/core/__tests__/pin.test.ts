@@ -278,30 +278,34 @@ describe("layoutPinsOnFace", () => {
     expect(positions[0].y).toBe(4);
   });
 
-  it("two pins on west face have sequential y positions", () => {
+  it("two pins on west face are evenly distributed (y=1,3)", () => {
     const positions = layoutPinsOnFace("west", 2, 4, 4);
     expect(positions).toHaveLength(2);
     expect(positions[0].x).toBe(0);
     expect(positions[1].x).toBe(0);
-    expect(positions[1].y - positions[0].y).toBe(1);
+    expect(positions[0].y).toBe(1);
+    expect(positions[1].y).toBe(3);
   });
 
-  it("two pins on east face have sequential y positions", () => {
+  it("two pins on east face are evenly distributed (y=1,3)", () => {
     const positions = layoutPinsOnFace("east", 2, 4, 4);
     expect(positions[0].x).toBe(4);
-    expect(positions[1].y - positions[0].y).toBe(1);
+    expect(positions[0].y).toBe(1);
+    expect(positions[1].y).toBe(3);
   });
 
-  it("two pins on north face have sequential x positions", () => {
+  it("two pins on north face are evenly distributed (x=1,3)", () => {
     const positions = layoutPinsOnFace("north", 2, 4, 4);
     expect(positions[0].y).toBe(0);
-    expect(positions[1].x - positions[0].x).toBe(1);
+    expect(positions[0].x).toBe(1);
+    expect(positions[1].x).toBe(3);
   });
 
-  it("two pins on south face have sequential x positions", () => {
+  it("two pins on south face are evenly distributed (x=1,3)", () => {
     const positions = layoutPinsOnFace("south", 2, 4, 4);
     expect(positions[0].y).toBe(4);
-    expect(positions[1].x - positions[0].x).toBe(1);
+    expect(positions[0].x).toBe(1);
+    expect(positions[1].x).toBe(3);
   });
 
   it("four pins on west face span the full height", () => {

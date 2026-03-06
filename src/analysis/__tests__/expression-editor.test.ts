@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ExpressionEditorTab } from '../expression-editor.js';
-import { ParseError } from '../expression-parser.js';
+import type { ParseError as _ParseError } from '../expression-parser.js';
 
 // ---------------------------------------------------------------------------
 // toTruthTable — parse "A & B", generate truth table, verify 4 rows with correct values

@@ -147,7 +147,7 @@ export function createRootContext(options: {
   const ctx = new HGSContext({
     enableOutput: true,
     rootPath: options.rootPath ?? "",
-    fileResolver: options.fileResolver,
+    ...(options.fileResolver !== undefined ? { fileResolver: options.fileResolver } : {}),
   });
 
   // Built-ins are registered by builtins.ts after context creation.

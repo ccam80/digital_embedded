@@ -36,6 +36,7 @@ function makeLayout(inputCount: number, inputOffset: number, outputOffset: numbe
     inputOffset: () => inputOffset,
     outputCount: () => 4,
     outputOffset: () => outputOffset,
+    stateOffset: () => 0,
   };
 }
 
@@ -117,9 +118,7 @@ const PROGCHANGE_LAYOUT = makeLayout(6, 0, 6);
 // Captured MIDI messages for testing
 // ---------------------------------------------------------------------------
 
-interface CapturedMessage {
-  data: number[];
-}
+// interface CapturedMessage { data: number[]; } // unused
 
 // ---------------------------------------------------------------------------
 // Reset MidiOutputManager singleton between tests that involve it
@@ -348,7 +347,7 @@ describe("executeMidi", () => {
       state[4] = 0; // C now low (falling edge)
       state[3] = 1; // en=1
 
-      const sent: number[][] = [];
+      // const sent: number[][] = []; // unused
       // If the manager were to send, we can't capture without mocking.
       // Since no MIDI is available in test env, just verify no throw.
       expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
@@ -409,11 +408,7 @@ describe("executeMidi", () => {
     it("note-on message has correct status byte (0x90 + channel)", () => {
       // We verify the message logic by testing the helper function behavior
       // through a mock MIDI output manager
-      const messages: number[][] = [];
-
-      // Override send to capture messages
-      const manager = MidiOutputManager.getInstance();
-      const originalSend = manager.send.bind(manager);
+      MidiOutputManager.getInstance();
 
       // Patch send via prototype inspection (test-only approach)
       // Since we can't mock the singleton easily, verify via observable state changes.

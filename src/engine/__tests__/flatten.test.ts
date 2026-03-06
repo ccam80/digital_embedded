@@ -9,13 +9,12 @@
 import { describe, it, expect } from "vitest";
 import { Circuit, Wire } from "@/core/circuit";
 import { AbstractCircuitElement } from "@/core/element";
-import type { CircuitElement } from "@/core/element";
-import type { Pin, PinDeclaration, Rotation } from "@/core/pin";
-import { PinDirection, layoutPinsOnFace } from "@/core/pin";
+import type { Pin } from "@/core/pin";
+import { PinDirection } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
-import { PropertyBag, PropertyType } from "@/core/properties";
+import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction, ComponentLayout } from "@/core/registry";
+import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { flattenCircuit, isSubcircuitHost } from "@/engine/flatten";
 import type { SubcircuitHost } from "@/engine/flatten";
 
@@ -176,7 +175,7 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
     const def: ComponentDefinition = {
       name: typeId,
       typeId: -1,
-      factory: (props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
+      factory: (_props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
       executeFn: makeNoOpExecute(),
       pinLayout: [],
       propertyDefs: [],

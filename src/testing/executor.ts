@@ -137,8 +137,8 @@ function executeVector(
       inputRecord[name] = HIGH_Z_SENTINEL;
       continue;
     }
-    // kind === 'value'
-    const numericValue = Number(val.value);
+    // kind === 'value' or 'clock' — clock inputs handled above via regularInputs list
+    const numericValue = val.kind === 'value' ? Number(val.value) : 0;
     facade.setInput(engine, name, numericValue);
     inputRecord[name] = numericValue;
   }
@@ -183,7 +183,7 @@ function executeVector(
     }
 
     // kind === 'value' — exact numeric match
-    const expectedNum = Number(expected.value);
+    const expectedNum = expected.kind === 'value' ? Number(expected.value) : 0;
     expectedOutputs[name] = expectedNum;
     if (actual !== expectedNum) {
       vectorPassed = false;

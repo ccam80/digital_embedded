@@ -36,6 +36,7 @@ function makeLayout(inputCount: number = 0, outputCount: number = 0): ComponentL
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+    stateOffset: () => 0,
   };
 }
 
@@ -220,7 +221,6 @@ describe("Testcase", () => {
     });
 
     it("label property defaults to 'Testcase'", () => {
-      const el = makeTestcase();
       const props = new PropertyBag();
       props.set("label", "Testcase");
       props.set("testData", "");
@@ -254,7 +254,7 @@ describe("Testcase", () => {
   describe("pinLayout", () => {
     it("Testcase has no input pins", () => {
       const el = makeTestcase();
-      const inputs = el.getPins().filter((p) => p.direction === 0); // INPUT=0
+      const inputs = el.getPins().filter((p) => (p.direction as unknown as number) === 0); // INPUT=0
       expect(inputs).toHaveLength(0);
     });
 

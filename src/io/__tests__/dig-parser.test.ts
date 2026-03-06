@@ -3,7 +3,6 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   parseDigXml,
-  resolveDigReference,
   parseAttributeValue,
   migrateVersion,
 } from "../dig-parser.js";

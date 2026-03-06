@@ -47,21 +47,13 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // Helpers — ComponentLayout mock
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputOffset: number, outputOffset: number): ComponentLayout {
-  return {
-    inputCount: () => 2,
-    inputOffset: () => inputOffset,
-    outputCount: () => 4,
-    outputOffset: () => outputOffset,
-  };
-}
-
 function makeLayoutSingle(inputOffset: number, outputOffset: number): ComponentLayout {
   return {
     inputCount: () => 1,
     inputOffset: () => inputOffset,
     outputCount: () => 1,
     outputOffset: () => outputOffset,
+    stateOffset: () => 0,
   };
 }
 
@@ -195,6 +187,7 @@ describe("Diode", () => {
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
+        stateOffset: () => 7,
       };
       const state = makeState(10);
       // cathodeIn = highZ (slot 0): value=0, highZ=1 → encode as (1 << 16) | 0
@@ -217,6 +210,7 @@ describe("Diode", () => {
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
+        stateOffset: () => 7,
       };
       const state = makeState(10);
       state[0] = (1 << 16) | 0; // cathodeIn = highZ
@@ -234,6 +228,7 @@ describe("Diode", () => {
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
+        stateOffset: () => 7,
       };
       const state = makeState(10);
       state[0] = 0;             // cathodeIn = 0, not highZ (driven low)
@@ -252,6 +247,7 @@ describe("Diode", () => {
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
+        stateOffset: () => 7,
       };
       const state = makeState(10);
       state[0] = (1 << 16) | 0; // cathodeIn = highZ
@@ -269,6 +265,7 @@ describe("Diode", () => {
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
+        stateOffset: () => 7,
       };
       const state = makeState(10);
       state[0] = 0;  // cathodeIn = 0 (driven low)
@@ -514,6 +511,7 @@ describe("DiodeForward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 1; // in=1
@@ -531,6 +529,7 @@ describe("DiodeForward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 0; // in=0
@@ -547,6 +546,7 @@ describe("DiodeForward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 1; // in=1 (would normally drive output)
@@ -689,6 +689,7 @@ describe("DiodeBackward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 1; // in=1
@@ -706,6 +707,7 @@ describe("DiodeBackward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 0; // in=0
@@ -723,6 +725,7 @@ describe("DiodeBackward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const state = makeState(6);
       state[0] = 1; // in=1 (would normally drive output)
@@ -739,6 +742,7 @@ describe("DiodeBackward", () => {
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
+        stateOffset: () => 4,
       };
       const stateBackward = makeState(6);
       stateBackward[0] = 0;

@@ -9,6 +9,9 @@
 import type { ComponentDefinition } from "@/core/registry";
 import type { ComponentCategory } from "@/core/registry";
 import type { ComponentPalette, PaletteNode } from "./palette.js";
+import type { ColorScheme } from "@/core/renderer-interface";
+import { CanvasRenderer } from "./canvas-renderer.js";
+import { PropertyBag } from "@/core/properties.js";
 
 export type PlacementHandler = (def: ComponentDefinition) => void;
 
@@ -27,14 +30,13 @@ export type PlacementHandler = (def: ComponentDefinition) => void;
 export class PaletteUI {
   private readonly _palette: ComponentPalette;
   private readonly _container: HTMLElement;
+  private readonly _colorScheme: ColorScheme | null;
   private _placementHandler: PlacementHandler | null = null;
 
-  /** Search input element, created once in render(). */
-  private _searchInput: HTMLInputElement | null = null;
-
-  constructor(palette: ComponentPalette, container: HTMLElement) {
+  constructor(palette: ComponentPalette, container: HTMLElement, colorScheme?: ColorScheme) {
     this._palette = palette;
     this._container = container;
+    this._colorScheme = colorScheme ?? null;
   }
 
   /**
@@ -100,8 +102,6 @@ export class PaletteUI {
     input.type = "text";
     input.placeholder = "Search components…";
     input.className = "palette-search-input";
-    this._searchInput = input;
-
     input.addEventListener("input", () => {
       const query = input.value.trim();
       if (query === "") {
@@ -151,8 +151,16 @@ export class PaletteUI {
 
     const header = document.createElement("div");
     header.className = "palette-category-header";
-    header.textContent = node.label;
     header.setAttribute("aria-expanded", String(node.expanded));
+
+    const arrow = document.createElement("span");
+    arrow.className = "palette-category-arrow";
+    arrow.textContent = node.expanded ? "▼" : "▶";
+    header.appendChild(arrow);
+
+    const label = document.createElement("span");
+    label.textContent = node.label;
+    header.appendChild(label);
 
     header.addEventListener("click", () => {
       this._palette.toggleCategory(node.category as ComponentCategory);
@@ -176,8 +184,15 @@ export class PaletteUI {
   private _buildComponentItem(def: ComponentDefinition): HTMLElement {
     const item = document.createElement("li");
     item.className = "palette-component-item";
-    item.textContent = def.name;
     item.title = def.helpText;
+
+    const icon = this._renderComponentIcon(def);
+    item.appendChild(icon);
+
+    const name = document.createElement("span");
+    name.className = "palette-component-name";
+    name.textContent = def.name;
+    item.appendChild(name);
 
     item.addEventListener("click", () => {
       this._palette.recordPlacement(def.name);
@@ -187,5 +202,53 @@ export class PaletteUI {
     });
 
     return item;
+  }
+
+  /**
+   * Render a mini component preview onto a small canvas element.
+   * Falls back to a placeholder div if no color scheme is available.
+   */
+  private _renderComponentIcon(def: ComponentDefinition): HTMLElement {
+    if (this._colorScheme === null) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "palette-component-icon--placeholder";
+      return placeholder;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "palette-component-icon";
+    const size = 24;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "palette-component-icon--placeholder";
+      return placeholder;
+    }
+
+    try {
+      const element = def.factory(new PropertyBag());
+      const bb = element.getBoundingBox();
+      const maxDim = Math.max(bb.width, bb.height, 1);
+      const scale = (size * dpr * 0.8) / maxDim;
+      const offsetX = (size * dpr - bb.width * scale) / 2;
+      const offsetY = (size * dpr - bb.height * scale) / 2;
+
+      ctx2d.translate(offsetX, offsetY);
+      ctx2d.scale(scale, scale);
+
+      const renderer = new CanvasRenderer(ctx2d, this._colorScheme);
+      renderer.setWorldScale(scale);
+      element.draw(renderer);
+    } catch {
+      // If rendering fails, just return empty canvas
+    }
+
+    return canvas;
   }
 }
