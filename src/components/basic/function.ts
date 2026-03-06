@@ -4,10 +4,6 @@
  * Implements a combinational boolean function defined by a user-editable truth
  * table. The truth table maps each combination of input values to an output value.
  *
- * Ported from de.neemann.digital.core.basic.Function (abstract base) — the
- * concrete TS implementation follows the Digital pattern where the truth table
- * is stored in the component properties.
- *
  * Properties:
  *   inputCount  — number of input variables (1–8). There are 2^inputCount rows.
  *   outputCount — number of output bits per row (1–32, default 1).

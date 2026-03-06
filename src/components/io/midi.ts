@@ -1,8 +1,6 @@
 /**
  * MIDI component — note on/off, channel, velocity via Web MIDI API.
  *
- * Ported from de.neemann.digital.core.io.MIDI.
- *
  * Inputs (rising-edge clock triggered, when en=1):
  *   N     — MIDI note number (7-bit, 0–127)
  *   V     — velocity / volume (7-bit, 0–127)

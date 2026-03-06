@@ -16,7 +16,6 @@
  *   any     → error    → ERROR
  *   ERROR   → reset()  → STOPPED
  *
- * Java reference: de.neemann.digital.core.Model (start/stop/step semantics)
  */
 
 import { EngineState } from "@/core/engine-interface";

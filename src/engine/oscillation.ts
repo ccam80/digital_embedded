@@ -7,7 +7,6 @@
  * after N iterations without stability, collect the culprits for 100 more
  * steps to confirm the pattern, then report them.
  *
- * Java reference: de.neemann.digital.core.Model (oscillation detection)
  */
 
 /** Default number of micro-step iterations before oscillation is declared. */

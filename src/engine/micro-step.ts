@@ -10,7 +10,6 @@
  * order; after all components are visited, stability is re-evaluated on the
  * next pass.
  *
- * Java reference: de.neemann.digital.core.Model.doMicroStep()
  */
 
 import type { DigitalEngine, ConcreteCompiledCircuit } from "./digital-engine.js";

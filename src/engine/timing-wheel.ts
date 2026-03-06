@@ -12,7 +12,6 @@
  * - `advance(toTimestamp)` returns events in ascending timestamp order.
  * - Zero allocation during steady-state: all events come from EventPool.
  *
- * Java reference: de.neemann.digital.core.Model (event scheduling)
  */
 
 import { EventPool, type ScheduledEvent } from "./event-pool";

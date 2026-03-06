@@ -13,7 +13,6 @@
  *   8. Classify sequential elements — flip-flops sampled on clock edge
  *   9. Produce CompiledCircuitImpl
  *
- * Java reference: de.neemann.digital.draw.model.ModelCreator
  */
 
 import type { Circuit, Wire } from "@/core/circuit";

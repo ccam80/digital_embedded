@@ -16,7 +16,6 @@
  * Micro-step mode:
  *   Evaluate one component at a time, report which component fired.
  *
- * Java reference: de.neemann.digital.core.Model
  */
 
 import type {

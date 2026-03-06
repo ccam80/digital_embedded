@@ -145,57 +145,75 @@
   },
   "hotPaths": [
     {
-      "path": "",
-      "accessCount": 14,
-      "lastAccessed": 1772781602978,
-      "type": "directory"
-    },
-    {
       "path": "src",
-      "accessCount": 11,
-      "lastAccessed": 1772781591985,
+      "accessCount": 17,
+      "lastAccessed": 1772782671287,
       "type": "directory"
     },
     {
       "path": "spec\\fix-spec.md",
-      "accessCount": 10,
-      "lastAccessed": 1772781307132,
+      "accessCount": 16,
+      "lastAccessed": 1772782442793,
       "type": "file"
     },
     {
-      "path": "src\\hgs\\builtins.ts",
-      "accessCount": 10,
-      "lastAccessed": 1772781317384,
-      "type": "file"
+      "path": "",
+      "accessCount": 15,
+      "lastAccessed": 1772782237065,
+      "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 9,
-      "lastAccessed": 1772781302856,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 9,
-      "lastAccessed": 1772781307184,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 8,
-      "lastAccessed": 1772781302897,
+      "accessCount": 15,
+      "lastAccessed": 1772782438382,
       "type": "file"
     },
     {
       "path": "spec\\progress.md",
+      "accessCount": 15,
+      "lastAccessed": 1772782708278,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 13,
+      "lastAccessed": 1772782443208,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 12,
+      "lastAccessed": 1772782438764,
+      "type": "file"
+    },
+    {
+      "path": "src\\hgs\\builtins.ts",
+      "accessCount": 12,
+      "lastAccessed": 1772782515405,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 8,
+      "lastAccessed": 1772782413652,
+      "type": "file"
+    },
+    {
+      "path": "src\\export\\zip.ts",
       "accessCount": 7,
-      "lastAccessed": 1772781640414,
+      "lastAccessed": 1772781987034,
       "type": "file"
     },
     {
       "path": "src\\analysis\\jk-synthesis.ts",
       "accessCount": 6,
       "lastAccessed": 1772781358968,
+      "type": "file"
+    },
+    {
+      "path": "src\\hgs\\evaluator.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772782506281,
       "type": "file"
     },
     {
@@ -211,21 +229,21 @@
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
-      "accessCount": 5,
-      "lastAccessed": 1772781282910,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\evaluator.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772781285909,
-      "type": "file"
-    },
-    {
       "path": "src\\fsm\\__tests__\\circuit-gen.test.ts",
       "accessCount": 5,
       "lastAccessed": 1772781351949,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\add.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772782004581,
+      "type": "file"
+    },
+    {
+      "path": "src\\i18n\\__tests__\\i18n-full.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772782037407,
       "type": "file"
     },
     {
@@ -247,21 +265,21 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\arithmetic\\add.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781376706,
-      "type": "file"
-    },
-    {
       "path": "src\\hgs\\__tests__\\hgs-parity.test.ts",
       "accessCount": 4,
       "lastAccessed": 1772781376750,
       "type": "file"
     },
     {
-      "path": "src\\export\\zip.ts",
+      "path": "src\\i18n\\index.ts",
       "accessCount": 4,
-      "lastAccessed": 1772781500608,
+      "lastAccessed": 1772781950227,
+      "type": "file"
+    },
+    {
+      "path": "src\\export\\__tests__\\zip.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772782027732,
       "type": "file"
     },
     {
@@ -295,15 +313,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\i18n\\index.ts",
+      "path": "src\\core\\renderer-interface.ts",
       "accessCount": 3,
-      "lastAccessed": 1772781580570,
+      "lastAccessed": 1772781951588,
       "type": "file"
     },
     {
-      "path": "src\\i18n\\__tests__\\i18n-full.test.ts",
+      "path": "spec\\.context\\reviewer.md",
       "accessCount": 3,
-      "lastAccessed": 1772781591598,
+      "lastAccessed": 1772782412730,
+      "type": "file"
+    },
+    {
+      "path": "src\\runtime\\timing-diagram.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772782648378,
       "type": "file"
     },
     {
@@ -331,33 +355,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772781393160,
-      "type": "file"
-    },
-    {
-      "path": "src\\export\\__tests__\\zip.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772781429415,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\properties.ts",
       "accessCount": 2,
       "lastAccessed": 1772781626983,
       "type": "directory"
     },
     {
-      "path": "package.json",
-      "accessCount": 1,
-      "lastAccessed": 1772780841705,
+      "path": "src\\analysis\\state-transition.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772782280224,
       "type": "file"
     },
     {
-      "path": "src\\runtime\\timing-diagram.ts",
+      "path": "package.json",
       "accessCount": 1,
-      "lastAccessed": 1772780918079,
+      "lastAccessed": 1772780841705,
       "type": "file"
     },
     {
@@ -424,18 +436,6 @@
       "path": "src\\fsm\\table-creator.ts",
       "accessCount": 1,
       "lastAccessed": 1772780997528,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis\\state-transition.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780997886,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 1,
-      "lastAccessed": 1772781265553,
       "type": "file"
     },
     {

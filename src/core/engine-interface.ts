@@ -9,7 +9,6 @@
  * is backed by SharedArrayBuffer-compatible typed arrays. Control is exercised
  * via message-passable EngineMessage commands.
  *
- * Java reference: de.neemann.digital.core.Model
  */
 
 import type { BitVector } from "./signal";
@@ -66,7 +65,6 @@ export type EngineChangeListener = (state: EngineState) => void;
  * Events are ordered by timestamp in a priority queue. When multiple events
  * share the same timestamp, they are processed in insertion order (stable).
  *
- * Java reference: de.neemann.digital.core.Model.Event
  */
 export interface SimulationEvent {
   /** Simulation time at which this event fires (nanoseconds). */
@@ -87,7 +85,6 @@ export interface SimulationEvent {
  * Registered observers are notified after each simulation step completes,
  * allowing the data table and measurement panel to capture signal snapshots.
  *
- * Java reference: de.neemann.digital.core.ModelStateObserverTyped
  */
 export interface MeasurementObserver {
   /** Called after each simulation step with the current step count. */

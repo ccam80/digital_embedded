@@ -16,8 +16,6 @@
  * Real-time mode paces clock advancement to wall-clock time by deferring
  * calls to advanceClocks() until the appropriate interval has elapsed.
  *
- * Java reference: de.neemann.digital.core.Model (clock management),
- * de.neemann.digital.core.ClockedElement (clock edge sampling).
  */
 
 import type { CompiledCircuit } from "@/core/engine-interface";

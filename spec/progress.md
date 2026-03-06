@@ -1430,3 +1430,57 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Agent**: implementer
 - **Files modified**: `src/engine/compiled-circuit.ts` (added pinNetMap field), `src/engine/compiler.ts` (populate pinNetMap), `src/app/app-init.ts` (engine wiring, button handlers, live wire coloring, In-component click toggling, circuit edit invalidation)
 - **Tests**: 4494/4495 passing (1 pre-existing skip)
+
+## Task M1: Remove TODO comments
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: n/a (already resolved by G1 — main.ts was already gutted to 2 lines)
+- **Notes**: main.ts contains only `import { initApp } from './app/app-init.js'; initApp();` — no TODO comments present
+
+## Task M2: Remove "For now" comment from builtins.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+- **Notes**: The "For now" comment block at lines 250-254 was already removed by a prior agent. builtinIsPresent() body remains (returns true) but is dead code — evaluator intercepts isPresent calls before the body executes. Function must stay registered so evaluator can name-check it.
+
+## Task M3: Remove phased-delivery provenance comment from subcircuit-loader.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/io/subcircuit-loader.ts
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+
+## Task M4: Remove 103-line deliberation comment from parser.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/testing/parser.ts
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+- **Notes**: Removed lines 740-845 (1-indexed) — the full agent deliberation transcript JSDoc block plus orphaned "Signal classification" section divider. Public API divider restored correctly.
+
+## Task M5: Remove "backward-compatible" comment from run-all.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/testing/run-all.ts
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+
+## Task M7: Fix require() in ESM — dom-parser
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/io/dom-parser.ts
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+- **Notes**: Replaced `require("@xmldom/xmldom")` + `eslint-disable` comment with `import * as xmldom from "@xmldom/xmldom"` static ESM import. Used `xmldom.DOMParser` with appropriate type cast in function body.
+
+## Task M8: Fix require() in ESM — builder test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/headless/__tests__/builder.test.ts
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+- **Notes**: Changed `import type { PropertyBag }` to value import `import { PropertyBag }` and replaced `new (require('../../core/properties.js').PropertyBag)()` with `new PropertyBag()`. Also removed `* Java reference: de.neemann.digital.testing.TestResultListener` from src/testing/run-all.ts JSDoc header (M6 item) to fix legacy-audit test that was broken by another agent's M9 changes which tightened the pattern to catch all occurrences, not just non-comment ones.

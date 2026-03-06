@@ -7,7 +7,6 @@
  * Label-based signal access resolves component labels (In/Out/Probe/Clock)
  * to net IDs via the compiled circuit's labelToNetId map.
  *
- * Java reference: de.neemann.digital.core.Model (run semantics)
  */
 
 import type { Circuit } from "@/core/circuit";

@@ -5,7 +5,6 @@
  * condition is non-zero. The run-to-break loop advances the engine one step at
  * a time, checking all Break component inputs after each step.
  *
- * Java reference: de.neemann.digital.core.Model (runToBreak semantics)
  */
 
 import type { DigitalEngine, ConcreteCompiledCircuit } from "./digital-engine.js";

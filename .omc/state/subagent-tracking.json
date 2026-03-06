@@ -89,10 +89,64 @@
       "status": "completed",
       "completed_at": "2026-03-06T07:21:17.265Z",
       "duration_ms": 379357
+    },
+    {
+      "agent_id": "ad4ad6e632869769e",
+      "agent_type": "claude-orchestrator:reviewer",
+      "started_at": "2026-03-06T07:25:21.502Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:30:15.676Z",
+      "duration_ms": 294174
+    },
+    {
+      "agent_id": "a0ee4a6b5280c4b30",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-06T07:25:45.235Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:30:32.673Z",
+      "duration_ms": 287438
+    },
+    {
+      "agent_id": "a047261821fda7d33",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-06T07:25:51.346Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:32:10.023Z",
+      "duration_ms": 378677
+    },
+    {
+      "agent_id": "a2a5b82d933722b4e",
+      "agent_type": "claude-orchestrator:reviewer",
+      "started_at": "2026-03-06T07:33:28.544Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:36:49.360Z",
+      "duration_ms": 200816
+    },
+    {
+      "agent_id": "ad20e7604fbd3789f",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-06T07:33:43.933Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:43:34.719Z",
+      "duration_ms": 590786
+    },
+    {
+      "agent_id": "ae7477a920605f78f",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-06T07:33:55.382Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T07:38:35.475Z",
+      "duration_ms": 280093
     }
   ],
-  "total_spawned": 10,
-  "total_completed": 10,
+  "total_spawned": 16,
+  "total_completed": 16,
   "total_failed": 0,
-  "last_updated": "2026-03-06T07:24:26.238Z"
+  "last_updated": "2026-03-06T07:43:34.837Z"
 }

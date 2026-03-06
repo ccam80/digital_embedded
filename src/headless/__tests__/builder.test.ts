@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CircuitBuilder } from '../builder.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import type { CircuitElement } from '../../core/element.js';
-import type { PropertyBag } from '../../core/properties.js';
+import { PropertyBag } from '../../core/properties.js';
 import type { Pin } from '../../core/pin.js';
 import { FacadeError } from '../types.js';
 
@@ -31,7 +31,7 @@ class MockCircuitElement implements CircuitElement {
   }
 
   getProperties(): PropertyBag {
-    return new (require('../../core/properties.js').PropertyBag)();
+    return new PropertyBag();
   }
 
   draw(): void {}

@@ -8,7 +8,6 @@
  *   4. Read all output signals via facade.readOutput()
  *   5. Compare against expected values
  *
- * Java reference: de.neemann.digital.testing.TestExecutor
  */
 
 import type { SimulationEngine } from '../core/engine-interface.js';

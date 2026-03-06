@@ -50,32 +50,9 @@ describe('legacy audit', () => {
     }
   });
 
-  it('noJavaPackageNames — no de.neemann.digital in non-comment code in src/', () => {
-    // "Java reference: de.neemann.digital..." in JSDoc comments is legitimate
-    // (documents porting provenance). Search for occurrences outside comments.
-    // grep for lines matching the pattern but NOT starting with * or // (comment lines)
-    try {
-      const result = execSync(
-        'grep -rn -E "de\\.neemann\\.digital" src/ --include="*.ts" --include="*.tsx" --include="*.js" --exclude-dir=node_modules',
-        { encoding: 'utf-8', timeout: 10000 },
-      );
-      const lines = result.trim().split('\n').filter((l) => l.length > 0);
-      // Filter out comment lines (JSDoc `* ...` or `// ...`) and this test file
-      const nonCommentLines = lines.filter((line) => {
-        if (line.includes('legacy-audit.test.ts')) return false;
-        // Extract the code portion after file:line:
-        const codeStart = line.indexOf(':', line.indexOf(':') + 1) + 1;
-        const code = line.slice(codeStart).trim();
-        // Comment patterns: starts with *, //, or is inside /** */
-        if (code.startsWith('*') || code.startsWith('//') || code.startsWith('/**')) return false;
-        // "Ported from de.neemann..." in line comments
-        if (code.includes('// ') && code.indexOf('de.neemann') > code.indexOf('//')) return false;
-        return true;
-      });
-      expect(nonCommentLines, `Found Java package in code:\n${nonCommentLines.join('\n')}`).toEqual([]);
-    } catch {
-      // No matches — pass
-    }
+  it('noJavaPackageNames — no de.neemann.digital anywhere in src/', () => {
+    const hits = searchInSrc('de\\.neemann\\.digital');
+    expect(hits, `Found Java package reference in: ${hits.join(', ')}`).toEqual([]);
   });
 
   it('noJavaClassReferences — no Launcher.java/JVM.java references in src/', () => {

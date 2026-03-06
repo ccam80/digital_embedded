@@ -6,7 +6,6 @@
  * After initialization is complete, noise mode is not used — the engine runs
  * deterministically.
  *
- * Java reference: de.neemann.digital.core.Model.doMicroStep(boolean noise)
  */
 
 import type { ComponentLayout, ExecuteFunction } from "../core/registry.js";

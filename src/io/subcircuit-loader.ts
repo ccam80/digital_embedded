@@ -42,10 +42,8 @@ const MAX_DEPTH = 30;
 /**
  * A minimal CircuitElement that holds a loaded subcircuit definition.
  *
- * This serves as the element type for dynamically registered subcircuits
- * until the full SubcircuitElement from task 6.2.1 is available. The
- * subcircuit definition (the loaded Circuit) is stored as a property so
- * the flattener (6.2.3) and renderer (6.2.1) can retrieve it.
+ * Stores the subcircuit definition (the loaded Circuit) as a property so
+ * the flattener and renderer can retrieve it.
  */
 export class SubcircuitHolderElement extends AbstractCircuitElement {
   readonly subcircuitDefinition: Circuit;

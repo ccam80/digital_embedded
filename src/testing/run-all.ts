@@ -6,8 +6,6 @@
  * aggregates the results into an AggregateTestResults summary.
  *
  * This is the backing logic for the "Run All Tests" (F11) action.
- *
- * Java reference: de.neemann.digital.testing.TestResultListener
  */
 
 import type { Circuit } from '../core/circuit.js';
@@ -31,7 +29,7 @@ import type { RunnerFacade } from './executor.js';
  * and outputs.
  *
  * Returns 0 if no In elements are found, which causes parseTestData to treat
- * all columns as inputs (backward-compatible behavior).
+ * all columns as inputs.
  */
 function countInputs(circuit: Circuit): number {
   return circuit.elements.filter((el) => el.typeId === 'In').length;

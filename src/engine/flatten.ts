@@ -18,7 +18,6 @@
  * `{parentScopedName}.{childTypeId}_{childIndex}` so multiple instances of the
  * same subcircuit produce distinct internal names.
  *
- * Java reference: de.neemann.digital.draw.model.ModelCreator (subcircuit inlining)
  */
 
 import { Circuit, Wire } from "../core/circuit.js";

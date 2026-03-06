@@ -16,7 +16,6 @@
  * the current simulation step count so click-to-jump can locate the nearest
  * one.
  *
- * Java reference: de.neemann.digital.gui.components.data.DataSet
  */
 
 import type { MeasurementObserver, SimulationEngine, SnapshotId } from "@/core/engine-interface";

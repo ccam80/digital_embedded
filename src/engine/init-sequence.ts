@@ -5,8 +5,6 @@
  * feedback SCCs, followed by reset component release, followed by a
  * deterministic settle pass.
  *
- * Java reference: de.neemann.digital.core.Model (constructor + init sequence)
- *
  * Sequence:
  *   1. Set all signals to UNDEFINED.
  *   2. For each feedback SCC: run evaluateWithNoise repeatedly until stable

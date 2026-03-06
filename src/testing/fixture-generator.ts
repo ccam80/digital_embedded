@@ -10,7 +10,6 @@
  * For circuits with ≤4 single-bit inputs, generates all 2^N combinations.
  * For circuits with >4 inputs, generates a partial template with representative rows.
  *
- * Java reference: no direct equivalent — this is a Digital-JS authoring tool.
  */
 
 import type { Circuit } from '../core/circuit.js';

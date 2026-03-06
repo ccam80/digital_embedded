@@ -116,7 +116,7 @@ export function initApp(search?: string): void {
     try {
       compiled = compileCircuit(circuit, registry);
       engine.init(compiled);
-      binding.bind(engine, compiled.wireToNetId, compiled.pinNetMap);
+      binding.bind(circuit, engine, compiled.wireToNetId, compiled.pinNetMap);
       compiledDirty = false;
       return true;
     } catch (err) {

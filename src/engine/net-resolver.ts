@@ -6,8 +6,6 @@
  * determined by matching wire endpoints to pin positions and wire-to-wire
  * junctions. Tunnel components with the same label are merged into one net.
  *
- * Java reference: de.neemann.digital.core.Net.interconnect (adapted for our
- * pre-compilation, flat-array architecture).
  */
 
 import type { Circuit } from "@/core/circuit.js";

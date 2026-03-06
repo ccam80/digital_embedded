@@ -8,7 +8,6 @@
  *
  * Configurable radix per signal via right-click context menu.
  *
- * Java reference: de.neemann.digital.gui.components.data.DataSet
  */
 
 import type { MeasurementObserver, SimulationEngine } from "@/core/engine-interface";

@@ -12,7 +12,6 @@
  * Input/output signal names for exhaustive mode are derived from the reference
  * circuit's In/Out elements (typeId "In" / "Out").
  *
- * Java reference: de.neemann.digital.testing.TestExecutor (partial analogue)
  */
 
 import type { SimulationEngine } from '../core/engine-interface.js';

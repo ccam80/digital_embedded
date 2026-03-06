@@ -11,7 +11,6 @@
  * Multi-bit signals: an N-bit input contributes N bits to the combination space.
  * Total combinations = 2^(sum of all input bit widths).
  *
- * Java reference: de.neemann.digital.analyse.ModelAnalyser
  */
 
 import type { Circuit } from '../core/circuit.js';

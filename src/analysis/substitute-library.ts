@@ -16,7 +16,6 @@
  * Components that cannot be substituted (flip-flops, RAM, ROM, etc.) are
  * collected and returned as blockingComponents.
  *
- * Java reference: de.neemann.digital.analyse.SubstituteLibrary
  */
 
 import { Circuit, Wire } from '../core/circuit.js';

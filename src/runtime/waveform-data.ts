@@ -5,7 +5,6 @@
  * oldest sample is overwritten (ring eviction). The buffer capacity is set at
  * construction time.
  *
- * Java reference: de.neemann.digital.gui.components.data.DataSet
  */
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,6 @@
  * speedTest() runs quickRun() and measures wall-clock time to report the
  * maximum achievable simulation frequency (kHz).
  *
- * Java reference: de.neemann.digital.gui.components.speedtest.SpeedTest
  */
 
 import type { DigitalEngine } from "./digital-engine.js";

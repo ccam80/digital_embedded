@@ -11,8 +11,6 @@
  * cycle detection. Memory components (flip-flops, latches) are treated as
  * cycle breakers — their inputs do not feed their outputs combinationally.
  *
- * Java reference: no direct equivalent; ModelAnalyser.java validates
- * acyclicity before analysis.
  */
 
 import type { Circuit } from '../core/circuit.js';

@@ -20,7 +20,6 @@
  * logical net. When it opens, they separate. This reconfigures which driver
  * net IDs contribute to the output net.
  *
- * Java reference: de.neemann.digital.core.wiring.bus/
  */
 
 import { BurnException } from "@/core/errors.js";

@@ -8,7 +8,6 @@
  * Per Decision 3: this contains zero visual data — no positions, no wire
  * coordinates. The binding layer (Phase 6) holds cross-references.
  *
- * Java reference: de.neemann.digital.core.Model (the runtime execution graph)
  */
 
 import type { CompiledCircuit } from "@/core/engine-interface";

@@ -9,7 +9,6 @@
  * The resulting flat Uint32Array is indexed by component slot index and
  * consumed by the engine's timed-mode scheduling logic.
  *
- * Java reference: de.neemann.digital.core.Model (gate delay scheduling)
  */
 
 import type { ComponentRegistry } from "@/core/registry";

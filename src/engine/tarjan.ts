@@ -7,8 +7,6 @@
  * Used by the circuit compiler to detect combinational feedback loops.
  * Each multi-node SCC is a feedback group that requires iterative evaluation.
  *
- * Java reference: no direct equivalent — the flat-array architecture
- * introduces SCC-based evaluation as an optimization over Digital's Node graph.
  */
 
 // ---------------------------------------------------------------------------

@@ -4,9 +4,6 @@
  * All simulation and structural errors extend SimulationError, which carries
  * optional context fields for user-facing diagnostics: which component failed,
  * which net was involved, and what the expected vs actual state was.
- *
- * Java references:
- *   NodeException, PinException, BurnException (in Net.java), BacktrackException
  */
 
 // ---------------------------------------------------------------------------
@@ -50,7 +47,6 @@ export class SimulationError extends Error {
  * Thrown when two or more output pins drive a net to conflicting values
  * simultaneously (a "burn" condition — analogous to a shorted circuit).
  *
- * Java reference: Net.BurnException (inner class in Net.java)
  */
 export class BurnException extends SimulationError {
   /** The conflicting signal values that were observed on the net. */
@@ -80,7 +76,6 @@ export class BurnException extends SimulationError {
  * gates) cannot reach a stable initial state during circuit initialization.
  * The resolver backtracks but exhausts its attempts.
  *
- * Java reference: BacktrackException
  */
 export class BacktrackException extends SimulationError {
   /** Number of backtrack attempts made before giving up. */
@@ -109,7 +104,6 @@ export class BacktrackException extends SimulationError {
  * Thrown when two pins connected by a wire have incompatible bit widths,
  * making it impossible to compile a valid net assignment.
  *
- * Java reference: BitsException (various usages in the core layer)
  */
 export class BitsException extends SimulationError {
   /** Bit width declared by the source (driving) pin. */
@@ -144,7 +138,6 @@ export class BitsException extends SimulationError {
  * internal error — for example, an invalid configuration that was not caught
  * at compile time.
  *
- * Java reference: NodeException
  */
 export class NodeException extends SimulationError {
   constructor(
@@ -169,7 +162,6 @@ export class NodeException extends SimulationError {
  * number of iterations. Indicates a combinational feedback loop that never
  * converges (e.g. a ring oscillator or improperly initialized SR latch).
  *
- * Java reference: de.neemann.digital.core.NodeException (oscillation variant)
  */
 export class OscillationError extends SimulationError {
   /** Number of iterations attempted before giving up. */
@@ -199,7 +191,6 @@ export class OscillationError extends SimulationError {
  * connected, multiply-driven when it may only have one driver, or configured
  * with an invalid bit width.
  *
- * Java reference: PinException
  */
 export class PinException extends SimulationError {
   /** Label of the pin that caused the error. */
