@@ -126,12 +126,10 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const cx = COMP_WIDTH / 2;
     const cy = COMP_HEIGHT / 2;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Component body — circle representing the encoder knob
     ctx.setColor("COMPONENT_FILL");

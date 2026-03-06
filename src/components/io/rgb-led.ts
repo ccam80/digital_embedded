@@ -110,12 +110,10 @@ export class RgbLedElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const cx = COMP_WIDTH / 2;
     const cy = COMP_HEIGHT / 2;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Outer circle body
     ctx.setColor("COMPONENT_FILL");

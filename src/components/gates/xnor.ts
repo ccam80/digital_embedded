@@ -124,11 +124,9 @@ export class XNOrElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._inputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     if (this._wideShape) {
       this._drawIEEE(ctx, h);
@@ -196,7 +194,7 @@ export class XNOrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -224,9 +222,8 @@ export class XNOrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, false);
 
-    // Extra curved line on input side (XOR distinguishing feature)
     ctx.drawPath({
       operations: [
         { op: "moveTo", x: -0.5, y: 0 },
@@ -240,7 +237,7 @@ export class XNOrElement extends AbstractCircuitElement {
           y: h,
         },
       ],
-    });
+    }, false);
 
     ctx.drawCircle(COMP_WIDTH + BUBBLE_RADIUS, halfH, BUBBLE_RADIUS, false);
   }

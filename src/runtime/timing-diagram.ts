@@ -22,12 +22,13 @@
 import type { MeasurementObserver, SimulationEngine, SnapshotId } from "@/core/engine-interface";
 import { WaveformChannel } from "./waveform-data.js";
 import type { WaveformSample } from "./waveform-data.js";
-import type { WaveformViewport } from "./waveform-renderer.js";
+import type { WaveformViewport, CursorTooltipRow } from "./waveform-renderer.js";
 import {
   drawDigitalWaveform,
   drawBusWaveform,
   drawTimeAxis,
   drawChannelLabel,
+  drawTimeCursor,
 } from "./waveform-renderer.js";
 
 // ---------------------------------------------------------------------------
@@ -121,6 +122,12 @@ export class TimingDiagramPanel implements MeasurementObserver {
   private _dragStartX = 0;
   private _dragStartViewStart = 0;
 
+  /**
+   * Current mouse X position in canvas coordinates, or null when the cursor
+   * is outside the canvas. Used to draw the time cursor crosshair.
+   */
+  private _cursorX: number | null = null;
+
   constructor(
     canvas: HTMLCanvasElement | null,
     engine: SimulationEngine,
@@ -203,6 +210,37 @@ export class TimingDiagramPanel implements MeasurementObserver {
   /** Return the current simulation step count. */
   getCurrentTime(): number {
     return this._currentTime;
+  }
+
+  // -------------------------------------------------------------------------
+  // Time cursor query
+  // -------------------------------------------------------------------------
+
+  /**
+   * Return the simulation time currently under the mouse cursor, or null
+   * when the cursor is outside the canvas.
+   */
+  getCursorTime(): number | null {
+    if (this._cursorX === null) return null;
+    return this._xToTime(this._cursorX);
+  }
+
+  /**
+   * Return the signal value for each channel at the given simulation time.
+   * Each entry holds the channel name, the value of the closest recorded
+   * sample at or before `time`, and the channel bit width.
+   *
+   * Channels with no recorded samples are omitted from the result.
+   */
+  getValuesAtTime(time: number): CursorTooltipRow[] {
+    const result: CursorTooltipRow[] = [];
+    for (const ch of this._channels) {
+      const idx = ch.findClosestIndex(time);
+      if (idx === -1) continue;
+      const sample = ch.getSample(idx);
+      result.push({ name: ch.name, value: sample.value, width: ch.width });
+    }
+    return result;
   }
 
   // -------------------------------------------------------------------------
@@ -308,6 +346,13 @@ export class TimingDiagramPanel implements MeasurementObserver {
     }
 
     drawTimeAxis(ctx, vp);
+
+    // Time cursor overlay — drawn last so it appears on top of all waveforms
+    if (this._cursorX !== null) {
+      const cursorTime = this._xToTime(this._cursorX);
+      const rows = this.getValuesAtTime(cursorTime);
+      drawTimeCursor(ctx, this._cursorX, cursorTime, rows, vp, this._channels.length);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -328,6 +373,8 @@ export class TimingDiagramPanel implements MeasurementObserver {
   };
 
   private _onMouseMove = (e: MouseEvent): void => {
+    this._cursorX = e.offsetX;
+
     if (this._isDragging) {
       const dx = e.offsetX - this._dragStartX;
       const range = this._viewEndTime - this._viewStartTime;
@@ -335,8 +382,14 @@ export class TimingDiagramPanel implements MeasurementObserver {
       const deltaTime = -(dx / drawWidth) * range;
       this._viewStartTime = this._dragStartViewStart + deltaTime;
       this._viewEndTime = this._viewStartTime + range;
-      this._render();
     }
+
+    this._render();
+  };
+
+  private _onMouseLeave = (_e: MouseEvent): void => {
+    this._cursorX = null;
+    this._render();
   };
 
   private _onMouseUp = (_e: MouseEvent): void => {
@@ -360,6 +413,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
     canvas.addEventListener("wheel", this._onWheel, { passive: false });
     canvas.addEventListener("mousedown", this._onMouseDown);
     canvas.addEventListener("mousemove", this._onMouseMove);
+    canvas.addEventListener("mouseleave", this._onMouseLeave);
     canvas.addEventListener("mouseup", this._onMouseUp);
     canvas.addEventListener("click", this._onClick);
   }
@@ -368,6 +422,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
     canvas.removeEventListener("wheel", this._onWheel);
     canvas.removeEventListener("mousedown", this._onMouseDown);
     canvas.removeEventListener("mousemove", this._onMouseMove);
+    canvas.removeEventListener("mouseleave", this._onMouseLeave);
     canvas.removeEventListener("mouseup", this._onMouseUp);
     canvas.removeEventListener("click", this._onClick);
   }

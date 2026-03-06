@@ -66,10 +66,8 @@ export class TextElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: this._fontSize });

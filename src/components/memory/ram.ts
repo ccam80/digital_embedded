@@ -258,9 +258,7 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
     ctx.restore();
   }
@@ -376,9 +374,7 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
     ctx.restore();
   }
@@ -492,9 +488,7 @@ export class RAMDualPortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
     ctx.restore();
   }
@@ -615,9 +609,7 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
     ctx.restore();
   }
@@ -729,9 +721,7 @@ export class RAMAsyncElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
     ctx.restore();
   }
@@ -834,9 +824,7 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "BRAM");
     ctx.restore();
   }

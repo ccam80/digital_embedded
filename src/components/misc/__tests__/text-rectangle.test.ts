@@ -135,7 +135,7 @@ describe("Text", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw() calls translate with component position", () => {
+    it("draw() does not translate to component position (ElementRenderer handles that)", () => {
       const props = new PropertyBag();
       props.set("text", "Test");
       props.set("fontSize", 1.0);
@@ -144,7 +144,7 @@ describe("Text", () => {
       el.draw(ctx);
 
       const translateCalls = calls.filter((c) => c.method === "translate");
-      expect(translateCalls.some((c) => c.args[0] === 3 && c.args[1] === 7)).toBe(true);
+      expect(translateCalls.some((c) => c.args[0] === 3 && c.args[1] === 7)).toBe(false);
     });
 
     it("draw() calls setFont with the configured fontSize", () => {
@@ -378,7 +378,7 @@ describe("Rectangle", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw() calls translate with component position", () => {
+    it("draw() does not translate to component position (ElementRenderer handles that)", () => {
       const props = new PropertyBag();
       props.set("rectWidth", 6);
       props.set("rectHeight", 4);
@@ -388,7 +388,7 @@ describe("Rectangle", () => {
       el.draw(ctx);
 
       const translateCalls = calls.filter((c) => c.method === "translate");
-      expect(translateCalls.some((c) => c.args[0] === 2 && c.args[1] === 4)).toBe(true);
+      expect(translateCalls.some((c) => c.args[0] === 2 && c.args[1] === 4)).toBe(false);
     });
 
     it("draw() with label calls drawText with the label", () => {

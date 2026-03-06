@@ -92,10 +92,8 @@ export class StopElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);

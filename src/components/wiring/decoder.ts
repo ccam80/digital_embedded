@@ -117,12 +117,10 @@ export class DecoderElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const outputCount = 1 << this._selectorBits;
     const h = componentHeight(outputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, COMP_WIDTH, h, true);

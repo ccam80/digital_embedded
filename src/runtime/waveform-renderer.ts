@@ -133,7 +133,6 @@ export interface WaveformViewport {
 
 /** Colour constants for waveform drawing. */
 const COLOR_DIGITAL_HIGH = "#00CC00";
-const COLOR_DIGITAL_LOW = "#005500";
 const COLOR_BUS = "#3399FF";
 const COLOR_BUS_HATCH = "#AACCFF";
 const COLOR_LABEL = "#CCCCCC";
@@ -332,4 +331,79 @@ export function drawChannelLabel(
   const midY = laneY + vp.laneHeight / 2;
   ctx.setFillStyle(COLOR_LABEL);
   ctx.fillText(label, 4, midY);
+}
+
+// ---------------------------------------------------------------------------
+// Time cursor — vertical crosshair with tooltip showing signal values
+// ---------------------------------------------------------------------------
+
+/** One row of the time-cursor tooltip: channel name + value at cursor. */
+export interface CursorTooltipRow {
+  name: string;
+  value: number;
+  width: number;
+}
+
+const COLOR_CURSOR = "rgba(255, 220, 0, 0.85)";
+const COLOR_TOOLTIP_BG = "rgba(30, 30, 30, 0.90)";
+const COLOR_TOOLTIP_TEXT = "#EEEEEE";
+const TOOLTIP_PADDING = 6;
+const TOOLTIP_LINE_HEIGHT = 16;
+
+/**
+ * Draw the time cursor: a vertical line at `cursorX` and a floating tooltip
+ * listing the simulation time and each channel's value at that time.
+ *
+ * @param ctx         Render context
+ * @param cursorX     Pixel X position of the cursor (canvas coordinates)
+ * @param cursorTime  Simulation time at the cursor position
+ * @param rows        Signal name + value rows for the tooltip
+ * @param vp          Current viewport (used for laneHeight / channel count)
+ * @param totalLanes  Number of waveform lanes (for vertical line height)
+ */
+export function drawTimeCursor(
+  ctx: WaveformRenderContext,
+  cursorX: number,
+  cursorTime: number,
+  rows: readonly CursorTooltipRow[],
+  vp: WaveformViewport,
+  totalLanes: number,
+): void {
+  // Vertical crosshair line
+  const lineBottom = totalLanes * vp.laneHeight;
+  ctx.beginPath();
+  ctx.setStrokeStyle(COLOR_CURSOR);
+  ctx.moveTo(cursorX, 0);
+  ctx.lineTo(cursorX, lineBottom);
+  ctx.stroke();
+
+  // Build tooltip lines
+  const timeLabel = `t = ${cursorTime}`;
+  const lines: string[] = [timeLabel];
+  for (const row of rows) {
+    const digits = Math.ceil(row.width / 4);
+    const hex = (row.value >>> 0).toString(16).toUpperCase().padStart(digits, "0");
+    lines.push(`${row.name}: 0x${hex}`);
+  }
+
+  // Tooltip dimensions
+  const tooltipWidth = 140;
+  const tooltipHeight = TOOLTIP_PADDING * 2 + lines.length * TOOLTIP_LINE_HEIGHT;
+
+  // Position tooltip to the right of cursor, flip left if too close to edge
+  let tipX = cursorX + 8;
+  if (tipX + tooltipWidth > ctx.width) {
+    tipX = cursorX - tooltipWidth - 8;
+  }
+  const tipY = TOOLTIP_PADDING;
+
+  // Background
+  ctx.setFillStyle(COLOR_TOOLTIP_BG);
+  ctx.fillRect(tipX, tipY, tooltipWidth, tooltipHeight);
+
+  // Text lines
+  ctx.setFillStyle(COLOR_TOOLTIP_TEXT);
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i]!, tipX + TOOLTIP_PADDING, tipY + TOOLTIP_PADDING + (i + 1) * TOOLTIP_LINE_HEIGHT - 4);
+  }
 }

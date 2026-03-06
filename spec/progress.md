@@ -1265,3 +1265,142 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files modified**: src/fsm/circuit-gen.ts, src/analysis/jk-synthesis.ts, src/analysis/__tests__/jk-synthesis.test.ts, src/fsm/__tests__/circuit-gen.test.ts
 - **Tests**: 11/11 passing (circuit-gen + jk-synthesis test files); 4478/4479 full suite passing
 - **Notes**: Implemented as part of F2. Renamed `_shouldMinimize` to `shouldMinimize` in synthesizeJK, updated deriveJKEquations signature to accept shouldMinimize:boolean, threaded it through JK table minimization (minimize vs generateSOP) and output expression derivation. Updated all 4 call sites in jk-synthesis.test.ts to pass true. Added synthesizeJK minimize:false test to circuit-gen.test.ts.
+
+## Task A3: `locale-loader.ts` feature flag pattern — eliminate
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/i18n/index.ts`, `src/i18n/__tests__/i18n-full.test.ts`
+- **Files deleted**: `src/i18n/locale-loader.ts`
+- **Tests**: 4479/4480 passing (1 skipped, matches baseline)
+- **Summary**: Removed `locale-loader.ts` entirely. Inlined locale loading directly into `index.ts` using a single Vite dynamic `import()` code path (no runtime `fetch`, no `registerLocaleModule`, no mutable `localeModules` registry). Updated `i18n-full.test.ts` to remove all imports from `locale-loader` and `registerLocaleModule` setup — tests now call `initializeI18n('en')` directly which exercises the same dynamic import path used in the browser. All 41 i18n tests pass.
+
+## Task A1: `exportZip` takes raw strings instead of `Circuit`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/export/zip.ts`, `src/export/__tests__/zip.test.ts`
+- **Tests**: 9/9 passing
+
+## Task A3: `locale-loader.ts` feature flag pattern — eliminate
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: N/A — pre-existing condition. `src/i18n/locale-loader.ts` does not exist. `src/i18n/index.ts` already uses a single Vite dynamic import() code path with no `registerLocaleModule`, no mutable `localeModules` registry, and no feature flag pattern. The banned pattern was never present or was already removed before this agent ran. All 190 test files pass (4479/4480 tests).
+
+## Task R2: Double translation — every component renders at 2x its grid position
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - `src/components/arithmetic/add.ts`
+  - `src/components/arithmetic/barrel-shifter.ts`
+  - `src/components/arithmetic/bit-count.ts`
+  - `src/components/arithmetic/bit-extender.ts`
+  - `src/components/arithmetic/comparator.ts`
+  - `src/components/arithmetic/div.ts`
+  - `src/components/arithmetic/mul.ts`
+  - `src/components/arithmetic/neg.ts`
+  - `src/components/arithmetic/prng.ts`
+  - `src/components/arithmetic/sub.ts`
+  - `src/components/basic/function.ts`
+  - `src/components/flipflops/d-async.ts`
+  - `src/components/flipflops/d.ts`
+  - `src/components/flipflops/jk-async.ts`
+  - `src/components/flipflops/jk.ts`
+  - `src/components/flipflops/monoflop.ts`
+  - `src/components/flipflops/rs-async.ts`
+  - `src/components/flipflops/rs.ts`
+  - `src/components/flipflops/t.ts`
+  - `src/components/gates/and.ts`
+  - `src/components/gates/nand.ts`
+  - `src/components/gates/nor.ts`
+  - `src/components/gates/not.ts`
+  - `src/components/gates/or.ts`
+  - `src/components/gates/xnor.ts`
+  - `src/components/gates/xor.ts`
+  - `src/components/graphics/graphic-card.ts`
+  - `src/components/graphics/led-matrix.ts`
+  - `src/components/graphics/vga.ts`
+  - `src/components/io/button-led.ts`
+  - `src/components/io/button.ts`
+  - `src/components/io/clock.ts`
+  - `src/components/io/const.ts`
+  - `src/components/io/dip-switch.ts`
+  - `src/components/io/ground.ts`
+  - `src/components/io/in.ts`
+  - `src/components/io/led.ts`
+  - `src/components/io/light-bulb.ts`
+  - `src/components/io/midi.ts`
+  - `src/components/io/not-connected.ts`
+  - `src/components/io/out.ts`
+  - `src/components/io/polarity-led.ts`
+  - `src/components/io/power-supply.ts`
+  - `src/components/io/probe.ts`
+  - `src/components/io/rgb-led.ts`
+  - `src/components/io/rotary-encoder.ts`
+  - `src/components/io/scope-trigger.ts`
+  - `src/components/io/scope.ts`
+  - `src/components/io/seven-seg-hex.ts`
+  - `src/components/io/seven-seg.ts`
+  - `src/components/io/sixteen-seg.ts`
+  - `src/components/io/stepper-motor.ts`
+  - `src/components/io/vdd.ts`
+  - `src/components/memory/counter-preset.ts`
+  - `src/components/memory/counter.ts`
+  - `src/components/memory/eeprom.ts`
+  - `src/components/memory/lookup-table.ts`
+  - `src/components/memory/program-counter.ts`
+  - `src/components/memory/program-memory.ts`
+  - `src/components/memory/ram.ts`
+  - `src/components/memory/register-file.ts`
+  - `src/components/memory/register.ts`
+  - `src/components/memory/rom.ts`
+  - `src/components/misc/rectangle.ts`
+  - `src/components/misc/testcase.ts`
+  - `src/components/misc/text.ts`
+  - `src/components/pld/diode.ts`
+  - `src/components/pld/pull-down.ts`
+  - `src/components/pld/pull-up.ts`
+  - `src/components/subcircuit/subcircuit.ts`
+  - `src/components/switching/fgnfet.ts`
+  - `src/components/switching/fgpfet.ts`
+  - `src/components/switching/fuse.ts`
+  - `src/components/switching/nfet.ts`
+  - `src/components/switching/pfet.ts`
+  - `src/components/switching/plain-switch-dt.ts`
+  - `src/components/switching/plain-switch.ts`
+  - `src/components/switching/relay-dt.ts`
+  - `src/components/switching/relay.ts`
+  - `src/components/switching/switch-dt.ts`
+  - `src/components/switching/switch.ts`
+  - `src/components/switching/trans-gate.ts`
+  - `src/components/terminal/keyboard.ts`
+  - `src/components/terminal/terminal.ts`
+  - `src/components/wiring/async-seq.ts`
+  - `src/components/wiring/bit-selector.ts`
+  - `src/components/wiring/break.ts`
+  - `src/components/wiring/bus-splitter.ts`
+  - `src/components/wiring/decoder.ts`
+  - `src/components/wiring/delay.ts`
+  - `src/components/wiring/demux.ts`
+  - `src/components/wiring/driver-inv.ts`
+  - `src/components/wiring/driver.ts`
+  - `src/components/wiring/mux.ts`
+  - `src/components/wiring/priority-encoder.ts`
+  - `src/components/wiring/reset.ts`
+  - `src/components/wiring/splitter.ts`
+  - `src/components/wiring/stop.ts`
+  - `src/components/wiring/tunnel.ts`
+  - `src/components/graphics/__tests__/graphic-card.test.ts` (updated test assertion)
+  - `src/components/graphics/__tests__/led-matrix.test.ts` (updated test assertion)
+  - `src/components/graphics/__tests__/vga.test.ts` (updated test assertion)
+  - `src/components/misc/__tests__/text-rectangle.test.ts` (updated 2 test assertions)
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+
+## Task R1: `drawPath()` never fills — all IEEE gate shapes are hollow
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/editor/__tests__/draw-path-filled.test.ts`
+- **Files modified**: `src/core/renderer-interface.ts`, `src/editor/canvas-renderer.ts`, `src/export/svg-render-context.ts`, `src/components/gates/and.ts`, `src/components/gates/or.ts`, `src/components/gates/nand.ts`, `src/components/gates/nor.ts`, `src/components/gates/xor.ts`, `src/components/gates/xnor.ts`, `src/components/gates/not.ts`
+- **Tests**: 15/15 passing (draw-path-filled.test.ts) + 4494/4495 total suite passing (1 pre-existing skip)

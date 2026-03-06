@@ -186,11 +186,9 @@ export class SplitterElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._parts.length);
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);

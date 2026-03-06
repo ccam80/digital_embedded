@@ -132,12 +132,10 @@ export class SixteenSegElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const halfW = COMP_WIDTH / 2;
     const halfH = COMP_HEIGHT / 2;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Background
     ctx.setColor("COMPONENT_FILL");

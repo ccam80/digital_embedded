@@ -254,9 +254,7 @@ export class DiodeElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBody(ctx, label);
@@ -327,9 +325,7 @@ export class DiodeForwardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBody(ctx, label);
@@ -396,9 +392,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBodyBackward(ctx, label);

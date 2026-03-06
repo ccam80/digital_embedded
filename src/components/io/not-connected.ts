@@ -90,10 +90,8 @@ export class NotConnectedElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     const cx = COMP_WIDTH / 2;
     const cy = COMP_HEIGHT / 2;

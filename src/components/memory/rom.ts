@@ -217,9 +217,7 @@ export class ROMElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "ROM");
     ctx.restore();
   }
@@ -388,9 +386,7 @@ export class ROMDualPortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "ROM2");
     ctx.restore();
   }

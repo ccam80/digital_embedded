@@ -109,12 +109,10 @@ export class PolarityLedElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const cx = COMP_WIDTH / 2;
     const cy = COMP_HEIGHT / 2;
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawCircle(cx, cy, LED_RADIUS, true);

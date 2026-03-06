@@ -124,11 +124,9 @@ export class OrElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._inputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     if (this._wideShape) {
       this._drawIEEE(ctx, h);
@@ -190,7 +188,7 @@ export class OrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -218,7 +216,7 @@ export class OrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, false);
   }
 
   private _drawInversionBubbles(ctx: RenderContext): void {

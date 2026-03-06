@@ -131,11 +131,9 @@ export class PlainSwitchDTElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const poles = this._poles;
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);

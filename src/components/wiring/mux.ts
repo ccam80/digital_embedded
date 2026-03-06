@@ -134,12 +134,10 @@ export class MuxElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const inputCount = 1 << this._selectorBits;
     const h = componentHeight(inputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(

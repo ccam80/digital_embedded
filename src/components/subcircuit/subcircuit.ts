@@ -124,10 +124,8 @@ export class SubcircuitElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     const positionedPins = buildPositionedPinDeclarations(
       this._definition.pinLayout.filter((p) => p.direction === PinDirection.INPUT),

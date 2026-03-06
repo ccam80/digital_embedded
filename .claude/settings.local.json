@@ -15,7 +15,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:kazuhikoarase.github.io)",
       "WebFetch(domain:simulator-docs.circuitverse.org)",
-      "WebFetch(domain:wcours.gel.ulaval.ca)"
+      "WebFetch(domain:wcours.gel.ulaval.ca)",
+      "mcp__plugin_oh-my-claudecode_t__notepad_write_working"
     ]
   }
 }

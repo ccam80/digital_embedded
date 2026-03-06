@@ -152,10 +152,8 @@ export class TElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = this._withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, COMP_WIDTH, h, true);

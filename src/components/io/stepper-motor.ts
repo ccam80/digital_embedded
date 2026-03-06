@@ -190,9 +190,7 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMotorBody(ctx, this._label, "Bipolar");
     ctx.restore();
   }
@@ -243,9 +241,7 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawMotorBody(ctx, this._label, "Unipolar");
     ctx.restore();
   }

@@ -383,4 +383,149 @@ describe("TimingDiagramPanel", () => {
       panel.dispose();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // timeCursor — getCursorTime and getValuesAtTime
+  // -------------------------------------------------------------------------
+
+  describe("timeCursor", () => {
+    it("getCursorTime returns null when no cursor position is set", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 2, componentCount: 0 });
+
+      const panel = new TimingDiagramPanel(null, engine, TWO_CHANNELS, {
+        snapshotInterval: 0,
+      });
+
+      expect(panel.getCursorTime()).toBeNull();
+
+      panel.dispose();
+    });
+
+    it("getCursorTime returns correct simulation time after mousemove on canvas", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 2, componentCount: 0 });
+
+      const canvas = makeCanvas();
+      const panel = new TimingDiagramPanel(canvas, engine, TWO_CHANNELS, {
+        snapshotInterval: 0,
+      });
+
+      // Default viewport: startTime=0, endTime=100, canvas width=800, leftMargin=80
+      // drawWidth = 800 - 80 = 720
+      // cursorX=80 → time = 0 + ((80 - 80) / 720) * 100 = 0
+      // cursorX=440 → time = 0 + ((440 - 80) / 720) * 100 = 50
+      const moveEvent = new MouseEvent("mousemove", { bubbles: true });
+      Object.defineProperty(moveEvent, "offsetX", { value: 440 });
+      canvas.dispatchEvent(moveEvent);
+
+      const cursorTime = panel.getCursorTime();
+      expect(cursorTime).not.toBeNull();
+      expect(cursorTime!).toBeCloseTo(50, 1);
+
+      teardownCanvas(canvas);
+      panel.dispose();
+    });
+
+    it("getCursorTime returns null after mouseleave", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 2, componentCount: 0 });
+
+      const canvas = makeCanvas();
+      const panel = new TimingDiagramPanel(canvas, engine, TWO_CHANNELS, {
+        snapshotInterval: 0,
+      });
+
+      const moveEvent = new MouseEvent("mousemove", { bubbles: true });
+      Object.defineProperty(moveEvent, "offsetX", { value: 400 });
+      canvas.dispatchEvent(moveEvent);
+      expect(panel.getCursorTime()).not.toBeNull();
+
+      const leaveEvent = new MouseEvent("mouseleave", { bubbles: false });
+      canvas.dispatchEvent(leaveEvent);
+      expect(panel.getCursorTime()).toBeNull();
+
+      teardownCanvas(canvas);
+      panel.dispose();
+    });
+
+    it("getValuesAtTime returns empty array when no samples recorded", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 2, componentCount: 0 });
+
+      const panel = new TimingDiagramPanel(null, engine, TWO_CHANNELS, {
+        snapshotInterval: 0,
+      });
+
+      const values = panel.getValuesAtTime(5);
+      expect(values).toHaveLength(0);
+
+      panel.dispose();
+    });
+
+    it("getValuesAtTime returns closest sample value for each channel", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 2, componentCount: 0 });
+
+      const panel = new TimingDiagramPanel(null, engine, TWO_CHANNELS, {
+        snapshotInterval: 0,
+      });
+
+      // Record samples at t=1,2,3
+      engine.setSignalRaw(0, 1);
+      engine.setSignalRaw(1, 0xAB);
+      panel.onStep(1);
+
+      engine.setSignalRaw(0, 0);
+      engine.setSignalRaw(1, 0xCD);
+      panel.onStep(2);
+
+      engine.setSignalRaw(0, 1);
+      engine.setSignalRaw(1, 0xEF);
+      panel.onStep(3);
+
+      // Query at t=2 — exact match
+      const values = panel.getValuesAtTime(2);
+      expect(values).toHaveLength(2);
+
+      const clkRow = values.find((r) => r.name === "CLK");
+      const dataRow = values.find((r) => r.name === "DATA");
+
+      expect(clkRow).toBeDefined();
+      expect(clkRow!.value).toBe(0);
+      expect(clkRow!.width).toBe(1);
+
+      expect(dataRow).toBeDefined();
+      expect(dataRow!.value).toBe(0xCD);
+      expect(dataRow!.width).toBe(8);
+
+      panel.dispose();
+    });
+
+    it("getValuesAtTime finds closest sample when time is between recorded samples", () => {
+      const engine = new MockEngine();
+      engine.init({ netCount: 1, componentCount: 0 });
+
+      const channels = [{ name: "SIG", netId: 0, width: 1 }];
+      const panel = new TimingDiagramPanel(null, engine, channels, {
+        snapshotInterval: 0,
+      });
+
+      engine.setSignalRaw(0, 0);
+      panel.onStep(10);
+
+      engine.setSignalRaw(0, 1);
+      panel.onStep(20);
+
+      // t=13 is closer to t=10 than to t=20
+      const valuesAt13 = panel.getValuesAtTime(13);
+      expect(valuesAt13[0]!.value).toBe(0);
+
+      // t=17 is closer to t=20
+      const valuesAt17 = panel.getValuesAtTime(17);
+      expect(valuesAt17[0]!.value).toBe(1);
+
+      panel.dispose();
+    });
+  });
 });

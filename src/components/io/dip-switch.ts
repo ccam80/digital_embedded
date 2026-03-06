@@ -112,11 +112,9 @@ export class DipSwitchElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const w = componentWidth(this._bitCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, w, COMP_HEIGHT, true);

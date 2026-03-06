@@ -89,10 +89,8 @@ export class NotElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     if (this._wideShape) {
       this._drawIEEE(ctx);
@@ -141,7 +139,7 @@ export class NotElement extends AbstractCircuitElement {
         { op: "lineTo", x: 0, y: COMP_HEIGHT },
         { op: "closePath" },
       ],
-    });
+    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -151,7 +149,7 @@ export class NotElement extends AbstractCircuitElement {
         { op: "lineTo", x: 0, y: COMP_HEIGHT },
         { op: "closePath" },
       ],
-    });
+    }, false);
 
     ctx.drawCircle(COMP_WIDTH - BUBBLE_RADIUS, halfH, BUBBLE_RADIUS, false);
   }

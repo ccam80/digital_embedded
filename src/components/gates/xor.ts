@@ -124,11 +124,9 @@ export class XOrElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._inputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     if (this._wideShape) {
       this._drawIEEE(ctx, h);
@@ -189,7 +187,7 @@ export class XOrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -217,9 +215,8 @@ export class XOrElement extends AbstractCircuitElement {
         },
         { op: "closePath" },
       ],
-    });
+    }, false);
 
-    // Extra curved line on input side (XOR distinguishing feature)
     ctx.drawPath({
       operations: [
         { op: "moveTo", x: -0.5, y: 0 },
@@ -233,7 +230,7 @@ export class XOrElement extends AbstractCircuitElement {
           y: h,
         },
       ],
-    });
+    }, false);
   }
 
   private _drawInversionBubbles(ctx: RenderContext): void {

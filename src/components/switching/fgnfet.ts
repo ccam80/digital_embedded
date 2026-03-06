@@ -107,9 +107,7 @@ export class FGNFETElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 

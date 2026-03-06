@@ -78,12 +78,12 @@ export class CanvasRenderer implements RenderContext {
     }
   }
 
-  drawPath(path: PathData): void {
+  drawPath(path: PathData, filled?: boolean): void {
     this._ctx.beginPath();
     for (const op of path.operations) {
       this._applyPathOperation(op);
     }
-    this._ctx.stroke();
+    if (filled) { this._ctx.fill(); } else { this._ctx.stroke(); }
   }
 
   private _applyPathOperation(op: PathOperation): void {

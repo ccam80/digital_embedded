@@ -89,10 +89,8 @@ export class GroundElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     const cx = COMP_WIDTH / 2;
     const top = COMP_HEIGHT / 2 - 0.5;

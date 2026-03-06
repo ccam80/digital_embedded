@@ -101,10 +101,8 @@ export class TunnelElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Pentagon / flag shape pointing right
     const tipX = COMP_WIDTH;

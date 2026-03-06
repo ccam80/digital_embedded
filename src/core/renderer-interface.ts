@@ -74,7 +74,7 @@ export interface RenderContext {
   drawCircle(cx: number, cy: number, radius: number, filled: boolean): void;
   drawArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): void;
   drawPolygon(points: readonly Point[], filled: boolean): void;
-  drawPath(path: PathData): void;
+  drawPath(path: PathData, filled?: boolean): void;
   drawText(text: string, x: number, y: number, anchor: TextAnchor): void;
 
   save(): void;

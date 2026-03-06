@@ -284,9 +284,9 @@ export class SVGRenderContext implements RenderContext {
     this._emit(`<polygon points="${pointsStr}"${attrs}${transform}/>`);
   }
 
-  drawPath(path: PathData): void {
+  drawPath(path: PathData, filled?: boolean): void {
     const d = this._buildPathD(path.operations);
-    const attrs = this._strokeAttrs();
+    const attrs = filled ? this._fillAttrs() : this._strokeAttrs();
     const transform = this._transformAttr();
     this._emit(`<path d="${d}"${attrs}${transform}/>`);
   }

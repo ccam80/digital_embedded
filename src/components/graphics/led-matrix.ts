@@ -161,11 +161,9 @@ export class LedMatrixElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight();
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Component body
     ctx.setColor("COMPONENT_FILL");

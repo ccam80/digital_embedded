@@ -134,11 +134,9 @@ export class AndElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._inputCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     if (this._wideShape) {
       this._drawIEEE(ctx, h);
@@ -192,7 +190,7 @@ export class AndElement extends AbstractCircuitElement {
         { op: "lineTo", x: 0, y: h },
         { op: "closePath" },
       ],
-    });
+    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -211,7 +209,7 @@ export class AndElement extends AbstractCircuitElement {
         { op: "lineTo", x: 0, y: h },
         { op: "closePath" },
       ],
-    });
+    }, false);
   }
 
   /**

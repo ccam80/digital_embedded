@@ -3,7 +3,7 @@
  *
  * Spec tests:
  *   createsZip        — export returns a Blob with type application/zip
- *   containsMainCircuit — ZIP contains main .dig file
+ *   containsMainCircuit — ZIP contains main .dig file named from circuit metadata
  *   containsSubcircuits — ZIP contains subcircuit .dig files
  *   containsDataFiles — ZIP contains hex data files
  *   roundTrip         — create ZIP, extract, verify file contents match originals
@@ -11,13 +11,12 @@
 
 import { describe, it, expect } from "vitest";
 import { exportZip } from "../zip";
+import { Circuit } from "../../core/circuit";
+import { serializeCircuit } from "../../io/save";
 
 /**
  * Helper to extract files from a ZIP Blob.
- * Uses the browser's DecompressionStream API (available in modern browsers and Node 18+).
- * For now, we use a basic approach: parse the ZIP format manually or use a library.
- *
- * Note: fflate is already a dependency. We can use it to unzip as well.
+ * Uses fflate (already a dependency) to unzip.
  */
 async function unzipBlob(blob: Blob): Promise<Map<string, Uint8Array>> {
   const { unzip } = await import("fflate");
@@ -29,7 +28,6 @@ async function unzipBlob(blob: Blob): Promise<Map<string, Uint8Array>> {
       if (err) {
         reject(err);
       } else {
-        // unzip returns an object with filenames as keys and Uint8Array as values
         const map = new Map<string, Uint8Array>();
         for (const [name, data] of Object.entries(unzipped)) {
           map.set(name, data as Uint8Array);
@@ -42,31 +40,31 @@ async function unzipBlob(blob: Blob): Promise<Map<string, Uint8Array>> {
 
 describe("exportZip", () => {
   it("createsZip — export returns a Blob with type application/zip", async () => {
-    const mainXml = "<circuit></circuit>";
+    const circuit = new Circuit({ name: "main" });
     const subcircuits = new Map<string, string>();
     const dataFiles = new Map<string, ArrayBuffer>();
 
-    const blob = await exportZip(mainXml, "main.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
 
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.type).toBe("application/zip");
   });
 
-  it("containsMainCircuit — ZIP contains main .dig file", async () => {
-    const mainXml = "<circuit><name>Main</name></circuit>";
+  it("containsMainCircuit — ZIP contains main .dig file named from circuit metadata", async () => {
+    const circuit = new Circuit({ name: "circuit" });
     const subcircuits = new Map<string, string>();
     const dataFiles = new Map<string, ArrayBuffer>();
 
-    const blob = await exportZip(mainXml, "circuit.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
     const extracted = await unzipBlob(blob);
 
     expect(extracted.has("circuit.dig")).toBe(true);
     const mainContent = new TextDecoder().decode(extracted.get("circuit.dig")!);
-    expect(mainContent).toBe(mainXml);
+    expect(mainContent).toBe(serializeCircuit(circuit));
   });
 
   it("containsSubcircuits — ZIP contains subcircuit .dig files", async () => {
-    const mainXml = "<circuit><name>Main</name></circuit>";
+    const circuit = new Circuit({ name: "circuit" });
     const sub1Xml = "<circuit><name>Sub1</name></circuit>";
     const sub2Xml = "<circuit><name>Sub2</name></circuit>";
 
@@ -76,7 +74,7 @@ describe("exportZip", () => {
     ]);
     const dataFiles = new Map<string, ArrayBuffer>();
 
-    const blob = await exportZip(mainXml, "circuit.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
     const extracted = await unzipBlob(blob);
 
     expect(extracted.has("sub1.dig")).toBe(true);
@@ -90,7 +88,7 @@ describe("exportZip", () => {
   });
 
   it("containsDataFiles — ZIP contains hex data files", async () => {
-    const mainXml = "<circuit><name>Main</name></circuit>";
+    const circuit = new Circuit({ name: "circuit" });
     const subcircuits = new Map<string, string>();
 
     const dataContent = new Uint8Array([0x00, 0x01, 0x02, 0x03]);
@@ -98,7 +96,7 @@ describe("exportZip", () => {
       ["data.hex", dataContent.buffer],
     ]);
 
-    const blob = await exportZip(mainXml, "circuit.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
     const extracted = await unzipBlob(blob);
 
     expect(extracted.has("data.hex")).toBe(true);
@@ -107,7 +105,7 @@ describe("exportZip", () => {
   });
 
   it("roundTrip — create ZIP, extract, verify file contents match originals", async () => {
-    const mainXml = "<circuit><name>Main</name></circuit>";
+    const circuit = new Circuit({ name: "main" });
     const sub1Xml = "<circuit><name>Sub1</name></circuit>";
     const dataContent = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
 
@@ -118,13 +116,13 @@ describe("exportZip", () => {
       ["memory.hex", dataContent.buffer],
     ]);
 
-    const blob = await exportZip(mainXml, "main.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
     const extracted = await unzipBlob(blob);
 
     // Check main circuit
     expect(extracted.has("main.dig")).toBe(true);
     const mainExtracted = new TextDecoder().decode(extracted.get("main.dig")!);
-    expect(mainExtracted).toBe(mainXml);
+    expect(mainExtracted).toBe(serializeCircuit(circuit));
 
     // Check subcircuit
     expect(extracted.has("sub1.dig")).toBe(true);
@@ -138,7 +136,7 @@ describe("exportZip", () => {
   });
 
   it("handles multiple data files correctly", async () => {
-    const mainXml = "<circuit></circuit>";
+    const circuit = new Circuit({ name: "main" });
     const subcircuits = new Map<string, string>();
 
     const data1 = new Uint8Array([0x01, 0x02]);
@@ -149,7 +147,7 @@ describe("exportZip", () => {
       ["data2.bin", data2.buffer],
     ]);
 
-    const blob = await exportZip(mainXml, "main.dig", subcircuits, dataFiles);
+    const blob = await exportZip(circuit, subcircuits, dataFiles);
     const extracted = await unzipBlob(blob);
 
     expect(extracted.size).toBe(3); // main + 2 data files
@@ -162,8 +160,8 @@ describe("exportZip", () => {
   });
 
   it("handles empty subcircuits and data files", async () => {
-    const mainXml = "<circuit></circuit>";
-    const blob = await exportZip(mainXml, "main.dig", new Map(), new Map());
+    const circuit = new Circuit({ name: "main" });
+    const blob = await exportZip(circuit, new Map(), new Map());
     const extracted = await unzipBlob(blob);
 
     expect(extracted.size).toBe(1);
@@ -171,16 +169,25 @@ describe("exportZip", () => {
   });
 
   it("preserves file structure in ZIP", async () => {
-    const mainXml = "<circuit></circuit>";
+    const circuit = new Circuit({ name: "main" });
     const sub1Xml = "<circuit></circuit>";
 
     const subcircuits = new Map<string, string>([
       ["subcircuits/sub1.dig", sub1Xml],
     ]);
 
-    const blob = await exportZip(mainXml, "main.dig", subcircuits);
+    const blob = await exportZip(circuit, subcircuits);
     const extracted = await unzipBlob(blob);
 
     expect(extracted.has("subcircuits/sub1.dig")).toBe(true);
+  });
+
+  it("derives filename from circuit metadata name", async () => {
+    const circuit = new Circuit({ name: "my-adder" });
+    const blob = await exportZip(circuit, new Map());
+    const extracted = await unzipBlob(blob);
+
+    expect(extracted.has("my-adder.dig")).toBe(true);
+    expect(extracted.has("my-adder.dig.dig")).toBe(false);
   });
 });

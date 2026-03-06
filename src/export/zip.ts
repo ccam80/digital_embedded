@@ -9,6 +9,8 @@
  */
 
 import { zip } from "fflate";
+import type { Circuit } from "../core/circuit.js";
+import { serializeCircuit } from "../io/save.js";
 
 export interface ZipExportOptions {
   /**
@@ -22,26 +24,30 @@ export interface ZipExportOptions {
 /**
  * Export a circuit and its dependencies to a ZIP Blob.
  *
- * @param mainCircuitXml — The main circuit in XML format (.dig)
- * @param mainFileName — Filename for the main circuit (e.g., "circuit.dig")
- * @param subcircuits — Map of subcircuit filenames to their XML content
+ * The main circuit is serialized from the Circuit object. The filename is
+ * derived from the circuit's metadata name with a ".dig" extension.
+ *
+ * @param circuit — The main circuit to serialize and include
+ * @param subcircuits — Map of subcircuit filenames to their serialized XML content
  * @param dataFiles — Optional map of data files (filenames to ArrayBuffers)
  * @returns A promise that resolves with a Blob of type "application/zip"
  */
 export function exportZip(
-  mainCircuitXml: string,
-  mainFileName: string,
+  circuit: Circuit,
   subcircuits: Map<string, string>,
   dataFiles?: Map<string, ArrayBuffer>,
 ): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
     try {
+      const mainFileName = `${circuit.metadata.name}.dig`;
+      const mainCircuitContent = serializeCircuit(circuit);
+
       // Build the file map for fflate.zip()
       // fflate expects: { [path: string]: Uint8Array | [Uint8Array, { ...options }] }
       const files: Record<string, Uint8Array | [Uint8Array, object]> = {};
 
       // Add main circuit
-      files[mainFileName] = new TextEncoder().encode(mainCircuitXml);
+      files[mainFileName] = new TextEncoder().encode(mainCircuitContent);
 
       // Add subcircuits
       for (const [filename, content] of subcircuits) {
@@ -63,7 +69,7 @@ export function exportZip(
         }
 
         // Convert Uint8Array to Blob
-        const blob = new Blob([data], { type: "application/zip" });
+        const blob = new Blob([data as Uint8Array<ArrayBuffer>], { type: "application/zip" });
         resolve(blob);
       });
     } catch (err) {

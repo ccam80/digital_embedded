@@ -297,7 +297,7 @@ describe("LedMatrix", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw() calls translate with component position", () => {
+    it("draw() does not translate to component position (ElementRenderer handles that)", () => {
       const props = new PropertyBag();
       props.set("rowDataBits", 8);
       props.set("colAddrBits", 3);
@@ -306,7 +306,7 @@ describe("LedMatrix", () => {
       el.draw(ctx);
 
       const translateCalls = calls.filter((c) => c.method === "translate");
-      expect(translateCalls.some((c) => c.args[0] === 5 && c.args[1] === 3)).toBe(true);
+      expect(translateCalls.some((c) => c.args[0] === 5 && c.args[1] === 3)).toBe(false);
     });
   });
 

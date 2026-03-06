@@ -130,10 +130,8 @@ export class SevenSegHexElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Background
     ctx.setColor("COMPONENT_FILL");

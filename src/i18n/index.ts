@@ -3,9 +3,10 @@
  *
  * Provides locale-aware string lookup with parameter interpolation,
  * fallback chains, and locale change events.
+ *
+ * Locale JSON files are loaded via Vite dynamic import() — one code path
+ * for both browser and test environments.
  */
-
-import { loadLocale, getCachedLocale, clearLocaleCache } from './locale-loader';
 
 type LocaleData = Record<string, string>;
 type LocaleChangeCallback = (locale: string) => void;
@@ -13,6 +14,17 @@ type LocaleChangeCallback = (locale: string) => void;
 let currentLocale = 'en';
 let localeData: LocaleData = {};
 let localeChangeCallbacks: LocaleChangeCallback[] = [];
+const localeCache: Map<string, LocaleData> = new Map();
+
+async function loadLocale(locale: string): Promise<LocaleData> {
+  if (localeCache.has(locale)) {
+    return localeCache.get(locale)!;
+  }
+  const module = await import(`./locales/${locale}.json`);
+  const data: LocaleData = module.default as LocaleData;
+  localeCache.set(locale, data);
+  return data;
+}
 
 /**
  * Initialize the i18n system.
@@ -27,7 +39,6 @@ export async function initializeI18n(initialLocale: string = 'en'): Promise<void
     localeData = await loadLocale(initialLocale);
     currentLocale = initialLocale;
   } catch (error) {
-    // Fallback: use English or empty map
     console.warn(`Failed to load locale ${initialLocale}, using empty locale data`);
     localeData = {};
     currentLocale = initialLocale;
@@ -48,23 +59,19 @@ export async function initializeI18n(initialLocale: string = 'en'): Promise<void
 export function i18n(key: string, params?: Record<string, string | number>): string {
   let value: string | undefined;
 
-  // Look up key in current locale data
   value = getNestedValue(localeData, key);
 
-  // Fall back to English if not found and current locale is not English
   if (!value && currentLocale !== 'en') {
-    const enData = getCachedLocale('en');
+    const enData = localeCache.get('en');
     if (enData) {
       value = getNestedValue(enData, key);
     }
   }
 
-  // Fall back to the key itself if still not found
   if (!value) {
     value = key;
   }
 
-  // Interpolate parameters
   if (params) {
     Object.entries(params).forEach(([paramKey, paramValue]) => {
       const placeholder = new RegExp(`\\{${paramKey}\\}`, 'g');
@@ -85,11 +92,11 @@ export function i18n(key: string, params?: Record<string, string | number>): str
  */
 function getNestedValue(obj: LocaleData, path: string): string | undefined {
   const parts = path.split('.');
-  let current: any = obj;
+  let current: unknown = obj;
 
   for (const part of parts) {
-    if (current && typeof current === 'object' && part in current) {
-      current = current[part];
+    if (current !== null && typeof current === 'object' && part in (current as object)) {
+      current = (current as Record<string, unknown>)[part];
     } else {
       return undefined;
     }
@@ -113,7 +120,6 @@ export async function setLocale(locale: string): Promise<void> {
     triggerLocaleChangeCallbacks(locale);
   } catch (error) {
     console.error(`Failed to set locale to ${locale}:`, error);
-    // Keep the current locale unchanged
   }
 }
 
@@ -135,8 +141,6 @@ export function getLocale(): string {
  */
 export function onLocaleChange(callback: LocaleChangeCallback): () => void {
   localeChangeCallbacks.push(callback);
-
-  // Return unregister function
   return () => {
     localeChangeCallbacks = localeChangeCallbacks.filter((cb) => cb !== callback);
   };
@@ -162,7 +166,7 @@ function triggerLocaleChangeCallbacks(locale: string): void {
  * Useful for testing.
  */
 export function resetI18n(): void {
-  clearLocaleCache();
+  localeCache.clear();
   localeData = {};
   currentLocale = 'en';
   localeChangeCallbacks = [];

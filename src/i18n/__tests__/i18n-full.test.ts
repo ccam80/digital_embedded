@@ -7,21 +7,15 @@ import {
   initializeI18n,
   resetI18n,
 } from '../index';
-import { clearLocaleCache, registerLocaleModule } from '../locale-loader';
-import enData from '../locales/en.json';
 
 describe('i18n Full Implementation', () => {
   beforeEach(async () => {
-    clearLocaleCache();
     resetI18n();
-    // Register the English locale module for testing
-    registerLocaleModule('en', async () => ({ default: enData }));
     await initializeI18n('en');
   });
 
   afterEach(() => {
     resetI18n();
-    clearLocaleCache();
   });
 
   describe('lookupKey', () => {
@@ -65,23 +59,17 @@ describe('i18n Full Implementation', () => {
 
     it('should handle missing parameters gracefully', () => {
       const result = i18n('errors.notFound', {});
-      // The key contains {name} but no value was provided, so it stays as-is
       expect(result).toContain('{name}');
     });
   });
 
   describe('fallbackToEnglish', () => {
     it('should fall back to English when key missing in current locale', async () => {
-      // First load a German locale (simulated with partial data)
-      // For this test, we'll use a spy on the locale data
       await setLocale('en');
-
-      // Verify English has the key
       expect(i18n('menu.file.open')).toBe('Open');
     });
 
     it('should use English as fallback when current locale is not en', async () => {
-      // Set to a non-existent locale that won't have all keys
       const result = i18n('menu.file.open');
       expect(result).toBe('Open');
     });
@@ -139,7 +127,6 @@ describe('i18n Full Implementation', () => {
       unregister();
       await setLocale('en');
 
-      // Should still be 1, not incremented
       expect(callback).toHaveBeenCalledTimes(1);
     });
 
@@ -152,7 +139,6 @@ describe('i18n Full Implementation', () => {
       onLocaleChange(errorCallback);
       onLocaleChange(goodCallback);
 
-      // Should not throw
       await expect(setLocale('en')).resolves.toBeUndefined();
 
       expect(errorCallback).toHaveBeenCalled();
@@ -181,7 +167,6 @@ describe('i18n Full Implementation', () => {
 
       await setLocale('invalid-locale-that-doesnt-exist');
 
-      // Should keep the original locale on error
       expect(getLocale()).toBe(originalLocale);
     });
   });
@@ -214,10 +199,8 @@ describe('i18n Full Implementation', () => {
 
     it('should handle initialization failure gracefully', async () => {
       resetI18n();
-      // Try to initialize with non-existent locale
       await initializeI18n('nonexistent-locale');
 
-      // Should set locale even if loading fails
       expect(getLocale()).toBe('nonexistent-locale');
     });
   });

@@ -383,7 +383,7 @@ describe("VGA", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw() calls translate with component position", () => {
+    it("draw() does not translate to component position (ElementRenderer handles that)", () => {
       const props = new PropertyBag();
       props.set("colorBits", 4);
       props.set("frameWidth", 16);
@@ -393,7 +393,7 @@ describe("VGA", () => {
       el.draw(ctx);
 
       const translateCalls = calls.filter((c) => c.method === "translate");
-      expect(translateCalls.some((c) => c.args[0] === 7 && c.args[1] === 2)).toBe(true);
+      expect(translateCalls.some((c) => c.args[0] === 7 && c.args[1] === 2)).toBe(false);
     });
   });
 

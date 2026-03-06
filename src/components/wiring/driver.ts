@@ -111,10 +111,8 @@ export class DriverElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Triangle body pointing right (buffer/driver symbol)
     ctx.setColor("COMPONENT_FILL");

@@ -241,9 +241,7 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawEEPROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "EEPROM");
     ctx.restore();
   }
@@ -434,9 +432,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     ctx.save();
-    ctx.translate(x, y);
     drawEEPROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "EEPROM2");
     ctx.restore();
   }

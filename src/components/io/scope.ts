@@ -166,11 +166,9 @@ export class ScopeElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const { x, y } = this.position;
     const h = componentHeight(this._channelCount);
 
     ctx.save();
-    ctx.translate(x, y);
 
     // Component body
     ctx.setColor("COMPONENT_FILL");

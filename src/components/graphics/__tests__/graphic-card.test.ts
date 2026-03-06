@@ -473,7 +473,7 @@ describe("GraphicCard", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw() calls translate with component position", () => {
+    it("draw() does not translate to component position (ElementRenderer handles that)", () => {
       const props = new PropertyBag();
       props.set("dataBits", 8);
       props.set("graphicWidth", 8);
@@ -485,7 +485,7 @@ describe("GraphicCard", () => {
       const translateCalls = calls.filter((c) => c.method === "translate");
       expect(
         translateCalls.some((c) => c.args[0] === 5 && c.args[1] === 3),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 
