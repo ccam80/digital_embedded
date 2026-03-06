@@ -137,6 +137,11 @@ export class WireDrawingMode {
     this._waypoints = [];
   }
 
+  /** Returns true when wire-drawing mode is active. */
+  isActive(): boolean {
+    return this._active;
+  }
+
   /**
    * Returns the current preview segments for the renderer.
    * These are the locked segments plus the current Manhattan route from the
