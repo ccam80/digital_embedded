@@ -125,6 +125,13 @@ export class CompiledCircuitImpl implements CompiledCircuit {
    */
   readonly wireToNetId: Map<Wire, number>;
 
+  /**
+   * Maps "{instanceId}:{pinLabel}" keys to net IDs for interactive input
+   * (e.g. clicking an In component) and pin-level signal reading.
+   * Populated by the compiler after net IDs are assigned.
+   */
+  readonly pinNetMap: Map<string, number>;
+
   constructor(fields: {
     netCount: number;
     componentCount: number;
@@ -139,6 +146,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     componentToElement: Map<number, CircuitElement>;
     labelToNetId: Map<string, number>;
     wireToNetId: Map<Wire, number>;
+    pinNetMap: Map<string, number>;
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
@@ -153,5 +161,6 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.componentToElement = fields.componentToElement;
     this.labelToNetId = fields.labelToNetId;
     this.wireToNetId = fields.wireToNetId;
+    this.pinNetMap = fields.pinNetMap;
   }
 }

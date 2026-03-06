@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createEditorBinding } from "../editor-binding";
 import type { EditorBinding } from "../editor-binding";
 import { MockEngine } from "@/test-utils/mock-engine";
-import { Wire } from "@/core/circuit";
+import { Wire, Circuit } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
@@ -46,6 +46,7 @@ class StubElement implements CircuitElement {
 
 describe("EditorBinding", () => {
   let binding: EditorBinding;
+  let circuit: Circuit;
   let engine: MockEngine;
   let wire: Wire;
   let element: StubElement;
@@ -54,6 +55,7 @@ describe("EditorBinding", () => {
 
   beforeEach(() => {
     binding = createEditorBinding();
+    circuit = new Circuit();
     engine = new MockEngine();
     engine.init({ netCount: 8, componentCount: 2 });
 
@@ -66,12 +68,12 @@ describe("EditorBinding", () => {
 
   it("bind — bind circuit + engine, assert isBound is true", () => {
     expect(binding.isBound).toBe(false);
-    binding.bind(engine, wireNetMap, pinNetMap);
+    binding.bind(circuit, engine, wireNetMap, pinNetMap);
     expect(binding.isBound).toBe(true);
   });
 
   it("unbind — unbind, assert isBound is false, engine is null", () => {
-    binding.bind(engine, wireNetMap, pinNetMap);
+    binding.bind(circuit, engine, wireNetMap, pinNetMap);
     expect(binding.isBound).toBe(true);
     binding.unbind();
     expect(binding.isBound).toBe(false);
@@ -81,7 +83,7 @@ describe("EditorBinding", () => {
   it("getWireValue — bind with known wireNetMap, mock engine returns specific value for net ID", () => {
     // Set net 3 to value 42
     engine.setSignalRaw(3, 42);
-    binding.bind(engine, wireNetMap, pinNetMap);
+    binding.bind(circuit, engine, wireNetMap, pinNetMap);
 
     const value = binding.getWireValue(wire);
     expect(value).toBe(42);
@@ -94,7 +96,7 @@ describe("EditorBinding", () => {
   });
 
   it("setInput — call setInput(), verify engine.setSignalValue() called with correct net ID", () => {
-    binding.bind(engine, wireNetMap, pinNetMap);
+    binding.bind(circuit, engine, wireNetMap, pinNetMap);
     const value = BitVector.fromNumber(1, 1);
     binding.setInput(element, "A", value);
 

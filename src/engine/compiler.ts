@@ -714,6 +714,21 @@ export function compileCircuit(
   }
 
   // -----------------------------------------------------------------------
+  // Step 13b: Build pinNetMap
+  // -----------------------------------------------------------------------
+
+  const pinNetMap = new Map<string, number>();
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const refs = allPinRefs[i]!;
+    for (let j = 0; j < refs.length; j++) {
+      const netId = slotToNetId(slotOf(i, j));
+      const pin = refs[j]!.pin;
+      pinNetMap.set(`${el.instanceId}:${pin.label}`, netId);
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Step 14: Allocate SCC snapshot buffer
   // -----------------------------------------------------------------------
 
@@ -760,6 +775,7 @@ export function compileCircuit(
     componentToElement,
     labelToNetId,
     wireToNetId,
+    pinNetMap,
   });
 }
 

@@ -11,7 +11,7 @@
  * module; this module does not import the renderer.
  */
 
-import type { Wire } from "@/core/circuit";
+import type { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { SimulationEngine } from "@/core/engine-interface";
 import type { BitVector } from "@/core/signal";
@@ -24,10 +24,12 @@ export interface EditorBinding {
   /**
    * Connect a circuit, engine, and net-ID mappings.
    *
+   * circuit     — the compiled circuit providing component-to-pin context.
    * wireNetMap  — maps each Wire to the net ID assigned by the compiler.
    * pinNetMap   — maps "{instanceId}:{pinLabel}" keys to net IDs.
    */
   bind(
+    circuit: Circuit,
     engine: SimulationEngine,
     wireNetMap: Map<Wire, number>,
     pinNetMap: Map<string, number>,
@@ -67,21 +69,25 @@ export interface EditorBinding {
 // ---------------------------------------------------------------------------
 
 class EditorBindingImpl implements EditorBinding {
+  private _circuit: Circuit | null = null;
   private _engine: SimulationEngine | null = null;
   private _wireNetMap: Map<Wire, number> = new Map();
   private _pinNetMap: Map<string, number> = new Map();
 
   bind(
+    circuit: Circuit,
     engine: SimulationEngine,
     wireNetMap: Map<Wire, number>,
     pinNetMap: Map<string, number>,
   ): void {
+    this._circuit = circuit;
     this._engine = engine;
     this._wireNetMap = wireNetMap;
     this._pinNetMap = pinNetMap;
   }
 
   unbind(): void {
+    this._circuit = null;
     this._engine = null;
     this._wireNetMap = new Map();
     this._pinNetMap = new Map();

@@ -1404,3 +1404,29 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: `src/editor/__tests__/draw-path-filled.test.ts`
 - **Files modified**: `src/core/renderer-interface.ts`, `src/editor/canvas-renderer.ts`, `src/export/svg-render-context.ts`, `src/components/gates/and.ts`, `src/components/gates/or.ts`, `src/components/gates/nand.ts`, `src/components/gates/nor.ts`, `src/components/gates/xor.ts`, `src/components/gates/xnor.ts`, `src/components/gates/not.ts`
 - **Tests**: 15/15 passing (draw-path-filled.test.ts) + 4494/4495 total suite passing (1 pre-existing skip)
+
+## Task A2: EditorBinding.bind() missing `circuit` parameter
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/integration/editor-binding.ts, src/integration/__tests__/editor-binding.test.ts
+- **Tests**: 5/5 passing
+
+## Task S1: Update spec for `analyseSequential`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: spec/phase-8-analysis-synthesis.md
+- **Tests**: N/A (spec-only update, no code change)
+
+## Task G1: Reduce main.ts to minimal placeholder
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/main.ts` (reduced from ~670 lines to 2 lines), `src/app/app-init.ts` (absorbed functionality)
+- **Tests**: 4494/4495 passing (1 pre-existing skip)
+
+## Task I1: Wire simulation engine to UI
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/engine/compiled-circuit.ts` (added pinNetMap field), `src/engine/compiler.ts` (populate pinNetMap), `src/app/app-init.ts` (engine wiring, button handlers, live wire coloring, In-component click toggling, circuit edit invalidation)
+- **Tests**: 4494/4495 passing (1 pre-existing skip)

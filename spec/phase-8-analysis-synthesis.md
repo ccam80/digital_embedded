@@ -164,7 +164,7 @@ All decisions from `spec/shared-decisions.md` apply. Additionally:
   ```
 
 - **Files to create**:
-  - `src/analysis/state-transition.ts` — `analyseSequential(facade, circuit): StateTransitionTable`
+  - `src/analysis/state-transition.ts` — `analyseSequential(facade: SequentialAnalysisFacade, stateVars: SignalSpec[], inputs: SignalSpec[], outputs: SignalSpec[]): StateTransitionTable`
 
 - **Tests**:
   - `src/analysis/__tests__/state-transition.test.ts::dFlipflop` — D flip-flop circuit → correct state transition table (Q_next = D)
