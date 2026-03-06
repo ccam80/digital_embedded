@@ -159,17 +159,17 @@ describe('path-analysis', () => {
     ], makeProps({ label: 'A' }));
 
     const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 3),
+      makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'B' }));
 
     const andGate = new StubElement('And', 'and1', { x: 4, y: 1 }, [
-      makePin('in0', PinDirection.INPUT, 4, 1),
-      makePin('in1', PinDirection.INPUT, 4, 3),
-      makePin('out', PinDirection.OUTPUT, 8, 2),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 2),
+      makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
     const outEl = new StubElement('Out', 'outY', { x: 10, y: 2 }, [
-      makePin('in', PinDirection.INPUT, 10, 2),
+      makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 
     circuit.addElement(inA);
@@ -208,32 +208,32 @@ describe('path-analysis', () => {
     ], makeProps({ label: 'A' }));
 
     const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 2),
+      makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'B' }));
 
     const inC = new StubElement('In', 'inC', { x: 0, y: 3 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 3),
+      makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'C' }));
 
     const andGate = new StubElement('And', 'and1', { x: 4, y: 0 }, [
-      makePin('in0', PinDirection.INPUT, 4, 0),
-      makePin('in1', PinDirection.INPUT, 4, 2),
-      makePin('out', PinDirection.OUTPUT, 8, 1),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 2),
+      makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
     const orGate = new StubElement('Or', 'or1', { x: 10, y: 1 }, [
-      makePin('in0', PinDirection.INPUT, 10, 1),
-      makePin('in1', PinDirection.INPUT, 10, 3),
-      makePin('out', PinDirection.OUTPUT, 14, 2),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 2),
+      makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
     const notGate = new StubElement('Not', 'not1', { x: 16, y: 2 }, [
-      makePin('in', PinDirection.INPUT, 16, 2),
-      makePin('out', PinDirection.OUTPUT, 20, 2),
+      makePin('in', PinDirection.INPUT, 0, 0),
+      makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     const outEl = new StubElement('Out', 'outY', { x: 22, y: 2 }, [
-      makePin('in', PinDirection.INPUT, 22, 2),
+      makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 
     circuit.addElement(inA);
@@ -280,30 +280,30 @@ describe('path-analysis', () => {
     ], makeProps({ label: 'A' }));
 
     const inB = new StubElement('In', 'inB', { x: 0, y: 4 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 4),
+      makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'B' }));
 
     // AND gate on path 1: one input from inA, output at (8, 0)
     const andGate = new StubElement('And', 'and1', { x: 4, y: 0 }, [
-      makePin('in0', PinDirection.INPUT, 4, 0),
-      makePin('in1', PinDirection.INPUT, 4, 1), // dummy second input
-      makePin('out', PinDirection.OUTPUT, 8, 0),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 1), // dummy second input
+      makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     // OR gate on path 2: one input from inB, output at (8, 4)
     const orGate = new StubElement('Or', 'or1', { x: 4, y: 4 }, [
-      makePin('in0', PinDirection.INPUT, 4, 4),
-      makePin('in1', PinDirection.INPUT, 4, 5), // dummy second input
-      makePin('out', PinDirection.OUTPUT, 8, 4),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 1), // dummy second input
+      makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     // Two separate Out components to avoid merging the paths
     const outY1 = new StubElement('Out', 'outY1', { x: 10, y: 0 }, [
-      makePin('in', PinDirection.INPUT, 10, 0),
+      makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y1' }));
 
     const outY2 = new StubElement('Out', 'outY2', { x: 10, y: 4 }, [
-      makePin('in', PinDirection.INPUT, 10, 4),
+      makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y2' }));
 
     circuit.addElement(inA);
@@ -341,22 +341,22 @@ describe('path-analysis', () => {
     ], makeProps({ label: 'A' }));
 
     const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 3),
+      makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'B' }));
 
     const andGate = new StubElement('And', 'and1', { x: 4, y: 1 }, [
-      makePin('in0', PinDirection.INPUT, 4, 1),
-      makePin('in1', PinDirection.INPUT, 4, 3),
-      makePin('out', PinDirection.OUTPUT, 8, 2),
+      makePin('in0', PinDirection.INPUT, 0, 0),
+      makePin('in1', PinDirection.INPUT, 0, 2),
+      makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
     const notGate = new StubElement('Not', 'not1', { x: 10, y: 2 }, [
-      makePin('in', PinDirection.INPUT, 10, 2),
-      makePin('out', PinDirection.OUTPUT, 14, 2),
+      makePin('in', PinDirection.INPUT, 0, 0),
+      makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     const outEl = new StubElement('Out', 'outY', { x: 16, y: 2 }, [
-      makePin('in', PinDirection.INPUT, 16, 2),
+      makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 
     circuit.addElement(inA);

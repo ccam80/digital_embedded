@@ -44,8 +44,8 @@ class MockElement extends AbstractCircuitElement {
   getHelpText(): string { return ""; }
 }
 
-function makePin(label: string, direction: PinDirection, worldX: number, worldY: number): Pin {
-  return { label, direction, position: { x: worldX, y: worldY }, bitWidth: 1, isNegated: false, isClock: false };
+function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
+  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false };
 }
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
@@ -167,29 +167,29 @@ function buildHalfAdder(): Circuit {
   ], makePropBag({ label: "A" }));
 
   const inB = new MockElement("In", "inB", { x: 0, y: 2 }, [
-    makePin("out", PinDirection.OUTPUT, 2, 2),
+    makePin("out", PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: "B" }));
 
   // XOR: inputs at (4,0) and (4,2), output at (8,1)
   const xor = new MockElement("XOR", "xor", { x: 4, y: 0 }, [
-    makePin("in0", PinDirection.INPUT, 4, 0),
-    makePin("in1", PinDirection.INPUT, 4, 2),
-    makePin("out", PinDirection.OUTPUT, 8, 1),
+    makePin("in0", PinDirection.INPUT, 0, 0),
+    makePin("in1", PinDirection.INPUT, 0, 2),
+    makePin("out", PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   // AND: shares input pin positions with XOR (same net A and net B)
   const and = new MockElement("AND", "and", { x: 4, y: 4 }, [
-    makePin("in0", PinDirection.INPUT, 4, 0),
-    makePin("in1", PinDirection.INPUT, 4, 2),
-    makePin("out", PinDirection.OUTPUT, 8, 5),
+    makePin("in0", PinDirection.INPUT, 0, -4),
+    makePin("in1", PinDirection.INPUT, 0, -2),
+    makePin("out", PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const outS = new MockElement("Out", "outS", { x: 9, y: 1 }, [
-    makePin("in", PinDirection.INPUT, 9, 1),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "S" }));
 
   const outC = new MockElement("Out", "outC", { x: 9, y: 5 }, [
-    makePin("in", PinDirection.INPUT, 9, 5),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "C" }));
 
   circuit.elements.push(inA, inB, xor, and, outS, outC);
@@ -229,29 +229,29 @@ function buildSrLatch(): Circuit {
   ], makePropBag({ label: "S" }));
 
   const inR = new MockElement("In", "inR", { x: 0, y: 10 }, [
-    makePin("out", PinDirection.OUTPUT, 2, 10),
+    makePin("out", PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: "R" }));
 
   // NOR1: in0=S at (4,0), in1=QB_feedback at (4,6), out=Q at (8,3)
   const nor1 = new MockElement("NOR", "nor1", { x: 4, y: 0 }, [
-    makePin("in0", PinDirection.INPUT, 4, 0),
-    makePin("in1", PinDirection.INPUT, 4, 6),
-    makePin("out", PinDirection.OUTPUT, 8, 3),
+    makePin("in0", PinDirection.INPUT, 0, 0),
+    makePin("in1", PinDirection.INPUT, 0, 6),
+    makePin("out", PinDirection.OUTPUT, 4, 3),
   ], makePropBag());
 
   // NOR2: in0=Q_feedback at (4,4), in1=R at (4,10), out=QB at (8,7)
   const nor2 = new MockElement("NOR", "nor2", { x: 4, y: 4 }, [
-    makePin("in0", PinDirection.INPUT, 4, 4),
-    makePin("in1", PinDirection.INPUT, 4, 10),
-    makePin("out", PinDirection.OUTPUT, 8, 7),
+    makePin("in0", PinDirection.INPUT, 0, 0),
+    makePin("in1", PinDirection.INPUT, 0, 6),
+    makePin("out", PinDirection.OUTPUT, 4, 3),
   ], makePropBag());
 
   const outQ = new MockElement("Out", "outQ", { x: 9, y: 3 }, [
-    makePin("in", PinDirection.INPUT, 9, 3),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "Q" }));
 
   const outQB = new MockElement("Out", "outQB", { x: 9, y: 7 }, [
-    makePin("in", PinDirection.INPUT, 9, 7),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "QB" }));
 
   circuit.elements.push(inS, inR, nor1, nor2, outQ, outQB);
@@ -285,24 +285,24 @@ function buildChainOfInverters(): Circuit {
 
   // NOT A: input at (4,0), output at (8,0)
   const notA = new MockElement("NOT", "notA", { x: 4, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 4, 0),
-    makePin("out", PinDirection.OUTPUT, 8, 0),
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   // NOT B: input at (10,0), output at (14,0)
   const notB = new MockElement("NOT", "notB", { x: 10, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 10, 0),
-    makePin("out", PinDirection.OUTPUT, 14, 0),
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   // NOT C: input at (16,0), output at (20,0)
   const notC = new MockElement("NOT", "notC", { x: 16, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 16, 0),
-    makePin("out", PinDirection.OUTPUT, 20, 0),
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   const outY = new MockElement("Out", "outY", { x: 21, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 22, 0),
+    makePin("in", PinDirection.INPUT, 1, 0),
   ], makePropBag({ label: "Y" }));
 
   circuit.elements.push(inX, notA, notB, notC, outY);
@@ -323,26 +323,26 @@ function buildRingOscillator(): Circuit {
 
   // NOT A: input at (4,0), output at (8,0)
   const notA = new MockElement("NOT", "notA", { x: 4, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 4, 0),
-    makePin("out", PinDirection.OUTPUT, 8, 0),
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   // NOT B: input at (10,0), output at (14,0)
   const notB = new MockElement("NOT", "notB", { x: 10, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 10, 0),
-    makePin("out", PinDirection.OUTPUT, 14, 0),
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   // NOT C: input at (16,0), output at (4,0) — feeds back to NOT A input
   const notC = new MockElement("NOT", "notC", { x: 16, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 16, 0),
-    makePin("out", PinDirection.OUTPUT, 4, 0),  // feedback: output at same position as NOT A input
+    makePin("in", PinDirection.INPUT, 0, 0),
+    makePin("out", PinDirection.OUTPUT, -12, 0),  // feedback: world (4,0) = local (4-16, 0-0)
   ], makePropBag());
 
   circuit.elements.push(notA, notB, notC);
   circuit.wires.push({ start: { x: 8, y: 0 }, end: { x: 10, y: 0 } } as any);
   circuit.wires.push({ start: { x: 14, y: 0 }, end: { x: 16, y: 0 } } as any);
-  // Ring closure: NOT C output (4,0) is at same position as NOT A input (4,0)
+  // Ring closure: NOT C output world (4,0) is at same position as NOT A input world (4,0)
   // — pin position overlap creates the net (no separate wire needed)
 
   return circuit;

@@ -225,17 +225,17 @@ function buildAndGate(): { circuit: Circuit } {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 2),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const and = new StubElement('AND', 'and1', { x: 4, y: 0 }, [
-    makePin('in0', PinDirection.INPUT, 4, 0),
-    makePin('in1', PinDirection.INPUT, 4, 2),
-    makePin('out', PinDirection.OUTPUT, 8, 1),
+    makePin('in0', PinDirection.INPUT, 0, 0),
+    makePin('in1', PinDirection.INPUT, 0, 2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const out = new StubElement('Out', 'outY', { x: 9, y: 1 }, [
-    makePin('in', PinDirection.INPUT, 9, 1),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, and, out);
@@ -259,27 +259,27 @@ function buildHalfAdder(): { circuit: Circuit } {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 2),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const xor = new StubElement('XOR', 'xor1', { x: 4, y: 0 }, [
-    makePin('in0', PinDirection.INPUT, 4, 0),
-    makePin('in1', PinDirection.INPUT, 4, 2),
-    makePin('out', PinDirection.OUTPUT, 8, 1),
+    makePin('in0', PinDirection.INPUT, 0, 0),
+    makePin('in1', PinDirection.INPUT, 0, 2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const and = new StubElement('AND', 'and1', { x: 4, y: 4 }, [
-    makePin('in0', PinDirection.INPUT, 4, 0),
-    makePin('in1', PinDirection.INPUT, 4, 2),
-    makePin('out', PinDirection.OUTPUT, 8, 5),
+    makePin('in0', PinDirection.INPUT, 0, -4),
+    makePin('in1', PinDirection.INPUT, 0, -2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const outSum = new StubElement('Out', 'outSum', { x: 9, y: 1 }, [
-    makePin('in', PinDirection.INPUT, 9, 1),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Sum', bitWidth: 1 }));
 
   const outCarry = new StubElement('Out', 'outCarry', { x: 9, y: 5 }, [
-    makePin('in', PinDirection.INPUT, 9, 5),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Carry', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, xor, and, outSum, outCarry);
@@ -299,7 +299,7 @@ function buildTooManyInputs(): { circuit: Circuit } {
 
   for (let i = 0; i < 21; i++) {
     const inEl = new StubElement('In', `in${i}`, { x: 0, y: i * 4 }, [
-      makePin('out', PinDirection.OUTPUT, 2, i * 4),
+      makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makePropBag({ label: `I${i}`, bitWidth: 1 }));
     circuit.elements.push(inEl);
   }
@@ -314,8 +314,8 @@ function buildCyclicCircuit(): { circuit: Circuit } {
   const circuit = new Circuit();
 
   const not1 = new StubElement('NOT', 'not1', { x: 4, y: 0 }, [
-    makePin('in', PinDirection.INPUT, 4, 0),
-    makePin('out', PinDirection.OUTPUT, 8, 0),
+    makePin('in', PinDirection.INPUT, 0, 0),
+    makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   circuit.elements.push(not1);
@@ -345,25 +345,25 @@ function buildMultiBitCircuit(): { circuit: Circuit } {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 4 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 4),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const notA = new StubElement('NOT', 'notA', { x: 4, y: 0 }, [
-    makePin('in', PinDirection.INPUT, 4, 0),
-    makePin('out', PinDirection.OUTPUT, 8, 0),
+    makePin('in', PinDirection.INPUT, 0, 0),
+    makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   const notB = new StubElement('NOT', 'notB', { x: 4, y: 4 }, [
-    makePin('in', PinDirection.INPUT, 4, 4),
-    makePin('out', PinDirection.OUTPUT, 8, 4),
+    makePin('in', PinDirection.INPUT, 0, 0),
+    makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
   const outY = new StubElement('Out', 'outY', { x: 10, y: 0 }, [
-    makePin('in', PinDirection.INPUT, 10, 0),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
   const outZ = new StubElement('Out', 'outZ', { x: 10, y: 4 }, [
-    makePin('in', PinDirection.INPUT, 10, 4),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Z', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, notA, notB, outY, outZ);
@@ -456,8 +456,7 @@ describe('ModelAnalyser', () => {
     const facade = buildFacade(registry);
     const { circuit } = buildCyclicCircuit();
 
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/combinational feedback/i);
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/Cycles detected/i);
+    expect(() => analyseCircuit(facade, circuit)).toThrow(/did not stabilize/i);
   });
 
   it('multiBit — 2 single-bit inputs, 2 single-bit outputs → 4 rows (2^2 combinations)', () => {

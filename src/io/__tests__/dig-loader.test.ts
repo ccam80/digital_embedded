@@ -143,16 +143,16 @@ describe("DigLoader", () => {
     const registry = buildAndGateRegistry();
     const circuit = loadDigCircuit(parsed, registry);
 
-    // In "A" is at (200, 200) per the dig file
+    // In "A" is at (200, 200) in .dig pixel coords = (10, 10) grid units
     const inElements = circuit.elements.filter((el) => el.typeId === "In");
     const inA = inElements.find((el) => String(el.getProperties().getOrDefault("label", "")) === "A");
     expect(inA).toBeDefined();
-    expect(inA!.position).toEqual({ x: 200, y: 200 });
+    expect(inA!.position).toEqual({ x: 10, y: 10 });
 
-    // And gate is at (300, 200) per the dig file
+    // And gate is at (300, 200) in .dig pixel coords = (15, 10) grid units
     const andElement = circuit.elements.find((el) => el.typeId === "And");
     expect(andElement).toBeDefined();
-    expect(andElement!.position).toEqual({ x: 300, y: 200 });
+    expect(andElement!.position).toEqual({ x: 15, y: 10 });
   });
 
   it("wiresCreatedCorrectly", () => {
@@ -163,15 +163,15 @@ describe("DigLoader", () => {
 
     expect(circuit.wires).toHaveLength(5);
 
-    // First wire: p1=(200,200), p2=(300,200)
+    // First wire: p1=(200,200), p2=(300,200) → grid (10,10) to (15,10)
     const wire0 = circuit.wires[0];
-    expect(wire0.start).toEqual({ x: 200, y: 200 });
-    expect(wire0.end).toEqual({ x: 300, y: 200 });
+    expect(wire0.start).toEqual({ x: 10, y: 10 });
+    expect(wire0.end).toEqual({ x: 15, y: 10 });
 
-    // Last wire: p1=(380,220), p2=(420,220)
+    // Last wire: p1=(380,220), p2=(420,220) → grid (19,11) to (21,11)
     const wire4 = circuit.wires[4];
-    expect(wire4.start).toEqual({ x: 380, y: 220 });
-    expect(wire4.end).toEqual({ x: 420, y: 220 });
+    expect(wire4.start).toEqual({ x: 19, y: 11 });
+    expect(wire4.end).toEqual({ x: 21, y: 11 });
   });
 
   it("unknownElementThrows", () => {
@@ -281,8 +281,8 @@ describe("DigLoader", () => {
   it("createWireFromDig", () => {
     const dw = { p1: { x: 10, y: 20 }, p2: { x: 30, y: 40 } };
     const wire = createWireFromDig(dw);
-    expect(wire.start).toEqual({ x: 10, y: 20 });
-    expect(wire.end).toEqual({ x: 30, y: 40 });
+    expect(wire.start).toEqual({ x: 0.5, y: 1 });
+    expect(wire.end).toEqual({ x: 1.5, y: 2 });
   });
 
   it("extractCircuitMetadataWithMeasurementOrdering", () => {
@@ -461,7 +461,7 @@ describe("DigLoader", () => {
     const circuit = loadDig(xml, registry);
     expect(circuit.elements).toHaveLength(1);
     const el = circuit.elements[0];
-    expect(el.position).toEqual({ x: 400, y: 320 });
+    expect(el.position).toEqual({ x: 20, y: 16 });
     expect(el.rotation).toBe(2);
   });
 

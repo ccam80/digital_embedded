@@ -207,21 +207,22 @@ describe("resolvePins", () => {
     },
   ];
 
-  it("resolves pins with identity rotation at given origin", () => {
+  it("resolves pins with identity rotation (origin ignored)", () => {
     const config = createInverterConfig([]);
     const pins = resolvePins(decls, { x: 10, y: 20 }, 0, config, createClockConfig([]));
     expect(pins).toHaveLength(2);
-    expect(pins[0].position).toEqual({ x: 10, y: 21 });
-    expect(pins[1].position).toEqual({ x: 12, y: 21 });
+    // Origin is ignored — positions are local-rotated only
+    expect(pins[0].position).toEqual({ x: 0, y: 1 });
+    expect(pins[1].position).toEqual({ x: 2, y: 1 });
   });
 
-  it("resolves pins with 180° rotation", () => {
+  it("resolves pins with 180° rotation (origin ignored)", () => {
     const config = createInverterConfig([]);
     const pins = resolvePins(decls, { x: 10, y: 20 }, 2, config, createClockConfig([]));
-    // decl[0] pos (0,1) rotated 180° → (0,-1), translated to (10, 19)
-    expect(pins[0].position).toEqual({ x: 10, y: 19 });
-    // decl[1] pos (2,1) rotated 180° → (-2,-1), translated to (8, 19)
-    expect(pins[1].position).toEqual({ x: 8, y: 19 });
+    // decl[0] pos (0,1) rotated 180° → (0,-1)
+    expect(pins[0].position).toEqual({ x: 0, y: -1 });
+    // decl[1] pos (2,1) rotated 180° → (-2,-1)
+    expect(pins[1].position).toEqual({ x: -2, y: -1 });
   });
 
   it("applies inverter config to resolved pins", () => {
@@ -318,6 +319,41 @@ describe("layoutPinsOnFace", () => {
       expect(positions[i].y - positions[i - 1].y).toBe(1);
     }
   });
+
+  it("single pin on west face is centred vertically (h=4 → y=2)", () => {
+    // floor((4 - 1 + 1) / 2) = floor(2) = 2
+    const positions = layoutPinsOnFace("west", 1, 4, 4);
+    expect(positions[0].y).toBe(2);
+  });
+
+  it("two pins on west face are evenly distributed (h=4 → y=1,3)", () => {
+    // Even distribution with margin=1: y=1,3 — symmetric about midline y=2
+    const positions = layoutPinsOnFace("west", 2, 4, 4);
+    expect(positions[0].y).toBe(1);
+    expect(positions[1].y).toBe(3);
+  });
+
+  it("four pins fill a h=4 component starting at y=0", () => {
+    // floor((4 - 4 + 1) / 2) = floor(0.5) = 0  → y=0,1,2,3
+    const positions = layoutPinsOnFace("west", 4, 4, 4);
+    expect(positions[0].y).toBe(0);
+    expect(positions[3].y).toBe(3);
+  });
+
+  it("AND gate 2-input standard layout: inputs straddle centre, output centred", () => {
+    // COMP_WIDTH=4, h=4 (2 inputs × 2 = 4)
+    // Inputs west: startY=1 → y=1,2
+    // Output east: startY=2 → y=2
+    const decls = standardGatePinLayout(["in0", "in1"], "out", 4, 4);
+    const inputs = decls.filter((d) => d.direction === PinDirection.INPUT);
+    const output = decls.find((d) => d.direction === PinDirection.OUTPUT)!;
+    expect(inputs[0].position.y).toBe(1);
+    expect(inputs[1].position.y).toBe(2);
+    expect(output.position.y).toBe(2);
+    // x-coordinates
+    expect(inputs[0].position.x).toBe(0);
+    expect(output.position.x).toBe(4);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -393,14 +429,14 @@ describe("Pin system integration", () => {
 
     expect(pinA.direction).toBe(PinDirection.INPUT);
     expect(pinA.isNegated).toBe(true);
-    expect(pinA.position.x).toBe(10); // west face x=0 + origin.x
+    expect(pinA.position.x).toBe(0); // west face x=0 (origin ignored)
 
     expect(pinB.direction).toBe(PinDirection.INPUT);
     expect(pinB.isNegated).toBe(false);
 
     expect(pinQ.direction).toBe(PinDirection.OUTPUT);
     expect(pinQ.isNegated).toBe(false);
-    expect(pinQ.position.x).toBe(14); // east face x=4 + origin.x
+    expect(pinQ.position.x).toBe(4); // east face x=4 (origin ignored)
   });
 
   it("rotating a gate 180° swaps input/output sides", () => {

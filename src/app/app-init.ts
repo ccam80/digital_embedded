@@ -28,7 +28,7 @@ import { SpeedControl } from '../integration/speed-control.js';
 import { darkColorScheme, lightColorScheme } from '../core/renderer-interface.js';
 import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.js';
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
-import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
+import { splitWiresAtPoint } from '../editor/wire-drawing.js';
 import { deleteSelection } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
 import { deserializeCircuit } from '../io/load.js';
@@ -77,75 +77,15 @@ export function initApp(search?: string): void {
 
   const palette = new ComponentPalette(registry);
   const paletteContainer = document.getElementById('palette-content')!;
-  const paletteUI = new PaletteUI(palette, paletteContainer, colorScheme);
+  const paletteUI = new PaletteUI(palette, paletteContainer);
 
   paletteUI.onPlace((def) => {
     placement.start(def);
   });
   paletteUI.render();
 
-  // -------------------------------------------------------------------------
-  // Insert menu — full component set with hierarchical submenus
-  // -------------------------------------------------------------------------
-  const insertMenuDropdown = document.getElementById('insert-menu-dropdown');
-  if (insertMenuDropdown) {
-    const categoryLabels: Record<string, string> = {
-      LOGIC: "Logic",
-      IO: "I/O",
-      FLIP_FLOPS: "Flip-Flops",
-      MEMORY: "Memory",
-      ARITHMETIC: "Arithmetic",
-      WIRING: "Wiring",
-      SWITCHING: "Switching",
-      PLD: "PLD",
-      MISC: "Miscellaneous",
-      GRAPHICS: "Graphics",
-      TERMINAL: "Terminal",
-      "74XX": "74xx",
-    };
-    const reg = palette.getRegistry();
-    for (const catKey of Object.keys(categoryLabels)) {
-      const defs = reg.getByCategory(catKey as any);
-      if (defs.length === 0) continue;
-      const sub = document.createElement("div");
-      sub.className = "menu-submenu";
-      const trigger = document.createElement("div");
-      trigger.className = "menu-action";
-      trigger.textContent = categoryLabels[catKey] ?? catKey;
-      sub.appendChild(trigger);
-
-      const subDropdown = document.createElement("div");
-      subDropdown.className = "menu-dropdown";
-      for (const def of defs) {
-        const item = document.createElement("div");
-        item.className = "menu-action";
-        item.textContent = def.name;
-        item.addEventListener("click", () => {
-          placement.start(def);
-          document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
-        });
-        subDropdown.appendChild(item);
-      }
-      sub.appendChild(subDropdown);
-      insertMenuDropdown.appendChild(sub);
-    }
-  }
-
-  const propertyContainer = document.getElementById('property-content')!;
-  const propertyPanel = new PropertyPanel(propertyContainer);
-
-  selection.onChange(() => {
-    const selected = selection.getSelectedElements();
-    if (selected.size === 1) {
-      const element = selected.values().next().value!;
-      const def = registry.get(element.typeId);
-      if (def) {
-        propertyPanel.showProperties(element, def.propertyDefs);
-      }
-    } else {
-      propertyPanel.clear();
-    }
-  });
+  // Property panel is now a popup on double-click, not a side panel.
+  // Keep selection change handler for potential future use.
 
   // -------------------------------------------------------------------------
   // Engine + binding
@@ -246,9 +186,9 @@ export function initApp(search?: string): void {
 
     ctx2d.save();
     ctx2d.translate(viewport.pan.x, viewport.pan.y);
-    const worldScale = viewport.zoom * GRID_SPACING;
-    ctx2d.scale(worldScale, worldScale);
-    canvasRenderer.setWorldScale(worldScale);
+    const gridScale = viewport.zoom * GRID_SPACING;
+    ctx2d.scale(gridScale, gridScale);
+    canvasRenderer.setGridScale(gridScale);
 
     const worldRect = viewport.getVisibleWorldRect({ width: w, height: h });
     elementRenderer.render(canvasRenderer, circuit, selection.getSelectedElements(), worldRect);
@@ -280,15 +220,15 @@ export function initApp(search?: string): void {
       const preview = wireDrawing.getPreviewSegments();
       if (preview) {
         canvasRenderer.setColor('WIRE');
-        canvasRenderer.setLineWidth(2);
+        canvasRenderer.setLineWidth(1);
         for (const seg of preview) {
           canvasRenderer.drawLine(seg.start.x, seg.start.y, seg.end.x, seg.end.y);
         }
       }
     }
 
-    canvasRenderer.setWorldScale(1);
     ctx2d.restore();
+    canvasRenderer.setGridScale(1);
 
     if (boxSelect.active) {
       ctx2d.save();
@@ -374,19 +314,13 @@ export function initApp(search?: string): void {
           wireDrawing.cancel();
         }
       } else {
-        // Check if cursor lands on an existing wire — split interior or connect at endpoint
+        // Check if the cursor lands on the interior of an existing wire segment;
+        // if so, split that wire at the tap point and complete the new wire there.
         const snappedPt = snapToGrid(worldPt, 1);
         const tappedPoint = splitWiresAtPoint(snappedPt, circuit);
         if (tappedPoint !== undefined) {
           try {
             wireDrawing.completeToPoint(tappedPoint, circuit);
-            invalidateCompiled();
-          } catch {
-            wireDrawing.cancel();
-          }
-        } else if (isWireEndpoint(snappedPt, circuit)) {
-          try {
-            wireDrawing.completeToPoint(snappedPt, circuit);
             invalidateCompiled();
           } catch {
             wireDrawing.cancel();
@@ -445,7 +379,8 @@ export function initApp(search?: string): void {
         scheduleRender();
         return;
       }
-      // Split wire at tap point or start from endpoint/corner
+      // If the click lands on the interior of a wire segment, split it and
+      // start drawing a new wire from the tap point.
       const snappedWirePt = snapToGrid(worldPt, 1);
       const tappedPoint = splitWiresAtPoint(snappedWirePt, circuit);
       if (tappedPoint !== undefined) {
@@ -454,11 +389,7 @@ export function initApp(search?: string): void {
         scheduleRender();
         return;
       }
-      if (isWireEndpoint(snappedWirePt, circuit)) {
-        wireDrawing.startFromPoint(snappedWirePt);
-        scheduleRender();
-        return;
-      }
+      // Click on endpoint or non-interior — select the wire
       selection.select(wireHit);
       scheduleRender();
       return;
@@ -600,6 +531,7 @@ export function initApp(search?: string): void {
     header.appendChild(closeBtn);
     popup.appendChild(header);
 
+    // Reuse PropertyPanel logic: build rows in the popup
     const tempPanel = new PropertyPanel(popup);
     tempPanel.showProperties(elementHit, def.propertyDefs);
     tempPanel.onPropertyChange(() => {
@@ -607,6 +539,7 @@ export function initApp(search?: string): void {
       scheduleRender();
     });
 
+    // Position near the click
     const screenPt = canvasToScreen(e);
     const container = canvas.parentElement!;
     popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
@@ -617,8 +550,10 @@ export function initApp(search?: string): void {
   });
 
   // Close popup when clicking elsewhere on canvas
-  canvas.addEventListener('mousedown', () => {
-    closePopup();
+  canvas.addEventListener('mousedown', (e: MouseEvent) => {
+    if (activePopup && !(activePopup as HTMLElement).contains(e.target as Node)) {
+      closePopup();
+    }
   }, true);
 
   // -------------------------------------------------------------------------
@@ -686,6 +621,24 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
+  // Circuit name field
+  // -------------------------------------------------------------------------
+
+  const circuitNameField = document.getElementById('circuit-name-field') as HTMLInputElement | null;
+
+  function updateCircuitNameField(): void {
+    if (circuitNameField) {
+      circuitNameField.value = circuit.metadata.name || 'Untitled';
+    }
+  }
+
+  circuitNameField?.addEventListener('change', () => {
+    if (circuitNameField) {
+      circuit.metadata.name = circuitNameField.value.trim() || 'Untitled';
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Speed control UI
   // -------------------------------------------------------------------------
 
@@ -721,83 +674,107 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
-  // Continuous run loop — steps engine at speed-control rate and repaints
+  // Menu: Simulation actions (Step / Run / Stop)
   // -------------------------------------------------------------------------
 
-  let runRafHandle = -1;
-
-  function startContinuousRun(): void {
-    engine.start();
-    let lastTime = performance.now();
-
-    const tick = (now: number): void => {
-      if (engine.getState() !== EngineState.RUNNING) {
-        runRafHandle = -1;
-        scheduleRender();
-        return;
-      }
-      const dt = (now - lastTime) / 1000; // seconds elapsed
-      lastTime = now;
-      const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
-      for (let i = 0; i < stepsThisFrame; i++) {
-        engine.step();
-      }
-      scheduleRender();
-      runRafHandle = requestAnimationFrame(tick);
-    };
-    runRafHandle = requestAnimationFrame(tick);
-  }
-
-  function stopContinuousRun(): void {
-    if (runRafHandle !== -1) {
-      cancelAnimationFrame(runRafHandle);
-      runRafHandle = -1;
-    }
-    engine.stop();
-    scheduleRender();
-  }
-
-  // -------------------------------------------------------------------------
-  // Toolbar: Step / Run / Stop
-  // -------------------------------------------------------------------------
-
-  document.getElementById('btn-step')?.addEventListener('click', () => {
+  document.getElementById('menu-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     if (engine.getState() === EngineState.RUNNING) engine.stop();
     engine.step();
     scheduleRender();
   });
 
-  document.getElementById('btn-run')?.addEventListener('click', () => {
+  document.getElementById('menu-run')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     if (engine.getState() === EngineState.RUNNING) return;
-    startContinuousRun();
+    engine.start();
   });
 
-  document.getElementById('btn-stop')?.addEventListener('click', () => {
+  document.getElementById('menu-stop')?.addEventListener('click', () => {
     if (!binding.isBound) return;
-    stopContinuousRun();
-  });
-
-  // Toolbar Start/Step/Stop buttons (mirror the menu actions)
-  document.getElementById('btn-tb-step')?.addEventListener('click', () => {
-    document.getElementById('btn-step')?.click();
-  });
-  document.getElementById('btn-tb-run')?.addEventListener('click', () => {
-    document.getElementById('btn-run')?.click();
-  });
-  document.getElementById('btn-tb-stop')?.addEventListener('click', () => {
-    document.getElementById('btn-stop')?.click();
+    engine.stop();
+    scheduleRender();
   });
 
   // -------------------------------------------------------------------------
-  // File I/O
+  // Menu: Edit actions
   // -------------------------------------------------------------------------
+
+  document.getElementById('menu-undo')?.addEventListener('click', () => {
+    undoStack.undo();
+    invalidateCompiled();
+  });
+
+  document.getElementById('menu-redo')?.addEventListener('click', () => {
+    undoStack.redo();
+    invalidateCompiled();
+  });
+
+  document.getElementById('menu-delete')?.addEventListener('click', () => {
+    if (!selection.isEmpty()) {
+      const elements = [...selection.getSelectedElements()];
+      const wires: Wire[] = [...selection.getSelectedWires()];
+      const cmd = deleteSelection(circuit, elements, wires);
+      undoStack.push(cmd);
+      selection.clear();
+      invalidateCompiled();
+    }
+  });
+
+  document.getElementById('menu-select-all')?.addEventListener('click', () => {
+    selection.selectAll(circuit);
+    scheduleRender();
+  });
+
+  // -------------------------------------------------------------------------
+  // File I/O helpers
+  // -------------------------------------------------------------------------
+
+  function saveCircuit(filename?: string): void {
+    try {
+      const json = serializeCircuit(circuit);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const name = filename ?? (circuit.metadata.name || 'circuit');
+      a.download = name.endsWith('.digj') ? name : name + '.digj';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to save:', err);
+    }
+  }
 
   const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
 
-  document.getElementById('btn-open')?.addEventListener('click', () => {
+  // -------------------------------------------------------------------------
+  // Menu: File actions
+  // -------------------------------------------------------------------------
+
+  document.getElementById('menu-new')?.addEventListener('click', () => {
+    circuit.elements.length = 0;
+    circuit.wires.length = 0;
+    circuit.metadata = { name: 'Untitled' };
+    selection.clear();
+    invalidateCompiled();
+    updateCircuitNameField();
+  });
+
+  document.getElementById('menu-open')?.addEventListener('click', () => {
     fileInput?.click();
+  });
+
+  document.getElementById('menu-save')?.addEventListener('click', () => {
+    saveCircuit();
+  });
+
+  document.getElementById('menu-save-as')?.addEventListener('click', () => {
+    const suggested = circuit.metadata.name || 'circuit';
+    const name = prompt('Save as:', suggested);
+    if (name !== null && name.trim() !== '') {
+      saveCircuit(name.trim());
+    }
   });
 
   fileInput?.addEventListener('change', () => {
@@ -825,7 +802,7 @@ export function initApp(search?: string): void {
           height: canvas.clientHeight,
         });
         invalidateCompiled();
-        updateCircuitName();
+        updateCircuitNameField();
         if (isIframe) {
           window.parent.postMessage({ type: 'digital-loaded' }, '*');
         }
@@ -838,97 +815,6 @@ export function initApp(search?: string): void {
       }
     };
     reader.readAsText(file);
-  });
-
-  document.getElementById('btn-save')?.addEventListener('click', () => {
-    try {
-      const json = serializeCircuit(circuit);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = (circuit.metadata.name || 'circuit') + '.digj';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to save:', err);
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Menu: New, Save As, Edit actions, Circuit name
-  // -------------------------------------------------------------------------
-
-  const circuitNameInput = document.getElementById('circuit-name') as HTMLInputElement | null;
-
-  function updateCircuitName(): void {
-    if (circuitNameInput) {
-      circuitNameInput.value = circuit.metadata.name || 'Untitled';
-    }
-  }
-
-  circuitNameInput?.addEventListener('change', () => {
-    circuit.metadata.name = circuitNameInput.value.trim() || 'Untitled';
-  });
-
-  document.getElementById('btn-new')?.addEventListener('click', () => {
-    circuit.elements.length = 0;
-    circuit.wires.length = 0;
-    circuit.metadata = { ...circuit.metadata, name: 'Untitled' };
-    selection.clear();
-    invalidateCompiled();
-    updateCircuitName();
-  });
-
-  document.getElementById('btn-save-as')?.addEventListener('click', () => {
-    const suggested = circuit.metadata.name || 'circuit';
-    const name = prompt('Save as:', suggested);
-    if (name !== null && name.trim() !== '') {
-      circuit.metadata.name = name.trim();
-      updateCircuitName();
-      document.getElementById('btn-save')?.click();
-    }
-  });
-
-  document.getElementById('btn-undo')?.addEventListener('click', () => {
-    undoStack.undo();
-    invalidateCompiled();
-  });
-
-  document.getElementById('btn-redo')?.addEventListener('click', () => {
-    undoStack.redo();
-    invalidateCompiled();
-  });
-
-  document.getElementById('btn-delete')?.addEventListener('click', () => {
-    if (!selection.isEmpty()) {
-      const elements = [...selection.getSelectedElements()];
-      const wires: Wire[] = [...selection.getSelectedWires()];
-      const cmd = deleteSelection(circuit, elements, wires);
-      undoStack.push(cmd);
-      selection.clear();
-      invalidateCompiled();
-    }
-  });
-
-  document.getElementById('btn-select-all')?.addEventListener('click', () => {
-    selection.selectAll(circuit);
-    scheduleRender();
-  });
-
-  // -------------------------------------------------------------------------
-  // Keyboard: Ctrl+S save, Ctrl+O open
-  // -------------------------------------------------------------------------
-
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      document.getElementById('btn-save')?.click();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-      e.preventDefault();
-      fileInput?.click();
-    }
   });
 
   // -------------------------------------------------------------------------

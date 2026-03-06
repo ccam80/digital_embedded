@@ -42,8 +42,8 @@ class MockElement extends AbstractCircuitElement {
   getHelpText(): string { return ""; }
 }
 
-function makePin(label: string, direction: PinDirection, worldX: number, worldY: number): Pin {
-  return { label, direction, position: { x: worldX, y: worldY }, bitWidth: 1, isNegated: false, isClock: false };
+function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
+  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false };
 }
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
@@ -122,7 +122,7 @@ function buildCounterCircuit(registry: ComponentRegistry): Circuit {
   ], makePropBag({ label: "Y" }));
 
   const out = new MockElement("Out", "out", { x: 3, y: 0 }, [
-    makePin("in", PinDirection.INPUT, 4, 0),
+    makePin("in", PinDirection.INPUT, 1, 0),
   ], makePropBag({ label: "Y" }));
 
   circuit.elements.push(counter, out);

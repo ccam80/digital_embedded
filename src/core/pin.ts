@@ -133,11 +133,16 @@ export function translatePoint(p: Point, offset: Point): Point {
  * Compute pin positions for a set of PinDeclarations given a component's
  * origin, rotation, and inverter configuration.
  *
- * Returns resolved Pin objects with world-space positions.
+ * Returns resolved Pin objects with positions relative to the component
+ * origin (rotation applied, but NOT translated by origin). Consumers must
+ * add element.position to get world-space coordinates.
+ *
+ * The origin parameter is accepted for API compatibility but ignored —
+ * all position offsetting is done at the consumer side.
  */
 export function resolvePins(
   declarations: readonly PinDeclaration[],
-  origin: Point,
+  _origin: Point,
   rotation: Rotation,
   inverterConfig: InverterConfig,
   clockConfig: ClockConfig,
@@ -145,8 +150,7 @@ export function resolvePins(
 ): Pin[] {
   return declarations.map((decl) => {
     const rotated = rotatePoint(decl.position, rotation);
-    const worldPos = translatePoint(rotated, origin);
-    return makePin(decl, worldPos, inverterConfig, clockConfig, bitWidth);
+    return makePin(decl, rotated, inverterConfig, clockConfig, bitWidth);
   });
 }
 
@@ -184,11 +188,12 @@ export function layoutPinsOnFace(
 
   if (count <= 0) return positions;
 
-  // Distribute pins evenly along the face. For count==1, centre.
-  // For count>1 with enough room, use margin=1 from each edge.
-  // When too dense (count > dim-1), fall back to 1-apart centered packing.
+  // Even distribution: for count==1 centre on the face; for count>1
+  // distribute with equal margins on each end.
+  // margin = 1 grid unit from each edge, remaining space split evenly.
   function distribute(dim: number, n: number): number[] {
     if (n === 1) return [Math.floor(dim / 2)];
+    // When pins are too dense (can't fit with margin=1), pack 1-apart centered
     if (n > dim - 1) {
       const start = Math.floor((dim - n + 1) / 2);
       return Array.from({ length: n }, (_, i) => start + i);
@@ -248,13 +253,9 @@ export function standardGatePinLayout(
   componentW: number,
   componentH: number,
   defaultBitWidth: number = 1,
-  outputXOffset: number = 0,
 ): PinDeclaration[] {
   const inputPositions = layoutPinsOnFace("west", inputLabels.length, componentW, componentH);
-  const rawOutputPositions = layoutPinsOnFace("east", 1, componentW, componentH);
-  const outputPositions = outputXOffset === 0
-    ? rawOutputPositions
-    : rawOutputPositions.map(p => ({ x: p.x + outputXOffset, y: p.y }));
+  const outputPositions = layoutPinsOnFace("east", 1, componentW, componentH);
 
   const inputs: PinDeclaration[] = inputLabels.map((label, i) => ({
     direction: PinDirection.INPUT,

@@ -20,7 +20,12 @@ import type {
 export class CanvasRenderer implements RenderContext {
   private _ctx: CanvasRenderingContext2D;
   private _scheme: ColorScheme;
-  private _worldScale: number = 1;
+  /**
+   * Inverse of the current canvas grid scale. Line widths passed to
+   * setLineWidth() are in pixels; this factor converts them to the
+   * scaled coordinate space so a width of 1 always renders as ~1 screen pixel.
+   */
+  private _lineWidthScale: number = 1;
 
   constructor(ctx: CanvasRenderingContext2D, scheme: ColorScheme) {
     this._ctx = ctx;
@@ -28,12 +33,11 @@ export class CanvasRenderer implements RenderContext {
   }
 
   /**
-   * Set the current world-to-pixel scale factor. When non-1, setLineWidth()
-   * compensates so that width values (e.g. 1) produce pixel-sized lines
-   * regardless of the canvas transform.
+   * Set the current grid scale so that setLineWidth() can compensate.
+   * Call this after applying the world→screen transform (zoom * GRID_SPACING).
    */
-  setWorldScale(scale: number): void {
-    this._worldScale = scale;
+  setGridScale(scale: number): void {
+    this._lineWidthScale = scale > 0 ? 1 / scale : 1;
   }
 
   setColorScheme(scheme: ColorScheme): void {
@@ -162,7 +166,7 @@ export class CanvasRenderer implements RenderContext {
   }
 
   setLineWidth(width: number): void {
-    this._ctx.lineWidth = width / this._worldScale;
+    this._ctx.lineWidth = width * this._lineWidthScale;
   }
 
   setFont(font: FontSpec): void {

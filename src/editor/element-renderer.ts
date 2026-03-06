@@ -9,12 +9,13 @@
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
+import type { Pin } from "@/core/pin";
 
 /** Radius of the filled circle drawn at each pin position (grid units). */
 const PIN_CIRCLE_RADIUS = 0.15;
 
 /** Radius of the unfilled negation bubble drawn outside the pin circle (grid units). */
-const NEGATION_BUBBLE_RADIUS = 0.25;
+const NEGATION_BUBBLE_RADIUS = 0.2;
 
 /** Half-size of the clock triangle indicator (grid units). */
 const CLOCK_TRIANGLE_HALF = 0.2;
@@ -90,34 +91,38 @@ export class ElementRenderer {
    */
   renderPins(ctx: RenderContext, element: CircuitElement): void {
     ctx.setColor("PIN");
-    const pos = element.position;
     for (const pin of element.getPins()) {
-      const wx = pos.x + pin.position.x;
-      const wy = pos.y + pin.position.y;
+      // Pin positions are resolved at origin (0,0); offset by element world position
+      const wx = element.position.x + pin.position.x;
+      const wy = element.position.y + pin.position.y;
       ctx.drawCircle(wx, wy, PIN_CIRCLE_RADIUS, true);
 
       if (pin.isNegated) {
-        this._renderNegationBubble(ctx, wx, wy);
+        this._renderNegationBubble(ctx, pin, element);
       }
 
       if (pin.isClock) {
-        this._renderClockTriangle(ctx, wx, wy);
+        this._renderClockTriangle(ctx, pin, element);
       }
     }
   }
 
-  /** Draw an unfilled negation bubble at the given world position. */
-  private _renderNegationBubble(ctx: RenderContext, wx: number, wy: number): void {
+  /** Draw an unfilled negation bubble at the pin position. */
+  private _renderNegationBubble(ctx: RenderContext, pin: Pin, element: CircuitElement): void {
+    const wx = element.position.x + pin.position.x;
+    const wy = element.position.y + pin.position.y;
     ctx.drawCircle(wx, wy, NEGATION_BUBBLE_RADIUS, false);
   }
 
   /** Draw a small filled triangle indicating a clock pin. */
-  private _renderClockTriangle(ctx: RenderContext, wx: number, wy: number): void {
+  private _renderClockTriangle(ctx: RenderContext, pin: Pin, element: CircuitElement): void {
+    const x = element.position.x + pin.position.x;
+    const y = element.position.y + pin.position.y;
     ctx.drawPolygon(
       [
-        { x: wx - CLOCK_TRIANGLE_HALF, y: wy - CLOCK_TRIANGLE_HALF },
-        { x: wx + CLOCK_TRIANGLE_HALF, y: wy },
-        { x: wx - CLOCK_TRIANGLE_HALF, y: wy + CLOCK_TRIANGLE_HALF },
+        { x: x - CLOCK_TRIANGLE_HALF, y: y - CLOCK_TRIANGLE_HALF },
+        { x: x + CLOCK_TRIANGLE_HALF, y: y },
+        { x: x - CLOCK_TRIANGLE_HALF, y: y + CLOCK_TRIANGLE_HALF },
       ],
       true,
     );

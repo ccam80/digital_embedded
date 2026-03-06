@@ -75,6 +75,7 @@ export function hitTestPins(
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     for (const pin of el.getPins()) {
+      // Pin positions are resolved at origin (0,0); offset by element world position
       const dx = point.x - (el.position.x + pin.position.x);
       const dy = point.y - (el.position.y + pin.position.y);
       if (Math.sqrt(dx * dx + dy * dy) <= threshold) {

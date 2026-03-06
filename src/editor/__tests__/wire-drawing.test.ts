@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { WireDrawingMode } from "@/editor/wire-drawing";
+import { WireDrawingMode, isPointOnSegmentInterior, splitWiresAtPoint } from "@/editor/wire-drawing";
 import { mergeCollinearSegments } from "@/editor/wire-merge";
 import { checkWireConsistency } from "@/editor/wire-consistency";
 import { Wire, Circuit } from "@/core/circuit";
@@ -186,6 +186,113 @@ describe("WireMerge", () => {
     const merged = mergeCollinearSegments([wire1, wire2]);
 
     expect(merged).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wire-tap tests
+// ---------------------------------------------------------------------------
+
+describe("isPointOnSegmentInterior", () => {
+  it("returns true for interior point on horizontal segment", () => {
+    expect(isPointOnSegmentInterior({ x: 3, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(true);
+  });
+
+  it("returns false for endpoint of horizontal segment", () => {
+    expect(isPointOnSegmentInterior({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
+    expect(isPointOnSegmentInterior({ x: 5, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
+  });
+
+  it("returns true for interior point on vertical segment", () => {
+    expect(isPointOnSegmentInterior({ x: 0, y: 3 }, { x: 0, y: 0 }, { x: 0, y: 5 })).toBe(true);
+  });
+
+  it("returns false for point off the segment axis", () => {
+    expect(isPointOnSegmentInterior({ x: 3, y: 1 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
+  });
+
+  it("returns false for point beyond segment bounds", () => {
+    expect(isPointOnSegmentInterior({ x: 7, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
+  });
+});
+
+describe("splitWiresAtPoint", () => {
+  it("splits a horizontal wire at an interior point", () => {
+    const circuit = new Circuit();
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
+
+    const result = splitWiresAtPoint({ x: 4, y: 0 }, circuit);
+
+    expect(result).toEqual({ x: 4, y: 0 });
+    expect(circuit.wires).toHaveLength(2);
+    // One wire from 0 to 4, one from 4 to 10
+    const sorted = [...circuit.wires].sort((a, b) => a.start.x - b.start.x);
+    expect(sorted[0]!.start).toEqual({ x: 0, y: 0 });
+    expect(sorted[0]!.end).toEqual({ x: 4, y: 0 });
+    expect(sorted[1]!.start).toEqual({ x: 4, y: 0 });
+    expect(sorted[1]!.end).toEqual({ x: 10, y: 0 });
+  });
+
+  it("splits a vertical wire at an interior point", () => {
+    const circuit = new Circuit();
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 10 }));
+
+    const result = splitWiresAtPoint({ x: 0, y: 6 }, circuit);
+
+    expect(result).toEqual({ x: 0, y: 6 });
+    expect(circuit.wires).toHaveLength(2);
+  });
+
+  it("returns undefined when no wire is hit", () => {
+    const circuit = new Circuit();
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
+
+    const result = splitWiresAtPoint({ x: 5, y: 3 }, circuit);
+
+    expect(result).toBeUndefined();
+    expect(circuit.wires).toHaveLength(1);
+  });
+
+  it("returns undefined when point is at a wire endpoint (not interior)", () => {
+    const circuit = new Circuit();
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
+
+    const result = splitWiresAtPoint({ x: 10, y: 0 }, circuit);
+
+    expect(result).toBeUndefined();
+    expect(circuit.wires).toHaveLength(1);
+  });
+});
+
+describe("WireDrawing wire-tap", () => {
+  it("startFromPoint activates drawing from an arbitrary point", () => {
+    const mode = new WireDrawingMode();
+    mode.startFromPoint({ x: 5, y: 3 });
+
+    expect(mode.isActive()).toBe(true);
+    mode.updateCursor({ x: 8, y: 3 });
+    const segments = mode.getPreviewSegments();
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments[0]!.start).toEqual({ x: 5, y: 3 });
+  });
+
+  it("completeToPoint adds wires and splits the target wire", () => {
+    const circuit = new Circuit();
+    // Existing wire from (0,5) to (10,5)
+    circuit.addWire(new Wire({ x: 0, y: 5 }, { x: 10, y: 5 }));
+
+    // Tap the existing wire at (4,5) to split it
+    splitWiresAtPoint({ x: 4, y: 5 }, circuit);
+    expect(circuit.wires).toHaveLength(2);
+
+    // Draw a new wire from (4,0) down to the tap point (4,5)
+    const mode = new WireDrawingMode();
+    mode.startFromPoint({ x: 4, y: 0 });
+    const newWires = mode.completeToPoint({ x: 4, y: 5 }, circuit);
+
+    expect(newWires.length).toBeGreaterThan(0);
+    // Circuit now has the 2 split wires + the new wire(s)
+    expect(circuit.wires.length).toBeGreaterThanOrEqual(3);
   });
 });
 

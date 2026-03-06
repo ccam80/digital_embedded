@@ -64,7 +64,7 @@ function findPinAtPoint(
 ): { element: CircuitElement; pinDirection: PinDirection; label: string; bitWidth: number } | undefined {
   for (const el of elements) {
     for (const pin of el.getPins()) {
-      if (pin.position.x === x && pin.position.y === y) {
+      if (el.position.x + pin.position.x === x && el.position.y + pin.position.y === y) {
         return {
           element: el,
           pinDirection: pin.direction,

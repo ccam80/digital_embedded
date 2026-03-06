@@ -69,14 +69,14 @@ export class GridRenderer {
     ctx.setColor("GRID");
     ctx.setLineWidth(MAJOR_LINE_WIDTH);
 
-    for (let gx = startX; gx <= endX; gx++) {
-      if (gx % MAJOR_GRID_INTERVAL !== 0) continue;
+    const majorStartX = Math.ceil(startX / MAJOR_GRID_INTERVAL) * MAJOR_GRID_INTERVAL;
+    for (let gx = majorStartX; gx <= endX; gx += MAJOR_GRID_INTERVAL) {
       const sx = gx * zoom * GRID_SPACING + pan.x;
       ctx.drawLine(sx, viewport.y, sx, viewport.y + pixelHeight);
     }
 
-    for (let gy = startY; gy <= endY; gy++) {
-      if (gy % MAJOR_GRID_INTERVAL !== 0) continue;
+    const majorStartY = Math.ceil(startY / MAJOR_GRID_INTERVAL) * MAJOR_GRID_INTERVAL;
+    for (let gy = majorStartY; gy <= endY; gy += MAJOR_GRID_INTERVAL) {
       const sy = gy * zoom * GRID_SPACING + pan.y;
       ctx.drawLine(viewport.x, sy, viewport.x + pixelWidth, sy);
     }

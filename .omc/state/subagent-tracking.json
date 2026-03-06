@@ -1,24 +1,60 @@
 {
   "agents": [
     {
-      "agent_id": "a9ace98c4ccdcb7fd",
-      "agent_type": "claude-orchestrator:review-spec",
-      "started_at": "2026-03-06T23:10:25.507Z",
+      "agent_id": "aeb53bd170f0ee96e",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-06T09:08:35.030Z",
       "parent_mode": "none",
       "status": "completed",
-      "completed_at": "2026-03-06T23:16:35.475Z",
-      "duration_ms": 369968
+      "completed_at": "2026-03-06T09:09:18.619Z",
+      "duration_ms": 43589
     },
     {
-      "agent_id": "a657f383588d36989",
-      "agent_type": "general-purpose",
-      "started_at": "2026-03-06T23:48:37.679Z",
+      "agent_id": "af00ea1bad1de1629",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-06T09:08:50.655Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T09:12:49.018Z",
+      "duration_ms": 238363
+    },
+    {
+      "agent_id": "ad1072610c19d2992",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-06T09:09:09.123Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T09:12:58.349Z",
+      "duration_ms": 229226
+    },
+    {
+      "agent_id": "afb615a4a4881ba7a",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-06T09:09:26.200Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T09:10:17.808Z",
+      "duration_ms": 51608
+    },
+    {
+      "agent_id": "aaa9903ac2f9b91b4",
+      "agent_type": "oh-my-claudecode:designer",
+      "started_at": "2026-03-06T09:09:41.295Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-06T09:15:03.754Z",
+      "duration_ms": 322459
+    },
+    {
+      "agent_id": "a1da01220d6eddcb2",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-06T09:28:53.392Z",
       "parent_mode": "none",
       "status": "running"
     }
   ],
-  "total_spawned": 2,
-  "total_completed": 1,
+  "total_spawned": 6,
+  "total_completed": 5,
   "total_failed": 0,
-  "last_updated": "2026-03-06T23:48:37.789Z"
+  "last_updated": "2026-03-06T23:54:30.365Z"
 }

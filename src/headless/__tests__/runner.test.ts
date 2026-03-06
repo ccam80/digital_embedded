@@ -2,10 +2,10 @@
  * Tests for SimulationRunner — task 3.5.1.
  *
  * Each test builds a circuit with mock elements that have the correct pin
- * world positions, then compiles and exercises the runner API.
+ * local positions (relative to element), then compiles and exercises the runner API.
  *
  * Half-adder circuit:
- *   Net layout (assigned by compiler based on pin world positions):
+ *   Net layout (assigned by compiler based on pin local positions + element position):
  *     netA: output of In "A"
  *     netB: output of In "B"
  *     netS: output of XOR, input of Out "S"
@@ -53,11 +53,11 @@ class MockElement extends AbstractCircuitElement {
   getHelpText(): string { return ""; }
 }
 
-function makePin(label: string, direction: PinDirection, worldX: number, worldY: number, bitWidth = 1): Pin {
+function makePin(label: string, direction: PinDirection, localX: number, localY: number, bitWidth = 1): Pin {
   return {
     label,
     direction,
-    position: { x: worldX, y: worldY },
+    position: { x: localX, y: localY },
     bitWidth,
     isNegated: false,
     isClock: false,
@@ -110,13 +110,14 @@ function executeAnd2(index: number, state: Uint32Array, layout: ComponentLayout)
 // buildHalfAdder — creates a Circuit with a half-adder topology
 //
 // Component layout (positions chosen so nets are contiguous):
+//   Pin positions are LOCAL (relative to element position).
 //
-//   In "A"   at (0,0)  → output pin at (2,0)
-//   In "B"   at (0,2)  → output pin at (2,2)
-//   XOR      at (4,0)  → input pins at (4,0) and (4,2), output pin at (8,1)
-//   AND      at (4,4)  → input pins at (4,0) and (4,2), output pin at (8,5)
-//   Out "S"  at (9,1)  → input pin at (9,1)
-//   Out "C"  at (9,5)  → input pin at (9,5)
+//   In "A"   at (0,0)  → output pin at local (2,0)   → world (2,0)
+//   In "B"   at (0,2)  → output pin at local (2,0)   → world (2,2)
+//   XOR      at (4,0)  → input pins at local (0,0) and (0,2), output at local (4,1) → world (4,0),(4,2),(8,1)
+//   AND      at (4,4)  → input pins at local (0,-4) and (0,-2), output at local (4,1) → world (4,0),(4,2),(8,5)
+//   Out "S"  at (9,1)  → input pin at local (0,0)    → world (9,1)
+//   Out "C"  at (9,5)  → input pin at local (0,0)    → world (9,5)
 //
 // Wires:
 //   (2,0)→(4,0): connects In A output to XOR input 0
@@ -130,39 +131,39 @@ function executeAnd2(index: number, state: Uint32Array, layout: ComponentLayout)
 function buildHalfAdder(registry: ComponentRegistry): Circuit {
   const circuit = new Circuit();
 
-  // In A: output at world (2,0)
+  // In A: output at local (2,0)
   const inA = new MockElement("In", "inA", { x: 0, y: 0 }, [
     makePin("out", PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: "A" }));
 
-  // In B: output at world (2,2)
+  // In B: output at local (2,0)
   const inB = new MockElement("In", "inB", { x: 0, y: 2 }, [
-    makePin("out", PinDirection.OUTPUT, 2, 2),
+    makePin("out", PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: "B" }));
 
-  // XOR: inputs at (4,0) and (4,2), output at (8,1)
+  // XOR: inputs at local (0,0) and (0,2), output at local (4,1)
   const xor = new MockElement("XOR", "xor", { x: 4, y: 0 }, [
-    makePin("in0", PinDirection.INPUT, 4, 0),
-    makePin("in1", PinDirection.INPUT, 4, 2),
-    makePin("out", PinDirection.OUTPUT, 8, 1),
+    makePin("in0", PinDirection.INPUT, 0, 0),
+    makePin("in1", PinDirection.INPUT, 0, 2),
+    makePin("out", PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
-  // AND: inputs at (4,0) and (4,2), output at (8,5)
-  // Note: AND inputs share positions with XOR inputs → same nets (net A and net B)
+  // AND: inputs at local (0,-4) and (0,-2), output at local (4,1)
+  // Note: AND inputs share world positions with XOR inputs → same nets (net A and net B)
   const and = new MockElement("AND", "and", { x: 4, y: 4 }, [
-    makePin("in0", PinDirection.INPUT, 4, 0),
-    makePin("in1", PinDirection.INPUT, 4, 2),
-    makePin("out", PinDirection.OUTPUT, 8, 5),
+    makePin("in0", PinDirection.INPUT, 0, -4),
+    makePin("in1", PinDirection.INPUT, 0, -2),
+    makePin("out", PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
-  // Out S: input at (9,1)
+  // Out S: input at local (0,0)
   const outS = new MockElement("Out", "outS", { x: 9, y: 1 }, [
-    makePin("in", PinDirection.INPUT, 9, 1),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "S" }));
 
-  // Out C: input at (9,5)
+  // Out C: input at local (0,0)
   const outC = new MockElement("Out", "outC", { x: 9, y: 5 }, [
-    makePin("in", PinDirection.INPUT, 9, 5),
+    makePin("in", PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: "C" }));
 
   circuit.elements.push(inA, inB, xor, and, outS, outC);
@@ -344,7 +345,7 @@ describe("Runner", () => {
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], makePropBag({ label: "X" }));
     const outY = new MockElement("Out", "outY", { x: 3, y: 0 }, [
-      makePin("in", PinDirection.INPUT, 4, 0),
+      makePin("in", PinDirection.INPUT, 1, 0),
     ], makePropBag({ label: "Y" }));
     circuit.elements.push(inX, outY);
     circuit.wires.push({ start: { x: 2, y: 0 }, end: { x: 4, y: 0 } } as any);

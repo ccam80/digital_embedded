@@ -176,17 +176,17 @@ function buildAndGate(): Circuit {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 2),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const and = new StubElement('AND', 'and1', { x: 4, y: 0 }, [
-    makePin('in0', PinDirection.INPUT, 4, 0),
-    makePin('in1', PinDirection.INPUT, 4, 2),
-    makePin('out', PinDirection.OUTPUT, 8, 1),
+    makePin('in0', PinDirection.INPUT, 0, 0),
+    makePin('in1', PinDirection.INPUT, 0, 2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const out = new StubElement('Out', 'outY', { x: 9, y: 1 }, [
-    makePin('in', PinDirection.INPUT, 9, 1),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, and, out);
@@ -210,15 +210,15 @@ function buildPassThrough(): Circuit {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 4 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 4),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const outY = new StubElement('Out', 'outY', { x: 4, y: 0 }, [
-    makePin('in', PinDirection.INPUT, 4, 0),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
   const outZ = new StubElement('Out', 'outZ', { x: 4, y: 4 }, [
-    makePin('in', PinDirection.INPUT, 4, 4),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Z', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, outY, outZ);
@@ -244,35 +244,35 @@ function buildIndependentOutputs(): Circuit {
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
   const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 2),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
   const inC = new StubElement('In', 'inC', { x: 0, y: 8 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 8),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'C', bitWidth: 1 }));
 
   const inD = new StubElement('In', 'inD', { x: 0, y: 10 }, [
-    makePin('out', PinDirection.OUTPUT, 2, 10),
+    makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'D', bitWidth: 1 }));
 
   const and1 = new StubElement('AND', 'and1', { x: 4, y: 0 }, [
-    makePin('in0', PinDirection.INPUT, 4, 0),
-    makePin('in1', PinDirection.INPUT, 4, 2),
-    makePin('out', PinDirection.OUTPUT, 8, 1),
+    makePin('in0', PinDirection.INPUT, 0, 0),
+    makePin('in1', PinDirection.INPUT, 0, 2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const and2 = new StubElement('AND', 'and2', { x: 4, y: 8 }, [
-    makePin('in0', PinDirection.INPUT, 4, 8),
-    makePin('in1', PinDirection.INPUT, 4, 10),
-    makePin('out', PinDirection.OUTPUT, 8, 9),
+    makePin('in0', PinDirection.INPUT, 0, 0),
+    makePin('in1', PinDirection.INPUT, 0, 2),
+    makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
   const outY1 = new StubElement('Out', 'outY1', { x: 10, y: 1 }, [
-    makePin('in', PinDirection.INPUT, 10, 1),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y1', bitWidth: 1 }));
 
   const outY2 = new StubElement('Out', 'outY2', { x: 10, y: 9 }, [
-    makePin('in', PinDirection.INPUT, 10, 9),
+    makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y2', bitWidth: 1 }));
 
   circuit.elements.push(inA, inB, inC, inD, and1, and2, outY1, outY2);

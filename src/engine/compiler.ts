@@ -175,10 +175,13 @@ export function compileCircuit(
   // Build a map from position key to list of pin slots at that position
   const positionToSlots = new Map<string, number[]>();
   for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
     const refs = allPinRefs[i]!;
     for (let j = 0; j < refs.length; j++) {
       const pin = refs[j]!.pin;
-      const key = `${pin.position.x},${pin.position.y}`;
+      const wx = el.position.x + pin.position.x;
+      const wy = el.position.y + pin.position.y;
+      const key = `${wx},${wy}`;
       let list = positionToSlots.get(key);
       if (list === undefined) {
         list = [];
@@ -213,10 +216,13 @@ export function compileCircuit(
 
   // Add pin slots
   for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
     const refs = allPinRefs[i]!;
     for (let j = 0; j < refs.length; j++) {
       const pin = refs[j]!.pin;
-      const key = `${pin.position.x},${pin.position.y}`;
+      const wx = el.position.x + pin.position.x;
+      const wy = el.position.y + pin.position.y;
+      const key = `${wx},${wy}`;
       let list = posToNodes.get(key);
       if (list === undefined) {
         list = [];

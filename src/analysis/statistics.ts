@@ -167,7 +167,7 @@ function computeCircuitDepth(circuit: Circuit, registry: ComponentRegistry): num
 
   for (const el of circuit.elements) {
     for (const pin of el.getPins()) {
-      const k = ptKey(pin.position.x, pin.position.y);
+      const k = ptKey(el.position.x + pin.position.x, el.position.y + pin.position.y);
       if (pin.direction === PinDirection.OUTPUT) {
         let list = outputPinMap.get(k);
         if (!list) { list = []; outputPinMap.set(k, list); }

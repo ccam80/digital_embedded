@@ -27,6 +27,12 @@ import { applyAttributeMappings } from "./attribute-map.js";
 import type { DigAttributeMapping } from "./attribute-map.js";
 import { parseDigXml } from "./dig-parser.js";
 
+/**
+ * Digital Java's grid unit size in pixels. .dig files store positions in
+ * Java pixel coordinates; we divide by this to get grid units.
+ */
+const DIG_SIZE = 20;
+
 // ---------------------------------------------------------------------------
 // DigParserError
 // ---------------------------------------------------------------------------
@@ -136,7 +142,7 @@ export function createElementFromDig(
 
   const element = def.factory(props);
 
-  element.position = { x: ve.pos.x, y: ve.pos.y };
+  element.position = { x: ve.pos.x / DIG_SIZE, y: ve.pos.y / DIG_SIZE };
 
   const rotation = extractRotationFromEntries(ve.elementAttributes);
   if (rotation !== undefined) {
@@ -265,8 +271,8 @@ export function applyInverterConfig(
  */
 export function createWireFromDig(dw: DigWire): Wire {
   return new Wire(
-    { x: dw.p1.x, y: dw.p1.y },
-    { x: dw.p2.x, y: dw.p2.y },
+    { x: dw.p1.x / DIG_SIZE, y: dw.p1.y / DIG_SIZE },
+    { x: dw.p2.x / DIG_SIZE, y: dw.p2.y / DIG_SIZE },
   );
 }
 

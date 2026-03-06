@@ -14,6 +14,8 @@ import type { Pin } from "@/core/pin";
 import { Wire, Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import { mergeCollinearSegments } from "@/editor/wire-merge";
+import { checkWireConsistency } from "@/editor/wire-consistency";
+import { FacadeError } from "@/headless/types";
 
 // ---------------------------------------------------------------------------
 // Wire-tap helpers
@@ -22,26 +24,34 @@ import { mergeCollinearSegments } from "@/editor/wire-merge";
 /**
  * Returns true if point P lies strictly on the interior of the axis-aligned
  * segment [A, B] (not at an endpoint).
+ *
+ * Wires in this editor are always horizontal (same y) or vertical (same x).
+ * We check collinearity on the shared axis and that P is strictly between
+ * the two endpoints.
  */
 export function isPointOnSegmentInterior(p: Point, a: Point, b: Point): boolean {
   if (a.x === b.x) {
+    // Vertical segment
     if (p.x !== a.x) return false;
     const minY = Math.min(a.y, b.y);
     const maxY = Math.max(a.y, b.y);
     return p.y > minY && p.y < maxY;
   }
   if (a.y === b.y) {
+    // Horizontal segment
     if (p.y !== a.y) return false;
     const minX = Math.min(a.x, b.x);
     const maxX = Math.max(a.x, b.x);
     return p.x > minX && p.x < maxX;
   }
+  // Diagonal — not a valid wire in this editor
   return false;
 }
 
 /**
- * Scan all wires for one whose interior contains the given point.
- * If found, remove it and replace with two wires split at that point.
+ * Scan all wires in the circuit for one whose interior contains the given point.
+ * If found, remove it and replace it with two wires split at that point.
+ * Returns the split point if a split occurred, or undefined if nothing was split.
  */
 export function splitWiresAtPoint(point: Point, circuit: Circuit): Point | undefined {
   for (const wire of circuit.wires) {
@@ -53,19 +63,6 @@ export function splitWiresAtPoint(point: Point, circuit: Circuit): Point | undef
     }
   }
   return undefined;
-}
-
-/**
- * Returns true if the given point coincides with any wire endpoint (start or end).
- */
-export function isWireEndpoint(point: Point, circuit: Circuit): boolean {
-  for (const wire of circuit.wires) {
-    if ((wire.start.x === point.x && wire.start.y === point.y) ||
-        (wire.end.x === point.x && wire.end.y === point.y)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /** Grid size for snapping wire endpoints. */
@@ -89,6 +86,8 @@ export interface PreviewSegment {
  */
 export class WireDrawingMode {
   private _active: boolean = false;
+  /** The origin of the entire wire (the starting pin world position). */
+  private _origin: Point = { x: 0, y: 0 };
   /** Locked waypoints including the origin. Each is the start of a new segment. */
   private _waypoints: Point[] = [];
   /** Current cursor position (snapped). */
@@ -107,6 +106,7 @@ export class WireDrawingMode {
       x: element.position.x + pin.position.x,
       y: element.position.y + pin.position.y,
     };
+    this._origin = startPos;
     this._waypoints = [startPos];
     this._cursor = startPos;
     this._active = true;
@@ -117,6 +117,7 @@ export class WireDrawingMode {
    * existing wire segment).
    */
   startFromPoint(point: Point): void {
+    this._origin = { ...point };
     this._waypoints = [{ ...point }];
     this._cursor = { ...point };
     this._active = true;
@@ -172,6 +173,12 @@ export class WireDrawingMode {
     // Merge collinear adjacent segments
     const merged = mergeCollinearSegments(wires);
 
+    // Consistency check
+    const error = checkWireConsistency(circuit, merged);
+    if (error !== undefined) {
+      throw error;
+    }
+
     // Add to circuit
     for (const wire of merged) {
       circuit.addWire(wire);
@@ -182,8 +189,12 @@ export class WireDrawingMode {
   }
 
   /**
-   * Complete the wire to an arbitrary world-space point (e.g. a wire tap).
-   * The caller is responsible for splitting the target wire.
+   * Complete the wire by connecting to an arbitrary world-space point (used
+   * when the endpoint lands on the interior of an existing wire segment rather
+   * than on a pin). The caller is responsible for splitting the target wire
+   * before or after calling this method.
+   *
+   * Throws FacadeError if consistency check fails.
    */
   completeToPoint(endPos: Point, circuit: Circuit): Wire[] {
     if (!this._active) {
@@ -193,6 +204,11 @@ export class WireDrawingMode {
     const segments = this._buildSegments(endPos);
     const wires = segments.map((seg) => new Wire(seg.start, seg.end));
     const merged = mergeCollinearSegments(wires);
+
+    const error = checkWireConsistency(circuit, merged);
+    if (error !== undefined) {
+      throw error;
+    }
 
     for (const wire of merged) {
       circuit.addWire(wire);

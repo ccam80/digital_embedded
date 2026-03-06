@@ -37,25 +37,7 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   [ComponentCategory.GRAPHICS]: "Graphics",
   [ComponentCategory.TERMINAL]: "Terminal",
   [ComponentCategory.SEVENTY_FOUR_XX]: "74xx",
-  [ComponentCategory.SUBCIRCUIT]: "Subcircuits",
 };
-
-/** All ComponentCategory values in display order. Used instead of Object.values() which doesn't work with const enums. */
-const ALL_CATEGORIES: readonly ComponentCategory[] = [
-  ComponentCategory.LOGIC,
-  ComponentCategory.IO,
-  ComponentCategory.FLIP_FLOPS,
-  ComponentCategory.MEMORY,
-  ComponentCategory.ARITHMETIC,
-  ComponentCategory.WIRING,
-  ComponentCategory.SWITCHING,
-  ComponentCategory.PLD,
-  ComponentCategory.MISC,
-  ComponentCategory.GRAPHICS,
-  ComponentCategory.TERMINAL,
-  ComponentCategory.SEVENTY_FOUR_XX,
-  ComponentCategory.SUBCIRCUIT,
-];
 
 const MAX_RECENT_HISTORY = 10;
 
@@ -67,16 +49,6 @@ const MAX_RECENT_HISTORY = 10;
  * Palette state: tree of categories, search filter, recent history, and
  * collapsed flag for iframe-embedded mode.
  */
-/** Categories hidden from the sidebar palette (available via Insert menu). */
-const PALETTE_HIDDEN_CATEGORIES: ReadonlySet<ComponentCategory> = new Set([
-  ComponentCategory.GRAPHICS,
-  ComponentCategory.TERMINAL,
-  ComponentCategory.PLD,
-  ComponentCategory.SEVENTY_FOUR_XX,
-  ComponentCategory.MISC,
-  ComponentCategory.SUBCIRCUIT,
-]);
-
 export class ComponentPalette {
   private readonly _registry: ComponentRegistry;
   /** Per-category expanded state. True = expanded (showing children). */
@@ -84,19 +56,17 @@ export class ComponentPalette {
   /** Recent placements — most recent first. Max 10 unique type names. */
   private readonly _recentHistory: string[] = [];
   private _collapsed = false;
+  /** Whether the first-category auto-expand has been applied. */
+  private _firstExpansionDone: boolean = false;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
 
-    // All categories start expanded.
-    for (const category of ALL_CATEGORIES) {
+    // All categories start expanded by default.
+    for (const category of Object.values(ComponentCategory)) {
       this._expandedCategories.set(category as ComponentCategory, true);
     }
-  }
-
-  /** Returns the underlying registry for Insert menu building. */
-  getRegistry(): ComponentRegistry {
-    return this._registry;
+    this._firstExpansionDone = true;
   }
 
   // ---------------------------------------------------------------------------
@@ -110,19 +80,32 @@ export class ComponentPalette {
    */
   getTree(): PaletteNode[] {
     const nodes: PaletteNode[] = [];
+    let firstFound = false;
 
-    for (const category of ALL_CATEGORIES) {
-      if (PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
-      const children = this._registry.getByCategory(category);
+    for (const category of Object.values(ComponentCategory)) {
+      const cat = category as ComponentCategory;
+      const children = this._registry.getByCategory(cat);
       if (children.length === 0) {
         continue;
       }
+
+      // Auto-expand the first populated category, but only once.
+      // After that, toggleCategory() owns the state entirely.
+      if (!this._firstExpansionDone && !firstFound) {
+        this._expandedCategories.set(cat, true);
+        firstFound = true;
+      }
+
       nodes.push({
-        category,
-        label: CATEGORY_LABELS[category] ?? category,
+        category: cat,
+        label: CATEGORY_LABELS[cat] ?? cat,
         children: [...children],
-        expanded: this._expandedCategories.get(category) ?? true,
+        expanded: this._expandedCategories.get(cat) ?? false,
       });
+    }
+
+    if (!this._firstExpansionDone && firstFound) {
+      this._firstExpansionDone = true;
     }
 
     return nodes;
@@ -143,7 +126,7 @@ export class ComponentPalette {
     const lowerQuery = query.toLowerCase();
     const nodes: PaletteNode[] = [];
 
-    for (const category of ALL_CATEGORIES) {
+    for (const category of Object.values(ComponentCategory)) {
       const cat = category as ComponentCategory;
       const all = this._registry.getByCategory(cat);
       const matched = all.filter((def) =>

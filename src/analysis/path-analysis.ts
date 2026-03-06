@@ -90,7 +90,7 @@ function buildAdjacency(circuit: Circuit): Map<string, Set<string>> {
 
   for (const el of circuit.elements) {
     for (const pin of el.getPins()) {
-      const key = pointKey(pin.position.x, pin.position.y);
+      const key = pointKey(el.position.x + pin.position.x, el.position.y + pin.position.y);
       if (pin.direction === PinDirection.OUTPUT) {
         let list = outputPinMap.get(key);
         if (list === undefined) { list = []; outputPinMap.set(key, list); }

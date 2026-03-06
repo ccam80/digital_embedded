@@ -138,7 +138,9 @@ export function resolveNets(
 
   for (const element of circuit.elements) {
     for (const pin of element.getPins()) {
-      const key = pointKey(pin.position.x, pin.position.y);
+      const wx = element.position.x + pin.position.x;
+      const wy = element.position.y + pin.position.y;
+      const key = pointKey(wx, wy);
       const nodeIndex = pinNodes.length;
       pinNodes.push({ element, pin, nodeIndex });
       if (!posToFirstPinNode.has(key)) {
@@ -157,7 +159,9 @@ export function resolveNets(
   {
     const seenAtPos = new Map<string, number>(); // key → first nodeIndex seen
     for (const pn of pinNodes) {
-      const key = pointKey(pn.pin.position.x, pn.pin.position.y);
+      const wx = pn.element.position.x + pn.pin.position.x;
+      const wy = pn.element.position.y + pn.pin.position.y;
+      const key = pointKey(wx, wy);
       const first = seenAtPos.get(key);
       if (first !== undefined) {
         uf.union(first, pn.nodeIndex);

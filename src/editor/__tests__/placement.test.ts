@@ -135,6 +135,21 @@ describe("PlacementMode", () => {
     expect(mode.isActive()).toBe(true);
   });
 
+  it("placedElementPositionMatchesSnappedCursor", () => {
+    const mode = new PlacementMode();
+    const def = makeMockDefinition();
+    const circuit = new Circuit();
+
+    mode.start(def);
+    // Move cursor to a fractional world position
+    mode.updateCursor({ x: 3.7, y: 2.3 });
+    const placed = mode.place(circuit);
+
+    // snapToGrid(gridSize=1): round(3.7)=4, round(2.3)=2
+    expect(placed.position.x).toBe(4);
+    expect(placed.position.y).toBe(2);
+  });
+
   it("cancelExitsMode", () => {
     const mode = new PlacementMode();
     const def = makeMockDefinition();
