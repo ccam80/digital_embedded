@@ -327,9 +327,6 @@ describe('fsmToCircuit', () => {
   });
 
   it('minimizedExpressions', () => {
-    // With minimize=true -> fewer gates than unminimized
-    // (Both paths use minimize internally, but we verify the synthesis works
-    // and produces a compact circuit)
     const fsm = createFSM('min-test');
     fsm.inputSignals = ['A', 'B'];
     fsm.outputSignals = ['Y'];
@@ -347,18 +344,86 @@ describe('fsmToCircuit', () => {
     const registry = buildRegistry();
     const minimizedCircuit = fsmToCircuit(fsm, registry, { minimize: true });
 
-    // The minimized circuit should have elements
     expect(minimizedCircuit.elements.length).toBeGreaterThan(0);
 
-    // It should have In components for state bits and input signals
     const inCount = countByType(minimizedCircuit, 'In');
     expect(inCount).toBeGreaterThanOrEqual(1);
 
-    // It should have Out components
     const outCount = countByType(minimizedCircuit, 'Out');
     expect(outCount).toBeGreaterThanOrEqual(1);
 
-    // The circuit should be structurally valid
     expect(Array.isArray(minimizedCircuit.wires)).toBe(true);
+  });
+
+  it('synthesizeD — minimize:false uses raw SOP not minimize()', () => {
+    // A 2-state FSM with one input: S0 --A--> S1 --A--> S0.
+    // With minimize=true: Z_0_next simplifies to A (one variable).
+    // With minimize=false: canonical SOP — one minterm per 1-row, no simplification.
+    // Both circuits must be structurally valid and the unminimized circuit
+    // must have at least as many elements as the minimized one.
+    const fsm = createFSM('d-unmin-test');
+    fsm.inputSignals = ['A'];
+    fsm.outputSignals = [];
+
+    const s0 = addState(fsm, 'S0', { x: 0, y: 0 });
+    const s1 = addState(fsm, 'S1', { x: 100, y: 0 });
+
+    addTransition(fsm, s0.id, s1.id, 'A');
+    addTransition(fsm, s1.id, s0.id, 'A');
+
+    const registry = buildRegistry();
+
+    const minCircuit = fsmToCircuit(fsm, registry, { flipflopType: 'D', minimize: true });
+    const rawCircuit = fsmToCircuit(fsm, registry, { flipflopType: 'D', minimize: false });
+
+    // Both circuits are structurally valid
+    expect(minCircuit.elements.length).toBeGreaterThan(0);
+    expect(rawCircuit.elements.length).toBeGreaterThan(0);
+    expect(Array.isArray(rawCircuit.wires)).toBe(true);
+
+    // Both have Out components (next-state outputs)
+    expect(countByType(rawCircuit, 'Out')).toBeGreaterThanOrEqual(1);
+
+    // Unminimized SOP is never simpler than minimized — at least as many elements
+    expect(rawCircuit.elements.length).toBeGreaterThanOrEqual(minCircuit.elements.length);
+  });
+
+  it('synthesizeJK — minimize:false uses raw SOP not minimize()', () => {
+    // Same 2-state FSM, JK synthesis path.
+    // With minimize=false the JK truth tables produce raw SOP expressions.
+    // The circuit must be valid, contain J and K outputs, and have at least
+    // as many elements as the minimized version.
+    const fsm = createFSM('jk-unmin-test');
+    fsm.inputSignals = ['A'];
+    fsm.outputSignals = [];
+
+    const s0 = addState(fsm, 'S0', { x: 0, y: 0 });
+    const s1 = addState(fsm, 'S1', { x: 100, y: 0 });
+
+    addTransition(fsm, s0.id, s1.id, 'A');
+    addTransition(fsm, s1.id, s0.id, 'A');
+
+    const registry = buildRegistry();
+
+    const minCircuit = fsmToCircuit(fsm, registry, { flipflopType: 'JK', minimize: true });
+    const rawCircuit = fsmToCircuit(fsm, registry, { flipflopType: 'JK', minimize: false });
+
+    // Both circuits are structurally valid
+    expect(minCircuit.elements.length).toBeGreaterThan(0);
+    expect(rawCircuit.elements.length).toBeGreaterThan(0);
+    expect(Array.isArray(rawCircuit.wires)).toBe(true);
+
+    // Both have J and K outputs for the state bit
+    const rawOutLabels = rawCircuit.elements
+      .filter((el) => el.typeId === 'Out')
+      .map((el) => {
+        const props = el.getProperties();
+        return props.has('label') ? props.get<string>('label') : '';
+      });
+    expect(rawOutLabels.some((l) => l.includes('_J'))).toBe(true);
+    expect(rawOutLabels.some((l) => l.includes('_K'))).toBe(true);
+
+    // Unminimized SOP is never simpler than minimized
+    expect(rawCircuit.elements.length).toBeGreaterThanOrEqual(minCircuit.elements.length);
   });
 });

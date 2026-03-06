@@ -241,7 +241,7 @@ export class FSMEditor {
           // Re-add the same state object on redo to preserve its ID
           fsm.states.push(createdState);
         } else {
-          createdState = addState(fsm, name, { x, y }, isInitial);
+          createdState = addState(fsm, name, { x, y }, { isInitial });
         }
       },
       undo(): void {

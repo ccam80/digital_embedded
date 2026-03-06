@@ -16,24 +16,28 @@ import { describe, it, expect } from "vitest";
 import {
   AddElement,
   makeExecuteAdd,
+  executeAdd,
   AddDefinition,
   ADD_ATTRIBUTE_MAPPINGS,
 } from "../add.js";
 import {
   SubElement,
   makeExecuteSub,
+  executeSub,
   SubDefinition,
   SUB_ATTRIBUTE_MAPPINGS,
 } from "../sub.js";
 import {
   MulElement,
   makeExecuteMul,
+  executeMul,
   MulDefinition,
   MUL_ATTRIBUTE_MAPPINGS,
 } from "../mul.js";
 import {
   DivElement,
   makeExecuteDiv,
+  executeDiv,
   DivDefinition,
   DIV_ATTRIBUTE_MAPPINGS,
 } from "../div.js";
@@ -54,6 +58,20 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     inputOffset: () => 0,
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
+  };
+}
+
+function makeLayoutWithProps(
+  inputCount: number,
+  outputCount: number,
+  props: Record<string, unknown>,
+): ComponentLayout {
+  return {
+    inputCount: () => inputCount,
+    inputOffset: () => 0,
+    outputCount: () => outputCount,
+    outputOffset: () => inputCount,
+    getProperty: (_index: number, key: string) => props[key] as (number | boolean | string | undefined),
   };
 }
 
@@ -1051,5 +1069,141 @@ describe("Div", () => {
       const el = DivDefinition.factory(props);
       expect(el.typeId).toBe("Div");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dynamic-dispatch wrapper tests — verify executeFn reads bitWidth from layout
+// ---------------------------------------------------------------------------
+
+describe("executeAdd dynamic dispatch via getProperty", () => {
+  it("4-bit: 0xF + 0x1 + 0 = 0x0 with carry (reads bitWidth=4 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 4 });
+    const state = makeState([0xF, 0x1, 0], 2);
+    executeAdd(0, state, layout);
+    expect(state[3]).toBe(0);
+    expect(state[4]).toBe(1);
+  });
+
+  it("8-bit: 0xFF + 0x01 + 0 = 0x00 with carry (reads bitWidth=8 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 8 });
+    const state = makeState([0xFF, 0x01, 0], 2);
+    executeAdd(0, state, layout);
+    expect(state[3]).toBe(0);
+    expect(state[4]).toBe(1);
+  });
+
+  it("16-bit: 0x7FFF + 0x0001 + 0 = 0x8000 no carry (reads bitWidth=16 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 16 });
+    const state = makeState([0x7FFF, 0x0001, 0], 2);
+    executeAdd(0, state, layout);
+    expect(state[3]).toBe(0x8000);
+    expect(state[4]).toBe(0);
+  });
+
+  it("defaults to bitWidth=1 when getProperty returns undefined", () => {
+    const layout = makeLayout(3, 2);
+    const state = makeState([1, 0, 0], 2);
+    executeAdd(0, state, layout);
+    expect(state[3]).toBe(1);
+    expect(state[4]).toBe(0);
+  });
+});
+
+describe("executeSub dynamic dispatch via getProperty", () => {
+  it("4-bit: 0x0 - 0x1 - 0 wraps to 0xF with borrow (reads bitWidth=4 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 4 });
+    const state = makeState([0, 1, 0], 2);
+    executeSub(0, state, layout);
+    expect(state[3]).toBe(0xF);
+    expect(state[4]).toBe(1);
+  });
+
+  it("8-bit: 0x00 - 0x01 - 0 = 0xFF with borrow (reads bitWidth=8 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 8 });
+    const state = makeState([0x00, 0x01, 0], 2);
+    executeSub(0, state, layout);
+    expect(state[3]).toBe(0xFF);
+    expect(state[4]).toBe(1);
+  });
+
+  it("16-bit: 0x0100 - 0x0001 - 0 = 0x00FF no borrow (reads bitWidth=16 from layout)", () => {
+    const layout = makeLayoutWithProps(3, 2, { bitWidth: 16 });
+    const state = makeState([0x0100, 0x0001, 0], 2);
+    executeSub(0, state, layout);
+    expect(state[3]).toBe(0x00FF);
+    expect(state[4]).toBe(0);
+  });
+
+  it("defaults to bitWidth=1 when getProperty returns undefined", () => {
+    const layout = makeLayout(3, 2);
+    const state = makeState([1, 0, 0], 2);
+    executeSub(0, state, layout);
+    expect(state[3]).toBe(1);
+    expect(state[4]).toBe(0);
+  });
+});
+
+describe("executeMul dynamic dispatch via getProperty", () => {
+  it("4-bit unsigned: 0xF * 0xF = 225 (reads bitWidth=4 from layout)", () => {
+    const layout = makeLayoutWithProps(2, 1, { bitWidth: 4, signed: false });
+    const state = makeState([0xF, 0xF], 1);
+    executeMul(0, state, layout);
+    expect(state[2]).toBe(225);
+  });
+
+  it("8-bit unsigned: 0xFF * 0xFF = 0xFE01 (reads bitWidth=8 from layout)", () => {
+    const layout = makeLayoutWithProps(2, 1, { bitWidth: 8, signed: false });
+    const state = makeState([0xFF, 0xFF], 1);
+    executeMul(0, state, layout);
+    expect(state[2]).toBe(0xFE01);
+  });
+
+  it("4-bit signed: -1 * -1 = 1 (reads bitWidth=4, signed=true from layout)", () => {
+    const layout = makeLayoutWithProps(2, 1, { bitWidth: 4, signed: true });
+    const state = makeState([0xF, 0xF], 1);
+    executeMul(0, state, layout);
+    expect(state[2]).toBe(1);
+  });
+
+  it("defaults to bitWidth=1, signed=false when getProperty returns undefined", () => {
+    const layout = makeLayout(2, 1);
+    const state = makeState([1, 1], 1);
+    executeMul(0, state, layout);
+    expect(state[2]).toBe(1);
+  });
+});
+
+describe("executeDiv dynamic dispatch via getProperty", () => {
+  it("8-bit unsigned: 255 / 10 = 25 remainder 5 (reads bitWidth=8 from layout)", () => {
+    const layout = makeLayoutWithProps(2, 2, { bitWidth: 8, signed: false, remainderPositive: false });
+    const state = makeState([255, 10], 2);
+    executeDiv(0, state, layout);
+    expect(state[2]).toBe(25);
+    expect(state[3]).toBe(5);
+  });
+
+  it("4-bit signed: -6 / 2 = -3 remainder 0 (reads bitWidth=4, signed=true from layout)", () => {
+    const layout = makeLayoutWithProps(2, 2, { bitWidth: 4, signed: true, remainderPositive: false });
+    const state = makeState([0xA, 2], 2);
+    executeDiv(0, state, layout);
+    expect(state[2]).toBe(0xD);
+    expect(state[3]).toBe(0);
+  });
+
+  it("division by zero treated as 1 (reads bitWidth=8 from layout)", () => {
+    const layout = makeLayoutWithProps(2, 2, { bitWidth: 8, signed: false, remainderPositive: false });
+    const state = makeState([7, 0], 2);
+    executeDiv(0, state, layout);
+    expect(state[2]).toBe(7);
+    expect(state[3]).toBe(0);
+  });
+
+  it("defaults to bitWidth=1, unsigned when getProperty returns undefined", () => {
+    const layout = makeLayout(2, 2);
+    const state = makeState([1, 1], 2);
+    executeDiv(0, state, layout);
+    expect(state[2]).toBe(1);
+    expect(state[3]).toBe(0);
   });
 });

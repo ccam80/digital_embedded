@@ -20,6 +20,7 @@
 
 import type { BoolExpr } from './expression.js';
 import { minimize } from './quine-mccluskey.js';
+import { generateSOP } from './expression-gen.js';
 import type { SignalSpec, StateTransitionTable } from './state-transition.js';
 import { TruthTable } from './truth-table.js';
 import type { TernaryValue } from './truth-table.js';
@@ -46,16 +47,19 @@ export interface JKEquations {
 /**
  * Derive JK flip-flop excitation equations from a state transition table.
  *
- * For each 1-bit state variable, produces minimized J and K expressions as
- * functions of all state variables and inputs.
+ * For each 1-bit state variable, produces J and K expressions as functions of
+ * all state variables and inputs. When shouldMinimize is true, expressions are
+ * minimized using Quine-McCluskey. When false, canonical SOP expressions are
+ * used directly.
  *
  * Multi-bit state variables are expanded bit-by-bit (each bit gets its own
  * J/K pair).
  *
- * @param table  State transition table from analyseSequential().
- * @returns      JK equations for each state bit and minimized output expressions.
+ * @param table          State transition table from analyseSequential().
+ * @param shouldMinimize When true, apply Quine-McCluskey minimization.
+ * @returns              JK equations for each state bit and output expressions.
  */
-export function deriveJKEquations(table: StateTransitionTable): JKEquations {
+export function deriveJKEquations(table: StateTransitionTable, shouldMinimize: boolean): JKEquations {
   // Build the flat list of input variables (state bits + external inputs),
   // mirroring the variable ordering that TruthTable uses for row indices.
   const allInputSpecs = buildAllInputSpecs(table);
@@ -72,18 +76,14 @@ export function deriveJKEquations(table: StateTransitionTable): JKEquations {
     const jTable = buildJKTruthTable(table, allInputSpecs, stateVarIndex, bitPos, 'J');
     const kTable = buildJKTruthTable(table, allInputSpecs, stateVarIndex, bitPos, 'K');
 
-    const jResult = minimize(jTable, 0);
-    const kResult = minimize(kTable, 0);
+    const jExpr = shouldMinimize ? minimize(jTable, 0).selectedCover : generateSOP(jTable, 0);
+    const kExpr = shouldMinimize ? minimize(kTable, 0).selectedCover : generateSOP(kTable, 0);
 
-    stateBits.push({
-      name: varName,
-      jExpr: jResult.selectedCover,
-      kExpr: kResult.selectedCover,
-    });
+    stateBits.push({ name: varName, jExpr, kExpr });
   }
 
-  // Build minimized output expressions
-  const outputExprs = deriveOutputExprs(table, allInputSpecs);
+  // Build output expressions
+  const outputExprs = deriveOutputExprs(table, allInputSpecs, shouldMinimize);
 
   return { stateBits, outputExprs };
 }
@@ -267,12 +267,14 @@ function jkExcitation(currentQ: bigint, nextQ: bigint, which: 'J' | 'K'): Ternar
 // ---------------------------------------------------------------------------
 
 /**
- * Derive minimized expressions for each output signal as a function of
- * current state and external inputs.
+ * Derive expressions for each output signal as a function of current state
+ * and external inputs. Minimizes when shouldMinimize is true; uses canonical
+ * SOP otherwise.
  */
 function deriveOutputExprs(
   table: StateTransitionTable,
   allInputSpecs: SignalSpec[],
+  shouldMinimize: boolean,
 ): { name: string; expr: BoolExpr }[] {
   if (table.outputs.length === 0) return [];
 
@@ -322,10 +324,9 @@ function deriveOutputExprs(
     }
   }
 
-  // Minimize each output
   return expandedOutputs.map(({ name, data }) => {
     const outTable = new TruthTable(allInputSpecs, [{ name, bitWidth: 1 }], data);
-    const result = minimize(outTable, 0);
-    return { name, expr: result.selectedCover };
+    const expr = shouldMinimize ? minimize(outTable, 0).selectedCover : generateSOP(outTable, 0);
+    return { name, expr };
   });
 }

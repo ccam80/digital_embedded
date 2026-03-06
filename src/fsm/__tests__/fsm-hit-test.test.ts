@@ -16,7 +16,7 @@ describe("FSMHitTest", () => {
   });
 
   it("hitState", () => {
-    const state = addState(fsm, "S0", { x: 100, y: 100 }, true);
+    const state = addState(fsm, "S0", { x: 100, y: 100 }, { isInitial: true });
 
     const result = hitTestFSM(fsm, 105, 105);
     expect(result.type).toBe("state");
@@ -26,7 +26,7 @@ describe("FSMHitTest", () => {
   });
 
   it("missState", () => {
-    addState(fsm, "S0", { x: 100, y: 100 }, true);
+    addState(fsm, "S0", { x: 100, y: 100 }, { isInitial: true });
 
     const result = hitTestFSM(fsm, 500, 500);
     expect(result.type).toBe("none");

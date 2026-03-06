@@ -61,7 +61,7 @@ describe('jk-synthesis', () => {
       ],
     };
 
-    const result = deriveJKEquations(table);
+    const result = deriveJKEquations(table, true);
 
     expect(result.stateBits).toHaveLength(1);
     const { jExpr, kExpr } = result.stateBits[0]!;
@@ -100,7 +100,7 @@ describe('jk-synthesis', () => {
       ],
     };
 
-    const result = deriveJKEquations(table);
+    const result = deriveJKEquations(table, true);
 
     expect(result.stateBits).toHaveLength(1);
     const { jExpr, kExpr } = result.stateBits[0]!;
@@ -163,7 +163,7 @@ describe('jk-synthesis', () => {
       ],
     };
 
-    const result = deriveJKEquations(table);
+    const result = deriveJKEquations(table, true);
 
     expect(result.stateBits).toHaveLength(2);
 
@@ -213,7 +213,7 @@ describe('jk-synthesis', () => {
       ],
     };
 
-    const result = deriveJKEquations(table);
+    const result = deriveJKEquations(table, true);
 
     const { jExpr, kExpr } = result.stateBits[0]!;
 

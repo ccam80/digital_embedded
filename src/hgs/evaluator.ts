@@ -130,11 +130,20 @@ async function evalExprInner(expr: Expression, ctx: HGSContext): Promise<HGSValu
 
     case "call": {
       const callee = await evaluateExpr(expr.callee, ctx);
+      const fn = toFunction(callee);
+      if (fn.name === "isPresent") {
+        if (expr.args.length === 0) return false;
+        try {
+          await evaluateExpr(expr.args[0]!, ctx);
+          return true;
+        } catch {
+          return false;
+        }
+      }
       const args: HGSValue[] = [];
       for (const arg of expr.args) {
         args.push(await evaluateExpr(arg, ctx));
       }
-      const fn = toFunction(callee);
       return await fn.callable(args);
     }
 

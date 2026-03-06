@@ -244,14 +244,7 @@ function builtinPanic(): HGSFunction {
 }
 
 function builtinIsPresent(): HGSFunction {
-  return new HGSFunction(async (_args) => {
-    // isPresent evaluates its argument — since args are already evaluated
-    // by the time the built-in is called, we just return true if we got here.
-    // (The HGS semantics require lazy evaluation, but our evaluator evaluates
-    // args eagerly. For isPresent to work properly it needs special-casing in
-    // the evaluator. For now return true if the value is non-null.)
-    return _args.length > 0 && _args[0] !== null;
-  }, "isPresent");
+  return new HGSFunction(async (_args) => true, "isPresent");
 }
 
 // ---------------------------------------------------------------------------

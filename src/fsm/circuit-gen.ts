@@ -13,6 +13,7 @@ import type { FSM } from './model.js';
 import { fsmToTransitionTable } from './table-creator.js';
 import type { BoolExpr } from '../analysis/expression.js';
 import { minimize } from '../analysis/quine-mccluskey.js';
+import { generateSOP } from '../analysis/expression-gen.js';
 import { TruthTable } from '../analysis/truth-table.js';
 import type { TernaryValue } from '../analysis/truth-table.js';
 import type { SignalSpec } from '../analysis/state-transition.js';
@@ -97,8 +98,7 @@ function synthesizeD(
       const result = minimize(tt, 0);
       expressions.set(outputName, result.selectedCover);
     } else {
-      const result = minimize(tt, 0);
-      expressions.set(outputName, result.selectedCover);
+      expressions.set(outputName, generateSOP(tt, 0));
     }
   }
 
@@ -131,9 +131,9 @@ function synthesizeD(
 function synthesizeJK(
   table: ReturnType<typeof fsmToTransitionTable>,
   registry: ComponentRegistry,
-  _shouldMinimize: boolean,
+  shouldMinimize: boolean,
 ): Circuit {
-  const jkEqs = deriveJKEquations(table);
+  const jkEqs = deriveJKEquations(table, shouldMinimize);
 
   const expressions = new Map<string, BoolExpr>();
   const allInputSpecs = buildFlatInputSpecs(table.stateVars, table.inputs);

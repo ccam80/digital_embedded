@@ -63,8 +63,8 @@ describe("FSMRenderer", () => {
 
   it("drawTransition", () => {
     const fsm = createFSM("test");
-    const s1 = addState(fsm, "A", { x: 50, y: 100 }, true);
-    const s2 = addState(fsm, "B", { x: 250, y: 100 }, false);
+    const s1 = addState(fsm, "A", { x: 50, y: 100 }, { isInitial: true });
+    const s2 = addState(fsm, "B", { x: 250, y: 100 }, { isInitial: false });
     const t = addTransition(fsm, s1.id, s2.id, "X & Y");
 
     renderTransition(ctx, fsm, t, false);

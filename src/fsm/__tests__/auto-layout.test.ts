@@ -16,10 +16,10 @@ describe("AutoLayout", () => {
   });
 
   it("circleLayout", () => {
-    addState(fsm, "S0", { x: 0, y: 0 }, true);
-    addState(fsm, "S1", { x: 0, y: 0 }, false);
-    addState(fsm, "S2", { x: 0, y: 0 }, false);
-    addState(fsm, "S3", { x: 0, y: 0 }, false);
+    addState(fsm, "S0", { x: 0, y: 0 }, { isInitial: true });
+    addState(fsm, "S1", { x: 0, y: 0 }, { isInitial: false });
+    addState(fsm, "S2", { x: 0, y: 0 }, { isInitial: false });
+    addState(fsm, "S3", { x: 0, y: 0 }, { isInitial: false });
 
     const cx = 200;
     const cy = 200;
