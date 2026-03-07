@@ -160,21 +160,24 @@ describe("Scope", () => {
     it("executeScope writes first channel input to output slot", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([42], 1);
-      executeScope(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeScope(0, state, highZs, layout);
       expect(state[1]).toBe(42);
     });
 
     it("executeScope with zero input → output=0", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeScope(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeScope(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeScope with multi-channel: first channel written to output", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([7, 2, 5], 1);
-      executeScope(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeScope(0, state, highZs, layout);
       expect(state[3]).toBe(7);
     });
   });
@@ -310,40 +313,45 @@ describe("ScopeTrigger", () => {
     it("rising edge: 0→1 produces output=1", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([1], 2);
+      const highZs = new Uint32Array(state.length);
       state[2] = 0; // previous value = 0 (no edge yet)
-      executeScopeTrigger(0, state, layout);
+      executeScopeTrigger(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("no edge: 1→1 produces output=0", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([1], 2);
+      const highZs = new Uint32Array(state.length);
       state[2] = 1; // previous value = 1 (no edge)
-      executeScopeTrigger(0, state, layout);
+      executeScopeTrigger(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("falling edge: 1→0 produces output=1", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([0], 2);
+      const highZs = new Uint32Array(state.length);
       state[2] = 1; // previous value = 1
-      executeScopeTrigger(0, state, layout);
+      executeScopeTrigger(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("no edge: 0→0 produces output=0", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([0], 2);
+      const highZs = new Uint32Array(state.length);
       state[2] = 0; // previous value = 0
-      executeScopeTrigger(0, state, layout);
+      executeScopeTrigger(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("previous value is updated after each step", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([1], 2);
+      const highZs = new Uint32Array(state.length);
       state[2] = 0;
-      executeScopeTrigger(0, state, layout);
+      executeScopeTrigger(0, state, highZs, layout);
       // After step, previous value should be 1
       expect(state[2]).toBe(1);
     });

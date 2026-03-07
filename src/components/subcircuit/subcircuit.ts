@@ -210,6 +210,7 @@ function buildPositionedPinDeclarations(
 export function executeSubcircuit(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // Subcircuits are inlined into the parent CompiledModel before simulation.

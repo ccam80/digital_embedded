@@ -151,7 +151,7 @@ export class LookUpTableElement extends AbstractCircuitElement {
 // Output  = backing_store[address]
 // ---------------------------------------------------------------------------
 
-export function executeLookUpTable(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeLookUpTable(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 

@@ -146,8 +146,8 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 31,
-      "lastAccessed": 1772787223994,
+      "accessCount": 52,
+      "lastAccessed": 1772842798511,
       "type": "directory"
     },
     {
@@ -158,8 +158,8 @@
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 18,
-      "lastAccessed": 1772786907473,
+      "accessCount": 22,
+      "lastAccessed": 1772843190361,
       "type": "file"
     },
     {
@@ -170,20 +170,20 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 15,
-      "lastAccessed": 1772782438382,
+      "accessCount": 16,
+      "lastAccessed": 1772841341847,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 13,
-      "lastAccessed": 1772782443208,
+      "accessCount": 15,
+      "lastAccessed": 1772841343697,
       "type": "file"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 12,
-      "lastAccessed": 1772782438764,
+      "accessCount": 13,
+      "lastAccessed": 1772841342786,
       "type": "file"
     },
     {
@@ -205,6 +205,12 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 7,
+      "lastAccessed": 1772841912795,
+      "type": "directory"
+    },
+    {
       "path": "src\\analysis\\jk-synthesis.ts",
       "accessCount": 6,
       "lastAccessed": 1772781358968,
@@ -214,6 +220,12 @@
       "path": "src\\hgs\\evaluator.ts",
       "accessCount": 6,
       "lastAccessed": 1772782506281,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\add.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772842131875,
       "type": "file"
     },
     {
@@ -232,12 +244,6 @@
       "path": "src\\fsm\\__tests__\\circuit-gen.test.ts",
       "accessCount": 5,
       "lastAccessed": 1772781351949,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\add.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772782004581,
       "type": "file"
     },
     {
@@ -287,12 +293,6 @@
       "accessCount": 4,
       "lastAccessed": 1772782027732,
       "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772788197163,
-      "type": "directory"
     },
     {
       "path": "src\\hgs\\value.ts",

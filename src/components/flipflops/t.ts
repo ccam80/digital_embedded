@@ -214,7 +214,7 @@ export class TElement extends AbstractCircuitElement {
 // We detect it from inputCount via layout.inputCount(index).
 // ---------------------------------------------------------------------------
 
-export function executeT(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

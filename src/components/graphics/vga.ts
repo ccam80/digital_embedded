@@ -337,6 +337,7 @@ export class VGAElement extends AbstractCircuitElement {
 export function executeVga(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

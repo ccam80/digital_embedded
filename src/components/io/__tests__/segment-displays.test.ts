@@ -120,7 +120,8 @@ describe("SevenSeg", () => {
     it("all segments off → output=0", () => {
       const layout = makeLayout(8, 1);
       const state = makeState([0, 0, 0, 0, 0, 0, 0, 0], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect(state[8]).toBe(0);
     });
 
@@ -128,7 +129,8 @@ describe("SevenSeg", () => {
       const layout = makeLayout(8, 1);
       // a=1, rest=0
       const state = makeState([1, 0, 0, 0, 0, 0, 0, 0], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect(state[8] & 1).toBe(1);
     });
 
@@ -136,14 +138,16 @@ describe("SevenSeg", () => {
       const layout = makeLayout(8, 1);
       // a=0,...,g=0,dp=1
       const state = makeState([0, 0, 0, 0, 0, 0, 0, 1], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect((state[8] >> 7) & 1).toBe(1);
     });
 
     it("all segments on → output=0xFF", () => {
       const layout = makeLayout(8, 1);
       const state = makeState([1, 1, 1, 1, 1, 1, 1, 1], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect(state[8]).toBe(0xFF);
     });
 
@@ -151,7 +155,8 @@ describe("SevenSeg", () => {
       const layout = makeLayout(8, 1);
       // a=1, b=0, c=0, d=0, e=0, f=0, g=1, dp=0
       const state = makeState([1, 0, 0, 0, 0, 0, 1, 0], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect(state[8] & 0b1000001).toBe(0b1000001);
     });
   });
@@ -160,14 +165,16 @@ describe("SevenSeg", () => {
     it("dp input on → bit 7 set", () => {
       const layout = makeLayout(8, 1);
       const state = makeState([0, 0, 0, 0, 0, 0, 0, 1], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect((state[8] & 0x80) !== 0).toBe(true);
     });
 
     it("dp input off → bit 7 clear", () => {
       const layout = makeLayout(8, 1);
       const state = makeState([1, 1, 1, 1, 1, 1, 1, 0], 1);
-      executeSevenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSeg(0, state, highZs, layout);
       expect((state[8] & 0x80)).toBe(0);
     });
   });
@@ -294,7 +301,8 @@ describe("SevenSegHex", () => {
     it("digit 0 → segment pattern for '0' (a,b,c,d,e,f on, g off)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       // 0 = 0b0111111 = segments a,b,c,d,e,f (no g)
       expect(state[1]).toBe(0b0111111);
     });
@@ -302,35 +310,40 @@ describe("SevenSegHex", () => {
     it("digit 1 → segment pattern for '1' (b,c on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(0b0000110);
     });
 
     it("digit 7 → segment pattern for '7' (a,b,c on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([7], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(0b0000111);
     });
 
     it("digit 8 → all segments on", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([8], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(0b1111111);
     });
 
     it("digit 0xA → segment pattern for 'A'", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xA], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(0b1110111);
     });
 
     it("digit 0xF → segment pattern for 'F'", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xF], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(0b1110001);
     });
 
@@ -338,7 +351,8 @@ describe("SevenSegHex", () => {
       const layout = makeLayout(1, 1);
       // Input 0x10 → digit 0 (lower 4 bits = 0)
       const state = makeState([0x10], 1);
-      executeSevenSegHex(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSevenSegHex(0, state, highZs, layout);
       expect(state[1]).toBe(HEX_SEGMENT_TABLE[0]);
     });
 
@@ -465,7 +479,8 @@ describe("SixteenSeg", () => {
     it("all segments off → output=0", () => {
       const layout = makeLayout(16, 1);
       const state = makeState(new Array(16).fill(0), 1);
-      executeSixteenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSixteenSeg(0, state, highZs, layout);
       expect(state[16]).toBe(0);
     });
 
@@ -474,7 +489,8 @@ describe("SixteenSeg", () => {
       const inputs = new Array(16).fill(0);
       inputs[0] = 1; // a1
       const state = makeState(inputs, 1);
-      executeSixteenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSixteenSeg(0, state, highZs, layout);
       expect(state[16] & 1).toBe(1);
     });
 
@@ -483,14 +499,16 @@ describe("SixteenSeg", () => {
       const inputs = new Array(16).fill(0);
       inputs[15] = 1; // dp
       const state = makeState(inputs, 1);
-      executeSixteenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSixteenSeg(0, state, highZs, layout);
       expect((state[16] >> 15) & 1).toBe(1);
     });
 
     it("all segments on → output has all 16 bits set", () => {
       const layout = makeLayout(16, 1);
       const state = makeState(new Array(16).fill(1), 1);
-      executeSixteenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSixteenSeg(0, state, highZs, layout);
       expect(state[16]).toBe(0xFFFF);
     });
 
@@ -499,7 +517,8 @@ describe("SixteenSeg", () => {
       const inputs = new Array(16).fill(0);
       inputs[0] = 0xFF; // non-zero but not 1
       const state = makeState(inputs, 1);
-      executeSixteenSeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeSixteenSeg(0, state, highZs, layout);
       expect(state[16] & 1).toBe(1);
     });
   });

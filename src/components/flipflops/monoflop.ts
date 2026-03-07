@@ -182,7 +182,7 @@ export class MonoflopElement extends AbstractCircuitElement {
 //   - R=1 at any time: reset storedQ=0, counter=0
 // ---------------------------------------------------------------------------
 
-export function executeMonoflop(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {

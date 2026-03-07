@@ -88,14 +88,14 @@ export class BitExtenderElement extends AbstractCircuitElement {
 export function makeExecuteBitExtender(
   inputBits: number,
   outputBits: number,
-): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const inMask = inputBits >= 32 ? 0xFFFFFFFF : ((1 << inputBits) - 1);
   const outMask = outputBits >= 32 ? 0xFFFFFFFF : ((1 << outputBits) - 1);
   const signBit = 1 << (inputBits - 1);
   // Extension mask: bits above inputBits up to outputBits
   const extendMask = (outMask ^ inMask) >>> 0;
 
-  return function executeBitExtender(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeBitExtender(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
     const inVal = state[inBase] & inMask;
@@ -110,8 +110,8 @@ export function makeExecuteBitExtender(
   };
 }
 
-export function executeBitExtender(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteBitExtender(4, 8)(index, state, layout);
+export function executeBitExtender(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  makeExecuteBitExtender(4, 8)(index, state, _highZs, layout);
 }
 
 export const BIT_EXTENDER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

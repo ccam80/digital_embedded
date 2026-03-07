@@ -118,8 +118,9 @@ describe("RotaryEncoder", () => {
     it("position 0: A=0, B=0", () => {
       const layout = makeLayout(0, 3);
       const state = makeState([], 3);
+      const highZs = new Uint32Array(state.length);
       state[2] = 0; // position = 0
-      executeRotaryEncoder(0, state, layout);
+      executeRotaryEncoder(0, state, highZs, layout);
       expect(state[0]).toBe(0); // A
       expect(state[1]).toBe(0); // B
     });
@@ -127,8 +128,9 @@ describe("RotaryEncoder", () => {
     it("position 1: A=1, B=0", () => {
       const layout = makeLayout(0, 3);
       const state = makeState([], 3);
+      const highZs = new Uint32Array(state.length);
       state[2] = 1; // position = 1
-      executeRotaryEncoder(0, state, layout);
+      executeRotaryEncoder(0, state, highZs, layout);
       expect(state[0]).toBe(1); // A
       expect(state[1]).toBe(0); // B
     });
@@ -136,8 +138,9 @@ describe("RotaryEncoder", () => {
     it("position 2: A=1, B=1", () => {
       const layout = makeLayout(0, 3);
       const state = makeState([], 3);
+      const highZs = new Uint32Array(state.length);
       state[2] = 2;
-      executeRotaryEncoder(0, state, layout);
+      executeRotaryEncoder(0, state, highZs, layout);
       expect(state[0]).toBe(1); // A
       expect(state[1]).toBe(1); // B
     });
@@ -145,8 +148,9 @@ describe("RotaryEncoder", () => {
     it("position 3: A=0, B=1", () => {
       const layout = makeLayout(0, 3);
       const state = makeState([], 3);
+      const highZs = new Uint32Array(state.length);
       state[2] = 3;
-      executeRotaryEncoder(0, state, layout);
+      executeRotaryEncoder(0, state, highZs, layout);
       expect(state[0]).toBe(0); // A
       expect(state[1]).toBe(1); // B
     });
@@ -154,8 +158,9 @@ describe("RotaryEncoder", () => {
     it("position wraps via mask (position 4 → same as 0)", () => {
       const layout = makeLayout(0, 3);
       const state = makeState([], 3);
+      const highZs = new Uint32Array(state.length);
       state[2] = 4; // 4 & 3 = 0
-      executeRotaryEncoder(0, state, layout);
+      executeRotaryEncoder(0, state, highZs, layout);
       expect(state[0]).toBe(QUADRATURE_TABLE[0][0]);
       expect(state[1]).toBe(QUADRATURE_TABLE[0][1]);
     });
@@ -271,28 +276,32 @@ describe("StepperMotorBipolar", () => {
     it("step 0 pattern: A+=1, A-=0, B+=1, B-=0 → output=0", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([1, 0, 1, 0], 1);
-      executeStepperMotorBipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorBipolar(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
     it("step 1 pattern: A+=0, A-=1, B+=1, B-=0 → output=1", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([0, 1, 1, 0], 1);
-      executeStepperMotorBipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorBipolar(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
 
     it("step 2 pattern: A+=0, A-=1, B+=0, B-=1 → output=2", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([0, 1, 0, 1], 1);
-      executeStepperMotorBipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorBipolar(0, state, highZs, layout);
       expect(state[4]).toBe(2);
     });
 
     it("step 3 pattern: A+=1, A-=0, B+=0, B-=1 → output=3", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([1, 0, 0, 1], 1);
-      executeStepperMotorBipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorBipolar(0, state, highZs, layout);
       expect(state[4]).toBe(3);
     });
   });
@@ -391,28 +400,32 @@ describe("StepperMotorUnipolar", () => {
     it("step 0: A=1,B=0,C=0,D=0 → output=0", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([1, 0, 0, 0], 1);
-      executeStepperMotorUnipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorUnipolar(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
     it("step 1: A=0,B=1,C=0,D=0 → output=1", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([0, 1, 0, 0], 1);
-      executeStepperMotorUnipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorUnipolar(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
 
     it("step 2: A=0,B=0,C=1,D=0 → output=2", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([0, 0, 1, 0], 1);
-      executeStepperMotorUnipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorUnipolar(0, state, highZs, layout);
       expect(state[4]).toBe(2);
     });
 
     it("step 3: A=0,B=0,C=0,D=1 → output=3", () => {
       const layout = makeLayout(4, 1);
       const state = makeState([0, 0, 0, 1], 1);
-      executeStepperMotorUnipolar(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStepperMotorUnipolar(0, state, highZs, layout);
       expect(state[4]).toBe(3);
     });
   });

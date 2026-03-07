@@ -33,7 +33,7 @@ function singleGroup(indices: number[]): EvaluationGroup {
 }
 
 function buildMinimalCircuit(): ConcreteCompiledCircuit {
-  const noopFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+  const noopFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
   const layout = new StaticLayout([[0]], [[1]]);
   return {
     netCount: 2,

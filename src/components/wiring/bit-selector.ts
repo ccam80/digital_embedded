@@ -159,6 +159,7 @@ export class BitSelectorElement extends AbstractCircuitElement {
 export function executeBitSelector(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inBase = layout.inputOffset(index);

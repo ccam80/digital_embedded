@@ -116,42 +116,48 @@ describe("NAndGate", () => {
     it("NAND of 0xFFFFFFFF and 0xFFFFFFFF produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0xFFFFFFFF]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("NAND of 0xFFFFFFFF and 0x00000000 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0x00000000]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("NAND of 0x0F0F0F0F and 0xFFFFFFFF produces 0xF0F0F0F0", () => {
       const layout = makeLayout(2);
       const state = makeState([0x0F0F0F0F, 0xFFFFFFFF]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0xF0F0F0F0);
     });
 
     it("single-bit: 1 NAND 1 = 0", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 1]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFE);
     });
 
     it("single-bit: 1 NAND 0 = 1 (all bits set)", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("single-bit: 0 NAND 0 = 1 (all bits set)", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
   });
@@ -160,7 +166,8 @@ describe("NAndGate", () => {
     it("NAND of 0xFF, 0x0F, 0x03 produces NOT(0x03)", () => {
       const layout = makeLayout(3);
       const state = makeState([0xFF, 0x0F, 0x03]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[3]).toBe((~0x03) >>> 0);
     });
   });
@@ -169,7 +176,8 @@ describe("NAndGate", () => {
     it("NAND of 0xAAAAAAAA and 0xAAAAAAAA produces NOT(0xAAAAAAAA)", () => {
       const layout = makeLayout(2);
       const state = makeState([0xAAAAAAAA, 0xAAAAAAAA]);
-      executeNAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0x55555555);
     });
   });

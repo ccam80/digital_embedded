@@ -110,29 +110,33 @@ describe("FlipflopD", () => {
   describe("truth table on clock edge", () => {
     it("D=1 captured on rising clock edge → Q=1, ~Q=0xFFFFFFFE", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe((~1) >>> 0);
     });
 
     it("D=0 captured on rising clock edge → Q=0, ~Q=0xFFFFFFFF", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe((~0) >>> 0);
     });
 
     it("D=1 but no clock edge (clock stays high) → Q unchanged", () => {
       const state = makeState(6, { 0: 1, 1: 1, 4: 0, 5: 1 });
-      executeD(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("D=1 but falling edge (clock goes 1→0) → Q unchanged", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 1, 5: 1 });
-      executeD(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -140,11 +144,12 @@ describe("FlipflopD", () => {
   describe("state persistence between edges", () => {
     it("stored value persists when clock is low", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       state[1] = 0;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -152,8 +157,9 @@ describe("FlipflopD", () => {
   describe("Q and ~Q complementary", () => {
     it("Q and ~Q are always complementary after clock edge", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe((~1) >>> 0);
 
@@ -161,7 +167,7 @@ describe("FlipflopD", () => {
       state[5] = 0;
       state[1] = 0;
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe((~0) >>> 0);
     });
@@ -170,16 +176,17 @@ describe("FlipflopD", () => {
   describe("edge detection", () => {
     it("only rising edge (0→1) triggers capture", () => {
       const state = makeState(6, { 0: 1, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
 
       state[1] = 1;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
 
       state[0] = 0;
-      executeD(0, state, layout);
+      executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -283,15 +290,17 @@ describe("FlipflopDAsync", () => {
   describe("truth table on clock edge", () => {
     it("D=1 captured on rising clock edge when Set=0 Clr=0", () => {
       const state = makeState(8, { 0: 0, 1: 1, 2: 0, 3: 0, 6: 0, 7: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeDAsync(0, state, layout);
+      executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
 
     it("D=0 captured on rising clock edge when Set=0 Clr=0", () => {
       const state = makeState(8, { 0: 0, 1: 0, 2: 0, 3: 0, 6: 1, 7: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeDAsync(0, state, layout);
+      executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
   });
@@ -299,15 +308,17 @@ describe("FlipflopDAsync", () => {
   describe("async set", () => {
     it("Set=1 forces Q=all-ones regardless of clock", () => {
       const state = makeState(8, { 0: 1, 1: 0, 2: 0, 3: 0, 6: 0, 7: 0 });
-      executeDAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(0xFFFFFFFF >>> 0);
       expect(state[5]).toBe((~0xFFFFFFFF) >>> 0);
     });
 
     it("Set=1 overrides D=0 on clock edge", () => {
       const state = makeState(8, { 0: 1, 1: 0, 2: 0, 3: 0, 6: 0, 7: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeDAsync(0, state, layout);
+      executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(0xFFFFFFFF >>> 0);
     });
   });
@@ -315,7 +326,8 @@ describe("FlipflopDAsync", () => {
   describe("async clear", () => {
     it("Clr=1 forces Q=0 regardless of clock", () => {
       const state = makeState(8, { 0: 0, 1: 1, 2: 0, 3: 1, 6: 1, 7: 0 });
-      executeDAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(0);
       expect(state[5]).toBe(0xFFFFFFFF >>> 0);
     });
@@ -381,38 +393,43 @@ describe("FlipflopJK", () => {
   describe("truth table on clock edge", () => {
     it("J=1 K=0 → set (Q=1)", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
 
     it("J=0 K=1 → reset (Q=0)", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
 
     it("J=1 K=1 → toggle (Q was 0, becomes 1)", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
 
     it("J=1 K=1 → toggle (Q was 1, becomes 0)", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("J=0 K=0 → hold (Q unchanged)", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
   });
@@ -420,14 +437,16 @@ describe("FlipflopJK", () => {
   describe("edge detection", () => {
     it("no update on falling edge (1→0)", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("no update when clock stays high", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
-      executeJK(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -435,16 +454,18 @@ describe("FlipflopJK", () => {
   describe("Q and ~Q complementary", () => {
     it("after set: Q=1 and ~Q=0", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
 
     it("after reset: Q=0 and ~Q=1", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, layout);
+      executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -514,22 +535,25 @@ describe("FlipflopJKAsync", () => {
   describe("truth table on clock edge", () => {
     it("J=1 K=0 → set when Set=0 Clr=0", () => {
       const state = makeState(9, { 0: 0, 1: 1, 2: 0, 3: 0, 4: 0, 7: 0, 8: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeJKAsync(0, state, layout);
+      executeJKAsync(0, state, highZs, layout);
       expect(state[5]).toBe(1);
     });
 
     it("J=0 K=1 → reset when Set=0 Clr=0", () => {
       const state = makeState(9, { 0: 0, 1: 0, 2: 0, 3: 1, 4: 0, 7: 1, 8: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeJKAsync(0, state, layout);
+      executeJKAsync(0, state, highZs, layout);
       expect(state[5]).toBe(0);
     });
 
     it("J=1 K=1 → toggle when Set=0 Clr=0", () => {
       const state = makeState(9, { 0: 0, 1: 1, 2: 0, 3: 1, 4: 0, 7: 0, 8: 0 });
+      const highZs = new Uint32Array(state.length);
       state[2] = 1;
-      executeJKAsync(0, state, layout);
+      executeJKAsync(0, state, highZs, layout);
       expect(state[5]).toBe(1);
     });
   });
@@ -537,7 +561,8 @@ describe("FlipflopJKAsync", () => {
   describe("async set", () => {
     it("Set=1 forces Q=1 regardless of clock", () => {
       const state = makeState(9, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 7: 0, 8: 0 });
-      executeJKAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeJKAsync(0, state, highZs, layout);
       expect(state[5]).toBe(1);
       expect(state[6]).toBe(0);
     });
@@ -546,7 +571,8 @@ describe("FlipflopJKAsync", () => {
   describe("async clear", () => {
     it("Clr=1 forces Q=0 regardless of clock", () => {
       const state = makeState(9, { 0: 0, 1: 0, 2: 0, 3: 0, 4: 1, 7: 1, 8: 0 });
-      executeJKAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeJKAsync(0, state, highZs, layout);
       expect(state[5]).toBe(0);
       expect(state[6]).toBe(1);
     });
@@ -587,31 +613,35 @@ describe("FlipflopRS", () => {
   describe("truth table on clock edge", () => {
     it("S=1 R=0 → set (Q=1)", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
 
     it("S=0 R=1 → reset (Q=0)", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
 
     it("S=0 R=0 → hold Q unchanged", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
 
     it("S=1 R=1 → hold (undefined state treated as hold)", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -619,8 +649,9 @@ describe("FlipflopRS", () => {
   describe("edge detection", () => {
     it("no update on falling clock edge", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -628,8 +659,9 @@ describe("FlipflopRS", () => {
   describe("Q and ~Q complementary", () => {
     it("Q and ~Q are complementary after set", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
@@ -638,11 +670,12 @@ describe("FlipflopRS", () => {
   describe("state persistence", () => {
     it("Q persists after clock returns low", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       state[0] = 0;
       state[1] = 0;
-      executeRS(0, state, layout);
+      executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
   });
@@ -710,35 +743,40 @@ describe("FlipflopRSAsync", () => {
   describe("truth table (level-sensitive)", () => {
     it("S=1 R=0 → Q=1, ~Q=0", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 1 });
-      executeRSAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
 
     it("S=0 R=1 → Q=0, ~Q=1", () => {
       const state = makeState(6, { 0: 0, 1: 1, 4: 1, 5: 0 });
-      executeRSAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(1);
     });
 
     it("S=0 R=0 → holds current state (Q=1 stays Q=1)", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
-      executeRSAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
 
     it("S=0 R=0 → holds current state (Q=0 stays Q=0)", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 0, 5: 1 });
-      executeRSAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(1);
     });
 
     it("S=1 R=1 → forbidden state: Q=0, ~Q=0", () => {
       const state = makeState(6, { 0: 1, 1: 1, 4: 1, 5: 0 });
-      executeRSAsync(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0);
     });
@@ -747,8 +785,9 @@ describe("FlipflopRSAsync", () => {
   describe("no clock needed — level sensitive", () => {
     it("changes propagate immediately without clock", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 0, 5: 1 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeRSAsync(0, state, layout);
+      executeRSAsync(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -815,30 +854,34 @@ describe("FlipflopT", () => {
 
     it("toggles Q from 0 to 1 on rising clock edge", () => {
       const state = makeState(5, { 0: 0, 3: 0, 4: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[1]).toBe(1);
       expect(state[2]).toBe(0);
     });
 
     it("toggles Q from 1 to 0 on second rising clock edge", () => {
       const state = makeState(5, { 0: 0, 3: 1, 4: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
       expect(state[2]).toBe(1);
     });
 
     it("no toggle on falling edge", () => {
       const state = makeState(5, { 0: 1, 3: 0, 4: 1 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("no toggle when clock stays high (no second rising edge)", () => {
       const state = makeState(5, { 0: 1, 3: 0, 4: 1 });
-      executeT(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
   });
@@ -849,28 +892,31 @@ describe("FlipflopT", () => {
 
     it("T=1: toggles Q on rising clock edge", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("T=0: holds Q on rising clock edge", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("T=1 multiple toggles", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
 
       state[5] = 0;
       state[1] = 0;
       state[1] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -880,14 +926,15 @@ describe("FlipflopT", () => {
 
     it("Q and ~Q are always complementary", () => {
       const state = makeState(5, { 0: 0, 3: 0, 4: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[1] + state[2]).toBe(1);
 
       state[4] = 0;
       state[0] = 0;
       state[0] = 1;
-      executeT(0, state, layout);
+      executeT(0, state, highZs, layout);
       expect(state[1] + state[2]).toBe(1);
     });
   });

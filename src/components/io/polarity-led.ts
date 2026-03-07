@@ -153,6 +153,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
 export function executePolarityLed(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

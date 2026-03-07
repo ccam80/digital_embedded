@@ -133,6 +133,7 @@ export class StopElement extends AbstractCircuitElement {
 export function executeStop(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inIdx = layout.inputOffset(index);

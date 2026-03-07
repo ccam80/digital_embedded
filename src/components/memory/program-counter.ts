@@ -202,7 +202,7 @@ export class ProgramCounterElement extends AbstractCircuitElement {
 // State layout:  [counter=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
-export function executeProgramCounter(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeProgramCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as ProgramCounterLayout).stateOffset(index);

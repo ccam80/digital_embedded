@@ -163,7 +163,7 @@ export class ProbeElement extends AbstractCircuitElement {
 // the executeFn performs edge detection and increments the counter slot.
 // ---------------------------------------------------------------------------
 
-export function executeProbe(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeProbe(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
   // Copy current input value to the output/storage slot.

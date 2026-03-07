@@ -166,7 +166,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(4);
       const layout = makeLayout(3, 2);
       const state = makeState([1, 1, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(2);
       expect(state[4]).toBe(0);
     });
@@ -175,7 +176,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(4);
       const layout = makeLayout(3, 2);
       const state = makeState([0, 0, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(0);
     });
@@ -184,7 +186,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(4);
       const layout = makeLayout(3, 2);
       const state = makeState([0xF, 0x1, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -193,7 +196,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(4);
       const layout = makeLayout(3, 2);
       const state = makeState([0xF, 0xF, 1], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 15 + 15 + 1 = 31 = 0x1F; low 4 bits = 0xF, carry = 1
       expect(state[3]).toBe(0xF);
       expect(state[4]).toBe(1);
@@ -203,7 +207,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0xFF, 0x01, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -212,7 +217,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0x7F, 0x01, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0x80);
       expect(state[4]).toBe(0);
     });
@@ -221,7 +227,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0xFE, 0x01, 1], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -230,7 +237,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(16);
       const layout = makeLayout(3, 2);
       const state = makeState([0xFFFF, 0x0001, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -239,7 +247,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(32);
       const layout = makeLayout(3, 2);
       const state = makeState([0xFFFFFFFF, 0x00000001, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -248,7 +257,8 @@ describe("Add", () => {
       const exec = makeExecuteAdd(32);
       const layout = makeLayout(3, 2);
       const state = makeState([0x7FFFFFFF, 0x00000001, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0x80000000);
       expect(state[4]).toBe(0);
     });
@@ -257,11 +267,12 @@ describe("Add", () => {
       const exec = makeExecuteAdd(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0, 0, 0], 2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = (i * 3) & 0xFF;
         state[2] = i & 1;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[3]).toBe("number");
     });
@@ -407,7 +418,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(4);
       const layout = makeLayout(3, 2);
       const state = makeState([4, 2, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(2);
       expect(state[4]).toBe(0);
     });
@@ -416,7 +428,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(4);
       const layout = makeLayout(3, 2);
       const state = makeState([0, 0, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(0);
     });
@@ -425,7 +438,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(4);
       const layout = makeLayout(3, 2);
       const state = makeState([0, 1, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xF);
       expect(state[4]).toBe(1);
     });
@@ -434,7 +448,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0x00, 0x01, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xFF);
       expect(state[4]).toBe(1);
     });
@@ -443,7 +458,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0xFF, 0x01, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xFE);
       expect(state[4]).toBe(0);
     });
@@ -452,7 +468,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0x01, 0x00, 1], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(0);
     });
@@ -461,7 +478,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0x00, 0x00, 1], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xFF);
       expect(state[4]).toBe(1);
     });
@@ -470,7 +488,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(16);
       const layout = makeLayout(3, 2);
       const state = makeState([0x0000, 0x0001, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xFFFF);
       expect(state[4]).toBe(1);
     });
@@ -479,7 +498,8 @@ describe("Sub", () => {
       const exec = makeExecuteSub(32);
       const layout = makeLayout(3, 2);
       const state = makeState([0x00000000, 0x00000001, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(0xFFFFFFFF);
       expect(state[4]).toBe(1);
     });
@@ -488,11 +508,12 @@ describe("Sub", () => {
       const exec = makeExecuteSub(8);
       const layout = makeLayout(3, 2);
       const state = makeState([0, 0, 0], 2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = (i * 2) & 0xFF;
         state[1] = i & 0xFF;
         state[2] = 0;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[3]).toBe("number");
     });
@@ -585,7 +606,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(1, false);
       const layout = makeLayout(2, 1);
       const state = makeState([1, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
@@ -593,7 +615,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(1, false);
       const layout = makeLayout(2, 1);
       const state = makeState([1, 0], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
@@ -601,7 +624,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(4, false);
       const layout = makeLayout(2, 1);
       const state = makeState([3, 4], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(12);
     });
 
@@ -609,7 +633,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(4, false);
       const layout = makeLayout(2, 1);
       const state = makeState([0xF, 0xF], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 15 * 15 = 225 = 0xE1
       expect(state[2]).toBe(225);
     });
@@ -618,7 +643,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(8, false);
       const layout = makeLayout(2, 1);
       const state = makeState([0xFF, 0xFF], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 255 * 255 = 65025 = 0xFE01
       expect(state[2]).toBe(0xFE01);
     });
@@ -627,7 +653,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(16, false);
       const layout = makeLayout(2, 2);
       const state = makeState([0xFFFF, 0xFFFF], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 65535 * 65535 = 4294836225 = 0xFFFE0001
       // Fits in 32 bits, high word = 0
       expect(state[2]).toBe(0xFFFE0001);
@@ -639,7 +666,8 @@ describe("Mul", () => {
       const layout = makeLayout(2, 2);
       // 0x80000000 * 2 = 0x100000000
       const state = makeState([0x80000000, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0); // low 32 bits
       expect(state[3]).toBe(1); // high 32 bits
     });
@@ -648,10 +676,11 @@ describe("Mul", () => {
       const exec = makeExecuteMul(8, false);
       const layout = makeLayout(2, 1);
       const state = makeState([0, 0], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = (255 - i) & 0xFF;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[2]).toBe("number");
     });
@@ -663,7 +692,8 @@ describe("Mul", () => {
       const layout = makeLayout(2, 1);
       // -1 in 4 bits = 0xF
       const state = makeState([3, 0xF], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 3 * -1 = -3, stored in 8-bit two's complement = 0xFD
       expect(state[2]).toBe(0xFD);
     });
@@ -673,7 +703,8 @@ describe("Mul", () => {
       const layout = makeLayout(2, 1);
       // -2 in 4 bits = 0xE, -3 in 4 bits = 0xD
       const state = makeState([0xE, 0xD], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(6);
     });
 
@@ -681,7 +712,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(4, true);
       const layout = makeLayout(2, 1);
       const state = makeState([0xF, 0xF], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
@@ -689,7 +721,8 @@ describe("Mul", () => {
       const exec = makeExecuteMul(8, true);
       const layout = makeLayout(2, 1);
       const state = makeState([127, 2], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(254);
     });
 
@@ -698,7 +731,8 @@ describe("Mul", () => {
       const layout = makeLayout(2, 1);
       // -128 in 8 bits = 0x80
       const state = makeState([0x80, 2], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // -128 * 2 = -256 = 0xFF00 in 16-bit two's complement
       expect(state[2]).toBe(0xFF00);
     });
@@ -805,7 +839,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(4, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([6, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(3);
       expect(state[3]).toBe(0);
     });
@@ -814,7 +849,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(4, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([7, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(3);
       expect(state[3]).toBe(1);
     });
@@ -823,7 +859,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(8, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([0, 5], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0);
     });
@@ -832,7 +869,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(8, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([5, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(5);
       expect(state[3]).toBe(0);
     });
@@ -841,7 +879,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(8, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([255, 10], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(25);
       expect(state[3]).toBe(5);
     });
@@ -850,7 +889,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(16, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([0xFFFF, 0x100], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
       expect(state[3]).toBe(0xFF);
     });
@@ -859,7 +899,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(32, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([0xFFFFFFFF, 0x10000], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFF);
       expect(state[3]).toBe(0xFFFF);
     });
@@ -868,10 +909,11 @@ describe("Div", () => {
       const exec = makeExecuteDiv(8, false, false);
       const layout = makeLayout(2, 2);
       const state = makeState([0, 1], 2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = Math.max(1, i & 0xF);
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[2]).toBe("number");
     });
@@ -882,7 +924,8 @@ describe("Div", () => {
       const exec = makeExecuteDiv(4, true, false);
       const layout = makeLayout(2, 2);
       const state = makeState([6, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(3);
       expect(state[3]).toBe(0);
     });
@@ -892,7 +935,8 @@ describe("Div", () => {
       const layout = makeLayout(2, 2);
       // -6 in 4 bits = 0xA, 2 = 0x2
       const state = makeState([0xA, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // -3 in 4-bit two's complement = 0xD, remainder 0
       expect(state[2]).toBe(0xD);
       expect(state[3]).toBe(0);
@@ -903,7 +947,8 @@ describe("Div", () => {
       const layout = makeLayout(2, 2);
       // -7 in 8 bits = 0xF9
       const state = makeState([0xF9, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // -7 / 2 = -3 (truncated toward zero), remainder = -7 - (-3*2) = -7 + 6 = -1
       // -3 in 8-bit = 0xFD, -1 in 8-bit = 0xFF
       expect(state[2]).toBe(0xFD);
@@ -915,7 +960,8 @@ describe("Div", () => {
       const layout = makeLayout(2, 2);
       // -5 in 8 bits = 0xFB
       const state = makeState([0xFB, 0], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // -5 / 1 = -5, remainder 0
       expect(state[2]).toBe(0xFB);
       expect(state[3]).toBe(0);
@@ -926,7 +972,8 @@ describe("Div", () => {
       const layout = makeLayout(2, 2);
       // -7 in 8 bits = 0xF9
       const state = makeState([0xF9, 2], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // With remainderPositive: floor(-7/2) = -4, remainder = -7 - (-4*2) = 1
       // -4 in 8-bit = 0xFC, remainder = 1
       expect(state[2]).toBe(0xFC);
@@ -938,7 +985,8 @@ describe("Div", () => {
       const layout = makeLayout(2, 2);
       // -7 in 8 bits = 0xF9, -2 in 8 bits = 0xFE
       const state = makeState([0xF9, 0xFE], 2);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // Truncated: -7 / -2 = 3 remainder -1
       // remainderPositive with bv < 0: r -= bv = -1 - (-2) = 1, q++  = 4
       // 4 = 0x04, remainder 1 = 0x01
@@ -1082,7 +1130,8 @@ describe("executeAdd dynamic dispatch via getProperty", () => {
   it("4-bit: 0xF + 0x1 + 0 = 0x0 with carry (reads bitWidth=4 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 4 });
     const state = makeState([0xF, 0x1, 0], 2);
-    executeAdd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeAdd(0, state, highZs, layout);
     expect(state[3]).toBe(0);
     expect(state[4]).toBe(1);
   });
@@ -1090,7 +1139,8 @@ describe("executeAdd dynamic dispatch via getProperty", () => {
   it("8-bit: 0xFF + 0x01 + 0 = 0x00 with carry (reads bitWidth=8 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 8 });
     const state = makeState([0xFF, 0x01, 0], 2);
-    executeAdd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeAdd(0, state, highZs, layout);
     expect(state[3]).toBe(0);
     expect(state[4]).toBe(1);
   });
@@ -1098,7 +1148,8 @@ describe("executeAdd dynamic dispatch via getProperty", () => {
   it("16-bit: 0x7FFF + 0x0001 + 0 = 0x8000 no carry (reads bitWidth=16 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 16 });
     const state = makeState([0x7FFF, 0x0001, 0], 2);
-    executeAdd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeAdd(0, state, highZs, layout);
     expect(state[3]).toBe(0x8000);
     expect(state[4]).toBe(0);
   });
@@ -1106,7 +1157,8 @@ describe("executeAdd dynamic dispatch via getProperty", () => {
   it("defaults to bitWidth=1 when getProperty returns undefined", () => {
     const layout = makeLayout(3, 2);
     const state = makeState([1, 0, 0], 2);
-    executeAdd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeAdd(0, state, highZs, layout);
     expect(state[3]).toBe(1);
     expect(state[4]).toBe(0);
   });
@@ -1116,7 +1168,8 @@ describe("executeSub dynamic dispatch via getProperty", () => {
   it("4-bit: 0x0 - 0x1 - 0 wraps to 0xF with borrow (reads bitWidth=4 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 4 });
     const state = makeState([0, 1, 0], 2);
-    executeSub(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeSub(0, state, highZs, layout);
     expect(state[3]).toBe(0xF);
     expect(state[4]).toBe(1);
   });
@@ -1124,7 +1177,8 @@ describe("executeSub dynamic dispatch via getProperty", () => {
   it("8-bit: 0x00 - 0x01 - 0 = 0xFF with borrow (reads bitWidth=8 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 8 });
     const state = makeState([0x00, 0x01, 0], 2);
-    executeSub(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeSub(0, state, highZs, layout);
     expect(state[3]).toBe(0xFF);
     expect(state[4]).toBe(1);
   });
@@ -1132,7 +1186,8 @@ describe("executeSub dynamic dispatch via getProperty", () => {
   it("16-bit: 0x0100 - 0x0001 - 0 = 0x00FF no borrow (reads bitWidth=16 from layout)", () => {
     const layout = makeLayoutWithProps(3, 2, { bitWidth: 16 });
     const state = makeState([0x0100, 0x0001, 0], 2);
-    executeSub(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeSub(0, state, highZs, layout);
     expect(state[3]).toBe(0x00FF);
     expect(state[4]).toBe(0);
   });
@@ -1140,7 +1195,8 @@ describe("executeSub dynamic dispatch via getProperty", () => {
   it("defaults to bitWidth=1 when getProperty returns undefined", () => {
     const layout = makeLayout(3, 2);
     const state = makeState([1, 0, 0], 2);
-    executeSub(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeSub(0, state, highZs, layout);
     expect(state[3]).toBe(1);
     expect(state[4]).toBe(0);
   });
@@ -1150,28 +1206,32 @@ describe("executeMul dynamic dispatch via getProperty", () => {
   it("4-bit unsigned: 0xF * 0xF = 225 (reads bitWidth=4 from layout)", () => {
     const layout = makeLayoutWithProps(2, 1, { bitWidth: 4, signed: false });
     const state = makeState([0xF, 0xF], 1);
-    executeMul(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeMul(0, state, highZs, layout);
     expect(state[2]).toBe(225);
   });
 
   it("8-bit unsigned: 0xFF * 0xFF = 0xFE01 (reads bitWidth=8 from layout)", () => {
     const layout = makeLayoutWithProps(2, 1, { bitWidth: 8, signed: false });
     const state = makeState([0xFF, 0xFF], 1);
-    executeMul(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeMul(0, state, highZs, layout);
     expect(state[2]).toBe(0xFE01);
   });
 
   it("4-bit signed: -1 * -1 = 1 (reads bitWidth=4, signed=true from layout)", () => {
     const layout = makeLayoutWithProps(2, 1, { bitWidth: 4, signed: true });
     const state = makeState([0xF, 0xF], 1);
-    executeMul(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeMul(0, state, highZs, layout);
     expect(state[2]).toBe(1);
   });
 
   it("defaults to bitWidth=1, signed=false when getProperty returns undefined", () => {
     const layout = makeLayout(2, 1);
     const state = makeState([1, 1], 1);
-    executeMul(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeMul(0, state, highZs, layout);
     expect(state[2]).toBe(1);
   });
 });
@@ -1180,7 +1240,8 @@ describe("executeDiv dynamic dispatch via getProperty", () => {
   it("8-bit unsigned: 255 / 10 = 25 remainder 5 (reads bitWidth=8 from layout)", () => {
     const layout = makeLayoutWithProps(2, 2, { bitWidth: 8, signed: false, remainderPositive: false });
     const state = makeState([255, 10], 2);
-    executeDiv(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeDiv(0, state, highZs, layout);
     expect(state[2]).toBe(25);
     expect(state[3]).toBe(5);
   });
@@ -1188,7 +1249,8 @@ describe("executeDiv dynamic dispatch via getProperty", () => {
   it("4-bit signed: -6 / 2 = -3 remainder 0 (reads bitWidth=4, signed=true from layout)", () => {
     const layout = makeLayoutWithProps(2, 2, { bitWidth: 4, signed: true, remainderPositive: false });
     const state = makeState([0xA, 2], 2);
-    executeDiv(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeDiv(0, state, highZs, layout);
     expect(state[2]).toBe(0xD);
     expect(state[3]).toBe(0);
   });
@@ -1196,7 +1258,8 @@ describe("executeDiv dynamic dispatch via getProperty", () => {
   it("division by zero treated as 1 (reads bitWidth=8 from layout)", () => {
     const layout = makeLayoutWithProps(2, 2, { bitWidth: 8, signed: false, remainderPositive: false });
     const state = makeState([7, 0], 2);
-    executeDiv(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeDiv(0, state, highZs, layout);
     expect(state[2]).toBe(7);
     expect(state[3]).toBe(0);
   });
@@ -1204,7 +1267,8 @@ describe("executeDiv dynamic dispatch via getProperty", () => {
   it("defaults to bitWidth=1, unsigned when getProperty returns undefined", () => {
     const layout = makeLayout(2, 2);
     const state = makeState([1, 1], 2);
-    executeDiv(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+    executeDiv(0, state, highZs, layout);
     expect(state[2]).toBe(1);
     expect(state[3]).toBe(0);
   });

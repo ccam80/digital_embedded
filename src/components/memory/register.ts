@@ -166,7 +166,7 @@ export class RegisterElement extends AbstractCircuitElement {
 // State layout:  [storedVal=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
-export function executeRegister(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRegister(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

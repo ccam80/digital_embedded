@@ -49,7 +49,7 @@ function makePin(label: string, direction: PinDirection, x: number, y: number): 
   return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false };
 }
 
-function noop(_i: number, _s: Uint32Array, _l: ComponentLayout): void {}
+function noop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
 
 // ---------------------------------------------------------------------------
 // Registry factory with configurable delays

@@ -272,7 +272,7 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeRAMSinglePort(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
@@ -388,7 +388,7 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
   }
 }
 
-export function executeRAMSinglePortSel(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMSinglePortSel(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
@@ -502,7 +502,7 @@ export class RAMDualPortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeRAMDualPort(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
@@ -623,7 +623,7 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
   }
 }
 
-export function executeRAMDualAccess(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
@@ -735,7 +735,7 @@ export class RAMAsyncElement extends AbstractCircuitElement {
   }
 }
 
-export function executeRAMAsync(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
@@ -838,7 +838,7 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeBlockRAMDualPort(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeBlockRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);

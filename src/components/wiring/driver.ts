@@ -156,7 +156,7 @@ export class DriverElement extends AbstractCircuitElement {
 //   outputOffset(index) + 1 = highZ flag (0=driven, 0xFFFFFFFF=high-Z)
 // ---------------------------------------------------------------------------
 
-export function executeDriver(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDriver(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 

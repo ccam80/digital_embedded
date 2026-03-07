@@ -186,7 +186,7 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
 // State layout:  [addrReg=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
-export function executeProgramMemory(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeProgramMemory(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as ProgramMemoryLayout).stateOffset(index);

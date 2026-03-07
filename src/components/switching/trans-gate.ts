@@ -169,7 +169,7 @@ export class TransGateElement extends AbstractCircuitElement {
 // Closed when: S=1 AND ~S=0 (complementary and S is high)
 // ---------------------------------------------------------------------------
 
-export function executeTransGate(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeTransGate(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 

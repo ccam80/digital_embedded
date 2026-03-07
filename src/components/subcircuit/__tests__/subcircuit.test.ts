@@ -262,6 +262,7 @@ describe("drawDIL", () => {
 describe("executeFnNoOp", () => {
   it("execute function does nothing — no state change", () => {
     const state = new Uint32Array([1, 2, 3, 4]);
+    const highZs = new Uint32Array(state.length);
     const snapshot = Uint32Array.from(state);
 
     const mockLayout = {
@@ -272,7 +273,7 @@ describe("executeFnNoOp", () => {
       stateOffset: () => 0,
     };
 
-    executeSubcircuit(0, state, mockLayout);
+    executeSubcircuit(0, state, highZs, mockLayout);
 
     expect(state).toEqual(snapshot);
   });

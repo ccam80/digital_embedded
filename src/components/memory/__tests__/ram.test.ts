@@ -206,10 +206,11 @@ describe("RAMSinglePort", () => {
       // Inputs: A=3, str=1, C=0→1 (rising edge), ld=1
       // State: +0=lastClk(0)
       const state = makeState([3, 1, 0, 1], 1, 1);
+      const highZs = new Uint32Array(state.length);
       // stateBase = 4 + 1 = 5; state[5]=lastClk=0
 
       // First call: clk=0, no edge, ld=1 but nothing written yet
-      executeRAMSinglePort(INDEX, state, layout);
+      executeRAMSinglePort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0);
 
       // Now produce rising edge: set clk=1
@@ -226,7 +227,7 @@ describe("RAMSinglePort", () => {
       // The previous call left state[5]=lastClk=0 and state[4]=0.
       // Let's set state[4] = data to write and re-call.
       state[4] = 0xCC;
-      executeRAMSinglePort(INDEX, state, layout);
+      executeRAMSinglePort(INDEX, state, highZs, layout);
 
       // After the call: clk goes from 0 to 1 (rising edge), str=1 → writes state[4]=0xCC to mem[3]
       // But wait: at the time of the write check, state[4] should be read BEFORE it's overwritten.
@@ -246,9 +247,10 @@ describe("RAMSinglePort", () => {
       const layout = makeRAMLayout(4, 1);
       // Inputs: A=0, str=0, C=1 (already high, but lastClk=0 → edge)
       const state = makeState([0, 0, 1, 1], 1, 1);
+      const highZs = new Uint32Array(state.length);
       // state[5] = lastClk = 0
 
-      executeRAMSinglePort(INDEX, state, layout);
+      executeRAMSinglePort(INDEX, state, highZs, layout);
       // str=0 → no write. ld=1 → read mem[0]=0xFF
       expect(state[4]).toBe(0xFF);
       expect(mem.read(0)).toBe(0xFF);
@@ -263,9 +265,10 @@ describe("RAMSinglePort", () => {
       const layout = makeRAMLayout(4, 1);
       // ld=0 → output stays 0
       const state = makeState([0, 0, 0, 0], 1, 1);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0xFF;
 
-      executeRAMSinglePort(INDEX, state, layout);
+      executeRAMSinglePort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
@@ -276,9 +279,10 @@ describe("RAMSinglePort", () => {
 
       const layout = makeRAMLayout(4, 1);
       const state = makeState([0, 1, 1, 0], 1, 1);
+      const highZs = new Uint32Array(state.length);
       state[5] = 1; // lastClk=1 → no rising edge (sustained high)
 
-      executeRAMSinglePort(INDEX, state, layout);
+      executeRAMSinglePort(INDEX, state, highZs, layout);
       expect(mem.read(0)).toBe(0);
     });
   });
@@ -448,9 +452,10 @@ describe("RAMSinglePortSel", () => {
       // Inputs: A=5, CS=1, WE=1, OE=0
       // Output slot state[4] = data to write (bidirectional feedback)
       const state = makeState([5, 1, 1, 0], 1);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0x77;
 
-      executeRAMSinglePortSel(INDEX, state, layout);
+      executeRAMSinglePortSel(INDEX, state, highZs, layout);
       expect(mem.read(5)).toBe(0x77);
     });
 
@@ -463,8 +468,9 @@ describe("RAMSinglePortSel", () => {
       const layout = makeLayout(4, 1);
       // Inputs: A=2, CS=1, WE=0, OE=1
       const state = makeState([2, 1, 0, 1], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMSinglePortSel(INDEX, state, layout);
+      executeRAMSinglePortSel(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0xAA);
     });
 
@@ -477,9 +483,10 @@ describe("RAMSinglePortSel", () => {
       const layout = makeLayout(4, 1);
       // WE=1 means write mode, output goes to 0
       const state = makeState([0, 1, 1, 1], 1);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0x55;
 
-      executeRAMSinglePortSel(INDEX, state, layout);
+      executeRAMSinglePortSel(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
@@ -491,9 +498,10 @@ describe("RAMSinglePortSel", () => {
 
       const layout = makeLayout(4, 1);
       const state = makeState([0, 0, 0, 1], 1);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0xFF;
 
-      executeRAMSinglePortSel(INDEX, state, layout);
+      executeRAMSinglePortSel(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
@@ -507,12 +515,12 @@ describe("RAMSinglePortSel", () => {
       // Write 0xAB to addr 7
       const stateW = makeState([7, 1, 1, 0], 1);
       stateW[4] = 0xAB;
-      executeRAMSinglePortSel(INDEX, stateW, layout);
+      executeRAMSinglePortSel(INDEX, stateW, new Uint32Array(stateW.length), layout);
       expect(mem.read(7)).toBe(0xAB);
 
       // Read from addr 7
       const stateR = makeState([7, 1, 0, 1], 1);
-      executeRAMSinglePortSel(INDEX, stateR, layout);
+      executeRAMSinglePortSel(INDEX, stateR, new Uint32Array(stateR.length), layout);
       expect(stateR[4]).toBe(0xAB);
     });
   });
@@ -587,15 +595,16 @@ describe("RAMDualPort", () => {
 
       // Setup: clk=0, str=1, A=4, Din=0x42, ld=1
       const state = makeState([4, 0x42, 1, 0, 1], 1, 1);
+      const highZs = new Uint32Array(state.length);
       // state[6] = stateBase = 5+1=6; lastClk=0
 
-      executeRAMDualPort(INDEX, state, layout);
+      executeRAMDualPort(INDEX, state, highZs, layout);
       // clk=0 → no rising edge → no write. ld=1 → read mem[4]=0
       expect(state[5]).toBe(0);
 
       // Now produce rising edge
       state[3] = 1;
-      executeRAMDualPort(INDEX, state, layout);
+      executeRAMDualPort(INDEX, state, highZs, layout);
       // Rising edge: str=1 → write Din=0x42 to mem[4]. ld=1 → output = mem[4] = 0x42
       expect(mem.read(4)).toBe(0x42);
       expect(state[5]).toBe(0x42);
@@ -610,9 +619,10 @@ describe("RAMDualPort", () => {
       const layout = makeRAMLayout(5, 1);
       // Rising edge but str=0
       const state = makeState([0, 0xFF, 0, 1, 1], 1, 1);
+      const highZs = new Uint32Array(state.length);
       // lastClk=0 in state[6]
 
-      executeRAMDualPort(INDEX, state, layout);
+      executeRAMDualPort(INDEX, state, highZs, layout);
       // str=0 → no write. mem[0] still 0x11
       expect(mem.read(0)).toBe(0x11);
     });
@@ -625,9 +635,10 @@ describe("RAMDualPort", () => {
 
       const layout = makeRAMLayout(5, 1);
       const state = makeState([0, 0, 0, 0, 0], 1, 1);
+      const highZs = new Uint32Array(state.length);
       state[5] = 0xFF;
 
-      executeRAMDualPort(INDEX, state, layout);
+      executeRAMDualPort(INDEX, state, highZs, layout);
       expect(state[5]).toBe(0);
     });
 
@@ -638,9 +649,10 @@ describe("RAMDualPort", () => {
 
       const layout = makeRAMLayout(5, 1);
       const state = makeState([0, 0xAA, 1, 1, 0], 1, 1);
+      const highZs = new Uint32Array(state.length);
       state[6] = 1; // lastClk=1 → no rising edge
 
-      executeRAMDualPort(INDEX, state, layout);
+      executeRAMDualPort(INDEX, state, highZs, layout);
       expect(mem.read(0)).toBe(0);
     });
 
@@ -656,13 +668,13 @@ describe("RAMDualPort", () => {
         // Rising edge write
         const stW = makeState([addr, data, 1, 1, 0], 1, 1);
         stW[6] = 0; // lastClk=0
-        executeRAMDualPort(INDEX, stW, layout);
+        executeRAMDualPort(INDEX, stW, new Uint32Array(stW.length), layout);
         expect(mem.read(addr)).toBe(data);
       }
 
       for (let addr = 0; addr < 8; addr++) {
         const stR = makeState([addr, 0, 0, 0, 1], 1, 1);
-        executeRAMDualPort(INDEX, stR, layout);
+        executeRAMDualPort(INDEX, stR, new Uint32Array(stR.length), layout);
         expect(stR[5]).toBe(addr * 17);
       }
     });
@@ -729,8 +741,9 @@ describe("RAMDualAccess", () => {
       const layout = makeRAMLayout(6, 2);
       // Port 2: addr=7
       const state = makeState([0, 0, 0, 0, 0, 7], 2, 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMDualAccess(INDEX, state, layout);
+      executeRAMDualAccess(INDEX, state, highZs, layout);
       // 2D = mem[7] = 0xDE regardless of clock/ld
       expect(state[7]).toBe(0xDE);
     });
@@ -745,9 +758,10 @@ describe("RAMDualAccess", () => {
       // Write 0xCA to addr 5 via port 1 on rising edge
       // Inputs: str=1, C=1, ld=0, 1A=5, 1Din=0xCA, 2A=5
       const state = makeState([1, 1, 0, 5, 0xCA, 5], 2, 1);
+      const highZs = new Uint32Array(state.length);
       state[8] = 0; // lastClk=0
 
-      executeRAMDualAccess(INDEX, state, layout);
+      executeRAMDualAccess(INDEX, state, highZs, layout);
       // Rising edge: str=1 → write 0xCA to mem[5]
       expect(mem.read(5)).toBe(0xCA);
       // Port 2 reads mem[5] = 0xCA
@@ -762,8 +776,9 @@ describe("RAMDualAccess", () => {
 
       const layout = makeRAMLayout(6, 2);
       const state = makeState([0, 0, 1, 3, 0, 0], 2, 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMDualAccess(INDEX, state, layout);
+      executeRAMDualAccess(INDEX, state, highZs, layout);
       // ld=1 → 1D = mem[3] = 0x88
       expect(state[6]).toBe(0x88);
     });
@@ -776,9 +791,10 @@ describe("RAMDualAccess", () => {
 
       const layout = makeRAMLayout(6, 2);
       const state = makeState([0, 0, 0, 0, 0, 0], 2, 1);
+      const highZs = new Uint32Array(state.length);
       state[6] = 0xFF;
 
-      executeRAMDualAccess(INDEX, state, layout);
+      executeRAMDualAccess(INDEX, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
 
@@ -791,9 +807,10 @@ describe("RAMDualAccess", () => {
       const layout = makeRAMLayout(6, 2);
       // Write to addr 2 via port 1, read from addr 9 via port 2
       const state = makeState([1, 1, 0, 2, 0x11, 9], 2, 1);
+      const highZs = new Uint32Array(state.length);
       state[8] = 0; // lastClk=0
 
-      executeRAMDualAccess(INDEX, state, layout);
+      executeRAMDualAccess(INDEX, state, highZs, layout);
       expect(mem.read(2)).toBe(0x11);
       expect(state[7]).toBe(0x55);
     });
@@ -865,8 +882,9 @@ describe("RAMAsync", () => {
       // Inputs: A, D, we — 3 inputs, 1 output
       const layout = makeLayout(3, 1);
       const state = makeState([6, 0xAB, 1], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(mem.read(6)).toBe(0xAB);
       expect(state[3]).toBe(0xAB);
     });
@@ -879,8 +897,9 @@ describe("RAMAsync", () => {
 
       const layout = makeLayout(3, 1);
       const state = makeState([2, 0xFF, 0], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(mem.read(2)).toBe(0xCD);
       expect(state[3]).toBe(0xCD);
     });
@@ -892,8 +911,9 @@ describe("RAMAsync", () => {
 
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0x42, 1], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(state[3]).toBe(0x42);
     });
 
@@ -906,8 +926,9 @@ describe("RAMAsync", () => {
       const layout = makeLayout(3, 1);
       // we=1, A=1, D=0x22 → writes 0x22, then reads 0x22
       const state = makeState([1, 0x22, 1], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(state[3]).toBe(0x22);
     });
 
@@ -919,8 +940,9 @@ describe("RAMAsync", () => {
       const layout = makeLayout(3, 1);
       // Write to address 8 → wraps to 0
       const state = makeState([8, 0x99, 1], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(mem.read(0)).toBe(0x99);
     });
 
@@ -932,8 +954,9 @@ describe("RAMAsync", () => {
 
       const layout = makeLayout(3, 1);
       const state = makeState([3, 0, 0], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(state[3]).toBe(30);
     });
 
@@ -942,8 +965,9 @@ describe("RAMAsync", () => {
       // No backing store registered for INDEX=99
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0xFF, 0], 1);
+      const highZs = new Uint32Array(state.length);
 
-      executeRAMAsync(INDEX, state, layout);
+      executeRAMAsync(INDEX, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
@@ -954,12 +978,13 @@ describe("RAMAsync", () => {
 
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 0], 1);
+      const highZs = new Uint32Array(state.length);
 
       for (let i = 0; i < 1000; i++) {
         state[0] = i % 256;
         state[1] = i & 0xFF;
         state[2] = 1;
-        executeRAMAsync(INDEX, state, layout);
+        executeRAMAsync(INDEX, state, highZs, layout);
       }
       expect(typeof state[3]).toBe("number");
     });
@@ -1061,9 +1086,10 @@ describe("BlockRAMDualPort", () => {
       // Inputs: A, Din, str, C — 4 inputs, 1 output, 2 state slots
       const layout = makeRAMLayout(4, 1);
       const state = makeState([0, 0, 0, 0], 1, 2);
+      const highZs = new Uint32Array(state.length);
       // stateBase = 4+1=5; state[5]=lastClk=0, state[6]=outputVal=0
 
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // clk=0 → no rising edge → output = state[6] = 0
       expect(state[4]).toBe(0);
     });
@@ -1077,9 +1103,10 @@ describe("BlockRAMDualPort", () => {
       const layout = makeRAMLayout(4, 1);
       // Inputs: A=2, Din=0x55, str=1, C=1
       const state = makeState([2, 0x55, 1, 1], 1, 2);
+      const highZs = new Uint32Array(state.length);
       // state[5]=lastClk=0, state[6]=outputVal=0
 
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // Rising edge: reads mem[2]=0xAA into outputVal, then writes 0x55 to mem[2]
       expect(state[4]).toBe(0xAA);
       expect(mem.read(2)).toBe(0x55);
@@ -1094,21 +1121,22 @@ describe("BlockRAMDualPort", () => {
       const layout = makeRAMLayout(4, 1);
       // First rising edge: read 0x10, write 0x20
       const state = makeState([0, 0x20, 1, 1], 1, 2);
+      const highZs = new Uint32Array(state.length);
       state[5] = 0; // lastClk=0
 
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0x10);
       expect(mem.read(0)).toBe(0x20);
 
       // Second rising edge: read 0x20, write 0x30
       state[1] = 0x30;
       state[3] = 0; // clk goes low
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // clk=0 → no edge, output unchanged
       expect(state[4]).toBe(0x10);
 
       state[3] = 1; // clk rises again
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0x20);
       expect(mem.read(0)).toBe(0x30);
     });
@@ -1121,9 +1149,10 @@ describe("BlockRAMDualPort", () => {
 
       const layout = makeRAMLayout(4, 1);
       const state = makeState([1, 0xFF, 0, 1], 1, 2);
+      const highZs = new Uint32Array(state.length);
       state[5] = 0;
 
-      executeBlockRAMDualPort(INDEX, state, layout);
+      executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // reads mem[1]=0x77 into outputVal, but str=0 → no write
       expect(state[4]).toBe(0x77);
       expect(mem.read(1)).toBe(0x77);
@@ -1137,9 +1166,10 @@ describe("BlockRAMDualPort", () => {
 
       const layout = makeRAMLayout(4, 1);
       const state = makeState([0, 0, 0, 0], 1, 2);
+      const highZs = new Uint32Array(state.length);
       // clk stays low — output never updates
       for (let i = 0; i < 5; i++) {
-        executeBlockRAMDualPort(INDEX, state, layout);
+        executeBlockRAMDualPort(INDEX, state, highZs, layout);
         expect(state[4]).toBe(0);
       }
     });

@@ -241,7 +241,7 @@ export class ROMElement extends AbstractCircuitElement {
   }
 }
 
-export function executeROM(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
@@ -409,7 +409,7 @@ export class ROMDualPortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeROMDualPort(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 

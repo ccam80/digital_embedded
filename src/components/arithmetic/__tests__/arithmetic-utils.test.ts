@@ -117,21 +117,24 @@ describe("Neg", () => {
     it("neg(0) = 0", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeNeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNeg(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("neg(1) = 0xFFFFFFFF (two's complement)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeNeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNeg(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFF);
     });
 
     it("neg(0xFF) = 0xFFFFFF01", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFF], 1);
-      executeNeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNeg(0, state, highZs, layout);
       // -0xFF = 0xFFFFFF01 as unsigned 32-bit
       expect(state[1]).toBe(0xFFFFFF01);
     });
@@ -139,26 +142,29 @@ describe("Neg", () => {
     it("neg(0x80000000) = 0x80000000 (min signed 32-bit negates to itself)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x80000000], 1);
-      executeNeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNeg(0, state, highZs, layout);
       expect(state[1]).toBe(0x80000000);
     });
 
     it("neg(neg(5)) = 5", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([5], 1);
-      executeNeg(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNeg(0, state, highZs, layout);
       const negFive = state[1];
       state[0] = negFive;
-      executeNeg(0, state, layout);
+      executeNeg(0, state, highZs, layout);
       expect(state[1]).toBe(5);
     });
 
     it("zero allocation: can run 1000 times", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i;
-        executeNeg(0, state, layout);
+        executeNeg(0, state, highZs, layout);
       }
       expect(typeof state[1]).toBe("number");
     });
@@ -220,7 +226,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(4, false);
       const layout = makeLayout(2, 3);
       const state = makeState([3, 3], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0); // >
       expect(state[3]).toBe(1); // =
       expect(state[4]).toBe(0); // <
@@ -230,7 +237,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(4, false);
       const layout = makeLayout(2, 3);
       const state = makeState([5, 3], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(1); // >
       expect(state[3]).toBe(0); // =
       expect(state[4]).toBe(0); // <
@@ -240,7 +248,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(4, false);
       const layout = makeLayout(2, 3);
       const state = makeState([2, 7], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0); // >
       expect(state[3]).toBe(0); // =
       expect(state[4]).toBe(1); // <
@@ -250,7 +259,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(8, false);
       const layout = makeLayout(2, 3);
       const state = makeState([0xFF, 0x0F], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(1); // >
       expect(state[3]).toBe(0); // =
       expect(state[4]).toBe(0); // <
@@ -260,7 +270,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(8, false);
       const layout = makeLayout(2, 3);
       const state = makeState([0, 0], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[3]).toBe(1); // =
     });
   });
@@ -271,7 +282,8 @@ describe("Comparator", () => {
       const layout = makeLayout(2, 3);
       // -1 in 4 bits = 0xF
       const state = makeState([0xF, 1], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[4]).toBe(1); // <
       expect(state[2]).toBe(0); // >
     });
@@ -281,7 +293,8 @@ describe("Comparator", () => {
       const layout = makeLayout(2, 3);
       // -1 = 0xF, -5 = 0xB in 4 bits
       const state = makeState([0xF, 0xB], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(1); // >
       expect(state[4]).toBe(0); // <
     });
@@ -290,7 +303,8 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(8, true);
       const layout = makeLayout(2, 3);
       const state = makeState([0x80, 0x7F], 3);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[4]).toBe(1); // <
     });
   });
@@ -300,10 +314,11 @@ describe("Comparator", () => {
       const exec = makeExecuteComparator(8, false);
       const layout = makeLayout(2, 3);
       const state = makeState([0, 0], 3);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = (i * 3) & 0xFF;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[2]).toBe("number");
     });
@@ -369,7 +384,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0x01, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x02);
     });
 
@@ -377,7 +393,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0xFF, 4], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0xF0);
     });
 
@@ -385,7 +402,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0x01, 0], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x01);
     });
 
@@ -393,7 +411,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0xAB, 8], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x00);
     });
   });
@@ -403,7 +422,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0x80, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x40);
     });
 
@@ -411,7 +431,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0xFF, 4], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x0F);
     });
   });
@@ -421,7 +442,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "rotate", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0x01, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x02);
     });
 
@@ -429,7 +451,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "rotate", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0x80, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x01);
     });
 
@@ -437,7 +460,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "rotate", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0xAB, 8], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0xAB);
     });
   });
@@ -447,7 +471,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "rotate", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0x01, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x80);
     });
   });
@@ -457,7 +482,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "arithmetic", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0x80, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // MSB=1, sign extends: 0x80 >> 1 = 0xC0
       expect(state[2]).toBe(0xC0);
     });
@@ -466,7 +492,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "arithmetic", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0x80, 4], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // 0x80 >> 4 = 0xF8
       expect(state[2]).toBe(0xF8);
     });
@@ -475,7 +502,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "arithmetic", "right");
       const layout = makeLayout(2, 1);
       const state = makeState([0x40, 1], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x20);
     });
   });
@@ -485,7 +513,8 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(16, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0x0001, 4], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[2]).toBe(0x0010);
     });
   });
@@ -495,10 +524,11 @@ describe("BarrelShifter", () => {
       const exec = makeExecuteBarrelShifter(8, false, "logical", "left");
       const layout = makeLayout(2, 1);
       const state = makeState([0, 0], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = i & 0x7;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[2]).toBe("number");
     });
@@ -564,51 +594,58 @@ describe("BitCount", () => {
     it("0x00 has 0 bits set", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x00], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("0xFF has 8 bits set", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFF], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(8);
     });
 
     it("0x0F has 4 bits set", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x0F], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(4);
     });
 
     it("0x01 has 1 bit set", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x01], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("0xFFFFFFFF has 32 bits set", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFFFFFFFF], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(32);
     });
 
     it("0xAAAAAAAA has 16 bits set (alternating)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xAAAAAAAA], 1);
-      executebitCount(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executebitCount(0, state, highZs, layout);
       expect(state[1]).toBe(16);
     });
 
     it("zero allocation: 1000 calls", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i;
-        executebitCount(0, state, layout);
+        executebitCount(0, state, highZs, layout);
       }
       expect(typeof state[1]).toBe("number");
     });
@@ -659,7 +696,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(4, 8);
       const layout = makeLayout(1, 1);
       const state = makeState([0x07], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0x07);
     });
 
@@ -667,7 +705,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(4, 8);
       const layout = makeLayout(1, 1);
       const state = makeState([0x00], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0x00);
     });
   });
@@ -677,7 +716,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(4, 8);
       const layout = makeLayout(1, 1);
       const state = makeState([0x0F], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0xFF);
     });
 
@@ -685,7 +725,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(4, 8);
       const layout = makeLayout(1, 1);
       const state = makeState([0x08], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0xF8);
     });
 
@@ -693,7 +734,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(8, 16);
       const layout = makeLayout(1, 1);
       const state = makeState([0x80], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0xFF80);
     });
 
@@ -701,7 +743,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(8, 16);
       const layout = makeLayout(1, 1);
       const state = makeState([0x7F], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0x007F);
     });
 
@@ -709,7 +752,8 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(16, 32);
       const layout = makeLayout(1, 1);
       const state = makeState([0x8000], 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFF8000);
     });
   });
@@ -719,9 +763,10 @@ describe("BitExtender", () => {
       const exec = makeExecuteBitExtender(8, 16);
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
-        exec(0, state, layout);
+        exec(0, state, highZs, layout);
       }
       expect(typeof state[1]).toBe("number");
     });
@@ -808,7 +853,8 @@ describe("PRNG", () => {
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       const state = makePRNGState(0, 0, 0, 0, 42, 0);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[4]).toBe(42); // output = current LFSR state
     });
   });
@@ -819,7 +865,8 @@ describe("PRNG", () => {
       const layout = makePRNGLayoutFull();
       // Clock goes 0->1 with se=1, S=0x55
       const state = makePRNGState(0x55, 1, 0, 1, 0xAA, 0);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[4]).toBe(0x55); // seeded to S
     });
 
@@ -827,7 +874,8 @@ describe("PRNG", () => {
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       const state = makePRNGState(0, 1, 0, 1, 0xAA, 0);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
   });
@@ -838,7 +886,8 @@ describe("PRNG", () => {
       const layout = makePRNGLayoutFull();
       // Start with LFSR=1, clock 0->1, ne=1
       const state = makePRNGState(0, 0, 1, 1, 1, 0);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // State should have advanced (be different from initial 1)
       const newState = state[STATE_BASE];
       expect(newState).not.toBe(1);
@@ -858,7 +907,7 @@ describe("PRNG", () => {
         arr[2] = 1; // ne
         arr[3] = 1; // clock high
         arr[STATE_BASE + 1] = 0; // prev clock low
-        exec(0, arr, layout);
+        exec(0, arr, new Uint32Array(arr.length), layout);
         seen.add(arr[4]);
         arr[STATE_BASE + 1] = 1; // update prev clock for next iteration
       }
@@ -873,7 +922,8 @@ describe("PRNG", () => {
       const layout = makePRNGLayoutFull();
       // prev clock = 1, current clock = 1 (no rising edge)
       const state = makePRNGState(0x55, 1, 1, 1, 0x42, 1);
-      exec(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      exec(0, state, highZs, layout);
       // LFSR state should be unchanged
       expect(state[STATE_BASE]).toBe(0x42);
     });

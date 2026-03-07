@@ -75,42 +75,47 @@ describe("Relay", () => {
   it("coilEnergised — in1=0 in2=1 → state=1 (closed)", () => {
     // 2 coil inputs + 1 state slot
     const { layout, state } = makeRelayLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; // in1
     state[1] = 1; // in2
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(1); // closed
   });
 
   it("coilEnergised — in1=1 in2=0 → state=1 (closed)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 0;
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(1);
   });
 
   it("coilDeenergised — in1=0 in2=0 → state=0 (open)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0;
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
   it("coilDeenergised — in1=1 in2=1 → state=0 (open)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
   it("coilTransitions — energised then de-energised", () => {
     const { layout, state } = makeRelayLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
 
     state[0] = 1; state[1] = 0;
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(1); // closed
 
     state[0] = 0; state[1] = 0;
-    executeRelay(0, state, layout);
+    executeRelay(0, state, highZs, layout);
     expect(state[2]).toBe(0); // open
   });
 
@@ -245,41 +250,46 @@ describe("Relay", () => {
 describe("RelayDT", () => {
   it("coilEnergised — in1 XOR in2 → state=1 (C connects to T)", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 0;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(1); // energised → C-T
   });
 
   it("coilEnergised — in1=0 in2=1 → state=1", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(1);
   });
 
   it("coilDeenergised — in1=in2=0 → state=0 (C connects to R)", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
   it("coilDeenergised — in1=in2=1 → state=0", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
   it("coilTransitions — energised then de-energised", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
 
     state[0] = 1; state[1] = 0;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(1);
 
     state[0] = 0;
-    executeRelayDT(0, state, layout);
+    executeRelayDT(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 

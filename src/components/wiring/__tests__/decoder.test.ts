@@ -98,7 +98,8 @@ describe("Decoder", () => {
       // inputs: [sel=0]; outputs: [out_0, out_1]
       const layout = makeLayout(1, 2);
       const state = makeState([0], 2);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(1); // out_0
       expect(state[2]).toBe(0); // out_1
     });
@@ -106,7 +107,8 @@ describe("Decoder", () => {
     it("1-bit selector: sel=1 → out_0=0, out_1=1", () => {
       const layout = makeLayout(1, 2);
       const state = makeState([1], 2);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(0); // out_0
       expect(state[2]).toBe(1); // out_1
     });
@@ -117,7 +119,8 @@ describe("Decoder", () => {
       // inputs: [sel=0]; outputs: [out_0..out_3]
       const layout = makeLayout(1, 4);
       const state = makeState([0], 4);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(1); // out_0
       expect(state[2]).toBe(0); // out_1
       expect(state[3]).toBe(0); // out_2
@@ -127,7 +130,8 @@ describe("Decoder", () => {
     it("2-bit selector: sel=1 → one-hot at index 1", () => {
       const layout = makeLayout(1, 4);
       const state = makeState([1], 4);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(0);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
@@ -137,7 +141,8 @@ describe("Decoder", () => {
     it("2-bit selector: sel=2 → one-hot at index 2", () => {
       const layout = makeLayout(1, 4);
       const state = makeState([2], 4);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(0);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(1);
@@ -147,7 +152,8 @@ describe("Decoder", () => {
     it("2-bit selector: sel=3 → one-hot at index 3", () => {
       const layout = makeLayout(1, 4);
       const state = makeState([3], 4);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       expect(state[1]).toBe(0);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0);
@@ -160,7 +166,8 @@ describe("Decoder", () => {
       const layout = makeLayout(1, 4);
       for (let sel = 0; sel < 4; sel++) {
         const state = makeState([sel], 4);
-        executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+        executeDecoder(0, state, highZs, layout);
         let ones = 0;
         for (let i = 1; i <= 4; i++) {
           if (state[i] === 1) ones++;
@@ -172,7 +179,8 @@ describe("Decoder", () => {
     it("all other outputs are 0 when one is active", () => {
       const layout = makeLayout(1, 4);
       const state = makeState([2], 4);
-      executeDecoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDecoder(0, state, highZs, layout);
       // All outputs should be 0 except out_2
       const outputs = [state[1], state[2], state[3], state[4]];
       outputs.forEach((v, i) => {

@@ -61,6 +61,7 @@ function makeMockElement(typeId: string, instanceId: string): CircuitElement {
 const noopExecuteFn: ExecuteFunction = (
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void => {
   // no-op

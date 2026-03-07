@@ -117,35 +117,40 @@ describe("NOrGate", () => {
     it("NOR of 0x00 and 0x00 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0x00, 0x00]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("NOR of 0xFF and 0x00 produces NOT(0xFF)", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFF, 0x00]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe((~0xFF) >>> 0);
     });
 
     it("NOR of 0xFFFFFFFF and 0x00000000 produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0x00000000]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("single-bit: 0 NOR 0 = 1 (all bits set)", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("single-bit: 1 NOR 0 = 0 (all bits clear)", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFE);
     });
   });
@@ -154,7 +159,8 @@ describe("NOrGate", () => {
     it("NOR of 0x01, 0x02, 0x04 produces NOT(0x07)", () => {
       const layout = makeLayout(3);
       const state = makeState([0x01, 0x02, 0x04]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[3]).toBe((~0x07) >>> 0);
     });
   });
@@ -163,14 +169,16 @@ describe("NOrGate", () => {
     it("NOR of 0xF0F0F0F0 and 0x0F0F0F0F produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0xF0F0F0F0, 0x0F0F0F0F]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("NOR of 0x00000000 and 0x00000000 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0x00000000, 0x00000000]);
-      executeNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
   });

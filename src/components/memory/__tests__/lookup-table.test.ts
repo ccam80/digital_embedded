@@ -59,11 +59,12 @@ describe("LookUpTable", () => {
 
     // 2 inputs, 1 output
     const { layout, state } = makeLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
 
-    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0);
-    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0);
-    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0);
-    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, layout); expect(state[2]).toBe(1);
+    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
+    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
+    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
+    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(1);
   });
 
   it("addressFormation — input 0 is LSB, input N-1 is MSB", () => {
@@ -73,20 +74,21 @@ describe("LookUpTable", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(3, 1);
+    const highZs = new Uint32Array(state.length);
 
     // in0=1, in1=0, in2=0 → addr = 0b001 = 1
     state[0] = 1; state[1] = 0; state[2] = 0;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[3]).toBe(1);
 
     // in0=0, in1=1, in2=0 → addr = 0b010 = 2
     state[0] = 0; state[1] = 1; state[2] = 0;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[3]).toBe(2);
 
     // in0=1, in1=1, in2=1 → addr = 0b111 = 7
     state[0] = 1; state[1] = 1; state[2] = 1;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[3]).toBe(7);
   });
 
@@ -99,17 +101,19 @@ describe("LookUpTable", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
 
-    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0x0);
-    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0xA);
-    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0xB);
-    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, layout); expect(state[2]).toBe(0xF);
+    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0x0);
+    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xA);
+    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xB);
+    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xF);
   });
 
   it("noBackingStore — returns 0 gracefully", () => {
     const { layout, state } = makeLayout(2, 1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
@@ -120,8 +124,9 @@ describe("LookUpTable", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(1, 1);
-    state[0] = 0; executeLookUpTable(0, state, layout); expect(state[1]).toBe(1);
-    state[0] = 1; executeLookUpTable(0, state, layout); expect(state[1]).toBe(0);
+    const highZs = new Uint32Array(state.length);
+    state[0] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[1]).toBe(1);
+    state[0] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[1]).toBe(0);
   });
 
   it("4InputLUT — 4-input lookup table", () => {
@@ -130,15 +135,16 @@ describe("LookUpTable", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(4, 1);
+    const highZs = new Uint32Array(state.length);
 
     // addr = 5 = 0b0101 (in0=1, in1=0, in2=1, in3=0)
     state[0] = 1; state[1] = 0; state[2] = 1; state[3] = 0;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[4]).toBe(10); // 5 * 2
 
     // addr = 15 = 0b1111 (all inputs = 1)
     state[0] = 1; state[1] = 1; state[2] = 1; state[3] = 1;
-    executeLookUpTable(0, state, layout);
+    executeLookUpTable(0, state, highZs, layout);
     expect(state[4]).toBe(30); // 15 * 2
   });
 

@@ -98,28 +98,32 @@ describe("BitSelector", () => {
       // inputs: [in=0b1010, sel=0]; output
       const layout = makeLayout(2, 1);
       const state = makeState([0b1010, 0]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("input=0b1010, sel=1 → output=1 (bit 1 is 1)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0b1010, 1]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("input=0b1010, sel=2 → output=0 (bit 2 is 0)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0b1010, 2]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("input=0b1010, sel=3 → output=1 (bit 3 is 1)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0b1010, 3]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -129,7 +133,8 @@ describe("BitSelector", () => {
       const layout = makeLayout(2, 1);
       for (let sel = 0; sel < 8; sel++) {
         const state = makeState([0xFF, sel]);
-        executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+        executeBitSelector(0, state, highZs, layout);
         expect(state[2]).toBe(1);
       }
     });
@@ -138,7 +143,8 @@ describe("BitSelector", () => {
       const layout = makeLayout(2, 1);
       for (let sel = 0; sel < 8; sel++) {
         const state = makeState([0x00, sel]);
-        executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+        executeBitSelector(0, state, highZs, layout);
         expect(state[2]).toBe(0);
       }
     });
@@ -149,7 +155,8 @@ describe("BitSelector", () => {
 
       for (let sel = 0; sel < 32; sel++) {
         const state = makeState([value, sel]);
-        executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+        executeBitSelector(0, state, highZs, layout);
         const expected = (value >>> sel) & 1;
         expect(state[2]).toBe(expected);
       }
@@ -160,14 +167,16 @@ describe("BitSelector", () => {
     it("output is always 0 or 1 (single bit)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0xFFFFFFFF, 15]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("selecting bit 0 of odd number returns 1", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0x12345679, 0]);
-      executeBitSelector(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBitSelector(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });

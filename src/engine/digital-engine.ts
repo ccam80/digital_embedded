@@ -546,7 +546,7 @@ export class DigitalEngine implements SimulationEngine {
     for (let i = 0; i < indices.length; i++) {
       const idx = indices[i]!;
       const typeId = typeIds[idx]!;
-      executeFns[typeId]!(idx, state, layout);
+      executeFns[typeId]!(idx, state, this._highZs, layout);
     }
   }
 
@@ -573,7 +573,7 @@ export class DigitalEngine implements SimulationEngine {
       for (let i = 0; i < indices.length; i++) {
         const idx = indices[i]!;
         const typeId = typeIds[idx]!;
-        executeFns[typeId]!(idx, state, layout);
+        executeFns[typeId]!(idx, state, this._highZs, layout);
       }
 
       // Check if outputs changed
@@ -652,7 +652,7 @@ export class DigitalEngine implements SimulationEngine {
           beforeHighZs[o] = this._highZs[outOffset + o]!;
         }
 
-        executeFns[typeId]!(idx, state, layout);
+        executeFns[typeId]!(idx, state, this._highZs, layout);
 
         // Schedule events for changed outputs
         const delay = BigInt(delays[idx] ?? 10);
@@ -705,7 +705,7 @@ export class DigitalEngine implements SimulationEngine {
         const idx = indices[this._microstepCursor.indexWithinGroup]!;
         const typeId = typeIds[idx]!;
 
-        executeFns[typeId]!(idx, state, layout);
+        executeFns[typeId]!(idx, state, this._highZs, layout);
 
         this._lastEvaluatedComponent = { index: idx, typeId: typeId.toString() };
 

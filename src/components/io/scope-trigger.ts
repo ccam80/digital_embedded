@@ -164,6 +164,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
 export function executeScopeTrigger(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputVal = state[layout.inputOffset(index)];

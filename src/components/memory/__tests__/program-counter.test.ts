@@ -51,117 +51,126 @@ function makeLayout(): {
 }
 
 // Helper: apply one clock cycle (rising edge if prevClk=0, falling if prevClk=1)
-function tick(state: Uint32Array, layout: ComponentLayout & ProgramCounterLayout, clkHigh: boolean): void {
+function tick(state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout & ProgramCounterLayout, clkHigh: boolean): void {
   state[2] = clkHigh ? 1 : 0; // C
-  executeProgramCounter(0, state, layout);
+  executeProgramCounter(0, state, highZs, layout);
 }
 
 describe("ProgramCounter", () => {
   it("incrementOnRisingEdge — en=1, ld=0 increments counter", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[0] = 0;  // D
     state[1] = 1;  // en
     state[3] = 0;  // ld
 
     // Rising edge
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1); // Q = 1
 
     // Falling edge — no change
-    tick(state, layout, false);
+    tick(state, highZs, layout, false);
     expect(state[4]).toBe(1);
 
     // Rising edge again
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(2); // Q = 2
   });
 
   it("jumpOnLoad — ld=1 loads D value", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[0] = 0x50; // D
     state[1] = 0;    // en
     state[3] = 1;    // ld
 
     // Rising edge → jump to 0x50
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(0x50); // Q = 0x50
   });
 
   it("loadTakesPriorityOverEnable — ld=1 and en=1, load wins", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[0] = 0x20; // D = 0x20
     state[1] = 1;    // en
     state[3] = 1;    // ld
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(0x20); // loaded, not incremented from 0
   });
 
   it("noActionWhenDisabled — en=0, ld=0, counter stays same", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[6] = 0x42; // counter = 0x42 initial
     state[1] = 0;    // en
     state[3] = 0;    // ld
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(0x42); // unchanged
   });
 
   it("noActionOnHighClock — no rising edge when clock stays high", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; state[3] = 0; // en=1, ld=0
 
     // First rising edge
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1);
 
     // Clock stays high → no rising edge → no increment
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1);
   });
 
   it("multipleIncrements — counter increments on each rising edge", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; state[3] = 0;
 
     for (let i = 1; i <= 10; i++) {
-      tick(state, layout, false); // falling
-      tick(state, layout, true);  // rising
+      tick(state, highZs, layout, false); // falling
+      tick(state, highZs, layout, true);  // rising
       expect(state[4]).toBe(i);
     }
   });
 
   it("jumpThenIncrement — jump to address then continue incrementing", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[0] = 100; state[3] = 1; state[1] = 0;
 
     // Jump to 100
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(100);
 
     // Switch to increment mode
     state[3] = 0; state[1] = 1;
-    tick(state, layout, false);
-    tick(state, layout, true);
+    tick(state, highZs, layout, false);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(101);
   });
 
   it("overflowAt32Bit — wraps from 0xFFFFFFFF to 0", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[6] = 0xFFFFFFFF; // counter at max 32-bit value
     state[1] = 1; state[3] = 0;
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(0); // wrapped to 0
     expect(state[5]).toBe(1); // ovf = 1
   });
 
   it("noOverflowOnNormalIncrement — ovf stays 0 normally", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[6] = 5;
     state[1] = 1; state[3] = 0;
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[5]).toBe(0); // no overflow
   });
 

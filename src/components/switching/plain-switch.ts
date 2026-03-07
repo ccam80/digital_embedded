@@ -194,7 +194,7 @@ export class PlainSwitchElement extends AbstractCircuitElement {
 //   output[0]: switch closed flag (0=open, 1=closed), managed by engine
 // ---------------------------------------------------------------------------
 
-export function executePlainSwitch(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executePlainSwitch(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   // Switch state is controlled externally (user interaction via engine).
   // The output slot already holds the correct closed/open flag.
   // No computation needed here — bus resolution reads the output slot directly.

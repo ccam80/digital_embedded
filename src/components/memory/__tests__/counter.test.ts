@@ -110,23 +110,25 @@ describe("Counter", () => {
     it("counts from 0 to 1 on first rising clock edge with en=1", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
 
     it("counts 0→1→2→3 over three rising edges", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
 
       for (let expected = 1; expected <= 3; expected++) {
         state[6] = 0;
         state[1] = 1;
-        executeCounter(0, state, layout);
+        executeCounter(0, state, highZs, layout);
         expect(state[3]).toBe(expected);
         state[1] = 0;
         state[6] = 1;
-        executeCounter(0, state, layout);
+        executeCounter(0, state, highZs, layout);
       }
     });
   });
@@ -135,16 +137,18 @@ describe("Counter", () => {
     it("wraps from maxValue (15 for 4-bit) back to 0", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 15, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("wraps from maxValue (255 for 8-bit) back to 0", () => {
       const layout = makeLayout(3, 2, { bitWidth: 8 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 255, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -153,16 +157,18 @@ describe("Counter", () => {
     it("clr=1 resets counter to 0 on clock edge (takes priority over increment)", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 7, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("clr=1 resets even when counter is at 0", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -171,8 +177,9 @@ describe("Counter", () => {
     it("en=0 holds counter unchanged on clock edge", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 5, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(5);
     });
   });
@@ -181,21 +188,24 @@ describe("Counter", () => {
     it("ovf=1 when counter==maxValue and en=1", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 15, 6: 1 });
-      executeCounter(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounter(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
 
     it("ovf=0 when counter==maxValue but en=0", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 15, 6: 1 });
-      executeCounter(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounter(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
     it("ovf=0 when counter < maxValue", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 7, 6: 1 });
-      executeCounter(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounter(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
   });
@@ -204,15 +214,17 @@ describe("Counter", () => {
     it("no count when clock stays high", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 3, 6: 1 });
-      executeCounter(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(3);
     });
 
     it("no count on falling edge", () => {
       const layout = makeLayout(3, 2, { bitWidth: 4 });
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 3, 6: 1 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeCounter(0, state, layout);
+      executeCounter(0, state, highZs, layout);
       expect(state[3]).toBe(3);
     });
   });
@@ -328,16 +340,18 @@ describe("CounterPreset", () => {
     it("counts from 0 to 1 with en=1 dir=0", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(1);
     });
 
     it("wraps from maxValue (15 for 4-bit) to 0 when counting up", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 15, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
   });
@@ -346,16 +360,18 @@ describe("CounterPreset", () => {
     it("decrements from 5 to 4 with en=1 dir=1", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 5, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(4);
     });
 
     it("wraps from 0 back to maxValue (15) when counting down", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(15);
     });
   });
@@ -364,16 +380,18 @@ describe("CounterPreset", () => {
     it("clr=1 resets counter to 0 on clock edge", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1, 8: 7, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
 
     it("clr=1 takes priority over ld=1", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 9, 4: 1, 5: 1, 8: 7, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
   });
@@ -382,16 +400,18 @@ describe("CounterPreset", () => {
     it("ld=1 loads 'in' value on clock edge when clr=0", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 9, 4: 1, 5: 0, 8: 0, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(9);
     });
 
     it("ld loads value after count operation on same edge", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 5, 4: 1, 5: 0, 8: 3, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(5);
     });
   });
@@ -400,8 +420,9 @@ describe("CounterPreset", () => {
     it("en=0 holds counter unchanged on clock edge", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 7, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(7);
     });
   });
@@ -410,21 +431,24 @@ describe("CounterPreset", () => {
     it("ovf=1 when counter==maxValue (15) counting up with en=1", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 15, 9: 1 });
-      executeCounterPreset(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[7]).toBe(1);
     });
 
     it("ovf=1 when counter==0 counting down (dir=1) with en=1", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 1 });
-      executeCounterPreset(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[7]).toBe(1);
     });
 
     it("ovf=0 when counter is not at overflow position", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 7, 9: 1 });
-      executeCounterPreset(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[7]).toBe(0);
     });
   });
@@ -433,16 +457,18 @@ describe("CounterPreset", () => {
     it("wraps at custom maxValue=9 when counting up", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 9 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 9, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
 
     it("wraps at 9 when counting down from 0", () => {
       const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 9 });
       const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeCounterPreset(0, state, layout);
+      executeCounterPreset(0, state, highZs, layout);
       expect(state[6]).toBe(9);
     });
   });

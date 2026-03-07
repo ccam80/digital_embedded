@@ -95,11 +95,15 @@ export interface ComponentLayout {
  *
  * @param index     Component slot index within the compiled model.
  * @param state     Signal value array owned by the engine.
+ * @param highZs    High-impedance flags array, parallel to `state`. Components
+ *                  that support tri-state output set `highZs[netId] = 1` when
+ *                  the output is high-Z, `0` otherwise.
  * @param layout    Wiring descriptor providing input/output offsets.
  */
 export type ExecuteFunction = (
   index: number,
   state: Uint32Array,
+  highZs: Uint32Array,
   layout: ComponentLayout,
 ) => void;
 

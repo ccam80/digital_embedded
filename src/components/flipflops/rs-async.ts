@@ -167,7 +167,7 @@ export class RSAsyncElement extends AbstractCircuitElement {
 // S=R=0 after forbidden state: stays in undefined until driven.
 // ---------------------------------------------------------------------------
 
-export function executeRSAsync(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRSAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

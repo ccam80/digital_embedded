@@ -76,7 +76,7 @@ function makePropBag(entries: Record<string, string | number | boolean> = {}): P
 // executePassThrough — for In components (output is set externally)
 // ---------------------------------------------------------------------------
 
-function executePassThrough(_index: number, _state: Uint32Array, _layout: ComponentLayout): void {
+function executePassThrough(_index: number, _state: Uint32Array, __highZs: Uint32Array, _layout: ComponentLayout): void {
   // In components: value is set externally via setSignalValue
 }
 
@@ -84,13 +84,13 @@ function executePassThrough(_index: number, _state: Uint32Array, _layout: Compon
 // executeNoop — for Out components (just reads, no writes)
 // ---------------------------------------------------------------------------
 
-function executeNoop(_index: number, _state: Uint32Array, _layout: ComponentLayout): void {}
+function executeNoop(_index: number, _state: Uint32Array, __highZs: Uint32Array, _layout: ComponentLayout): void {}
 
 // ---------------------------------------------------------------------------
 // executeXor2 — two-input XOR using inputOffset + contiguous net IDs
 // ---------------------------------------------------------------------------
 
-function executeXor2(index: number, state: Uint32Array, layout: ComponentLayout): void {
+function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const a = state[layout.inputOffset(index)] ?? 0;
   const b = state[layout.inputOffset(index) + 1] ?? 0;
   state[layout.outputOffset(index)] = (a ^ b) >>> 0;
@@ -100,7 +100,7 @@ function executeXor2(index: number, state: Uint32Array, layout: ComponentLayout)
 // executeAnd2 — two-input AND using inputOffset + contiguous net IDs
 // ---------------------------------------------------------------------------
 
-function executeAnd2(index: number, state: Uint32Array, layout: ComponentLayout): void {
+function executeAnd2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const a = state[layout.inputOffset(index)] ?? 0;
   const b = state[layout.inputOffset(index) + 1] ?? 0;
   state[layout.outputOffset(index)] = (a & b) >>> 0;
@@ -374,7 +374,7 @@ describe("Runner", () => {
       factory: (props) => new MockElement("Osc", crypto.randomUUID(), { x: 0, y: 0 }, [
         makePin("out", PinDirection.OUTPUT, 2, 0),
       ], props),
-      executeFn: (_index: number, state: Uint32Array, layout: ComponentLayout) => {
+      executeFn: (_index: number, state: Uint32Array, __highZs: Uint32Array, layout: ComponentLayout) => {
         toggle = toggle === 0 ? 1 : 0;
         state[layout.outputOffset(_index)] = toggle;
       },

@@ -124,8 +124,9 @@ describe("Register", () => {
       const layout = makeLayout(3, 1);
       // slots: [D=0, C=1, en=2, Q=3, storedVal=4, prevClock=5]
       const state = makeState(6, { 0: 42, 1: 0, 2: 1, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1; // rising edge
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(42); // Q = stored value
       expect(state[4]).toBe(42); // storedVal updated
     });
@@ -133,25 +134,27 @@ describe("Register", () => {
     it("Q reflects stored value after multiple clocks", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 10, 1: 0, 2: 1, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       // First rising edge — store 10
       state[1] = 1;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(10);
       // Clock falls
       state[5] = 1; // prevClock = 1
       state[1] = 0;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(10); // still 10
       // New value on D but no rising edge
       state[0] = 99;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(10); // still 10
     });
 
     it("initial Q is 0 before any clock edge", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6);
-      executeRegister(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -160,8 +163,9 @@ describe("Register", () => {
     it("does not capture D when en=0 on rising edge", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 77, 1: 0, 2: 0, 4: 55, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1; // rising edge
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[4]).toBe(55); // storedVal unchanged
       expect(state[3]).toBe(55); // Q = old stored value
     });
@@ -169,16 +173,17 @@ describe("Register", () => {
     it("captures D when en=1 after previously disabled", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 77, 1: 0, 2: 0, 4: 55, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       // Rising edge but en=0 → no capture
       state[1] = 1;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[4]).toBe(55);
       // Fall + re-arm
       state[5] = 1; state[1] = 0;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       // New rising edge with en=1
       state[2] = 1; state[5] = 0; state[1] = 1;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[4]).toBe(77);
       expect(state[3]).toBe(77);
     });
@@ -188,21 +193,24 @@ describe("Register", () => {
     it("does not capture when clock stays high", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 99, 1: 1, 2: 1, 4: 7, 5: 1 });
-      executeRegister(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRegister(0, state, highZs, layout);
       expect(state[4]).toBe(7); // no change
     });
 
     it("does not capture on falling edge", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 99, 1: 0, 2: 1, 4: 7, 5: 1 });
-      executeRegister(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRegister(0, state, highZs, layout);
       expect(state[4]).toBe(7); // no change
     });
 
     it("prevClock is updated after each call", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 0, 1: 1, 2: 0, 4: 0, 5: 0 });
-      executeRegister(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRegister(0, state, highZs, layout);
       expect(state[5]).toBe(1); // prevClock = clock
     });
   });
@@ -211,8 +219,9 @@ describe("Register", () => {
     it("stores wide values correctly (8-bit)", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 0xFF, 1: 0, 2: 1, 4: 0, 5: 0 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRegister(0, state, layout);
+      executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(0xFF);
     });
   });
@@ -364,9 +373,10 @@ describe("RegisterFile", () => {
       const layout = makeRegFileLayout(2); // 4 registers
       // total slots: 6 inputs + 2 outputs + 1 prevClock + 4 regs = 13
       const state = makeState(13);
+      const highZs = new Uint32Array(state.length);
       // Din=0xAB, we=1, Rw=2, C rising, Ra=2, Rb=0
       state[0] = 0xAB; state[1] = 1; state[2] = 2; state[3] = 1; state[4] = 2; state[5] = 0;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       // Da should reflect register[2] = 0xAB
       expect(state[6]).toBe(0xAB);
     });
@@ -374,8 +384,9 @@ describe("RegisterFile", () => {
     it("does not write when we=0", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13, { 9: 0, 10: 0, 11: 55, 12: 0 }); // reg2=55
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xFF; state[1] = 0; state[2] = 2; state[3] = 1; state[4] = 2; state[5] = 0;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[11]).toBe(55); // register[2] unchanged
       expect(state[6]).toBe(55); // Da = 55
     });
@@ -383,9 +394,10 @@ describe("RegisterFile", () => {
     it("combinational read: Da = register[Ra], Db = register[Rb]", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13, { 9: 10, 10: 20, 11: 30, 12: 40 }); // regs 0–3
+      const highZs = new Uint32Array(state.length);
       // No clock edge; just read
       state[4] = 1; state[5] = 3; // Ra=1, Rb=3
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[6]).toBe(20); // Da = reg[1] = 20
       expect(state[7]).toBe(40); // Db = reg[3] = 40
     });
@@ -393,9 +405,10 @@ describe("RegisterFile", () => {
     it("reads reflect value written in same call (write then read)", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13);
+      const highZs = new Uint32Array(state.length);
       // Write 0x55 to reg[1], read Ra=1, Rb=1
       state[0] = 0x55; state[1] = 1; state[2] = 1; state[3] = 1; state[4] = 1; state[5] = 1;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[6]).toBe(0x55); // Da = reg[1] written this cycle
       expect(state[7]).toBe(0x55); // Db = reg[1] written this cycle
     });
@@ -405,8 +418,9 @@ describe("RegisterFile", () => {
     it("writing to reg[0] does not affect reg[1]", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13, { 10: 99 }); // reg[1] = 99
+      const highZs = new Uint32Array(state.length);
       state[0] = 42; state[1] = 1; state[2] = 0; state[3] = 1; state[4] = 1; state[5] = 1;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[10]).toBe(99); // reg[1] unchanged
       expect(state[6]).toBe(99); // Da = reg[1] = 99
     });
@@ -414,21 +428,22 @@ describe("RegisterFile", () => {
     it("independent writes to all 4 registers", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13);
+      const highZs = new Uint32Array(state.length);
 
       const writeReg = (addr: number, val: number): void => {
         state[8] = 0; // reset prevClock
         state[0] = val; state[1] = 1; state[2] = addr; state[3] = 1;
-        executeRegisterFile(0, state, layout);
+        executeRegisterFile(0, state, highZs, layout);
         state[3] = 0; // clock falls
         state[8] = 1; // prevClock = 1 after fall
-        executeRegisterFile(0, state, layout);
+        executeRegisterFile(0, state, highZs, layout);
         state[8] = 0; // ready for next rising edge
       };
 
       writeReg(0, 10); writeReg(1, 20); writeReg(2, 30); writeReg(3, 40);
 
       state[4] = 0; state[5] = 3;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[6]).toBe(10); // Da = reg[0]
       expect(state[7]).toBe(40); // Db = reg[3]
     });
@@ -438,16 +453,18 @@ describe("RegisterFile", () => {
     it("does not write when clock stays high (no new rising edge)", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13, { 11: 77 }); // reg[2] = 77
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xFF; state[1] = 1; state[2] = 2; state[3] = 1; state[4] = 2; state[8] = 1; // prevClock=1
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[11]).toBe(77); // no write
     });
 
     it("prevClock is updated after each call", () => {
       const layout = makeRegFileLayout(2);
       const state = makeState(13);
+      const highZs = new Uint32Array(state.length);
       state[3] = 1; // clock high
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[8]).toBe(1); // prevClock updated
     });
   });
@@ -456,9 +473,10 @@ describe("RegisterFile", () => {
     it("address wraps modulo numRegs", () => {
       const layout = makeRegFileLayout(2); // 4 registers, mask = 3
       const state = makeState(13, { 9: 55 }); // reg[0] = 55
+      const highZs = new Uint32Array(state.length);
       // Ra = 4 (should wrap to 0)
       state[4] = 4; state[5] = 0;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[6]).toBe(55); // Da = reg[4 & 3] = reg[0] = 55
     });
   });
@@ -468,8 +486,9 @@ describe("RegisterFile", () => {
       const layout = makeRegFileLayout(1); // 2 registers
       // total slots: 6 inputs + 2 outputs + 1 prevClock + 2 regs = 11
       const state = makeState(11);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xAA; state[1] = 1; state[2] = 0; state[3] = 1; state[4] = 0; state[5] = 0;
-      executeRegisterFile(0, state, layout);
+      executeRegisterFile(0, state, highZs, layout);
       expect(state[6]).toBe(0xAA);
     });
   });

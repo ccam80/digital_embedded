@@ -150,7 +150,7 @@ export class PFETElement extends AbstractCircuitElement {
 // G=0 → closed=1; G=1 → closed=0 (inverted compared to NFET)
 // ---------------------------------------------------------------------------
 
-export function executePFET(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executePFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
   state[stBase] = (state[inBase] & 1) ^ 1; // invert gate signal

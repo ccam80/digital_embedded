@@ -210,7 +210,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
 // Address inputs are masked to addrBits to prevent out-of-bounds access.
 // ---------------------------------------------------------------------------
 
-export function executeRegisterFile(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRegisterFile(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {

@@ -142,11 +142,11 @@ export function makeExecuteBarrelShifter(
   signed: boolean,
   mode: BarrelShifterMode,
   direction: ShiftDirection,
-): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const shiftSignBit = shiftBitsFor(bitWidth) + (signed ? 1 : 0) - 1;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
 
-  return function executeBarrelShifter(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeBarrelShifter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -202,8 +202,8 @@ export function makeExecuteBarrelShifter(
   };
 }
 
-export function executeBarrelShifter(index: number, state: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteBarrelShifter(8, false, "logical", "left")(index, state, layout);
+export function executeBarrelShifter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  makeExecuteBarrelShifter(8, false, "logical", "left")(index, state, _highZs, layout);
 }
 
 export const BARREL_SHIFTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

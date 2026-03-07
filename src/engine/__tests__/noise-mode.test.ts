@@ -125,7 +125,7 @@ describe("NoiseMode", () => {
       // Component 0: NOR_Q — Q = NOR(R, Qbar)
       // inputOffset(0)=0 → state[0]=R, state[1]=Qbar
       // outputOffset(0)=2 → state[2]=Q
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         const inOff = layout.inputOffset(index);
         const outOff = layout.outputOffset(index);
         const r = st[inOff];       // R input
@@ -138,7 +138,7 @@ describe("NoiseMode", () => {
       // Component 1: NOR_Qbar — Qbar = NOR(S, Q)
       // inputOffset(1)=3 → state[3]=S, state[4]=Q
       // outputOffset(1)=5 → state[5]=Qbar
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         const inOff = layout.inputOffset(index);
         const outOff = layout.outputOffset(index);
         const s = st[inOff];    // S input
@@ -164,6 +164,7 @@ describe("NoiseMode", () => {
 
     const engine: InitializableEngine = {
       state,
+      highZs: new Uint32Array(STATE_SIZE),
       snapshotBuffer,
       typeIds,
       executeFns,
@@ -217,7 +218,7 @@ describe("NoiseMode", () => {
       // comp0: NOR_Q — Q = NOR(R, Qbar)
       // inputOffset(0)=0 → state[0]=R, state[1]=Qbar
       // outputOffset(0)=2 → state[2]=Q
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         const inOff = layout.inputOffset(index);
         const outOff = layout.outputOffset(index);
         const r = st[inOff];
@@ -229,7 +230,7 @@ describe("NoiseMode", () => {
       // comp1: NOR_Qbar — Qbar = NOR(S, Q)
       // inputOffset(1)=3 → state[3]=S, state[4]=Q
       // outputOffset(1)=5 → state[5]=Qbar
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         const inOff = layout.inputOffset(index);
         const outOff = layout.outputOffset(index);
         const s = st[inOff];
@@ -240,7 +241,7 @@ describe("NoiseMode", () => {
       },
       // comp2: Reset — drives R (slot 0) to 1
       // outputOffset(2)=0 → state[0]=R
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         const outOff = layout.outputOffset(index);
         st[outOff] = 1; // Reset released: drive R high
       },
@@ -265,6 +266,7 @@ describe("NoiseMode", () => {
 
     const engine: InitializableEngine = {
       state,
+      highZs: new Uint32Array(STATE_SIZE),
       snapshotBuffer,
       typeIds,
       executeFns,
@@ -322,11 +324,11 @@ describe("NoiseMode", () => {
 
     const executeFns: ExecuteFunction[] = [
       // comp0: reads inputOffset(0)=0 → slot 0; writes outputOffset(0)=1 → slot 1
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         st[layout.outputOffset(index)] = st[layout.inputOffset(index)];
       },
       // comp1: reads inputOffset(1)=1 → slot 1; writes outputOffset(1)=3 → slot 3
-      (index, st, layout) => {
+      (index, st, _hz, layout) => {
         st[layout.outputOffset(index)] = st[layout.inputOffset(index)];
       },
     ];
@@ -350,13 +352,15 @@ describe("NoiseMode", () => {
     const state1 = makeState();
     const snap1 = new Uint32Array(STATE_SIZE);
     const indices01 = new Uint32Array([0, 1]);
-    evaluateSynchronized(indices01, 0, 2, state1, snap1, executeFns, typeIds, layout);
+    const highZs1 = new Uint32Array(STATE_SIZE);
+    evaluateSynchronized(indices01, 0, 2, state1, highZs1, snap1, executeFns, typeIds, layout);
 
     // Run with order [comp1, comp0]
     const state2 = makeState();
     const snap2 = new Uint32Array(STATE_SIZE);
     const indices10 = new Uint32Array([1, 0]);
-    evaluateSynchronized(indices10, 0, 2, state2, snap2, executeFns, typeIds, layout);
+    const highZs2 = new Uint32Array(STATE_SIZE);
+    evaluateSynchronized(indices10, 0, 2, state2, highZs2, snap2, executeFns, typeIds, layout);
 
     // Both orderings must produce identical state
     expect(state1[1]).toBe(state2[1]); // comp0's output

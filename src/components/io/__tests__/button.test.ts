@@ -93,16 +93,18 @@ describe("Button", () => {
     it("executeButton is a no-op: does not modify state array", () => {
       const layout = makeLayout(0, 1);
       const state = makeState([], 1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 42;
-      executeButton(0, state, layout);
+      executeButton(0, state, highZs, layout);
       expect(state[0]).toBe(42);
     });
 
     it("executeButton can be called 1000 times without error", () => {
       const layout = makeLayout(0, 1);
       const state = makeState([], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
-        executeButton(0, state, layout);
+        executeButton(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0);
     });

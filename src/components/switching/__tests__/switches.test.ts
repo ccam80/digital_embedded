@@ -232,9 +232,10 @@ describe("PlainSwitch", () => {
     it("executePlainSwitch does not modify the state array", () => {
       const layout = makeLayout(0, 1);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 42;
       state[1] = 99;
-      executePlainSwitch(0, state, layout);
+      executePlainSwitch(0, state, highZs, layout);
       expect(state[0]).toBe(42);
       expect(state[1]).toBe(99);
     });
@@ -242,8 +243,9 @@ describe("PlainSwitch", () => {
     it("executePlainSwitch can be called 1000 times without error", () => {
       const layout = makeLayout(0, 1);
       const state = makeState(1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
-        executePlainSwitch(0, state, layout);
+        executePlainSwitch(0, state, highZs, layout);
       }
       expect(true).toBe(true);
     });
@@ -487,9 +489,10 @@ describe("PlainSwitchDT", () => {
     it("executePlainSwitchDT does not modify the state array", () => {
       const layout = makeLayout(0, 1);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 7;
       state[1] = 13;
-      executePlainSwitchDT(0, state, layout);
+      executePlainSwitchDT(0, state, highZs, layout);
       expect(state[0]).toBe(7);
       expect(state[1]).toBe(13);
     });
@@ -650,8 +653,9 @@ describe("Switch", () => {
     it("executeSwitch does not modify the state array", () => {
       const layout = makeLayout(0, 1);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 55;
-      executeSwitch(0, state, layout);
+      executeSwitch(0, state, highZs, layout);
       expect(state[0]).toBe(55);
     });
   });
@@ -840,9 +844,10 @@ describe("SwitchDT", () => {
     it("executeSwitchDT does not modify the state array", () => {
       const layout = makeLayout(0, 1);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 33;
       state[1] = 77;
-      executeSwitchDT(0, state, layout);
+      executeSwitchDT(0, state, highZs, layout);
       expect(state[0]).toBe(33);
       expect(state[1]).toBe(77);
     });

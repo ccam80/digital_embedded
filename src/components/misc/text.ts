@@ -93,6 +93,7 @@ export class TextElement extends AbstractCircuitElement {
 export function executeText(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // No simulation behavior.

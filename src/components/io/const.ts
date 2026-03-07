@@ -135,7 +135,7 @@ export class ConstElement extends AbstractCircuitElement {
 // executeConst — writes the fixed value to the output slot
 // ---------------------------------------------------------------------------
 
-export function executeConst(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeConst(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   // The constant value is embedded in the component's property bag.
   // However, since the engine function table doesn't pass the element,
   // the compiler must pre-write the constant into the output net during

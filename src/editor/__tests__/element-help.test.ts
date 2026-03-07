@@ -80,7 +80,7 @@ function makeDefinition(
     typeId: -1,
     factory: (_props) =>
       makeElementWithPins(helpText, []) as unknown as ReturnType<ComponentDefinition["factory"]>,
-    executeFn: (_index: number, _state: Uint32Array, _layout: ComponentLayout) => {},
+    executeFn: (_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout) => {},
     pinLayout: [],
     propertyDefs,
     attributeMap: [],

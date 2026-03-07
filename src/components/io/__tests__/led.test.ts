@@ -128,28 +128,32 @@ describe("LED", () => {
     it("executeLed: input=1 → output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLed(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("executeLed: input=0 → output=0 (off)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLed(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeLed: non-zero input → output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFF], 1);
-      executeLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLed(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("executeLed: large non-zero input → output=1", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFFFFFFFF], 1);
-      executeLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLed(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
   });
@@ -273,28 +277,32 @@ describe("PolarityAwareLED", () => {
     it("anode=1, cathode=0 → output=1 (lit)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([1, 0], 1);
-      executePolarityLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePolarityLed(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("anode=0, cathode=0 → output=0 (not lit)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0, 0], 1);
-      executePolarityLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePolarityLed(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("anode=1, cathode=1 → output=0 (no current flow)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([1, 1], 1);
-      executePolarityLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePolarityLed(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("anode=0, cathode=1 → output=0 (reverse bias)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0, 1], 1);
-      executePolarityLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePolarityLed(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -396,21 +404,24 @@ describe("LightBulb", () => {
     it("executeLightBulb: input=1 → output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeLightBulb(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLightBulb(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("executeLightBulb: input=0 → output=0 (off)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeLightBulb(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLightBulb(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeLightBulb: non-zero input → output=1", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([42], 1);
-      executeLightBulb(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLightBulb(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
   });
@@ -523,7 +534,8 @@ describe("RGBLED", () => {
     it("R=1, G=0, B=0 → output has R bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 0, 0], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       // R is bit 2: output = (1<<2)|(0<<1)|0 = 4
       expect(state[3]).toBe(4);
     });
@@ -531,7 +543,8 @@ describe("RGBLED", () => {
     it("R=0, G=1, B=0 → output has G bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 1, 0], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       // G is bit 1: output = 0|(1<<1)|0 = 2
       expect(state[3]).toBe(2);
     });
@@ -539,7 +552,8 @@ describe("RGBLED", () => {
     it("R=0, G=0, B=1 → output has B bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 1], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       // B is bit 0: output = 0|0|1 = 1
       expect(state[3]).toBe(1);
     });
@@ -547,21 +561,24 @@ describe("RGBLED", () => {
     it("R=1, G=1, B=1 → output=7 (white, all channels)", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 1, 1], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       expect(state[3]).toBe(7);
     });
 
     it("R=0, G=0, B=0 → output=0 (off)", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 0], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("non-zero R input → R channel active", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0xFF, 0, 0], 1);
-      executeRgbLed(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeRgbLed(0, state, highZs, layout);
       // R bit (bit 2) must be set
       expect((state[3] >> 2) & 1).toBe(1);
     });

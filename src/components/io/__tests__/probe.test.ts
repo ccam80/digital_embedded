@@ -98,30 +98,34 @@ describe("Probe", () => {
     it("executeProbe copies input value to output slot", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xAB], 1);
-      executeProbe(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeProbe(0, state, highZs, layout);
       expect(state[1]).toBe(0xAB);
     });
 
     it("executeProbe with input=0 stores 0", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeProbe(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeProbe(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeProbe with input=0xFFFFFFFF stores 0xFFFFFFFF", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFFFFFFFF], 1);
-      executeProbe(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeProbe(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFF);
     });
 
     it("executeProbe can be called 1000 times without error", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x55], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFFFFFFFF;
-        executeProbe(0, state, layout);
+        executeProbe(0, state, highZs, layout);
       }
       expect(typeof state[1]).toBe("number");
     });
@@ -135,12 +139,13 @@ describe("Probe", () => {
     it("probe stores last seen input in output slot after execute", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([42], 1);
-      executeProbe(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeProbe(0, state, highZs, layout);
       expect(state[1]).toBe(42);
 
       // Update input and re-execute
       state[0] = 99;
-      executeProbe(0, state, layout);
+      executeProbe(0, state, highZs, layout);
       expect(state[1]).toBe(99);
     });
   });

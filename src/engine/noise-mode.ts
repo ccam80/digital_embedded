@@ -61,6 +61,7 @@ export function evaluateWithNoise(
   start: number,
   count: number,
   state: Uint32Array,
+  highZs: Uint32Array,
   executeFns: ExecuteFunction[],
   typeIds: Uint8Array,
   layout: ComponentLayout,
@@ -71,7 +72,7 @@ export function evaluateWithNoise(
 
   for (let i = 0; i < count; i++) {
     const compIdx = indices[i];
-    executeFns[typeIds[compIdx]](compIdx, state, layout);
+    executeFns[typeIds[compIdx]](compIdx, state, highZs, layout);
   }
 }
 
@@ -105,6 +106,7 @@ export function evaluateSynchronized(
   start: number,
   count: number,
   state: Uint32Array,
+  highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
   executeFns: ExecuteFunction[],
   typeIds: Uint8Array,
@@ -146,7 +148,7 @@ export function evaluateSynchronized(
     // Create a working copy of the snapshot for this component
     const working = new Uint32Array(snapshotBuffer);
     // Execute: reads from snapshot values, writes to working
-    executeFns[typeIds[compIdx]](compIdx, working, layout);
+    executeFns[typeIds[compIdx]](compIdx, working, highZs, layout);
     // Apply only the changed slots to real state
     for (let s = 0; s < working.length; s++) {
       if (working[s] !== snapshotBuffer[s]) {

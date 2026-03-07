@@ -155,7 +155,7 @@ export class FuseElement extends AbstractCircuitElement {
 // from the blown property and no runtime input can change it.
 // ---------------------------------------------------------------------------
 
-export function executeFuse(_index: number, _state: Uint32Array, _layout: ComponentLayout): void {
+export function executeFuse(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
   // Blown state is set by the engine from the blown property at compile time.
   // No inputs to read; state[stBase] is already correct.
 }

@@ -95,7 +95,7 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     factory: (props) => new MockElement("Counter", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: (_index: number, state: Uint32Array, layout: ComponentLayout) => {
+    executeFn: (_index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => {
       const val = counterValues[stepIndex] ?? 0;
       stepIndex = (stepIndex + 1) % counterValues.length;
       state[layout.outputOffset(_index)] = val;

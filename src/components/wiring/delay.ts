@@ -145,6 +145,7 @@ export class DelayElement extends AbstractCircuitElement {
 export function executeDelay(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inIdx = layout.inputOffset(index);

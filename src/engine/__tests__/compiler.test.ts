@@ -329,9 +329,10 @@ describe("Compiler", () => {
 
     // Call them to verify they're the right functions
     const state = new Uint32Array(10);
+    const highZs = new Uint32Array(state.length);
     const layout = compiled.layout;
-    compiled.executeFns[notTypeId]!(0, state, layout);
-    compiled.executeFns[andTypeId]!(1, state, layout);
+    compiled.executeFns[notTypeId]!(0, state, highZs, layout);
+    compiled.executeFns[andTypeId]!(1, state, highZs, layout);
     expect(notCalled).toBe(true);
     expect(andCalled).toBe(true);
   });

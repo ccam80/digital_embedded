@@ -262,6 +262,7 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
 export function executeStepperMotorBipolar(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);
@@ -293,6 +294,7 @@ export function executeStepperMotorBipolar(
 export function executeStepperMotorUnipolar(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

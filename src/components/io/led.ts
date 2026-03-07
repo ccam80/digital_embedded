@@ -139,6 +139,7 @@ export class LedElement extends AbstractCircuitElement {
 export function executeLed(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputVal = state[layout.inputOffset(index)];

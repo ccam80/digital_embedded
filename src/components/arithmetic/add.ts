@@ -175,11 +175,11 @@ export class AddElement extends AbstractCircuitElement {
 // component whose execute behaviour depends on a property.
 // ---------------------------------------------------------------------------
 
-export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const carryMask = bitWidth >= 32 ? 0 : (1 << bitWidth);
 
-  return function executeAdd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeAdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -200,9 +200,9 @@ export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32A
   };
 }
 
-export function executeAdd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeAdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  makeExecuteAdd(bitWidth)(index, state, layout);
+  makeExecuteAdd(bitWidth)(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

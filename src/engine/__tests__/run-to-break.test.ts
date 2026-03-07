@@ -43,7 +43,7 @@ function buildCircuit(
   netCount: number,
   inputNets: number[][],
   outputNets: number[][],
-  executeFns: Array<(i: number, s: Uint32Array, l: ComponentLayout) => void>,
+  executeFns: Array<(i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout) => void>,
   typeIds: Uint8Array,
   evaluationOrder: EvaluationGroup[],
   componentElements: Map<number, Partial<CircuitElement>>,
@@ -88,12 +88,12 @@ describe("RunToBreak", () => {
     // run-to-break reads the Break's input net directly after each step.
 
     let callCount = 0;
-    const driverFn = (_i: number, s: Uint32Array, _l: ComponentLayout): void => {
+    const driverFn = (_i: number, s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {
       callCount++;
       // Assert net 0 on the 5th call
       s[0] = callCount >= 5 ? 1 : 0;
     };
-    const breakFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {
+    const breakFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {
       // Break components have no side-effectful execute behaviour in this test
     };
 
@@ -122,7 +122,7 @@ describe("RunToBreak", () => {
 
   it("haltsOnMaxSteps — no Break fires, verify stops at maxSteps", () => {
     // Circuit with a Break component whose input never goes high.
-    const noopFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+    const noopFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
     const compiled = buildCircuit(
       2,
@@ -156,10 +156,10 @@ describe("RunToBreak", () => {
     //
     // The Break fires on step 1. breakComponent must be 2.
 
-    const driverFn = (_i: number, s: Uint32Array, _l: ComponentLayout): void => {
+    const driverFn = (_i: number, s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {
       s[0] = 1;
     };
-    const noopFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+    const noopFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
     const compiled = buildCircuit(
       3,

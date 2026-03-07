@@ -160,6 +160,7 @@ export class SevenSegElement extends AbstractCircuitElement {
 export function executeSevenSeg(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

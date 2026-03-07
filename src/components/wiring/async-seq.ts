@@ -139,6 +139,7 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 export function executeAsyncSeq(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // No-op: marker component. The engine uses its presence to set async mode.

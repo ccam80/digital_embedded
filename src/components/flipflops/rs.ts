@@ -176,7 +176,7 @@ export class RSElement extends AbstractCircuitElement {
 // (deterministic undefined: Digital uses random, we use hold for reproducibility in tests)
 // ---------------------------------------------------------------------------
 
-export function executeRS(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

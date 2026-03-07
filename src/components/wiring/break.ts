@@ -141,6 +141,7 @@ export class BreakElement extends AbstractCircuitElement {
 export function executeBreak(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inIdx = layout.inputOffset(index);

@@ -143,6 +143,7 @@ export class ButtonElement extends AbstractCircuitElement {
 export function executeButton(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // Output value is set externally via engine.setSignalValue() on mouse events.

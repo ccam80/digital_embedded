@@ -154,6 +154,7 @@ export class ResetElement extends AbstractCircuitElement {
 export function executeReset(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   // Reset is a source component: its output is managed by the engine's

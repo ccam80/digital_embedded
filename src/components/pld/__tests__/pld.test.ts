@@ -190,6 +190,7 @@ describe("Diode", () => {
         stateOffset: () => 7,
       };
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       // cathodeIn = highZ (slot 0): value=0, highZ=1 → encode as (1 << 16) | 0
       state[0] = (1 << 16) | 0;
       // anodeIn = driven high: value=1, highZ=0 → encode as 0 | 1
@@ -197,7 +198,7 @@ describe("Diode", () => {
       // blown flag at outputStart+4 = state[6] = 0 (not blown)
       state[6] = 0;
 
-      executeDiode(0, state, layout);
+      executeDiode(0, state, highZs, layout);
 
       // cathode output slot (outputStart=2): state[2]=driven value, state[3]=highZ
       expect(state[2]).toBe(1);
@@ -213,11 +214,12 @@ describe("Diode", () => {
         stateOffset: () => 7,
       };
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = (1 << 16) | 0; // cathodeIn = highZ
       state[1] = 0;             // anodeIn = 0, not highZ
       state[6] = 0;             // not blown
 
-      executeDiode(0, state, layout);
+      executeDiode(0, state, highZs, layout);
 
       expect(state[3]).toBe(1); // cathode is high-Z (diode not conducting forward)
     });
@@ -231,11 +233,12 @@ describe("Diode", () => {
         stateOffset: () => 7,
       };
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;             // cathodeIn = 0, not highZ (driven low)
       state[1] = (1 << 16) | 0; // anodeIn = highZ
       state[6] = 0;             // not blown
 
-      executeDiode(0, state, layout);
+      executeDiode(0, state, highZs, layout);
 
       expect(state[4]).toBe(0); // anode driven to 0
       expect(state[5]).toBe(0); // not highZ — actively pulling anode low
@@ -250,11 +253,12 @@ describe("Diode", () => {
         stateOffset: () => 7,
       };
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = (1 << 16) | 0; // cathodeIn = highZ
       state[1] = (1 << 16) | 0; // anodeIn = highZ
       state[6] = 0;              // not blown
 
-      executeDiode(0, state, layout);
+      executeDiode(0, state, highZs, layout);
 
       expect(state[5]).toBe(1); // anode is high-Z
     });
@@ -268,11 +272,12 @@ describe("Diode", () => {
         stateOffset: () => 7,
       };
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;  // cathodeIn = 0 (driven low)
       state[1] = 1;  // anodeIn = 1 (driven high)
       state[6] = 1;  // blown flag set
 
-      executeDiode(0, state, layout);
+      executeDiode(0, state, highZs, layout);
 
       expect(state[3]).toBe(1); // cathode high-Z
       expect(state[5]).toBe(1); // anode high-Z
@@ -514,10 +519,11 @@ describe("DiodeForward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 1; // in=1
       state[3] = 0; // not blown
 
-      executeDiodeForward(0, state, layout);
+      executeDiodeForward(0, state, highZs, layout);
 
       expect(state[1]).toBe(1); // out=1
       expect(state[2]).toBe(0); // highZ=0 (actively driven)
@@ -532,10 +538,11 @@ describe("DiodeForward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0; // in=0
       state[3] = 0; // not blown
 
-      executeDiodeForward(0, state, layout);
+      executeDiodeForward(0, state, highZs, layout);
 
       expect(state[2]).toBe(1); // highZ=1 (high-Z)
     });
@@ -549,10 +556,11 @@ describe("DiodeForward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 1; // in=1 (would normally drive output)
       state[3] = 1; // blown
 
-      executeDiodeForward(0, state, layout);
+      executeDiodeForward(0, state, highZs, layout);
 
       expect(state[2]).toBe(1); // high-Z regardless
     });
@@ -692,10 +700,11 @@ describe("DiodeBackward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 1; // in=1
       state[3] = 0; // not blown
 
-      executeDiodeBackward(0, state, layout);
+      executeDiodeBackward(0, state, highZs, layout);
 
       expect(state[1]).toBe(1); // out=1
       expect(state[2]).toBe(0); // not high-Z
@@ -710,10 +719,11 @@ describe("DiodeBackward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0; // in=0
       state[3] = 0; // not blown
 
-      executeDiodeBackward(0, state, layout);
+      executeDiodeBackward(0, state, highZs, layout);
 
       expect(state[1]).toBe(0); // out=0 (actively pulling down)
       expect(state[2]).toBe(0); // not high-Z — actively driven
@@ -728,10 +738,11 @@ describe("DiodeBackward", () => {
         stateOffset: () => 4,
       };
       const state = makeState(6);
+      const highZs = new Uint32Array(state.length);
       state[0] = 1; // in=1 (would normally drive output)
       state[3] = 1; // blown
 
-      executeDiodeBackward(0, state, layout);
+      executeDiodeBackward(0, state, highZs, layout);
 
       expect(state[2]).toBe(1); // high-Z (blown)
     });
@@ -747,12 +758,12 @@ describe("DiodeBackward", () => {
       const stateBackward = makeState(6);
       stateBackward[0] = 0;
       stateBackward[3] = 0;
-      executeDiodeBackward(0, stateBackward, layout);
+      executeDiodeBackward(0, stateBackward, new Uint32Array(stateBackward.length), layout);
 
       const stateForward = makeState(6);
       stateForward[0] = 0;
       stateForward[3] = 0;
-      executeDiodeForward(0, stateForward, layout);
+      executeDiodeForward(0, stateForward, new Uint32Array(stateForward.length), layout);
 
       // Backward: drives 0 actively
       expect(stateBackward[2]).toBe(0); // not high-Z
@@ -875,15 +886,17 @@ describe("PullUp", () => {
     it("executePullUp writes 0xFFFFFFFF to output slot", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
-      executePullUp(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePullUp(0, state, highZs, layout);
       expect(state[0]).toBe(0xFFFFFFFF);
     });
 
     it("executePullUp can be called 1000 times without error", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
-        executePullUp(0, state, layout);
+        executePullUp(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0xFFFFFFFF);
     });
@@ -891,8 +904,9 @@ describe("PullUp", () => {
     it("executePullUp always writes all-ones regardless of prior state", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executePullUp(0, state, layout);
+      executePullUp(0, state, highZs, layout);
       expect(state[0]).toBe(0xFFFFFFFF);
     });
   });
@@ -1087,24 +1101,27 @@ describe("PullDown", () => {
     it("executePullDown writes 0 to output slot", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xFFFFFFFF; // pre-fill with all-ones
-      executePullDown(0, state, layout);
+      executePullDown(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });
 
     it("executePullDown always writes 0 regardless of prior state", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 42;
-      executePullDown(0, state, layout);
+      executePullDown(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });
 
     it("executePullDown can be called 1000 times without error", () => {
       const layout = makeLayoutSingle(0, 0);
       const state = makeState(2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
-        executePullDown(0, state, layout);
+        executePullDown(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0);
     });
@@ -1113,11 +1130,11 @@ describe("PullDown", () => {
       const layout = makeLayoutSingle(0, 0);
 
       const stateUp = makeState(2);
-      executePullUp(0, stateUp, layout);
+      executePullUp(0, stateUp, new Uint32Array(stateUp.length), layout);
 
       const stateDown = makeState(2);
       stateDown[0] = 0xFFFFFFFF;
-      executePullDown(0, stateDown, layout);
+      executePullDown(0, stateDown, new Uint32Array(stateDown.length), layout);
 
       expect(stateUp[0]).toBe(0xFFFFFFFF);
       expect(stateDown[0]).toBe(0);

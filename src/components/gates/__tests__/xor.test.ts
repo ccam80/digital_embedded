@@ -117,35 +117,40 @@ describe("XOrGate", () => {
     it("XOR of 0 and 0 produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("XOR of 1 and 0 produces 1", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("XOR of 1 and 1 produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 1]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("XOR of 0xFFFFFFFF and 0xFFFFFFFF produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0xFFFFFFFF]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("XOR of 0xAAAAAAAA and 0x55555555 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xAAAAAAAA, 0x55555555]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
   });
@@ -154,21 +159,24 @@ describe("XOrGate", () => {
     it("XOR of 0xFF, 0x0F, 0x03 produces 0xFF ^ 0x0F ^ 0x03", () => {
       const layout = makeLayout(3);
       const state = makeState([0xFF, 0x0F, 0x03]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[3]).toBe((0xFF ^ 0x0F ^ 0x03) >>> 0);
     });
 
     it("XOR of 4 equal values produces 0 (even number of highs)", () => {
       const layout = makeLayout(4);
       const state = makeState([0xFF, 0xFF, 0xFF, 0xFF]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[4]).toBe(0);
     });
 
     it("XOR of 3 equal values produces original (odd number of highs)", () => {
       const layout = makeLayout(3);
       const state = makeState([0xAB, 0xAB, 0xAB]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[3]).toBe(0xAB);
     });
   });
@@ -177,14 +185,16 @@ describe("XOrGate", () => {
     it("XOR of 0x0F0F0F0F and 0xF0F0F0F0 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0x0F0F0F0F, 0xF0F0F0F0]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("XOR of identical multi-bit values produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0x12345678, 0x12345678]);
-      executeXOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });

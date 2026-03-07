@@ -309,25 +309,27 @@ describe("GraphicCard", () => {
     it("all-zero inputs produce output=0", () => {
       const layout = makeLayout();
       const state = makeState(0, 0, 0, 0, 0, 0);
-      executeGraphicCard(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeGraphicCard(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
 
     it("non-zero inputs produce non-zero output slot", () => {
       const layout = makeLayout();
       const state = makeState(5, 1, 1, 0, 0, 0xAB);
-      executeGraphicCard(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeGraphicCard(0, state, highZs, layout);
       expect(state[6]).not.toBe(0);
     });
 
     it("str flag is encoded in output slot", () => {
       const layout = makeLayout();
       const stateStr = makeState(0, 1, 0, 0, 0, 0);
-      executeGraphicCard(0, stateStr, layout);
+      executeGraphicCard(0, stateStr, new Uint32Array(stateStr.length), layout);
       const withStr = stateStr[6];
 
       const stateNoStr = makeState(0, 0, 0, 0, 0, 0);
-      executeGraphicCard(0, stateNoStr, layout);
+      executeGraphicCard(0, stateNoStr, new Uint32Array(stateNoStr.length), layout);
       const withoutStr = stateNoStr[6];
 
       expect(withStr).not.toBe(withoutStr);
@@ -336,11 +338,11 @@ describe("GraphicCard", () => {
     it("ld flag is encoded in output slot", () => {
       const layout = makeLayout();
       const stateLd = makeState(0, 0, 0, 1, 0, 0);
-      executeGraphicCard(0, stateLd, layout);
+      executeGraphicCard(0, stateLd, new Uint32Array(stateLd.length), layout);
       const withLd = stateLd[6];
 
       const stateNoLd = makeState(0, 0, 0, 0, 0, 0);
-      executeGraphicCard(0, stateNoLd, layout);
+      executeGraphicCard(0, stateNoLd, new Uint32Array(stateNoLd.length), layout);
       const withoutLd = stateNoLd[6];
 
       expect(withLd).not.toBe(withoutLd);
@@ -349,11 +351,11 @@ describe("GraphicCard", () => {
     it("bank flag is encoded in output slot", () => {
       const layout = makeLayout();
       const stateB1 = makeState(0, 0, 0, 0, 1, 0);
-      executeGraphicCard(0, stateB1, layout);
+      executeGraphicCard(0, stateB1, new Uint32Array(stateB1.length), layout);
       const withB1 = stateB1[6];
 
       const stateB0 = makeState(0, 0, 0, 0, 0, 0);
-      executeGraphicCard(0, stateB0, layout);
+      executeGraphicCard(0, stateB0, new Uint32Array(stateB0.length), layout);
       const withB0 = stateB0[6];
 
       expect(withB1).not.toBe(withB0);
@@ -362,10 +364,11 @@ describe("GraphicCard", () => {
     it("can be called 1000 times without error (zero-allocation path)", () => {
       const layout = makeLayout();
       const state = makeState(0, 0, 0, 0, 0, 0);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFFFF;
         state[2] = i & 1;
-        executeGraphicCard(0, state, layout);
+        executeGraphicCard(0, state, highZs, layout);
       }
       expect(typeof state[6]).toBe("number");
     });

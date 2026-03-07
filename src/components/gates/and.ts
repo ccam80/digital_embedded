@@ -263,7 +263,7 @@ export class AndElement extends AbstractCircuitElement {
 // writes the result to the output slot.
 // ---------------------------------------------------------------------------
 
-export function executeAnd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeAnd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);

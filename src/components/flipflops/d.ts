@@ -168,7 +168,7 @@ export class DElement extends AbstractCircuitElement {
 // Output layout: [Q=0, ~Q=1]
 // ---------------------------------------------------------------------------
 
-export function executeD(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

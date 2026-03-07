@@ -187,7 +187,8 @@ describe("LedMatrix", () => {
     it("encodes r-data and c-addr into output slot", () => {
       const layout = makeLayout();
       const state = makeState(0xAB, 3);
-      executeLedMatrix(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLedMatrix(0, state, highZs, layout);
       expect(typeof state[2]).toBe("number");
       // Output encodes both values
       const colAddr = state[2] & 0xFFFF;
@@ -199,17 +200,19 @@ describe("LedMatrix", () => {
     it("r-data=0, c-addr=0 produces output=0", () => {
       const layout = makeLayout();
       const state = makeState(0, 0);
-      executeLedMatrix(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeLedMatrix(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("can be called 1000 times without error (zero-allocation path)", () => {
       const layout = makeLayout();
       const state = makeState(0, 0);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xFF;
         state[1] = i & 0x7;
-        executeLedMatrix(0, state, layout);
+        executeLedMatrix(0, state, highZs, layout);
       }
       expect(typeof state[2]).toBe("number");
     });

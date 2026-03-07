@@ -78,13 +78,14 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; // A
     state[1] = 1; // CS
     state[2] = 0; // WE
     state[3] = 1; // OE
     state[4] = 0; // Din
 
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0xAB); // D
   });
 
@@ -94,8 +95,9 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0; state[2] = 0; state[3] = 1; state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 
@@ -105,8 +107,9 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1; state[2] = 0; state[3] = 0; state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 
@@ -116,9 +119,10 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1; state[2] = 1; state[3] = 1; state[4] = 0;
     // lastWE starts at 0 → this is WE rising edge (address capture only)
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 
@@ -127,6 +131,7 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
 
     // Step 1: Rising edge of WE at address 5 with CS=1
     // lastWE=0 (initial) → WE goes to 1
@@ -135,7 +140,7 @@ describe("EEPROM", () => {
     state[2] = 1;   // WE (rising)
     state[3] = 0;   // OE
     state[4] = 0;   // Din (not yet relevant)
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     // lastWE should now be 1, writeAddr = 5
     expect(state[IN + OUT + 0]).toBe(1);   // lastWE
     expect(state[IN + OUT + 1]).toBe(5);   // writeAddr
@@ -146,7 +151,7 @@ describe("EEPROM", () => {
     state[2] = 0;   // WE (falling)
     state[3] = 0;   // OE
     state[4] = 0xBE; // Din
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     // memory[5] should now be 0xBE
     expect(mem.read(5)).toBe(0xBE);
 
@@ -156,7 +161,7 @@ describe("EEPROM", () => {
     state[2] = 0; // WE
     state[3] = 1; // OE
     state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0xBE);
   });
 
@@ -165,14 +170,15 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
 
     // Rising edge of WE without CS
     state[0] = 2; state[1] = 0; state[2] = 1; state[3] = 0; state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
 
     // Falling edge of WE without CS
     state[2] = 0; state[4] = 0x99;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
 
     // Nothing should have been written
     expect(mem.read(2)).toBe(0);
@@ -183,15 +189,16 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; // CS always asserted
 
     const writeValue = (addr: number, val: number) => {
       // Rising edge
       state[0] = addr; state[2] = 1; state[3] = 0; state[4] = 0;
-      executeEEPROM(0, state, layout);
+      executeEEPROM(0, state, highZs, layout);
       // Falling edge
       state[2] = 0; state[4] = val;
-      executeEEPROM(0, state, layout);
+      executeEEPROM(0, state, highZs, layout);
     };
 
     writeValue(1, 0x11);
@@ -209,19 +216,21 @@ describe("EEPROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 4; // wraps to 0
     state[1] = 1;
     state[2] = 0;
     state[3] = 1;
     state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0xAA);
   });
 
   it("noBackingStore — read returns 0 gracefully", () => {
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1; state[2] = 0; state[3] = 1; state[4] = 0;
-    executeEEPROM(0, state, layout);
+    executeEEPROM(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 
@@ -346,6 +355,7 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
 
     // Write 0xAB to address 3 on rising clock edge
     state[0] = 3;   // A
@@ -354,7 +364,7 @@ describe("EEPROMDualPort", () => {
     state[3] = 1;   // C (rising: lastClk was 0)
     state[4] = 0;   // ld
 
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(mem.read(3)).toBe(0xAB);
 
     // Read back from address 3
@@ -363,7 +373,7 @@ describe("EEPROMDualPort", () => {
     state[3] = 0;   // C (falling, no edge)
     state[4] = 1;   // ld
 
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0xAB);
   });
 
@@ -372,13 +382,14 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
 
     // Set lastClk = 1 first by running a cycle with clk=1
     state[0] = 0; state[1] = 0xAA; state[2] = 1; state[3] = 1; state[4] = 0;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     // Now write with clk still high (no rising edge — lastClk=1)
     state[1] = 0xFF; state[2] = 1; state[3] = 1;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     // Only the first write (on first rising edge) should have occurred
     expect(mem.read(0)).toBe(0xAA);
   });
@@ -388,8 +399,9 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0x77; state[2] = 0; state[3] = 1; state[4] = 0;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(mem.read(0)).toBe(0);
   });
 
@@ -399,8 +411,9 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 7; state[1] = 0; state[2] = 0; state[3] = 0; state[4] = 1;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0xCC);
   });
 
@@ -410,8 +423,9 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0; state[2] = 0; state[3] = 0; state[4] = 0;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 
@@ -420,21 +434,22 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
 
     // Cycle 1: clk=0 → lastClk stays 0
     state[3] = 0;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(0); // lastClk = 0
 
     // Cycle 2: clk=1 (rising) → writes if str=1
     state[0] = 4; state[1] = 0x11; state[2] = 1; state[3] = 1;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(1); // lastClk = 1
     expect(mem.read(4)).toBe(0x11);
 
     // Cycle 3: clk=0 (falling) → no rising edge, no write
     state[1] = 0x22; state[3] = 0;
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(0); // lastClk = 0
     expect(mem.read(4)).toBe(0x11); // unchanged
   });
@@ -445,10 +460,11 @@ describe("EEPROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[0] = 6; // wraps to 2
     state[4] = 1; // ld
     state[3] = 0; // no clock
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0x55);
   });
 
@@ -537,8 +553,9 @@ describe("EEPROMDualPort", () => {
 
   it("noBackingStore — read returns 0 gracefully", () => {
     const { layout, state } = makeLayout(IN, OUT, STATE);
+    const highZs = new Uint32Array(state.length);
     state[4] = 1; // ld
-    executeEEPROMDualPort(0, state, layout);
+    executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0);
   });
 });

@@ -211,7 +211,7 @@ export class PlainSwitchDTElement extends AbstractCircuitElement {
 // No computation is needed in this executeFn.
 // ---------------------------------------------------------------------------
 
-export function executePlainSwitchDT(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executePlainSwitchDT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   void index;
   void state;
   void layout;

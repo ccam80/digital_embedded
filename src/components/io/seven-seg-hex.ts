@@ -182,6 +182,7 @@ export class SevenSegHexElement extends AbstractCircuitElement {
 export function executeSevenSegHex(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const digit = state[layout.inputOffset(index)] & 0xF;

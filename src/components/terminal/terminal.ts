@@ -290,6 +290,7 @@ export class TerminalElement extends AbstractCircuitElement {
 export function executeTerminal(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inBase = layout.inputOffset(index);

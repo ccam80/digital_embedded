@@ -119,30 +119,34 @@ describe("Delay", () => {
       // inputs: [in=0xABCD]; output: [out]
       const layout = makeLayout(1, 1);
       const state = makeState([0xABCD]);
-      executeDelay(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDelay(0, state, highZs, layout);
       expect(state[1]).toBe(0xABCD);
     });
 
     it("input=0 produces output=0", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0]);
-      executeDelay(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDelay(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("input=0xFFFFFFFF passes through as unsigned 32-bit", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFFFFFFFF]);
-      executeDelay(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDelay(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFF);
     });
 
     it("pass-through is idempotent (repeated calls)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0x1234]);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 100; i++) {
         state[0] = (i * 31) & 0xFFFF;
-        executeDelay(0, state, layout);
+        executeDelay(0, state, highZs, layout);
         expect(state[1]).toBe(state[0]);
       }
     });
@@ -226,37 +230,41 @@ describe("Break", () => {
       // inputs: [brk=0]; output: [triggered]
       const layout = makeLayout(1, 1);
       const state = makeState([0]);
-      executeBreak(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("input=1 → output=1 (triggered)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1]);
-      executeBreak(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("input=0xFF (non-zero) → output=1 (triggered)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFF]);
-      executeBreak(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("input transitions 0→1→0 are tracked correctly", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0]);
+      const highZs = new Uint32Array(state.length);
 
-      executeBreak(0, state, layout);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(0);
 
       state[0] = 1;
-      executeBreak(0, state, layout);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(1);
 
       state[0] = 0;
-      executeBreak(0, state, layout);
+      executeBreak(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
   });
@@ -326,21 +334,24 @@ describe("Stop", () => {
     it("input=0 → output=0 (not triggered)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0]);
-      executeStop(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStop(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("input=1 → output=1 (triggered)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1]);
-      executeStop(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStop(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("input=0xDEAD (non-zero) → output=1", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xDEAD]);
-      executeStop(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeStop(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
   });
@@ -402,9 +413,10 @@ describe("Reset", () => {
       // Reset has no inputs — output managed by engine
       const layout = makeLayout(0, 1);
       const state = makeState([]);
+      const highZs = new Uint32Array(state.length);
       // Pre-set output to a sentinel value
       state[0] = 42;
-      executeReset(0, state, layout);
+      executeReset(0, state, highZs, layout);
       // No-op: output should still be 42
       expect(state[0]).toBe(42);
     });
@@ -412,9 +424,10 @@ describe("Reset", () => {
     it("executeReset can be called repeatedly without side effects", () => {
       const layout = makeLayout(0, 1);
       const state = makeState([]);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xAB;
       for (let i = 0; i < 100; i++) {
-        executeReset(0, state, layout);
+        executeReset(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0xAB);
     });
@@ -508,10 +521,11 @@ describe("AsyncSeq", () => {
       // AsyncSeq has no inputs or outputs
       const layout = makeLayout(0, 0);
       const state = makeState([]);
+      const highZs = new Uint32Array(state.length);
       // Pre-populate state with sentinel values
       state[0] = 0xDEAD;
       state[1] = 0xBEEF;
-      executeAsyncSeq(0, state, layout);
+      executeAsyncSeq(0, state, highZs, layout);
       // State should be unchanged
       expect(state[0]).toBe(0xDEAD);
       expect(state[1]).toBe(0xBEEF);
@@ -520,7 +534,8 @@ describe("AsyncSeq", () => {
     it("executeAsyncSeq can be called without error", () => {
       const layout = makeLayout(0, 0);
       const state = new Uint32Array(4);
-      expect(() => executeAsyncSeq(0, state, layout)).not.toThrow();
+      const highZs = new Uint32Array(state.length);
+      expect(() => executeAsyncSeq(0, state, highZs, layout)).not.toThrow();
     });
   });
 

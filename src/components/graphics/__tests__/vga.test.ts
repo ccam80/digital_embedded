@@ -249,7 +249,8 @@ describe("VGA", () => {
     it("packs R, G, B, H, V, C inputs into output slot", () => {
       const layout = makeLayout();
       const state = makeState(0xF, 0xA, 0x5, 1, 0, 1);
-      executeVga(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeVga(0, state, highZs, layout);
       expect(typeof state[6]).toBe("number");
       // Output should be non-zero given non-zero inputs
       expect(state[6]).not.toBe(0);
@@ -258,17 +259,19 @@ describe("VGA", () => {
     it("all-zero inputs produce output=0", () => {
       const layout = makeLayout();
       const state = makeState(0, 0, 0, 0, 0, 0);
-      executeVga(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeVga(0, state, highZs, layout);
       expect(state[6]).toBe(0);
     });
 
     it("can be called 1000 times without error (zero-allocation path)", () => {
       const layout = makeLayout();
       const state = makeState(0, 0, 0, 0, 0, 0);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[0] = i & 0xF;
         state[5] = i & 1;
-        executeVga(0, state, layout);
+        executeVga(0, state, highZs, layout);
       }
       expect(typeof state[6]).toBe("number");
     });
@@ -276,15 +279,15 @@ describe("VGA", () => {
     it("H and V flags are encoded in output slot", () => {
       const layout = makeLayout();
       const stateH = makeState(0, 0, 0, 1, 0, 0);
-      executeVga(0, stateH, layout);
+      executeVga(0, stateH, new Uint32Array(stateH.length), layout);
       const withH = stateH[6];
 
       const stateV = makeState(0, 0, 0, 0, 1, 0);
-      executeVga(0, stateV, layout);
+      executeVga(0, stateV, new Uint32Array(stateV.length), layout);
       const withV = stateV[6];
 
       const stateNone = makeState(0, 0, 0, 0, 0, 0);
-      executeVga(0, stateNone, layout);
+      executeVga(0, stateNone, new Uint32Array(stateNone.length), layout);
       const withNone = stateNone[6];
 
       expect(withH).not.toBe(withNone);

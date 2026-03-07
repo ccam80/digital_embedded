@@ -189,10 +189,11 @@ describe("Text", () => {
     it("executeText is a no-op — does not modify state", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(4);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xDEADBEEF;
       state[1] = 0xCAFEBABE;
 
-      executeText(0, state, layout);
+      executeText(0, state, highZs, layout);
 
       expect(state[0]).toBe(0xDEADBEEF);
       expect(state[1]).toBe(0xCAFEBABE);
@@ -201,8 +202,9 @@ describe("Text", () => {
     it("executeText can be called repeatedly without error", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 100; i++) {
-        executeText(0, state, layout);
+        executeText(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0);
     });
@@ -437,10 +439,11 @@ describe("Rectangle", () => {
     it("executeRectangle is a no-op — does not modify state", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(4);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xDEADBEEF;
       state[1] = 0xCAFEBABE;
 
-      executeRectangle(0, state, layout);
+      executeRectangle(0, state, highZs, layout);
 
       expect(state[0]).toBe(0xDEADBEEF);
       expect(state[1]).toBe(0xCAFEBABE);
@@ -449,8 +452,9 @@ describe("Rectangle", () => {
     it("executeRectangle can be called repeatedly without error", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(2);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 100; i++) {
-        executeRectangle(0, state, layout);
+        executeRectangle(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0);
     });

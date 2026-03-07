@@ -74,7 +74,7 @@ export class NegElement extends AbstractCircuitElement {
   }
 }
 
-export function executeNeg(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeNeg(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const val = state[inBase] >>> 0;

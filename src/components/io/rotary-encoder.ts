@@ -179,6 +179,7 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
 export function executeRotaryEncoder(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const outputStart = layout.outputOffset(index);

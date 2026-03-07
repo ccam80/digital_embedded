@@ -176,6 +176,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
 export function executeDipSwitch(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // Output value is set externally via engine.setSignalValue() on click events.

@@ -196,7 +196,7 @@ export class SwitchElement extends AbstractCircuitElement {
 // No computation needed in this executeFn.
 // ---------------------------------------------------------------------------
 
-export function executeSwitch(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeSwitch(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   void index;
   void state;
   void layout;

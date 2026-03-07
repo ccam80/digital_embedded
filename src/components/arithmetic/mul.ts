@@ -179,11 +179,11 @@ export class MulElement extends AbstractCircuitElement {
 export function makeExecuteMul(
   bitWidth: number,
   signed: boolean,
-): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const inputMask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const signBit = 1 << (bitWidth - 1);
 
-  return function executeMul(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeMul(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -224,10 +224,10 @@ export function makeExecuteMul(
   };
 }
 
-export function executeMul(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeMul(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
   const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
-  makeExecuteMul(bitWidth, signed)(index, state, layout);
+  makeExecuteMul(bitWidth, signed)(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

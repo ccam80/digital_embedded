@@ -173,10 +173,10 @@ export class SubElement extends AbstractCircuitElement {
 // For bitWidth == 32: use BigInt to detect underflow across the 32-bit boundary.
 // ---------------------------------------------------------------------------
 
-export function makeExecuteSub(bitWidth: number): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+export function makeExecuteSub(bitWidth: number): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
 
-  return function executeSub(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeSub(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -201,9 +201,9 @@ export function makeExecuteSub(bitWidth: number): (index: number, state: Uint32A
   };
 }
 
-export function executeSub(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeSub(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  makeExecuteSub(bitWidth)(index, state, layout);
+  makeExecuteSub(bitWidth)(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

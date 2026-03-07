@@ -43,7 +43,7 @@ function buildCircuit(
   netCount: number,
   inputNets: number[][],
   outputNets: number[][],
-  executeFns: Array<(i: number, s: Uint32Array, l: ComponentLayout) => void>,
+  executeFns: Array<(i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout) => void>,
   typeIds: Uint8Array,
   evaluationOrder: EvaluationGroup[],
 ): ConcreteCompiledCircuit {
@@ -82,10 +82,10 @@ describe("MicroStep", () => {
     // Net 1: output for gate 0
     // Net 2: input for gate 1
     // Net 3: output for gate 1
-    const executeFn0 = (i: number, s: Uint32Array, l: ComponentLayout): void => {
+    const executeFn0 = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
       s[l.outputOffset(i)] = s[l.inputOffset(i)];
     };
-    const executeFn1 = (i: number, s: Uint32Array, l: ComponentLayout): void => {
+    const executeFn1 = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
       s[l.outputOffset(i)] = s[l.inputOffset(i)];
     };
 
@@ -122,7 +122,7 @@ describe("MicroStep", () => {
 
   it("reportsWhichComponentFired — step, verify componentIndex and typeId are correct", () => {
     // Single component: typeId=0, component index 0
-    const executeFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+    const executeFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
     const compiled = buildCircuit(
       2,
@@ -149,7 +149,7 @@ describe("MicroStep", () => {
 
   it("eventuallyStabilizes — step repeatedly, verify isStable() eventually returns true", () => {
     // Simple 2-gate circuit with no feedback
-    const executeFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+    const executeFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
     const compiled = buildCircuit(
       3,
@@ -190,7 +190,7 @@ describe("MicroStep", () => {
     // Net 3: C output
     //
     // Components: 0=A, 1=B, 2=C in a single non-feedback group in that order.
-    const executeFn = (i: number, s: Uint32Array, l: ComponentLayout): void => {
+    const executeFn = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
       s[l.outputOffset(i)] = s[l.inputOffset(i)];
     };
 
@@ -223,7 +223,7 @@ describe("MicroStep", () => {
   // -------------------------------------------------------------------------
 
   it("reset clears stability state — after stabilizing, reset makes isStable() false again", () => {
-    const executeFn = (_i: number, _s: Uint32Array, _l: ComponentLayout): void => {};
+    const executeFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
     const compiled = buildCircuit(
       2,

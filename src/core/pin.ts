@@ -253,6 +253,7 @@ export function standardGatePinLayout(
   componentW: number,
   componentH: number,
   defaultBitWidth: number = 1,
+  _outputBubbleOffset: number = 0,
 ): PinDeclaration[] {
   const inputPositions = layoutPinsOnFace("west", inputLabels.length, componentW, componentH);
   const outputPositions = layoutPinsOnFace("east", 1, componentW, componentH);

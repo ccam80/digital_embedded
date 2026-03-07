@@ -212,7 +212,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
 // No computation needed here.
 // ---------------------------------------------------------------------------
 
-export function executeSwitchDT(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeSwitchDT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   void index;
   void state;
   void layout;

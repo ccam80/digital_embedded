@@ -72,13 +72,14 @@ describe("ROM", () => {
 
     // Inputs: A=0, sel=1; Outputs: D
     const { layout, state } = makeLayout(2, 1, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0;   // A
     state[1] = 1;   // sel
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0xAB);
 
     state[0] = 3;   // A
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0xCD);
   });
 
@@ -88,9 +89,10 @@ describe("ROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(2, 1, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0;   // A
     state[1] = 0;   // sel = 0
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
@@ -103,24 +105,26 @@ describe("ROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(2, 1, 0);
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; // sel = 1
 
     // Address 4 wraps to 0
     state[0] = 4;
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0x11);
 
     // Address 7 wraps to 3
     state[0] = 7;
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0x44);
   });
 
   it("noBackingStore — returns 0 when no DataField registered", () => {
     const { layout, state } = makeLayout(2, 1, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0;
     state[1] = 1;
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
@@ -130,16 +134,17 @@ describe("ROM", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(2, 1, 0);
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; // sel = 1
 
     for (let i = 0; i < 5; i++) {
       state[0] = i;
-      executeROM(0, state, layout);
+      executeROM(0, state, highZs, layout);
       expect(state[2]).toBe((i + 1) * 0x10);
     }
     // Uninitialised addresses return 0
     state[0] = 5;
-    executeROM(0, state, layout);
+    executeROM(0, state, highZs, layout);
     expect(state[2]).toBe(0);
   });
 
@@ -301,12 +306,13 @@ describe("ROMDualPort", () => {
 
     // Inputs: A1, s1, A2, s2 (4); Outputs: D1, D2 (2)
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 2;   // A1
     state[1] = 1;   // s1
     state[2] = 5;   // A2
     state[3] = 1;   // s2
 
-    executeROMDualPort(0, state, layout);
+    executeROMDualPort(0, state, highZs, layout);
     expect(state[4]).toBe(0xAA); // D1
     expect(state[5]).toBe(0xBB); // D2
   });
@@ -317,10 +323,11 @@ describe("ROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0; // A1=0, s1=0
     state[2] = 0; state[3] = 1; // A2=0, s2=1
 
-    executeROMDualPort(0, state, layout);
+    executeROMDualPort(0, state, highZs, layout);
     expect(state[4]).toBe(0);    // D1 = 0 (not selected)
     expect(state[5]).toBe(0xFF); // D2 = memory[0]
   });
@@ -331,10 +338,11 @@ describe("ROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1; // A1=1, s1=1
     state[2] = 1; state[3] = 0; // A2=1, s2=0
 
-    executeROMDualPort(0, state, layout);
+    executeROMDualPort(0, state, highZs, layout);
     expect(state[4]).toBe(0x55); // D1
     expect(state[5]).toBe(0);    // D2 = 0 (not selected)
   });
@@ -345,10 +353,11 @@ describe("ROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0;
     state[2] = 0; state[3] = 0;
 
-    executeROMDualPort(0, state, layout);
+    executeROMDualPort(0, state, highZs, layout);
     expect(state[4]).toBe(0);
     expect(state[5]).toBe(0);
   });
@@ -359,11 +368,12 @@ describe("ROMDualPort", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[1] = 1; state[3] = 1;
 
     for (let a = 0; a < 16; a++) {
       state[0] = a; state[2] = (a + 1) % 16;
-      executeROMDualPort(0, state, layout);
+      executeROMDualPort(0, state, highZs, layout);
       expect(state[4]).toBe(a * 0x10);
       expect(state[5]).toBe(((a + 1) % 16) * 0x10);
     }
@@ -440,10 +450,11 @@ describe("ROMDualPort", () => {
 
   it("noBackingStore — returns 0 for both ports", () => {
     const { layout, state } = makeLayout(4, 2, 0);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1;
     state[2] = 0; state[3] = 1;
 
-    executeROMDualPort(0, state, layout);
+    executeROMDualPort(0, state, highZs, layout);
     expect(state[4]).toBe(0);
     expect(state[5]).toBe(0);
   });

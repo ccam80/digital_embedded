@@ -233,9 +233,10 @@ describe("Testcase", () => {
     it("executeTestcase is a no-op — state unchanged", () => {
       const layout = makeLayout(0, 0);
       const state = new Uint32Array(4);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xdeadbeef;
       state[1] = 0xcafebabe;
-      executeTestcase(0, state, layout);
+      executeTestcase(0, state, highZs, layout);
       expect(state[0]).toBe(0xdeadbeef);
       expect(state[1]).toBe(0xcafebabe);
     });
@@ -243,10 +244,11 @@ describe("Testcase", () => {
     it("executeTestcase can be called multiple times without error", () => {
       const layout = makeLayout(0, 0);
       const state = new Uint32Array(2);
+      const highZs = new Uint32Array(state.length);
       expect(() => {
-        executeTestcase(0, state, layout);
-        executeTestcase(0, state, layout);
-        executeTestcase(0, state, layout);
+        executeTestcase(0, state, highZs, layout);
+        executeTestcase(0, state, highZs, layout);
+        executeTestcase(0, state, highZs, layout);
       }).not.toThrow();
     });
   });

@@ -274,7 +274,7 @@ export class MidiElement extends AbstractCircuitElement {
 //   stateSlot 2 = progChangeEnable flag (0 or 1, set by compiler from props)
 // ---------------------------------------------------------------------------
 
-export function executeMidi(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeMidi(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
 

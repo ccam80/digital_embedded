@@ -53,15 +53,17 @@ describe("Fuse — executeFn", () => {
     // Engine sets state[stBase]=1 at compile time for blown=false.
     // executeFuse is a no-op; it must not corrupt that initial value.
     const { layout, state } = makeFuseLayout(1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; // engine pre-initialises: closed
-    executeFuse(0, state, layout);
+    executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(1); // still closed
   });
 
   it("blownState — engine sets state=0 for blown fuse, executeFuse preserves it", () => {
     const { layout, state } = makeFuseLayout(1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; // engine pre-initialises: open (blown)
-    executeFuse(0, state, layout);
+    executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(0); // still open
   });
 
@@ -69,19 +71,21 @@ describe("Fuse — executeFn", () => {
     // There is no gate input, so executeFuse is a true no-op.
     // Once the engine sets blown=true → state=0, nothing can change it.
     const { layout, state } = makeFuseLayout(1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 0; // blown (open)
-    executeFuse(0, state, layout);
+    executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(0);
     // Try again — still no change
-    executeFuse(0, state, layout);
+    executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(0);
   });
 
   it("multipleCallsPreserveState — repeated execution preserves initial closed state", () => {
     const { layout, state } = makeFuseLayout(1);
+    const highZs = new Uint32Array(state.length);
     state[0] = 1; // closed
-    executeFuse(0, state, layout);
-    executeFuse(0, state, layout);
+    executeFuse(0, state, highZs, layout);
+    executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(1);
   });
 });

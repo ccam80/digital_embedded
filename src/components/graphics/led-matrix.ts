@@ -217,6 +217,7 @@ export class LedMatrixElement extends AbstractCircuitElement {
 export function executeLedMatrix(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

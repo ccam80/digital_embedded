@@ -259,7 +259,7 @@ export class OrElement extends AbstractCircuitElement {
 // executeOr — flat simulation function
 // ---------------------------------------------------------------------------
 
-export function executeOr(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);

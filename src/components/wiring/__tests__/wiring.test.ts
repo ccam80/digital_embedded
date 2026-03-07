@@ -180,7 +180,8 @@ describe("Driver", () => {
       const layout = makeDriverLayout();
       // state: [data=0xFF, sel=1, outValue=0, outHighZ=0]
       const state = makeState(0xFF, 1, 0, 0);
-      executeDriver(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
       expect(state[3]).toBe(0);
     });
@@ -188,7 +189,8 @@ describe("Driver", () => {
     it("sel=1, input=0xABCD → output=0xABCD, highZ=0", () => {
       const layout = makeDriverLayout();
       const state = makeState(0xABCD, 1, 0, 0);
-      executeDriver(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0xABCD);
       expect(state[3]).toBe(0);
     });
@@ -196,7 +198,8 @@ describe("Driver", () => {
     it("sel=1, input=0 → output=0, highZ=0 (driven low)", () => {
       const layout = makeDriverLayout();
       const state = makeState(0, 1, 0xFFFFFFFF, 0xFFFFFFFF);
-      executeDriver(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0);
     });
@@ -206,7 +209,8 @@ describe("Driver", () => {
     it("sel=0, any input → output=0 (high-Z), highZ=0xFFFFFFFF", () => {
       const layout = makeDriverLayout();
       const state = makeState(0xFF, 0, 0, 0);
-      executeDriver(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0xFFFFFFFF);
     });
@@ -214,7 +218,8 @@ describe("Driver", () => {
     it("sel=0 with large input → highZ is set regardless of input", () => {
       const layout = makeDriverLayout();
       const state = makeState(0xDEADBEEF, 0, 0, 0);
-      executeDriver(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriver(0, state, highZs, layout);
       expect(state[3]).toBe(0xFFFFFFFF);
     });
   });
@@ -285,7 +290,8 @@ describe("DriverInvSel", () => {
     it("sel=0, input=0xFF → output=0xFF, highZ=0", () => {
       const layout = makeDriverLayout();
       const state = makeState(0xFF, 0, 0, 0);
-      executeDriverInvSel(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriverInvSel(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
       expect(state[3]).toBe(0);
     });
@@ -295,7 +301,8 @@ describe("DriverInvSel", () => {
     it("sel=1 → output=0, highZ=0xFFFFFFFF", () => {
       const layout = makeDriverLayout();
       const state = makeState(0xFF, 1, 0, 0);
-      executeDriverInvSel(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDriverInvSel(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0xFFFFFFFF);
     });
@@ -418,7 +425,8 @@ describe("Splitter", () => {
       const layout = makeLayout(1, 2);
       // state: [wideInput=0xAB, out0=0, out1=0]
       const state = makeState(0xAB, 0, 0);
-      executeSplitterWithWidths(0, state, layout, [4, 4]);
+      const highZs = new Uint32Array(state.length);
+      executeSplitterWithWidths(0, state, highZs, layout, [4, 4]);
       expect(state[1]).toBe(0xB);  // low nibble
       expect(state[2]).toBe(0xA);  // high nibble
     });
@@ -430,7 +438,8 @@ describe("Splitter", () => {
       const layout = makeLayout(2, 1);
       // state: [in0=0xA, in1=0xB, wideOut=0]
       const state = makeState(0xA, 0xB, 0);
-      executeSplitterMergeWithWidths(0, state, layout, [4, 4]);
+      const highZs = new Uint32Array(state.length);
+      executeSplitterMergeWithWidths(0, state, highZs, layout, [4, 4]);
       // 0xA in [0,4) + 0xB in [4,8) = 0xBA
       expect(state[2]).toBe(0xBA);
     });
@@ -442,7 +451,8 @@ describe("Splitter", () => {
       // bit 0 = 1, bit 1 = 0, bit 2 = 1, bit 3 = 0, bits 4..7 = 0xF
       const layout = makeLayout(1, 5);
       const state = makeState(0xF5, 0, 0, 0, 0, 0);
-      executeSplitterWithWidths(0, state, layout, [1, 1, 1, 1, 4]);
+      const highZs = new Uint32Array(state.length);
+      executeSplitterWithWidths(0, state, highZs, layout, [1, 1, 1, 1, 4]);
       expect(state[1]).toBe(1);   // bit 0
       expect(state[2]).toBe(0);   // bit 1
       expect(state[3]).toBe(1);   // bit 2
@@ -576,7 +586,8 @@ describe("Tunnel", () => {
     it("executeTunnel does not modify state", () => {
       const layout = makeLayout(1, 0);
       const state = makeState(0xCAFE, 0xBEEF);
-      executeTunnel(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeTunnel(0, state, highZs, layout);
       expect(state[0]).toBe(0xCAFE);
       expect(state[1]).toBe(0xBEEF);
     });
@@ -584,7 +595,8 @@ describe("Tunnel", () => {
     it("executeTunnel does not throw", () => {
       const layout = makeLayout(1, 0);
       const state = makeState(0);
-      expect(() => executeTunnel(0, state, layout)).not.toThrow();
+      const highZs = new Uint32Array(state.length);
+      expect(() => executeTunnel(0, state, highZs, layout)).not.toThrow();
     });
   });
 

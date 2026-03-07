@@ -147,7 +147,7 @@ export class PullDownElement extends AbstractCircuitElement {
 // only when the net is otherwise floating.
 // ---------------------------------------------------------------------------
 
-export function executePullDown(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executePullDown(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const outputIdx = layout.outputOffset(index);
   state[outputIdx] = 0;
 }

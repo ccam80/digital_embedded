@@ -48,6 +48,8 @@ export interface EvaluationGroup {
 export interface InitializableEngine {
   /** The signal value array (all nets). */
   readonly state: Uint32Array;
+  /** High-impedance flags array, parallel to state. */
+  readonly highZs: Uint32Array;
   /** Pre-allocated snapshot buffer, same length as state. */
   readonly snapshotBuffer: Uint32Array;
   /** Type ID per component index. */
@@ -93,20 +95,20 @@ const MAX_SETTLE_ITERATIONS = 100;
  * @param engine  The engine internals to initialize.
  */
 export function initializeCircuit(engine: InitializableEngine): void {
-  const { state, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder } = engine;
+  const { state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder } = engine;
 
   // Step 1: Set all signals to UNDEFINED (value = 0)
   state.fill(UNDEFINED_VALUE);
 
   // Step 2: Noise propagation — run multiple passes to let circuit settle
   // For feedback SCCs: use noise (shuffled, interleaved). For non-feedback: synchronized.
-  runNoisePropagation(state, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
+  runNoisePropagation(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
 
   // Step 3: Release Reset components (drive output to 1)
   releaseResetComponents(engine);
 
   // Step 4: Deterministic settle — one full sweep in topological order, no noise
-  runDeterministicSettle(state, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
+  runDeterministicSettle(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +117,7 @@ export function initializeCircuit(engine: InitializableEngine): void {
 
 function runNoisePropagation(
   state: Uint32Array,
+  highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
   typeIds: Uint8Array,
   executeFns: ExecuteFunction[],
@@ -134,9 +137,9 @@ function runNoisePropagation(
       const outputsBefore = captureOutputs(componentIndices, count, state, layout);
 
       if (isFeedback) {
-        evaluateWithNoise(componentIndices, 0, count, state, executeFns, typeIds, layout);
+        evaluateWithNoise(componentIndices, 0, count, state, highZs, executeFns, typeIds, layout);
       } else {
-        evaluateSynchronized(componentIndices, 0, count, state, snapshotBuffer, executeFns, typeIds, layout);
+        evaluateSynchronized(componentIndices, 0, count, state, highZs, snapshotBuffer, executeFns, typeIds, layout);
       }
 
       if (outputsChanged(componentIndices, count, state, layout, outputsBefore)) {
@@ -154,6 +157,7 @@ function runNoisePropagation(
 
 function runDeterministicSettle(
   state: Uint32Array,
+  highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
   typeIds: Uint8Array,
   executeFns: ExecuteFunction[],
@@ -170,7 +174,7 @@ function runDeterministicSettle(
       if (count === 0) continue;
 
       const outputsBefore = captureOutputs(componentIndices, count, state, layout);
-      evaluateSynchronized(componentIndices, 0, count, state, snapshotBuffer, executeFns, typeIds, layout);
+      evaluateSynchronized(componentIndices, 0, count, state, highZs, snapshotBuffer, executeFns, typeIds, layout);
 
       if (outputsChanged(componentIndices, count, state, layout, outputsBefore)) {
         anyChanged = true;
@@ -202,7 +206,7 @@ function releaseResetComponents(engine: InitializableEngine): void {
   const { state, typeIds, executeFns, layout, resetComponentIndices } = engine;
   for (let i = 0; i < resetComponentIndices.length; i++) {
     const compIdx = resetComponentIndices[i];
-    executeFns[typeIds[compIdx]](compIdx, state, layout);
+    executeFns[typeIds[compIdx]](compIdx, state, engine.highZs, layout);
   }
 }
 

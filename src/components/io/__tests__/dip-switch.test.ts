@@ -96,16 +96,18 @@ describe("DipSwitch", () => {
     it("executeDipSwitch is a no-op: does not modify state", () => {
       const layout = makeLayout(0, 1);
       const state = makeState([], 1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0b101;
-      executeDipSwitch(0, state, layout);
+      executeDipSwitch(0, state, highZs, layout);
       expect(state[0]).toBe(0b101);
     });
 
     it("executeDipSwitch can be called 1000 times without error", () => {
       const layout = makeLayout(0, 1);
       const state = makeState([], 1);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
-        executeDipSwitch(0, state, layout);
+        executeDipSwitch(0, state, highZs, layout);
       }
       expect(state[0]).toBe(0);
     });

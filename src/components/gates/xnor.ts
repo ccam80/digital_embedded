@@ -285,7 +285,7 @@ export class XNOrElement extends AbstractCircuitElement {
 // executeXNOr — flat simulation function
 // ---------------------------------------------------------------------------
 
-export function executeXNOr(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeXNOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);

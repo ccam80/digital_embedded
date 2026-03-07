@@ -152,6 +152,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 export function executeDriverInvSel(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inBase = layout.inputOffset(index);

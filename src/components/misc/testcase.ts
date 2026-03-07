@@ -213,6 +213,7 @@ export class TestcaseElement extends AbstractCircuitElement {
 export function executeTestcase(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // Testcase has no simulation behavior — it is a data carrier only.

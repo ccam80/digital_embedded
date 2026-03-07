@@ -137,7 +137,7 @@ export class InElement extends AbstractCircuitElement {
 // executeIn — pass-through (value is set externally by engine interaction)
 // ---------------------------------------------------------------------------
 
-export function executeIn(_index: number, _state: Uint32Array, _layout: ComponentLayout): void {
+export function executeIn(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
   // The output value is set externally via engine.setSignalValue().
   // No computation needed here.
 }

@@ -173,11 +173,11 @@ export function makeExecuteDiv(
   bitWidth: number,
   signed: boolean,
   remainderPositive: boolean,
-): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const signBit = 1 << (bitWidth - 1);
 
-  return function executeDiv(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeDiv(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -224,11 +224,11 @@ export function makeExecuteDiv(
   };
 }
 
-export function executeDiv(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDiv(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
   const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
   const remainderPositive = (layout.getProperty?.(index, "remainderPositive") as boolean | undefined) ?? false;
-  makeExecuteDiv(bitWidth, signed, remainderPositive)(index, state, layout);
+  makeExecuteDiv(bitWidth, signed, remainderPositive)(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

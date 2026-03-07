@@ -303,33 +303,36 @@ describe("executeMidi", () => {
       // In test environment, Web MIDI is not available.
       // The function must not throw.
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = 60; // N=60
       state[1] = 100; // V=100
       state[2] = 1;   // OnOff=1
       state[3] = 1;   // en=1
       state[4] = 0;   // C=0 (no edge yet)
-      expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, STANDARD_LAYOUT)).not.toThrow();
     });
 
     it("executeMidi on rising edge does not throw when Web MIDI unavailable", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[0] = 60; // N
       state[1] = 100; // V
       state[2] = 1;   // OnOff=1
       state[3] = 1;   // en=1
       state[4] = 0;   // C=0
       state[5] = 0;   // prevClock=0
-      executeMidi(0, state, STANDARD_LAYOUT); // prevClock updated to 0
+      executeMidi(0, state, highZs, STANDARD_LAYOUT); // prevClock updated to 0
 
       state[4] = 1; // C goes high
-      expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, STANDARD_LAYOUT)).not.toThrow();
     });
 
     it("executeMidi can be called 1000 times without error", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 1000; i++) {
         state[4] = i % 2; // alternate clock
-        executeMidi(0, state, STANDARD_LAYOUT);
+        executeMidi(0, state, highZs, STANDARD_LAYOUT);
       }
       expect(true).toBe(true);
     });
@@ -343,6 +346,7 @@ describe("executeMidi", () => {
     it("does not trigger on falling clock edge", () => {
       // Start with prevClock=1, clock goes to 0 — falling edge, should not trigger
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[5] = 1; // prevClock=1 (was high)
       state[4] = 0; // C now low (falling edge)
       state[3] = 1; // en=1
@@ -350,53 +354,57 @@ describe("executeMidi", () => {
       // const sent: number[][] = []; // unused
       // If the manager were to send, we can't capture without mocking.
       // Since no MIDI is available in test env, just verify no throw.
-      expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, STANDARD_LAYOUT)).not.toThrow();
       // prevClock should now be updated to 0
       expect(state[5]).toBe(0);
     });
 
     it("updates prevClock state slot on every call", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0; // C=0
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(0); // prevClock=0
 
       state[4] = 1; // C=1
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(1); // prevClock=1
     });
 
     it("does not trigger when en=0 even on rising clock edge", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0; // C=0
       state[3] = 0; // en=0
       state[5] = 0; // prevClock=0
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
 
       state[4] = 1; // rising edge
       // en=0 → should not send MIDI (no throw expected)
-      expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, STANDARD_LAYOUT)).not.toThrow();
     });
 
     it("does not trigger when clock stays low", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[4] = 0; // C stays low
       state[3] = 1; // en=1
       state[5] = 0; // prevClock=0
 
       expect(() => {
-        executeMidi(0, state, STANDARD_LAYOUT);
-        executeMidi(0, state, STANDARD_LAYOUT);
+        executeMidi(0, state, highZs, STANDARD_LAYOUT);
+        executeMidi(0, state, highZs, STANDARD_LAYOUT);
       }).not.toThrow();
     });
 
     it("does not trigger when clock stays high (no repeated triggers)", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[3] = 1; // en=1
       state[4] = 1; // C=1
       state[5] = 1; // prevClock=1 (already high, no rising edge)
 
-      expect(() => executeMidi(0, state, STANDARD_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, STANDARD_LAYOUT)).not.toThrow();
     });
   });
 
@@ -414,6 +422,7 @@ describe("executeMidi", () => {
       // Since we can't mock the singleton easily, verify via observable state changes.
       // The prevClock slot is updated, which confirms the function executed.
       const state = makeState(12);
+      const highZs = new Uint32Array(state.length);
       state[0] = 69;  // N=69 (A4)
       state[1] = 127; // V=127 (max)
       state[2] = 1;   // OnOff=1 (note on)
@@ -421,33 +430,34 @@ describe("executeMidi", () => {
       state[4] = 0;   // C=0
       state[5] = 0;   // prevClock=0
 
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(0); // prevClock updated (was 0, C=0)
 
       state[4] = 1; // rising edge
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(1); // prevClock updated to 1 (rising edge processed)
     });
 
     it("state is correctly updated after multiple rising edges", () => {
       const state = makeState(10);
+      const highZs = new Uint32Array(state.length);
       state[3] = 1; // en=1
 
       // First rising edge
       state[4] = 0;
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       state[4] = 1;
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(1);
 
       // Falling edge
       state[4] = 0;
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(0);
 
       // Second rising edge
       state[4] = 1;
-      executeMidi(0, state, STANDARD_LAYOUT);
+      executeMidi(0, state, highZs, STANDARD_LAYOUT);
       expect(state[5]).toBe(1);
     });
   });
@@ -459,6 +469,7 @@ describe("executeMidi", () => {
   describe("progChangeEnableLayout", () => {
     it("progChange layout (6 inputs) does not throw on rising edge", () => {
       const state = makeState(14);
+      const highZs = new Uint32Array(state.length);
       state[0] = 40;  // N=40 (program number)
       state[1] = 0;   // V (unused for prog change)
       state[2] = 0;   // OnOff
@@ -467,21 +478,22 @@ describe("executeMidi", () => {
       state[5] = 0;   // C=0
       state[6] = 0;   // prevClock
 
-      executeMidi(0, state, PROGCHANGE_LAYOUT);
+      executeMidi(0, state, highZs, PROGCHANGE_LAYOUT);
       state[5] = 1; // rising edge
-      expect(() => executeMidi(0, state, PROGCHANGE_LAYOUT)).not.toThrow();
+      expect(() => executeMidi(0, state, highZs, PROGCHANGE_LAYOUT)).not.toThrow();
     });
 
     it("progChange layout updates prevClock correctly", () => {
       const state = makeState(14);
+      const highZs = new Uint32Array(state.length);
       state[5] = 0; // C=0
       state[4] = 1; // en=1
 
-      executeMidi(0, state, PROGCHANGE_LAYOUT);
+      executeMidi(0, state, highZs, PROGCHANGE_LAYOUT);
       expect(state[6]).toBe(0); // prevClock=0
 
       state[5] = 1;
-      executeMidi(0, state, PROGCHANGE_LAYOUT);
+      executeMidi(0, state, highZs, PROGCHANGE_LAYOUT);
       expect(state[6]).toBe(1); // prevClock=1
     });
   });

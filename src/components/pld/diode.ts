@@ -429,7 +429,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
 // Input slots: 0=cathodeIn, 1=anodeIn, each encoded as value | (highZ << 16).
 // ---------------------------------------------------------------------------
 
-export function executeDiode(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 
@@ -479,7 +479,7 @@ export function executeDiode(index: number, state: Uint32Array, layout: Componen
 // Output encoding: slot 0 = value, slot 1 = highZ (1=highZ).
 // ---------------------------------------------------------------------------
 
-export function executeDiodeForward(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDiodeForward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 
@@ -507,7 +507,7 @@ export function executeDiodeForward(index: number, state: Uint32Array, layout: C
 // in=1 → out=1 (contributes to pull-up); in=0 → out=0 (pulls down).
 // ---------------------------------------------------------------------------
 
-export function executeDiodeBackward(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDiodeBackward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 

@@ -100,28 +100,32 @@ describe("Multiplexer", () => {
       // state: [sel=0, in_0=0xAA, in_1=0xBB, out]
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0xAA, 0xBB]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(0xAA);
     });
 
     it("sel=1 selects in_1", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 0xAA, 0xBB]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(0xBB);
     });
 
     it("sel=0 with 1-bit inputs: selects 0", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 1]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("sel=1 with 1-bit inputs: selects 1", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 0, 1]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
   });
@@ -132,21 +136,24 @@ describe("Multiplexer", () => {
       // state: [sel=2, in_0=0x11, in_1=0x22, in_2=0x33, in_3=0x44, out]
       const layout = makeLayout(5, 1);
       const state = makeState([2, 0x11, 0x22, 0x33, 0x44]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[5]).toBe(0x33);
     });
 
     it("4-input mux: sel=3 selects in_3", () => {
       const layout = makeLayout(5, 1);
       const state = makeState([3, 0x11, 0x22, 0x33, 0x44]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[5]).toBe(0x44);
     });
 
     it("4-input mux: sel=0 selects in_0", () => {
       const layout = makeLayout(5, 1);
       const state = makeState([0, 0x11, 0x22, 0x33, 0x44]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[5]).toBe(0x11);
     });
   });
@@ -155,14 +162,16 @@ describe("Multiplexer", () => {
     it("multi-bit: sel=1, 32-bit values", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 0xDEADBEEF, 0xCAFEBABE]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(0xCAFEBABE >>> 0);
     });
 
     it("multi-bit: sel=0, 32-bit all-ones passes through", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0xFFFFFFFF, 0x00000000]);
-      executeMux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMux(0, state, highZs, layout);
       expect(state[3]).toBe(0xFFFFFFFF);
     });
   });

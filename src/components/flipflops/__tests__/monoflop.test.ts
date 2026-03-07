@@ -106,8 +106,9 @@ describe("Monoflop", () => {
       const layout = makeLayout(2, 2, 3);
       // slots: [C=0, R=1, Q=2, ~Q=3, storedQ=4, prevClock=5, counter=6]
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
@@ -115,8 +116,9 @@ describe("Monoflop", () => {
     it("after trigger, counter is set to timerDelay", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(3);
     });
 
@@ -124,24 +126,25 @@ describe("Monoflop", () => {
       const timerDelay = 3;
       const layout = makeLayout(2, 2, timerDelay);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
 
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(3);
 
       state[0] = 0;
       state[5] = 0;
 
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(2);
 
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(1);
 
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[6]).toBe(0);
     });
@@ -149,14 +152,15 @@ describe("Monoflop", () => {
     it("timerDelay=1 produces single-tick pulse", () => {
       const layout = makeLayout(2, 2, 1);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(1);
 
       state[0] = 0;
       state[5] = 0;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -166,19 +170,20 @@ describe("Monoflop", () => {
       const timerDelay = 4;
       const layout = makeLayout(2, 2, timerDelay);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
 
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(4);
 
       state[0] = 0;
       state[5] = 0;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(3);
 
       state[0] = 1;
       state[5] = 0;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(4);
       expect(state[2]).toBe(1);
     });
@@ -188,8 +193,9 @@ describe("Monoflop", () => {
     it("R=1 immediately forces Q=0 and cancels pulse", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 0, 4: 1, 5: 0, 6: 2 });
+      const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[6]).toBe(0);
     });
@@ -197,8 +203,9 @@ describe("Monoflop", () => {
     it("R=1 prevents trigger on rising edge", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 1, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -207,15 +214,17 @@ describe("Monoflop", () => {
     it("no trigger when clock stays high (no new rising edge)", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 1, 1: 0, 4: 0, 5: 1, 6: 0 });
-      executeMonoflop(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("no trigger on falling edge", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 1, 1: 0, 4: 0, 5: 1, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -224,8 +233,9 @@ describe("Monoflop", () => {
     it("Q=1 → ~Q=0", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, layout);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
@@ -233,7 +243,8 @@ describe("Monoflop", () => {
     it("Q=0 → ~Q=1", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
-      executeMonoflop(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(1);
     });

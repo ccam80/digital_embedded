@@ -159,6 +159,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 export function executeButtonLED(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   // The LED input (index 0) is read for display; no output computed here.

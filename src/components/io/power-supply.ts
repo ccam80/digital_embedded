@@ -160,6 +160,7 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 export function executePowerSupply(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputStart = layout.inputOffset(index);

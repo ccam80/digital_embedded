@@ -53,9 +53,9 @@ function makeLayout(): {
   return { layout, state };
 }
 
-function tick(state: Uint32Array, layout: ComponentLayout & ProgramMemoryLayout, clkHigh: boolean): void {
+function tick(state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout & ProgramMemoryLayout, clkHigh: boolean): void {
   state[2] = clkHigh ? 1 : 0;
-  executeProgramMemory(0, state, layout);
+  executeProgramMemory(0, state, highZs, layout);
 }
 
 describe("ProgramMemory", () => {
@@ -69,22 +69,23 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 0; // ld = 0
 
     // First call: addrReg=0, read memory[0] = 0
-    tick(state, layout, false);
+    tick(state, highZs, layout, false);
     expect(state[3]).toBe(0); // D = memory[0]
 
     // Rising edge: addrReg increments to 1
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(10); // D = memory[1]
 
-    tick(state, layout, false);
-    tick(state, layout, true);
+    tick(state, highZs, layout, false);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(20); // D = memory[2]
 
-    tick(state, layout, false);
-    tick(state, layout, true);
+    tick(state, highZs, layout, false);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(30); // D = memory[3]
   });
 
@@ -94,10 +95,11 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[0] = 8;  // A = 8
     state[1] = 1;  // ld = 1
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(0xAB); // memory[8]
     expect(state[4]).toBe(8);    // addrReg = 8
   });
@@ -108,18 +110,19 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
 
     // Jump to address 5
     state[0] = 5; state[1] = 1;
-    tick(state, layout, false);
-    tick(state, layout, true);
+    tick(state, highZs, layout, false);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(5); // addrReg = 5
     expect(state[3]).toBe(105); // memory[5]
 
     // Switch to auto-increment
     state[1] = 0;
-    tick(state, layout, false);
-    tick(state, layout, true);
+    tick(state, highZs, layout, false);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(6); // addrReg = 6
     expect(state[3]).toBe(106); // memory[6]
   });
@@ -131,18 +134,19 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 0;
 
     // Rising edge → increment to 1
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1);
 
     // Falling edge → no change
-    tick(state, layout, false);
+    tick(state, highZs, layout, false);
     expect(state[4]).toBe(1);
 
     // Another falling edge → still no change
-    tick(state, layout, false);
+    tick(state, highZs, layout, false);
     expect(state[4]).toBe(1);
   });
 
@@ -151,21 +155,23 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 0;
 
     // Rising edge → addr=1
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1);
 
     // Clock stays high → no additional increment
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[4]).toBe(1);
   });
 
   it("noBackingStore — output is 0, no crash", () => {
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 0;
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(0);
   });
 
@@ -176,14 +182,15 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[1] = 0;
 
     // Before first clock: addrReg=0
-    tick(state, layout, false);
+    tick(state, highZs, layout, false);
     expect(state[3]).toBe(0xAA); // memory[0]
 
     // Rising edge: addrReg → 1
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     expect(state[3]).toBe(0xBB); // memory[1]
   });
 
@@ -193,10 +200,11 @@ describe("ProgramMemory", () => {
     registerBackingStore(0, mem);
 
     const { layout, state } = makeLayout();
+    const highZs = new Uint32Array(state.length);
     state[4] = 0xFFFFFFFF; // addrReg at max
     state[1] = 0;
 
-    tick(state, layout, true);
+    tick(state, highZs, layout, true);
     // address wraps to 0
     expect(state[4]).toBe(0);
     expect(state[3]).toBe(0x99); // memory[0]

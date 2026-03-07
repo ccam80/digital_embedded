@@ -117,35 +117,40 @@ describe("XNOrGate", () => {
     it("XNOR of 0 and 0 produces 0xFFFFFFFF (all bits set)", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("XNOR of 1 and 1 produces 0xFFFFFFFF (equal, so XOR=0, NOT=all-ones)", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 1]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("XNOR of 1 and 0 produces 0xFFFFFFFE (XOR=1, NOT=all-but-lsb)", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFE);
     });
 
     it("XNOR of 0xFFFFFFFF and 0xFFFFFFFF produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0xFFFFFFFF]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("XNOR of 0xAAAAAAAA and 0x55555555 produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0xAAAAAAAA, 0x55555555]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -154,7 +159,8 @@ describe("XNOrGate", () => {
     it("XNOR of 0xFF, 0x0F, 0x03 produces NOT(0xFF ^ 0x0F ^ 0x03)", () => {
       const layout = makeLayout(3);
       const state = makeState([0xFF, 0x0F, 0x03]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[3]).toBe((~(0xFF ^ 0x0F ^ 0x03)) >>> 0);
     });
   });
@@ -163,14 +169,16 @@ describe("XNOrGate", () => {
     it("XNOR of identical 32-bit values produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0x12345678, 0x12345678]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("XNOR of 0x0F0F0F0F and 0xF0F0F0F0 produces 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0x0F0F0F0F, 0xF0F0F0F0]);
-      executeXNOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeXNOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });

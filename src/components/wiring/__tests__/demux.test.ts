@@ -99,7 +99,8 @@ describe("Demultiplexer", () => {
       // inputs: [sel=0, in=0xAA]; outputs: [out_0, out_1]
       const layout = makeLayout(2, 2);
       const state = makeState([0, 0xAA], 2);
-      executeDemux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0xAA); // out_0
       expect(state[3]).toBe(0);    // out_1
     });
@@ -107,7 +108,8 @@ describe("Demultiplexer", () => {
     it("sel=1, in=0xBB routes to out_1; out_0=0", () => {
       const layout = makeLayout(2, 2);
       const state = makeState([1, 0xBB], 2);
-      executeDemux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0);    // out_0
       expect(state[3]).toBe(0xBB); // out_1
     });
@@ -118,7 +120,8 @@ describe("Demultiplexer", () => {
       // inputs: [sel=2, in=0x55]; outputs: [out_0..out_3]
       const layout = makeLayout(2, 4);
       const state = makeState([2, 0x55], 4);
-      executeDemux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0);    // out_0
       expect(state[3]).toBe(0);    // out_1
       expect(state[4]).toBe(0x55); // out_2
@@ -128,7 +131,8 @@ describe("Demultiplexer", () => {
     it("4-output demux: sel=3 routes to out_3, all others 0", () => {
       const layout = makeLayout(2, 4);
       const state = makeState([3, 0xFF], 4);
-      executeDemux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(0);
@@ -140,7 +144,8 @@ describe("Demultiplexer", () => {
     it("32-bit value routed to selected output", () => {
       const layout = makeLayout(2, 2);
       const state = makeState([1, 0xDEADBEEF], 2);
-      executeDemux(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(0xDEADBEEF >>> 0);
     });
@@ -148,10 +153,11 @@ describe("Demultiplexer", () => {
     it("unselected outputs are always 0 regardless of previous state", () => {
       const layout = makeLayout(2, 2);
       const state = makeState([0, 0xAA], 2);
+      const highZs = new Uint32Array(state.length);
       // Pre-populate outputs with garbage
       state[2] = 0xFF;
       state[3] = 0xFF;
-      executeDemux(0, state, layout);
+      executeDemux(0, state, highZs, layout);
       expect(state[2]).toBe(0xAA);
       expect(state[3]).toBe(0); // cleared
     });

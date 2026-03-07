@@ -129,7 +129,8 @@ describe("AndGate", () => {
     it("AND of 0xFFFFFFFF and 0x0F0F0F0F produces 0x0F0F0F0F", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0x0F0F0F0F]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0x0F0F0F0F);
     });
   });
@@ -138,7 +139,8 @@ describe("AndGate", () => {
     it("AND of 0xFF, 0x0F, 0x03 produces 0x03", () => {
       const layout = makeLayout(3);
       const state = makeState([0xFF, 0x0F, 0x03]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[3]).toBe(0x03);
     });
   });
@@ -147,7 +149,8 @@ describe("AndGate", () => {
     it("AND of all-zero inputs produces 0", () => {
       const layout = makeLayout(3);
       const state = makeState([0, 0, 0]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -156,7 +159,8 @@ describe("AndGate", () => {
     it("AND of all-0xFFFFFFFF inputs produces 0xFFFFFFFF", () => {
       const layout = makeLayout(4);
       const state = makeState([0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[4]).toBe(0xFFFFFFFF);
     });
   });
@@ -165,28 +169,32 @@ describe("AndGate", () => {
     it("1 AND 1 = 1", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 1]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("1 AND 0 = 0", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("0 AND 1 = 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 1]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("0 AND 0 = 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -195,7 +203,8 @@ describe("AndGate", () => {
     it("8-bit AND: 0xFF AND 0x0F = 0x0F", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFF, 0x0F]);
-      executeAnd(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeAnd(0, state, highZs, layout);
       expect(state[2]).toBe(0x0F);
     });
   });
@@ -204,11 +213,12 @@ describe("AndGate", () => {
     it("executeAnd can be called 1000 times without error (zero-allocation path)", () => {
       const layout = makeLayout(2);
       const state = makeState([0xAAAAAAAA, 0x55555555]);
+      const highZs = new Uint32Array(state.length);
 
       for (let i = 0; i < 1000; i++) {
         state[0] = (i % 2 === 0) ? 0xFFFFFFFF : 0xAAAAAAAA;
         state[1] = (i % 3 === 0) ? 0x55555555 : 0x0F0F0F0F;
-        executeAnd(0, state, layout);
+        executeAnd(0, state, highZs, layout);
       }
 
       expect(typeof state[2]).toBe("number");

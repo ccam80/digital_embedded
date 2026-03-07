@@ -147,7 +147,7 @@ export class PullUpElement extends AbstractCircuitElement {
 // only when the net is otherwise floating.
 // ---------------------------------------------------------------------------
 
-export function executePullUp(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executePullUp(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const outputIdx = layout.outputOffset(index);
   state[outputIdx] = 0xFFFFFFFF;
 }

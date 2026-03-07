@@ -152,7 +152,7 @@ export class ClockElement extends AbstractCircuitElement {
 // executeClock — no-op (clock value managed by ClockManager)
 // ---------------------------------------------------------------------------
 
-export function executeClock(_index: number, _state: Uint32Array, _layout: ComponentLayout): void {
+export function executeClock(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
   // Clock output is set externally by the engine's ClockManager.
 }
 

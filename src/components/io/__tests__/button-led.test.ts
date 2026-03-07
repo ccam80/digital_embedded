@@ -96,21 +96,24 @@ describe("ButtonLED", () => {
     it("executeButtonLED copies LED input (slot 0) to output slot", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeButtonLED(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeButtonLED(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
 
     it("executeButtonLED with LED input=0 writes 0 to output", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
-      executeButtonLED(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeButtonLED(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeButtonLED with LED input=1 writes 1 to output", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
-      executeButtonLED(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeButtonLED(0, state, highZs, layout);
       expect(state[1]).toBe(1);
     });
   });

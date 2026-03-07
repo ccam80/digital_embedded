@@ -142,6 +142,7 @@ export class LightBulbElement extends AbstractCircuitElement {
 export function executeLightBulb(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inputVal = state[layout.inputOffset(index)];

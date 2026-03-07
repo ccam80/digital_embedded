@@ -221,6 +221,7 @@ export class SplitterElement extends AbstractCircuitElement {
 export function executeSplitter(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const inBase = layout.inputOffset(index);
@@ -253,6 +254,7 @@ export function executeSplitter(
 export function executeSplitterWithWidths(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
   partWidths: number[],
 ): void {
@@ -275,6 +277,7 @@ export function executeSplitterWithWidths(
 export function executeSplitterMergeWithWidths(
   index: number,
   state: Uint32Array,
+  _highZs: Uint32Array,
   layout: ComponentLayout,
   partWidths: number[],
 ): void {

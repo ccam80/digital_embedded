@@ -118,42 +118,48 @@ describe("OrGate", () => {
     it("OR of 0x00 and 0x0F produces 0x0F", () => {
       const layout = makeLayout(2);
       const state = makeState([0x00, 0x0F]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0x0F);
     });
 
     it("OR of 0xFF and 0x00 produces 0xFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFF, 0x00]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
     });
 
     it("OR of 0x00 and 0x00 produces 0x00", () => {
       const layout = makeLayout(2);
       const state = makeState([0x00, 0x00]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0x00);
     });
 
     it("OR of 0xFFFFFFFF and 0x00000000 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xFFFFFFFF, 0x00000000]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("single-bit: 1 OR 0 = 1", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
     it("single-bit: 0 OR 0 = 0", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -162,14 +168,16 @@ describe("OrGate", () => {
     it("OR of 0x01, 0x02, 0x04 produces 0x07", () => {
       const layout = makeLayout(3);
       const state = makeState([0x01, 0x02, 0x04]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[3]).toBe(0x07);
     });
 
     it("OR of four values produces accumulated OR", () => {
       const layout = makeLayout(4);
       const state = makeState([0x10, 0x20, 0x40, 0x80]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[4]).toBe(0xF0);
     });
   });
@@ -178,14 +186,16 @@ describe("OrGate", () => {
     it("OR of 0xF0F0F0F0 and 0x0F0F0F0F produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xF0F0F0F0, 0x0F0F0F0F]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
 
     it("OR of 0xAAAAAAAA and 0x55555555 produces 0xFFFFFFFF", () => {
       const layout = makeLayout(2);
       const state = makeState([0xAAAAAAAA, 0x55555555]);
-      executeOr(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOr(0, state, highZs, layout);
       expect(state[2]).toBe(0xFFFFFFFF);
     });
   });

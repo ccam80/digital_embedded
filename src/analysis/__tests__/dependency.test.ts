@@ -60,10 +60,10 @@ function makePropBag(entries: Record<string, string | number | boolean> = {}): P
 // Execute functions
 // ---------------------------------------------------------------------------
 
-function executePassThrough(_i: number, _s: Uint32Array, _l: ComponentLayout): void {}
-function executeNoop(_i: number, _s: Uint32Array, _l: ComponentLayout): void {}
+function executePassThrough(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
+function executeNoop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
 
-function executeAnd2(index: number, state: Uint32Array, layout: ComponentLayout): void {
+function executeAnd2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const a = state[layout.inputOffset(index)] ?? 0;
   const b = state[layout.inputOffset(index) + 1] ?? 0;
   state[layout.outputOffset(index)] = (a & b) >>> 0;

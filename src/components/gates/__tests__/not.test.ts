@@ -110,21 +110,24 @@ describe("NotGate", () => {
     it("NOT 0 produces 0xFFFFFFFF", () => {
       const layout = makeLayout();
       const state = makeState(0);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFF);
     });
 
     it("NOT 0xFFFFFFFF produces 0", () => {
       const layout = makeLayout();
       const state = makeState(0xFFFFFFFF);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("NOT 1 produces 0xFFFFFFFE", () => {
       const layout = makeLayout();
       const state = makeState(1);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFE);
     });
   });
@@ -133,14 +136,16 @@ describe("NotGate", () => {
     it("NOT 0x0F0F0F0F produces 0xF0F0F0F0", () => {
       const layout = makeLayout();
       const state = makeState(0x0F0F0F0F);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(0xF0F0F0F0);
     });
 
     it("NOT 0xAAAAAAAA produces 0x55555555", () => {
       const layout = makeLayout();
       const state = makeState(0xAAAAAAAA);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(0x55555555);
     });
 
@@ -148,10 +153,11 @@ describe("NotGate", () => {
       const layout = makeLayout();
       const original = 0x12345678;
       const state = makeState(original);
-      executeNot(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeNot(0, state, highZs, layout);
       // state[1] is now NOT(original), put it back as input
       state[0] = state[1];
-      executeNot(0, state, layout);
+      executeNot(0, state, highZs, layout);
       expect(state[1]).toBe(original);
     });
   });

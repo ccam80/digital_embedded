@@ -161,6 +161,7 @@ export class TunnelElement extends AbstractCircuitElement {
 export function executeTunnel(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // Net merging is handled at compile time. No runtime behavior needed.

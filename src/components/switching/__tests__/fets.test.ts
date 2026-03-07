@@ -56,8 +56,10 @@ import type { ComponentLayout } from "../../../core/registry.js";
 function makeFETLayout(inputCount: number, stateCount: number): {
   layout: ComponentLayout & FETLayout;
   state: Uint32Array;
+  highZs: Uint32Array;
 } {
   const state = new Uint32Array(inputCount + stateCount);
+  const highZs = new Uint32Array(state.length);
   const layout: ComponentLayout & FETLayout = {
     inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
@@ -65,7 +67,7 @@ function makeFETLayout(inputCount: number, stateCount: number): {
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
   };
-  return { layout, state };
+  return { layout, state, highZs };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,32 +76,32 @@ function makeFETLayout(inputCount: number, stateCount: number): {
 
 describe("NFET", () => {
   it("gateHigh — G=1 → closed (state=1)", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 1; // G
-    executeNFET(0, state, layout);
+    executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
   });
 
   it("gateLow — G=0 → open (state=0)", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 0; // G
-    executeNFET(0, state, layout);
+    executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0);
   });
 
   it("gateTransitions — toggles correctly", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
 
     state[0] = 1;
-    executeNFET(0, state, layout);
+    executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
 
     state[0] = 0;
-    executeNFET(0, state, layout);
+    executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0);
 
     state[0] = 1;
-    executeNFET(0, state, layout);
+    executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
   });
 
@@ -198,28 +200,28 @@ describe("NFET", () => {
 
 describe("PFET", () => {
   it("gateLow — G=0 → closed (state=1)", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 0; // G
-    executePFET(0, state, layout);
+    executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
   });
 
   it("gateHigh — G=1 → open (state=0)", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 1; // G
-    executePFET(0, state, layout);
+    executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(0);
   });
 
   it("gateTransitions — toggles correctly (inverted vs NFET)", () => {
-    const { layout, state } = makeFETLayout(1, 1);
+    const { layout, state, highZs } = makeFETLayout(1, 1);
 
     state[0] = 0;
-    executePFET(0, state, layout);
+    executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(1); // conducting
 
     state[0] = 1;
-    executePFET(0, state, layout);
+    executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // non-conducting
   });
 
@@ -291,6 +293,7 @@ describe("FGNFET", () => {
   it("gateHigh_notBlown — G=1, blown=0 → closed (state=1)", () => {
     // State layout: [G=0, closedFlag=1, blownFlag=2]
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -300,7 +303,7 @@ describe("FGNFET", () => {
     };
     state[0] = 1;  // G high
     state[2] = 0;  // blownFlag=0
-    executeFGNFET(0, state, layout);
+    executeFGNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1); // closedFlag=1 (conducting)
   });
 
@@ -308,6 +311,7 @@ describe("FGNFET", () => {
     // State layout: inputs=[G], state=[closedFlag, blownFlag]
     // Total slots: 1 input + 2 state = 3
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -318,12 +322,13 @@ describe("FGNFET", () => {
     state[0] = 0;  // G
     state[1] = 0;  // closedFlag (will be written)
     state[2] = 0;  // blownFlag
-    executeFGNFET(0, state, layout);
+    executeFGNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // closed=0 (gate low)
   });
 
   it("gateHigh_notBlown — G=1, blown=0 → closed=1", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -333,12 +338,13 @@ describe("FGNFET", () => {
     };
     state[0] = 1;  // G
     state[2] = 0;  // blownFlag=0
-    executeFGNFET(0, state, layout);
+    executeFGNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1); // closed=1
   });
 
   it("blown_gateHigh — G=1, blown=1 → permanently open (state=0)", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -348,12 +354,13 @@ describe("FGNFET", () => {
     };
     state[0] = 1;  // G high
     state[2] = 1;  // blownFlag=1
-    executeFGNFET(0, state, layout);
+    executeFGNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // blown → always open
   });
 
   it("blown_gateLow — G=0, blown=1 → still open", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -363,7 +370,7 @@ describe("FGNFET", () => {
     };
     state[0] = 0;  // G low
     state[2] = 1;  // blownFlag=1
-    executeFGNFET(0, state, layout);
+    executeFGNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // blown → always open
   });
 
@@ -444,6 +451,7 @@ describe("FGNFET", () => {
 describe("FGPFET", () => {
   it("gateLow_notBlown — G=0, blown=0 → closed=1 (P-channel)", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -453,12 +461,13 @@ describe("FGPFET", () => {
     };
     state[0] = 0;  // G low
     state[2] = 0;  // blownFlag=0
-    executeFGPFET(0, state, layout);
+    executeFGPFET(0, state, highZs, layout);
     expect(state[1]).toBe(1); // closed (PFET: gate low → conducting)
   });
 
   it("gateHigh_notBlown — G=1, blown=0 → open=0", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -468,12 +477,13 @@ describe("FGPFET", () => {
     };
     state[0] = 1;  // G high
     state[2] = 0;  // blownFlag=0
-    executeFGPFET(0, state, layout);
+    executeFGPFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // open (PFET: gate high → non-conducting)
   });
 
   it("blown_gateLow — G=0, blown=1 → permanently open", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -483,12 +493,13 @@ describe("FGPFET", () => {
     };
     state[0] = 0;  // G low (would normally close)
     state[2] = 1;  // blownFlag=1
-    executeFGPFET(0, state, layout);
+    executeFGPFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // blown → always open
   });
 
   it("blown_gateHigh — G=1, blown=1 → still open", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 1,
       inputOffset: () => 0,
@@ -498,7 +509,7 @@ describe("FGPFET", () => {
     };
     state[0] = 1;  // G high
     state[2] = 1;  // blownFlag=1
-    executeFGPFET(0, state, layout);
+    executeFGPFET(0, state, highZs, layout);
     expect(state[1]).toBe(0); // blown → always open
   });
 
@@ -557,6 +568,7 @@ describe("FGPFET", () => {
 describe("TransGate", () => {
   it("S=1 ~S=0 — valid complementary pair, gate on → closed (state=1)", () => {
     const state = new Uint32Array(3); // [S=0, ~S=1, closedFlag=2]
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 2,
       inputOffset: () => 0,
@@ -566,12 +578,13 @@ describe("TransGate", () => {
     };
     state[0] = 1;  // S
     state[1] = 0;  // ~S
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(1); // closed
   });
 
   it("S=0 ~S=1 — valid complementary pair, gate off → open (state=0)", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 2,
       inputOffset: () => 0,
@@ -581,12 +594,13 @@ describe("TransGate", () => {
     };
     state[0] = 0;  // S
     state[1] = 1;  // ~S
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(0); // open
   });
 
   it("S=0 ~S=0 — invalid (same) → open (state=0)", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 2,
       inputOffset: () => 0,
@@ -596,12 +610,13 @@ describe("TransGate", () => {
     };
     state[0] = 0;  // S
     state[1] = 0;  // ~S
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(0); // invalid → open
   });
 
   it("S=1 ~S=1 — invalid (same) → open (state=0)", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 2,
       inputOffset: () => 0,
@@ -611,12 +626,13 @@ describe("TransGate", () => {
     };
     state[0] = 1;  // S
     state[1] = 1;  // ~S
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(0); // invalid → open
   });
 
   it("gateTransitions — toggling S and ~S changes state", () => {
     const state = new Uint32Array(3);
+    const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
       inputCount: () => 2,
       inputOffset: () => 0,
@@ -626,11 +642,11 @@ describe("TransGate", () => {
     };
 
     state[0] = 1; state[1] = 0;
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(1); // closed
 
     state[0] = 0; state[1] = 1;
-    executeTransGate(0, state, layout);
+    executeTransGate(0, state, highZs, layout);
     expect(state[2]).toBe(0); // open
   });
 

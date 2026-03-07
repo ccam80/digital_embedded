@@ -182,7 +182,7 @@ export class DAsyncElement extends AbstractCircuitElement {
 // State layout:  [storedQ=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
-export function executeDAsync(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeDAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);

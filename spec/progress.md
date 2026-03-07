@@ -1,7 +1,7 @@
 # Engine Remaining Work — Progress
 
 ## Pre-requisite: ExecuteFunction Signature Update
-- [ ] Update ExecuteFunction signature to include highZs
+- [x] Update ExecuteFunction signature to include highZs
 
 ## Wave 1: Structural Correctness
 - [ ] Task 1.0: Deduplicate EvaluationGroup Interface
@@ -34,3 +34,10 @@
 - [ ] Task 5.1: Worker Init Protocol
 - [ ] Task 5.2: Worker Signal Synchronization
 - [ ] Task 5.3: createEngine Factory Fix
+
+## Task prereq-executefn-signature: ExecuteFunction Signature Update
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/core/registry.ts, src/engine/digital-engine.ts, src/engine/init-sequence.ts, src/engine/noise-mode.ts, src/components/arithmetic/prng.ts, and all executeFn files across src/components/ (gates, flipflops, memory, io, wiring, switching, pld, graphics, terminal, misc, subcircuit, basic, arithmetic), plus all corresponding test files
+- **Tests**: 4500/4511 passing (10 failing: 8 pre-existing baseline failures + 2 unrelated pre-existing failures in pin.test.ts and wire-renderer.test.ts not caused by this change)
+- **Changes summary**: Added `highZs: Uint32Array` as third parameter to ExecuteFunction type. Updated all engine call sites to pass `this._highZs`. Updated InitializableEngine interface to include highZs. Updated evaluateWithNoise and evaluateSynchronized signatures. Updated all ~90 executeFn implementations across components (using `_highZs` prefix since unused). Updated all test files with highZs declarations and call site arguments.

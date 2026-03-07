@@ -179,7 +179,7 @@ export class NotElement extends AbstractCircuitElement {
 // executeNot — flat simulation function
 // ---------------------------------------------------------------------------
 
-export function executeNot(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeNot(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
   state[outputIdx] = (~state[inputIdx]) >>> 0;

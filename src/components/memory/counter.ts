@@ -179,7 +179,7 @@ export class CounterElement extends AbstractCircuitElement {
 // maxValue = (1 << bitWidth) - 1, accessed via getProperty
 // ---------------------------------------------------------------------------
 
-export function executeCounter(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {

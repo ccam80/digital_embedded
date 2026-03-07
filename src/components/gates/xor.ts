@@ -273,7 +273,7 @@ export class XOrElement extends AbstractCircuitElement {
 // executeXOr — flat simulation function
 // ---------------------------------------------------------------------------
 
-export function executeXOr(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeXOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);

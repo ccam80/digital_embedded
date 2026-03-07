@@ -125,7 +125,7 @@ export class VddElement extends AbstractCircuitElement {
 // executeVdd — writes all-ones mask to output (bit-width masked)
 // ---------------------------------------------------------------------------
 
-export function executeVdd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeVdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   // Output all ones. The bit-width mask is applied by the net resolver;
   // writing 0xFFFFFFFF is correct for any width up to 32 bits.
   state[layout.outputOffset(index)] = 0xFFFFFFFF;

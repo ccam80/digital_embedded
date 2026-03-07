@@ -103,7 +103,8 @@ describe("PriorityEncoder", () => {
       // 1-bit selector → 2 inputs
       const layout = makeLayout(2);
       const state = makeState([1, 0]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[2]).toBe(0); // num
       expect(state[3]).toBe(1); // any
     });
@@ -111,7 +112,8 @@ describe("PriorityEncoder", () => {
     it("only in1=1: num=1, any=1", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 1]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[2]).toBe(1); // num
       expect(state[3]).toBe(1); // any
     });
@@ -119,7 +121,8 @@ describe("PriorityEncoder", () => {
     it("both in0=1 and in1=1: num=1 (highest index wins), any=1", () => {
       const layout = makeLayout(2);
       const state = makeState([1, 1]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[2]).toBe(1); // num = highest active index
       expect(state[3]).toBe(1); // any
     });
@@ -127,7 +130,8 @@ describe("PriorityEncoder", () => {
     it("all inputs 0: num=0, any=0", () => {
       const layout = makeLayout(2);
       const state = makeState([0, 0]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[2]).toBe(0); // num
       expect(state[3]).toBe(0); // any
     });
@@ -138,7 +142,8 @@ describe("PriorityEncoder", () => {
       // 2-bit selector → 4 inputs
       const layout = makeLayout(4);
       const state = makeState([0, 0, 1, 0]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[4]).toBe(2); // num
       expect(state[5]).toBe(1); // any
     });
@@ -146,7 +151,8 @@ describe("PriorityEncoder", () => {
     it("4-input encoder: in0=1 and in3=1 → num=3 (in3 has higher priority)", () => {
       const layout = makeLayout(4);
       const state = makeState([1, 0, 0, 1]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[4]).toBe(3); // highest active index
       expect(state[5]).toBe(1);
     });
@@ -154,7 +160,8 @@ describe("PriorityEncoder", () => {
     it("4-input encoder: all active → num=3 (highest index)", () => {
       const layout = makeLayout(4);
       const state = makeState([1, 1, 1, 1]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[4]).toBe(3);
       expect(state[5]).toBe(1);
     });
@@ -162,7 +169,8 @@ describe("PriorityEncoder", () => {
     it("4-input encoder: all inactive → num=0, any=0", () => {
       const layout = makeLayout(4);
       const state = makeState([0, 0, 0, 0]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[4]).toBe(0);
       expect(state[5]).toBe(0);
     });
@@ -172,7 +180,8 @@ describe("PriorityEncoder", () => {
     it("non-zero input value (not just 1) still counts as active", () => {
       const layout = makeLayout(4);
       const state = makeState([0xFF, 0, 0, 0]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[4]).toBe(0); // only in0 active
       expect(state[5]).toBe(1); // any
     });
@@ -180,7 +189,8 @@ describe("PriorityEncoder", () => {
     it("8-input encoder: only in7=1 → num=7", () => {
       const layout = makeLayout(8);
       const state = makeState([0, 0, 0, 0, 0, 0, 0, 1]);
-      executePriorityEncoder(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executePriorityEncoder(0, state, highZs, layout);
       expect(state[8]).toBe(7);
       expect(state[9]).toBe(1);
     });

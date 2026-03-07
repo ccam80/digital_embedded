@@ -87,11 +87,11 @@ export class ComparatorElement extends AbstractCircuitElement {
 export function makeExecuteComparator(
   bitWidth: number,
   signed: boolean,
-): (index: number, state: Uint32Array, layout: ComponentLayout) => void {
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void {
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const signBit = 1 << (bitWidth - 1);
 
-  return function executeComparator(index: number, state: Uint32Array, layout: ComponentLayout): void {
+  return function executeComparator(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
@@ -125,10 +125,10 @@ export function makeExecuteComparator(
   };
 }
 
-export function executeComparator(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeComparator(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
   const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
-  makeExecuteComparator(bitWidth, signed)(index, state, layout);
+  makeExecuteComparator(bitWidth, signed)(index, state, _highZs, layout);
 }
 
 export const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

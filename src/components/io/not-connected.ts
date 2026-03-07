@@ -122,6 +122,7 @@ export class NotConnectedElement extends AbstractCircuitElement {
 export function executeNotConnected(
   _index: number,
   _state: Uint32Array,
+  _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
   // No simulation behavior. The compiler uses this component to suppress

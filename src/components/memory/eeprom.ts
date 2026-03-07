@@ -261,7 +261,7 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 }
 
-export function executeEEPROM(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);
@@ -451,7 +451,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeEEPROMDualPort(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);

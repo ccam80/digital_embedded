@@ -322,7 +322,7 @@ describe("subcircuit-loader", () => {
       outputOffset: () => 0,
       stateOffset: () => 0,
     };
-    expect(() => subADef!.executeFn(0, mockState, mockLayout)).not.toThrow();
+    expect(() => subADef!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
   });
 });
 

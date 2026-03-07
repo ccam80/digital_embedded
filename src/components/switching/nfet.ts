@@ -156,7 +156,7 @@ export class NFETElement extends AbstractCircuitElement {
 // G=1 → closed=1; G=0 → closed=0
 // ---------------------------------------------------------------------------
 
-export function executeNFET(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeNFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
   state[stBase] = state[inBase] & 1;

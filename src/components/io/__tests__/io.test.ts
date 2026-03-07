@@ -211,8 +211,9 @@ describe("InComponent", () => {
     it("executeIn is a no-op — does not write to output slot", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 42;
-      executeIn(0, state, layout);
+      executeIn(0, state, highZs, layout);
       // executeIn must not alter the output slot (externally managed)
       expect(state[0]).toBe(42);
     });
@@ -220,9 +221,10 @@ describe("InComponent", () => {
     it("executeIn called 1000 times does not throw", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       expect(() => {
         for (let i = 0; i < 1000; i++) {
-          executeIn(0, state, layout);
+          executeIn(0, state, highZs, layout);
         }
       }).not.toThrow();
     });
@@ -232,13 +234,14 @@ describe("InComponent", () => {
     it("In output value can be set externally and executeIn preserves it", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       // Simulate external engine.setSignalValue
       state[0] = 1;
-      executeIn(0, state, layout);
+      executeIn(0, state, highZs, layout);
       expect(state[0]).toBe(1);
 
       state[0] = 0;
-      executeIn(0, state, layout);
+      executeIn(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });
   });
@@ -359,21 +362,24 @@ describe("OutComponent", () => {
     it("executeOut copies input value to output slot", () => {
       const layout = makeLayout(1);
       const state = makeState([0xAB]);
-      executeOut(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOut(0, state, highZs, layout);
       expect(state[1]).toBe(0xAB);
     });
 
     it("executeOut with value 0 writes 0 to output", () => {
       const layout = makeLayout(1);
       const state = makeState([0]);
-      executeOut(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOut(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("executeOut with 0xFFFFFFFF preserves all bits", () => {
       const layout = makeLayout(1);
       const state = makeState([0xFFFFFFFF]);
-      executeOut(0, state, layout);
+      const highZs = new Uint32Array(state.length);
+      executeOut(0, state, highZs, layout);
       expect(state[1]).toBe(0xFFFFFFFF);
     });
   });
@@ -494,17 +500,19 @@ describe("ClockComponent", () => {
     it("executeClock is a no-op — output unchanged", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeClock(0, state, layout);
+      executeClock(0, state, highZs, layout);
       expect(state[0]).toBe(1);
     });
 
     it("executeClock does not throw when called repeatedly", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       expect(() => {
         for (let i = 0; i < 100; i++) {
-          executeClock(0, state, layout);
+          executeClock(0, state, highZs, layout);
         }
       }).not.toThrow();
     });
@@ -613,9 +621,10 @@ describe("ConstComponent", () => {
     it("executeConst preserves the pre-initialised output value", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       // Compiler pre-initialises the output net to the constant value
       state[0] = 0xBEEF;
-      executeConst(0, state, layout);
+      executeConst(0, state, highZs, layout);
       // The value must not be cleared
       expect(state[0]).toBe(0xBEEF);
     });
@@ -623,8 +632,9 @@ describe("ConstComponent", () => {
     it("executeConst with value 0 leaves output as 0", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeConst(0, state, layout);
+      executeConst(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });
   });
@@ -711,17 +721,19 @@ describe("GroundComponent", () => {
     it("executeGround writes 0 to output", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xFFFFFFFF;
-      executeGround(0, state, layout);
+      executeGround(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });
 
     it("executeGround always writes 0 regardless of prior value", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       for (const prior of [0xDEAD, 0xBEEF, 0x1, 0xFF]) {
         state[0] = prior;
-        executeGround(0, state, layout);
+        executeGround(0, state, highZs, layout);
         expect(state[0]).toBe(0);
       }
     });
@@ -781,17 +793,19 @@ describe("VddComponent", () => {
     it("executeVdd writes 0xFFFFFFFF to output", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeVdd(0, state, layout);
+      executeVdd(0, state, highZs, layout);
       expect(state[0]).toBe(0xFFFFFFFF);
     });
 
     it("executeVdd always writes all-ones regardless of prior value", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
       for (const prior of [0, 0xAB, 0x1234, 0]) {
         state[0] = prior;
-        executeVdd(0, state, layout);
+        executeVdd(0, state, highZs, layout);
         expect(state[0]).toBe(0xFFFFFFFF);
       }
     });
@@ -860,9 +874,10 @@ describe("NotConnectedComponent", () => {
     it("executeNotConnected is a no-op", () => {
       const layout = makeLayout(1);
       const state = new Uint32Array(2);
+      const highZs = new Uint32Array(state.length);
       state[0] = 0xAB;
       state[1] = 0xCD;
-      executeNotConnected(0, state, layout);
+      executeNotConnected(0, state, highZs, layout);
       expect(state[0]).toBe(0xAB);
       expect(state[1]).toBe(0xCD);
     });
@@ -870,7 +885,8 @@ describe("NotConnectedComponent", () => {
     it("executeNotConnected does not throw", () => {
       const layout = makeLayout(1);
       const state = new Uint32Array(2);
-      expect(() => executeNotConnected(0, state, layout)).not.toThrow();
+      const highZs = new Uint32Array(state.length);
+      expect(() => executeNotConnected(0, state, highZs, layout)).not.toThrow();
     });
   });
 

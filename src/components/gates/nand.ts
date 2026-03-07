@@ -252,7 +252,7 @@ export class NAndElement extends AbstractCircuitElement {
 // executeNAnd — flat simulation function
 // ---------------------------------------------------------------------------
 
-export function executeNAnd(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);

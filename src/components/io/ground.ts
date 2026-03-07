@@ -120,7 +120,7 @@ export class GroundElement extends AbstractCircuitElement {
 // executeGround — always writes 0 to output
 // ---------------------------------------------------------------------------
 
-export function executeGround(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeGround(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   state[layout.outputOffset(index)] = 0;
 }
 

@@ -167,7 +167,7 @@ export class OutElement extends AbstractCircuitElement {
 // executeOut — reads input, copies to output slot for display
 // ---------------------------------------------------------------------------
 
-export function executeOut(index: number, state: Uint32Array, layout: ComponentLayout): void {
+export function executeOut(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
   state[outputIdx] = state[inputIdx];
