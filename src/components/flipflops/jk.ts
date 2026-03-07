@@ -173,10 +173,9 @@ export class JKElement extends AbstractCircuitElement {
 // State layout:  [storedQ=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
-export function executeJK(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleJK(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
   const j = state[wt[inBase]];
@@ -198,6 +197,12 @@ export function executeJK(index: number, state: Uint32Array, _highZs: Uint32Arra
     }
   }
   state[stBase + 1] = clock;
+}
+
+export function executeJK(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const q = state[stBase];
   state[wt[outBase]] = q;
@@ -240,6 +245,7 @@ export const JKDefinition: ComponentDefinition = {
   typeId: -1,
   factory: jkFactory,
   executeFn: executeJK,
+  sampleFn: sampleJK,
   pinLayout: JK_FF_PIN_DECLARATIONS,
   propertyDefs: JK_FF_PROPERTY_DEFS,
   attributeMap: JK_FF_ATTRIBUTE_MAPPINGS,

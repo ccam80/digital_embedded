@@ -154,16 +154,15 @@ export interface PRNGLayout extends ComponentLayout {
   stateOffset(componentIndex: number): number;
 }
 
-export function makeExecutePRNG(
+export function makeSamplePRNG(
   bitWidth: number,
 ): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout) => void {
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const taps = LFSR_TAPS[bitWidth] ?? LFSR_TAPS[8];
 
-  return function executePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout): void {
+  return function samplePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout): void {
     const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
-    const outBase = layout.outputOffset(index);
     const stateBase = layout.stateOffset(index);
 
     const seedInput = state[wt[inBase]] & mask;
@@ -186,8 +185,23 @@ export function makeExecutePRNG(
 
     state[stateBase] = lfsrState;
     state[stateBase + 1] = clock;
-    state[wt[outBase]] = lfsrState;
   };
+}
+
+export function makeExecutePRNG(
+  _bitWidth: number,
+): (index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout) => void {
+  return function executePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout): void {
+    const wt = layout.wiringTable;
+    const outBase = layout.outputOffset(index);
+    const stateBase = layout.stateOffset(index);
+
+    state[wt[outBase]] = state[stateBase] >>> 0;
+  };
+}
+
+export function samplePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  makeSamplePRNG(8)(index, state, _highZs, layout as PRNGLayout);
 }
 
 export function executePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -209,6 +223,7 @@ export const PRNGDefinition: ComponentDefinition = {
   typeId: -1,
   factory: (props) => new PRNGElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
   executeFn: executePRNG,
+  sampleFn: samplePRNG,
   pinLayout: buildPRNGPinDeclarations(8),
   propertyDefs: PRNG_PROPERTY_DEFS,
   attributeMap: PRNG_ATTRIBUTE_MAPPINGS,

@@ -166,6 +166,24 @@ export class RegisterElement extends AbstractCircuitElement {
 // State layout:  [storedVal=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
+export function sampleRegister(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const stBase = layout.stateOffset(index);
+
+  const d = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const en = state[wt[inBase + 2]];
+  const prevClock = state[stBase + 1];
+
+  if (clock !== 0 && prevClock === 0) {
+    if (en !== 0) {
+      state[stBase] = d;
+    }
+  }
+  state[stBase + 1] = clock;
+}
+
 export function executeRegister(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
@@ -233,6 +251,7 @@ export const RegisterDefinition: ComponentDefinition = {
   typeId: -1,
   factory: registerFactory,
   executeFn: executeRegister,
+  sampleFn: sampleRegister,
   pinLayout: REGISTER_PIN_DECLARATIONS,
   propertyDefs: REGISTER_PROPERTY_DEFS,
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,

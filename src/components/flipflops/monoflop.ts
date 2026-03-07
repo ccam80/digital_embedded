@@ -182,10 +182,9 @@ export class MonoflopElement extends AbstractCircuitElement {
 //   - R=1 at any time: reset storedQ=0, counter=0
 // ---------------------------------------------------------------------------
 
-export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleMonoflop(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
     getProperty?(i: number, key: string): number;
@@ -211,6 +210,15 @@ export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint
   }
 
   state[stBase + 1] = clock;
+}
+
+export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const extLayout = layout as unknown as {
+    stateOffset(i: number): number;
+  };
+  const stBase = extLayout.stateOffset(index);
 
   const q = state[stBase];
   state[wt[outBase]] = q;
@@ -263,6 +271,7 @@ export const MonoflopDefinition: ComponentDefinition = {
   typeId: -1,
   factory: monoflopFactory,
   executeFn: executeMonoflop,
+  sampleFn: sampleMonoflop,
   pinLayout: MONOFLOP_PIN_DECLARATIONS,
   propertyDefs: MONOFLOP_PROPERTY_DEFS,
   attributeMap: MONOFLOP_ATTRIBUTE_MAPPINGS,

@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MonoflopElement,
+  sampleMonoflop,
   executeMonoflop,
   MonoflopDefinition,
   MONOFLOP_ATTRIBUTE_MAPPINGS,
@@ -111,7 +112,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
@@ -121,7 +122,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(3);
     });
 
@@ -132,22 +133,22 @@ describe("Monoflop", () => {
       const highZs = new Uint32Array(state.length);
 
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(3);
 
       state[0] = 0;
       state[5] = 0;
 
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(2);
 
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(1);
 
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[6]).toBe(0);
     });
@@ -157,13 +158,13 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[6]).toBe(1);
 
       state[0] = 0;
       state[5] = 0;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -176,17 +177,17 @@ describe("Monoflop", () => {
       const highZs = new Uint32Array(state.length);
 
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(4);
 
       state[0] = 0;
       state[5] = 0;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(3);
 
       state[0] = 1;
       state[5] = 0;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[6]).toBe(4);
       expect(state[2]).toBe(1);
     });
@@ -198,7 +199,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 0, 4: 1, 5: 0, 6: 2 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[6]).toBe(0);
     });
@@ -208,7 +209,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 1, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -218,7 +219,7 @@ describe("Monoflop", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 1, 1: 0, 4: 0, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
@@ -227,7 +228,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 1, 1: 0, 4: 0, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -238,7 +239,7 @@ describe("Monoflop", () => {
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe(0);
     });
@@ -247,7 +248,7 @@ describe("Monoflop", () => {
       const layout = makeLayout(2, 2, 3);
       const state = makeState(7, { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
-      executeMonoflop(0, state, highZs, layout);
+      sampleMonoflop(0, state, highZs, layout); executeMonoflop(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe(1);
     });

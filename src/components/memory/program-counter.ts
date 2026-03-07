@@ -202,6 +202,31 @@ export class ProgramCounterElement extends AbstractCircuitElement {
 // State layout:  [counter=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
+export function sampleProgramCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const stBase = (layout as ProgramCounterLayout).stateOffset(index);
+
+  const D = state[wt[inBase]] >>> 0;
+  const en = state[wt[inBase + 1]] & 1;
+  const clk = state[wt[inBase + 2]] & 1;
+  const ld = state[wt[inBase + 3]] & 1;
+  const prevClock = state[stBase + 1] & 1;
+
+  let counter = state[stBase] >>> 0;
+
+  if (!prevClock && clk) {
+    if (ld) {
+      counter = D;
+    } else if (en) {
+      counter = (counter + 1) >>> 0;
+    }
+  }
+
+  state[stBase] = counter;
+  state[stBase + 1] = clk;
+}
+
 export function executeProgramCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
@@ -221,10 +246,6 @@ export function executeProgramCounter(index: number, state: Uint32Array, _highZs
     if (ld) {
       counter = D;
     } else if (en) {
-      // Determine maxValue from the backing state upper bound.
-      // Since we don't have the property available here, we use 0xFFFFFFFF
-      // as the 32-bit wrap. Proper maxValue is set by the engine during
-      // compilation via state initialisation. We wrap at 32-bit boundary.
       counter = (counter + 1) >>> 0;
       if (counter === 0) {
         ovf = 1;
@@ -283,6 +304,7 @@ export const ProgramCounterDefinition: ComponentDefinition = {
   typeId: -1,
   factory: programCounterFactory,
   executeFn: executeProgramCounter,
+  sampleFn: sampleProgramCounter,
   pinLayout: PROGRAM_COUNTER_PIN_DECLARATIONS,
   propertyDefs: PROGRAM_COUNTER_PROPERTY_DEFS,
   attributeMap: PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS,

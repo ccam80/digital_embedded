@@ -100,6 +100,9 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Function table indexed by type ID. Populated from registry. */
   readonly executeFns: ExecuteFunction[];
 
+  /** Sample function table indexed by type ID. Non-null for sequential components. */
+  readonly sampleFns: (ExecuteFunction | null)[];
+
   /** Wiring indirection table mapping layout indices to net IDs. */
   readonly wiringTable: Int32Array;
 
@@ -149,6 +152,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     totalStateSlots?: number;
     typeIds: Uint8Array;
     executeFns: ExecuteFunction[];
+    sampleFns?: (ExecuteFunction | null)[];
     wiringTable: Int32Array;
     layout: FlatComponentLayout;
     evaluationOrder: EvaluationGroup[];
@@ -167,6 +171,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.signalArraySize = fields.netCount + (fields.totalStateSlots ?? 0);
     this.typeIds = fields.typeIds;
     this.executeFns = fields.executeFns;
+    this.sampleFns = fields.sampleFns ?? fields.executeFns.map(() => null);
     this.wiringTable = fields.wiringTable;
     this.layout = fields.layout;
     this.evaluationOrder = fields.evaluationOrder;

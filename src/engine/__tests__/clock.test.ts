@@ -134,6 +134,7 @@ function buildClockCircuit(
     componentCount,
     typeIds: new Uint8Array(componentCount),
     executeFns: [],
+    sampleFns: [],
     wiringTable: layout.wiringTable,
     layout,
     evaluationOrder: componentCount > 0 ? [group] : [],

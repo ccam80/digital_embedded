@@ -209,6 +209,60 @@ export class CounterPresetElement extends AbstractCircuitElement {
 // Priority on clock edge: clr > ld > count
 // ---------------------------------------------------------------------------
 
+export function sampleCounterPreset(
+  index: number,
+  state: Uint32Array,
+  _highZs: Uint32Array,
+  layout: ComponentLayout,
+): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const extLayout = layout as unknown as {
+    stateOffset(i: number): number;
+    getProperty?(i: number, key: string): number;
+  };
+  const stBase = extLayout.stateOffset(index);
+
+  const en = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const dir = state[wt[inBase + 2]];
+  const loadVal = state[wt[inBase + 3]];
+  const ld = state[wt[inBase + 4]];
+  const clr = state[wt[inBase + 5]];
+  const prevClock = state[stBase + 1];
+
+  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
+  let maxValue = extLayout.getProperty ? extLayout.getProperty(index, "maxValue") : 0;
+  if (maxValue === 0) maxValue = mask;
+  maxValue = maxValue & mask;
+
+  if (clock !== 0 && prevClock === 0) {
+    if (en !== 0) {
+      if (dir !== 0) {
+        if (state[stBase] === 0) {
+          state[stBase] = maxValue;
+        } else {
+          state[stBase] -= 1;
+        }
+      } else {
+        if (state[stBase] === maxValue) {
+          state[stBase] = 0;
+        } else {
+          state[stBase] += 1;
+        }
+      }
+    }
+
+    if (clr !== 0) {
+      state[stBase] = 0;
+    } else if (ld !== 0) {
+      state[stBase] = loadVal & mask;
+    }
+  }
+  state[stBase + 1] = clock;
+}
+
 export function executeCounterPreset(
   index: number,
   state: Uint32Array,
@@ -326,6 +380,7 @@ export const CounterPresetDefinition: ComponentDefinition = {
   typeId: -1,
   factory: counterPresetFactory,
   executeFn: executeCounterPreset,
+  sampleFn: sampleCounterPreset,
   pinLayout: COUNTER_PRESET_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PRESET_PROPERTY_DEFS,
   attributeMap: COUNTER_PRESET_ATTRIBUTE_MAPPINGS,

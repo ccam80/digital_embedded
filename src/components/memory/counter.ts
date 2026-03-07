@@ -179,6 +179,38 @@ export class CounterElement extends AbstractCircuitElement {
 // maxValue = (1 << bitWidth) - 1, accessed via getProperty
 // ---------------------------------------------------------------------------
 
+export function sampleCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const extLayout = layout as unknown as {
+    stateOffset(i: number): number;
+    getProperty?(i: number, key: string): number;
+  };
+  const stBase = extLayout.stateOffset(index);
+
+  const en = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const clr = state[wt[inBase + 2]];
+  const prevClock = state[stBase + 1];
+
+  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
+
+  if (clock !== 0 && prevClock === 0) {
+    if (en !== 0) {
+      if (state[stBase] === maxValue) {
+        state[stBase] = 0;
+      } else {
+        state[stBase] += 1;
+      }
+    }
+    if (clr !== 0) {
+      state[stBase] = 0;
+    }
+  }
+  state[stBase + 1] = clock;
+}
+
 export function executeCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
@@ -261,6 +293,7 @@ export const CounterDefinition: ComponentDefinition = {
   typeId: -1,
   factory: counterFactory,
   executeFn: executeCounter,
+  sampleFn: sampleCounter,
   pinLayout: COUNTER_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PROPERTY_DEFS,
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,

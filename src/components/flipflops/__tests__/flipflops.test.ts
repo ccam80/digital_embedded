@@ -14,13 +14,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { DElement, executeD, DDefinition, D_FF_ATTRIBUTE_MAPPINGS } from "../d.js";
+import { DElement, sampleD, executeD, DDefinition, D_FF_ATTRIBUTE_MAPPINGS } from "../d.js";
 import { DAsyncElement, executeDAsync, DAsyncDefinition } from "../d-async.js";
-import { JKElement, executeJK, JKDefinition, JK_FF_ATTRIBUTE_MAPPINGS } from "../jk.js";
+import { JKElement, sampleJK, executeJK, JKDefinition, JK_FF_ATTRIBUTE_MAPPINGS } from "../jk.js";
 import { JKAsyncElement, executeJKAsync, JKAsyncDefinition } from "../jk-async.js";
-import { RSElement, executeRS, RSDefinition, RS_FF_ATTRIBUTE_MAPPINGS } from "../rs.js";
+import { RSElement, sampleRS, executeRS, RSDefinition, RS_FF_ATTRIBUTE_MAPPINGS } from "../rs.js";
 import { RSAsyncElement, executeRSAsync, RSAsyncDefinition } from "../rs-async.js";
-import { TElement, executeT, TDefinition, T_FF_ATTRIBUTE_MAPPINGS } from "../t.js";
+import { TElement, sampleT, executeT, TDefinition, T_FF_ATTRIBUTE_MAPPINGS } from "../t.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
@@ -115,7 +115,7 @@ describe("FlipflopD", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe((~1) >>> 0);
     });
@@ -124,7 +124,7 @@ describe("FlipflopD", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe((~0) >>> 0);
     });
@@ -132,14 +132,14 @@ describe("FlipflopD", () => {
     it("D=1 but no clock edge (clock stays high) → Q unchanged", () => {
       const state = makeState(6, { 0: 1, 1: 1, 4: 0, 5: 1 });
       const highZs = new Uint32Array(state.length);
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
 
     it("D=1 but falling edge (clock goes 1→0) → Q unchanged", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 1, 5: 1 });
       const highZs = new Uint32Array(state.length);
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -149,10 +149,10 @@ describe("FlipflopD", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       state[1] = 0;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -162,7 +162,7 @@ describe("FlipflopD", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
       expect(state[3]).toBe((~1) >>> 0);
 
@@ -170,7 +170,7 @@ describe("FlipflopD", () => {
       state[5] = 0;
       state[1] = 0;
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
       expect(state[3]).toBe((~0) >>> 0);
     });
@@ -181,15 +181,15 @@ describe("FlipflopD", () => {
       const state = makeState(6, { 0: 1, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
 
       state[1] = 1;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
 
       state[0] = 0;
-      executeD(0, state, highZs, layout);
+      sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
   });
@@ -398,7 +398,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
@@ -407,7 +407,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -416,7 +416,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
 
@@ -424,7 +424,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
@@ -432,7 +432,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
   });
@@ -442,14 +442,14 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
       const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
 
     it("no update when clock stays high", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
       const highZs = new Uint32Array(state.length);
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -459,7 +459,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
@@ -468,7 +468,7 @@ describe("FlipflopJK", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeJK(0, state, highZs, layout);
+      sampleJK(0, state, highZs, layout); executeJK(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -618,7 +618,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
@@ -627,7 +627,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 1, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
       expect(state[4]).toBe(1);
     });
@@ -636,7 +636,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 1, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
 
@@ -644,7 +644,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -654,7 +654,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 0, 6: 1 });
       const highZs = new Uint32Array(state.length);
       state[1] = 0;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(0);
     });
   });
@@ -664,7 +664,7 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
       expect(state[4]).toBe(0);
     });
@@ -675,10 +675,10 @@ describe("FlipflopRS", () => {
       const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       state[0] = 0;
       state[1] = 0;
-      executeRS(0, state, highZs, layout);
+      sampleRS(0, state, highZs, layout); executeRS(0, state, highZs, layout);
       expect(state[3]).toBe(1);
     });
   });
@@ -859,7 +859,7 @@ describe("FlipflopT", () => {
       const state = makeState(5, { 0: 0, 3: 0, 4: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1]).toBe(1);
       expect(state[2]).toBe(0);
     });
@@ -868,7 +868,7 @@ describe("FlipflopT", () => {
       const state = makeState(5, { 0: 0, 3: 1, 4: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
       expect(state[2]).toBe(1);
     });
@@ -877,14 +877,14 @@ describe("FlipflopT", () => {
       const state = makeState(5, { 0: 1, 3: 0, 4: 1 });
       const highZs = new Uint32Array(state.length);
       state[0] = 0;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
 
     it("no toggle when clock stays high (no second rising edge)", () => {
       const state = makeState(5, { 0: 1, 3: 0, 4: 1 });
       const highZs = new Uint32Array(state.length);
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1]).toBe(0);
     });
   });
@@ -897,7 +897,7 @@ describe("FlipflopT", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
@@ -905,7 +905,7 @@ describe("FlipflopT", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
     });
 
@@ -913,13 +913,13 @@ describe("FlipflopT", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[2]).toBe(1);
 
       state[5] = 0;
       state[1] = 0;
       state[1] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[2]).toBe(0);
     });
   });
@@ -931,13 +931,13 @@ describe("FlipflopT", () => {
       const state = makeState(5, { 0: 0, 3: 0, 4: 0 });
       const highZs = new Uint32Array(state.length);
       state[0] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1] + state[2]).toBe(1);
 
       state[4] = 0;
       state[0] = 0;
       state[0] = 1;
-      executeT(0, state, highZs, layout);
+      sampleT(0, state, highZs, layout); executeT(0, state, highZs, layout);
       expect(state[1] + state[2]).toBe(1);
     });
   });

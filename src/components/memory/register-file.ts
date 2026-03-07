@@ -210,6 +210,34 @@ export class RegisterFileElement extends AbstractCircuitElement {
 // Address inputs are masked to addrBits to prevent out-of-bounds access.
 // ---------------------------------------------------------------------------
 
+export function sampleRegisterFile(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const extLayout = layout as unknown as {
+    stateOffset(i: number): number;
+    getProperty?(i: number, key: string): number;
+  };
+  const stBase = extLayout.stateOffset(index);
+
+  const din = state[wt[inBase]];
+  const we = state[wt[inBase + 1]];
+  const rw = state[wt[inBase + 2]];
+  const clock = state[wt[inBase + 3]];
+  const prevClock = state[stBase];
+
+  const addrBits = extLayout.getProperty ? extLayout.getProperty(index, "addrBits") : 2;
+  const numRegs = 1 << addrBits;
+  const addrMask = numRegs - 1;
+
+  if (clock !== 0 && prevClock === 0) {
+    if (we !== 0) {
+      const writeAddr = (rw >>> 0) & addrMask;
+      state[stBase + 1 + writeAddr] = din;
+    }
+  }
+  state[stBase] = clock;
+}
+
 export function executeRegisterFile(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
@@ -302,6 +330,7 @@ export const RegisterFileDefinition: ComponentDefinition = {
   typeId: -1,
   factory: registerFileFactory,
   executeFn: executeRegisterFile,
+  sampleFn: sampleRegisterFile,
   pinLayout: REGISTER_FILE_PIN_DECLARATIONS,
   propertyDefs: REGISTER_FILE_PROPERTY_DEFS,
   attributeMap: REGISTER_FILE_ATTRIBUTE_MAPPINGS,

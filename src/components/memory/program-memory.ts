@@ -186,6 +186,30 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
 // State layout:  [addrReg=0, prevClock=1]
 // ---------------------------------------------------------------------------
 
+export function sampleProgramMemory(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const stBase = (layout as ProgramMemoryLayout).stateOffset(index);
+
+  const A = state[wt[inBase]] >>> 0;
+  const ld = state[wt[inBase + 1]] & 1;
+  const clk = state[wt[inBase + 2]] & 1;
+  const prevClock = state[stBase + 1] & 1;
+
+  let addrReg = state[stBase] >>> 0;
+
+  if (!prevClock && clk) {
+    if (ld) {
+      addrReg = A;
+    } else {
+      addrReg = (addrReg + 1) >>> 0;
+    }
+  }
+
+  state[stBase] = addrReg;
+  state[stBase + 1] = clk;
+}
+
 export function executeProgramMemory(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
@@ -269,6 +293,7 @@ export const ProgramMemoryDefinition: ComponentDefinition = {
   typeId: -1,
   factory: programMemoryFactory,
   executeFn: executeProgramMemory,
+  sampleFn: sampleProgramMemory,
   pinLayout: buildProgramMemoryPins(8, 8),
   propertyDefs: PROGRAM_MEMORY_PROPERTY_DEFS,
   attributeMap: PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS,

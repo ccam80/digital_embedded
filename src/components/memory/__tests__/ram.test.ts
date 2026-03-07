@@ -21,6 +21,7 @@ import {
   registerBackingStore,
   clearBackingStores,
   RAMSinglePortElement,
+  sampleRAMSinglePort,
   executeRAMSinglePort,
   RAMSinglePortDefinition,
   RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS,
@@ -29,10 +30,12 @@ import {
   RAMSinglePortSelDefinition,
   RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS,
   RAMDualPortElement,
+  sampleRAMDualPort,
   executeRAMDualPort,
   RAMDualPortDefinition,
   RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   RAMDualAccessElement,
+  sampleRAMDualAccess,
   executeRAMDualAccess,
   RAMDualAccessDefinition,
   RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS,
@@ -41,6 +44,7 @@ import {
   RAMAsyncDefinition,
   RAM_ASYNC_ATTRIBUTE_MAPPINGS,
   BlockRAMDualPortElement,
+  sampleBlockRAMDualPort,
   executeBlockRAMDualPort,
   BlockRAMDualPortDefinition,
   BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
@@ -217,24 +221,15 @@ describe("RAMSinglePort", () => {
 
       // Now produce rising edge: set clk=1
       state[2] = 1;
-      // We need to provide the "data to write" for single port
       // For single-port, data comes from the current output slot (state[4])
       // Set the output slot to the data we want to write
-      state[4] = 0xBB;
-      // But wait — we need to read the Din from the correct place.
-      // Looking at the Java: RAMSinglePort extends RAMDualPort, Din comes from
-      // the bidirectional D port read-back (input index 4 in the base class).
-      // In our implementation we read state[inBase + 1 + 3] = state[4] which is
-      // actually state[outBase] (the bidirectional feedback slot).
-      // The previous call left state[5]=lastClk=0 and state[4]=0.
-      // Let's set state[4] = data to write and re-call.
       state[4] = 0xCC;
+      // Sample phase: detect edge, write to memory
+      sampleRAMSinglePort(INDEX, state, highZs, layout);
+      // Execute phase: read from memory to output
       executeRAMSinglePort(INDEX, state, highZs, layout);
 
-      // After the call: clk goes from 0 to 1 (rising edge), str=1 → writes state[4]=0xCC to mem[3]
-      // But wait: at the time of the write check, state[4] should be read BEFORE it's overwritten.
-      // Actually per our implementation: we read the write-data from state[inBase+1+3] = state[4]
-      // before we write the output. Since str was set and we had a rising edge, mem[3]=0xCC.
+      // Rising edge: str=1 → writes state[4]=0xCC to mem[3]
       // Then ld=1 → state[4] = mem.read(3) = 0xCC
       expect(state[4]).toBe(0xCC);
       expect(mem.read(3)).toBe(0xCC);
@@ -606,6 +601,7 @@ describe("RAMDualPort", () => {
 
       // Now produce rising edge
       state[3] = 1;
+      sampleRAMDualPort(INDEX, state, highZs, layout);
       executeRAMDualPort(INDEX, state, highZs, layout);
       // Rising edge: str=1 → write Din=0x42 to mem[4]. ld=1 → output = mem[4] = 0x42
       expect(mem.read(4)).toBe(0x42);
@@ -670,6 +666,7 @@ describe("RAMDualPort", () => {
         // Rising edge write
         const stW = makeState([addr, data, 1, 1, 0], 1, 1);
         stW[6] = 0; // lastClk=0
+        sampleRAMDualPort(INDEX, stW, new Uint32Array(stW.length), layout);
         executeRAMDualPort(INDEX, stW, new Uint32Array(stW.length), layout);
         expect(mem.read(addr)).toBe(data);
       }
@@ -763,6 +760,7 @@ describe("RAMDualAccess", () => {
       const highZs = new Uint32Array(state.length);
       state[8] = 0; // lastClk=0
 
+      sampleRAMDualAccess(INDEX, state, highZs, layout);
       executeRAMDualAccess(INDEX, state, highZs, layout);
       // Rising edge: str=1 → write 0xCA to mem[5]
       expect(mem.read(5)).toBe(0xCA);
@@ -812,6 +810,7 @@ describe("RAMDualAccess", () => {
       const highZs = new Uint32Array(state.length);
       state[8] = 0; // lastClk=0
 
+      sampleRAMDualAccess(INDEX, state, highZs, layout);
       executeRAMDualAccess(INDEX, state, highZs, layout);
       expect(mem.read(2)).toBe(0x11);
       expect(state[7]).toBe(0x55);
@@ -1108,6 +1107,7 @@ describe("BlockRAMDualPort", () => {
       const highZs = new Uint32Array(state.length);
       // state[5]=lastClk=0, state[6]=outputVal=0
 
+      sampleBlockRAMDualPort(INDEX, state, highZs, layout);
       executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // Rising edge: reads mem[2]=0xAA into outputVal, then writes 0x55 to mem[2]
       expect(state[4]).toBe(0xAA);
@@ -1126,6 +1126,7 @@ describe("BlockRAMDualPort", () => {
       const highZs = new Uint32Array(state.length);
       state[5] = 0; // lastClk=0
 
+      sampleBlockRAMDualPort(INDEX, state, highZs, layout);
       executeBlockRAMDualPort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0x10);
       expect(mem.read(0)).toBe(0x20);
@@ -1133,11 +1134,13 @@ describe("BlockRAMDualPort", () => {
       // Second rising edge: read 0x20, write 0x30
       state[1] = 0x30;
       state[3] = 0; // clk goes low
+      sampleBlockRAMDualPort(INDEX, state, highZs, layout);
       executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // clk=0 → no edge, output unchanged
       expect(state[4]).toBe(0x10);
 
       state[3] = 1; // clk rises again
+      sampleBlockRAMDualPort(INDEX, state, highZs, layout);
       executeBlockRAMDualPort(INDEX, state, highZs, layout);
       expect(state[4]).toBe(0x20);
       expect(mem.read(0)).toBe(0x30);
@@ -1154,6 +1157,7 @@ describe("BlockRAMDualPort", () => {
       const highZs = new Uint32Array(state.length);
       state[5] = 0;
 
+      sampleBlockRAMDualPort(INDEX, state, highZs, layout);
       executeBlockRAMDualPort(INDEX, state, highZs, layout);
       // reads mem[1]=0x77 into outputVal, but str=0 → no write
       expect(state[4]).toBe(0x77);

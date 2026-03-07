@@ -632,6 +632,7 @@ export function compileCircuit(
 
   // Collect all unique type IDs from definitions
   const executeFnsMap = new Map<number, ExecuteFunction>();
+  const sampleFnsMap = new Map<number, ExecuteFunction>();
   const typeIds = new Uint8Array(componentCount);
 
   for (let i = 0; i < componentCount; i++) {
@@ -640,14 +641,21 @@ export function compileCircuit(
     typeIds[i] = def.typeId;
     if (!executeFnsMap.has(def.typeId)) {
       executeFnsMap.set(def.typeId, def.executeFn);
+      if (def.sampleFn !== undefined) {
+        sampleFnsMap.set(def.typeId, def.sampleFn);
+      }
     }
   }
 
-  // Build flat executeFns array indexed by type ID
+  // Build flat executeFns and sampleFns arrays indexed by type ID
   const maxTypeId = executeFnsMap.size > 0 ? Math.max(...executeFnsMap.keys()) : -1;
   const executeFns: ExecuteFunction[] = new Array(maxTypeId + 1);
+  const sampleFns: (ExecuteFunction | null)[] = new Array(maxTypeId + 1).fill(null);
   for (const [typeId, fn] of executeFnsMap) {
     executeFns[typeId] = fn;
+  }
+  for (const [typeId, fn] of sampleFnsMap) {
+    sampleFns[typeId] = fn;
   }
 
   // -----------------------------------------------------------------------
@@ -762,6 +770,7 @@ export function compileCircuit(
     totalStateSlots,
     typeIds,
     executeFns,
+    sampleFns,
     wiringTable,
     layout,
     evaluationOrder,

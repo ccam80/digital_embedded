@@ -261,27 +261,23 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 }
 
-export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);
 
   const A = state[wt[inBase]] >>> 0;
   const cs = state[wt[inBase + 1]] & 1;
   const we = state[wt[inBase + 2]] & 1;
-  const oe = state[wt[inBase + 3]] & 1;
   const din = state[wt[inBase + 4]] >>> 0;
 
   const lastWE = state[stBase] & 1;
   const writeAddr = state[stBase + 1] >>> 0;
 
   if (cs) {
-    // Rising edge of WE: capture address for upcoming write
     if (!lastWE && we) {
       state[stBase + 1] = A;
     }
-    // Falling edge of WE: commit write using address captured on rising edge
     if (lastWE && !we) {
       const mem = getBackingStore(index);
       if (mem !== undefined) {
@@ -290,15 +286,25 @@ export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32
     }
   }
 
-  // Read: CS=1, OE=1, WE=0
+  state[stBase] = we;
+}
+
+export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
+
+  const A = state[wt[inBase]] >>> 0;
+  const cs = state[wt[inBase + 1]] & 1;
+  const we = state[wt[inBase + 2]] & 1;
+  const oe = state[wt[inBase + 3]] & 1;
+
   if (cs && oe && !we) {
     const mem = getBackingStore(index);
     state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
     state[wt[outBase]] = 0;
   }
-
-  state[stBase] = we;
 }
 
 export const EEPROM_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
@@ -319,6 +325,7 @@ export const EEPROMDefinition: ComponentDefinition = {
   typeId: -1,
   factory: eepromFactory,
   executeFn: executeEEPROM,
+  sampleFn: sampleEEPROM,
   pinLayout: buildEEPROMPins(4, 8),
   propertyDefs: EEPROM_PROPERTY_DEFS,
   attributeMap: EEPROM_ATTRIBUTE_MAPPINGS,
@@ -453,17 +460,15 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 }
 
-export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);
 
   const A = state[wt[inBase]] >>> 0;
   const din = state[wt[inBase + 1]] >>> 0;
   const str = state[wt[inBase + 2]] & 1;
   const clk = state[wt[inBase + 3]] & 1;
-  const ld = state[wt[inBase + 4]] & 1;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
@@ -475,14 +480,23 @@ export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs
     }
   }
 
+  state[stBase] = clk;
+}
+
+export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
+
+  const A = state[wt[inBase]] >>> 0;
+  const ld = state[wt[inBase + 4]] & 1;
+
   if (ld) {
     const mem = getBackingStore(index);
     state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
     state[wt[outBase]] = 0;
   }
-
-  state[stBase] = clk;
 }
 
 export const EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
@@ -503,6 +517,7 @@ export const EEPROMDualPortDefinition: ComponentDefinition = {
   typeId: -1,
   factory: eepromDualPortFactory,
   executeFn: executeEEPROMDualPort,
+  sampleFn: sampleEEPROMDualPort,
   pinLayout: buildEEPROMDualPortPins(4, 8),
   propertyDefs: EEPROM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,

@@ -214,10 +214,9 @@ export class TElement extends AbstractCircuitElement {
 // We detect it from inputCount via layout.inputCount(index).
 // ---------------------------------------------------------------------------
 
-export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
   const inputCount = layout.inputCount(index);
@@ -242,6 +241,12 @@ export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array
     }
   }
   state[stBase + 1] = clock;
+}
+
+export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const q = state[stBase];
   state[wt[outBase]] = q;
@@ -292,6 +297,7 @@ export const TDefinition: ComponentDefinition = {
   typeId: -1,
   factory: tFactory,
   executeFn: executeT,
+  sampleFn: sampleT,
   pinLayout: T_FF_PINS_NO_ENABLE,
   propertyDefs: T_FF_PROPERTY_DEFS,
   attributeMap: T_FF_ATTRIBUTE_MAPPINGS,

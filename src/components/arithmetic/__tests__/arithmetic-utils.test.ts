@@ -9,7 +9,7 @@ import { ComparatorElement, makeExecuteComparator, ComparatorDefinition, COMPARA
 import { BarrelShifterElement, makeExecuteBarrelShifter, BarrelShifterDefinition, BARREL_SHIFTER_ATTRIBUTE_MAPPINGS } from "../barrel-shifter.js";
 import { BitCountElement, executebitCount, BitCountDefinition, BIT_COUNT_ATTRIBUTE_MAPPINGS } from "../bit-count.js";
 import { BitExtenderElement, makeExecuteBitExtender, BitExtenderDefinition, BIT_EXTENDER_ATTRIBUTE_MAPPINGS } from "../bit-extender.js";
-import { PRNGElement, makeExecutePRNG, PRNGDefinition, PRNG_ATTRIBUTE_MAPPINGS } from "../prng.js";
+import { PRNGElement, makeSamplePRNG, makeExecutePRNG, PRNGDefinition, PRNG_ATTRIBUTE_MAPPINGS } from "../prng.js";
 import type { PRNGLayout } from "../prng.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
@@ -864,20 +864,24 @@ describe("PRNG", () => {
 
   describe("rising edge: seed", () => {
     it("se=1 on rising clock seeds LFSR with S value", () => {
+      const sample = makeSamplePRNG(8);
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       // Clock goes 0->1 with se=1, S=0x55
       const state = makePRNGState(0x55, 1, 0, 1, 0xAA, 0);
       const highZs = new Uint32Array(state.length);
+      sample(0, state, highZs, layout);
       exec(0, state, highZs, layout);
       expect(state[4]).toBe(0x55); // seeded to S
     });
 
     it("se=1 with S=0 seeds LFSR to 1 (avoid all-zero)", () => {
+      const sample = makeSamplePRNG(8);
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       const state = makePRNGState(0, 1, 0, 1, 0xAA, 0);
       const highZs = new Uint32Array(state.length);
+      sample(0, state, highZs, layout);
       exec(0, state, highZs, layout);
       expect(state[4]).toBe(1);
     });
@@ -885,11 +889,13 @@ describe("PRNG", () => {
 
   describe("rising edge: next", () => {
     it("ne=1 on rising clock advances LFSR state", () => {
+      const sample = makeSamplePRNG(8);
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       // Start with LFSR=1, clock 0->1, ne=1
       const state = makePRNGState(0, 0, 1, 1, 1, 0);
       const highZs = new Uint32Array(state.length);
+      sample(0, state, highZs, layout);
       exec(0, state, highZs, layout);
       // State should have advanced (be different from initial 1)
       const newState = state[STATE_BASE];
@@ -898,6 +904,7 @@ describe("PRNG", () => {
     });
 
     it("ne=1 produces a sequence of distinct values", () => {
+      const sample = makeSamplePRNG(8);
       const exec = makeExecutePRNG(8);
       const layout = makePRNGLayoutFull();
       const arr = new Uint32Array(8);
@@ -910,9 +917,9 @@ describe("PRNG", () => {
         arr[2] = 1; // ne
         arr[3] = 1; // clock high
         arr[STATE_BASE + 1] = 0; // prev clock low
+        sample(0, arr, new Uint32Array(arr.length), layout);
         exec(0, arr, new Uint32Array(arr.length), layout);
         seen.add(arr[4]);
-        arr[STATE_BASE + 1] = 1; // update prev clock for next iteration
       }
       // At least 10 distinct values in 20 steps
       expect(seen.size).toBeGreaterThanOrEqual(10);

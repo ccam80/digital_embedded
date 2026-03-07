@@ -144,6 +144,12 @@ export interface ComponentDefinition {
   factory: (props: PropertyBag) => CircuitElement;
   /** Flat simulation function called by the engine's inner loop. */
   executeFn: ExecuteFunction;
+  /**
+   * Sequential components provide `sampleFn` to latch inputs on clock edges.
+   * Called before the combinational sweep. Combinational components leave
+   * this undefined.
+   */
+  sampleFn?: ExecuteFunction;
   /** Default pin layout for property panel and compiler. */
   pinLayout: PinDeclaration[];
   /** Property definitions for the property panel. */

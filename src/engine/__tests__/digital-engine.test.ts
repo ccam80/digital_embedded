@@ -97,6 +97,7 @@ function buildCircuit(
     signalArraySize: netCount,
     typeIds,
     executeFns,
+    sampleFns: executeFns.map(() => null),
     wiringTable: layout.wiringTable,
     layout,
     evaluationOrder,

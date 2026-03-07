@@ -73,6 +73,7 @@ function buildCircuit(
     componentCount,
     typeIds,
     executeFns,
+    sampleFns: executeFns.map(() => null),
     wiringTable: layout.wiringTable,
     layout,
     evaluationOrder,

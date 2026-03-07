@@ -71,6 +71,8 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly typeIds: Uint8Array;
   /** Function table indexed by type ID. */
   readonly executeFns: ExecuteFunction[];
+  /** Sample function table indexed by type ID. Non-null for sequential components. */
+  readonly sampleFns: (ExecuteFunction | null)[];
   /** Wiring indirection table mapping layout indices to net IDs. */
   readonly wiringTable: Int32Array;
   /** Wiring descriptor providing input/output wiring-table offsets per component. */
@@ -539,8 +541,17 @@ export class DigitalEngine implements SimulationEngine {
 
   private _stepLevel(): void {
     const compiled = this._compiled!;
-    const { executeFns, typeIds, layout, evaluationOrder } = compiled;
+    const { executeFns, sampleFns, typeIds, layout, evaluationOrder, sequentialComponents } = compiled;
     const state = this._values;
+
+    for (let s = 0; s < sequentialComponents.length; s++) {
+      const idx = sequentialComponents[s]!;
+      const typeId = typeIds[idx]!;
+      const sampleFn = sampleFns[typeId];
+      if (sampleFn !== null) {
+        sampleFn(idx, state, this._highZs, layout);
+      }
+    }
 
     for (let g = 0; g < evaluationOrder.length; g++) {
       const group = evaluationOrder[g]!;

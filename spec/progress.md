@@ -15,11 +15,11 @@
 - [x] Task 1.2g: Test Files (Wiring Table)
 
 ## Wave 2: Two-Phase Sequential Protocol
-- [ ] Task 2.1: sampleFn on ComponentDefinition
-- [ ] Task 2.2: Two-Phase _stepLevel()
-- [ ] Task 2.3a: Edge-Triggered Flip-Flops (Two-Phase)
-- [ ] Task 2.3b: Counters and Registers (Two-Phase)
-- [ ] Task 2.3c: Memory Components and PRNG (Two-Phase)
+- [x] Task 2.1: sampleFn on ComponentDefinition
+- [x] Task 2.2: Two-Phase _stepLevel()
+- [x] Task 2.3a: Edge-Triggered Flip-Flops (Two-Phase)
+- [x] Task 2.3b: Counters and Registers (Two-Phase)
+- [x] Task 2.3c: Memory Components and PRNG (Two-Phase)
 
 ## Wave 3: Engine Subsystem Integration
 - [ ] Task 3.1: Bus Resolution Integration
@@ -113,3 +113,34 @@
 - **Files modified**: src/components/wiring/__tests__/bit-selector.test.ts, src/components/wiring/__tests__/decoder.test.ts, src/components/wiring/__tests__/demux.test.ts, src/components/wiring/__tests__/mux.test.ts, src/components/wiring/__tests__/priority-encoder.test.ts, src/components/wiring/__tests__/sim-control.test.ts, src/components/wiring/__tests__/wiring.test.ts, src/components/switching/__tests__/fets.test.ts, src/components/switching/__tests__/fuse.test.ts, src/components/switching/__tests__/relay.test.ts, src/components/switching/__tests__/switches.test.ts, src/components/memory/__tests__/counter.test.ts, src/components/memory/__tests__/eeprom.test.ts, src/components/memory/__tests__/lookup-table.test.ts, src/components/memory/__tests__/program-counter.test.ts, src/components/memory/__tests__/program-memory.test.ts, src/components/memory/__tests__/ram.test.ts, src/components/memory/__tests__/register.test.ts, src/components/memory/__tests__/rom.test.ts, src/components/pld/__tests__/pld.test.ts, src/components/graphics/__tests__/graphic-card.test.ts, src/components/graphics/__tests__/led-matrix.test.ts, src/components/graphics/__tests__/vga.test.ts, src/components/basic/__tests__/function.test.ts, src/components/terminal/__tests__/terminal.test.ts, src/components/misc/__tests__/testcase.test.ts, src/components/misc/__tests__/text-rectangle.test.ts, src/components/subcircuit/__tests__/subcircuit.test.ts, src/io/__tests__/subcircuit-loader.test.ts, src/analysis/__tests__/dependency.test.ts, src/analysis/__tests__/model-analyser.test.ts, src/analysis/__tests__/substitute-library.test.ts, src/headless/__tests__/integration.test.ts, src/headless/__tests__/runner.test.ts, src/headless/__tests__/test-runner.test.ts
 - **Tests**: 4511/4523 passing (11 failing: 8 pre-existing baseline failures + 3 pre-existing failures from earlier tasks in pin.test.ts, wire-renderer.test.ts, trace.test.ts not caused by this change)
 - **Changes summary**: Added identity `wiringTable: new Int32Array(64).map((_, i) => i)` to all mock ComponentLayout objects in 29 component test files (helper functions and inline layout literals). Updated 6 additional test files (analysis, headless) containing inline executeFn implementations to use wiring table indirection: `state[layout.wiringTable[layout.inputOffset(index)]]` and `state[layout.wiringTable[layout.outputOffset(index)]]`.
+
+## Task 2.2: Two-Phase _stepLevel()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/engine/digital-engine.ts, src/engine/__tests__/two-phase.test.ts
+- **Tests**: 5/5 passing (two-phase.test.ts); 154/156 engine tests passing (2 pre-existing delay.test.ts failures)
+- **Changes summary**: Modified `_stepLevel()` in `digital-engine.ts` to iterate `compiled.sequentialComponents` before the combinational evaluation loop. For each sequential component index, looks up its typeId, checks `compiled.sampleFns[typeId]`, and if non-null calls it with `(index, state, highZs, layout)`. Added 3 new tests to `two-phase.test.ts`: `shift_register_propagates_correctly` (verifies data propagates one stage per clock cycle), `concurrent_flip_flops_sample_simultaneously` (verifies cross-feedback flip-flops swap values correctly because both sample before either writes), `combinational_only_circuit_unaffected` (verifies AND gate circuit works and sequentialComponents is empty).
+
+## Task 2.3b: Counters and Registers (Two-Phase)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/memory/counter.ts, src/components/memory/counter-preset.ts, src/components/memory/program-counter.ts, src/components/memory/register.ts, src/components/memory/register-file.ts, src/components/memory/program-memory.ts, src/components/memory/__tests__/two-phase-memory.test.ts
+- **Tests**: 169/169 passing (counter.test.ts: 50, program-counter.test.ts: 18, register.test.ts: 50, program-memory.test.ts: 19, two-phase-memory.test.ts: 32)
+- **Changes summary**: Added sampleFn to all 6 edge-triggered counter/register components. Each sampleFn reads inputs through wiringTable, detects rising clock edge via prevClock in state slot, and updates state (increment/clear/load/latch). ExecuteFns retain full logic (edge detection + output) for backward compatibility with existing tests that call executeFn standalone; in two-phase engine mode, sampleFn runs first and updates prevClock, so executeFn sees no edge and only outputs from state. Added sampleFn field to CounterDefinition, CounterPresetDefinition, ProgramCounterDefinition, RegisterDefinition, RegisterFileDefinition, and ProgramMemoryDefinition. Added 14 tests to two-phase-memory.test.ts covering: sampleCounter increments on rising edge, sampleCounter clears on clr, sampleCounterPreset loads on ld, sampleProgramCounter increments on edge, sampleRegister latches on rising edge, executeRegister outputs from state not inputs, sampleRegisterFile writes on edge, sampleProgramMemory latches address, plus definition sampleFn presence checks for all 6 components.
+
+## Task 2.3a: Edge-Triggered Flip-Flops (Two-Phase)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/flipflops/__tests__/two-phase-flipflops.test.ts
+- **Files modified**: src/components/flipflops/d.ts, src/components/flipflops/jk.ts, src/components/flipflops/t.ts, src/components/flipflops/rs.ts, src/components/flipflops/monoflop.ts, src/components/flipflops/__tests__/flipflops.test.ts, src/components/flipflops/__tests__/monoflop.test.ts
+- **Tests**: 142/142 passing (16 new two-phase tests + 126 existing tests updated to use sampleFn+executeFn)
+
+## Task 2.3c: Memory Components and PRNG (Two-Phase)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none (two-phase-memory.test.ts already created by Task 2.3b)
+- **Files modified**: src/components/memory/ram.ts, src/components/memory/eeprom.ts, src/components/arithmetic/prng.ts, src/components/memory/__tests__/ram.test.ts, src/components/memory/__tests__/eeprom.test.ts, src/components/arithmetic/__tests__/arithmetic-utils.test.ts, src/components/memory/__tests__/two-phase-memory.test.ts
+- **Tests**: 270/270 passing across affected test files (105 ram.test.ts + 34 eeprom.test.ts + 99 arithmetic-utils.test.ts + 32 two-phase-memory.test.ts)
+- **Changes summary**: Split edge-triggered RAM/EEPROM/PRNG executeFns into sampleFn + executeFn. Added sampleRAMSinglePort, sampleRAMDualPort, sampleRAMDualAccess, sampleBlockRAMDualPort to ram.ts. Added sampleEEPROM, sampleEEPROMDualPort to eeprom.ts. Added samplePRNG and makeSamplePRNG to prng.ts. Each sampleFn handles clock/WE edge detection and memory writes; executeFn only reads from memory and writes outputs. Set sampleFn on RAMSinglePortDefinition, RAMDualPortDefinition, RAMDualAccessDefinition, BlockRAMDualPortDefinition, EEPROMDefinition, EEPROMDualPortDefinition, PRNGDefinition. Confirmed RAMSinglePortSelDefinition, RAMAsyncDefinition (combinational) have no sampleFn. Confirmed ROMDefinition and LookUpTableDefinition have no sampleFn. Updated existing tests in ram.test.ts, eeprom.test.ts, and arithmetic-utils.test.ts to call sampleFn before executeFn for write-then-read scenarios. Added 18 new tests to two-phase-memory.test.ts covering RAM sample/execute split, EEPROM sample/execute split, PRNG sample/execute split, and ROM/LookupTable no-sampleFn confirmation.

@@ -18,10 +18,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   EEPROMElement,
+  sampleEEPROM,
   executeEEPROM,
   EEPROMDefinition,
   EEPROM_ATTRIBUTE_MAPPINGS,
   EEPROMDualPortElement,
+  sampleEEPROMDualPort,
   executeEEPROMDualPort,
   EEPROMDualPortDefinition,
   EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
@@ -141,6 +143,7 @@ describe("EEPROM", () => {
     state[2] = 1;   // WE (rising)
     state[3] = 0;   // OE
     state[4] = 0;   // Din (not yet relevant)
+    sampleEEPROM(0, state, highZs, layout);
     executeEEPROM(0, state, highZs, layout);
     // lastWE should now be 1, writeAddr = 5
     expect(state[IN + OUT + 0]).toBe(1);   // lastWE
@@ -152,6 +155,7 @@ describe("EEPROM", () => {
     state[2] = 0;   // WE (falling)
     state[3] = 0;   // OE
     state[4] = 0xBE; // Din
+    sampleEEPROM(0, state, highZs, layout);
     executeEEPROM(0, state, highZs, layout);
     // memory[5] should now be 0xBE
     expect(mem.read(5)).toBe(0xBE);
@@ -175,10 +179,12 @@ describe("EEPROM", () => {
 
     // Rising edge of WE without CS
     state[0] = 2; state[1] = 0; state[2] = 1; state[3] = 0; state[4] = 0;
+    sampleEEPROM(0, state, highZs, layout);
     executeEEPROM(0, state, highZs, layout);
 
     // Falling edge of WE without CS
     state[2] = 0; state[4] = 0x99;
+    sampleEEPROM(0, state, highZs, layout);
     executeEEPROM(0, state, highZs, layout);
 
     // Nothing should have been written
@@ -196,9 +202,11 @@ describe("EEPROM", () => {
     const writeValue = (addr: number, val: number) => {
       // Rising edge
       state[0] = addr; state[2] = 1; state[3] = 0; state[4] = 0;
+      sampleEEPROM(0, state, highZs, layout);
       executeEEPROM(0, state, highZs, layout);
       // Falling edge
       state[2] = 0; state[4] = val;
+      sampleEEPROM(0, state, highZs, layout);
       executeEEPROM(0, state, highZs, layout);
     };
 
@@ -365,6 +373,7 @@ describe("EEPROMDualPort", () => {
     state[3] = 1;   // C (rising: lastClk was 0)
     state[4] = 0;   // ld
 
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(mem.read(3)).toBe(0xAB);
 
@@ -374,6 +383,7 @@ describe("EEPROMDualPort", () => {
     state[3] = 0;   // C (falling, no edge)
     state[4] = 1;   // ld
 
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN]).toBe(0xAB);
   });
@@ -387,9 +397,11 @@ describe("EEPROMDualPort", () => {
 
     // Set lastClk = 1 first by running a cycle with clk=1
     state[0] = 0; state[1] = 0xAA; state[2] = 1; state[3] = 1; state[4] = 0;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     // Now write with clk still high (no rising edge — lastClk=1)
     state[1] = 0xFF; state[2] = 1; state[3] = 1;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     // Only the first write (on first rising edge) should have occurred
     expect(mem.read(0)).toBe(0xAA);
@@ -402,6 +414,7 @@ describe("EEPROMDualPort", () => {
     const { layout, state } = makeLayout(IN, OUT, STATE);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0x77; state[2] = 0; state[3] = 1; state[4] = 0;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(mem.read(0)).toBe(0);
   });
@@ -439,17 +452,20 @@ describe("EEPROMDualPort", () => {
 
     // Cycle 1: clk=0 → lastClk stays 0
     state[3] = 0;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(0); // lastClk = 0
 
     // Cycle 2: clk=1 (rising) → writes if str=1
     state[0] = 4; state[1] = 0x11; state[2] = 1; state[3] = 1;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(1); // lastClk = 1
     expect(mem.read(4)).toBe(0x11);
 
     // Cycle 3: clk=0 (falling) → no rising edge, no write
     state[1] = 0x22; state[3] = 0;
+    sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
     expect(state[IN + OUT]).toBe(0); // lastClk = 0
     expect(mem.read(4)).toBe(0x11); // unchanged

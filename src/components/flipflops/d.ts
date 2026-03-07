@@ -168,10 +168,9 @@ export class DElement extends AbstractCircuitElement {
 // Output layout: [Q=0, ~Q=1]
 // ---------------------------------------------------------------------------
 
-export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleD(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
   const d = state[wt[inBase]];
@@ -182,6 +181,12 @@ export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array
     state[stBase] = d;
   }
   state[stBase + 1] = clock;
+}
+
+export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const q = state[stBase];
   state[wt[outBase]] = q;
@@ -234,6 +239,7 @@ export const DDefinition: ComponentDefinition = {
   typeId: -1,
   factory: dFactory,
   executeFn: executeD,
+  sampleFn: sampleD,
   pinLayout: D_FF_PIN_DECLARATIONS,
   propertyDefs: D_FF_PROPERTY_DEFS,
   attributeMap: D_FF_ATTRIBUTE_MAPPINGS,

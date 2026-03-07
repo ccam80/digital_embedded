@@ -176,10 +176,9 @@ export class RSElement extends AbstractCircuitElement {
 // (deterministic undefined: Digital uses random, we use hold for reproducibility in tests)
 // ---------------------------------------------------------------------------
 
-export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function sampleRS(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
   const s = state[wt[inBase]];
@@ -198,6 +197,12 @@ export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Arra
     }
   }
   state[stBase + 1] = clock;
+}
+
+export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const q = state[stBase];
   state[wt[outBase]] = q;
@@ -240,6 +245,7 @@ export const RSDefinition: ComponentDefinition = {
   typeId: -1,
   factory: rsFactory,
   executeFn: executeRS,
+  sampleFn: sampleRS,
   pinLayout: RS_FF_PIN_DECLARATIONS,
   propertyDefs: RS_FF_PROPERTY_DEFS,
   attributeMap: RS_FF_ATTRIBUTE_MAPPINGS,
