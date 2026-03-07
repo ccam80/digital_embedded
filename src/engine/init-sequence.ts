@@ -17,22 +17,9 @@
 
 import { evaluateWithNoise, evaluateSynchronized } from "./noise-mode.js";
 import type { ExecuteFunction, ComponentLayout } from "../core/registry.js";
+import type { EvaluationGroup } from "./digital-engine.js";
 
-// ---------------------------------------------------------------------------
-// EvaluationGroup — one SCC or singleton in topological order
-// ---------------------------------------------------------------------------
-
-/**
- * One group in the compiled circuit's evaluation order.
- * A single-node group (isFeedback=false) is evaluated once per step.
- * A multi-node group (isFeedback=true) is iterated until stable.
- */
-export interface EvaluationGroup {
-  /** Component indices in this group. */
-  readonly componentIndices: Uint32Array;
-  /** True when this group contains a combinational feedback loop (SCC size > 1). */
-  readonly isFeedback: boolean;
-}
+export type { EvaluationGroup };
 
 // ---------------------------------------------------------------------------
 // InitializableEngine — subset of DigitalEngine needed by the init sequence

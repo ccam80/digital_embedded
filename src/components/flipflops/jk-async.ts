@@ -272,5 +272,6 @@ export const JKAsyncDefinition: ComponentDefinition = {
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

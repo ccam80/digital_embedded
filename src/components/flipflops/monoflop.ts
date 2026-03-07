@@ -270,5 +270,6 @@ export const MonoflopDefinition: ComponentDefinition = {
     "Monoflop — monostable multivibrator.\n" +
     "On rising edge of C: Q goes high for timerDelay clock cycles, then returns low.\n" +
     "R (reset) immediately forces Q=0 and cancels any active pulse.",
+  stateSlotCount: 3,
   defaultDelay: 10,
 };

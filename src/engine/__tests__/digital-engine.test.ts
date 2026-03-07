@@ -74,6 +74,8 @@ function buildCircuit(
   return {
     netCount,
     componentCount,
+    totalStateSlots: 0,
+    signalArraySize: netCount,
     typeIds,
     executeFns,
     layout,

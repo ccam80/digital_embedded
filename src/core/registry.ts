@@ -141,6 +141,13 @@ export interface ComponentDefinition {
   /** Help text displayed to the user. */
   helpText: string;
   /**
+   * Number of persistent state slots this component type requires.
+   * Static number for most components; function of properties for components
+   * whose state size depends on configuration (RAM, register-file, EEPROM).
+   * Defaults to 0 (combinational, no state).
+   */
+  stateSlotCount?: number | ((props: PropertyBag) => number);
+  /**
    * Default propagation delay in nanoseconds for timed simulation mode.
    * Individual component instances can override via a "delay" property.
    * Defaults to 10ns when not specified.

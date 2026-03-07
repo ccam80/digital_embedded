@@ -309,5 +309,6 @@ export const RegisterFileDefinition: ComponentDefinition = {
     "RegisterFile — register file with 2 read ports and 1 write port.\n" +
     "On rising clock edge: if we=1, writes Din to register[Rw].\n" +
     "Da = register[Ra] and Db = register[Rb] always (combinational reads).",
+  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 2))),
   defaultDelay: 10,
 };

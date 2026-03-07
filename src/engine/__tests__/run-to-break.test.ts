@@ -65,6 +65,8 @@ function buildCircuit(
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
     pinNetMap: new Map(),
+    totalStateSlots: 0,
+    signalArraySize: netCount,
   };
 }
 

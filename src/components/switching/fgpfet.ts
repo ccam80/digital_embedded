@@ -228,5 +228,6 @@ export const FGPFETDefinition: ComponentDefinition = {
   attributeMap: FGPFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "FGPFET — P-channel floating-gate MOSFET. Programmed (blown) gate permanently disables conduction.",
+  stateSlotCount: 2,
   defaultDelay: 0,
 };

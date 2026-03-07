@@ -204,5 +204,6 @@ export const NFETDefinition: ComponentDefinition = {
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "NFET — N-channel MOSFET. G=1 → conducting.",
+  stateSlotCount: 1,
   defaultDelay: 0,
 };

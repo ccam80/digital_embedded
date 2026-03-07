@@ -292,5 +292,6 @@ export const RelayDefinition: ComponentDefinition = {
   attributeMap: RELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "Relay (SPST) — coil-controlled single-pole single-throw contact switch.",
+  stateSlotCount: 1,
   defaultDelay: 0,
 };

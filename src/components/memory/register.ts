@@ -240,5 +240,6 @@ export const RegisterDefinition: ComponentDefinition = {
     "Register — edge-triggered storage register with enable.\n" +
     "On rising clock edge: if en=1, captures D input into stored value.\n" +
     "Output Q always reflects the stored value.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

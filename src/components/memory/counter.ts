@@ -268,5 +268,6 @@ export const CounterDefinition: ComponentDefinition = {
     "Counter — edge-triggered up counter.\n" +
     "On rising clock edge: if en=1, increments (wraps at maxValue); if clr=1, resets to 0.\n" +
     "ovf output is 1 when counter==maxValue and en=1.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

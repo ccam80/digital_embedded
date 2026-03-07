@@ -35,6 +35,7 @@ import type { EvaluationGroup } from "./digital-engine.js";
  */
 export class FlatComponentLayout implements ComponentLayout {
   private readonly _componentProperties: ReadonlyArray<ReadonlyMap<string, PropertyValue>>;
+  private readonly _stateOffsets: Int32Array;
 
   constructor(
     private readonly _inputOffsets: Int32Array,
@@ -42,8 +43,10 @@ export class FlatComponentLayout implements ComponentLayout {
     private readonly _inputCounts: Uint8Array,
     private readonly _outputCounts: Uint8Array,
     componentProperties?: ReadonlyArray<ReadonlyMap<string, PropertyValue>>,
+    stateOffsets?: Int32Array,
   ) {
     this._componentProperties = componentProperties ?? [];
+    this._stateOffsets = stateOffsets ?? new Int32Array(_inputOffsets.length);
   }
 
   inputCount(componentIndex: number): number {
@@ -62,8 +65,8 @@ export class FlatComponentLayout implements ComponentLayout {
     return this._outputOffsets[componentIndex] ?? 0;
   }
 
-  stateOffset(_componentIndex: number): number {
-    return 0;
+  stateOffset(componentIndex: number): number {
+    return this._stateOffsets[componentIndex] ?? 0;
   }
 
   getProperty(componentIndex: number, key: string): PropertyValue | undefined {
@@ -84,6 +87,8 @@ export class FlatComponentLayout implements ComponentLayout {
 export class CompiledCircuitImpl implements CompiledCircuit {
   readonly netCount: number;
   readonly componentCount: number;
+  readonly totalStateSlots: number;
+  readonly signalArraySize: number;
 
   /** Type ID per component slot — indexes into executeFns. */
   readonly typeIds: Uint8Array;
@@ -134,6 +139,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   constructor(fields: {
     netCount: number;
     componentCount: number;
+    totalStateSlots?: number;
     typeIds: Uint8Array;
     executeFns: ExecuteFunction[];
     layout: FlatComponentLayout;
@@ -149,6 +155,8 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
+    this.totalStateSlots = fields.totalStateSlots ?? 0;
+    this.signalArraySize = fields.netCount + (fields.totalStateSlots ?? 0);
     this.typeIds = fields.typeIds;
     this.executeFns = fields.executeFns;
     this.layout = fields.layout;

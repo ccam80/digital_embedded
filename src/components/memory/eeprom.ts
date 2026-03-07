@@ -323,6 +323,7 @@ export const EEPROMDefinition: ComponentDefinition = {
   attributeMap: EEPROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "EEPROM — electrically-erasable ROM. WE-edge write, combinational read.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };
 
@@ -505,5 +506,6 @@ export const EEPROMDualPortDefinition: ComponentDefinition = {
   attributeMap: EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "EEPROMDualPort — EEPROM with clock-synchronous write and combinational read.",
+  stateSlotCount: 1,
   defaultDelay: 10,
 };

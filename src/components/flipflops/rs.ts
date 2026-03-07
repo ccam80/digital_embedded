@@ -249,5 +249,6 @@ export const RSDefinition: ComponentDefinition = {
     "RS Flip-Flop — edge-triggered with S/R control inputs.\n" +
     "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
     "Q and ~Q outputs are always complementary (except on S=R=1).",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

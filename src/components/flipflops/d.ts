@@ -241,5 +241,6 @@ export const DDefinition: ComponentDefinition = {
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

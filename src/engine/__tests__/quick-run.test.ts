@@ -50,6 +50,8 @@ function buildMinimalCircuit(): ConcreteCompiledCircuit {
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
     pinNetMap: new Map(),
+    totalStateSlots: 0,
+    signalArraySize: 2,
   };
 }
 

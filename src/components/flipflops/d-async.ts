@@ -264,5 +264,6 @@ export const DAsyncDefinition: ComponentDefinition = {
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "When Set and Clr are both inactive, stores D on rising clock edge.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

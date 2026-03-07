@@ -233,5 +233,6 @@ export const LookUpTableDefinition: ComponentDefinition = {
   attributeMap: LUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "LookUpTable — user-configurable combinational truth table. Output = table[input_address].",
+  stateSlotCount: 0,
   defaultDelay: 10,
 };

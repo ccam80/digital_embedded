@@ -273,5 +273,6 @@ export const ProgramMemoryDefinition: ComponentDefinition = {
   attributeMap: PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "ProgramMemory — ROM with address auto-increment for CPU instruction fetch.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

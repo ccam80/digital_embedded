@@ -322,6 +322,7 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
   attributeMap: RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "RAMSinglePort — synchronous RAM with a single read/write port.",
+  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
   defaultDelay: 10,
 };
 
@@ -435,6 +436,7 @@ export const RAMSinglePortSelDefinition: ComponentDefinition = {
   attributeMap: RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "RAMSinglePortSel — combinational RAM with chip select (CS/WE/OE).",
+  stateSlotCount: 0,
   defaultDelay: 10,
 };
 
@@ -553,6 +555,7 @@ export const RAMDualPortDefinition: ComponentDefinition = {
   attributeMap: RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "RAMDualPort — synchronous RAM with separate read/write address buses.",
+  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
   defaultDelay: 10,
 };
 
@@ -672,6 +675,7 @@ export const RAMDualAccessDefinition: ComponentDefinition = {
   attributeMap: RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "RAMDualAccess — RAM with two independent access ports (one sync, one async read).",
+  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
   defaultDelay: 10,
 };
 
@@ -770,6 +774,7 @@ export const RAMAsyncDefinition: ComponentDefinition = {
   attributeMap: RAM_ASYNC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "RAMAsync — fully asynchronous RAM. Combinational read, write-enable driven write.",
+  stateSlotCount: 0,
   defaultDelay: 10,
 };
 
@@ -882,5 +887,6 @@ export const BlockRAMDualPortDefinition: ComponentDefinition = {
   attributeMap: BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "BlockRAMDualPort — synchronous read block RAM suitable for FPGA block RAM inference.",
+  stateSlotCount: (props) => 2 + (1 << (props.getOrDefault<number>("addrBits", 4))),
   defaultDelay: 10,
 };

@@ -63,6 +63,10 @@ export interface EvaluationGroup {
  * isConcreteCompiledCircuit().
  */
 export interface ConcreteCompiledCircuit extends CompiledCircuit {
+  /** Total number of state slots allocated for all components. */
+  readonly totalStateSlots: number;
+  /** Total signal array size: netCount + totalStateSlots. */
+  readonly signalArraySize: number;
   /** Type ID per component slot (index into executeFns). */
   readonly typeIds: Uint8Array;
   /** Function table indexed by type ID. */
@@ -94,7 +98,8 @@ function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCir
     "typeIds" in c &&
     "executeFns" in c &&
     "layout" in c &&
-    "evaluationOrder" in c
+    "evaluationOrder" in c &&
+    "signalArraySize" in c
   );
 }
 
@@ -216,9 +221,10 @@ export class DigitalEngine implements SimulationEngine {
     }
 
     this._compiled = circuit;
-    this._values = new Uint32Array(circuit.netCount);
-    this._highZs = new Uint32Array(circuit.netCount);
-    this._initSignalsUndefined(circuit.netCount);
+    const arraySize = circuit.signalArraySize;
+    this._values = new Uint32Array(arraySize);
+    this._highZs = new Uint32Array(arraySize);
+    this._initSignalsUndefined(circuit.netCount, arraySize);
     this._engineState = EngineState.STOPPED;
     this._stepCount = 0;
     this._resetMicrostepCursor();
@@ -227,8 +233,9 @@ export class DigitalEngine implements SimulationEngine {
   }
 
   reset(): void {
-    const netCount = this._values.length;
-    this._initSignalsUndefined(netCount);
+    const arraySize = this._values.length;
+    const netCount = this._compiled !== null ? this._compiled.netCount : arraySize;
+    this._initSignalsUndefined(netCount, arraySize);
     this._stepCount = 0;
     this._resetMicrostepCursor();
     this._currentTime = 0n;
@@ -501,10 +508,16 @@ export class DigitalEngine implements SimulationEngine {
   // Private: signal helpers
   // -------------------------------------------------------------------------
 
-  private _initSignalsUndefined(netCount: number): void {
-    // UNDEFINED: value=0, highZ=0xFFFFFFFF (all bits high-Z)
-    this._values.fill(0);
-    this._highZs.fill(0xffffffff);
+  private _initSignalsUndefined(netCount: number, arraySize?: number): void {
+    const totalSize = arraySize ?? netCount;
+    // Net portion: UNDEFINED (value=0, highZ=0xFFFFFFFF)
+    this._values.fill(0, 0, netCount);
+    this._highZs.fill(0xffffffff, 0, netCount);
+    // State portion: initialized to 0
+    if (totalSize > netCount) {
+      this._values.fill(0, netCount, totalSize);
+      this._highZs.fill(0, netCount, totalSize);
+    }
     this._undefinedFlags = new Uint8Array(netCount);
     this._undefinedFlags.fill(1);
   }

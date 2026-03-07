@@ -333,5 +333,6 @@ export const CounterPresetDefinition: ComponentDefinition = {
     "CounterPreset — edge-triggered up/down counter with preset load.\n" +
     "dir=0: counts up; dir=1: counts down. clr clears to 0, ld loads from 'in'.\n" +
     "maxValue property sets the wrap-around value.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

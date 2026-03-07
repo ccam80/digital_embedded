@@ -247,5 +247,6 @@ export const JKDefinition: ComponentDefinition = {
     "JK Flip-Flop — edge-triggered with J/K control inputs.\n" +
     "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.\n" +
     "Q and ~Q outputs are always complementary.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

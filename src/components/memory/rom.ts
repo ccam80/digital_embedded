@@ -280,6 +280,7 @@ export const ROMDefinition: ComponentDefinition = {
   attributeMap: ROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "ROM — read-only memory. If sel=1, output D = memory[A].",
+  stateSlotCount: 0,
   defaultDelay: 10,
 };
 
@@ -447,5 +448,6 @@ export const ROMDualPortDefinition: ComponentDefinition = {
   attributeMap: ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText: "ROMDualPort — dual-port read-only memory with two independent read ports.",
+  stateSlotCount: 0,
   defaultDelay: 10,
 };

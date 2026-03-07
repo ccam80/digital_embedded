@@ -222,5 +222,6 @@ export const TransGateDefinition: ComponentDefinition = {
   attributeMap: TRANS_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "TransGate — CMOS transmission gate. S=1, ~S=0 → A and B connected.",
+  stateSlotCount: 1,
   defaultDelay: 0,
 };

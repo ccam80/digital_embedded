@@ -198,5 +198,6 @@ export const PFETDefinition: ComponentDefinition = {
   attributeMap: PFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "PFET — P-channel MOSFET. G=0 → conducting.",
+  stateSlotCount: 1,
   defaultDelay: 0,
 };

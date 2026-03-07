@@ -216,5 +216,6 @@ export const PRNGDefinition: ComponentDefinition = {
   attributeMap: PRNG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
   helpText: "PRNG — pseudo-random number generator (LFSR-based). se=1 seeds; ne=1 advances on rising clock edge.",
+  stateSlotCount: 2,
   defaultDelay: 10,
 };

@@ -17,7 +17,8 @@
 
 import type { Circuit, Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
-import type { ComponentRegistry, ExecuteFunction } from "@/core/registry";
+import type { ComponentRegistry, ExecuteFunction, ComponentDefinition } from "@/core/registry";
+import { PropertyBag } from "@/core/properties";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import { BitsException } from "@/core/errors";
@@ -509,14 +510,35 @@ export function compileCircuit(
     componentPropertiesList.push(propMap);
   }
 
+  // -----------------------------------------------------------------------
+  // Step 6b: Allocate state slots per component
+  // -----------------------------------------------------------------------
+
+  const stateOffsets = new Int32Array(componentCount);
+  let totalStateSlots = 0;
+
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const def = registry.get(el.typeId)!;
+    const slotSpec = (def as ComponentDefinition & { stateSlotCount?: number | ((props: PropertyBag) => number) }).stateSlotCount;
+    let resolvedSlots = 0;
+    if (typeof slotSpec === "function") {
+      const props = new PropertyBag(componentPropertiesList[i]!);
+      resolvedSlots = slotSpec(props);
+    } else if (typeof slotSpec === "number") {
+      resolvedSlots = slotSpec;
+    }
+    stateOffsets[i] = netCount + totalStateSlots;
+    totalStateSlots += resolvedSlots;
+  }
+
   const layout = new FlatComponentLayout(
-    // inputOffsets here store the first INPUT NET ID for each component
     buildNetIdOffsets(componentInputNets),
-    // outputOffsets here store the first OUTPUT NET ID for each component
     buildNetIdOffsets(componentOutputNets),
     inputCounts,
     outputCounts,
     componentPropertiesList,
+    stateOffsets,
   );
 
   // -----------------------------------------------------------------------
@@ -763,6 +785,7 @@ export function compileCircuit(
   return new CompiledCircuitImpl({
     netCount,
     componentCount,
+    totalStateSlots,
     typeIds,
     executeFns,
     layout,
