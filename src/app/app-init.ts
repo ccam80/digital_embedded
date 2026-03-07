@@ -35,6 +35,7 @@ import { deserializeCircuit } from '../io/load.js';
 import { serializeCircuit } from '../io/save.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
 import { compileCircuit } from '../engine/compiler.js';
+import { ClockManager } from '../engine/clock.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
 import { EngineState } from '../core/engine-interface.js';
 import { BitVector } from '../core/signal.js';
@@ -95,6 +96,7 @@ export function initApp(search?: string): void {
   const binding = createEditorBinding();
   let compiledDirty = true;
   let compiled: CompiledCircuitImpl | null = null;
+  let clockManager: ClockManager | null = null;
 
   function compileAndBind(): boolean {
     if (binding.isBound) {
@@ -106,6 +108,7 @@ export function initApp(search?: string): void {
       compiled = compileCircuit(circuit, registry);
       engine.init(compiled);
       binding.bind(circuit, engine, compiled.wireToNetId, compiled.pinNetMap);
+      clockManager = new ClockManager(compiled);
       compiledDirty = false;
       return true;
     } catch (err) {
@@ -680,6 +683,7 @@ export function initApp(search?: string): void {
   document.getElementById('menu-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     if (engine.getState() === EngineState.RUNNING) engine.stop();
+    if (clockManager !== null) clockManager.advanceClocks(engine.getSignalArray());
     engine.step();
     scheduleRender();
   });

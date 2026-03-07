@@ -167,18 +167,23 @@ export class OscillationError extends SimulationError {
   /** Number of iterations attempted before giving up. */
   readonly iterations: number;
 
+  /** Indices of the components confirmed to be oscillating. */
+  readonly componentIndices: number[];
+
   constructor(
     message: string,
     options?: {
       componentId?: string;
       netId?: number;
       iterations?: number;
+      componentIndices?: number[];
       cause?: unknown;
     },
   ) {
     super(message, options);
     this.name = "OscillationError";
     this.iterations = options?.iterations ?? 0;
+    this.componentIndices = options?.componentIndices ?? [];
   }
 }
 

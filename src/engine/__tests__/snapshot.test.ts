@@ -76,6 +76,8 @@ function buildCircuit(
     labelToNetId: new Map(),
     wireToNetId: new Map(),
     pinNetMap: new Map(),
+    resetComponentIndices: new Uint32Array(0),
+    busResolver: null,
     totalStateSlots: 0,
     signalArraySize: netCount,
   };

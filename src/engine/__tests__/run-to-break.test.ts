@@ -85,6 +85,8 @@ function buildCircuit(
     labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
     pinNetMap: new Map(),
+    resetComponentIndices: new Uint32Array(0),
+    busResolver: null,
     totalStateSlots: 0,
     signalArraySize: netCount,
   };
@@ -131,6 +133,7 @@ describe("RunToBreak", () => {
 
     const engine = new DigitalEngine("level");
     engine.init(compiled);
+    callCount = 0;
 
     const result = run(engine, compiled, 100);
 

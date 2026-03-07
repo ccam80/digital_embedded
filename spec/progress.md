@@ -22,9 +22,9 @@
 - [x] Task 2.3c: Memory Components and PRNG (Two-Phase)
 
 ## Wave 3: Engine Subsystem Integration
-- [ ] Task 3.1: Bus Resolution Integration
-- [ ] Task 3.2: Noise Mode / Init Sequence Integration
-- [ ] Task 3.3: Oscillation Detection Integration
+- [x] Task 3.1: Bus Resolution Integration
+- [x] Task 3.2: Noise Mode / Init Sequence Integration
+- [x] Task 3.3: Oscillation Detection Integration
 
 ## Wave 4: Clock and Switch Network
 - [ ] Task 4.1: Clock Manager as External Utility
@@ -144,3 +144,32 @@
 - **Files modified**: src/components/memory/ram.ts, src/components/memory/eeprom.ts, src/components/arithmetic/prng.ts, src/components/memory/__tests__/ram.test.ts, src/components/memory/__tests__/eeprom.test.ts, src/components/arithmetic/__tests__/arithmetic-utils.test.ts, src/components/memory/__tests__/two-phase-memory.test.ts
 - **Tests**: 270/270 passing across affected test files (105 ram.test.ts + 34 eeprom.test.ts + 99 arithmetic-utils.test.ts + 32 two-phase-memory.test.ts)
 - **Changes summary**: Split edge-triggered RAM/EEPROM/PRNG executeFns into sampleFn + executeFn. Added sampleRAMSinglePort, sampleRAMDualPort, sampleRAMDualAccess, sampleBlockRAMDualPort to ram.ts. Added sampleEEPROM, sampleEEPROMDualPort to eeprom.ts. Added samplePRNG and makeSamplePRNG to prng.ts. Each sampleFn handles clock/WE edge detection and memory writes; executeFn only reads from memory and writes outputs. Set sampleFn on RAMSinglePortDefinition, RAMDualPortDefinition, RAMDualAccessDefinition, BlockRAMDualPortDefinition, EEPROMDefinition, EEPROMDualPortDefinition, PRNGDefinition. Confirmed RAMSinglePortSelDefinition, RAMAsyncDefinition (combinational) have no sampleFn. Confirmed ROMDefinition and LookUpTableDefinition have no sampleFn. Updated existing tests in ram.test.ts, eeprom.test.ts, and arithmetic-utils.test.ts to call sampleFn before executeFn for write-then-read scenarios. Added 18 new tests to two-phase-memory.test.ts covering RAM sample/execute split, EEPROM sample/execute split, PRNG sample/execute split, and ROM/LookupTable no-sampleFn confirmation.
+
+## Task 3.2: Noise Mode / Init Sequence Integration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/init-sequence-integration.test.ts
+- **Files modified**: src/engine/compiled-circuit.ts, src/engine/compiler.ts, src/engine/digital-engine.ts, src/engine/__tests__/digital-engine.test.ts, src/engine/__tests__/clock.test.ts, src/engine/__tests__/micro-step.test.ts, src/engine/__tests__/quick-run.test.ts, src/engine/__tests__/run-to-break.test.ts, src/engine/__tests__/snapshot.test.ts, src/engine/__tests__/delay.test.ts, src/engine/__tests__/oscillation-integration.test.ts
+- **Tests**: 4/4 passing (init-sequence-integration.test.ts); 158/163 engine tests passing (5 failures: 2 pre-existing delay.test.ts baseline failures + 3 pre-existing oscillation-integration.test.ts failures from Task 3.3)
+- **Changes summary**: Added `resetComponentIndices: Uint32Array` to `CompiledCircuitImpl` (compiled-circuit.ts). Compiler scans for Reset components by typeId and builds `resetComponentIndices` array. `DigitalEngine` implements `InitializableEngine` interface with getters for `state`, `highZs`, `snapshotBuffer`, `typeIds`, `executeFns`, `sampleFns`, `layout`, `evaluationOrder`, `resetComponentIndices`. Engine `init()` calls `initializeCircuit(this)` after allocating signal arrays. Added `_initSnapshotBuffer` (state-sized) for `evaluateSynchronized` during init. `_evaluateFeedbackGroup()` uses `_compiled.sccSnapshotBuffer.subarray(0, outputNets.length)` instead of allocating `new Uint32Array` per iteration. Updated 8 engine test files to include `resetComponentIndices: new Uint32Array(0)` in ConcreteCompiledCircuit mocks. Reset side-effect counters in digital-engine.test.ts and run-to-break.test.ts after `engine.init()` since init sequence now evaluates components during initialization.
+
+## Task 3.3: Oscillation Detection Integration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/oscillation-integration.test.ts
+- **Files modified**: src/engine/oscillation.ts, src/core/errors.ts, src/engine/digital-engine.ts
+- **Tests**: 3/3 passing (oscillation-integration.test.ts); 166/168 engine tests passing (2 pre-existing delay.test.ts failures)
+- **Changes summary**: Added `COLLECTION_STEPS = 100` constant to oscillation.ts. Added `componentIndices: number[]` field to `OscillationError` in errors.ts with constructor support. Wired `OscillationDetector` into `_evaluateFeedbackGroup()` in digital-engine.ts: added `_oscillationDetector` field, imported `OscillationDetector`, `COLLECTION_STEPS`, and `OscillationError`. In `_evaluateFeedbackGroup()`: detector resets at start, ticks each iteration, and when the main loop exhausts `MAX_FEEDBACK_ITERATIONS` without convergence, runs `COLLECTION_STEPS` additional iterations collecting which components' outputs changed. Throws `OscillationError` with the confirmed oscillating component indices. Added 3 integration tests: ring oscillator throws OscillationError with 3 component indices, SR latch (NOR gates) converges without throwing, and exception contains correct componentIndices and iterations fields.
+
+## Task 3.1: Bus Resolution Integration
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/engine/compiled-circuit.ts, src/engine/compiler.ts, src/engine/digital-engine.ts, src/engine/__tests__/bus-resolution.test.ts, src/engine/__tests__/digital-engine.test.ts, src/engine/__tests__/clock.test.ts, src/engine/__tests__/delay.test.ts, src/engine/__tests__/micro-step.test.ts, src/engine/__tests__/quick-run.test.ts, src/engine/__tests__/run-to-break.test.ts, src/engine/__tests__/snapshot.test.ts, src/engine/__tests__/noise-mode.test.ts
+- **Tests**: 21/21 passing (bus-resolution.test.ts: 9 BusNet unit + 7 BusResolver unit + 5 BusIntegration integration); 165/168 engine tests passing (3 pre-existing failures: 2 delay.test.ts baseline + 1 oscillation-integration.test.ts from concurrent task)
+- **Changes summary**: Wired existing BusResolver into compiler and engine. CompiledCircuitImpl gains `busResolver: BusResolver | null` and `multiDriverNets: Set<number>`. Compiler step 7 changed `netDriver` from `Map<number, number>` to `Map<number, number[]>` to track all drivers per net. New step 7b detects multi-driver nets (drivers.length > 1), allocates shadow driver nets so each driver writes to a private slot (preventing overwrite), creates BusResolver with shadow net IDs as drivers and original shared net as output, determines pull-resistor type from PullUp/PullDown typeIds, shifts state offsets to accommodate shadow nets, and remaps wiring table entries. ConcreteCompiledCircuit interface gains `busResolver: BusResolver | null`. Engine `_stepLevel()` calls `busResolver.checkAllBurns()` after all groups and throws BurnException on conflict. `_evaluateGroupOnce()` calls `busResolver.onNetChanged()` for all output nets unconditionally. `_evaluateFeedbackGroup()` calls `busResolver.onNetChanged()` for changed nets after each iteration. Updated 8 engine test files to include `busResolver: null` in ConcreteCompiledCircuit mocks. Added 5 integration tests: compiler_identifies_multi_driver_nets, tri_state_resolves_correctly, burn_detected_on_conflicting_drivers, pull_up_resolves_floating_net, single_driver_nets_have_no_bus_resolver.
+
+---
+## Wave 3 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1

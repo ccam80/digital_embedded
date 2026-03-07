@@ -26,6 +26,8 @@ import { CompiledCircuitImpl, FlatComponentLayout } from "./compiled-circuit.js"
 import type { EvaluationGroup } from "./digital-engine.js";
 import { findSCCs, hasSelfLoop } from "./tarjan.js";
 import { topologicalSort } from "./topological-sort.js";
+import { BusResolver } from "./bus-resolution.js";
+import type { PullResistor } from "./bus-resolution.js";
 
 // ---------------------------------------------------------------------------
 // CompilationWarning — non-fatal issue found during compilation
@@ -521,12 +523,17 @@ export function compileCircuit(
 
   // adjacency[i] = list of components j such that component i depends on j
   // (i.e. i reads from a net that j writes to).
-  // Build a map: netId → component that outputs to it
-  const netDriver = new Map<number, number>(); // netId → component index
+  // Build a map: netId → list of component indices that output to it
+  const netDrivers = new Map<number, number[]>();
 
   for (let i = 0; i < componentCount; i++) {
     for (const netId of componentOutputNets[i]!) {
-      netDriver.set(netId, i);
+      let drivers = netDrivers.get(netId);
+      if (drivers === undefined) {
+        drivers = [];
+        netDrivers.set(netId, drivers);
+      }
+      drivers.push(i);
     }
   }
 
@@ -536,13 +543,100 @@ export function compileCircuit(
     const deps: number[] = [];
     const seen = new Set<number>();
     for (const netId of componentInputNets[i]!) {
-      const driver = netDriver.get(netId);
-      if (driver !== undefined && driver !== i && !seen.has(driver)) {
-        deps.push(driver);
-        seen.add(driver);
+      const drivers = netDrivers.get(netId);
+      if (drivers !== undefined) {
+        for (const driver of drivers) {
+          if (driver !== i && !seen.has(driver)) {
+            deps.push(driver);
+            seen.add(driver);
+          }
+        }
       }
     }
     adjacency.push(deps);
+  }
+
+  // -----------------------------------------------------------------------
+  // Step 7b: Detect multi-driver nets and create BusResolver
+  // -----------------------------------------------------------------------
+
+  const multiDriverNets = new Set<number>();
+  let busResolver: BusResolver | null = null;
+  let shadowNetCount = 0;
+
+  for (const [netId, drivers] of netDrivers) {
+    if (drivers.length > 1) {
+      multiDriverNets.add(netId);
+    }
+  }
+
+  if (multiDriverNets.size > 0) {
+    busResolver = new BusResolver();
+
+    // Allocate shadow driver nets: each driver of a multi-driver net gets
+    // its own private net slot so components don't overwrite each other.
+    // The BusResolver combines these shadow nets into the shared output net.
+    let nextShadowNetId = netCount;
+
+    // Track remapping: for each (componentIndex, outputPinIndex in componentOutputNets),
+    // if the output net is multi-driver, remap to a shadow net.
+    // shadowRemap[componentIndex] = Map<outputPinIndex, shadowNetId>
+    const shadowRemap = new Map<number, Map<number, number>>();
+
+    for (const sharedNetId of multiDriverNets) {
+      const drivers = netDrivers.get(sharedNetId)!;
+
+      let pull: PullResistor = "none";
+      for (const driverIdx of drivers) {
+        const el = elements[driverIdx]!;
+        if (el.typeId === "PullUp") {
+          pull = "up";
+          break;
+        }
+        if (el.typeId === "PullDown") {
+          pull = "down";
+          break;
+        }
+      }
+
+      const shadowNetIds: number[] = [];
+
+      for (const driverIdx of drivers) {
+        const outNets = componentOutputNets[driverIdx]!;
+        for (let pinIdx = 0; pinIdx < outNets.length; pinIdx++) {
+          if (outNets[pinIdx] === sharedNetId) {
+            const shadowId = nextShadowNetId++;
+            shadowNetIds.push(shadowId);
+
+            let remap = shadowRemap.get(driverIdx);
+            if (remap === undefined) {
+              remap = new Map();
+              shadowRemap.set(driverIdx, remap);
+            }
+            remap.set(pinIdx, shadowId);
+          }
+        }
+      }
+
+      busResolver.addBusNet(sharedNetId, shadowNetIds, pull);
+    }
+
+    // Apply shadow remapping to the wiring table: replace each driver's
+    // output net entry with its shadow net ID so executeFns write to the
+    // shadow slot instead of the shared net.
+    for (const [compIdx, remap] of shadowRemap) {
+      const outBase = outputOffsets[compIdx]!;
+      for (const [pinIdx, shadowId] of remap) {
+        wiringTable[outBase + pinIdx] = shadowId;
+      }
+    }
+
+    // Track extra shadow nets for signal array sizing.
+    // Shift state offsets to make room for shadow nets in the signal array.
+    shadowNetCount = nextShadowNetId - netCount;
+    for (let i = 0; i < componentCount; i++) {
+      stateOffsets[i] += shadowNetCount;
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -694,6 +788,19 @@ export function compileCircuit(
   const sequentialComponents = new Uint32Array(sequentialIndices);
 
   // -----------------------------------------------------------------------
+  // Step 12b: Identify Reset components
+  // -----------------------------------------------------------------------
+
+  const resetIndices: number[] = [];
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    if (el.typeId === "Reset") {
+      resetIndices.push(i);
+    }
+  }
+  const resetComponentIndices = new Uint32Array(resetIndices);
+
+  // -----------------------------------------------------------------------
   // Step 13: Build labelToNetId
   // -----------------------------------------------------------------------
 
@@ -767,7 +874,7 @@ export function compileCircuit(
   return new CompiledCircuitImpl({
     netCount,
     componentCount,
-    totalStateSlots,
+    totalStateSlots: totalStateSlots + shadowNetCount,
     typeIds,
     executeFns,
     sampleFns,
@@ -782,6 +889,9 @@ export function compileCircuit(
     labelToNetId,
     wireToNetId,
     pinNetMap,
+    resetComponentIndices,
+    busResolver,
+    multiDriverNets,
   });
 }
 

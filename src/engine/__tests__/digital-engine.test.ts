@@ -109,6 +109,8 @@ function buildCircuit(
     labelToNetId: new Map(),
     wireToNetId: new Map(),
     pinNetMap: new Map(),
+    resetComponentIndices: new Uint32Array(0),
+    busResolver: null,
   };
 }
 
@@ -230,6 +232,7 @@ describe("DigitalEngine", () => {
     const circuit = buildCircuit(2, inputNets, outputNets, executeFns, typeIds, evaluationOrder);
     const engine = new DigitalEngine("level");
     engine.init(circuit);
+    callCount = 0;
 
     setNet(engine, 0, 0); // input = 0
 
@@ -313,6 +316,7 @@ describe("DigitalEngine", () => {
     const circuit = buildCircuit(3, inputNets, outputNets, executeFns, typeIds, evaluationOrder);
     const engine = new DigitalEngine("microstep");
     engine.init(circuit);
+    evaluated.length = 0;
 
     // First step: evaluate component 0 only
     engine.step();

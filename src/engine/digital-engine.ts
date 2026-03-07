@@ -31,6 +31,11 @@ import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 import type { CircuitElement } from "@/core/element";
 import type { Wire } from "@/core/circuit";
 import type { EvaluationMode } from "./evaluation-mode.js";
+import { initializeCircuit } from "./init-sequence.js";
+import type { InitializableEngine } from "./init-sequence.js";
+import type { BusResolver } from "./bus-resolution.js";
+import { OscillationError } from "@/core/errors.js";
+import { OscillationDetector, COLLECTION_STEPS } from "./oscillation.js";
 
 // ---------------------------------------------------------------------------
 // EvaluationGroup — one group in the topological evaluation order
@@ -95,6 +100,10 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly wireToNetId: Map<Wire, number>;
   /** Maps "{instanceId}:{pinLabel}" keys to net IDs for pin-level signal access. */
   readonly pinNetMap: Map<string, number>;
+  /** Indices of Reset components (if any). Used by init sequence. */
+  readonly resetComponentIndices: Uint32Array;
+  /** Bus resolver for multi-driver nets, or null if no multi-driver nets. */
+  readonly busResolver: BusResolver | null;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -162,7 +171,7 @@ interface EngineSnapshot {
  * components according to the selected mode. The compiled circuit supplies
  * the function table, wiring, and evaluation order.
  */
-export class DigitalEngine implements SimulationEngine {
+export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _mode: EvaluationMode;
   private _engineState: EngineState = EngineState.STOPPED;
 
@@ -195,6 +204,12 @@ export class DigitalEngine implements SimulationEngine {
   // Continuous run handle (requestAnimationFrame id or -1)
   private _rafHandle = -1;
 
+  // Pre-allocated buffer for init-sequence's evaluateSynchronized (same size as state)
+  private _initSnapshotBuffer: Uint32Array = new Uint32Array(0);
+
+  // Oscillation detection for feedback groups
+  private _oscillationDetector: OscillationDetector = new OscillationDetector();
+
   // Snapshot ring buffer
   private _snapshots: EngineSnapshot[] = [];
   private _nextSnapshotId = 0;
@@ -203,6 +218,54 @@ export class DigitalEngine implements SimulationEngine {
 
   constructor(mode: EvaluationMode = "level") {
     this._mode = mode;
+  }
+
+  // -------------------------------------------------------------------------
+  // InitializableEngine getters
+  // -------------------------------------------------------------------------
+
+  get state(): Uint32Array {
+    return this._values;
+  }
+
+  get highZs(): Uint32Array {
+    return this._highZs;
+  }
+
+  get snapshotBuffer(): Uint32Array {
+    return this._initSnapshotBuffer;
+  }
+
+  get typeIds(): Uint8Array {
+    return this._compiled !== null ? this._compiled.typeIds : new Uint8Array(0);
+  }
+
+  get executeFns(): ExecuteFunction[] {
+    return this._compiled !== null ? this._compiled.executeFns : [];
+  }
+
+  get sampleFns(): (ExecuteFunction | null)[] {
+    return this._compiled !== null ? this._compiled.sampleFns : [];
+  }
+
+  get layout(): ComponentLayout {
+    if (this._compiled !== null) return this._compiled.layout;
+    return {
+      wiringTable: new Int32Array(0),
+      inputCount: () => 0,
+      inputOffset: () => 0,
+      outputCount: () => 0,
+      outputOffset: () => 0,
+      stateOffset: () => 0,
+    };
+  }
+
+  get evaluationOrder(): EvaluationGroup[] {
+    return this._compiled !== null ? this._compiled.evaluationOrder : [];
+  }
+
+  get resetComponentIndices(): Uint32Array {
+    return this._compiled !== null ? this._compiled.resetComponentIndices : new Uint32Array(0);
   }
 
   // -------------------------------------------------------------------------
@@ -235,6 +298,8 @@ export class DigitalEngine implements SimulationEngine {
     this._resetMicrostepCursor();
     this._currentTime = 0n;
     this._pendingTimedEvents = [];
+    this._initSnapshotBuffer = new Uint32Array(arraySize);
+    initializeCircuit(this);
   }
 
   reset(): void {
@@ -489,6 +554,17 @@ export class DigitalEngine implements SimulationEngine {
   // -------------------------------------------------------------------------
 
   /**
+   * Returns the raw signal value array owned by the engine.
+   *
+   * Callers such as ClockManager write clock outputs directly into this
+   * array before each engine.step(). The array is sized to
+   * `compiled.signalArraySize` (nets + state slots).
+   */
+  getSignalArray(): Uint32Array {
+    return this._values;
+  }
+
+  /**
    * Returns the most recently evaluated component during micro-step mode,
    * or undefined if no evaluation has occurred yet.
    */
@@ -541,7 +617,7 @@ export class DigitalEngine implements SimulationEngine {
 
   private _stepLevel(): void {
     const compiled = this._compiled!;
-    const { executeFns, sampleFns, typeIds, layout, evaluationOrder, sequentialComponents } = compiled;
+    const { executeFns, sampleFns, typeIds, layout, evaluationOrder, sequentialComponents, busResolver } = compiled;
     const state = this._values;
 
     for (let s = 0; s < sequentialComponents.length; s++) {
@@ -561,6 +637,13 @@ export class DigitalEngine implements SimulationEngine {
         this._evaluateGroupOnce(group, executeFns, typeIds, layout, state);
       }
     }
+
+    if (busResolver !== null) {
+      const burns = busResolver.checkAllBurns();
+      if (burns.length > 0) {
+        throw burns[0]!;
+      }
+    }
   }
 
   private _evaluateGroupOnce(
@@ -576,6 +659,14 @@ export class DigitalEngine implements SimulationEngine {
       const typeId = typeIds[idx]!;
       executeFns[typeId]!(idx, state, this._highZs, layout);
     }
+
+    const busResolver = this._compiled!.busResolver;
+    if (busResolver !== null) {
+      const outputNets = this._collectOutputNets(indices, layout);
+      for (let n = 0; n < outputNets.length; n++) {
+        busResolver.onNetChanged(outputNets[n]!, state, this._highZs);
+      }
+    }
   }
 
   private _evaluateFeedbackGroup(
@@ -590,9 +681,13 @@ export class DigitalEngine implements SimulationEngine {
     // Collect all output net IDs touched by this SCC for change detection
     const outputNets = this._collectOutputNets(indices, layout);
 
+    const snapshotBuf = this._compiled!.sccSnapshotBuffer;
+    const detector = this._oscillationDetector;
+    detector.reset();
+
     for (let iter = 0; iter < MAX_FEEDBACK_ITERATIONS; iter++) {
-      // Snapshot current output values for change detection
-      const snapshot = new Uint32Array(outputNets.length);
+      // Snapshot current output values for change detection using pre-allocated buffer
+      const snapshot = snapshotBuf.subarray(0, outputNets.length);
       for (let n = 0; n < outputNets.length; n++) {
         snapshot[n] = state[outputNets[n]!]!;
       }
@@ -604,19 +699,62 @@ export class DigitalEngine implements SimulationEngine {
         executeFns[typeId]!(idx, state, this._highZs, layout);
       }
 
-      // Check if outputs changed
+      detector.tick();
+
+      // Check if outputs changed; trigger bus resolution for changed nets
       let stable = true;
+      const busResolver = this._compiled!.busResolver;
       for (let n = 0; n < outputNets.length; n++) {
         if (state[outputNets[n]!] !== snapshot[n]) {
           stable = false;
-          break;
+          if (busResolver !== null) {
+            busResolver.onNetChanged(outputNets[n]!, state, this._highZs);
+          }
         }
       }
 
       if (stable) return;
     }
 
-    // Oscillation detected — leave state as-is (engine remains in ERROR-capable state)
+    // Oscillation limit exceeded — collect oscillating components
+    for (let c = 0; c < COLLECTION_STEPS; c++) {
+      const snapshot = snapshotBuf.subarray(0, outputNets.length);
+      for (let n = 0; n < outputNets.length; n++) {
+        snapshot[n] = state[outputNets[n]!]!;
+      }
+
+      for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i]!;
+        const typeId = typeIds[idx]!;
+        executeFns[typeId]!(idx, state, this._highZs, layout);
+      }
+
+      const changed: number[] = [];
+      for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i]!;
+        const outCount = layout.outputCount(idx);
+        const outOffset = layout.outputOffset(idx);
+        const wt = layout.wiringTable;
+        for (let o = 0; o < outCount; o++) {
+          const netId = wt[outOffset + o]!;
+          const snIdx = outputNets.indexOf(netId);
+          if (snIdx >= 0 && state[netId] !== snapshot[snIdx]) {
+            changed.push(idx);
+            break;
+          }
+        }
+      }
+      detector.collectOscillatingComponents(changed);
+    }
+
+    const oscillating = detector.getOscillatingComponents();
+    throw new OscillationError(
+      `Circuit oscillation detected: ${oscillating.length} component(s) failed to stabilize`,
+      {
+        iterations: MAX_FEEDBACK_ITERATIONS,
+        componentIndices: oscillating,
+      },
+    );
   }
 
   private _collectOutputNets(indices: Uint32Array, layout: ComponentLayout): number[] {

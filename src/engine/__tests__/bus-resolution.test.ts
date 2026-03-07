@@ -16,6 +16,18 @@
 import { describe, it, expect } from "vitest";
 import { BusNet, BusResolver } from "../bus-resolution.js";
 import { BurnException } from "@/core/errors.js";
+import { compileCircuit } from "../compiler.js";
+import { DigitalEngine } from "../digital-engine.js";
+import { Circuit, Wire } from "@/core/circuit";
+import { ComponentRegistry } from "@/core/registry";
+import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import { ComponentCategory } from "@/core/registry";
+import { AbstractCircuitElement } from "@/core/element";
+import type { Pin, PinDeclaration } from "@/core/pin";
+import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
+import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PropertyBag } from "@/core/properties";
+import type { PropertyBag as PropertyBagType } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -384,5 +396,293 @@ describe("BusResolver", () => {
     const burns = resolver.checkAllBurns();
     // Should be 2 burn exceptions (one per output net), not 4
     expect(burns.length).toBeLessThanOrEqual(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration test helpers — compile real circuits and run the engine
+// ---------------------------------------------------------------------------
+
+class TestElement extends AbstractCircuitElement {
+  private readonly _pins: readonly Pin[];
+
+  constructor(
+    typeId: string,
+    instanceId: string,
+    position: { x: number; y: number },
+    pinDecls: PinDeclaration[],
+    props?: PropertyBag,
+  ) {
+    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
+    this._pins = resolvePins(
+      pinDecls,
+      position,
+      0,
+      createInverterConfig([]),
+      createClockConfig([]),
+    );
+  }
+
+  getPins(): readonly Pin[] {
+    return this._pins;
+  }
+
+  draw(_ctx: RenderContext): void {}
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
+  }
+
+  getHelpText(): string {
+    return "";
+  }
+}
+
+function outputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {
+  return [
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false },
+  ];
+}
+
+function inputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {
+  return [
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false },
+  ];
+}
+
+function twoInputOneOutputPins(): PinDeclaration[] {
+  return [
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+  ];
+}
+
+const noopExecute: ExecuteFunction = (_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout) => {};
+
+function makeDefinition(
+  name: string,
+  pins: PinDeclaration[],
+  executeFn: ExecuteFunction = noopExecute,
+): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
+  return {
+    name,
+    typeId: -1,
+    factory: (props: PropertyBagType) =>
+      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+    executeFn,
+    pinLayout: pins,
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.LOGIC,
+    helpText: "",
+  };
+}
+
+function makeRegistry(...defs: (Omit<ComponentDefinition, "typeId"> & { typeId: number })[]): ComponentRegistry {
+  const registry = new ComponentRegistry();
+  for (const def of defs) {
+    registry.register(def as ComponentDefinition);
+  }
+  return registry;
+}
+
+// ---------------------------------------------------------------------------
+// BusIntegration — compiler + engine integration tests
+// ---------------------------------------------------------------------------
+
+describe("BusIntegration", () => {
+  it("compiler_identifies_multi_driver_nets", () => {
+    // Two output components (DriverA and DriverB) driving the same net via wires
+    // meeting at a common junction point.
+    // DriverA at (3,0), output pin at relative (2,0) => world (5,0)
+    // DriverB at (3,5), output pin at relative (2,0) => world (5,5)
+    // Wire from (5,5) to (5,0) merges the two output nets.
+    // ReaderC at (5,0), input pin at relative (0,0) => world (5,0)
+
+    const driverAPins = outputOnlyPin({ x: 2, y: 0 });
+    const driverBPins = outputOnlyPin({ x: 2, y: 0 });
+    const readerCPins = inputOnlyPin({ x: 0, y: 0 });
+
+    const driverADef = makeDefinition("DriverA", driverAPins);
+    const driverBDef = makeDefinition("DriverB", driverBPins);
+    const readerCDef = makeDefinition("ReaderC", readerCPins);
+    const registry = makeRegistry(driverADef, driverBDef, readerCDef);
+
+    const circuit = new Circuit();
+    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
+    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
+    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    circuit.addElement(elA);
+    circuit.addElement(elB);
+    circuit.addElement(elC);
+
+    circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
+
+    const compiled = compileCircuit(circuit, registry);
+
+    expect(compiled.busResolver).not.toBeNull();
+    expect(compiled.multiDriverNets.size).toBeGreaterThanOrEqual(1);
+  });
+
+  it("tri_state_resolves_correctly", () => {
+    // Two drivers on one net: driver A outputs 1 (not high-Z), driver B is high-Z.
+    // After step, net value should be 1.
+
+    const driverAPins = outputOnlyPin({ x: 2, y: 0 });
+    const driverBPins = outputOnlyPin({ x: 2, y: 0 });
+    const readerCPins = inputOnlyPin({ x: 0, y: 0 });
+
+    const driverAExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 1;
+      highZs[outIdx] = 0;
+    };
+
+    const driverBExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 0;
+      highZs[outIdx] = 0xffffffff;
+    };
+
+    const driverADef = makeDefinition("DriverA", driverAPins, driverAExec);
+    const driverBDef = makeDefinition("DriverB", driverBPins, driverBExec);
+    const readerCDef = makeDefinition("ReaderC", readerCPins);
+    const registry = makeRegistry(driverADef, driverBDef, readerCDef);
+
+    const circuit = new Circuit();
+    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
+    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
+    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    circuit.addElement(elA);
+    circuit.addElement(elB);
+    circuit.addElement(elC);
+
+    circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
+
+    const compiled = compileCircuit(circuit, registry);
+    const engine = new DigitalEngine("level");
+    engine.init(compiled);
+
+    engine.step();
+
+    const sharedNetId = compiled.multiDriverNets.values().next().value!;
+    expect(engine.getSignalRaw(sharedNetId)).toBe(1);
+  });
+
+  it("burn_detected_on_conflicting_drivers", () => {
+    // Two drivers on one net: driver A outputs 1, driver B outputs 0, neither high-Z.
+    // Step should throw BurnException.
+
+    const driverAPins = outputOnlyPin({ x: 2, y: 0 });
+    const driverBPins = outputOnlyPin({ x: 2, y: 0 });
+    const readerCPins = inputOnlyPin({ x: 0, y: 0 });
+
+    const driverAExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 1;
+      highZs[outIdx] = 0;
+    };
+
+    const driverBExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 0;
+      highZs[outIdx] = 0;
+    };
+
+    const driverADef = makeDefinition("DriverA", driverAPins, driverAExec);
+    const driverBDef = makeDefinition("DriverB", driverBPins, driverBExec);
+    const readerCDef = makeDefinition("ReaderC", readerCPins);
+    const registry = makeRegistry(driverADef, driverBDef, readerCDef);
+
+    const circuit = new Circuit();
+    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
+    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
+    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    circuit.addElement(elA);
+    circuit.addElement(elB);
+    circuit.addElement(elC);
+
+    circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
+
+    const compiled = compileCircuit(circuit, registry);
+    const engine = new DigitalEngine("level");
+    engine.init(compiled);
+
+    expect(() => engine.step()).toThrow(BurnException);
+  });
+
+  it("pull_up_resolves_floating_net", () => {
+    // One driver is high-Z on a net with a PullUp component. Net should resolve to all-ones.
+
+    const driverAPins = outputOnlyPin({ x: 2, y: 0 });
+    const pullUpPins = outputOnlyPin({ x: 2, y: 0 });
+    const readerCPins = inputOnlyPin({ x: 0, y: 0 });
+
+    const driverAExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 0;
+      highZs[outIdx] = 0xffffffff;
+    };
+
+    const pullUpExec: ExecuteFunction = (idx: number, state: Uint32Array, highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = 0;
+      highZs[outIdx] = 0xffffffff;
+    };
+
+    const driverADef = makeDefinition("DriverA", driverAPins, driverAExec);
+    const pullUpDef = makeDefinition("PullUp", pullUpPins, pullUpExec);
+    const readerCDef = makeDefinition("ReaderC", readerCPins);
+    const registry = makeRegistry(driverADef, pullUpDef, readerCDef);
+
+    const circuit = new Circuit();
+    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
+    const elPU = new TestElement("PullUp", "pu1", { x: 3, y: 5 }, pullUpPins);
+    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    circuit.addElement(elA);
+    circuit.addElement(elPU);
+    circuit.addElement(elC);
+
+    circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
+
+    const compiled = compileCircuit(circuit, registry);
+    const engine = new DigitalEngine("level");
+    engine.init(compiled);
+
+    engine.step();
+
+    const sharedNetId = compiled.multiDriverNets.values().next().value!;
+    expect(engine.getSignalRaw(sharedNetId)).toBe(0xffffffff >>> 0);
+  });
+
+  it("single_driver_nets_have_no_bus_resolver", () => {
+    // Simple AND gate circuit: single driver per net. No bus resolver needed.
+    const andPins = twoInputOneOutputPins();
+
+    const andExec: ExecuteFunction = (idx: number, state: Uint32Array, _highZs: Uint32Array, layout) => {
+      const wt = layout.wiringTable;
+      const inBase = layout.inputOffset(idx);
+      const outIdx = wt[layout.outputOffset(idx)]!;
+      state[outIdx] = (state[wt[inBase]!]! & state[wt[inBase + 1]!]!) >>> 0;
+    };
+
+    const andDef = makeDefinition("And", andPins, andExec);
+    const registry = makeRegistry(andDef);
+
+    const circuit = new Circuit();
+    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, andPins);
+    circuit.addElement(andEl);
+
+    const compiled = compileCircuit(circuit, registry);
+
+    expect(compiled.busResolver).toBeNull();
+    expect(compiled.multiDriverNets.size).toBe(0);
   });
 });

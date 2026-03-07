@@ -17,6 +17,7 @@ export const DEFAULT_OSCILLATION_LIMIT = 1000;
  * used to confirm which components are genuinely oscillating vs transiently
  * unstable.
  */
+export const COLLECTION_STEPS = 100;
 
 /**
  * Detects and identifies oscillating components in a feedback SCC.

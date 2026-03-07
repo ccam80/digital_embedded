@@ -16,6 +16,7 @@ import type { Wire } from "@/core/circuit";
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 import type { PropertyValue } from "@/core/properties";
 import type { EvaluationGroup } from "./digital-engine.js";
+import type { BusResolver } from "./bus-resolution.js";
 
 // ---------------------------------------------------------------------------
 // FlatComponentLayout — ComponentLayout backed by flat typed arrays
@@ -146,6 +147,15 @@ export class CompiledCircuitImpl implements CompiledCircuit {
    */
   readonly pinNetMap: Map<string, number>;
 
+  /** Indices of Reset components (if any). Used by init sequence. */
+  readonly resetComponentIndices: Uint32Array;
+
+  /** Bus resolver for multi-driver nets, or null if no multi-driver nets exist. */
+  readonly busResolver: BusResolver | null;
+
+  /** Set of net IDs that have multiple drivers (used by switch classification). */
+  readonly multiDriverNets: Set<number>;
+
   constructor(fields: {
     netCount: number;
     componentCount: number;
@@ -164,6 +174,9 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     labelToNetId: Map<string, number>;
     wireToNetId: Map<Wire, number>;
     pinNetMap: Map<string, number>;
+    resetComponentIndices?: Uint32Array;
+    busResolver?: BusResolver | null;
+    multiDriverNets?: Set<number>;
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
@@ -183,5 +196,8 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.labelToNetId = fields.labelToNetId;
     this.wireToNetId = fields.wireToNetId;
     this.pinNetMap = fields.pinNetMap;
+    this.resetComponentIndices = fields.resetComponentIndices ?? new Uint32Array(0);
+    this.busResolver = fields.busResolver ?? null;
+    this.multiDriverNets = fields.multiDriverNets ?? new Set();
   }
 }

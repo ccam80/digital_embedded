@@ -146,32 +146,32 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 71,
-      "lastAccessed": 1772847054502,
+      "accessCount": 92,
+      "lastAccessed": 1772848262461,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 59,
-      "lastAccessed": 1772845554132,
+      "accessCount": 64,
+      "lastAccessed": 1772847623285,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 33,
-      "lastAccessed": 1772846632615,
+      "accessCount": 36,
+      "lastAccessed": 1772847314244,
       "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 27,
-      "lastAccessed": 1772846348917,
+      "accessCount": 30,
+      "lastAccessed": 1772847315867,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 27,
-      "lastAccessed": 1772846350594,
+      "accessCount": 30,
+      "lastAccessed": 1772847319475,
       "type": "file"
     },
     {
