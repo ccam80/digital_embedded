@@ -281,4 +281,5 @@ export const RelayDTDefinition: ComponentDefinition = {
   helpText: "RelayDT (SPDT) — coil-controlled double-throw contact switch. C connects to T when energised, R when de-energised.",
   stateSlotCount: 1,
   defaultDelay: 0,
+  switchPins: [2, 3],
 };

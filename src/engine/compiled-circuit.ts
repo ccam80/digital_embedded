@@ -74,6 +74,17 @@ export class FlatComponentLayout implements ComponentLayout {
     return this._stateOffsets[componentIndex] ?? 0;
   }
 
+  getSwitchClassification(componentIndex: number): number {
+    if (this._switchClassification === undefined) return 0;
+    return this._switchClassification[componentIndex] ?? 0;
+  }
+
+  private _switchClassification?: Uint8Array;
+
+  setSwitchClassification(classification: Uint8Array): void {
+    this._switchClassification = classification;
+  }
+
   getProperty(componentIndex: number, key: string): PropertyValue | undefined {
     return this._componentProperties[componentIndex]?.get(key);
   }
@@ -156,6 +167,12 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Set of net IDs that have multiple drivers (used by switch classification). */
   readonly multiDriverNets: Set<number>;
 
+  /** Indices of bidirectional switch components that interact with bus resolver. */
+  readonly switchComponentIndices: Uint32Array;
+
+  /** Per-component switch classification: 0=not a switch, 1=unidirectional, 2=bidirectional. */
+  readonly switchClassification: Uint8Array;
+
   constructor(fields: {
     netCount: number;
     componentCount: number;
@@ -177,6 +194,8 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     resetComponentIndices?: Uint32Array;
     busResolver?: BusResolver | null;
     multiDriverNets?: Set<number>;
+    switchComponentIndices?: Uint32Array;
+    switchClassification?: Uint8Array;
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
@@ -199,5 +218,10 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.resetComponentIndices = fields.resetComponentIndices ?? new Uint32Array(0);
     this.busResolver = fields.busResolver ?? null;
     this.multiDriverNets = fields.multiDriverNets ?? new Set();
+    this.switchComponentIndices = fields.switchComponentIndices ?? new Uint32Array(0);
+    this.switchClassification = fields.switchClassification ?? new Uint8Array(fields.componentCount);
+    if (this.switchClassification.length > 0) {
+      this.layout.setSwitchClassification(this.switchClassification);
+    }
   }
 }

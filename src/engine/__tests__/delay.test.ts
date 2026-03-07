@@ -105,6 +105,8 @@ function buildCompiled(
     pinNetMap: new Map(),
     resetComponentIndices: new Uint32Array(0),
     busResolver: null,
+    switchComponentIndices: new Uint32Array(0),
+    switchClassification: new Uint8Array(0),
   });
 }
 

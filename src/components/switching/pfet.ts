@@ -150,11 +150,27 @@ export class PFETElement extends AbstractCircuitElement {
 // G=0 → closed=1; G=1 → closed=0 (inverted compared to NFET)
 // ---------------------------------------------------------------------------
 
-export function executePFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executePFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
-  state[stBase] = (state[wt[inBase]] & 1) ^ 1; // invert gate signal
+
+  const gate = state[wt[inBase]!]! & 1;
+  const closed = gate ^ 1;
+  state[stBase] = closed;
+
+  const classification = layout.getSwitchClassification?.(index) ?? 1;
+  if (classification !== 2) {
+    const sourceNet = wt[outBase]!;
+    const drainNet = wt[outBase + 1]!;
+    if (closed) {
+      state[drainNet] = state[sourceNet]!;
+      highZs[drainNet] = 0;
+    } else {
+      highZs[drainNet] = 0xffffffff;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -201,4 +217,5 @@ export const PFETDefinition: ComponentDefinition = {
   helpText: "PFET — P-channel MOSFET. G=0 → conducting.",
   stateSlotCount: 1,
   defaultDelay: 0,
+  switchPins: [1, 2],
 };

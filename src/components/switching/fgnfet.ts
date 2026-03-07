@@ -168,15 +168,28 @@ export class FGNFETElement extends AbstractCircuitElement {
 // State layout: [closedFlag=0, blownFlag=1]
 // ---------------------------------------------------------------------------
 
-export function executeFGNFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeFGNFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const gate = state[wt[inBase]] & 1;
-  const blown = state[stBase + 1] & 1;
+  const gate = state[wt[inBase]!]! & 1;
+  const blown = state[stBase + 1]! & 1;
+  const closed = blown ? 0 : gate;
+  state[stBase] = closed;
 
-  state[stBase] = blown ? 0 : gate;
+  const classification = layout.getSwitchClassification?.(index) ?? 1;
+  if (classification !== 2) {
+    const drainNet = wt[outBase]!;
+    const sourceNet = wt[outBase + 1]!;
+    if (closed) {
+      state[sourceNet] = state[drainNet]!;
+      highZs[sourceNet] = 0;
+    } else {
+      highZs[sourceNet] = 0xffffffff;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -231,4 +244,5 @@ export const FGNFETDefinition: ComponentDefinition = {
   helpText: "FGNFET — N-channel floating-gate MOSFET. Programmed (blown) gate permanently disables conduction.",
   stateSlotCount: 2,
   defaultDelay: 0,
+  switchPins: [1, 2],
 };

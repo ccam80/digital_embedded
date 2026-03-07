@@ -86,6 +86,12 @@ export interface ComponentLayout {
    * ExecuteFunctions use this to read bitWidth, signed, etc. at runtime.
    */
   getProperty?(componentIndex: number, key: string): PropertyValue | undefined;
+  /**
+   * Returns the switch classification for a component: 0=not a switch,
+   * 1=unidirectional, 2=bidirectional. Used by switch executeFns to choose
+   * between forwarding values directly or writing closedFlag only.
+   */
+  getSwitchClassification?(componentIndex: number): number;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +179,12 @@ export interface ComponentDefinition {
    * Defaults to 10ns when not specified.
    */
   defaultDelay?: number;
+  /**
+   * For switch components, identifies the two pin indices that form the
+   * switchable connection (e.g. drain/source for FETs, A/B for TransGate).
+   * Only switch components set this field.
+   */
+  switchPins?: [number, number];
 }
 
 // ---------------------------------------------------------------------------

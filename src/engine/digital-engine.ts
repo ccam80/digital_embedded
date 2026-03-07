@@ -104,6 +104,10 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly resetComponentIndices: Uint32Array;
   /** Bus resolver for multi-driver nets, or null if no multi-driver nets. */
   readonly busResolver: BusResolver | null;
+  /** Indices of bidirectional switch components that interact with bus resolver. */
+  readonly switchComponentIndices: Uint32Array;
+  /** Per-component switch classification: 0=not switch, 1=unidirectional, 2=bidirectional. */
+  readonly switchClassification: Uint8Array;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -210,6 +214,9 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   // Oscillation detection for feedback groups
   private _oscillationDetector: OscillationDetector = new OscillationDetector();
 
+  // Switch state tracking: previous closedFlag values for change detection
+  private _switchPrevStates: Uint32Array = new Uint32Array(0);
+
   // Snapshot ring buffer
   private _snapshots: EngineSnapshot[] = [];
   private _nextSnapshotId = 0;
@@ -299,6 +306,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._currentTime = 0n;
     this._pendingTimedEvents = [];
     this._initSnapshotBuffer = new Uint32Array(arraySize);
+    this._switchPrevStates = new Uint32Array(circuit.switchComponentIndices?.length ?? 0);
     initializeCircuit(this);
   }
 
@@ -638,6 +646,10 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       }
     }
 
+    if (compiled.switchComponentIndices !== undefined && compiled.switchComponentIndices.length > 0 && busResolver !== null) {
+      this._checkSwitchStateChanges(compiled, state);
+    }
+
     if (busResolver !== null) {
       const burns = busResolver.checkAllBurns();
       if (burns.length > 0) {
@@ -769,6 +781,41 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       }
     }
     return nets;
+  }
+
+  private _checkSwitchStateChanges(
+    compiled: ConcreteCompiledCircuit,
+    state: Uint32Array,
+  ): void {
+    const switchIndices = compiled.switchComponentIndices;
+    const layout = compiled.layout;
+    const busResolver = compiled.busResolver!;
+    let anyChanged = false;
+
+    for (let s = 0; s < switchIndices.length; s++) {
+      const compIdx = switchIndices[s]!;
+      const stBase = layout.stateOffset(compIdx);
+      const closedFlag = state[stBase]!;
+      const prevFlag = this._switchPrevStates[s]!;
+
+      if (closedFlag !== prevFlag) {
+        this._switchPrevStates[s] = closedFlag;
+        busResolver.reconfigureForSwitch(compIdx, closedFlag !== 0);
+        anyChanged = true;
+      }
+    }
+
+    if (anyChanged) {
+      const { executeFns, typeIds, evaluationOrder } = compiled;
+      for (let g = 0; g < evaluationOrder.length; g++) {
+        const group = evaluationOrder[g]!;
+        if (group.isFeedback) {
+          this._evaluateFeedbackGroup(group, executeFns, typeIds, layout, state);
+        } else {
+          this._evaluateGroupOnce(group, executeFns, typeIds, layout, state);
+        }
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

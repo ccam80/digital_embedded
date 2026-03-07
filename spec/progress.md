@@ -27,13 +27,13 @@
 - [x] Task 3.3: Oscillation Detection Integration
 
 ## Wave 4: Clock and Switch Network
-- [ ] Task 4.1: Clock Manager as External Utility
-- [ ] Task 4.2: Switch Network Integration
+- [x] Task 4.1: Clock Manager as External Utility
+- [x] Task 4.2: Switch Network Integration
 
 ## Wave 5: Web Worker Mode
 - [ ] Task 5.1: Worker Init Protocol
 - [ ] Task 5.2: Worker Signal Synchronization
-- [ ] Task 5.3: createEngine Factory Fix
+- [x] Task 5.3: createEngine Factory Fix
 
 ## Task prereq-executefn-signature: ExecuteFunction Signature Update
 - **Status**: complete
@@ -172,4 +172,42 @@
 ## Wave 3 Summary
 - **Status**: complete
 - **Tasks completed**: 3/3
+- **Rounds**: 1
+
+## Task 4.1: Clock Manager as External Utility
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/clock-integration.test.ts
+- **Files modified**: src/engine/digital-engine.ts, src/app/app-init.ts
+- **Tests**: 3/3 passing (clock-integration.test.ts); 169/171 engine tests passing (2 pre-existing delay.test.ts failures)
+- **Changes summary**: Added `getSignalArray(): Uint32Array` public getter to `DigitalEngine` returning `_values` array. In `app-init.ts`: imported `ClockManager`, created `clockManager` variable initialized in `compileAndBind()` after `engine.init()`. Added `clockManager.advanceClocks(engine.getSignalArray())` call before `engine.step()` in the menu-step handler and before the In component toggle step. Created 3 integration tests: `clock_advances_before_step` verifies clock toggles and DFF latches D on rising edge, `step_without_clock_advance_does_not_toggle` verifies step alone does not toggle clock or latch DFF, `multi_frequency_clocks` verifies fast clock (freq=1) toggles 4 times in 4 steps while slow clock (freq=2) toggles 2 times.
+
+## Task 4.2: Switch Network Integration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/switch-network.test.ts
+- **Files modified**: src/core/registry.ts, src/engine/compiled-circuit.ts, src/engine/compiler.ts, src/engine/digital-engine.ts, src/components/switching/nfet.ts, src/components/switching/pfet.ts, src/components/switching/fgnfet.ts, src/components/switching/fgpfet.ts, src/components/switching/trans-gate.ts, src/components/switching/relay.ts, src/components/switching/relay-dt.ts
+- **Tests**: 8/8 passing (switch-network.test.ts); 375/380 engine+switching tests passing (5 pre-existing baseline failures: FGNFET/FGPFET/Fuse blown rendering x3, delay.test.ts x2)
+- **Changes summary**: Added `switchPins?: [number, number]` to ComponentDefinition in registry.ts. Added `getSwitchClassification?(componentIndex: number): number` to ComponentLayout. FlatComponentLayout gains `_switchClassification` field and `setSwitchClassification()`/`getSwitchClassification()` methods. CompiledCircuitImpl gains `switchComponentIndices: Uint32Array` and `switchClassification: Uint8Array`. Compiler step 7c classifies components with switchPins: if both nets are in multiDriverNets, classification=2 (bidirectional, registered with busResolver.registerSwitch()), otherwise classification=1 (unidirectional). DigitalEngine gains `_switchPrevStates: Uint32Array` tracking previous closedFlag values; `_checkSwitchStateChanges()` scans after combinational evaluation and calls `busResolver.reconfigureForSwitch()` on changes, then re-evaluates all groups. Updated 7 switching executeFns: NFET/PFET/TransGate/FGNFET/FGPFET forward values or set highZ for unidirectional mode (classification !== 2), skip forwarding for bidirectional mode (bus resolver handles). Added switchPins to all 7 switching ComponentDefinitions. Engine defensively handles missing switchComponentIndices for backward compatibility with existing test mocks. 8 new tests: nfet_forwards_when_gate_high, nfet_highz_when_gate_low, transgate_closed_when_s_neq_ns, transgate_open_when_s_eq_ns, transgate_open_when_control_highz, unidirectional_nfet_no_bus_resolver, bidirectional_switch_registered_with_bus_resolver, switch_feedback_converges.
+
+## Task 4.2: Switch Network Integration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none - all created by concurrent agent)
+- **Files modified**: src/core/registry.ts (added getSwitchClassification to ComponentLayout), src/engine/__tests__/switch-network.test.ts (added 9th test: bidirectional_switch_triggers_bus_reconfiguration)
+- **Tests**: 9/9 passing (switch-network.test.ts)
+- **Changes summary**: Added `getSwitchClassification?(componentIndex: number): number` to the `ComponentLayout` interface in registry.ts. Added the missing 9th test `bidirectional_switch_triggers_bus_reconfiguration` which verifies: BusResolver with two bus nets (each with 2 drivers), a registered switch connecting them, reconfigureForSwitch(0, true) merges the nets so all four drivers contribute, reconfigureForSwitch(0, false) splits them back so changes to one net do not affect the other. Most of the task implementation (switchPins on ComponentDefinitions, compiler classification logic, engine switch state change detection, executeFn classification-aware forwarding) was already completed by a concurrent agent.
+
+## Task 5.3: createEngine Factory Fix
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/engine/worker-detection.ts, src/engine/__tests__/worker-detection.test.ts
+- **Tests**: 3/3 passing (worker-detection.test.ts)
+- **Changes summary**: Renamed `canUseSharedArrayBuffer()` to `canUseWorkerEngine()`. The new function checks both `typeof SharedArrayBuffer !== "undefined"` and `typeof Worker !== "undefined"`, preventing incorrect WorkerEngine selection in Node.js test environments where SAB is available but Worker is not. Updated `createEngine()` to wrap the WorkerEngine construction in a try/catch for graceful fallback on Worker spawn failure. Updated test file: `falls_back_when_Worker_undefined` verifies that in Node.js (no Worker), `canUseWorkerEngine()` returns false and `createEngine()` returns DigitalEngine. `uses_worker_when_available` mocks Worker on globalThis and verifies `canUseWorkerEngine()` returns true when both SAB and Worker are present. `falls_back_when_SAB_undefined` removes SAB from globalThis and verifies fallback to DigitalEngine.
+
+---
+## Wave 4 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2 (plus Task 5.3 completed ahead of schedule)
 - **Rounds**: 1

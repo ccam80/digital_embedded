@@ -346,7 +346,10 @@ export function initApp(search?: string): void {
             ? (current === 0 ? 1 : 0)
             : ((current + 1) & ((1 << bitWidth) - 1));
           binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          if (engine.getState() !== EngineState.RUNNING) engine.step();
+          if (engine.getState() !== EngineState.RUNNING) {
+            if (clockManager !== null) clockManager.advanceClocks(engine.getSignalArray());
+            engine.step();
+          }
           scheduleRender();
         } catch {
           scheduleRender();

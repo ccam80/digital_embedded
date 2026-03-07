@@ -156,11 +156,27 @@ export class NFETElement extends AbstractCircuitElement {
 // G=1 → closed=1; G=0 → closed=0
 // ---------------------------------------------------------------------------
 
-export function executeNFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
-  state[stBase] = state[wt[inBase]] & 1;
+
+  const gate = state[wt[inBase]!]! & 1;
+  const closed = gate;
+  state[stBase] = closed;
+
+  const classification = layout.getSwitchClassification?.(index) ?? 1;
+  if (classification !== 2) {
+    const drainNet = wt[outBase]!;
+    const sourceNet = wt[outBase + 1]!;
+    if (closed) {
+      state[sourceNet] = state[drainNet]!;
+      highZs[sourceNet] = 0;
+    } else {
+      highZs[sourceNet] = 0xffffffff;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,4 +223,5 @@ export const NFETDefinition: ComponentDefinition = {
   helpText: "NFET — N-channel MOSFET. G=1 → conducting.",
   stateSlotCount: 1,
   defaultDelay: 0,
+  switchPins: [1, 2],
 };

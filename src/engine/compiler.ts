@@ -640,6 +640,40 @@ export function compileCircuit(
   }
 
   // -----------------------------------------------------------------------
+  // Step 7c: Classify switch components (unidirectional vs bidirectional)
+  // -----------------------------------------------------------------------
+
+  const switchClassification = new Uint8Array(componentCount);
+  const bidirectionalSwitchIndices: number[] = [];
+
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const def = registry.get(el.typeId)!;
+    const sp = (def as { switchPins?: [number, number] }).switchPins;
+    if (sp === undefined) continue;
+
+    const refs = allPinRefs[i]!;
+    const pinAIdx = sp[0];
+    const pinBIdx = sp[1];
+    if (pinAIdx >= refs.length || pinBIdx >= refs.length) continue;
+
+    const netA = slotToNetId(slotOf(i, pinAIdx));
+    const netB = slotToNetId(slotOf(i, pinBIdx));
+
+    if (multiDriverNets.has(netA) && multiDriverNets.has(netB)) {
+      switchClassification[i] = 2;
+      bidirectionalSwitchIndices.push(i);
+      if (busResolver !== null) {
+        busResolver.registerSwitch(i, netA, netB);
+      }
+    } else {
+      switchClassification[i] = 1;
+    }
+  }
+
+  const switchComponentIndices = new Uint32Array(bidirectionalSwitchIndices);
+
+  // -----------------------------------------------------------------------
   // Step 8: SCC decomposition (Tarjan's algorithm)
   // -----------------------------------------------------------------------
 
@@ -892,6 +926,8 @@ export function compileCircuit(
     resetComponentIndices,
     busResolver,
     multiDriverNets,
+    switchComponentIndices,
+    switchClassification,
   });
 }
 

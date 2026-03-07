@@ -1,15 +1,9 @@
 /**
  * Worker detection and engine factory.
  *
- * Detects whether SharedArrayBuffer is available (requires Cross-Origin-Isolation
- * headers: COOP + COEP). If available, creates a WorkerEngine that runs the
- * simulation in a Web Worker with SAB-backed signal state. Falls back to a
- * main-thread DigitalEngine when SAB is unavailable.
- *
- * Cross-Origin-Isolation is required because SharedArrayBuffer was re-restricted
- * after Spectre. Pages must serve:
- *   Cross-Origin-Opener-Policy: same-origin
- *   Cross-Origin-Embedder-Policy: require-corp
+ * Detects whether both SharedArrayBuffer and Worker are available. SAB requires
+ * Cross-Origin-Isolation headers (COOP + COEP) in browsers; Worker must also
+ * be defined. Falls back to a main-thread DigitalEngine when either is missing.
  */
 
 import { DigitalEngine } from "./digital-engine.js";
@@ -18,17 +12,22 @@ import type { SimulationEngine, CompiledCircuit } from "@/core/engine-interface"
 import type { EvaluationMode } from "./evaluation-mode.js";
 
 // ---------------------------------------------------------------------------
-// canUseSharedArrayBuffer
+// canUseWorkerEngine
 // ---------------------------------------------------------------------------
 
 /**
- * Returns true when SharedArrayBuffer is available in the current environment.
+ * Returns true when the environment supports running the simulation in a
+ * Web Worker with shared memory.
  *
- * In browsers, this requires Cross-Origin-Isolation headers.
- * In Node.js (test environment), SharedArrayBuffer is always available.
+ * Both `SharedArrayBuffer` (for lock-free signal reads from the main thread)
+ * and `Worker` (for off-thread execution) must be available.
+ *
+ * In browsers this requires Cross-Origin-Isolation headers.
+ * In Node.js (test environment) SAB is available but Worker is not, so this
+ * correctly returns false.
  */
-export function canUseSharedArrayBuffer(): boolean {
-  return typeof SharedArrayBuffer !== "undefined";
+export function canUseWorkerEngine(): boolean {
+  return typeof SharedArrayBuffer !== "undefined" && typeof Worker !== "undefined";
 }
 
 // ---------------------------------------------------------------------------
@@ -38,12 +37,12 @@ export function canUseSharedArrayBuffer(): boolean {
 /**
  * Factory that returns the best available engine implementation.
  *
- * When SharedArrayBuffer is available:
- *   Returns a WorkerEngine that runs the simulation in a Web Worker.
- *   Signal state is in a SAB-backed Uint32Array readable from the main thread
- *   via Atomics.load() without blocking.
+ * When both SharedArrayBuffer and Worker are available:
+ *   Attempts to create a WorkerEngine. If the Worker fails to spawn
+ *   (e.g. CSP restrictions, missing worker script), falls back to
+ *   DigitalEngine.
  *
- * When SharedArrayBuffer is unavailable:
+ * Otherwise:
  *   Returns a DigitalEngine running on the main thread.
  *
  * @param compiled  The compiled circuit to simulate.
@@ -53,10 +52,14 @@ export function createEngine(
   compiled: CompiledCircuit,
   mode: EvaluationMode,
 ): SimulationEngine {
-  if (canUseSharedArrayBuffer()) {
-    const engine = new WorkerEngine(compiled.netCount, mode);
-    engine.init(compiled);
-    return engine;
+  if (canUseWorkerEngine()) {
+    try {
+      const engine = new WorkerEngine(compiled.netCount, mode);
+      engine.init(compiled);
+      return engine;
+    } catch {
+      // Worker spawn failed — fall through to main-thread engine
+    }
   }
 
   const engine = new DigitalEngine(mode);

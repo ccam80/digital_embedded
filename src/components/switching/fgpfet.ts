@@ -167,16 +167,28 @@ export class FGPFETElement extends AbstractCircuitElement {
 // State layout: [closedFlag=0, blownFlag=1]
 // ---------------------------------------------------------------------------
 
-export function executeFGPFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeFGPFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const gate = state[wt[inBase]] & 1;
-  const blown = state[stBase + 1] & 1;
+  const gate = state[wt[inBase]!]! & 1;
+  const blown = state[stBase + 1]! & 1;
+  const closed = blown ? 0 : (gate ^ 1);
+  state[stBase] = closed;
 
-  // PFET: conducting when gate=0; blown permanently disables
-  state[stBase] = blown ? 0 : (gate ^ 1);
+  const classification = layout.getSwitchClassification?.(index) ?? 1;
+  if (classification !== 2) {
+    const sourceNet = wt[outBase]!;
+    const drainNet = wt[outBase + 1]!;
+    if (closed) {
+      state[drainNet] = state[sourceNet]!;
+      highZs[drainNet] = 0;
+    } else {
+      highZs[drainNet] = 0xffffffff;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -231,4 +243,5 @@ export const FGPFETDefinition: ComponentDefinition = {
   helpText: "FGPFET — P-channel floating-gate MOSFET. Programmed (blown) gate permanently disables conduction.",
   stateSlotCount: 2,
   defaultDelay: 0,
+  switchPins: [1, 2],
 };

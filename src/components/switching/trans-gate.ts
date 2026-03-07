@@ -169,16 +169,36 @@ export class TransGateElement extends AbstractCircuitElement {
 // Closed when: S=1 AND ~S=0 (complementary and S is high)
 // ---------------------------------------------------------------------------
 
-export function executeTransGate(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeTransGate(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const s = state[wt[inBase]] & 1;
-  const ns = state[wt[inBase + 1]] & 1;
+  const sHighZ = highZs[wt[inBase]!]! !== 0;
+  const nsHighZ = highZs[wt[inBase + 1]!]! !== 0;
 
-  // Closed only when S != ~S and S is high (valid complementary pair, gate on)
-  state[stBase] = (s !== ns && s === 1) ? 1 : 0;
+  let closed = 0;
+  if (!sHighZ && !nsHighZ) {
+    const s = state[wt[inBase]!]! & 1;
+    const ns = state[wt[inBase + 1]!]! & 1;
+    if (s !== ns) {
+      closed = s;
+    }
+  }
+  state[stBase] = closed;
+
+  const classification = layout.getSwitchClassification?.(index) ?? 1;
+  if (classification !== 2) {
+    const aNet = wt[outBase]!;
+    const bNet = wt[outBase + 1]!;
+    if (closed) {
+      state[bNet] = state[aNet]!;
+      highZs[bNet] = 0;
+    } else {
+      highZs[bNet] = 0xffffffff;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -225,4 +245,5 @@ export const TransGateDefinition: ComponentDefinition = {
   helpText: "TransGate — CMOS transmission gate. S=1, ~S=0 → A and B connected.",
   stateSlotCount: 1,
   defaultDelay: 0,
+  switchPins: [2, 3],
 };
