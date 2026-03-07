@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && ls \\\"spec/.locks/files/src__engine__digital-engine.ts/\\\" 2>/dev/null && cat \\\"spec/.locks/files/src__engine__digital-engine.ts/owner\\...",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && grep -E \\\"^\\\\- \\\\[ \\\\]\\\" \\\"spec/progress.md\\\" && echo \\\"---\\\" && ls \\\"spec/.locks/tasks/\\\" 2>/dev/null && echo \\\"--- locks empty\\\"\",\"...",
   "error": "Exit code 1",
-  "timestamp": "2026-03-07T01:36:37.417Z",
+  "timestamp": "2026-03-07T02:13:02.967Z",
   "retry_count": 1
 }

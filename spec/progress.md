@@ -31,8 +31,8 @@
 - [x] Task 4.2: Switch Network Integration
 
 ## Wave 5: Web Worker Mode
-- [ ] Task 5.1: Worker Init Protocol
-- [ ] Task 5.2: Worker Signal Synchronization
+- [x] Task 5.1: Worker Init Protocol
+- [x] Task 5.2: Worker Signal Synchronization
 - [x] Task 5.3: createEngine Factory Fix
 
 ## Task prereq-executefn-signature: ExecuteFunction Signature Update
@@ -211,3 +211,25 @@
 - **Status**: complete
 - **Tasks completed**: 2/2 (plus Task 5.3 completed ahead of schedule)
 - **Rounds**: 1
+
+---
+## Wave 5 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1
+
+## Task 5.1: Worker Init Protocol
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/worker-engine.test.ts
+- **Files modified**: src/core/engine-interface.ts, src/engine/worker-engine.ts, src/engine/worker.ts, src/engine/compiled-circuit.ts, src/engine/compiler.ts
+- **Tests**: 2/2 passing (worker-engine.test.ts); 32/32 passing across worker-detection, compiler, and digital-engine tests
+- **Changes summary**: Added `"init"` variant to `EngineMessage` discriminated union in engine-interface.ts containing all typed arrays needed to reconstruct a compiled circuit (sharedBuffer, typeIds, typeNames, inputOffsets, outputOffsets, inputCounts, outputCounts, stateOffsets, wiringTable, evaluationGroups, sequentialComponents, netWidths, delays, resetComponentIndices, switchComponentIndices, switchClassification). WorkerEngine.init() now narrows to ConcreteCompiledCircuit, extracts all typed arrays and layout offsets, builds typeNames list, and posts the init message with SharedArrayBuffer in the Transferable list. Removed dynamic import() in setSignalValue -- now uses static import of bitVectorToRaw. Stores netWidths locally for width lookup in getSignalValue. Worker.ts handles "init" message: imports createDefaultRegistry, reconstructs executeFns/sampleFns from typeNames via registry lookups (unrecognised types get no-op with console warning), builds FlatComponentLayout from received offset arrays, constructs worker-side ConcreteCompiledCircuit object with empty Maps for non-serializable fields (componentToElement, wireToNetId, labelToNetId, pinNetMap). Creates DigitalEngine, calls init(), syncs shared buffer. Added syncSharedBuffer() that copies engine signal values to SharedArrayBuffer via Atomics.store() after each step/microStep/runToBreak/reset. Added continuous run using MessageChannel for yielding. CompiledCircuitImpl gains typeNames field populated by compiler. Compiler step 10 now builds typeNameMap alongside executeFnsMap.
+
+## Task 5.2: Worker Signal Synchronization
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/engine/__tests__/worker-signal.test.ts
+- **Files modified**: none (sync logic was implemented in Task 5.1's worker.ts changes)
+- **Tests**: 2/2 passing (worker-signal.test.ts)
+- **Changes summary**: Signal synchronization logic was already implemented in Task 5.1 (syncSharedBuffer() in worker.ts using Atomics.store(), continuous run via MessageChannel, Atomics.load() reads in worker-engine.ts). This task adds the dedicated test file with two integration tests: `main_thread_reads_signal_after_step` verifies that after the worker writes values to the SharedArrayBuffer via Atomics.store(), the main thread reads correct values through getSignalRaw() and getSignalValue() (including proper BitVector width from stored netWidths). `setSignalValue_propagates_to_worker` verifies that setSignalValue() updates the SharedArrayBuffer immediately (main-thread side via Atomics.store) and posts a setSignal message to the worker with correct netId and value fields.

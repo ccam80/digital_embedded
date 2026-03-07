@@ -1,14 +1,14 @@
 /**
- * WorkerEngine — SimulationEngine proxy that delegates to a Web Worker.
+ * WorkerEngine -- SimulationEngine proxy that delegates to a Web Worker.
  *
- * Signal state is held in a SharedArrayBuffer-backed Uint32Array so the main
+ * Signal state is held in a SharedArrayBuffer-backed Int32Array so the main
  * thread can read values with Atomics.load() without blocking or transferring
  * ownership. All lifecycle commands are sent as EngineMessage via postMessage.
  * The Worker posts EngineResponse messages back for state change notifications.
  *
  * Two parallel arrays are used for each signal:
- *   sharedValues[netId]  — the value word
- *   sharedHighZs[netId]  — the high-Z mask word
+ *   sharedValues[netId]  -- the value word
+ *   sharedHighZs[netId]  -- the high-Z mask word
  *
  * Both are Int32Array views over a single SharedArrayBuffer (Atomics requires
  * Int32Array or BigInt64Array).
@@ -23,8 +23,60 @@ import type {
   MeasurementObserver,
 } from "@/core/engine-interface";
 import { EngineState } from "@/core/engine-interface";
-import { BitVector, rawToBitVector } from "@/core/signal";
+import { BitVector, rawToBitVector, bitVectorToRaw } from "@/core/signal";
 import type { EvaluationMode } from "./evaluation-mode.js";
+
+// ---------------------------------------------------------------------------
+// ConcreteCompiledCircuit type guard
+// ---------------------------------------------------------------------------
+
+interface ConcreteCompiledCircuit extends CompiledCircuit {
+  readonly totalStateSlots: number;
+  readonly signalArraySize: number;
+  readonly typeIds: Uint8Array;
+  readonly executeFns: Array<unknown>;
+  readonly sampleFns: Array<unknown>;
+  readonly wiringTable: Int32Array;
+  readonly layout: {
+    inputOffset(i: number): number;
+    outputOffset(i: number): number;
+    inputCount(i: number): number;
+    outputCount(i: number): number;
+    stateOffset(i: number): number;
+    readonly wiringTable: Int32Array;
+  };
+  readonly evaluationOrder: Array<{
+    componentIndices: Uint32Array;
+    isFeedback: boolean;
+  }>;
+  readonly sequentialComponents: Uint32Array;
+  readonly netWidths: Uint8Array;
+  readonly delays: Uint32Array;
+  readonly resetComponentIndices: Uint32Array;
+  readonly switchComponentIndices: Uint32Array;
+  readonly switchClassification: Uint8Array;
+}
+
+function isConcreteCompiled(c: CompiledCircuit): c is ConcreteCompiledCircuit {
+  return "typeIds" in c && "wiringTable" in c && "evaluationOrder" in c;
+}
+
+// ---------------------------------------------------------------------------
+// Build type name list from compiled circuit
+// ---------------------------------------------------------------------------
+
+function buildTypeNames(compiled: ConcreteCompiledCircuit): string[] {
+  if ("typeNames" in compiled && Array.isArray((compiled as Record<string, unknown>)["typeNames"])) {
+    const names = (compiled as Record<string, string[]>)["typeNames"];
+    if (names.length > 0) return names;
+  }
+  const names: string[] = [];
+  const maxTypeId = compiled.typeIds.length > 0 ? Math.max(...Array.from(compiled.typeIds)) : -1;
+  for (let t = 0; t <= maxTypeId; t++) {
+    names.push(`type_${t}`);
+  }
+  return names;
+}
 
 // ---------------------------------------------------------------------------
 // WorkerEngine
@@ -33,13 +85,13 @@ import type { EvaluationMode } from "./evaluation-mode.js";
 /**
  * Main-thread proxy for a DigitalEngine running in a Web Worker.
  *
- * getSignalRaw() uses Atomics.load() — non-blocking, safe to call from the
+ * getSignalRaw() uses Atomics.load() -- non-blocking, safe to call from the
  * render loop. All other operations post messages to the Worker.
  */
 export class WorkerEngine implements SimulationEngine {
   private readonly _netCount: number;
 
-  // Shared signal storage — readable from the main thread via Atomics.load()
+  // Shared signal storage -- readable from the main thread via Atomics.load()
   private readonly _sharedBuffer: SharedArrayBuffer;
   private readonly _sharedValues: Int32Array;
   private readonly _sharedHighZs: Int32Array;
@@ -49,6 +101,9 @@ export class WorkerEngine implements SimulationEngine {
 
   // Engine state tracked locally (updated from Worker responses)
   private _state: EngineState = EngineState.STOPPED;
+
+  // Net widths for BitVector construction
+  private _netWidths: Uint8Array | null = null;
 
   // Registered listeners and observers
   private readonly _changeListeners: Set<EngineChangeListener> = new Set();
@@ -73,8 +128,58 @@ export class WorkerEngine implements SimulationEngine {
   // -------------------------------------------------------------------------
 
   init(circuit: CompiledCircuit): void {
-    this._postMessage({ type: "reset" });
-    void circuit;
+    if (!isConcreteCompiled(circuit)) {
+      this._postMessage({ type: "reset" });
+      return;
+    }
+
+    this._netWidths = circuit.netWidths;
+
+    const inputOffsets = new Int32Array(circuit.componentCount);
+    const outputOffsets = new Int32Array(circuit.componentCount);
+    const inputCounts = new Uint8Array(circuit.componentCount);
+    const outputCounts = new Uint8Array(circuit.componentCount);
+    const stateOffsets = new Int32Array(circuit.componentCount);
+
+    for (let i = 0; i < circuit.componentCount; i++) {
+      inputOffsets[i] = circuit.layout.inputOffset(i);
+      outputOffsets[i] = circuit.layout.outputOffset(i);
+      inputCounts[i] = circuit.layout.inputCount(i);
+      outputCounts[i] = circuit.layout.outputCount(i);
+      stateOffsets[i] = circuit.layout.stateOffset(i);
+    }
+
+    const typeNames = buildTypeNames(circuit);
+
+    const evaluationGroups = circuit.evaluationOrder.map((g) => ({
+      componentIndices: g.componentIndices,
+      isFeedback: g.isFeedback,
+    }));
+
+    const initMsg: EngineMessage = {
+      type: "init",
+      sharedBuffer: this._sharedBuffer,
+      netCount: circuit.netCount,
+      componentCount: circuit.componentCount,
+      signalArraySize: circuit.signalArraySize,
+      typeIds: circuit.typeIds,
+      typeNames,
+      inputOffsets,
+      outputOffsets,
+      inputCounts,
+      outputCounts,
+      stateOffsets,
+      wiringTable: circuit.wiringTable,
+      evaluationGroups,
+      sequentialComponents: circuit.sequentialComponents,
+      netWidths: circuit.netWidths,
+      delays: circuit.delays,
+      resetComponentIndices: circuit.resetComponentIndices,
+      switchComponentIndices: circuit.switchComponentIndices,
+      switchClassification: circuit.switchClassification,
+    };
+
+    this._worker?.postMessage(initMsg, [this._sharedBuffer]);
   }
 
   reset(): void {
@@ -145,33 +250,28 @@ export class WorkerEngine implements SimulationEngine {
     }
     const valueRaw = Atomics.load(this._sharedValues, netId);
     const highZRaw = Atomics.load(this._sharedHighZs, netId);
-    // Build a temporary Uint32Array pair for rawToBitVector
+    const width = this._netWidths !== null ? this._netWidths[netId] ?? 1 : 1;
     const values = new Uint32Array([valueRaw]);
     const highZs = new Uint32Array([highZRaw]);
-    return rawToBitVector(values, highZs, 0, 1);
+    return rawToBitVector(values, highZs, 0, width);
   }
 
   setSignalValue(netId: number, value: BitVector): void {
     if (netId >= this._netCount) return;
-    // Extract raw words from BitVector
     const values = new Uint32Array(1);
     const highZs = new Uint32Array(1);
-    import("@/core/signal").then(({ bitVectorToRaw }) => {
-      bitVectorToRaw(value, values, highZs, 0);
-      // Update shared buffer so main-thread reads reflect the new value
-      Atomics.store(this._sharedValues, netId, values[0]!);
-      Atomics.store(this._sharedHighZs, netId, highZs[0]!);
-    });
-    // Post message to Worker to propagate on next step
-    const valueLo = Number(value.valueBits & 1n);
+    bitVectorToRaw(value, values, highZs, 0);
+    Atomics.store(this._sharedValues, netId, values[0]!);
+    Atomics.store(this._sharedHighZs, netId, highZs[0]!);
+    const width = this._netWidths !== null ? this._netWidths[netId] ?? 1 : 1;
     this._postMessage({
       type: "setSignal",
       netId,
-      valueLo,
+      valueLo: values[0]!,
       valueHi: 0,
-      highZLo: 0,
+      highZLo: highZs[0]!,
       highZHi: 0,
-      width: 1,
+      width,
     });
   }
 
@@ -196,11 +296,11 @@ export class WorkerEngine implements SimulationEngine {
   }
 
   // -------------------------------------------------------------------------
-  // Snapshot API — not supported in WorkerEngine (Worker owns state)
+  // Snapshot API -- not supported in WorkerEngine (Worker owns state)
   // -------------------------------------------------------------------------
 
   saveSnapshot(): number {
-    this._postMessage({ type: "step" }); // no-op placeholder
+    this._postMessage({ type: "step" });
     return -1;
   }
 
@@ -237,7 +337,6 @@ export class WorkerEngine implements SimulationEngine {
         void ev;
       };
     } catch {
-      // Worker spawn failed (e.g. CSP restrictions) — engine stays in STOPPED
       this._worker = null;
     }
   }

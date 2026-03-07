@@ -123,6 +123,39 @@ export type EngineMessage =
       highZHi: number;
       /** Bit width of the signal (1–64). */
       width: number;
+    }
+  | {
+      /**
+       * Transfers a compiled circuit's typed arrays and SharedArrayBuffer to
+       * the worker. The worker reconstructs a ConcreteCompiledCircuit using
+       * its own registry for the function table.
+       *
+       * The sharedBuffer (SharedArrayBuffer) is shared -- both threads retain
+       * access. All typed arrays are structured-cloned (copied).
+       */
+      type: "init";
+      sharedBuffer: SharedArrayBuffer;
+      netCount: number;
+      componentCount: number;
+      signalArraySize: number;
+      typeIds: Uint8Array;
+      typeNames: string[];
+      inputOffsets: Int32Array;
+      outputOffsets: Int32Array;
+      inputCounts: Uint8Array;
+      outputCounts: Uint8Array;
+      stateOffsets: Int32Array;
+      wiringTable: Int32Array;
+      evaluationGroups: Array<{
+        componentIndices: Uint32Array;
+        isFeedback: boolean;
+      }>;
+      sequentialComponents: Uint32Array;
+      netWidths: Uint8Array;
+      delays: Uint32Array;
+      resetComponentIndices: Uint32Array;
+      switchComponentIndices: Uint32Array;
+      switchClassification: Uint8Array;
     };
 
 // ---------------------------------------------------------------------------

@@ -173,6 +173,9 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Per-component switch classification: 0=not a switch, 1=unidirectional, 2=bidirectional. */
   readonly switchClassification: Uint8Array;
 
+  /** Type name per type ID slot, for serialization to the Web Worker. */
+  readonly typeNames: string[];
+
   constructor(fields: {
     netCount: number;
     componentCount: number;
@@ -196,6 +199,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     multiDriverNets?: Set<number>;
     switchComponentIndices?: Uint32Array;
     switchClassification?: Uint8Array;
+    typeNames?: string[];
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
@@ -220,6 +224,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.multiDriverNets = fields.multiDriverNets ?? new Set();
     this.switchComponentIndices = fields.switchComponentIndices ?? new Uint32Array(0);
     this.switchClassification = fields.switchClassification ?? new Uint8Array(fields.componentCount);
+    this.typeNames = fields.typeNames ?? [];
     if (this.switchClassification.length > 0) {
       this.layout.setSwitchClassification(this.switchClassification);
     }

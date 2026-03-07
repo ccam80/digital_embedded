@@ -146,44 +146,44 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 92,
-      "lastAccessed": 1772848262461,
+      "accessCount": 115,
+      "lastAccessed": 1772849729012,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 64,
-      "lastAccessed": 1772847623285,
+      "accessCount": 67,
+      "lastAccessed": 1772849058723,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 36,
-      "lastAccessed": 1772847314244,
+      "accessCount": 37,
+      "lastAccessed": 1772848387827,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 34,
+      "lastAccessed": 1772849167318,
       "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 30,
-      "lastAccessed": 1772847315867,
+      "accessCount": 33,
+      "lastAccessed": 1772849040969,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 30,
-      "lastAccessed": 1772847319475,
+      "accessCount": 32,
+      "lastAccessed": 1772848333011,
       "type": "file"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 26,
-      "lastAccessed": 1772846380703,
-      "type": "directory"
-    },
-    {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 24,
-      "lastAccessed": 1772846349411,
+      "accessCount": 26,
+      "lastAccessed": 1772848332079,
       "type": "file"
     },
     {

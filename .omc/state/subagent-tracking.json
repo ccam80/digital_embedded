@@ -183,11 +183,31 @@
       "agent_type": "claude-orchestrator:implementer",
       "started_at": "2026-03-07T01:35:07.132Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "completed",
+      "completed_at": "2026-03-07T01:54:12.879Z",
+      "duration_ms": 1145747
+    },
+    {
+      "agent_id": "afe3578ad00cbea37",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-07T01:51:54.274Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-07T02:13:17.695Z",
+      "duration_ms": 1283421
+    },
+    {
+      "agent_id": "a56fad3f7e58b6c36",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-07T01:52:03.411Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-07T02:04:03.479Z",
+      "duration_ms": 720068
     }
   ],
-  "total_spawned": 21,
-  "total_completed": 19,
+  "total_spawned": 23,
+  "total_completed": 22,
   "total_failed": 0,
-  "last_updated": "2026-03-07T01:49:49.039Z"
+  "last_updated": "2026-03-07T02:13:17.812Z"
 }
