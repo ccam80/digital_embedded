@@ -15,30 +15,34 @@ import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
-  constructor(
-    private readonly _inputNets: number[][],
-    private readonly _outputNets: number[][],
-  ) {}
+  readonly wiringTable: Int32Array;
+  private readonly _inputOffsets: number[];
+  private readonly _outputOffsets: number[];
+  private readonly _inputCounts: number[];
+  private readonly _outputCounts: number[];
 
-  inputCount(idx: number): number {
-    return this._inputNets[idx]?.length ?? 0;
+  constructor(inputNets: number[][], outputNets: number[][]) {
+    const entries: number[] = [];
+    this._inputOffsets = [];
+    this._outputOffsets = [];
+    this._inputCounts = inputNets.map(n => n.length);
+    this._outputCounts = outputNets.map(n => n.length);
+    for (const nets of inputNets) {
+      this._inputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    for (const nets of outputNets) {
+      this._outputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    this.wiringTable = Int32Array.from(entries);
   }
 
-  inputOffset(idx: number): number {
-    return this._inputNets[idx]?.[0] ?? 0;
-  }
-
-  outputCount(idx: number): number {
-    return this._outputNets[idx]?.length ?? 0;
-  }
-
-  outputOffset(idx: number): number {
-    return this._outputNets[idx]?.[0] ?? 0;
-  }
-
-  stateOffset(_idx: number): number {
-    return 0;
-  }
+  inputCount(idx: number): number { return this._inputCounts[idx] ?? 0; }
+  inputOffset(idx: number): number { return this._inputOffsets[idx] ?? 0; }
+  outputCount(idx: number): number { return this._outputCounts[idx] ?? 0; }
+  outputOffset(idx: number): number { return this._outputOffsets[idx] ?? 0; }
+  stateOffset(_idx: number): number { return 0; }
 }
 
 function buildCircuit(
@@ -60,6 +64,7 @@ function buildCircuit(
     componentCount,
     typeIds,
     executeFns,
+    wiringTable: layout.wiringTable,
     layout,
     evaluationOrder,
     sequentialComponents: new Uint32Array(0),

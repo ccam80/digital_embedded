@@ -19,15 +19,33 @@ import { BitVector } from "@/core/signal";
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
-  constructor(
-    private readonly _inputNets: number[][],
-    private readonly _outputNets: number[][],
-  ) {}
+  readonly wiringTable: Int32Array;
+  private readonly _inputOffsets: number[];
+  private readonly _outputOffsets: number[];
+  private readonly _inputCounts: number[];
+  private readonly _outputCounts: number[];
 
-  inputCount(i: number): number { return this._inputNets[i]?.length ?? 0; }
-  inputOffset(i: number): number { return this._inputNets[i]?.[0] ?? 0; }
-  outputCount(i: number): number { return this._outputNets[i]?.length ?? 0; }
-  outputOffset(i: number): number { return this._outputNets[i]?.[0] ?? 0; }
+  constructor(inputNets: number[][], outputNets: number[][]) {
+    const entries: number[] = [];
+    this._inputOffsets = [];
+    this._outputOffsets = [];
+    this._inputCounts = inputNets.map(n => n.length);
+    this._outputCounts = outputNets.map(n => n.length);
+    for (const nets of inputNets) {
+      this._inputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    for (const nets of outputNets) {
+      this._outputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    this.wiringTable = Int32Array.from(entries);
+  }
+
+  inputCount(i: number): number { return this._inputCounts[i] ?? 0; }
+  inputOffset(i: number): number { return this._inputOffsets[i] ?? 0; }
+  outputCount(i: number): number { return this._outputCounts[i] ?? 0; }
+  outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
   stateOffset(_i: number): number { return 0; }
 }
 
@@ -54,6 +72,7 @@ function buildCircuit(
     componentCount,
     typeIds,
     executeFns,
+    wiringTable: layout.wiringTable,
     layout,
     evaluationOrder,
     sequentialComponents: new Uint32Array(0),
@@ -85,10 +104,10 @@ describe("MicroStep", () => {
     // Net 2: input for gate 1
     // Net 3: output for gate 1
     const executeFn0 = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
-      s[l.outputOffset(i)] = s[l.inputOffset(i)];
+      s[l.wiringTable[l.outputOffset(i)]!] = s[l.wiringTable[l.inputOffset(i)]!];
     };
     const executeFn1 = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
-      s[l.outputOffset(i)] = s[l.inputOffset(i)];
+      s[l.wiringTable[l.outputOffset(i)]!] = s[l.wiringTable[l.inputOffset(i)]!];
     };
 
     const compiled = buildCircuit(
@@ -193,7 +212,7 @@ describe("MicroStep", () => {
     //
     // Components: 0=A, 1=B, 2=C in a single non-feedback group in that order.
     const executeFn = (i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout): void => {
-      s[l.outputOffset(i)] = s[l.inputOffset(i)];
+      s[l.wiringTable[l.outputOffset(i)]!] = s[l.wiringTable[l.inputOffset(i)]!];
     };
 
     const compiled = buildCircuit(

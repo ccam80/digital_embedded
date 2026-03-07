@@ -182,9 +182,8 @@ export class ClockManager {
     for (const [componentIndex, element] of componentToElement.entries()) {
       if (element.typeId !== "Clock") continue;
 
-      // Output net ID: the clock has one output pin. layout.outputOffset(i)
-      // returns the net ID of the first output.
-      const netId = layout.outputOffset(componentIndex);
+      // Output net ID: the clock has one output pin. Resolve through wiringTable.
+      const netId = layout.wiringTable[layout.outputOffset(componentIndex)]!;
 
       // Read the Frequency property from the element via the standard
       // getAttribute interface. ClockElement stores frequency as the

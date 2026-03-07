@@ -17,6 +17,11 @@ import type { ExecuteFunction, ComponentLayout } from "../../core/registry.js";
 /**
  * Build a simple flat ComponentLayout given parallel arrays of input/output
  * net offsets and counts per component.
+ *
+ * The wiringTable is an identity map (wt[i] = i) since the test executeFns
+ * access state slots directly. The engine's captureOutputs/outputsChanged
+ * read through wiringTable, so wt[outputOffset + k] must equal the actual
+ * net slot — which it does when wiringTable is identity.
  */
 function makeLayout(
   inputOffsets: number[],
@@ -24,7 +29,18 @@ function makeLayout(
   outputOffsets: number[],
   outputCounts: number[],
 ): ComponentLayout {
+  let maxSlot = 0;
+  for (let i = 0; i < inputOffsets.length; i++) {
+    maxSlot = Math.max(maxSlot, inputOffsets[i]! + inputCounts[i]!);
+  }
+  for (let i = 0; i < outputOffsets.length; i++) {
+    maxSlot = Math.max(maxSlot, outputOffsets[i]! + outputCounts[i]!);
+  }
+  const wiringTable = new Int32Array(maxSlot);
+  for (let i = 0; i < maxSlot; i++) wiringTable[i] = i;
+
   return {
+    wiringTable,
     inputCount: (i: number) => inputCounts[i],
     inputOffset: (i: number) => inputOffsets[i],
     outputCount: (i: number) => outputCounts[i],

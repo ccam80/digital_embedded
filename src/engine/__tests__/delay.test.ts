@@ -78,11 +78,13 @@ function buildCompiled(
   componentCount: number,
   componentToElement: Map<number, CircuitElement>,
 ): CompiledCircuitImpl {
+  const emptyWiringTable = new Int32Array(0);
   const emptyLayout = new FlatComponentLayout(
     new Int32Array(componentCount),
     new Int32Array(componentCount),
     new Uint8Array(componentCount),
     new Uint8Array(componentCount),
+    emptyWiringTable,
   );
 
   return new CompiledCircuitImpl({
@@ -90,6 +92,7 @@ function buildCompiled(
     componentCount,
     typeIds: new Uint8Array(componentCount),
     executeFns: [],
+    wiringTable: emptyWiringTable,
     layout: emptyLayout,
     evaluationOrder: [],
     sequentialComponents: new Uint32Array(0),

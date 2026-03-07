@@ -59,7 +59,8 @@ export function run(
 
     for (const componentIndex of breakIndices) {
       const inputOffset = concrete!.layout.inputOffset(componentIndex);
-      const raw = engine.getSignalRaw(inputOffset);
+      const netId = concrete!.layout.wiringTable[inputOffset]!;
+      const raw = engine.getSignalRaw(netId);
       if (raw !== 0) {
         return { reason: "break", breakComponent: componentIndex, stepsExecuted: step + 1 };
       }

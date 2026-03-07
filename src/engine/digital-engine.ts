@@ -71,7 +71,9 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly typeIds: Uint8Array;
   /** Function table indexed by type ID. */
   readonly executeFns: ExecuteFunction[];
-  /** Wiring descriptor providing input/output net offsets per component. */
+  /** Wiring indirection table mapping layout indices to net IDs. */
+  readonly wiringTable: Int32Array;
+  /** Wiring descriptor providing input/output wiring-table offsets per component. */
   readonly layout: ComponentLayout;
   /** Topologically sorted evaluation groups. */
   readonly evaluationOrder: EvaluationGroup[];
@@ -99,7 +101,8 @@ function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCir
     "executeFns" in c &&
     "layout" in c &&
     "evaluationOrder" in c &&
-    "signalArraySize" in c
+    "signalArraySize" in c &&
+    "wiringTable" in c
   );
 }
 
@@ -316,7 +319,8 @@ export class DigitalEngine implements SimulationEngine {
       // Check whether any Break component's input net is asserted.
       for (const componentIndex of breakIndices) {
         const inputOffset = this._compiled.layout.inputOffset(componentIndex);
-        if (this._values[inputOffset] !== 0) {
+        const netId = this._compiled.layout.wiringTable[inputOffset]!;
+        if (this._values[netId] !== 0) {
           this._setState(EngineState.STOPPED);
           return;
         }
@@ -605,13 +609,14 @@ export class DigitalEngine implements SimulationEngine {
   }
 
   private _collectOutputNets(indices: Uint32Array, layout: ComponentLayout): number[] {
+    const wt = layout.wiringTable;
     const nets: number[] = [];
     for (let i = 0; i < indices.length; i++) {
       const idx = indices[i]!;
       const outCount = layout.outputCount(idx);
       const outOffset = layout.outputOffset(idx);
       for (let o = 0; o < outCount; o++) {
-        nets.push(outOffset + o);
+        nets.push(wt[outOffset + o]!);
       }
     }
     return nets;
@@ -625,6 +630,7 @@ export class DigitalEngine implements SimulationEngine {
     const compiled = this._compiled!;
     const { executeFns, typeIds, layout, delays } = compiled;
     const state = this._values;
+    const wt = layout.wiringTable;
 
     // Advance time by default clock period (use smallest delay as tick unit)
     const tick = 10n; // 10ns default clock period
@@ -661,8 +667,9 @@ export class DigitalEngine implements SimulationEngine {
         const beforeValues = new Uint32Array(outCount);
         const beforeHighZs = new Uint32Array(outCount);
         for (let o = 0; o < outCount; o++) {
-          beforeValues[o] = state[outOffset + o]!;
-          beforeHighZs[o] = this._highZs[outOffset + o]!;
+          const netId = wt[outOffset + o]!;
+          beforeValues[o] = state[netId]!;
+          beforeHighZs[o] = this._highZs[netId]!;
         }
 
         executeFns[typeId]!(idx, state, this._highZs, layout);
@@ -672,7 +679,7 @@ export class DigitalEngine implements SimulationEngine {
         const eventTime = targetTime + delay;
 
         for (let o = 0; o < outCount; o++) {
-          const netId = outOffset + o;
+          const netId = wt[outOffset + o]!;
           if (
             state[netId] !== beforeValues[o] ||
             this._highZs[netId] !== beforeHighZs[o]

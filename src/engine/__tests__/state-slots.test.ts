@@ -95,23 +95,25 @@ function dynamicPins(): PinDeclaration[] {
 const noopExecute: ExecuteFunction = () => {};
 
 const executeAnd: ExecuteFunction = (index, state, _highZs, layout) => {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  state[outBase] = (state[inBase]! & state[inBase + 1]!) >>> 0;
+  state[wt[outBase]!] = (state[wt[inBase]!]! & state[wt[inBase + 1]!]!) >>> 0;
 };
 
 const executeDFF: ExecuteFunction = (index, state, _highZs, layout) => {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
-  const D = state[inBase]! & 1;
-  const clk = state[inBase + 1]! & 1;
+  const D = state[wt[inBase]!]! & 1;
+  const clk = state[wt[inBase + 1]!]! & 1;
   const prevClk = state[stBase + 1]! & 1;
   if (!prevClk && clk) {
     state[stBase] = D;
   }
-  state[outBase] = state[stBase]!;
-  state[outBase + 1] = (~state[stBase]!) >>> 0;
+  state[wt[outBase]!] = state[stBase]!;
+  state[wt[outBase + 1]!] = (~state[stBase]!) >>> 0;
   state[stBase + 1] = clk;
 };
 

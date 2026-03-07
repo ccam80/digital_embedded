@@ -60,17 +60,23 @@ export interface AttributeMapping {
  * Produced by the compiler (Phase 3). Defined here as a type so that
  * ExecuteFunction can reference it. Phase 3 implements layout computation.
  *
- * inputOffset(index) and outputOffset(index) return the flat Uint32Array
- * index at which a given component's nth input/output net begins.
+ * inputOffset(index) and outputOffset(index) return indices into the
+ * wiringTable. The wiringTable maps those indices to actual net IDs in
+ * the signal array. Access pattern:
+ *   - Inputs:  state[wiringTable[inputOffset(i) + k]]
+ *   - Outputs: state[wiringTable[outputOffset(i) + k]]
+ *   - State:   state[stateOffset(i) + k]  (direct, no indirection)
  */
 export interface ComponentLayout {
+  /** Wiring indirection table mapping layout indices to net IDs. */
+  readonly wiringTable: Int32Array;
   /** Number of input pins for component at the given index. */
   inputCount(componentIndex: number): number;
-  /** Starting index in the signal array for component's inputs. */
+  /** Starting index in the wiringTable for component's inputs. */
   inputOffset(componentIndex: number): number;
   /** Number of output pins for component at the given index. */
   outputCount(componentIndex: number): number;
-  /** Starting index in the signal array for component's outputs. */
+  /** Starting index in the wiringTable for component's outputs. */
   outputOffset(componentIndex: number): number;
   /** Starting index in the state array for component's persistent state slots. */
   stateOffset(componentIndex: number): number;
@@ -92,6 +98,14 @@ export interface ComponentLayout {
  * Per Decision 1: simulation logic does NOT live on CircuitElement. These
  * functions are stored in the ComponentDefinition and called by the engine's
  * inner loop via a function table indexed by typeId.
+ *
+ * Access pattern inside executeFns:
+ *   const wt = layout.wiringTable;
+ *   const inBase = layout.inputOffset(index);
+ *   const outBase = layout.outputOffset(index);
+ *   // Read input k:  state[wt[inBase + k]]
+ *   // Write output k: state[wt[outBase + k]] = value
+ *   // Read/write state slot k: state[layout.stateOffset(index) + k]  (direct)
  *
  * @param index     Component slot index within the compiled model.
  * @param state     Signal value array owned by the engine.

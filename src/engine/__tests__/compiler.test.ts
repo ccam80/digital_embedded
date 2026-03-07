@@ -289,10 +289,10 @@ describe("Compiler", () => {
 
     // The NOT output (pin index 1, position 2,0) and AND input-a (pin index 0,
     // position 8,0) should be on the same net.
-    // We verify this by checking outputOffset(NOT) === inputOffset(AND)
-    // since both should map to the same net ID.
-    const notOutputNetId = compiled.layout.outputOffset(0);
-    const andFirstInputNetId = compiled.layout.inputOffset(1);
+    // We verify by resolving through the wiringTable.
+    const wt = compiled.layout.wiringTable;
+    const notOutputNetId = wt[compiled.layout.outputOffset(0)]!;
+    const andFirstInputNetId = wt[compiled.layout.inputOffset(1)]!;
     expect(notOutputNetId).toBe(andFirstInputNetId);
   });
 

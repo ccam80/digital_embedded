@@ -28,12 +28,14 @@ import type { EvaluationGroup } from "./digital-engine.js";
  * inputOffset/outputOffset on every component evaluation — these are O(1)
  * array reads.
  *
- * inputOffsets[i]  = index in state[] of the first input net for component i
- * outputOffsets[i] = index in state[] of the first output net for component i
+ * inputOffsets[i]  = index in wiringTable where component i's inputs start
+ * outputOffsets[i] = index in wiringTable where component i's outputs start
  * inputCounts[i]   = number of input pins for component i
  * outputCounts[i]  = number of output pins for component i
+ * wiringTable[k]   = net ID in the signal array for wiring-table position k
  */
 export class FlatComponentLayout implements ComponentLayout {
+  readonly wiringTable: Int32Array;
   private readonly _componentProperties: ReadonlyArray<ReadonlyMap<string, PropertyValue>>;
   private readonly _stateOffsets: Int32Array;
 
@@ -42,9 +44,11 @@ export class FlatComponentLayout implements ComponentLayout {
     private readonly _outputOffsets: Int32Array,
     private readonly _inputCounts: Uint8Array,
     private readonly _outputCounts: Uint8Array,
+    wiringTable: Int32Array,
     componentProperties?: ReadonlyArray<ReadonlyMap<string, PropertyValue>>,
     stateOffsets?: Int32Array,
   ) {
+    this.wiringTable = wiringTable;
     this._componentProperties = componentProperties ?? [];
     this._stateOffsets = stateOffsets ?? new Int32Array(_inputOffsets.length);
   }
@@ -96,6 +100,9 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Function table indexed by type ID. Populated from registry. */
   readonly executeFns: ExecuteFunction[];
 
+  /** Wiring indirection table mapping layout indices to net IDs. */
+  readonly wiringTable: Int32Array;
+
   /** Wiring layout — O(1) input/output offset lookups per component. */
   readonly layout: FlatComponentLayout;
 
@@ -142,6 +149,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     totalStateSlots?: number;
     typeIds: Uint8Array;
     executeFns: ExecuteFunction[];
+    wiringTable: Int32Array;
     layout: FlatComponentLayout;
     evaluationOrder: EvaluationGroup[];
     sequentialComponents: Uint32Array;
@@ -159,6 +167,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.signalArraySize = fields.netCount + (fields.totalStateSlots ?? 0);
     this.typeIds = fields.typeIds;
     this.executeFns = fields.executeFns;
+    this.wiringTable = fields.wiringTable;
     this.layout = fields.layout;
     this.evaluationOrder = fields.evaluationOrder;
     this.sequentialComponents = fields.sequentialComponents;

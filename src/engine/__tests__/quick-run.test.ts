@@ -16,15 +16,33 @@ import type { Wire } from "@/core/circuit";
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
-  constructor(
-    private readonly _inputNets: number[][],
-    private readonly _outputNets: number[][],
-  ) {}
+  readonly wiringTable: Int32Array;
+  private readonly _inputOffsets: number[];
+  private readonly _outputOffsets: number[];
+  private readonly _inputCounts: number[];
+  private readonly _outputCounts: number[];
 
-  inputCount(i: number): number { return this._inputNets[i]?.length ?? 0; }
-  inputOffset(i: number): number { return this._inputNets[i]?.[0] ?? 0; }
-  outputCount(i: number): number { return this._outputNets[i]?.length ?? 0; }
-  outputOffset(i: number): number { return this._outputNets[i]?.[0] ?? 0; }
+  constructor(inputNets: number[][], outputNets: number[][]) {
+    const entries: number[] = [];
+    this._inputOffsets = [];
+    this._outputOffsets = [];
+    this._inputCounts = inputNets.map(n => n.length);
+    this._outputCounts = outputNets.map(n => n.length);
+    for (const nets of inputNets) {
+      this._inputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    for (const nets of outputNets) {
+      this._outputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    this.wiringTable = Int32Array.from(entries);
+  }
+
+  inputCount(i: number): number { return this._inputCounts[i] ?? 0; }
+  inputOffset(i: number): number { return this._inputOffsets[i] ?? 0; }
+  outputCount(i: number): number { return this._outputCounts[i] ?? 0; }
+  outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
   stateOffset(_i: number): number { return 0; }
 }
 
@@ -40,6 +58,7 @@ function buildMinimalCircuit(): ConcreteCompiledCircuit {
     componentCount: 1,
     typeIds: new Uint8Array([0]),
     executeFns: [noopFn],
+    wiringTable: layout.wiringTable,
     layout,
     evaluationOrder: [singleGroup([0])],
     sequentialComponents: new Uint32Array(0),

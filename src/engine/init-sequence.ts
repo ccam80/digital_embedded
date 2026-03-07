@@ -203,7 +203,7 @@ function releaseResetComponents(engine: InitializableEngine): void {
 
 /**
  * Capture output net values for all components in a group before evaluation.
- * Returns a flat array of [netId, value] pairs for all output nets.
+ * Returns a flat array of output net values in layout order.
  */
 function captureOutputs(
   componentIndices: Uint32Array,
@@ -211,7 +211,7 @@ function captureOutputs(
   state: Uint32Array,
   layout: ComponentLayout,
 ): Uint32Array {
-  // Count total output slots
+  const wt = layout.wiringTable;
   let totalOutputs = 0;
   for (let i = 0; i < count; i++) {
     totalOutputs += layout.outputCount(componentIndices[i]);
@@ -224,7 +224,7 @@ function captureOutputs(
     const outOffset = layout.outputOffset(compIdx);
     const outCount = layout.outputCount(compIdx);
     for (let j = 0; j < outCount; j++) {
-      captured[pos++] = state[outOffset + j];
+      captured[pos++] = state[wt[outOffset + j]!];
     }
   }
   return captured;
@@ -241,13 +241,14 @@ function outputsChanged(
   layout: ComponentLayout,
   before: Uint32Array,
 ): boolean {
+  const wt = layout.wiringTable;
   let pos = 0;
   for (let i = 0; i < count; i++) {
     const compIdx = componentIndices[i];
     const outOffset = layout.outputOffset(compIdx);
     const outCount = layout.outputCount(compIdx);
     for (let j = 0; j < outCount; j++) {
-      if (state[outOffset + j] !== before[pos]) return true;
+      if (state[wt[outOffset + j]!] !== before[pos]) return true;
       pos++;
     }
   }

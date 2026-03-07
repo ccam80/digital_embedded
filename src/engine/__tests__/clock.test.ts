@@ -70,12 +70,17 @@ class StubElement implements CircuitElement {
 
 /**
  * ComponentLayout where each component has an explicit output net ID.
- * outputOffsets[i] is the net ID of the first output of component i.
+ * Builds a wiringTable so outputOffset(i) returns an index into the table,
+ * and wiringTable[outputOffset(i)] returns the actual net ID.
  */
 class StubLayout implements ComponentLayout {
-  constructor(
-    private readonly _outputOffsets: number[],
-  ) {}
+  readonly wiringTable: Int32Array;
+  private readonly _outputOffsets: number[];
+
+  constructor(outputNetIds: number[]) {
+    this._outputOffsets = outputNetIds.map((_, i) => i);
+    this.wiringTable = Int32Array.from(outputNetIds);
+  }
 
   inputCount(_i: number): number { return 0; }
   inputOffset(_i: number): number { return 0; }
@@ -129,6 +134,7 @@ function buildClockCircuit(
     componentCount,
     typeIds: new Uint8Array(componentCount),
     executeFns: [],
+    wiringTable: layout.wiringTable,
     layout,
     evaluationOrder: componentCount > 0 ? [group] : [],
     sequentialComponents: new Uint32Array(sequentialComponents),

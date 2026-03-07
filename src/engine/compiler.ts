@@ -467,33 +467,6 @@ export function compileCircuit(
     }
   }
 
-  // Create the layout. The layout's inputOffset(i) returns the NET ID of the
-  // first input of component i (not a wiring-table index). For the common
-  // single-input/output case this is correct. For multi-input components,
-  // the executeFn reads state[inputOffset(i)], state[inputOffset(i)+1], etc.,
-  // which only works if input nets are assigned contiguous net IDs.
-  //
-  // This is NOT guaranteed in general. The correct architecture for
-  // multi-input components is to have executeFns read nets via the wiring
-  // table. However, since existing tests use direct net IDs (AND tests set
-  // state[netId] directly) and the existing ConcreteCompiledCircuit tests
-  // also do this, we match that convention here.
-  //
-  // For the compiler's own output, we provide the actual net IDs as the
-  // offsets. This means inputOffset(i) = first input net ID of component i,
-  // and reading state[inputOffset(i) + k] will work IF AND ONLY IF the net
-  // IDs for that component's inputs happen to be contiguous. The net resolver
-  // assigns net IDs in discovery order, so this is not guaranteed for circuits
-  // with complex connectivity.
-  //
-  // The correct fix is to use a wiring indirection table in executeFns.
-  // For now we use the same convention as existing tests: inputOffset returns
-  // the first input net ID directly. This matches the StaticLayout in
-  // digital-engine.test.ts and the And gate's executeAnd function.
-  //
-  // When Phase 5 components are implemented, they should use layout.inputOffset
-  // as a net ID (not a wiring array index).
-
   // Build per-component property maps so executeFns can read bitWidth etc.
   const componentPropertiesList: ReadonlyMap<string, import("@/core/properties").PropertyValue>[] = [];
   for (let i = 0; i < componentCount; i++) {
@@ -533,10 +506,11 @@ export function compileCircuit(
   }
 
   const layout = new FlatComponentLayout(
-    buildNetIdOffsets(componentInputNets),
-    buildNetIdOffsets(componentOutputNets),
+    inputOffsets,
+    outputOffsets,
     inputCounts,
     outputCounts,
+    wiringTable,
     componentPropertiesList,
     stateOffsets,
   );
@@ -788,6 +762,7 @@ export function compileCircuit(
     totalStateSlots,
     typeIds,
     executeFns,
+    wiringTable,
     layout,
     evaluationOrder,
     sequentialComponents,
@@ -804,18 +779,6 @@ export function compileCircuit(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Build a flat offset array where offset[i] = first net ID of component i.
- * Returns the first element of each component's net array, or 0 if empty.
- */
-function buildNetIdOffsets(componentNets: number[][]): Int32Array {
-  const offsets = new Int32Array(componentNets.length);
-  for (let i = 0; i < componentNets.length; i++) {
-    offsets[i] = componentNets[i]![0] ?? 0;
-  }
-  return offsets;
-}
 
 /**
  * Returns true if the component type name indicates a sequential element.

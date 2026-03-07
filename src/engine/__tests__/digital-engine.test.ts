@@ -20,32 +20,51 @@ import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
  * inputNets[i]  = array of net IDs that are inputs to component i
  * outputNets[i] = array of net IDs that are outputs of component i
  *
- * inputOffset(i)  returns the first input net ID for component i.
- * outputOffset(i) returns the first output net ID for component i.
- *
- * Execute functions in tests address nets by their direct net IDs
- * (reading state[netId]) so they do not rely on inputOffset arithmetic.
+ * Builds a wiringTable mapping wiring-table positions to net IDs.
+ * inputOffset(i) and outputOffset(i) return positions in the wiringTable.
  */
 class StaticLayout implements ComponentLayout {
+  readonly wiringTable: Int32Array;
+  private readonly _inputOffsets: number[];
+  private readonly _outputOffsets: number[];
+  private readonly _inputCounts: number[];
+  private readonly _outputCounts: number[];
+
   constructor(
-    private readonly _inputNets: number[][],
-    private readonly _outputNets: number[][],
-  ) {}
+    inputNets: number[][],
+    outputNets: number[][],
+  ) {
+    const entries: number[] = [];
+    this._inputOffsets = [];
+    this._outputOffsets = [];
+    this._inputCounts = inputNets.map(n => n.length);
+    this._outputCounts = outputNets.map(n => n.length);
+
+    for (const nets of inputNets) {
+      this._inputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    for (const nets of outputNets) {
+      this._outputOffsets.push(entries.length);
+      for (const netId of nets) entries.push(netId);
+    }
+    this.wiringTable = Int32Array.from(entries);
+  }
 
   inputCount(idx: number): number {
-    return this._inputNets[idx]?.length ?? 0;
+    return this._inputCounts[idx] ?? 0;
   }
 
   inputOffset(idx: number): number {
-    return this._inputNets[idx]?.[0] ?? 0;
+    return this._inputOffsets[idx] ?? 0;
   }
 
   outputCount(idx: number): number {
-    return this._outputNets[idx]?.length ?? 0;
+    return this._outputCounts[idx] ?? 0;
   }
 
   outputOffset(idx: number): number {
-    return this._outputNets[idx]?.[0] ?? 0;
+    return this._outputOffsets[idx] ?? 0;
   }
 
   stateOffset(_idx: number): number {
@@ -78,6 +97,7 @@ function buildCircuit(
     signalArraySize: netCount,
     typeIds,
     executeFns,
+    wiringTable: layout.wiringTable,
     layout,
     evaluationOrder,
     sequentialComponents: new Uint32Array(0),
