@@ -142,8 +142,9 @@ export function executeLed(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
-  const inputVal = state[layout.inputOffset(index)];
-  state[layout.outputOffset(index)] = inputVal !== 0 ? 1 : 0;
+  const wt = layout.wiringTable;
+  const inputVal = state[wt[layout.inputOffset(index)]];
+  state[wt[layout.outputOffset(index)]] = inputVal !== 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

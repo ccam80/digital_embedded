@@ -147,11 +147,12 @@ export function makeExecuteBarrelShifter(
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
 
   return function executeBarrelShifter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
-    const inVal = state[inBase] & mask;
-    const rawShift = state[inBase + 1];
+    const inVal = state[wt[inBase]] & mask;
+    const rawShift = state[wt[inBase + 1]];
 
     let shiftVal: number;
     if (signed) {
@@ -198,7 +199,7 @@ export function makeExecuteBarrelShifter(
       }
     }
 
-    state[outBase] = (result & mask) >>> 0;
+    state[wt[outBase]] = (result & mask) >>> 0;
   };
 }
 

@@ -184,11 +184,12 @@ export function makeExecuteMul(
   const signBit = 1 << (bitWidth - 1);
 
   return function executeMul(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
-    const rawA = state[inBase] & inputMask;
-    const rawB = state[inBase + 1] & inputMask;
+    const rawA = state[wt[inBase]] & inputMask;
+    const rawB = state[wt[inBase + 1]] & inputMask;
 
     let bigA: bigint;
     let bigB: bigint;
@@ -213,21 +214,20 @@ export function makeExecuteMul(
       : (BigInt(1) << BigInt(outBits)) - BigInt(1);
     const maskedProduct = ((product % (outMask + BigInt(1))) + (outMask + BigInt(1))) % (outMask + BigInt(1));
 
-    // Store lower 32 bits in outBase
-    state[outBase] = Number(maskedProduct & BigInt(0xFFFFFFFF)) >>> 0;
+    state[wt[outBase]] = Number(maskedProduct & BigInt(0xFFFFFFFF)) >>> 0;
 
-    // Store upper 32 bits in outBase+1 if layout has 2 output slots
     const outCount = layout.outputCount(index);
     if (outCount >= 2) {
-      state[outBase + 1] = Number((maskedProduct >> BigInt(32)) & BigInt(0xFFFFFFFF)) >>> 0;
+      state[wt[outBase + 1]] = Number((maskedProduct >> BigInt(32)) & BigInt(0xFFFFFFFF)) >>> 0;
     }
   };
 }
 
 export function executeMul(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
-  makeExecuteMul(bitWidth, signed)(index, state, _highZs, layout);
+  makeExecuteMul(
+    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
+  )(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

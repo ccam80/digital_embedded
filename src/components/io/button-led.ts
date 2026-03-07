@@ -162,12 +162,13 @@ export function executeButtonLED(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   // The LED input (index 0) is read for display; no output computed here.
   // The button output (index 1) is set externally via engine.setSignalValue().
   // Copy LED input to output slot so the display can read it.
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = state[inputIdx];
+  state[wt[outputIdx]] = state[wt[inputIdx]];
 }
 
 // ---------------------------------------------------------------------------

@@ -179,12 +179,13 @@ export function executeRgbLed(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const r = state[inputStart] !== 0 ? 1 : 0;
-  const g = state[inputStart + 1] !== 0 ? 1 : 0;
-  const b = state[inputStart + 2] !== 0 ? 1 : 0;
+  const r = state[wt[inputStart]] !== 0 ? 1 : 0;
+  const g = state[wt[inputStart + 1]] !== 0 ? 1 : 0;
+  const b = state[wt[inputStart + 2]] !== 0 ? 1 : 0;
   // Pack channels into output: bits 2=R, 1=G, 0=B
-  state[layout.outputOffset(index)] = (r << 2) | (g << 1) | b;
+  state[wt[layout.outputOffset(index)]] = (r << 2) | (g << 1) | b;
 }
 
 // ---------------------------------------------------------------------------

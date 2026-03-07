@@ -157,18 +157,19 @@ export class DriverElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeDriver(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const dataIn = state[inBase];
-  const sel = state[inBase + 1];
+  const dataIn = state[wt[inBase]];
+  const sel = state[wt[inBase + 1]];
 
   if (sel !== 0) {
-    state[outBase] = dataIn;
-    state[outBase + 1] = 0;
+    state[wt[outBase]] = dataIn;
+    state[wt[outBase + 1]] = 0;
   } else {
-    state[outBase] = 0;
-    state[outBase + 1] = 0xFFFFFFFF;
+    state[wt[outBase]] = 0;
+    state[wt[outBase + 1]] = 0xFFFFFFFF;
   }
 }
 

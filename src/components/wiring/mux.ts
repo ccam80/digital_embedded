@@ -197,13 +197,14 @@ export function executeMux(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outIdx = layout.outputOffset(index);
 
-  const sel = state[inBase] >>> 0;
+  const sel = state[wt[inBase]] >>> 0;
   // input 0 is sel, data inputs start at inBase+1
   const dataBase = inBase + 1;
-  state[outIdx] = state[dataBase + sel] >>> 0;
+  state[wt[outIdx]] = state[wt[dataBase + sel]] >>> 0;
 }
 
 // ---------------------------------------------------------------------------

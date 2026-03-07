@@ -168,9 +168,10 @@ export class OutElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeOut(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = state[inputIdx];
+  state[wt[outputIdx]] = state[wt[inputIdx]];
 }
 
 // ---------------------------------------------------------------------------

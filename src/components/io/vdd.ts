@@ -126,9 +126,10 @@ export class VddElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeVdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   // Output all ones. The bit-width mask is applied by the net resolver;
   // writing 0xFFFFFFFF is correct for any width up to 32 bits.
-  state[layout.outputOffset(index)] = 0xFFFFFFFF;
+  state[wt[layout.outputOffset(index)]] = 0xFFFFFFFF;
 }
 
 // ---------------------------------------------------------------------------

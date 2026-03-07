@@ -53,7 +53,9 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
+  const totalSlots = inputCount + outputCount;
   return {
+    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => outputCount,
@@ -67,7 +69,9 @@ function makeLayoutWithProps(
   outputCount: number,
   props: Record<string, unknown>,
 ): ComponentLayout {
+  const totalSlots = inputCount + outputCount;
   return {
+    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => outputCount,

@@ -96,16 +96,15 @@ export function makeExecuteBitExtender(
   const extendMask = (outMask ^ inMask) >>> 0;
 
   return function executeBitExtender(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
-    const inVal = state[inBase] & inMask;
+    const inVal = state[wt[inBase]] & inMask;
 
     if ((inVal & signBit) !== 0) {
-      // Sign bit is set: extend with 1s
-      state[outBase] = (inVal | extendMask) >>> 0;
+      state[wt[outBase]] = (inVal | extendMask) >>> 0;
     } else {
-      // Sign bit is clear: zero-extend
-      state[outBase] = inVal >>> 0;
+      state[wt[outBase]] = inVal >>> 0;
     }
   };
 }

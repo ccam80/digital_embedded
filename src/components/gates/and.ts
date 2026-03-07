@@ -264,15 +264,16 @@ export class AndElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeAnd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);
 
   let result = 0xFFFFFFFF;
   for (let i = 0; i < inputCount; i++) {
-    result = (result & state[inputStart + i]) >>> 0;
+    result = (result & state[wt[inputStart + i]]) >>> 0;
   }
-  state[outputIdx] = result;
+  state[wt[outputIdx]] = result;
 }
 
 // ---------------------------------------------------------------------------

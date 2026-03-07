@@ -293,19 +293,20 @@ export function executeTerminal(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const din = state[inBase];          // 8-bit character
-  const wr = state[inBase + 1] & 1;  // write strobe
-  const rd = state[inBase + 2] & 1;  // read strobe
+  const din = state[wt[inBase]];          // 8-bit character
+  const wr = state[wt[inBase + 1]] & 1;  // write strobe
+  const rd = state[wt[inBase + 2]] & 1;  // read strobe
 
   // Internal state: previous wr and rd for edge detection
   // stateOffset not available in this layout interface — store in output scratch
   // We use two extra output slots beyond dout/rdy for previous wr/rd state.
   // Slot: outBase+0=dout, outBase+1=rdy, outBase+2=prev_wr, outBase+3=prev_rd
-  const prevWr = state[outBase + 2] & 1;
-  const prevRd = state[outBase + 3] & 1;
+  const prevWr = state[wt[outBase + 2]] & 1;
+  const prevRd = state[wt[outBase + 3]] & 1;
 
   // Rising edge on wr: character din should be appended to buffer.
   // The engine's post-step hook calls element.appendChar(din) when it detects
@@ -323,18 +324,18 @@ export function executeTerminal(
   // On a rising wr edge, mark pending write in a scratch slot.
   if (wr === 1 && prevWr === 0) {
     // Encode pending character write in scratch area (outBase+4)
-    state[outBase + 4] = din;
-    state[outBase + 5] = 1; // pending_wr flag
+    state[wt[outBase + 4]] = din;
+    state[wt[outBase + 5]] = 1; // pending_wr flag
   }
 
   // On a rising rd edge, signal dequeue request
   if (rd === 1 && prevRd === 0) {
-    state[outBase + 6] = 1; // pending_rd flag
+    state[wt[outBase + 6]] = 1; // pending_rd flag
   }
 
   // Update previous strobe values
-  state[outBase + 2] = wr;
-  state[outBase + 3] = rd;
+  state[wt[outBase + 2]] = wr;
+  state[wt[outBase + 3]] = rd;
 }
 
 // ---------------------------------------------------------------------------

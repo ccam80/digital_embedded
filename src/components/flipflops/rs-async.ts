@@ -168,12 +168,13 @@ export class RSAsyncElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeRSAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
-  const s = state[inBase] !== 0;
-  const r = state[inBase + 1] !== 0;
+  const s = state[wt[inBase]] !== 0;
+  const r = state[wt[inBase + 1]] !== 0;
 
   if (s && r) {
     state[stBase] = 0;
@@ -185,10 +186,9 @@ export function executeRSAsync(index: number, state: Uint32Array, _highZs: Uint3
     state[stBase] = 0;
     state[stBase + 1] = 1;
   }
-  // S=0, R=0: hold current state (no update)
 
-  state[outBase] = state[stBase];
-  state[outBase + 1] = state[stBase + 1];
+  state[wt[outBase]] = state[stBase];
+  state[wt[outBase + 1]] = state[stBase + 1];
 }
 
 // ---------------------------------------------------------------------------

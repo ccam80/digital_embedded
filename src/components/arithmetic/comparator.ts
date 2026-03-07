@@ -92,11 +92,12 @@ export function makeExecuteComparator(
   const signBit = 1 << (bitWidth - 1);
 
   return function executeComparator(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
-    const rawA = state[inBase] & mask;
-    const rawB = state[inBase + 1] & mask;
+    const rawA = state[wt[inBase]] & mask;
+    const rawB = state[wt[inBase + 1]] & mask;
 
     let a: number;
     let b: number;
@@ -110,25 +111,26 @@ export function makeExecuteComparator(
     }
 
     if (a === b) {
-      state[outBase] = 0;     // >
-      state[outBase + 1] = 1; // =
-      state[outBase + 2] = 0; // <
+      state[wt[outBase]] = 0;     // >
+      state[wt[outBase + 1]] = 1; // =
+      state[wt[outBase + 2]] = 0; // <
     } else if (a < b) {
-      state[outBase] = 0;     // >
-      state[outBase + 1] = 0; // =
-      state[outBase + 2] = 1; // <
+      state[wt[outBase]] = 0;     // >
+      state[wt[outBase + 1]] = 0; // =
+      state[wt[outBase + 2]] = 1; // <
     } else {
-      state[outBase] = 1;     // >
-      state[outBase + 1] = 0; // =
-      state[outBase + 2] = 0; // <
+      state[wt[outBase]] = 1;     // >
+      state[wt[outBase + 1]] = 0; // =
+      state[wt[outBase + 2]] = 0; // <
     }
   };
 }
 
 export function executeComparator(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
-  makeExecuteComparator(bitWidth, signed)(index, state, _highZs, layout);
+  makeExecuteComparator(
+    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
+  )(index, state, _highZs, layout);
 }
 
 export const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

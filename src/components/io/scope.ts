@@ -226,11 +226,12 @@ export function executeScope(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   // Write first channel value to output for trigger/display reference
-  const firstVal = inputCount > 0 ? state[inputStart] : 0;
-  state[layout.outputOffset(index)] = firstVal;
+  const firstVal = inputCount > 0 ? state[wt[inputStart]] : 0;
+  state[wt[layout.outputOffset(index)]] = firstVal;
 }
 
 // ---------------------------------------------------------------------------

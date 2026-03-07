@@ -262,15 +262,16 @@ export class EEPROMElement extends AbstractCircuitElement {
 }
 
 export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const cs = state[inBase + 1] & 1;
-  const we = state[inBase + 2] & 1;
-  const oe = state[inBase + 3] & 1;
-  const din = state[inBase + 4] >>> 0;
+  const A = state[wt[inBase]] >>> 0;
+  const cs = state[wt[inBase + 1]] & 1;
+  const we = state[wt[inBase + 2]] & 1;
+  const oe = state[wt[inBase + 3]] & 1;
+  const din = state[wt[inBase + 4]] >>> 0;
 
   const lastWE = state[stBase] & 1;
   const writeAddr = state[stBase + 1] >>> 0;
@@ -292,9 +293,9 @@ export function executeEEPROM(index: number, state: Uint32Array, _highZs: Uint32
   // Read: CS=1, OE=1, WE=0
   if (cs && oe && !we) {
     const mem = getBackingStore(index);
-    state[outBase] = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 
   state[stBase] = we;
@@ -453,15 +454,16 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
 }
 
 export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as EEPROMLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const din = state[inBase + 1] >>> 0;
-  const str = state[inBase + 2] & 1;
-  const clk = state[inBase + 3] & 1;
-  const ld = state[inBase + 4] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const din = state[wt[inBase + 1]] >>> 0;
+  const str = state[wt[inBase + 2]] & 1;
+  const clk = state[wt[inBase + 3]] & 1;
+  const ld = state[wt[inBase + 4]] & 1;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
@@ -475,9 +477,9 @@ export function executeEEPROMDualPort(index: number, state: Uint32Array, _highZs
 
   if (ld) {
     const mem = getBackingStore(index);
-    state[outBase] = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 
   state[stBase] = clk;

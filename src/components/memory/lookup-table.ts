@@ -152,6 +152,7 @@ export class LookUpTableElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeLookUpTable(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
@@ -160,7 +161,7 @@ export function executeLookUpTable(index: number, state: Uint32Array, _highZs: U
   // Instead, we rely on the backing store size: 2^N entries.
   const mem = getBackingStore(index);
   if (mem === undefined) {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
     return;
   }
 
@@ -172,13 +173,13 @@ export function executeLookUpTable(index: number, state: Uint32Array, _highZs: U
   // tableSize = 2^N, so N = log2(tableSize)
   const n = Math.round(Math.log2(tableSize));
   for (let i = 0; i < n; i++) {
-    if (state[inBase + i] & 1) {
+    if (state[wt[inBase + i]] & 1) {
       addr |= mask;
     }
     mask <<= 1;
   }
 
-  state[outBase] = mem.read(addr) >>> 0;
+  state[wt[outBase]] = mem.read(addr) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

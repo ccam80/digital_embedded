@@ -43,6 +43,7 @@ function makeRelayLayout(inputCount: number, stateCount: number): {
 } {
   const state = new Uint32Array(inputCount + stateCount);
   const layout: ComponentLayout & RelayLayout = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => 0,
@@ -58,6 +59,7 @@ function makeRelayDTLayout(inputCount: number, stateCount: number): {
 } {
   const state = new Uint32Array(inputCount + stateCount);
   const layout: ComponentLayout & RelayDTLayout = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => 0,

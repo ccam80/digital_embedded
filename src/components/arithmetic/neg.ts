@@ -75,10 +75,11 @@ export class NegElement extends AbstractCircuitElement {
 }
 
 export function executeNeg(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const val = state[inBase] >>> 0;
-  state[outBase] = (-val) >>> 0;
+  const val = state[wt[inBase]] >>> 0;
+  state[wt[outBase]] = (-val) >>> 0;
 }
 
 export const NEG_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

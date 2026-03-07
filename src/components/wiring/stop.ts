@@ -136,9 +136,10 @@ export function executeStop(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inIdx = layout.inputOffset(index);
   const outIdx = layout.outputOffset(index);
-  state[outIdx] = state[inIdx] !== 0 ? 1 : 0;
+  state[wt[outIdx]] = state[wt[inIdx]] !== 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

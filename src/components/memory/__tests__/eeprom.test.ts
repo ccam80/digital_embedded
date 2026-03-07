@@ -47,6 +47,7 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
 } {
   const state = new Uint32Array(inputCount + outputCount + stateCount);
   const layout: ComponentLayout & EEPROMLayout = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => outputCount,

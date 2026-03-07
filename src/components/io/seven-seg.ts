@@ -163,14 +163,15 @@ export function executeSevenSeg(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   let packed = 0;
   for (let i = 0; i < 8; i++) {
-    if (state[inputStart + i] !== 0) {
+    if (state[wt[inputStart + i]] !== 0) {
       packed |= (1 << i);
     }
   }
-  state[layout.outputOffset(index)] = packed >>> 0;
+  state[wt[layout.outputOffset(index)]] = packed >>> 0;
 }
 
 // ---------------------------------------------------------------------------

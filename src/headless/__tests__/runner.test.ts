@@ -91,9 +91,9 @@ function executeNoop(_index: number, _state: Uint32Array, __highZs: Uint32Array,
 // ---------------------------------------------------------------------------
 
 function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.inputOffset(index)] ?? 0;
-  const b = state[layout.inputOffset(index) + 1] ?? 0;
-  state[layout.outputOffset(index)] = (a ^ b) >>> 0;
+  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
+  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
+  state[layout.wiringTable[layout.outputOffset(index)]] = (a ^ b) >>> 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,9 +101,9 @@ function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, la
 // ---------------------------------------------------------------------------
 
 function executeAnd2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.inputOffset(index)] ?? 0;
-  const b = state[layout.inputOffset(index) + 1] ?? 0;
-  state[layout.outputOffset(index)] = (a & b) >>> 0;
+  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
+  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
+  state[layout.wiringTable[layout.outputOffset(index)]] = (a & b) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

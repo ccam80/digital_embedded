@@ -44,6 +44,8 @@ function makeLayout(inputCount: number, outputCount: number, _stateCount: number
   const inputStart = 0;
   const outputStart = inputCount;
   const stateStart = inputCount + outputCount;
+  const totalSlots = inputCount + outputCount + _stateCount;
+  const wiringTable = new Int32Array(totalSlots).map((_, i) => i);
 
   return {
     inputCount: () => inputCount,
@@ -51,6 +53,7 @@ function makeLayout(inputCount: number, outputCount: number, _stateCount: number
     outputCount: () => outputCount,
     outputOffset: () => outputStart,
     stateOffset: () => stateStart,
+    wiringTable,
   };
 }
 

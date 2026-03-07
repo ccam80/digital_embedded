@@ -134,15 +134,16 @@ export function executeBusSplitter(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const outCount = layout.outputCount(index);
 
-  const wideValue = state[inBase];
+  const wideValue = state[wt[inBase]];
 
   let startBit = 0;
   for (let i = 0; i < outCount; i++) {
-    state[outBase + i] = extractBits(wideValue, startBit, 1);
+    state[wt[outBase + i]] = extractBits(wideValue, startBit, 1);
     startBit += 1;
   }
 }

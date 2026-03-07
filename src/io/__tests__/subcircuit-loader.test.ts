@@ -316,7 +316,8 @@ describe("subcircuit-loader", () => {
     // executeFn should be callable without throwing
     const mockState = new Uint32Array(10);
     const mockLayout = {
-      inputCount: () => 0,
+      wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 0,
       inputOffset: () => 0,
       outputCount: () => 0,
       outputOffset: () => 0,

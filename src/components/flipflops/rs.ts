@@ -177,13 +177,14 @@ export class RSElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
-  const s = state[inBase];
-  const clock = state[inBase + 1];
-  const r = state[inBase + 2];
+  const s = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const r = state[wt[inBase + 2]];
   const prevClock = state[stBase + 1];
 
   if (clock !== 0 && prevClock === 0) {
@@ -195,14 +196,12 @@ export function executeRS(index: number, state: Uint32Array, _highZs: Uint32Arra
     } else if (!sBit && rBit) {
       state[stBase] = 0;
     }
-    // S=1, R=1: undefined — hold current state (deterministic for testing)
-    // S=0, R=0: hold current state
   }
   state[stBase + 1] = clock;
 
   const q = state[stBase];
-  state[outBase] = q;
-  state[outBase + 1] = q !== 0 ? 0 : 1;
+  state[wt[outBase]] = q;
+  state[wt[outBase + 1]] = q !== 0 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------

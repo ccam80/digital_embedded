@@ -185,8 +185,9 @@ export function executeSevenSegHex(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
-  const digit = state[layout.inputOffset(index)] & 0xF;
-  state[layout.outputOffset(index)] = HEX_SEGMENT_TABLE[digit];
+  const wt = layout.wiringTable;
+  const digit = state[wt[layout.inputOffset(index)]] & 0xF;
+  state[wt[layout.outputOffset(index)]] = HEX_SEGMENT_TABLE[digit];
 }
 
 // ---------------------------------------------------------------------------

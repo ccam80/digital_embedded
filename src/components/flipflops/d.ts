@@ -169,12 +169,13 @@ export class DElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
-  const d = state[inBase];
-  const clock = state[inBase + 1];
+  const d = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
   const prevClock = state[stBase + 1];
 
   if (clock !== 0 && prevClock === 0) {
@@ -183,8 +184,8 @@ export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array
   state[stBase + 1] = clock;
 
   const q = state[stBase];
-  state[outBase] = q;
-  state[outBase + 1] = (~q) >>> 0;
+  state[wt[outBase]] = q;
+  state[wt[outBase + 1]] = (~q) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

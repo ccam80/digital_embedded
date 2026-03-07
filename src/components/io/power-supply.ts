@@ -163,17 +163,18 @@ export function executePowerSupply(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const vdd = state[inputStart];     // index 0: VDD
-  const gnd = state[inputStart + 1]; // index 1: GND
+  const vdd = state[wt[inputStart]];     // index 0: VDD
+  const gnd = state[wt[inputStart + 1]]; // index 1: GND
   const outputIdx = layout.outputOffset(index);
 
   if (vdd !== 1) {
-    state[outputIdx] = 1; // VDD error
+    state[wt[outputIdx]] = 1; // VDD error
   } else if (gnd !== 0) {
-    state[outputIdx] = 2; // GND error
+    state[wt[outputIdx]] = 2; // GND error
   } else {
-    state[outputIdx] = 0; // OK
+    state[wt[outputIdx]] = 0; // OK
   }
 }
 

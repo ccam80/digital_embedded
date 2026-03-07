@@ -67,6 +67,7 @@ import type {
 
 function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => outputCount,
@@ -78,6 +79,7 @@ function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
 /** Layout where inputs and outputs don't overlap — for driver 2-output layout */
 function makeDriverLayout(): ComponentLayout {
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => 2,        // data + sel
     inputOffset: () => 0,
     outputCount: () => 2,       // value + highZ

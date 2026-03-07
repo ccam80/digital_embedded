@@ -178,11 +178,12 @@ export function makeExecuteDiv(
   const signBit = 1 << (bitWidth - 1);
 
   return function executeDiv(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
-    const rawA = state[inBase] & mask;
-    const rawB = state[inBase + 1] & mask;
+    const rawA = state[wt[inBase]] & mask;
+    const rawB = state[wt[inBase + 1]] & mask;
 
     if (signed) {
       // Sign-extend from bitWidth
@@ -205,11 +206,9 @@ export function makeExecuteDiv(
         }
       }
 
-      // Store as unsigned (mask to bitWidth, handle negative via two's complement)
-      state[outBase] = (q & mask) >>> 0;
-      state[outBase + 1] = (r & mask) >>> 0;
+      state[wt[outBase]] = (q & mask) >>> 0;
+      state[wt[outBase + 1]] = (r & mask) >>> 0;
     } else {
-      // Unsigned division
       const av = rawA >>> 0;
       let bv = rawB >>> 0;
 
@@ -218,17 +217,18 @@ export function makeExecuteDiv(
       const q = Math.floor(av / bv);
       const r = av % bv;
 
-      state[outBase] = (q & mask) >>> 0;
-      state[outBase + 1] = (r & mask) >>> 0;
+      state[wt[outBase]] = (q & mask) >>> 0;
+      state[wt[outBase + 1]] = (r & mask) >>> 0;
     }
   };
 }
 
 export function executeDiv(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  const signed = (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false;
-  const remainderPositive = (layout.getProperty?.(index, "remainderPositive") as boolean | undefined) ?? false;
-  makeExecuteDiv(bitWidth, signed, remainderPositive)(index, state, _highZs, layout);
+  makeExecuteDiv(
+    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
+    (layout.getProperty?.(index, "remainderPositive") as boolean | undefined) ?? false,
+  )(index, state, _highZs, layout);
 }
 
 // ---------------------------------------------------------------------------

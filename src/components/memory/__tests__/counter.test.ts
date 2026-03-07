@@ -53,6 +53,7 @@ function makeLayout(
   const outputStart = inputCount;
   const stateStart = inputCount + outputCount;
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => outputCount,

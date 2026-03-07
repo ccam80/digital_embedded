@@ -148,8 +148,9 @@ export class PullDownElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executePullDown(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = 0;
+  state[wt[outputIdx]] = 0;
 }
 
 // ---------------------------------------------------------------------------

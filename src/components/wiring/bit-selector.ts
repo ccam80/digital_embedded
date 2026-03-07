@@ -162,13 +162,14 @@ export function executeBitSelector(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outIdx = layout.outputOffset(index);
 
-  const value = state[inBase] >>> 0;
-  const sel = state[inBase + 1] >>> 0;
+  const value = state[wt[inBase]] >>> 0;
+  const sel = state[wt[inBase + 1]] >>> 0;
 
-  state[outIdx] = (value >>> sel) & 1;
+  state[wt[outIdx]] = (value >>> sel) & 1;
 }
 
 // ---------------------------------------------------------------------------

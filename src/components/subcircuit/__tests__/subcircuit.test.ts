@@ -266,7 +266,8 @@ describe("executeFnNoOp", () => {
     const snapshot = Uint32Array.from(state);
 
     const mockLayout = {
-      inputCount: () => 1,
+      wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
       inputOffset: () => 0,
       outputCount: () => 1,
       outputOffset: () => 1,

@@ -180,9 +180,10 @@ export class NotElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeNot(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = (~state[inputIdx]) >>> 0;
+  state[wt[outputIdx]] = (~state[wt[inputIdx]]) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

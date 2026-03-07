@@ -9,10 +9,10 @@
 import { describe, it, expect } from "vitest";
 import { compileCircuit } from "../compiler.js";
 import { DigitalEngine } from "../digital-engine.js";
-import type { ConcreteCompiledCircuit, EvaluationGroup } from "../digital-engine.js";
+
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction, ComponentLayout } from "@/core/registry";
+import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
@@ -60,13 +60,6 @@ function twoInputOneOutput(): PinDeclaration[] {
   return [
     { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
     { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
-  ];
-}
-
-function oneInputOneOutput(): PinDeclaration[] {
-  return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
     { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
   ];
 }
@@ -145,7 +138,7 @@ function makeDef(
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    stateSlotCount: opts?.stateSlotCount,
+    ...(opts?.stateSlotCount !== undefined ? { stateSlotCount: opts.stateSlotCount } : {}),
   };
 }
 

@@ -31,12 +31,14 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number, inputOffset: number, outputOffset: number): ComponentLayout {
+  const wt = new Int32Array(64).map((_, i) => i);
   return {
     inputCount: () => inputCount,
     inputOffset: () => inputOffset,
     outputCount: () => 4,
     outputOffset: () => outputOffset,
     stateOffset: () => 0,
+    wiringTable: wt,
   };
 }
 

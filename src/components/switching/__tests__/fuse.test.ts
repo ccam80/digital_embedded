@@ -35,6 +35,7 @@ function makeFuseLayout(stateCount: number): {
   // Fuse has no inputs; state slots start at 0
   const state = new Uint32Array(stateCount);
   const layout: ComponentLayout & FETLayout = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => 0,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => 0,

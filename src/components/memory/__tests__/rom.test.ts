@@ -46,6 +46,7 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
   const totalSlots = inputCount + outputCount + stateCount;
   const state = new Uint32Array(totalSlots);
   const layout: ComponentLayout & { stateOffset(i: number): number } = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => inputCount,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => outputCount,

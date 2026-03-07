@@ -211,6 +211,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeRegisterFile(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
@@ -219,12 +220,12 @@ export function executeRegisterFile(index: number, state: Uint32Array, _highZs: 
   };
   const stBase = extLayout.stateOffset(index);
 
-  const din = state[inBase];
-  const we = state[inBase + 1];
-  const rw = state[inBase + 2];
-  const clock = state[inBase + 3];
-  const ra = state[inBase + 4];
-  const rb = state[inBase + 5];
+  const din = state[wt[inBase]];
+  const we = state[wt[inBase + 1]];
+  const rw = state[wt[inBase + 2]];
+  const clock = state[wt[inBase + 3]];
+  const ra = state[wt[inBase + 4]];
+  const rb = state[wt[inBase + 5]];
   const prevClock = state[stBase];
 
   const addrBits = extLayout.getProperty ? extLayout.getProperty(index, "addrBits") : 2;
@@ -241,8 +242,8 @@ export function executeRegisterFile(index: number, state: Uint32Array, _highZs: 
 
   const readAddrA = (ra >>> 0) & addrMask;
   const readAddrB = (rb >>> 0) & addrMask;
-  state[outBase] = state[stBase + 1 + readAddrA];
-  state[outBase + 1] = state[stBase + 1 + readAddrB];
+  state[wt[outBase]] = state[stBase + 1 + readAddrA];
+  state[wt[outBase + 1]] = state[stBase + 1 + readAddrB];
 }
 
 // ---------------------------------------------------------------------------

@@ -146,51 +146,51 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 58,
-      "lastAccessed": 1772844218363,
+      "accessCount": 59,
+      "lastAccessed": 1772845554132,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 31,
-      "lastAccessed": 1772845111953,
+      "accessCount": 56,
+      "lastAccessed": 1772845932312,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 27,
-      "lastAccessed": 1772844379774,
+      "accessCount": 30,
+      "lastAccessed": 1772845197803,
       "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 19,
-      "lastAccessed": 1772844356328,
+      "accessCount": 23,
+      "lastAccessed": 1772845192848,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 18,
-      "lastAccessed": 1772844357693,
+      "accessCount": 23,
+      "lastAccessed": 1772845801946,
       "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 20,
+      "lastAccessed": 1772845192993,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 17,
+      "lastAccessed": 1772845238377,
+      "type": "directory"
     },
     {
       "path": "spec\\fix-spec.md",
       "accessCount": 16,
       "lastAccessed": 1772782442793,
       "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 16,
-      "lastAccessed": 1772844356790,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 14,
-      "lastAccessed": 1772844442723,
-      "type": "directory"
     },
     {
       "path": "src\\hgs\\builtins.ts",
@@ -203,6 +203,18 @@
       "accessCount": 9,
       "lastAccessed": 1772844252910,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\arithmetic\\add.ts",
+      "accessCount": 9,
+      "lastAccessed": 1772845284125,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\__tests__\\arithmetic.test.ts",
+      "accessCount": 9,
+      "lastAccessed": 1772845397963,
+      "type": "file"
     },
     {
       "path": "CLAUDE.md",
@@ -229,18 +241,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\arithmetic\\add.ts",
-      "accessCount": 6,
-      "lastAccessed": 1772842131875,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\__tests__\\arithmetic.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772781282601,
-      "type": "file"
-    },
-    {
       "path": "src\\fsm\\circuit-gen.ts",
       "accessCount": 5,
       "lastAccessed": 1772781282856,
@@ -262,6 +262,18 @@
       "path": "src\\core\\renderer-interface.ts",
       "accessCount": 5,
       "lastAccessed": 1772788210710,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\mul.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772845312898,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\div.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772845327954,
       "type": "file"
     },
     {
@@ -299,6 +311,18 @@
       "accessCount": 4,
       "lastAccessed": 1772782027732,
       "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\sub.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772845299137,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic",
+      "accessCount": 4,
+      "lastAccessed": 1772845377082,
+      "type": "directory"
     },
     {
       "path": "src\\hgs\\value.ts",
@@ -343,12 +367,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\arithmetic",
-      "accessCount": 2,
-      "lastAccessed": 1772781298394,
-      "type": "directory"
-    },
-    {
       "path": "src\\analysis",
       "accessCount": 2,
       "lastAccessed": 1772781337085,
@@ -382,24 +400,6 @@
       "path": "src\\analysis\\quine-mccluskey.ts",
       "accessCount": 1,
       "lastAccessed": 1772780928620,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\sub.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780932973,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\mul.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780933297,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\div.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780933419,
       "type": "file"
     },
     {

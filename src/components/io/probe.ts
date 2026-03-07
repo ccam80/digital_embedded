@@ -164,11 +164,12 @@ export class ProbeElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeProbe(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
   // Copy current input value to the output/storage slot.
   // Edge-counting is handled by the engine layer that wraps this function.
-  state[outputIdx] = state[inputIdx];
+  state[wt[outputIdx]] = state[wt[inputIdx]];
 }
 
 // ---------------------------------------------------------------------------

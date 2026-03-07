@@ -121,7 +121,8 @@ export class GroundElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeGround(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  state[layout.outputOffset(index)] = 0;
+  const wt = layout.wiringTable;
+  state[wt[layout.outputOffset(index)]] = 0;
 }
 
 // ---------------------------------------------------------------------------

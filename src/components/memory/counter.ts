@@ -180,6 +180,7 @@ export class CounterElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
@@ -188,9 +189,9 @@ export function executeCounter(index: number, state: Uint32Array, _highZs: Uint3
   };
   const stBase = extLayout.stateOffset(index);
 
-  const en = state[inBase];
-  const clock = state[inBase + 1];
-  const clr = state[inBase + 2];
+  const en = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const clr = state[wt[inBase + 2]];
   const prevClock = state[stBase + 1];
 
   const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
@@ -210,8 +211,8 @@ export function executeCounter(index: number, state: Uint32Array, _highZs: Uint3
   }
   state[stBase + 1] = clock;
 
-  state[outBase] = state[stBase];
-  state[outBase + 1] = (state[stBase] === maxValue && en !== 0) ? 1 : 0;
+  state[wt[outBase]] = state[stBase];
+  state[wt[outBase + 1]] = (state[stBase] === maxValue && en !== 0) ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

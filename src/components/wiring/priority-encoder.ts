@@ -187,6 +187,7 @@ export function executePriorityEncoder(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const inputCount = layout.inputCount(index);
@@ -195,14 +196,14 @@ export function executePriorityEncoder(
   let any = 0;
 
   for (let i = 0; i < inputCount; i++) {
-    if (state[inBase + i] !== 0) {
+    if (state[wt[inBase + i]] !== 0) {
       sel = i;
       any = 1;
     }
   }
 
-  state[outBase] = sel >>> 0;
-  state[outBase + 1] = any;
+  state[wt[outBase]] = sel >>> 0;
+  state[wt[outBase + 1]] = any;
 }
 
 // ---------------------------------------------------------------------------

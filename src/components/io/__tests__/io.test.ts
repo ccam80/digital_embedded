@@ -71,22 +71,26 @@ import type {
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number): ComponentLayout {
+  const wt = new Int32Array(64).map((_, i) => i);
   return {
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    wiringTable: wt,
   };
 }
 
 function makeLayoutNoInputs(): ComponentLayout {
+  const wt = new Int32Array(64).map((_, i) => i);
   return {
     inputCount: () => 0,
     inputOffset: () => 0,
     outputCount: () => 1,
     outputOffset: () => 0,
     stateOffset: () => 0,
+    wiringTable: wt,
   };
 }
 

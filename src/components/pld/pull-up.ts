@@ -148,8 +148,9 @@ export class PullUpElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executePullUp(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = 0xFFFFFFFF;
+  state[wt[outputIdx]] = 0xFFFFFFFF;
 }
 
 // ---------------------------------------------------------------------------

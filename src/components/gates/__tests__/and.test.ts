@@ -35,7 +35,9 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
  * Inputs start at slot 0, outputs follow immediately after inputs.
  */
 function makeLayout(inputCount: number): ComponentLayout {
+  const totalSlots = inputCount + 1;
   return {
+    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => 1,

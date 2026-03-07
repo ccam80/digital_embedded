@@ -44,6 +44,7 @@ function makeLayout(): {
 } {
   const state = new Uint32Array(3 + 1 + 2); // 6 slots
   const layout: ComponentLayout & ProgramMemoryLayout = {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: (_i: number) => 3,
     inputOffset: (_i: number) => 0,
     outputCount: (_i: number) => 1,

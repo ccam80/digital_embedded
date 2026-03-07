@@ -215,11 +215,12 @@ export interface RelayDTLayout extends ComponentLayout {
 // ---------------------------------------------------------------------------
 
 export function executeRelayDT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const stBase = (layout as RelayDTLayout).stateOffset(index);
 
-  const in1 = state[inBase] & 1;
-  const in2 = state[inBase + 1] & 1;
+  const in1 = state[wt[inBase]] & 1;
+  const in2 = state[wt[inBase + 1]] & 1;
 
   // Energised when coil terminals differ
   const energised = (in1 ^ in2) !== 0 ? 1 : 0;

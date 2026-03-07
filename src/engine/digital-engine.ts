@@ -318,8 +318,8 @@ export class DigitalEngine implements SimulationEngine {
 
       // Check whether any Break component's input net is asserted.
       for (const componentIndex of breakIndices) {
-        const inputOffset = this._compiled.layout.inputOffset(componentIndex);
-        const netId = this._compiled.layout.wiringTable[inputOffset]!;
+        const inOff: number = this._compiled.layout.inputOffset(componentIndex);
+        const netId = this._compiled.layout.wiringTable[inOff]!;
         if (this._values[netId] !== 0) {
           this._setState(EngineState.STOPPED);
           return;

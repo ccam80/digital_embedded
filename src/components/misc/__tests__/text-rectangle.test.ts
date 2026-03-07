@@ -74,6 +74,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 
 function makeNoOpLayout(): ComponentLayout {
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => 0,
     inputOffset: () => 0,
     outputCount: () => 0,

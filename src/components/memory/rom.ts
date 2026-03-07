@@ -242,17 +242,18 @@ export class ROMElement extends AbstractCircuitElement {
 }
 
 export function executeROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const sel = state[inBase + 1] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const sel = state[wt[inBase + 1]] & 1;
 
   if (sel) {
     const mem = getBackingStore(index);
-    state[outBase] = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 }
 
@@ -411,17 +412,18 @@ export class ROMDualPortElement extends AbstractCircuitElement {
 }
 
 export function executeROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const A1 = state[inBase] >>> 0;
-  const s1 = state[inBase + 1] & 1;
-  const A2 = state[inBase + 2] >>> 0;
-  const s2 = state[inBase + 3] & 1;
+  const A1 = state[wt[inBase]] >>> 0;
+  const s1 = state[wt[inBase + 1]] & 1;
+  const A2 = state[wt[inBase + 2]] >>> 0;
+  const s2 = state[wt[inBase + 3]] & 1;
 
   const mem = getBackingStore(index);
-  state[outBase] = s1 ? (mem !== undefined ? mem.read(A1) : 0) : 0;
-  state[outBase + 1] = s2 ? (mem !== undefined ? mem.read(A2) : 0) : 0;
+  state[wt[outBase]] = s1 ? (mem !== undefined ? mem.read(A1) : 0) : 0;
+  state[wt[outBase + 1]] = s2 ? (mem !== undefined ? mem.read(A2) : 0) : 0;
 }
 
 export const ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];

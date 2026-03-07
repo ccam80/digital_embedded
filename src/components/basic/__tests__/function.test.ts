@@ -39,6 +39,7 @@ function makeLayout(
   outputOffset: number,
 ): ComponentLayout {
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => inputOffset,
     outputCount: () => outputCount,

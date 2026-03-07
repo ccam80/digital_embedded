@@ -43,6 +43,8 @@ interface LayoutWithState extends ComponentLayout {
 function makeLayout(inputCount: number, outputCount: number, timerDelay: number): LayoutWithState {
   const outputStart = inputCount;
   const stateStart = inputCount + outputCount;
+  const totalSlots = inputCount + outputCount + 3;
+  const wiringTable = new Int32Array(totalSlots).map((_, i) => i);
 
   return {
     inputCount: () => inputCount,
@@ -50,6 +52,7 @@ function makeLayout(inputCount: number, outputCount: number, timerDelay: number)
     outputCount: () => outputCount,
     outputOffset: () => outputStart,
     stateOffset: () => stateStart,
+    wiringTable,
     getProperty: (_i: number, key: string) => {
       if (key === "timerDelay") return timerDelay;
       return 0;

@@ -265,11 +265,12 @@ export function executeStepperMotorBipolar(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const aPosHigh = state[inputStart];
-  const aNegHigh = state[inputStart + 1];
-  const bPosHigh = state[inputStart + 2];
-  const bNegHigh = state[inputStart + 3];
+  const aPosHigh = state[wt[inputStart]];
+  const aNegHigh = state[wt[inputStart + 1]];
+  const bPosHigh = state[wt[inputStart + 2]];
+  const bNegHigh = state[wt[inputStart + 3]];
 
   let stepIndex = 0;
   for (let s = 0; s < BIPOLAR_STEP_SEQUENCE.length; s++) {
@@ -284,7 +285,7 @@ export function executeStepperMotorBipolar(
       break;
     }
   }
-  state[layout.outputOffset(index)] = stepIndex;
+  state[wt[layout.outputOffset(index)]] = stepIndex;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,11 +298,12 @@ export function executeStepperMotorUnipolar(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const a = state[inputStart];
-  const b = state[inputStart + 1];
-  const c = state[inputStart + 2];
-  const d = state[inputStart + 3];
+  const a = state[wt[inputStart]];
+  const b = state[wt[inputStart + 1]];
+  const c = state[wt[inputStart + 2]];
+  const d = state[wt[inputStart + 3]];
 
   let stepIndex = 0;
   for (let s = 0; s < UNIPOLAR_STEP_SEQUENCE.length; s++) {
@@ -316,7 +318,7 @@ export function executeStepperMotorUnipolar(
       break;
     }
   }
-  state[layout.outputOffset(index)] = stepIndex;
+  state[wt[layout.outputOffset(index)]] = stepIndex;
 }
 
 // ---------------------------------------------------------------------------

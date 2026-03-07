@@ -170,11 +170,12 @@ export class TransGateElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeTransGate(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const s = state[inBase] & 1;
-  const ns = state[inBase + 1] & 1;
+  const s = state[wt[inBase]] & 1;
+  const ns = state[wt[inBase + 1]] & 1;
 
   // Closed only when S != ~S and S is high (valid complementary pair, gate on)
   state[stBase] = (s !== ns && s === 1) ? 1 : 0;

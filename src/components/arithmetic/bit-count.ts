@@ -93,16 +93,16 @@ export class BitCountElement extends AbstractCircuitElement {
 }
 
 export function executebitCount(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  let val = state[inBase] >>> 0;
-  // Kernighan's bit-counting algorithm
+  let val = state[wt[inBase]] >>> 0;
   let count = 0;
   while (val !== 0) {
     val &= val - 1;
     count++;
   }
-  state[outBase] = count;
+  state[wt[outBase]] = count;
 }
 
 export { executebitCount as executeBitCount };

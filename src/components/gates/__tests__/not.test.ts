@@ -29,6 +29,7 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 function makeLayout(): ComponentLayout {
   return {
+    wiringTable: Int32Array.from({ length: 2 }, (_, i) => i),
     inputCount: () => 1,
     inputOffset: () => 0,
     outputCount: () => 1,

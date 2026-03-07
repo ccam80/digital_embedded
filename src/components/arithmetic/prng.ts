@@ -161,34 +161,32 @@ export function makeExecutePRNG(
   const taps = LFSR_TAPS[bitWidth] ?? LFSR_TAPS[8];
 
   return function executePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: PRNGLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
     const stateBase = layout.stateOffset(index);
 
-    const seedInput = state[inBase] & mask;
-    const se = state[inBase + 1] & 1;
-    const ne = state[inBase + 2] & 1;
-    const clock = state[inBase + 3] & 1;
+    const seedInput = state[wt[inBase]] & mask;
+    const se = state[wt[inBase + 1]] & 1;
+    const ne = state[wt[inBase + 2]] & 1;
+    const clock = state[wt[inBase + 3]] & 1;
     const prevClock = state[stateBase + 1] & 1;
 
     let lfsrState = state[stateBase] >>> 0;
 
-    // Rising edge detection
     if (clock === 1 && prevClock === 0) {
       if (se === 1) {
-        // Seed: use seedInput, avoid all-zero state
         lfsrState = seedInput !== 0 ? seedInput & mask : 1;
       }
       if (ne === 1) {
         lfsrState = lfsrNext(lfsrState, taps, mask);
-        // Ensure non-zero state
         if (lfsrState === 0) lfsrState = 1;
       }
     }
 
     state[stateBase] = lfsrState;
     state[stateBase + 1] = clock;
-    state[outBase] = lfsrState;
+    state[wt[outBase]] = lfsrState;
   };
 }
 

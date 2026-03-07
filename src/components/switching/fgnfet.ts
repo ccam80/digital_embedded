@@ -169,10 +169,11 @@ export class FGNFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeFGNFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const gate = state[inBase] & 1;
+  const gate = state[wt[inBase]] & 1;
   const blown = state[stBase + 1] & 1;
 
   state[stBase] = blown ? 0 : gate;

@@ -168,10 +168,11 @@ export class FGPFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeFGPFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
 
-  const gate = state[inBase] & 1;
+  const gate = state[wt[inBase]] & 1;
   const blown = state[stBase + 1] & 1;
 
   // PFET: conducting when gate=0; blown permanently disables

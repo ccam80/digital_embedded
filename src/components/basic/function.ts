@@ -267,7 +267,7 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
 // Output slot layout: out0 at outputStart+0, out1 at outputStart+1, etc.
 //
 // Truth table values are stored in output slots AFTER the output pins:
-//   state[outputStart + outputCount + row] = table[row]
+//   state[wt[outputStart + outputCount + row]] = table[row]
 //
 // A don't-care entry is encoded as 0xFFFFFFFF in the state array.
 // ---------------------------------------------------------------------------
@@ -278,6 +278,7 @@ export function executeBooleanFunction(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputStart = layout.outputOffset(index);
@@ -286,26 +287,26 @@ export function executeBooleanFunction(
   // Compute input index: in0 is LSB
   let inputIndex = 0;
   for (let i = 0; i < inputCount; i++) {
-    if ((state[inputStart + i] & 1) !== 0) {
+    if ((state[wt[inputStart + i]] & 1) !== 0) {
       inputIndex |= (1 << i);
     }
   }
 
   // Table starts at outputStart + outputCount
   const tableBase = outputStart + outputCount;
-  const tableEntry = state[tableBase + inputIndex];
+  const tableEntry = state[wt[tableBase + inputIndex]];
 
   if (tableEntry === 0xFFFFFFFF) {
     // Don't-care: output all zeros
     for (let o = 0; o < outputCount; o++) {
-      state[outputStart + o] = 0;
+      state[wt[outputStart + o]] = 0;
     }
     return;
   }
 
   // Write each output bit
   for (let o = 0; o < outputCount; o++) {
-    state[outputStart + o] = (tableEntry >>> o) & 1;
+    state[wt[outputStart + o]] = (tableEntry >>> o) & 1;
   }
 }
 

@@ -183,6 +183,7 @@ export class MonoflopElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
@@ -191,8 +192,8 @@ export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint
   };
   const stBase = extLayout.stateOffset(index);
 
-  const clock = state[inBase];
-  const reset = state[inBase + 1];
+  const clock = state[wt[inBase]];
+  const reset = state[wt[inBase + 1]];
   const prevClock = state[stBase + 1];
 
   if (reset !== 0) {
@@ -212,8 +213,8 @@ export function executeMonoflop(index: number, state: Uint32Array, _highZs: Uint
   state[stBase + 1] = clock;
 
   const q = state[stBase];
-  state[outBase] = q;
-  state[outBase + 1] = q !== 0 ? 0 : 1;
+  state[wt[outBase]] = q;
+  state[wt[outBase + 1]] = q !== 0 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------

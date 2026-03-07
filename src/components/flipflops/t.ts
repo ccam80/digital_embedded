@@ -215,6 +215,7 @@ export class TElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
@@ -226,11 +227,11 @@ export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array
   let t: number;
 
   if (withEnable) {
-    t = state[inBase];
-    clock = state[inBase + 1];
+    t = state[wt[inBase]];
+    clock = state[wt[inBase + 1]];
   } else {
     t = 1;
-    clock = state[inBase];
+    clock = state[wt[inBase]];
   }
 
   const prevClock = state[stBase + 1];
@@ -243,8 +244,8 @@ export function executeT(index: number, state: Uint32Array, _highZs: Uint32Array
   state[stBase + 1] = clock;
 
   const q = state[stBase];
-  state[outBase] = q;
-  state[outBase + 1] = q !== 0 ? 0 : 1;
+  state[wt[outBase]] = q;
+  state[wt[outBase + 1]] = q !== 0 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------

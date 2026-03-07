@@ -156,11 +156,12 @@ export function executePolarityLed(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const anode = state[inputStart];
-  const cathode = state[inputStart + 1];
+  const anode = state[wt[inputStart]];
+  const cathode = state[wt[inputStart + 1]];
   // Lit when anode is high and cathode is low
-  state[layout.outputOffset(index)] = anode !== 0 && cathode === 0 ? 1 : 0;
+  state[wt[layout.outputOffset(index)]] = anode !== 0 && cathode === 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

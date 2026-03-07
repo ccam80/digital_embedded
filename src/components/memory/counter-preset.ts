@@ -215,6 +215,7 @@ export function executeCounterPreset(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
@@ -223,12 +224,12 @@ export function executeCounterPreset(
   };
   const stBase = extLayout.stateOffset(index);
 
-  const en = state[inBase];
-  const clock = state[inBase + 1];
-  const dir = state[inBase + 2];
-  const loadVal = state[inBase + 3];
-  const ld = state[inBase + 4];
-  const clr = state[inBase + 5];
+  const en = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const dir = state[wt[inBase + 2]];
+  const loadVal = state[wt[inBase + 3]];
+  const ld = state[wt[inBase + 4]];
+  const clr = state[wt[inBase + 5]];
   const prevClock = state[stBase + 1];
 
   const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
@@ -262,12 +263,12 @@ export function executeCounterPreset(
   }
   state[stBase + 1] = clock;
 
-  state[outBase] = state[stBase];
+  state[wt[outBase]] = state[stBase];
 
   const atOverflow = dir !== 0
     ? state[stBase] === 0
     : state[stBase] === maxValue;
-  state[outBase + 1] = (atOverflow && en !== 0) ? 1 : 0;
+  state[wt[outBase + 1]] = (atOverflow && en !== 0) ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

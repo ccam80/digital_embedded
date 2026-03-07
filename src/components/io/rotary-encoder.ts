@@ -182,12 +182,13 @@ export function executeRotaryEncoder(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const outputStart = layout.outputOffset(index);
   // Position stored in scratch slot (outputStart + 2)
-  const position = state[outputStart + 2] & 3;
+  const position = state[wt[outputStart + 2]] & 3;
   const [a, b] = QUADRATURE_TABLE[position];
-  state[outputStart] = a;
-  state[outputStart + 1] = b;
+  state[wt[outputStart]] = a;
+  state[wt[outputStart + 1]] = b;
 }
 
 // ---------------------------------------------------------------------------

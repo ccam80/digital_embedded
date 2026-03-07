@@ -23,7 +23,9 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
+  const totalSlots = inputCount + outputCount;
   return {
+    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => outputCount,
@@ -840,6 +842,7 @@ describe("PRNG", () => {
 
   function makePRNGLayoutFull(): PRNGLayout {
     return {
+      wiringTable: Int32Array.from({ length: 5 }, (_, i) => i),
       inputCount: () => 4,
       inputOffset: () => 0,
       outputCount: () => 1,

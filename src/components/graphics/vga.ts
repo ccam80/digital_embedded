@@ -340,17 +340,18 @@ export function executeVga(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   // Inputs: [R=0, G=1, B=2, H=3, V=4, C=5]
-  const r = state[inputStart] >>> 0;
-  const g = state[inputStart + 1] >>> 0;
-  const b = state[inputStart + 2] >>> 0;
-  const h = state[inputStart + 3] & 1;
-  const v = state[inputStart + 4] & 1;
-  const c = state[inputStart + 5] & 1;
+  const r = state[wt[inputStart]] >>> 0;
+  const g = state[wt[inputStart + 1]] >>> 0;
+  const b = state[wt[inputStart + 2]] >>> 0;
+  const h = state[wt[inputStart + 3]] & 1;
+  const v = state[wt[inputStart + 4]] & 1;
+  const c = state[wt[inputStart + 5]] & 1;
 
   // Pack all signals into output slot for change detection
-  state[layout.outputOffset(index)] =
+  state[wt[layout.outputOffset(index)]] =
     ((r & 0xF) << 8) | ((g & 0xF) << 4) | (b & 0xF) |
     (h << 16) | (v << 17) | (c << 18);
 }

@@ -144,10 +144,11 @@ export function executeConst(index: number, state: Uint32Array, _highZs: Uint32A
   // For proper operation the compiler initialises the output net to
   // the constant value. This no-op preserves that initial value since
   // nothing else writes to a Const output net.
+  const wt = layout.wiringTable;
   const outputIdx = layout.outputOffset(index);
   // The value at outputIdx was set by the compiler during model init.
   // We reference outputIdx to satisfy the parameter usage requirement.
-  void state[outputIdx];
+  void state[wt[outputIdx]];
 }
 
 // ---------------------------------------------------------------------------

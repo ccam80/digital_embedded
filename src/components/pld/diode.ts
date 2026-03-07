@@ -430,11 +430,12 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 
-  const cathodeIn = state[inputStart];
-  const anodeIn = state[inputStart + 1];
+  const cathodeIn = state[wt[inputStart]];
+  const anodeIn = state[wt[inputStart + 1]];
 
   const cathodeVal = cathodeIn & 0xFFFF;
   const cathodeHighZ = (cathodeIn >>> 16) & 1;
@@ -442,33 +443,33 @@ export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32A
   const anodeHighZ = (anodeIn >>> 16) & 1;
 
   // blown flag stored in output slot 4 as a sentinel (set once by compiler from props)
-  const blown = state[outputStart + 4] !== 0;
+  const blown = state[wt[outputStart + 4]] !== 0;
 
   if (blown) {
     // Open circuit — both outputs high-Z
-    state[outputStart] = 0;
-    state[outputStart + 1] = 1;
-    state[outputStart + 2] = 0;
-    state[outputStart + 3] = 1;
+    state[wt[outputStart]] = 0;
+    state[wt[outputStart + 1]] = 1;
+    state[wt[outputStart + 2]] = 0;
+    state[wt[outputStart + 3]] = 1;
     return;
   }
 
   // Cathode output: driven to 1 if anode is high (not high-Z)
   if (anodeHighZ === 0 && anodeVal !== 0) {
-    state[outputStart] = 1;
-    state[outputStart + 1] = 0;
+    state[wt[outputStart]] = 1;
+    state[wt[outputStart + 1]] = 0;
   } else {
-    state[outputStart] = 0;
-    state[outputStart + 1] = 1;
+    state[wt[outputStart]] = 0;
+    state[wt[outputStart + 1]] = 1;
   }
 
   // Anode output: driven to 0 if cathode is low (not high-Z)
   if (cathodeHighZ === 0 && cathodeVal === 0) {
-    state[outputStart + 2] = 0;
-    state[outputStart + 3] = 0;
+    state[wt[outputStart + 2]] = 0;
+    state[wt[outputStart + 3]] = 0;
   } else {
-    state[outputStart + 2] = 0;
-    state[outputStart + 3] = 1;
+    state[wt[outputStart + 2]] = 0;
+    state[wt[outputStart + 3]] = 1;
   }
 }
 
@@ -480,24 +481,25 @@ export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32A
 // ---------------------------------------------------------------------------
 
 export function executeDiodeForward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 
-  const blown = state[outputStart + 2] !== 0;
+  const blown = state[wt[outputStart + 2]] !== 0;
 
   if (blown) {
-    state[outputStart] = 0;
-    state[outputStart + 1] = 1;
+    state[wt[outputStart]] = 0;
+    state[wt[outputStart + 1]] = 1;
     return;
   }
 
-  const inVal = state[inputStart] & 1;
+  const inVal = state[wt[inputStart]] & 1;
   if (inVal !== 0) {
-    state[outputStart] = 1;
-    state[outputStart + 1] = 0;
+    state[wt[outputStart]] = 1;
+    state[wt[outputStart + 1]] = 0;
   } else {
-    state[outputStart] = 0;
-    state[outputStart + 1] = 1;
+    state[wt[outputStart]] = 0;
+    state[wt[outputStart + 1]] = 1;
   }
 }
 
@@ -508,20 +510,21 @@ export function executeDiodeForward(index: number, state: Uint32Array, _highZs: 
 // ---------------------------------------------------------------------------
 
 export function executeDiodeBackward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const outputStart = layout.outputOffset(index);
 
-  const blown = state[outputStart + 2] !== 0;
+  const blown = state[wt[outputStart + 2]] !== 0;
 
   if (blown) {
-    state[outputStart] = 0;
-    state[outputStart + 1] = 1;
+    state[wt[outputStart]] = 0;
+    state[wt[outputStart + 1]] = 1;
     return;
   }
 
-  const inVal = state[inputStart] & 1;
-  state[outputStart] = inVal;
-  state[outputStart + 1] = 0;
+  const inVal = state[wt[inputStart]] & 1;
+  state[wt[outputStart]] = inVal;
+  state[wt[outputStart + 1]] = 0;
 }
 
 // ---------------------------------------------------------------------------

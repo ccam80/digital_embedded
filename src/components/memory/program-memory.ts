@@ -187,13 +187,14 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeProgramMemory(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as ProgramMemoryLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const ld = state[inBase + 1] & 1;
-  const clk = state[inBase + 2] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const ld = state[wt[inBase + 1]] & 1;
+  const clk = state[wt[inBase + 2]] & 1;
   const prevClock = state[stBase + 1] & 1;
 
   let addrReg = state[stBase] >>> 0;
@@ -210,7 +211,7 @@ export function executeProgramMemory(index: number, state: Uint32Array, _highZs:
   state[stBase + 1] = clk;
 
   const mem = getBackingStore(index);
-  state[outBase] = mem !== undefined ? mem.read(addrReg) : 0;
+  state[wt[outBase]] = mem !== undefined ? mem.read(addrReg) : 0;
 }
 
 // ---------------------------------------------------------------------------

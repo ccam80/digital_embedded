@@ -275,6 +275,7 @@ export class MidiElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeMidi(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
 
@@ -286,22 +287,22 @@ export function executeMidi(index: number, state: Uint32Array, _highZs: Uint32Ar
   const nIdx = inputStart;
   const pcIdx = progChangeEnable ? inputStart + 3 : -1;
 
-  const clock = state[clockIdx] & 1;
-  const en = state[enIdx] & 1;
+  const clock = state[wt[clockIdx]] & 1;
+  const en = state[wt[enIdx]] & 1;
 
   const outputStart = layout.outputOffset(index);
-  const prevClock = state[outputStart];
+  const prevClock = state[wt[outputStart]];
 
   const risingEdge = prevClock === 0 && clock === 1;
-  state[outputStart] = clock;
+  state[wt[outputStart]] = clock;
 
   if (!risingEdge || en === 0) return;
 
-  const note = state[nIdx] & 0x7F;
-  const velocity = state[vIdx] & 0x7F;
-  const onOff = state[onOffIdx] & 1;
-  const midiChannel = (state[outputStart + 1] & 0xF);
-  const pc = pcIdx >= 0 ? (state[pcIdx] & 1) : 0;
+  const note = state[wt[nIdx]] & 0x7F;
+  const velocity = state[wt[vIdx]] & 0x7F;
+  const onOff = state[wt[onOffIdx]] & 1;
+  const midiChannel = (state[wt[outputStart + 1]] & 0xF);
+  const pc = pcIdx >= 0 ? (state[wt[pcIdx]] & 1) : 0;
 
   const manager = MidiOutputManager.getInstance();
 

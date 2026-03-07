@@ -161,14 +161,15 @@ export function executeDecoder(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const outCount = layout.outputCount(index);
 
-  const sel = state[inBase] >>> 0;
+  const sel = state[wt[inBase]] >>> 0;
 
   for (let i = 0; i < outCount; i++) {
-    state[outBase + i] = i === sel ? 1 : 0;
+    state[wt[outBase + i]] = i === sel ? 1 : 0;
   }
 }
 

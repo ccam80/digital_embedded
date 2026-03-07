@@ -72,20 +72,20 @@ function executePassThrough(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: C
 function executeNoop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
 
 function executeAnd2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.inputOffset(index)] ?? 0;
-  const b = state[layout.inputOffset(index) + 1] ?? 0;
-  state[layout.outputOffset(index)] = (a & b) >>> 0;
+  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
+  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
+  state[layout.wiringTable[layout.outputOffset(index)]] = (a & b) >>> 0;
 }
 
 function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.inputOffset(index)] ?? 0;
-  const b = state[layout.inputOffset(index) + 1] ?? 0;
-  state[layout.outputOffset(index)] = (a ^ b) >>> 0;
+  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
+  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
+  state[layout.wiringTable[layout.outputOffset(index)]] = (a ^ b) >>> 0;
 }
 
 function executeNot(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.inputOffset(index)] ?? 0;
-  state[layout.outputOffset(index)] = a === 0 ? 1 : 0;
+  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
+  state[layout.wiringTable[layout.outputOffset(index)]] = a === 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -180,29 +180,47 @@ export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32A
   const carryMask = bitWidth >= 32 ? 0 : (1 << bitWidth);
 
   return function executeAdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+    const wt = layout.wiringTable;
     const inBase = layout.inputOffset(index);
     const outBase = layout.outputOffset(index);
 
-    const a = state[inBase] >>> 0;
-    const b = state[inBase + 1] >>> 0;
-    const ci = state[inBase + 2] & 1;
+    const a = state[wt[inBase]] >>> 0;
+    const b = state[wt[inBase + 1]] >>> 0;
+    const ci = state[wt[inBase + 2]] & 1;
 
     if (bitWidth < 32) {
       const full = (a + b + ci) >>> 0;
-      state[outBase] = full & mask;
-      state[outBase + 1] = (full & carryMask) !== 0 ? 1 : 0;
+      state[wt[outBase]] = full & mask;
+      state[wt[outBase + 1]] = (full & carryMask) !== 0 ? 1 : 0;
     } else {
-      // 32-bit: use BigInt for carry detection
       const full = BigInt(a) + BigInt(b) + BigInt(ci);
-      state[outBase] = Number(full & BigInt(0xFFFFFFFF)) >>> 0;
-      state[outBase + 1] = full > BigInt(0xFFFFFFFF) ? 1 : 0;
+      state[wt[outBase]] = Number(full & BigInt(0xFFFFFFFF)) >>> 0;
+      state[wt[outBase + 1]] = full > BigInt(0xFFFFFFFF) ? 1 : 0;
     }
   };
 }
 
 export function executeAdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
-  makeExecuteAdd(bitWidth)(index, state, _highZs, layout);
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
+  const carryMask = bitWidth >= 32 ? 0 : (1 << bitWidth);
+  const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
+
+  const a = state[wt[inBase]] >>> 0;
+  const b = state[wt[inBase + 1]] >>> 0;
+  const ci = state[wt[inBase + 2]] & 1;
+
+  if (bitWidth < 32) {
+    const full = (a + b + ci) >>> 0;
+    state[wt[outBase]] = full & mask;
+    state[wt[outBase + 1]] = (full & carryMask) !== 0 ? 1 : 0;
+  } else {
+    const full = BigInt(a) + BigInt(b) + BigInt(ci);
+    state[wt[outBase]] = Number(full & BigInt(0xFFFFFFFF)) >>> 0;
+    state[wt[outBase + 1]] = full > BigInt(0xFFFFFFFF) ? 1 : 0;
+  }
 }
 
 // ---------------------------------------------------------------------------

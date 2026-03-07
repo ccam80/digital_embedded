@@ -203,14 +203,15 @@ export class ProgramCounterElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeProgramCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as ProgramCounterLayout).stateOffset(index);
 
-  const D = state[inBase] >>> 0;
-  const en = state[inBase + 1] & 1;
-  const clk = state[inBase + 2] & 1;
-  const ld = state[inBase + 3] & 1;
+  const D = state[wt[inBase]] >>> 0;
+  const en = state[wt[inBase + 1]] & 1;
+  const clk = state[wt[inBase + 2]] & 1;
+  const ld = state[wt[inBase + 3]] & 1;
   const prevClock = state[stBase + 1] & 1;
 
   let counter = state[stBase] >>> 0;
@@ -233,8 +234,8 @@ export function executeProgramCounter(index: number, state: Uint32Array, _highZs
 
   state[stBase] = counter;
   state[stBase + 1] = clk;
-  state[outBase] = counter;
-  state[outBase + 1] = ovf;
+  state[wt[outBase]] = counter;
+  state[wt[outBase + 1]] = ovf;
 }
 
 // ---------------------------------------------------------------------------

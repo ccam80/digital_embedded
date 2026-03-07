@@ -246,20 +246,21 @@ export function executeKeyboard(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const rd = state[inBase] & 1;
-  const prevRd = state[outBase + 2] & 1;
+  const rd = state[wt[inBase]] & 1;
+  const prevRd = state[wt[outBase + 2]] & 1;
 
   // Detect rising edge of rd strobe
   if (rd === 1 && prevRd === 0) {
     // Signal dequeue request via scratch slot
-    state[outBase + 3] = 1; // pending_rd flag for engine side-channel
+    state[wt[outBase + 3]] = 1; // pending_rd flag for engine side-channel
   }
 
   // Update previous rd value
-  state[outBase + 2] = rd;
+  state[wt[outBase + 2]] = rd;
 
   // dout and rdy (outBase+0, outBase+1) are kept up to date by the engine's
   // step loop which calls element.currentKeyCode() / element.readyFlag()

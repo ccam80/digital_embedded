@@ -220,13 +220,14 @@ export function executeLedMatrix(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   // input 0: r-data, input 1: c-addr
-  const rowData = state[inputStart] >>> 0;
-  const colAddr = state[inputStart + 1] >>> 0;
+  const rowData = state[wt[inputStart]] >>> 0;
+  const colAddr = state[wt[inputStart + 1]] >>> 0;
   // Write the addressed col and row data to output slot for engine tracking
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] = (colAddr & 0xFFFF) | ((rowData & 0xFFFF) << 16);
+  state[wt[outputIdx]] = (colAddr & 0xFFFF) | ((rowData & 0xFFFF) << 16);
 }
 
 // ---------------------------------------------------------------------------

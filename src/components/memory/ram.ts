@@ -215,7 +215,7 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 //
 // On rising clock edge: if str=1, writes the current D output value back to
 // memory[A] (the D pin is bidirectional — data to write comes from the net
-// driving the bidirectional D pin; we model this as state[outBase] at write time).
+// driving the bidirectional D pin; we model this as state[wt[outBase]] at write time).
 // If ld=1, output D = memory[A]; else D = 0.
 //
 // State slots (via stateOffset):
@@ -273,30 +273,31 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
 }
 
 export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const str = state[inBase + 1] & 1;
-  const clk = state[inBase + 2] & 1;
-  const ld = state[inBase + 3] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const str = state[wt[inBase + 1]] & 1;
+  const clk = state[wt[inBase + 2]] & 1;
+  const ld = state[wt[inBase + 3]] & 1;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
     if (str) {
       const mem = _backingStores.get(index);
       if (mem !== undefined) {
-        mem.write(A, state[inBase + 1 + 3]);
+        mem.write(A, state[wt[inBase + 1 + 3]]);
       }
     }
   }
 
   if (ld) {
     const mem = _backingStores.get(index);
-    state[outBase] = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 
   state[stBase] = clk;
@@ -390,29 +391,30 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
 }
 
 export function executeRAMSinglePortSel(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const cs = state[inBase + 1] & 1;
-  const we = state[inBase + 2] & 1;
-  const oe = state[inBase + 3] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const cs = state[wt[inBase + 1]] & 1;
+  const we = state[wt[inBase + 2]] & 1;
+  const oe = state[wt[inBase + 3]] & 1;
 
   if (cs) {
     if (we) {
       const mem = _backingStores.get(index);
       if (mem !== undefined) {
-        mem.write(A, state[outBase]);
+        mem.write(A, state[wt[outBase]]);
       }
     }
     if (oe && !we) {
       const mem = _backingStores.get(index);
-      state[outBase] = mem !== undefined ? mem.read(A) : 0;
+      state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
     } else {
-      state[outBase] = 0;
+      state[wt[outBase]] = 0;
     }
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 }
 
@@ -505,15 +507,16 @@ export class RAMDualPortElement extends AbstractCircuitElement {
 }
 
 export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const din = state[inBase + 1] >>> 0;
-  const str = state[inBase + 2] & 1;
-  const clk = state[inBase + 3] & 1;
-  const ld = state[inBase + 4] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const din = state[wt[inBase + 1]] >>> 0;
+  const str = state[wt[inBase + 2]] & 1;
+  const clk = state[wt[inBase + 3]] & 1;
+  const ld = state[wt[inBase + 4]] & 1;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
@@ -527,9 +530,9 @@ export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: U
 
   if (ld) {
     const mem = _backingStores.get(index);
-    state[outBase] = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
-    state[outBase] = 0;
+    state[wt[outBase]] = 0;
   }
 
   state[stBase] = clk;
@@ -627,16 +630,17 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
 }
 
 export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
 
-  const str = state[inBase] & 1;
-  const clk = state[inBase + 1] & 1;
-  const ld = state[inBase + 2] & 1;
-  const addr1 = state[inBase + 3] >>> 0;
-  const din1 = state[inBase + 4] >>> 0;
-  const addr2 = state[inBase + 5] >>> 0;
+  const str = state[wt[inBase]] & 1;
+  const clk = state[wt[inBase + 1]] & 1;
+  const ld = state[wt[inBase + 2]] & 1;
+  const addr1 = state[wt[inBase + 3]] >>> 0;
+  const din1 = state[wt[inBase + 4]] >>> 0;
+  const addr2 = state[wt[inBase + 5]] >>> 0;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
@@ -649,8 +653,8 @@ export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs:
   }
 
   const mem = _backingStores.get(index);
-  state[outBase] = ld ? (mem !== undefined ? mem.read(addr1) : 0) : 0;
-  state[outBase + 1] = mem !== undefined ? mem.read(addr2) : 0;
+  state[wt[outBase]] = ld ? (mem !== undefined ? mem.read(addr1) : 0) : 0;
+  state[wt[outBase + 1]] = mem !== undefined ? mem.read(addr2) : 0;
 
   state[stBase] = clk;
 }
@@ -740,18 +744,19 @@ export class RAMAsyncElement extends AbstractCircuitElement {
 }
 
 export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const D = state[inBase + 1] >>> 0;
-  const we = state[inBase + 2] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const D = state[wt[inBase + 1]] >>> 0;
+  const we = state[wt[inBase + 2]] & 1;
 
   const mem = _backingStores.get(index);
   if (we && mem !== undefined) {
     mem.write(A, D);
   }
-  state[outBase] = mem !== undefined ? mem.read(A) : 0;
+  state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
 }
 
 export const RAM_ASYNC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
@@ -844,14 +849,15 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
 }
 
 export function executeBlockRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = (layout as RAMLayout).stateOffset(index);
 
-  const A = state[inBase] >>> 0;
-  const din = state[inBase + 1] >>> 0;
-  const str = state[inBase + 2] & 1;
-  const clk = state[inBase + 3] & 1;
+  const A = state[wt[inBase]] >>> 0;
+  const din = state[wt[inBase + 1]] >>> 0;
+  const str = state[wt[inBase + 2]] & 1;
+  const clk = state[wt[inBase + 3]] & 1;
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
@@ -863,7 +869,7 @@ export function executeBlockRAMDualPort(index: number, state: Uint32Array, _high
     }
   }
 
-  state[outBase] = state[stBase + 1];
+  state[wt[outBase]] = state[stBase + 1];
   state[stBase] = clk;
 }
 

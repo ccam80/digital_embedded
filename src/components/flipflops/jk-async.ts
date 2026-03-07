@@ -190,15 +190,16 @@ export class JKAsyncElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeJKAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
-  const setIn = state[inBase];
-  const j = state[inBase + 1];
-  const clock = state[inBase + 2];
-  const k = state[inBase + 3];
-  const clr = state[inBase + 4];
+  const setIn = state[wt[inBase]];
+  const j = state[wt[inBase + 1]];
+  const clock = state[wt[inBase + 2]];
+  const k = state[wt[inBase + 3]];
+  const clr = state[wt[inBase + 4]];
   const prevClock = state[stBase + 1];
 
   if (clock !== 0 && prevClock === 0) {
@@ -223,8 +224,8 @@ export function executeJKAsync(index: number, state: Uint32Array, _highZs: Uint3
   }
 
   const q = state[stBase];
-  state[outBase] = q;
-  state[outBase + 1] = q !== 0 ? 0 : 1;
+  state[wt[outBase]] = q;
+  state[wt[outBase + 1]] = q !== 0 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------

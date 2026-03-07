@@ -390,19 +390,20 @@ export function executeGraphicCard(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
   // Inputs: [A=0, str=1, C=2, ld=3, B=4, D=5]
-  const addr = state[inputStart] >>> 0;
-  const str = state[inputStart + 1] & 1;
-  const clk = state[inputStart + 2] & 1;
-  const ld = state[inputStart + 3] & 1;
-  const bank = state[inputStart + 4] & 1;
-  const dataIn = state[inputStart + 5] >>> 0;
+  const addr = state[wt[inputStart]] >>> 0;
+  const str = state[wt[inputStart + 1]] & 1;
+  const clk = state[wt[inputStart + 2]] & 1;
+  const ld = state[wt[inputStart + 3]] & 1;
+  const bank = state[wt[inputStart + 4]] & 1;
+  const dataIn = state[wt[inputStart + 5]] >>> 0;
 
   // Pack control signals and low bits of addr/data into output slot
   // for change detection by the engine post-step hook
   const outputIdx = layout.outputOffset(index);
-  state[outputIdx] =
+  state[wt[outputIdx]] =
     ((addr & 0xFFFF) << 0) |
     (str << 16) |
     (clk << 17) |

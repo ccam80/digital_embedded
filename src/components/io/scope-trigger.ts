@@ -167,17 +167,18 @@ export function executeScopeTrigger(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
-  const inputVal = state[layout.inputOffset(index)];
+  const wt = layout.wiringTable;
+  const inputVal = state[wt[layout.inputOffset(index)]];
   const outputIdx = layout.outputOffset(index);
   // Previous value stored in slot outputIdx+1 (scratch slot, allocated by engine)
-  const prevVal = state[outputIdx + 1];
+  const prevVal = state[wt[outputIdx + 1]];
 
   const risingEdge = prevVal === 0 && inputVal !== 0;
   const fallingEdge = prevVal !== 0 && inputVal === 0;
 
   // Default to rising edge trigger (mode not accessible in flat fn without closure)
-  state[outputIdx] = risingEdge || fallingEdge ? 1 : 0;
-  state[outputIdx + 1] = inputVal;
+  state[wt[outputIdx]] = risingEdge || fallingEdge ? 1 : 0;
+  state[wt[outputIdx + 1]] = inputVal;
 }
 
 // ---------------------------------------------------------------------------

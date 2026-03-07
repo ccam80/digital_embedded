@@ -27,7 +27,9 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number): ComponentLayout {
+  const totalSlots = inputCount + 1;
   return {
+    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
     inputCount: () => inputCount,
     inputOffset: () => 0,
     outputCount: () => 1,

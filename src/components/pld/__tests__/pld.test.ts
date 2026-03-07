@@ -49,6 +49,7 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 function makeLayoutSingle(inputOffset: number, outputOffset: number): ComponentLayout {
   return {
+    wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => 1,
     inputOffset: () => inputOffset,
     outputCount: () => 1,
@@ -183,7 +184,8 @@ describe("Diode", () => {
       // outputStart=2: cathodeOut=state[2], cathodeHighZ=state[3], anodeOut=state[4] (blown), ...
       // Use 8-slot layout to avoid overlap
       const layout: ComponentLayout = {
-        inputCount: () => 2,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 2,
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
@@ -207,7 +209,8 @@ describe("Diode", () => {
 
     it("anode low (not highZ) → cathode is high-Z (not driven)", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 2,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 2,
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
@@ -226,7 +229,8 @@ describe("Diode", () => {
 
     it("cathode low (not highZ) → anode is driven to 0 (pulling down)", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 2,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 2,
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
@@ -246,7 +250,8 @@ describe("Diode", () => {
 
     it("cathode highZ → anode is high-Z (not pulling)", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 2,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 2,
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
@@ -265,7 +270,8 @@ describe("Diode", () => {
 
     it("blown diode — both outputs are high-Z", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 2,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 2,
         inputOffset: () => 0,
         outputCount: () => 5,
         outputOffset: () => 2,
@@ -512,7 +518,8 @@ describe("DiodeForward", () => {
     it("in=1 → output driven to 1 (highZ=0)", () => {
       // inputOffset=0, outputOffset=1; blown flag at output+2=state[3]
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -531,7 +538,8 @@ describe("DiodeForward", () => {
 
     it("in=0 → output is high-Z", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -549,7 +557,8 @@ describe("DiodeForward", () => {
 
     it("blown=true → output always high-Z regardless of input", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -693,7 +702,8 @@ describe("DiodeBackward", () => {
   describe("backwardConduction", () => {
     it("in=1 → output driven to 1 (contributes to pull-up net)", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -712,7 +722,8 @@ describe("DiodeBackward", () => {
 
     it("in=0 → output driven to 0 (pulls down the pull-up net)", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -731,7 +742,8 @@ describe("DiodeBackward", () => {
 
     it("blown=true → output always high-Z", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,
@@ -749,7 +761,8 @@ describe("DiodeBackward", () => {
 
     it("DiodeBackward vs DiodeForward: backward drives 0 when in=0, forward does not", () => {
       const layout: ComponentLayout = {
-        inputCount: () => 1,
+        wiringTable: new Int32Array(64).map((_, i) => i),
+    inputCount: () => 1,
         inputOffset: () => 0,
         outputCount: () => 3,
         outputOffset: () => 1,

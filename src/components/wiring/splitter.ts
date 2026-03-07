@@ -224,11 +224,12 @@ export function executeSplitter(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const outCount = layout.outputCount(index);
 
-  const wideValue = state[inBase];
+  const wideValue = state[wt[inBase]];
 
   let startBit = 0;
   for (let i = 0; i < outCount; i++) {
@@ -240,7 +241,7 @@ export function executeSplitter(
     // port widths. Here we extract 1 bit per output as a baseline that the
     // compiler overrides with per-port width information.
     const portValue = extractBits(wideValue, startBit, 1);
-    state[outBase + i] = portValue;
+    state[wt[outBase + i]] = portValue;
     startBit += 1;
   }
 }
@@ -258,15 +259,16 @@ export function executeSplitterWithWidths(
   layout: ComponentLayout,
   partWidths: number[],
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const wideValue = state[inBase];
+  const wideValue = state[wt[inBase]];
 
   let startBit = 0;
   for (let i = 0; i < partWidths.length; i++) {
     const width = partWidths[i];
-    state[outBase + i] = extractBits(wideValue, startBit, width);
+    state[wt[outBase + i]] = extractBits(wideValue, startBit, width);
     startBit += width;
   }
 }
@@ -281,6 +283,7 @@ export function executeSplitterMergeWithWidths(
   layout: ComponentLayout,
   partWidths: number[],
 ): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
@@ -288,10 +291,10 @@ export function executeSplitterMergeWithWidths(
   let startBit = 0;
   for (let i = 0; i < partWidths.length; i++) {
     const width = partWidths[i];
-    wideValue = insertBits(wideValue, state[inBase + i], startBit, width);
+    wideValue = insertBits(wideValue, state[wt[inBase + i]], startBit, width);
     startBit += width;
   }
-  state[outBase] = wideValue;
+  state[wt[outBase]] = wideValue;
 }
 
 // ---------------------------------------------------------------------------

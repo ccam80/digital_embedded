@@ -167,13 +167,14 @@ export class RegisterElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeRegister(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
-  const d = state[inBase];
-  const clock = state[inBase + 1];
-  const en = state[inBase + 2];
+  const d = state[wt[inBase]];
+  const clock = state[wt[inBase + 1]];
+  const en = state[wt[inBase + 2]];
   const prevClock = state[stBase + 1];
 
   if (clock !== 0 && prevClock === 0) {
@@ -183,7 +184,7 @@ export function executeRegister(index: number, state: Uint32Array, _highZs: Uint
   }
   state[stBase + 1] = clock;
 
-  state[outBase] = state[stBase];
+  state[wt[outBase]] = state[stBase];
 }
 
 // ---------------------------------------------------------------------------

@@ -151,9 +151,10 @@ export class PFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executePFET(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const stBase = (layout as FETLayout).stateOffset(index);
-  state[stBase] = (state[inBase] & 1) ^ 1; // invert gate signal
+  state[stBase] = (state[wt[inBase]] & 1) ^ 1; // invert gate signal
 }
 
 // ---------------------------------------------------------------------------
