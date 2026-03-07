@@ -342,13 +342,13 @@ describe("layoutPinsOnFace", () => {
 
   it("AND gate 2-input standard layout: inputs straddle centre, output centred", () => {
     // COMP_WIDTH=4, h=4 (2 inputs × 2 = 4)
-    // Inputs west: startY=1 → y=1,2
-    // Output east: startY=2 → y=2
+    // Inputs west: margin=1, step=2 → y=1,3
+    // Output east: centred → y=2
     const decls = standardGatePinLayout(["in0", "in1"], "out", 4, 4);
     const inputs = decls.filter((d) => d.direction === PinDirection.INPUT);
     const output = decls.find((d) => d.direction === PinDirection.OUTPUT)!;
     expect(inputs[0].position.y).toBe(1);
-    expect(inputs[1].position.y).toBe(2);
+    expect(inputs[1].position.y).toBe(3);
     expect(output.position.y).toBe(2);
     // x-coordinates
     expect(inputs[0].position.x).toBe(0);

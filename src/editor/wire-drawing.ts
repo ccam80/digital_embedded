@@ -15,8 +15,6 @@ import { Wire, Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import { mergeCollinearSegments } from "@/editor/wire-merge";
 import { checkWireConsistency } from "@/editor/wire-consistency";
-import { FacadeError } from "@/headless/types";
-
 // ---------------------------------------------------------------------------
 // Wire-tap helpers
 // ---------------------------------------------------------------------------
@@ -65,6 +63,20 @@ export function splitWiresAtPoint(point: Point, circuit: Circuit): Point | undef
   return undefined;
 }
 
+/**
+ * Returns true if the given point coincides with the start or end of any wire
+ * in the circuit. Used to allow wire-drawing from existing wire corners/endpoints.
+ */
+export function isWireEndpoint(point: Point, circuit: Circuit): boolean {
+  for (const wire of circuit.wires) {
+    if ((wire.start.x === point.x && wire.start.y === point.y) ||
+        (wire.end.x === point.x && wire.end.y === point.y)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Grid size for snapping wire endpoints. */
 const WIRE_GRID_SIZE = 1;
 
@@ -86,8 +98,6 @@ export interface PreviewSegment {
  */
 export class WireDrawingMode {
   private _active: boolean = false;
-  /** The origin of the entire wire (the starting pin world position). */
-  private _origin: Point = { x: 0, y: 0 };
   /** Locked waypoints including the origin. Each is the start of a new segment. */
   private _waypoints: Point[] = [];
   /** Current cursor position (snapped). */
@@ -106,7 +116,6 @@ export class WireDrawingMode {
       x: element.position.x + pin.position.x,
       y: element.position.y + pin.position.y,
     };
-    this._origin = startPos;
     this._waypoints = [startPos];
     this._cursor = startPos;
     this._active = true;
@@ -117,7 +126,6 @@ export class WireDrawingMode {
    * existing wire segment).
    */
   startFromPoint(point: Point): void {
-    this._origin = { ...point };
     this._waypoints = [{ ...point }];
     this._cursor = { ...point };
     this._active = true;

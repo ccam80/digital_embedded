@@ -405,10 +405,10 @@ describe("FGNFET", () => {
       drawLine: () => {}, drawText: () => {}, drawCircle: () => {},
     };
     el.draw(ctx as never);
-    expect(colors).toContain("ERROR");
+    expect(colors).toContain("WIRE_ERROR");
   });
 
-  it("draw_notBlown — no ERROR color when not blown", () => {
+  it("draw_notBlown — no WIRE_ERROR color when not blown", () => {
     const props = new PropertyBag();
     const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const colors: string[] = [];
@@ -542,7 +542,7 @@ describe("FGPFET", () => {
       drawLine: () => {}, drawText: () => {}, drawCircle: () => {},
     };
     el.draw(ctx as never);
-    expect(colors).toContain("ERROR");
+    expect(colors).toContain("WIRE_ERROR");
   });
 
   it("attributeMapping — blown converts string to boolean", () => {

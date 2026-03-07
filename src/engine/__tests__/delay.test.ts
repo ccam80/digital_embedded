@@ -37,7 +37,10 @@ class MockElement implements CircuitElement {
   }
 
   getAttribute(key: string): PropertyValue | undefined {
-    return this._props.get(key);
+    if (this._props.has(key)) {
+      return this._props.get(key);
+    }
+    return undefined;
   }
 
   getProperties(): PropertyBag {

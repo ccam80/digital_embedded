@@ -118,7 +118,7 @@ const LIGHT_COLORS: ColorMap = {
 const DARK_COLORS: ColorMap = {
   WIRE: "#888888",
   WIRE_HIGH: "#00ff00",
-  WIRE_LOW: "#006600",
+  WIRE_LOW: "#00aa00",
   WIRE_Z: "#4444ff",
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff8800",

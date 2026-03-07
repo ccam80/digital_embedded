@@ -55,161 +55,136 @@
       width: 100%;
       height: 100%;
     }
-
-    /* -------------------------------------------------------------------------
-       Menu bar
-    ------------------------------------------------------------------------- */
-    #menu-bar {
+    /* ---- Menu bar ---- */
+    #menubar {
       display: flex;
       align-items: center;
-      height: 28px;
       background: var(--toolbar-bg);
       border-bottom: 1px solid var(--toolbar-border);
       flex-shrink: 0;
+      height: 28px;
+      font-size: 12px;
       user-select: none;
-      position: relative;
-      z-index: 200;
     }
-
-    /* Menu items (top-level) */
     .menu-item {
       position: relative;
-    }
-    .menu-item > .menu-label {
-      display: flex;
-      align-items: center;
-      padding: 0 10px;
-      height: 28px;
+      padding: 4px 10px;
       cursor: pointer;
-      font-size: 13px;
       color: var(--fg);
-      white-space: nowrap;
     }
-    .menu-item > .menu-label:hover,
-    .menu-item.open > .menu-label {
-      background: var(--accent);
-      color: #fff;
+    .menu-item:hover, .menu-item.open {
+      background: var(--panel-border);
     }
-
-    /* Dropdown panel */
     .menu-dropdown {
       display: none;
       position: absolute;
-      top: 28px;
+      top: 100%;
       left: 0;
-      min-width: 180px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      z-index: 300;
-      padding: 2px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      min-width: 180px;
+      z-index: 200;
+      padding: 4px 0;
     }
-    .menu-item.open > .menu-dropdown {
+    .menu-item.open .menu-dropdown {
       display: block;
     }
-
-    /* Dropdown entries */
-    .menu-entry {
+    .menu-action {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 4px 16px 4px 12px;
+      align-items: center;
+      padding: 4px 16px;
       cursor: pointer;
       color: var(--fg);
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
-      gap: 24px;
     }
-    .menu-entry:hover {
+    .menu-action:hover {
       background: var(--accent);
       color: #fff;
     }
-    .menu-entry-shortcut {
+    .menu-shortcut {
+      margin-left: 24px;
+      opacity: 0.5;
       font-size: 11px;
-      opacity: 0.65;
-      margin-left: auto;
     }
-    .menu-entry:hover .menu-entry-shortcut {
-      opacity: 0.85;
-    }
-
-    /* Separator inside dropdown */
     .menu-separator {
       height: 1px;
       background: var(--panel-border);
-      margin: 3px 0;
+      margin: 4px 8px;
     }
-
-    /* Circuit name field — right of the menu items */
-    #circuit-name-field {
-      margin-left: 16px;
-      font-size: 13px;
-      color: var(--fg);
-      opacity: 0.8;
-      cursor: text;
-      padding: 1px 6px;
-      border: 1px solid transparent;
-      border-radius: 3px;
+    .menu-submenu {
+      position: relative;
+    }
+    .menu-submenu > .menu-action::after {
+      content: "\25B6";
+      font-size: 9px;
+      opacity: 0.5;
+    }
+    .menu-submenu > .menu-dropdown {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: -4px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      min-width: 160px;
+      z-index: 201;
+      padding: 4px 0;
+    }
+    .menu-submenu.open > .menu-dropdown {
+      display: block;
+    }
+    #circuit-name {
+      margin-left: 12px;
+      padding: 2px 6px;
       background: transparent;
-      max-width: 240px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      min-width: 80px;
+      border: 1px solid transparent;
+      color: var(--fg);
+      font-size: 12px;
+      border-radius: 3px;
+      width: 150px;
+      opacity: 0.8;
     }
-    #circuit-name-field:hover {
+    #circuit-name:hover {
       border-color: var(--panel-border);
     }
-    #circuit-name-field:focus {
-      outline: none;
+    #circuit-name:focus {
       border-color: var(--accent);
-      background: var(--panel-bg);
       opacity: 1;
+      outline: none;
+      background: var(--panel-bg);
     }
-
-    /* Speed control group — pushed to the right */
-    #menu-speed-group {
+    .menubar-spacer { flex: 1; }
+    .menubar-speed {
       display: flex;
       align-items: center;
       gap: 2px;
-      margin-left: auto;
-      padding-right: 8px;
+      margin-right: 8px;
     }
-    #menu-speed-group button {
-      padding: 1px 6px;
+    .menubar-speed button {
+      padding: 1px 5px;
       background: transparent;
       border: 1px solid var(--toolbar-border);
       color: var(--fg);
       cursor: pointer;
       border-radius: 3px;
       font-size: 11px;
-      height: 20px;
-      line-height: 1;
     }
-    #menu-speed-group button:hover {
-      background: var(--panel-border);
-    }
-    #menu-speed-group input {
-      width: 56px;
-      padding: 1px 4px;
+    .menubar-speed button:hover { background: var(--panel-border); }
+    .menubar-speed input {
+      width: 50px;
+      padding: 1px 3px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       color: var(--fg);
       border-radius: 3px;
       font-size: 11px;
       text-align: center;
-      height: 20px;
     }
-    #menu-speed-label {
-      font-size: 11px;
-      color: var(--fg);
-      opacity: 0.6;
-      margin-right: 2px;
-    }
-
-    /* -------------------------------------------------------------------------
-       Workspace
-    ------------------------------------------------------------------------- */
+    /* ---- Workspace ---- */
     #workspace {
       display: flex;
       flex: 1;
@@ -247,6 +222,7 @@
     #property-panel {
       display: none;
     }
+    /* ---- Prop popup ---- */
     .prop-popup {
       position: absolute;
       background: var(--panel-bg);
@@ -258,7 +234,7 @@
       max-width: 280px;
       z-index: 100;
     }
-    .prop-popup .prop-popup-header {
+    .prop-popup-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -266,12 +242,12 @@
       border-bottom: 1px solid var(--panel-border);
       margin-bottom: 4px;
     }
-    .prop-popup .prop-popup-title {
+    .prop-popup-title {
       font-weight: 600;
       font-size: 12px;
       color: var(--fg);
     }
-    .prop-popup .prop-popup-close {
+    .prop-popup-close {
       background: none;
       border: none;
       color: var(--fg);
@@ -280,19 +256,52 @@
       padding: 0 2px;
       opacity: 0.6;
     }
-    .prop-popup .prop-popup-close:hover {
-      opacity: 1;
-    }
+    .prop-popup-close:hover { opacity: 1; }
     .panels-none #palette-panel,
     .panels-none #property-panel {
       display: none;
     }
-
-    /* -------------------------------------------------------------------------
-       Palette styles
-    ------------------------------------------------------------------------- */
+    /* ---- Status bar ---- */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      background: var(--toolbar-bg);
+      border-top: 1px solid var(--toolbar-border);
+      font-size: 11px;
+      flex-shrink: 0;
+      user-select: none;
+      overflow: hidden;
+    }
+    #status-bar.error {
+      background: #5c1a1a;
+      color: #ffaaaa;
+    }
+    #status-bar.error .status-icon::before {
+      content: "\26A0\FE0F ";
+    }
+    #status-message {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    #status-dismiss {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+      opacity: 0.6;
+      display: none;
+    }
+    #status-dismiss:hover { opacity: 1; }
+    #status-bar.error #status-dismiss { display: inline; }
+    /* ---- Palette ---- */
     .palette-search {
-      padding: 5px 8px;
+      padding: 4px 6px;
       border-bottom: 1px solid var(--panel-border);
     }
     .palette-search-input {
@@ -308,7 +317,7 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 5px 10px;
+      padding: 5px 8px;
       font-size: 11px;
       font-weight: 600;
       color: var(--fg);
@@ -336,8 +345,8 @@
     .palette-component-item {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 4px 10px;
+      gap: 6px;
+      padding: 3px 8px 3px 18px;
       font-size: 12px;
       cursor: pointer;
       user-select: none;
@@ -366,10 +375,7 @@
       white-space: nowrap;
       min-width: 0;
     }
-
-    /* -------------------------------------------------------------------------
-       Property panel styles
-    ------------------------------------------------------------------------- */
+    /* ---- Property rows ---- */
     .prop-row {
       display: flex;
       flex-direction: column;
@@ -398,86 +404,49 @@
 </head>
 <body>
   <div id="app">
-    <!-- Menu bar -->
-    <div id="menu-bar">
-
-      <!-- File menu -->
-      <div class="menu-item" id="menu-file">
-        <div class="menu-label">File</div>
+    <div id="menubar">
+      <div class="menu-item" data-menu="file">File
         <div class="menu-dropdown">
-          <div class="menu-entry" id="menu-new">
-            <span>New</span>
-          </div>
+          <div class="menu-action" id="btn-new">New<span class="menu-shortcut"></span></div>
+          <div class="menu-action" id="btn-open">Open<span class="menu-shortcut">Ctrl+O</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" id="menu-open">
-            <span>Open...</span>
-          </div>
-          <div class="menu-separator"></div>
-          <div class="menu-entry" id="menu-save">
-            <span>Save</span>
-            <span class="menu-entry-shortcut">Ctrl+S</span>
-          </div>
-          <div class="menu-entry" id="menu-save-as">
-            <span>Save As...</span>
-            <span class="menu-entry-shortcut">Ctrl+Shift+S</span>
-          </div>
+          <div class="menu-action" id="btn-save">Save<span class="menu-shortcut">Ctrl+S</span></div>
+          <div class="menu-action" id="btn-save-as">Save As...</div>
         </div>
       </div>
-
-      <!-- Edit menu -->
-      <div class="menu-item" id="menu-edit">
-        <div class="menu-label">Edit</div>
+      <div class="menu-item" data-menu="edit">Edit
         <div class="menu-dropdown">
-          <div class="menu-entry" id="menu-undo">
-            <span>Undo</span>
-            <span class="menu-entry-shortcut">Ctrl+Z</span>
-          </div>
-          <div class="menu-entry" id="menu-redo">
-            <span>Redo</span>
-            <span class="menu-entry-shortcut">Ctrl+Y</span>
-          </div>
+          <div class="menu-action" id="btn-undo">Undo<span class="menu-shortcut">Ctrl+Z</span></div>
+          <div class="menu-action" id="btn-redo">Redo<span class="menu-shortcut">Ctrl+Y</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" id="menu-delete">
-            <span>Delete</span>
-            <span class="menu-entry-shortcut">Del</span>
-          </div>
-          <div class="menu-entry" id="menu-select-all">
-            <span>Select All</span>
-            <span class="menu-entry-shortcut">Ctrl+A</span>
-          </div>
+          <div class="menu-action" id="btn-delete">Delete<span class="menu-shortcut">Del</span></div>
+          <div class="menu-action" id="btn-select-all">Select All<span class="menu-shortcut">Ctrl+A</span></div>
         </div>
       </div>
-
-      <!-- Simulation menu -->
-      <div class="menu-item" id="menu-sim">
-        <div class="menu-label">Simulation</div>
+      <div class="menu-item" data-menu="insert">Insert
+        <div class="menu-dropdown" id="insert-menu-dropdown">
+        </div>
+      </div>
+      <div class="menu-item" data-menu="sim">Simulation
         <div class="menu-dropdown">
-          <div class="menu-entry" id="menu-step">
-            <span>Step</span>
-          </div>
-          <div class="menu-entry" id="menu-run">
-            <span>Run</span>
-          </div>
-          <div class="menu-entry" id="menu-stop">
-            <span>Stop</span>
-          </div>
+          <div class="menu-action" id="btn-step">Step</div>
+          <div class="menu-action" id="btn-run">Run</div>
+          <div class="menu-action" id="btn-stop">Stop</div>
         </div>
       </div>
-
-      <!-- Circuit name editable field -->
-      <input id="circuit-name-field" type="text" value="Untitled" spellcheck="false" title="Circuit name (click to edit)" />
-
-      <!-- Speed controls pushed to the right -->
-      <div id="menu-speed-group">
-        <span id="menu-speed-label">Speed:</span>
-        <button id="btn-speed-div10" title="Speed ÷ 10">/10</button>
-        <button id="btn-speed-div2" title="Speed ÷ 2">/2</button>
+      <input id="circuit-name" type="text" value="Untitled" title="Circuit name" />
+      <div class="menubar-spacer"></div>
+      <div class="menubar-speed">
+        <button id="btn-tb-run" title="Start simulation">&#9654;</button>
+        <button id="btn-tb-step" title="Single step">&#9205;</button>
+        <button id="btn-tb-stop" title="Stop simulation">&#9632;</button>
+        <button id="btn-speed-div10" title="Speed / 10">/10</button>
+        <button id="btn-speed-div2" title="Speed / 2">/2</button>
         <input id="speed-input" type="text" value="1000" title="Steps per second" />
-        <button id="btn-speed-mul2" title="Speed × 2">×2</button>
-        <button id="btn-speed-mul10" title="Speed × 10">×10</button>
+        <button id="btn-speed-mul2" title="Speed x 2">x2</button>
+        <button id="btn-speed-mul10" title="Speed x 10">x10</button>
       </div>
     </div>
-
     <div id="workspace">
       <div id="palette-panel">
         <div class="panel-header">Components</div>
@@ -491,56 +460,66 @@
         <div id="property-content"></div>
       </div>
     </div>
+    <div id="status-bar">
+      <span class="status-icon"></span>
+      <span id="status-message">Ready</span>
+      <button id="status-dismiss" title="Dismiss">&times;</button>
+    </div>
   </div>
   <input id="file-input" type="file" accept=".dig,.digb,.json,.digj" style="display:none" />
   <script type="module" src="/src/main.ts"></script>
   <script>
-    // Menu bar dropdown logic — pure JS, no framework dependency.
-    // Runs before module scripts to avoid FOUC on first click.
-    (function () {
-      const menuBar = document.getElementById('menu-bar');
-      const menuItems = menuBar ? menuBar.querySelectorAll('.menu-item') : [];
-
-      function closeAll() {
-        menuItems.forEach(function (m) { m.classList.remove('open'); });
+    // Menu bar dropdown logic
+    document.querySelectorAll('.menu-item[data-menu]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const tgt = e.target instanceof Element ? e.target : null;
+        if (tgt && tgt.closest('.menu-action')) return;
+        const wasOpen = item.classList.contains('open');
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        if (!wasOpen) item.classList.add('open');
+      });
+      item.addEventListener('mouseenter', () => {
+        if (document.querySelector('.menu-item.open') && !item.classList.contains('open')) {
+          document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+          item.classList.add('open');
+        }
+      });
+    });
+    document.querySelectorAll('.menu-action').forEach(action => {
+      action.addEventListener('click', () => {
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+      });
+    });
+    document.addEventListener('click', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el || !el.closest('.menu-item')) {
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
       }
-
-      menuItems.forEach(function (item) {
-        const label = item.querySelector('.menu-label');
-        if (!label) return;
-        label.addEventListener('click', function (e) {
-          e.stopPropagation();
-          const wasOpen = item.classList.contains('open');
-          closeAll();
-          if (!wasOpen) {
-            item.classList.add('open');
-          }
-        });
-        // If one menu is open and you hover another, switch to it
-        label.addEventListener('mouseenter', function () {
-          const anyOpen = Array.from(menuItems).some(function (m) {
-            return m.classList.contains('open');
-          });
-          if (anyOpen) {
-            closeAll();
-            item.classList.add('open');
-          }
-        });
-      });
-
-      // Close dropdowns when clicking outside the menu bar
-      document.addEventListener('click', function () {
-        closeAll();
-      });
-
-      // Prevent clicks inside a dropdown from closing it
-      document.querySelectorAll('.menu-dropdown').forEach(function (dd) {
-        dd.addEventListener('click', function (e) {
-          e.stopPropagation();
-          closeAll();
-        });
-      });
-    })();
+    });
+    // Submenu hover management: only one submenu open at a time
+    document.addEventListener('mouseenter', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el) return;
+      const sub = el.closest('.menu-submenu');
+      if (!sub) return;
+      const parent = sub.parentElement;
+      if (parent) {
+        parent.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
+      }
+      sub.classList.add('open');
+    }, true);
+    document.addEventListener('mouseleave', (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el) return;
+      const sub = el.closest('.menu-submenu');
+      if (!sub) return;
+      // Delay removal so mouse can move into the dropdown
+      setTimeout(() => {
+        if (!sub.matches(':hover')) {
+          sub.classList.remove('open');
+        }
+      }, 100);
+    }, true);
   </script>
 </body>
 </html>

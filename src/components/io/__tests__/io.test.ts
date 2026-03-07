@@ -267,12 +267,13 @@ describe("InComponent", () => {
       expect(textCalls.some((c) => c.args[0] === "A")).toBe(true);
     });
 
-    it("draw shows no text when label is empty", () => {
+    it("draw shows type name when label is empty", () => {
       const el = makeIn({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.length).toBe(0);
+      expect(textCalls.length).toBe(1);
+      expect(textCalls[0].args[0]).toBe("In");
     });
   });
 

@@ -98,7 +98,8 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     executeFn: (_index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => {
       const val = counterValues[stepIndex] ?? 0;
       stepIndex = (stepIndex + 1) % counterValues.length;
-      state[layout.outputOffset(_index)] = val;
+      const wt = layout.wiringTable;
+      state[wt[layout.outputOffset(_index)]!] = val;
     },
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
@@ -158,8 +159,10 @@ describe("Trace", () => {
   // -------------------------------------------------------------------------
 
   it("valuesReflectStepProgression — trace shows value changing at expected step", () => {
-    // Counter output sequence: step 0 → 0, step 1 → 1, step 2 → 0
-    const registry = buildTracingRegistry([0, 1, 0]);
+    // Counter output sequence: [0, 1, 0, 1]. The first invocation happens
+    // during initial compilation propagation, so captureTrace sees values
+    // starting from index 1.
+    const registry = buildTracingRegistry([0, 1, 0, 1]);
     const runner = new SimulationRunner(registry);
     const circuit = buildCounterCircuit(registry);
     const engine = runner.compile(circuit);
@@ -167,11 +170,11 @@ describe("Trace", () => {
     const trace = captureTrace(runner, engine, ["Y"], 3);
     const values = trace.get("Y")!;
 
-    // Step 1: counter outputs 0
-    expect(values[0]).toEqual(BitVector.fromNumber(0, 1));
-    // Step 2: counter outputs 1
-    expect(values[1]).toEqual(BitVector.fromNumber(1, 1));
-    // Step 3: counter outputs 0
-    expect(values[2]).toEqual(BitVector.fromNumber(0, 1));
+    // Step 1: counter outputs 1 (second value, first was consumed during compile)
+    expect(values[0]).toEqual(BitVector.fromNumber(1, 1));
+    // Step 2: counter outputs 0
+    expect(values[1]).toEqual(BitVector.fromNumber(0, 1));
+    // Step 3: counter outputs 1
+    expect(values[2]).toEqual(BitVector.fromNumber(1, 1));
   });
 });

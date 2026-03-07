@@ -596,3 +596,122 @@ describe("TopologicalSort", () => {
     expect(order).toEqual([0]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Feedback wire mapping — SR latch
+// ---------------------------------------------------------------------------
+
+describe("Compiler — feedback wire mapping", () => {
+  it("allWiresMappedInSRLatch", () => {
+    // Build an SR latch from two NOR gates with cross-feedback wires.
+    //
+    // NOR1 at (0,0): inputs at (0,0) and (0,1), output at (2,0)
+    // NOR2 at (6,0): inputs at (6,0) and (6,1), output at (8,0)
+    //
+    // Wires:
+    //   NOR1 output (2,0) → NOR2 input-a (6,0)   [direct]
+    //   NOR2 output (8,0) → (8,1) → (0,1) → NOR1 input-b (0,1)  [feedback, multi-segment]
+
+    const norDef = makeDefinition("NOr", twoInputPins());
+    const registry = makeRegistry(norDef);
+
+    const circuit = new Circuit();
+    const nor1 = new TestElement("NOr", "nor-1", { x: 0, y: 0 }, twoInputPins());
+    const nor2 = new TestElement("NOr", "nor-2", { x: 6, y: 0 }, twoInputPins());
+    circuit.addElement(nor1);
+    circuit.addElement(nor2);
+
+    // Wire: NOR1 output → NOR2 input-a (forward)
+    const w1 = new Wire({ x: 2, y: 0 }, { x: 6, y: 0 });
+    circuit.addWire(w1);
+
+    // Wire: NOR2 output → NOR1 input-b (feedback, two segments with corner)
+    const w2 = new Wire({ x: 8, y: 0 }, { x: 8, y: 1 });  // down
+    const w3 = new Wire({ x: 8, y: 1 }, { x: 0, y: 1 });   // across to NOR1 input-b
+    circuit.addWire(w2);
+    circuit.addWire(w3);
+
+    const compiled = compileCircuit(circuit, registry);
+
+    // All 3 wires must be in wireToNetId
+    expect(compiled.wireToNetId.size).toBe(3);
+    expect(compiled.wireToNetId.has(w1)).toBe(true);
+    expect(compiled.wireToNetId.has(w2)).toBe(true);
+    expect(compiled.wireToNetId.has(w3)).toBe(true);
+
+    // The forward wire net should connect NOR1 output and NOR2 input-a
+    const net1 = compiled.wireToNetId.get(w1)!;
+    // The feedback wires should share the same net (NOR2 output → NOR1 input-b)
+    const net2 = compiled.wireToNetId.get(w2)!;
+    const net3 = compiled.wireToNetId.get(w3)!;
+    expect(net2).toBe(net3);
+
+    // The two nets should be different (forward vs feedback)
+    expect(net1).not.toBe(net2);
+  });
+
+  it("allWiresMappedWithRealNOrPinPositions", () => {
+    // Use actual NOR gate pin positions (from standardGatePinLayout):
+    // For 2-input NOR (width=4, height=4):
+    //   in0 at (0,1), in1 at (0,3), out at (4,2)
+    //
+    // NOR1 at (0,0): in0 world=(0,1), in1 world=(0,3), out world=(4,2)
+    // NOR2 at (10,0): in0 world=(10,1), in1 world=(10,3), out world=(14,2)
+    //
+    // Forward: NOR1.out (4,2) → NOR2.in0 (10,1) via corner at (7,2)→(7,1)
+    // Feedback: NOR2.out (14,2) → NOR1.in1 (0,3) via corners
+
+    const norPins: PinDeclaration[] = [
+      { direction: PinDirection.INPUT, label: "in0", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in1", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 4, y: 2 }, isNegatable: false, isClockCapable: false },
+    ];
+
+    const norDef = makeDefinition("NOr", norPins);
+    const registry = makeRegistry(norDef);
+
+    const circuit = new Circuit();
+    const nor1 = new TestElement("NOr", "nor-1", { x: 0, y: 0 }, norPins);
+    const nor2 = new TestElement("NOr", "nor-2", { x: 10, y: 0 }, norPins);
+    circuit.addElement(nor1);
+    circuit.addElement(nor2);
+
+    // Forward: NOR1.out (4,2) → corner (7,2) → corner (7,1) → NOR2.in0 (10,1)
+    const wf1 = new Wire({ x: 4, y: 2 }, { x: 7, y: 2 });
+    const wf2 = new Wire({ x: 7, y: 2 }, { x: 7, y: 1 });
+    const wf3 = new Wire({ x: 7, y: 1 }, { x: 10, y: 1 });
+    circuit.addWire(wf1);
+    circuit.addWire(wf2);
+    circuit.addWire(wf3);
+
+    // Feedback: NOR2.out (14,2) → (14,5) → (0,5) → (0,3) = NOR1.in1
+    const wb1 = new Wire({ x: 14, y: 2 }, { x: 14, y: 5 });
+    const wb2 = new Wire({ x: 14, y: 5 }, { x: 0, y: 5 });
+    const wb3 = new Wire({ x: 0, y: 5 }, { x: 0, y: 3 });
+    circuit.addWire(wb1);
+    circuit.addWire(wb2);
+    circuit.addWire(wb3);
+
+    const compiled = compileCircuit(circuit, registry);
+
+    // All 6 wires must be in wireToNetId
+    const allWires = [wf1, wf2, wf3, wb1, wb2, wb3];
+    for (const w of allWires) {
+      expect(compiled.wireToNetId.has(w)).toBe(true);
+    }
+    expect(compiled.wireToNetId.size).toBe(6);
+
+    // Forward wires share one net
+    const fwdNet = compiled.wireToNetId.get(wf1)!;
+    expect(compiled.wireToNetId.get(wf2)).toBe(fwdNet);
+    expect(compiled.wireToNetId.get(wf3)).toBe(fwdNet);
+
+    // Feedback wires share one net
+    const fbNet = compiled.wireToNetId.get(wb1)!;
+    expect(compiled.wireToNetId.get(wb2)).toBe(fbNet);
+    expect(compiled.wireToNetId.get(wb3)).toBe(fbNet);
+
+    // Forward and feedback are different nets
+    expect(fwdNet).not.toBe(fbNet);
+  });
+});

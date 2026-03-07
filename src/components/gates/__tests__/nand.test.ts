@@ -25,7 +25,7 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 // Helpers — ComponentLayout mock
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number): ComponentLayout {
+function makeLayout(inputCount: number, bitWidth = 32): ComponentLayout {
   const totalSlots = inputCount + 1;
   return {
     wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
@@ -34,6 +34,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     outputCount: () => 1,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    getProperty: (_index: number, key: string) => key === "bitWidth" ? bitWidth : undefined,
   };
 }
 

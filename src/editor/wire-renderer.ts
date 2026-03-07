@@ -113,10 +113,15 @@ export class WireRenderer {
     value: { raw: number; width: number } | undefined,
   ): "WIRE" | "WIRE_HIGH" | "WIRE_LOW" | "WIRE_Z" | "WIRE_UNDEFINED" {
     if (value === undefined) return "WIRE";
+    // Mask raw value to the signal's bit width — execute functions may store
+    // full 32-bit results (e.g. ~0 >>> 0 = 0xFFFFFFFF for a 1-bit NOT output).
+    const mask = value.width >= 32 ? 0xFFFFFFFF : (1 << value.width) - 1;
+    const masked = (value.raw & mask) >>> 0;
     if (value.width === 1) {
-      if (value.raw === 1) return "WIRE_HIGH";
-      if (value.raw === 0) return "WIRE_LOW";
+      if (masked === 1) return "WIRE_HIGH";
+      if (masked === 0) return "WIRE_LOW";
     }
+    // For bus wires, use neutral color (bus annotations show the value)
     return "WIRE";
   }
 

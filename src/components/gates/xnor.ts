@@ -295,7 +295,9 @@ export function executeXNOr(index: number, state: Uint32Array, _highZs: Uint32Ar
   for (let i = 0; i < inputCount; i++) {
     result = (result ^ state[wt[inputStart + i]]) >>> 0;
   }
-  state[wt[outputIdx]] = (~result) >>> 0;
+  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
+  state[wt[outputIdx]] = ((~result) & mask) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

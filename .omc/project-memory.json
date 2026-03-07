@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1772780655706,
+  "lastScanned": 1772873547627,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -72,52 +72,60 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1772780655633,
+      "lastAccessed": 1772873547551,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
         "sr-latch.dig"
       ]
     },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1772873547552,
+      "keyFiles": [
+        "main.js"
+      ]
+    },
     "lib": {
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1772780655633,
+      "lastAccessed": 1772873547553,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1772780655678,
+      "lastAccessed": 1772873547597,
       "keyFiles": []
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 20,
-      "lastAccessed": 1772780655679,
+      "fileCount": 5,
+      "lastAccessed": 1772873547597,
       "keyFiles": [
         "author_instructions.md",
-        "fix-spec.md",
-        "phase-0-dead-code-removal.md",
-        "phase-0-verify.sh",
-        "phase-1-foundation.md"
+        "engine-remaining-work-spec.md",
+        "progress.md",
+        "test-baseline.md"
       ]
     },
     "specs": {
       "path": "specs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1772780655679,
+      "lastAccessed": 1772873547598,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1772780655680,
+      "lastAccessed": 1772873547598,
       "keyFiles": [
         "main.ts"
       ]
@@ -126,7 +134,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 2,
-      "lastAccessed": 1772780655682,
+      "lastAccessed": 1772873547600,
       "keyFiles": [
         "app-init.ts",
         "url-params.ts"
@@ -136,7 +144,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 2,
-      "lastAccessed": 1772780655682,
+      "lastAccessed": 1772873547600,
       "keyFiles": [
         "library-74xx.ts",
         "register-all.ts"
@@ -145,304 +153,178 @@
   },
   "hotPaths": [
     {
-      "path": "spec\\progress.md",
-      "accessCount": 115,
-      "lastAccessed": 1772849729012,
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 17,
+      "lastAccessed": 1772875058805,
       "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\compiler.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1772874355412,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 7,
+      "lastAccessed": 1772874395631,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-renderer.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772874737933,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\nor.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772874807432,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\digital-engine.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772873669483,
+      "type": "file"
+    },
+    {
+      "path": "src\\integration\\editor-binding.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772873742396,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor",
+      "accessCount": 3,
+      "lastAccessed": 1772873837306,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\wire-drawing.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772873968115,
+      "type": "file"
+    },
+    {
+      "path": "simulator.html",
+      "accessCount": 3,
+      "lastAccessed": 1772874105498,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772874276557,
+      "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 67,
-      "lastAccessed": 1772849058723,
+      "accessCount": 3,
+      "lastAccessed": 1772874411411,
       "type": "directory"
     },
     {
-      "path": "",
-      "accessCount": 37,
-      "lastAccessed": 1772848387827,
+      "path": "src\\components\\gates\\not.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772874826903,
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 34,
-      "lastAccessed": 1772849167318,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 33,
-      "lastAccessed": 1772849040969,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 32,
-      "lastAccessed": 1772848333011,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 26,
-      "lastAccessed": 1772848332079,
-      "type": "file"
-    },
-    {
-      "path": "spec\\fix-spec.md",
-      "accessCount": 16,
-      "lastAccessed": 1772782442793,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\builtins.ts",
-      "accessCount": 12,
-      "lastAccessed": 1772782515405,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772844252910,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\arithmetic\\add.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772845284125,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\__tests__\\arithmetic.test.ts",
-      "accessCount": 9,
-      "lastAccessed": 1772845397963,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 8,
-      "lastAccessed": 1772782413652,
-      "type": "file"
-    },
-    {
-      "path": "src\\export\\zip.ts",
-      "accessCount": 7,
-      "lastAccessed": 1772781987034,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis\\jk-synthesis.ts",
-      "accessCount": 6,
-      "lastAccessed": 1772781358968,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\evaluator.ts",
-      "accessCount": 6,
-      "lastAccessed": 1772782506281,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\circuit-gen.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772781282856,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\__tests__\\circuit-gen.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772781351949,
-      "type": "file"
-    },
-    {
-      "path": "src\\i18n\\__tests__\\i18n-full.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772782037407,
+      "path": "src\\components\\gates\\__tests__\\not.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772874953516,
       "type": "file"
     },
     {
       "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772788210710,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\mul.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772845312898,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\div.ts",
-      "accessCount": 5,
-      "lastAccessed": 1772845327954,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic",
-      "accessCount": 5,
-      "lastAccessed": 1772846773922,
-      "type": "directory"
-    },
-    {
-      "path": "src\\fsm\\editor.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781283984,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\__tests__\\fsm-hit-test.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781285138,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis\\__tests__\\jk-synthesis.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781358684,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\__tests__\\hgs-parity.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781376750,
-      "type": "file"
-    },
-    {
-      "path": "src\\i18n\\index.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772781950227,
-      "type": "file"
-    },
-    {
-      "path": "src\\export\\__tests__\\zip.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772782027732,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\arithmetic\\sub.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772845299137,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\value.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772780991597,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\__tests__\\fsm-renderer.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772781284745,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\__tests__\\auto-layout.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772781285525,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm",
-      "accessCount": 3,
-      "lastAccessed": 1772781380357,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 3,
-      "lastAccessed": 1772782412730,
-      "type": "file"
-    },
-    {
-      "path": "src\\runtime\\timing-diagram.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772782648378,
-      "type": "file"
-    },
-    {
-      "path": "spec\\plan.md",
-      "accessCount": 3,
-      "lastAccessed": 1772786900910,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis",
       "accessCount": 2,
-      "lastAccessed": 1772781337085,
+      "lastAccessed": 1772874403715,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 2,
+      "lastAccessed": 1772874790655,
       "type": "directory"
     },
     {
-      "path": "src\\hgs",
+      "path": "src\\components\\gates\\nand.ts",
       "accessCount": 2,
-      "lastAccessed": 1772781361853,
+      "lastAccessed": 1772874814505,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\xnor.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772874820541,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\__tests__\\nand.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772874984540,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\__tests__\\nor.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772874991039,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\__tests__\\xnor.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772874998287,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\init-sequence.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772873663703,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\canvas-renderer.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772873763235,
       "type": "directory"
     },
     {
-      "path": "src\\analysis\\state-transition.ts",
-      "accessCount": 2,
-      "lastAccessed": 1772782280224,
+      "path": "src\\editor\\color-scheme.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772873823532,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core",
+      "accessCount": 1,
+      "lastAccessed": 1772873847308,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772873953359,
       "type": "file"
     },
     {
-      "path": "package.json",
+      "path": "src\\components\\gates",
       "accessCount": 1,
-      "lastAccessed": 1772780841705,
-      "type": "file"
+      "lastAccessed": 1772874244634,
+      "type": "directory"
     },
     {
-      "path": "src\\analysis\\truth-table.ts",
+      "path": "src\\core\\registry.ts",
       "accessCount": 1,
-      "lastAccessed": 1772780928556,
-      "type": "file"
+      "lastAccessed": 1772874760854,
+      "type": "directory"
     },
     {
-      "path": "src\\analysis\\quine-mccluskey.ts",
+      "path": "src\\components\\gates\\__tests__",
       "accessCount": 1,
-      "lastAccessed": 1772780928620,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis\\expression.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780935165,
-      "type": "file"
-    },
-    {
-      "path": "src\\analysis\\expression-gen.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780946561,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\__tests__\\parser.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780946757,
-      "type": "file"
-    },
-    {
-      "path": "src\\hgs\\ast.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780950880,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\model.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780955560,
-      "type": "file"
-    },
-    {
-      "path": "src\\fsm\\table-creator.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772780997528,
-      "type": "file"
-    },
-    {
-      "path": "src\\i18n\\locale-loader.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772781292806,
-      "type": "file"
+      "lastAccessed": 1772874962153,
+      "type": "directory"
     }
   ],
   "userDirectives": []

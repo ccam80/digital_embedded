@@ -191,10 +191,10 @@ describe("Fuse — rendering", () => {
       drawRect: () => {}, drawLine: () => {}, drawText: () => {},
     };
     el.draw(ctx as never);
-    expect(colors).toContain("ERROR");
+    expect(colors).toContain("WIRE_ERROR");
   });
 
-  it("draw_notBlown — no ERROR color when intact", () => {
+  it("draw_notBlown — no WIRE_ERROR color when intact", () => {
     const props = new PropertyBag();
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const colors: string[] = [];

@@ -323,17 +323,17 @@ describe("Diode", () => {
       expect(calls.filter((c) => c.method === "drawText")).toHaveLength(0);
     });
 
-    it("blown diode draw() calls setColor ERROR for the blow mark", () => {
+    it("blown diode draw() calls setColor WIRE_ERROR for the blow mark", () => {
       const d = makeDiode({ blown: true });
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
       const errorColor = calls.filter(
-        (c) => c.method === "setColor" && c.args[0] === "ERROR",
+        (c) => c.method === "setColor" && c.args[0] === "WIRE_ERROR",
       );
       expect(errorColor.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("non-blown diode draw() does not call setColor ERROR", () => {
+    it("non-blown diode draw() does not call setColor WIRE_ERROR", () => {
       const d = makeDiode({ blown: false });
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
@@ -605,7 +605,7 @@ describe("DiodeForward", () => {
       const d = makeDiodeForward({ blown: true });
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
-      expect(calls.filter((c) => c.method === "setColor" && c.args[0] === "ERROR").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "setColor" && c.args[0] === "WIRE_ERROR").length).toBeGreaterThanOrEqual(1);
     });
   });
 
