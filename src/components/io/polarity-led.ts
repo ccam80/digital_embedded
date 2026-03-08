@@ -13,7 +13,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,14 +36,12 @@ const LED_RADIUS = 0.7;
 // ---------------------------------------------------------------------------
 
 function buildPolarityLedPinDeclarations(): PinDeclaration[] {
-  const anodePositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
-  const cathodePositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "anode",
       defaultBitWidth: 1,
-      position: anodePositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -52,7 +49,7 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "cathode",
       defaultBitWidth: 1,
-      position: cathodePositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -102,7 +99,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -110,21 +107,20 @@ export class PolarityLedElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, cy, LED_RADIUS, true);
+    ctx.drawCircle(cx, 0, LED_RADIUS, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(cx, cy, LED_RADIUS, false);
+    ctx.drawCircle(cx, 0, LED_RADIUS, false);
 
     // Draw A/K polarity markers
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("A", 0.2, cy, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", COMP_WIDTH - 0.2, cy, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("A", 0.2, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("K", COMP_WIDTH - 0.2, 0, { horizontal: "right", vertical: "middle" });
 
     if (this._label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.7 });

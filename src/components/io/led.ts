@@ -13,7 +13,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,13 +36,12 @@ const LED_RADIUS = 0.7;
 // ---------------------------------------------------------------------------
 
 function buildLedPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -93,7 +91,7 @@ export class LedElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -101,7 +99,7 @@ export class LedElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
+    const cy = 0;
 
     ctx.save();
 

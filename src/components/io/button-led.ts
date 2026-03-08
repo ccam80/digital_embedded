@@ -15,7 +15,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -40,14 +39,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildButtonLEDPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -55,7 +52,7 @@ function buildButtonLEDPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -101,7 +98,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -112,28 +109,29 @@ export class ButtonLEDElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Button symbol: inner rect
-    ctx.drawRect(0.4, 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
+    ctx.drawRect(0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
 
     // LED indicator: small circle in top-right area
     ctx.setColor("WIRE_Z");
-    ctx.drawCircle(COMP_WIDTH - 0.4, 0.4, 0.25, true);
+    ctx.drawCircle(COMP_WIDTH - 0.4, yOff + 0.4, 0.25, true);
     ctx.setColor("COMPONENT");
-    ctx.drawCircle(COMP_WIDTH - 0.4, 0.4, 0.25, false);
+    ctx.drawCircle(COMP_WIDTH - 0.4, yOff + 0.4, 0.25, false);
 
     if (this._label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.3, {
+      ctx.drawText(this._label, COMP_WIDTH / 2, yOff - 0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

@@ -13,7 +13,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -36,13 +35,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildConstPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -96,25 +94,26 @@ export class ConstElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText(this._value.toString(10), COMP_WIDTH / 2, COMP_HEIGHT / 2, {
+    ctx.drawText(this._value.toString(10), COMP_WIDTH / 2, 0, {
       horizontal: "center",
       vertical: "middle",
     });

@@ -14,7 +14,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -42,13 +41,12 @@ function componentWidth(bitCount: number): number {
 
 function buildDipSwitchPinDeclarations(bitCount: number): PinDeclaration[] {
   const w = componentWidth(bitCount);
-  const outputPositions = layoutPinsOnFace("east", 1, w, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitCount,
-      position: outputPositions[0],
+      position: { x: w, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -97,7 +95,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
     const w = componentWidth(this._bitCount);
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: w,
       height: COMP_HEIGHT,
     };
@@ -113,14 +111,15 @@ export class DipSwitchElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const w = componentWidth(this._bitCount);
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, w, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, w, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, w, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, w, COMP_HEIGHT, false);
 
     // Draw individual switch slots — one per bit
     for (let i = 0; i < this._bitCount; i++) {
@@ -129,28 +128,28 @@ export class DipSwitchElement extends AbstractCircuitElement {
       const bitOn = ((this._defaultValue >>> i) & 1) === 1;
 
       ctx.setColor("COMPONENT");
-      ctx.drawRect(slotX, 0.2, slotW, COMP_HEIGHT - 0.4, false);
+      ctx.drawRect(slotX, yOff + 0.2, slotW, COMP_HEIGHT - 0.4, false);
 
       if (bitOn) {
         // Switch paddle in upper position (ON)
         ctx.setColor("COMPONENT_FILL");
-        ctx.drawRect(slotX + 0.05, 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, true);
+        ctx.drawRect(slotX + 0.05, yOff + 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, true);
         ctx.setColor("COMPONENT");
-        ctx.drawRect(slotX + 0.05, 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, false);
+        ctx.drawRect(slotX + 0.05, yOff + 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, false);
       } else {
         // Switch paddle in lower position (OFF)
         const halfH = (COMP_HEIGHT - 0.5) / 2;
         ctx.setColor("COMPONENT_FILL");
-        ctx.drawRect(slotX + 0.05, 0.25 + halfH, slotW - 0.1, halfH, true);
+        ctx.drawRect(slotX + 0.05, yOff + 0.25 + halfH, slotW - 0.1, halfH, true);
         ctx.setColor("COMPONENT");
-        ctx.drawRect(slotX + 0.05, 0.25 + halfH, slotW - 0.1, halfH, false);
+        ctx.drawRect(slotX + 0.05, yOff + 0.25 + halfH, slotW - 0.1, halfH, false);
       }
     }
 
     if (this._label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, w / 2, -0.3, {
+      ctx.drawText(this._label, w / 2, yOff - 0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

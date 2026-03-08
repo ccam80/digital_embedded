@@ -15,7 +15,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -39,13 +38,12 @@ const BULB_RADIUS = 0.7;
 // ---------------------------------------------------------------------------
 
 function buildLightBulbPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -89,7 +87,7 @@ export class LightBulbElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -97,22 +95,21 @@ export class LightBulbElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
 
     ctx.save();
 
     // Bulb body
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, cy, BULB_RADIUS, true);
+    ctx.drawCircle(cx, 0, BULB_RADIUS, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(cx, cy, BULB_RADIUS, false);
+    ctx.drawCircle(cx, 0, BULB_RADIUS, false);
 
     // Filament cross lines (incandescent bulb symbol)
     const r = BULB_RADIUS * 0.5;
     ctx.setLineWidth(1);
-    ctx.drawLine(cx - r, cy - r, cx + r, cy + r);
-    ctx.drawLine(cx + r, cy - r, cx - r, cy + r);
+    ctx.drawLine(cx - r, -r, cx + r, r);
+    ctx.drawLine(cx + r, -r, cx - r, r);
 
     if (this._label.length > 0) {
       ctx.setColor("TEXT");

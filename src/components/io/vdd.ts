@@ -12,7 +12,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -35,13 +34,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildVddPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -85,29 +83,27 @@ export class VddElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const cx = COMP_WIDTH / 2;
 
     ctx.save();
-
-    const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     // Vertical stem
-    ctx.drawLine(cx, cy + 0.5, cx, cy - 0.3);
+    ctx.drawLine(cx, 0.5, cx, -0.3);
     // Horizontal bar at top (VDD symbol)
-    ctx.drawLine(cx - 0.5, cy - 0.3, cx + 0.5, cy - 0.3);
+    ctx.drawLine(cx - 0.5, -0.3, cx + 0.5, -0.3);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7, weight: "bold" });
-    ctx.drawText("VDD", cx, cy - 0.5, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText("VDD", cx, -0.5, { horizontal: "center", vertical: "bottom" });
 
     ctx.restore();
   }

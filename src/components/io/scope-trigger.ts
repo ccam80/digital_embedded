@@ -22,7 +22,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -51,14 +50,12 @@ export type TriggerMode = "rising" | "falling" | "both";
 // ---------------------------------------------------------------------------
 
 function buildScopeTriggerPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: true,
     },
@@ -66,7 +63,7 @@ function buildScopeTriggerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -114,30 +111,30 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
     const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
 
     ctx.save();
 
     // Component body
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Rising edge symbol
     ctx.setLineWidth(1);
-    ctx.drawLine(cx - 0.5, cy + 0.3, cx - 0.5, cy - 0.3);
-    ctx.drawLine(cx - 0.5, cy - 0.3, cx + 0.5, cy - 0.3);
-    ctx.drawLine(cx + 0.5, cy - 0.3, cx + 0.5, cy + 0.3);
+    ctx.drawLine(cx - 0.5, 0.3, cx - 0.5, -0.3);
+    ctx.drawLine(cx - 0.5, -0.3, cx + 0.5, -0.3);
+    ctx.drawLine(cx + 0.5, -0.3, cx + 0.5, 0.3);
 
     ctx.restore();
   }

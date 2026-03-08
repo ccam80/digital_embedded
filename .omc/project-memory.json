@@ -177,16 +177,16 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 14,
+      "lastAccessed": 1772961544197,
+      "type": "directory"
+    },
+    {
       "path": "simulator.html",
       "accessCount": 12,
       "lastAccessed": 1772941842202,
       "type": "file"
-    },
-    {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 12,
-      "lastAccessed": 1772955338171,
-      "type": "directory"
     },
     {
       "path": "src\\editor\\hit-test.ts",
@@ -255,15 +255,21 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\nor.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772874807432,
-      "type": "file"
+      "path": "src\\components",
+      "accessCount": 5,
+      "lastAccessed": 1772961267554,
+      "type": "directory"
     },
     {
       "path": "src\\components\\memory\\rom.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772961274530,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\nor.ts",
       "accessCount": 4,
-      "lastAccessed": 1772881017646,
+      "lastAccessed": 1772874807432,
       "type": "file"
     },
     {
@@ -276,6 +282,12 @@
       "path": "src\\editor",
       "accessCount": 4,
       "lastAccessed": 1772943572632,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1772961506414,
       "type": "directory"
     },
     {
@@ -303,21 +315,9 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 3,
-      "lastAccessed": 1772880447960,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\memory",
       "accessCount": 3,
       "lastAccessed": 1772881074515,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 3,
-      "lastAccessed": 1772943572589,
       "type": "directory"
     },
     {

@@ -14,7 +14,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,13 +36,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildButtonPinDeclarations(): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -89,7 +87,7 @@ export class ButtonElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -100,19 +98,20 @@ export class ButtonElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Draw button symbol: a smaller filled rect indicating a pushbutton
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0.4, 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
+    ctx.drawRect(0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
 
     if (this._label.length > 0) {
       ctx.setColor("TEXT");

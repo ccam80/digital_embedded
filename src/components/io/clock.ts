@@ -13,7 +13,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -36,13 +35,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildClockPinDeclarations(): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: true,
     },
@@ -98,27 +96,28 @@ export class ClockElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Draw clock waveform symbol
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     const mx = COMP_WIDTH / 2;
-    const my = COMP_HEIGHT / 2;
+    const my = 0;
     const halfW = 0.6;
     const halfH = 0.4;
     ctx.drawLine(mx - halfW, my + halfH, mx - halfW, my - halfH);

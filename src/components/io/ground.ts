@@ -12,7 +12,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -35,13 +34,12 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildGroundPinDeclarations(): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -82,28 +80,25 @@ export class GroundElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const cx = COMP_WIDTH / 2;
 
     ctx.save();
-
-    const cx = COMP_WIDTH / 2;
-    const top = COMP_HEIGHT / 2 - 0.5;
-    const bottom = COMP_HEIGHT / 2 + 0.5;
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     // Vertical stem
-    ctx.drawLine(cx, top, cx, bottom);
+    ctx.drawLine(cx, -0.5, cx, 0.5);
     // Three horizontal bars (classic ground symbol)
-    ctx.drawLine(cx - 0.6, bottom, cx + 0.6, bottom);
-    ctx.drawLine(cx - 0.4, bottom + 0.2, cx + 0.4, bottom + 0.2);
-    ctx.drawLine(cx - 0.2, bottom + 0.4, cx + 0.2, bottom + 0.4);
+    ctx.drawLine(cx - 0.6, 0.5, cx + 0.6, 0.5);
+    ctx.drawLine(cx - 0.4, 0.7, cx + 0.4, 0.7);
+    ctx.drawLine(cx - 0.2, 0.9, cx + 0.2, 0.9);
 
     ctx.restore();
   }

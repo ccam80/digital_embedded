@@ -19,7 +19,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -67,13 +66,12 @@ export const HEX_SEGMENT_TABLE: readonly number[] = [
 // ---------------------------------------------------------------------------
 
 function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 4,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -121,44 +119,47 @@ export class SevenSegHexElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
 
     // Background
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Static 7-segment shape
-    const halfH = COMP_HEIGHT / 2;
+    const top = yOff + 0.3;
+    const mid = 0;
+    const bot = yOff + COMP_HEIGHT - 0.3;
     // Top (a)
-    ctx.drawLine(0.4, 0.3, COMP_WIDTH - 0.4, 0.3);
+    ctx.drawLine(0.4, top, COMP_WIDTH - 0.4, top);
     // Middle (g)
-    ctx.drawLine(0.4, halfH, COMP_WIDTH - 0.4, halfH);
+    ctx.drawLine(0.4, mid, COMP_WIDTH - 0.4, mid);
     // Bottom (d)
-    ctx.drawLine(0.4, COMP_HEIGHT - 0.3, COMP_WIDTH - 0.4, COMP_HEIGHT - 0.3);
+    ctx.drawLine(0.4, bot, COMP_WIDTH - 0.4, bot);
     // Upper-left (f)
-    ctx.drawLine(0.4, 0.3, 0.4, halfH);
+    ctx.drawLine(0.4, top, 0.4, mid);
     // Upper-right (b)
-    ctx.drawLine(COMP_WIDTH - 0.4, 0.3, COMP_WIDTH - 0.4, halfH);
+    ctx.drawLine(COMP_WIDTH - 0.4, top, COMP_WIDTH - 0.4, mid);
     // Lower-left (e)
-    ctx.drawLine(0.4, halfH, 0.4, COMP_HEIGHT - 0.3);
+    ctx.drawLine(0.4, mid, 0.4, bot);
     // Lower-right (c)
-    ctx.drawLine(COMP_WIDTH - 0.4, halfH, COMP_WIDTH - 0.4, COMP_HEIGHT - 0.3);
+    ctx.drawLine(COMP_WIDTH - 0.4, mid, COMP_WIDTH - 0.4, bot);
 
     // Label indicating hex decoder
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("hex", COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
+    ctx.drawText("hex", COMP_WIDTH / 2, yOff + COMP_HEIGHT + 0.3, {
       horizontal: "center",
       vertical: "top",
     });
