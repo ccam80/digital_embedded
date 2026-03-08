@@ -131,12 +131,28 @@ const AUTO_RELOAD_DEF: PropertyDefinition = {
   description: "Reload ROM contents from hex file on simulation reset",
 };
 
+const DATA_DEF: PropertyDefinition = {
+  key: "data",
+  type: PropertyType.HEX_DATA,
+  label: "Data",
+  defaultValue: [],
+  description: "Memory contents as hex values (one word per entry)",
+};
+
 const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "dataBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "AddrBits", propertyKey: "addrBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
   { xmlName: "isProgramMemory", propertyKey: "isProgramMemory", convert: (v) => v === "true" },
   { xmlName: "AutoReloadRom", propertyKey: "autoReload", convert: (v) => v === "true" },
+  { xmlName: "Data", propertyKey: "data", convert: (v) => {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.map(Number);
+    } catch { /* ignore */ }
+    if (v.trim() === '') return [];
+    return v.trim().split(/[\s,]+/).map((s: string) => parseInt(s, 16));
+  }},
 ];
 
 // ---------------------------------------------------------------------------
@@ -265,6 +281,7 @@ const ROM_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_DEF,
   IS_PROGRAM_MEMORY_DEF,
   AUTO_RELOAD_DEF,
+  DATA_DEF,
 ];
 
 function romFactory(props: PropertyBag): ROMElement {
@@ -434,6 +451,7 @@ const ROM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_DEF,
   IS_PROGRAM_MEMORY_DEF,
   AUTO_RELOAD_DEF,
+  DATA_DEF,
 ];
 
 function romDualPortFactory(props: PropertyBag): ROMDualPortElement {

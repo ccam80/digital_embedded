@@ -156,7 +156,7 @@ export class HttpResolver implements FileResolver {
     fetchFn?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>,
   ) {
     this._basePath = basePath;
-    this._fetchFn = fetchFn ?? (globalThis.fetch as unknown as typeof this._fetchFn);
+    this._fetchFn = fetchFn ?? ((url: string) => globalThis.fetch(url));
   }
 
   /**
@@ -174,7 +174,8 @@ export class HttpResolver implements FileResolver {
   }
 
   async resolve(name: string): Promise<string> {
-    const url = `${this._basePath}${name}.dig`;
+    const suffix = name.endsWith('.dig') ? '' : '.dig';
+    const url = `${this._basePath}${name}${suffix}`;
     const response = await this._fetchFn(url);
     if (!response.ok) {
       throw new ResolverNotFoundError(name);
@@ -211,7 +212,8 @@ export class NodeResolver implements FileResolver {
   }
 
   async resolve(name: string): Promise<string> {
-    const path = `${this._basePath}${name}.dig`;
+    const suffix = name.endsWith('.dig') ? '' : '.dig';
+    const path = `${this._basePath}${name}${suffix}`;
     try {
       return await this._readFileFn(path);
     } catch {

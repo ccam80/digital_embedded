@@ -113,6 +113,8 @@ export class TestcaseElement extends AbstractCircuitElement {
   private readonly _testData: string;
   private readonly _pins: readonly Pin[];
 
+  private readonly _testDataCompiled: string;
+
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -124,6 +126,7 @@ export class TestcaseElement extends AbstractCircuitElement {
 
     this._label = props.getOrDefault<string>("label", "Testcase");
     this._testData = props.getOrDefault<string>("testData", "");
+    this._testDataCompiled = props.getOrDefault<string>("testDataCompiled", "");
 
     const decls = buildTestcasePinDeclarations();
     this._pins = resolvePins(
@@ -141,9 +144,15 @@ export class TestcaseElement extends AbstractCircuitElement {
     return this._testData;
   }
 
-  /** Parse and return the structured test data. */
+  /** The compiled (plain-format) test data, if the source was a JS script. */
+  get testDataCompiled(): string {
+    return this._testDataCompiled;
+  }
+
+  /** Parse and return the structured test data. Uses compiled data if available. */
   getParsedTestData(): TestcaseData {
-    return parseTestData(this._testData);
+    const data = this._testDataCompiled || this._testData;
+    return parseTestData(data);
   }
 
   getPins(): readonly Pin[] {

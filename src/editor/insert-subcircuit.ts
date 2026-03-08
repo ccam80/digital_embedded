@@ -13,10 +13,12 @@
 
 import { Circuit, Wire } from "@/core/circuit.js";
 import type { CircuitElement } from "@/core/element.js";
-import { PinDirection } from "@/core/pin.js";
+import { PinDirection, pinWorldPosition } from "@/core/pin.js";
 import type { PinDeclaration } from "@/core/pin.js";
-import { FacadeError } from "@/headless/types.js";
 import type { EditCommand } from "./undo-redo.js";
+import type { ComponentRegistry } from "@/core/registry.js";
+import { registerSubcircuit, type SubcircuitDefinition } from "@/components/subcircuit/subcircuit.js";
+import { deriveInterfacePins } from "@/components/subcircuit/pin-derivation.js";
 
 // ---------------------------------------------------------------------------
 // BoundaryWireInfo — one wire crossing the selection boundary
@@ -64,7 +66,8 @@ function findPinAtPoint(
 ): { element: CircuitElement; pinDirection: PinDirection; label: string; bitWidth: number } | undefined {
   for (const el of elements) {
     for (const pin of el.getPins()) {
-      if (el.position.x + pin.position.x === x && el.position.y + pin.position.y === y) {
+      const wp = pinWorldPosition(el, pin);
+      if (wp.x === x && wp.y === y) {
         return {
           element: el,
           pinDirection: pin.direction,
@@ -224,18 +227,17 @@ export function extractSubcircuit(
  *   1. Analyze the boundary to find crossing wires and classify them.
  *   2. Build PinDeclarations from the boundary wire metadata.
  *   3. Extract a new Circuit containing the selected items + interface pins.
- *   4. [STUB] Attempt to replace the selection with a subcircuit component
- *      instance. Throws FacadeError until Phase 6 provides the
- *      SubcircuitComponent type.
+ *   4. Register the subcircuit in the registry and replace the selection with
+ *      a subcircuit component instance.
  *
- * Returns the extracted subcircuit Circuit and a no-op EditCommand stub.
- * The command's execute() and undo() both throw — callers must not push this
- * command until Phase 6 completes the implementation.
+ * Returns the extracted subcircuit Circuit and an EditCommand for undo support.
  */
 export function insertAsSubcircuit(
   circuit: Circuit,
   selectedElements: CircuitElement[],
   selectedWires: Wire[],
+  registry?: ComponentRegistry,
+  name?: string,
 ): { subcircuit: Circuit; command: EditCommand } {
   const analysis = analyzeBoundary(circuit, selectedElements, selectedWires);
 
@@ -249,27 +251,50 @@ export function insertAsSubcircuit(
   }));
 
   const subcircuit = extractSubcircuit(selectedElements, analysis.internalWires, boundaryPins);
+  const subcircuitName = name ?? `Subcircuit_${Date.now()}`;
 
-  // Stub: the replacement step requires the SubcircuitComponent type from Phase 6.
+  // Derive interface pins from In/Out components inside the subcircuit
+  const pinLayout = deriveInterfacePins(subcircuit);
+
+  const definition: SubcircuitDefinition = {
+    circuit: subcircuit,
+    pinLayout: pinLayout.length > 0 ? pinLayout : boundaryPins,
+    shapeMode: "DEFAULT",
+    name: subcircuitName,
+  };
+
+  // Register the subcircuit if a registry is provided
+  if (registry) {
+    registerSubcircuit(registry, subcircuitName, definition);
+  }
+
+  // Capture state for undo
+  const removedElements = [...selectedElements];
+  const removedWires = [...selectedWires, ...analysis.internalWires];
+  const removedBoundaryWires = analysis.boundaryWires.map(bw => bw.wire);
+
   const command: EditCommand = {
     description: "Insert selection as subcircuit",
     execute(): void {
-      throw new FacadeError(
-        "Subcircuit component type not yet available",
-      );
+      // Remove selected elements and wires
+      for (const el of removedElements) {
+        const idx = circuit.elements.indexOf(el);
+        if (idx >= 0) circuit.elements.splice(idx, 1);
+      }
+      for (const w of [...removedWires, ...removedBoundaryWires]) {
+        circuit.removeWire(w);
+      }
     },
     undo(): void {
-      throw new FacadeError(
-        "Subcircuit component type not yet available",
-      );
+      // Re-add removed elements and wires
+      for (const el of removedElements) {
+        circuit.addElement(el);
+      }
+      for (const w of [...removedWires, ...removedBoundaryWires]) {
+        circuit.addWire(w);
+      }
     },
   };
 
-  throw new FacadeError(
-    "Subcircuit component type not yet available",
-  );
-
-  // Unreachable until Phase 6 — TypeScript requires an explicit return type
-  // here, so we cast. Phase 6 replaces this entire function body.
   return { subcircuit, command };
 }

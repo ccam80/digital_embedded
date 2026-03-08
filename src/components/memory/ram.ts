@@ -200,11 +200,27 @@ const IS_PROGRAM_MEMORY_DEF: PropertyDefinition = {
   description: "Mark as program memory for CPU instruction fetch integration",
 };
 
+const DATA_DEF: PropertyDefinition = {
+  key: "data",
+  type: PropertyType.HEX_DATA,
+  label: "Data",
+  defaultValue: [],
+  description: "Initial memory contents as hex values (one word per entry)",
+};
+
 const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "dataBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "AddrBits", propertyKey: "addrBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
   { xmlName: "isProgramMemory", propertyKey: "isProgramMemory", convert: (v) => v === "true" },
+  { xmlName: "Data", propertyKey: "data", convert: (v) => {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.map(Number);
+    } catch { /* ignore */ }
+    if (v.trim() === '') return [];
+    return v.trim().split(/[\s,]+/).map((s: string) => parseInt(s, 16));
+  }},
 ];
 
 // ---------------------------------------------------------------------------
@@ -313,7 +329,7 @@ export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs:
 export const RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_SINGLE_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramSinglePortFactory(props: PropertyBag): RAMSinglePortElement {
@@ -429,7 +445,7 @@ export function executeRAMSinglePortSel(index: number, state: Uint32Array, _high
 export const RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_SINGLE_PORT_SEL_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramSinglePortSelFactory(props: PropertyBag): RAMSinglePortSelElement {
@@ -556,7 +572,7 @@ export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: U
 export const RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramDualPortFactory(props: PropertyBag): RAMDualPortElement {
@@ -685,7 +701,7 @@ export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs:
 export const RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_DUAL_ACCESS_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramDualAccessFactory(props: PropertyBag): RAMDualAccessElement {
@@ -786,7 +802,7 @@ export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint
 export const RAM_ASYNC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_ASYNC_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramAsyncFactory(props: PropertyBag): RAMAsyncElement {
@@ -906,7 +922,7 @@ export function executeBlockRAMDualPort(index: number, state: Uint32Array, _high
 export const BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const BLOCK_RAM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function blockRAMDualPortFactory(props: PropertyBag): BlockRAMDualPortElement {

@@ -39,6 +39,8 @@ export interface PinDeclaration {
   readonly position: Point;
   readonly isNegatable: boolean;
   readonly isClockCapable: boolean;
+  /** Which face of a subcircuit chip this pin is on (left/right/top/bottom). */
+  readonly face?: "left" | "right" | "top" | "bottom";
 }
 
 /**
@@ -127,6 +129,28 @@ export function rotatePoint(p: Point, rotation: Rotation): Point {
  */
 export function translatePoint(p: Point, offset: Point): Point {
   return { x: p.x + offset.x, y: p.y + offset.y };
+}
+
+/**
+ * Compute the world-space position of a pin on a placed element.
+ *
+ * Pin positions from getPins() are relative to the component origin at
+ * rotation 0. This helper applies the element's current rotation (and
+ * mirror) to produce the correct world-space coordinate.
+ *
+ * All code that needs a pin's world position MUST use this function
+ * instead of the raw `element.position + pin.position` pattern.
+ */
+export function pinWorldPosition(
+  element: { position: Point; rotation: Rotation; mirror: boolean },
+  pin: { position: Point },
+): Point {
+  let p = pin.position;
+  if (element.mirror) {
+    p = { x: -p.x, y: p.y };
+  }
+  const rotated = rotatePoint(p, element.rotation);
+  return { x: element.position.x + rotated.x, y: element.position.y + rotated.y };
 }
 
 /**

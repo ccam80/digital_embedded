@@ -36,7 +36,7 @@ export class WireRenderer {
   ): void {
     for (const wire of wires) {
       const value = signalAccess?.getWireValue(wire);
-      const isBus = value !== undefined && value.width > 1;
+      const isBus = (value !== undefined && value.width > 1) || wire.bitWidth > 1;
       const lineWidth = isBus ? WIRE_WIDTH_BUS : WIRE_WIDTH_SINGLE;
 
       ctx.save();

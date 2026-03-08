@@ -11,6 +11,7 @@
 import type { Point } from "@/core/renderer-interface";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
+import { pinWorldPosition } from "@/core/pin";
 import { Wire, Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import { mergeCollinearSegments } from "@/editor/wire-merge";
@@ -112,10 +113,7 @@ export class WireDrawingMode {
    * The pin position is used as the starting point.
    */
   startFromPin(element: CircuitElement, pin: Pin): void {
-    const startPos = {
-      x: element.position.x + pin.position.x,
-      y: element.position.y + pin.position.y,
-    };
+    const startPos = pinWorldPosition(element, pin);
     this._waypoints = [startPos];
     this._cursor = startPos;
     this._active = true;
@@ -169,10 +167,7 @@ export class WireDrawingMode {
       throw new Error("WireDrawingMode: cannot complete when not active");
     }
 
-    const endPos = {
-      x: element.position.x + pin.position.x,
-      y: element.position.y + pin.position.y,
-    };
+    const endPos = pinWorldPosition(element, pin);
 
     // Build all wire segments from waypoints + final Manhattan route to end
     const segments = this._buildSegments(endPos);
@@ -237,6 +232,16 @@ export class WireDrawingMode {
   /** Returns true when wire-drawing mode is active. */
   isActive(): boolean {
     return this._active;
+  }
+
+  /**
+   * Returns true if the given point is the same as the last locked waypoint.
+   * Used to detect double-click-in-place to finalize a wire at an empty spot.
+   */
+  isSameAsLastWaypoint(point: Point): boolean {
+    if (!this._active || this._waypoints.length === 0) return false;
+    const last = this._waypoints[this._waypoints.length - 1]!;
+    return last.x === point.x && last.y === point.y;
   }
 
   /**

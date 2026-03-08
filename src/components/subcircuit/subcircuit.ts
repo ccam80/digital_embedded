@@ -31,12 +31,12 @@ import {
 import type { Circuit } from "../../core/circuit.js";
 import type { ShapeMode } from "./shape-renderer.js";
 import {
-  computeChipDimensions,
   drawDefaultShape,
   drawDILShape,
   drawCustomShape,
   drawLayoutShape,
 } from "./shape-renderer.js";
+import { countPinsByFace } from "./pin-derivation.js";
 
 // ---------------------------------------------------------------------------
 // SubcircuitDefinition
@@ -79,25 +79,27 @@ export class SubcircuitElement extends AbstractCircuitElement {
     super(typeId, instanceId, position, rotation, mirror, props);
     this._definition = definition;
 
-    const inputPins = definition.pinLayout.filter(
-      (p) => p.direction === PinDirection.INPUT,
-    );
-    const outputPins = definition.pinLayout.filter(
-      (p) => p.direction === PinDirection.OUTPUT,
-    );
+    const chipWidth = definition.circuit.metadata.chipWidth ?? 3;
+    const chipHeight = definition.circuit.metadata.chipHeight ?? 3;
 
-    const { width, height } = computeChipDimensions(
-      inputPins.length,
-      outputPins.length,
-    );
-    this._width = width;
-    this._height = height;
+    if (definition.shapeMode === "LAYOUT") {
+      // LAYOUT: faces from In/Out rotation, dimensions are max(pins+1, explicit attribute)
+      const faceCounts = countPinsByFace(definition.pinLayout);
+      this._width = Math.max(faceCounts.top + 1, faceCounts.bottom + 1, chipWidth);
+      this._height = Math.max(faceCounts.left + 1, faceCounts.right + 1, chipHeight);
+    } else {
+      // DEFAULT/DIL/CUSTOM: all inputs on left, all outputs on right
+      const inputCount = definition.pinLayout.filter(p => p.direction === PinDirection.INPUT).length;
+      const outputCount = definition.pinLayout.filter(p => p.direction === PinDirection.OUTPUT).length;
+      this._width = chipWidth;
+      this._height = Math.max(inputCount, outputCount, 1);
+    }
 
     const positionedPins = buildPositionedPinDeclarations(
-      inputPins,
-      outputPins,
-      width,
-      height,
+      definition.pinLayout,
+      this._width,
+      this._height,
+      definition.shapeMode,
     );
 
     this._pins = resolvePins(
@@ -114,11 +116,21 @@ export class SubcircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    if (this._definition.shapeMode === "LAYOUT") {
+      // LAYOUT chip rect: origin at (0,0), full width × height
+      return {
+        x: this.position.x,
+        y: this.position.y,
+        width: this._width,
+        height: this._height,
+      };
+    }
+    // DEFAULT/DIL/CUSTOM: chip rect has 0.5 border above and below pin area
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: this._width,
-      height: this._height,
+      height: this._height - 1 + 1, // pinRows - 1 + 2 * BORDER
     };
   }
 
@@ -127,24 +139,27 @@ export class SubcircuitElement extends AbstractCircuitElement {
     ctx.save();
 
     const positionedPins = buildPositionedPinDeclarations(
-      this._definition.pinLayout.filter((p) => p.direction === PinDirection.INPUT),
-      this._definition.pinLayout.filter((p) => p.direction === PinDirection.OUTPUT),
+      this._definition.pinLayout,
       this._width,
       this._height,
+      this._definition.shapeMode,
     );
 
     switch (this._definition.shapeMode) {
-      case "DEFAULT":
-        drawDefaultShape(ctx, this._definition.name, positionedPins, this._width, this._height);
-        break;
       case "DIL":
-        drawDILShape(ctx, this._definition.name, positionedPins, this._width, this._height);
+        drawDILShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
         break;
       case "CUSTOM":
-        drawCustomShape(ctx, this._definition.name, positionedPins, this._width, this._height);
+        drawCustomShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
         break;
       case "LAYOUT":
-        drawLayoutShape(ctx, this._definition.name, positionedPins, this._width, this._height);
+        drawLayoutShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
+        break;
+      case "DEFAULT":
+      case "SIMPLE":
+      case "MINIMIZED":
+      default:
+        drawDefaultShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
         break;
     }
 
@@ -170,35 +185,132 @@ export class SubcircuitElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 /**
- * Assign final positions to input and output pins on a chip rectangle.
+ * Assign final positions to pins on a chip rectangle based on their face
+ * and the shape mode.
  *
- * Input pins are placed on the left (west) face; output pins on the right
- * (east) face. Positions are computed to be evenly spaced, matching the
- * chip height produced by computeChipDimensions().
+ * DEFAULT/DIL/CUSTOM: all inputs on left face, all outputs on right face,
+ * sequential y positions (matching Digital's GenericShape).
+ *
+ * LAYOUT: faces from In/Out element rotation, pins distributed evenly across
+ * the declared face length (matching Digital's LayoutShape).
  */
 function buildPositionedPinDeclarations(
-  inputPins: readonly PinDeclaration[],
-  outputPins: readonly PinDeclaration[],
+  pins: readonly PinDeclaration[],
+  width: number,
+  height: number,
+  shapeMode: ShapeMode,
+): PinDeclaration[] {
+  if (shapeMode === "LAYOUT") {
+    return buildLayoutPositions(pins, width, height);
+  }
+  return buildDefaultPositions(pins, width, height);
+}
+
+/**
+ * DEFAULT/DIL/CUSTOM: all inputs on left, all outputs on right.
+ * Sequential y positions (0, 1, 2, ...).
+ */
+function buildDefaultPositions(
+  pins: readonly PinDeclaration[],
+  width: number,
+  _height: number,
+): PinDeclaration[] {
+  const inputs: PinDeclaration[] = [];
+  const outputs: PinDeclaration[] = [];
+
+  for (const pin of pins) {
+    if (pin.direction === PinDirection.INPUT) {
+      inputs.push(pin);
+    } else {
+      outputs.push(pin);
+    }
+  }
+
+  const positioned: PinDeclaration[] = [];
+
+  // Inputs on left face: x=0, y=0,1,2,...
+  for (let i = 0; i < inputs.length; i++) {
+    positioned.push({ ...inputs[i], face: "left", position: { x: 0, y: i } });
+  }
+  // Outputs on right face: x=width, y=0,1,2,...
+  for (let i = 0; i < outputs.length; i++) {
+    positioned.push({ ...outputs[i], face: "right", position: { x: width, y: i } });
+  }
+
+  return positioned;
+}
+
+/**
+ * LAYOUT: pins keep their rotation-derived face assignment and are
+ * distributed evenly across the declared face length.
+ *
+ * Matches Digital's LayoutShape.PinList.createPosition() algorithm:
+ *   delta = floor((length + 2) / (nPins + 1))
+ *   span  = delta * (nPins - 1)
+ *   start = floor((length - span) / 2)
+ *   positions: start, start+delta, start+2*delta, ...
+ */
+function buildLayoutPositions(
+  pins: readonly PinDeclaration[],
   width: number,
   height: number,
 ): PinDeclaration[] {
+  type Face = "left" | "right" | "top" | "bottom";
+
+  // Group by face, preserving sort order from deriveInterfacePins
+  const groups: Record<Face, PinDeclaration[]> = {
+    left: [], right: [], top: [], bottom: [],
+  };
+  for (const pin of pins) {
+    const face: Face = pin.face ??
+      (pin.direction === PinDirection.INPUT ? "left" : "right");
+    groups[face].push(pin);
+  }
+
+  /**
+   * Distribute N pins evenly across a face of the given length (in grid units).
+   * Returns offset positions along the face axis.
+   */
+  function distribute(n: number, length: number): number[] {
+    if (n === 0) return [];
+    if (n === 1) {
+      return [Math.floor(length / 2)];
+    }
+    const delta = Math.floor((length + 2) / (n + 1));
+    const span = delta * (n - 1);
+    const start = Math.floor((length - span) / 2);
+    const positions: number[] = [];
+    for (let i = 0; i < n; i++) {
+      positions.push(start + i * delta);
+    }
+    return positions;
+  }
+
   const positioned: PinDeclaration[] = [];
 
-  const inputSpacing = inputPins.length > 0 ? (height - 1) / (inputPins.length + 1) : 0;
-  inputPins.forEach((pin, i) => {
-    positioned.push({
-      ...pin,
-      position: { x: 0, y: Math.round((i + 1) * inputSpacing * 10) / 10 + 0.5 },
-    });
-  });
+  // Left face: x=0, y distributed across height
+  const leftY = distribute(groups.left.length, height);
+  for (let i = 0; i < groups.left.length; i++) {
+    positioned.push({ ...groups.left[i], position: { x: 0, y: leftY[i] } });
+  }
 
-  const outputSpacing = outputPins.length > 0 ? (height - 1) / (outputPins.length + 1) : 0;
-  outputPins.forEach((pin, i) => {
-    positioned.push({
-      ...pin,
-      position: { x: width, y: Math.round((i + 1) * outputSpacing * 10) / 10 + 0.5 },
-    });
-  });
+  // Right face: x=width, y distributed across height
+  const rightY = distribute(groups.right.length, height);
+  for (let i = 0; i < groups.right.length; i++) {
+    positioned.push({ ...groups.right[i], position: { x: width, y: rightY[i] } });
+  }
+
+  // Top face: y=-1 (stub extends above chip), x distributed across width
+  const topX = distribute(groups.top.length, width);
+  for (let i = 0; i < groups.top.length; i++) {
+    positioned.push({ ...groups.top[i], position: { x: topX[i], y: -1 } });
+  }
+
+  // Bottom face: y=height (stub extends below chip), x distributed across width
+  const bottomX = distribute(groups.bottom.length, width);
+  for (let i = 0; i < groups.bottom.length; i++) {
+    positioned.push({ ...groups.bottom[i], position: { x: bottomX[i], y: height } });
+  }
 
   return positioned;
 }

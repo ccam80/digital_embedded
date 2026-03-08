@@ -14,7 +14,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,13 +36,14 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildInPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
+  // Pin at (width, 0) — matching Digital's InputShape where pin is at component origin y=0.
+  // The body is drawn centered around y=0.
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -90,10 +90,9 @@ export class InElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const size = this._small ? 1 : COMP_HEIGHT;
-    const yOff = this._small ? 0.5 : 0;
     return {
       x: this.position.x,
-      y: this.position.y + yOff,
+      y: this.position.y - size / 2,
       width: COMP_WIDTH,
       height: size,
     };
@@ -101,8 +100,7 @@ export class InElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const size = this._small ? 1 : COMP_HEIGHT;
-    const yOff = this._small ? 0.5 : 0;
-    const centerY = yOff + size / 2;
+    const yOff = -size / 2;
 
     ctx.save();
 
@@ -116,7 +114,7 @@ export class InElement extends AbstractCircuitElement {
     const displayText = this._label.length > 0 ? this._label : "In";
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: size * 0.6 });
-    ctx.drawText(displayText, COMP_WIDTH / 2, centerY, {
+    ctx.drawText(displayText, COMP_WIDTH / 2, 0, {
       horizontal: "center",
       vertical: "middle",
     });

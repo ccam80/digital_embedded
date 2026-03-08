@@ -154,8 +154,80 @@
   "hotPaths": [
     {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 17,
-      "lastAccessed": 1772875058805,
+      "accessCount": 47,
+      "lastAccessed": 1772942505032,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\subcircuit\\subcircuit.ts",
+      "accessCount": 21,
+      "lastAccessed": 1772957839681,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-loader.ts",
+      "accessCount": 19,
+      "lastAccessed": 1772959667213,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\subcircuit-loader.ts",
+      "accessCount": 14,
+      "lastAccessed": 1772955131675,
+      "type": "file"
+    },
+    {
+      "path": "simulator.html",
+      "accessCount": 12,
+      "lastAccessed": 1772941842202,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 12,
+      "lastAccessed": 1772955338171,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\hit-test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1772943847786,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 11,
+      "lastAccessed": 1772956184836,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\element-renderer.ts",
+      "accessCount": 10,
+      "lastAccessed": 1772958083788,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 10,
+      "lastAccessed": 1772959271725,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-drawing.ts",
+      "accessCount": 9,
+      "lastAccessed": 1772958083537,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\memory\\ram.ts",
+      "accessCount": 8,
+      "lastAccessed": 1772881045411,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\insert-subcircuit.ts",
+      "accessCount": 8,
+      "lastAccessed": 1772881241650,
       "type": "file"
     },
     {
@@ -171,9 +243,15 @@
       "type": "file"
     },
     {
+      "path": "src\\io\\file-resolver.ts",
+      "accessCount": 7,
+      "lastAccessed": 1772942523021,
+      "type": "file"
+    },
+    {
       "path": "src\\editor\\wire-renderer.ts",
-      "accessCount": 4,
-      "lastAccessed": 1772874737933,
+      "accessCount": 7,
+      "lastAccessed": 1772959277568,
       "type": "file"
     },
     {
@@ -181,6 +259,24 @@
       "accessCount": 4,
       "lastAccessed": 1772874807432,
       "type": "file"
+    },
+    {
+      "path": "src\\components\\memory\\rom.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772881017646,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772941075329,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor",
+      "accessCount": 4,
+      "lastAccessed": 1772943572632,
+      "type": "directory"
     },
     {
       "path": "src\\engine\\digital-engine.ts",
@@ -192,36 +288,6 @@
       "path": "src\\integration\\editor-binding.ts",
       "accessCount": 3,
       "lastAccessed": 1772873742396,
-      "type": "directory"
-    },
-    {
-      "path": "src\\editor",
-      "accessCount": 3,
-      "lastAccessed": 1772873837306,
-      "type": "directory"
-    },
-    {
-      "path": "src\\editor\\wire-drawing.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772873968115,
-      "type": "file"
-    },
-    {
-      "path": "simulator.html",
-      "accessCount": 3,
-      "lastAccessed": 1772874105498,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 3,
-      "lastAccessed": 1772874276557,
-      "type": "directory"
-    },
-    {
-      "path": "src",
-      "accessCount": 3,
-      "lastAccessed": 1772874411411,
       "type": "directory"
     },
     {
@@ -237,16 +303,40 @@
       "type": "file"
     },
     {
+      "path": "",
+      "accessCount": 3,
+      "lastAccessed": 1772880447960,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\memory",
+      "accessCount": 3,
+      "lastAccessed": 1772881074515,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 3,
+      "lastAccessed": 1772943572589,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\element.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772943797171,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\property-panel.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772944340614,
+      "type": "file"
+    },
+    {
       "path": "src\\core\\renderer-interface.ts",
       "accessCount": 2,
       "lastAccessed": 1772874403715,
       "type": "file"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 2,
-      "lastAccessed": 1772874790655,
-      "type": "directory"
     },
     {
       "path": "src\\components\\gates\\nand.ts",
@@ -279,6 +369,30 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\gates",
+      "accessCount": 2,
+      "lastAccessed": 1772880583302,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\placement.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772880749784,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette-ui.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772941015995,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772941042323,
+      "type": "directory"
+    },
+    {
       "path": "src\\engine\\init-sequence.ts",
       "accessCount": 1,
       "lastAccessed": 1772873663703,
@@ -303,28 +417,40 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772873953359,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates",
-      "accessCount": 1,
-      "lastAccessed": 1772874244634,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 1,
-      "lastAccessed": 1772874760854,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\gates\\__tests__",
       "accessCount": 1,
       "lastAccessed": 1772874962153,
       "type": "directory"
+    },
+    {
+      "path": "src\\editor\\locked-mode.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772880416456,
+      "type": "file"
+    },
+    {
+      "path": "src\\main.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772880423359,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\property-inputs.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772880423884,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\coordinates.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772880447349,
+      "type": "file"
+    },
+    {
+      "path": "src\\testing\\batch-runner.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772880453479,
+      "type": "file"
     }
   ],
   "userDirectives": []

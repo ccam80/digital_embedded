@@ -31,6 +31,8 @@ import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.j
 import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
 import { deleteSelection } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
+import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
+import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
 import { deserializeCircuit } from '../io/load.js';
 import { serializeCircuit } from '../io/save.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
@@ -39,10 +41,70 @@ import { ClockManager } from '../engine/clock.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
 import { EngineState } from '../core/engine-interface.js';
 import { BitVector } from '../core/signal.js';
+import { PropertyBag } from '../core/properties.js';
+import { pinWorldPosition } from '../core/pin.js';
 import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
 import type { CompiledCircuitImpl } from '../engine/compiled-circuit.js';
+
+/** Component type names that are togglable during simulation — skip property popup on dblclick. */
+const TOGGLABLE_TYPES = new Set(["In", "Button", "Switch", "DipSwitch"]);
+
+/**
+ * After completing a wire to a pin or junction, check if the newly added
+ * segments contain a dead-end stub that overshot the target. A dead-end stub
+ * is a zero-length wire or a segment whose endpoint is not connected to any
+ * pin or any other wire endpoint in the circuit.
+ */
+function removeDeadEndStubs(newWires: Wire[], circuit: Circuit): void {
+  // Collect all wire endpoint positions (excluding the new wires themselves)
+  const endpointCounts = new Map<string, number>();
+  const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
+
+  for (const w of circuit.wires) {
+    const sk = key(w.start);
+    const ek = key(w.end);
+    endpointCounts.set(sk, (endpointCounts.get(sk) ?? 0) + 1);
+    endpointCounts.set(ek, (endpointCounts.get(ek) ?? 0) + 1);
+  }
+
+  // Remove zero-length wires
+  for (const w of newWires) {
+    if (w.start.x === w.end.x && w.start.y === w.end.y) {
+      circuit.removeWire(w);
+    }
+  }
+
+  // Check new wires for dead-end stubs: segments with an endpoint that has
+  // exactly 1 connection (only this wire) and doesn't touch any component pin.
+  for (const w of newWires) {
+    if (w.start.x === w.end.x && w.start.y === w.end.y) continue; // already removed
+
+    for (const pt of [w.start, w.end]) {
+      const k = key(pt);
+      const count = endpointCounts.get(k) ?? 0;
+      if (count <= 1) {
+        // Check if this endpoint touches a pin
+        let touchesPin = false;
+        for (const el of circuit.elements) {
+          for (const pin of el.getPins()) {
+            const wp = pinWorldPosition(el, pin);
+            if (wp.x === pt.x && wp.y === pt.y) {
+              touchesPin = true;
+              break;
+            }
+          }
+          if (touchesPin) break;
+        }
+        if (!touchesPin && newWires.length > 1) {
+          circuit.removeWire(w);
+          break;
+        }
+      }
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // initApp — entry point called from main.ts
@@ -394,7 +456,8 @@ export function initApp(search?: string): void {
       const pinHit = hitTestPins(worldPt, circuit.elements, HIT_THRESHOLD);
       if (pinHit) {
         try {
-          wireDrawing.completeToPin(pinHit.element, pinHit.pin, circuit);
+          const wires = wireDrawing.completeToPin(pinHit.element, pinHit.pin, circuit);
+          removeDeadEndStubs(wires, circuit);
           invalidateCompiled();
         } catch {
           wireDrawing.cancel();
@@ -405,12 +468,22 @@ export function initApp(search?: string): void {
         const tappedPoint = splitWiresAtPoint(snappedPt, circuit);
         if (tappedPoint !== undefined) {
           try {
-            wireDrawing.completeToPoint(tappedPoint, circuit);
+            const wires = wireDrawing.completeToPoint(tappedPoint, circuit);
+            removeDeadEndStubs(wires, circuit);
             invalidateCompiled();
           } catch {
             wireDrawing.cancel();
           }
         } else if (isWireEndpoint(snappedPt, circuit)) {
+          try {
+            const wires = wireDrawing.completeToPoint(snappedPt, circuit);
+            removeDeadEndStubs(wires, circuit);
+            invalidateCompiled();
+          } catch {
+            wireDrawing.cancel();
+          }
+        } else if (wireDrawing.isSameAsLastWaypoint(snappedPt)) {
+          // Clicking the same spot twice ends the wire at that point
           try {
             wireDrawing.completeToPoint(snappedPt, circuit);
             invalidateCompiled();
@@ -607,6 +680,9 @@ export function initApp(search?: string): void {
     const worldPt = canvasToWorld(e);
     const elementHit = hitTestElements(worldPt, circuit.elements);
     if (!elementHit) return;
+
+    // During simulation, don't open properties for togglable components
+    if (binding.isBound && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
 
     const def = registry.get(elementHit.typeId);
     if (!def || def.propertyDefs.length === 0) return;
@@ -844,11 +920,30 @@ export function initApp(search?: string): void {
     fileInput?.click();
   });
 
+  /** HTTP resolver for subcircuit .dig file resolution. */
+  const httpResolver = new HttpResolver(params.base || './');
+
+  /** Replace circuit contents from a loaded Circuit object. */
+  function applyLoadedCircuit(loaded: Circuit): void {
+    circuit.elements.length = 0;
+    circuit.wires.length = 0;
+    for (const el of loaded.elements) circuit.addElement(el);
+    for (const w of loaded.wires) circuit.addWire(w);
+    circuit.metadata = loaded.metadata;
+    selection.clear();
+    viewport.fitToContent(circuit.elements, {
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+    });
+    invalidateCompiled();
+    updateCircuitName();
+  }
+
   fileInput?.addEventListener('change', () => {
     const file = fileInput?.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const text = reader.result as string;
         let loaded: Circuit;
@@ -856,26 +951,22 @@ export function initApp(search?: string): void {
         if (firstChar === '{' || firstChar === '[') {
           loaded = deserializeCircuit(text, registry);
         } else {
-          loaded = loadDig(text, registry);
+          // Use async subcircuit-aware loader to handle embedded subcircuit references
+          try {
+            loaded = await loadWithSubcircuits(text, httpResolver, registry);
+          } catch {
+            // Fall back to simple loader if async loading fails
+            loaded = loadDig(text, registry);
+          }
         }
-        circuit.elements.length = 0;
-        circuit.wires.length = 0;
-        for (const el of loaded.elements) circuit.addElement(el);
-        for (const w of loaded.wires) circuit.addWire(w);
-        circuit.metadata = loaded.metadata;
-        selection.clear();
-        viewport.fitToContent(circuit.elements, {
-          width: canvas.clientWidth,
-          height: canvas.clientHeight,
-        });
-        invalidateCompiled();
-        updateCircuitName();
+        applyLoadedCircuit(loaded);
         if (isIframe) {
           window.parent.postMessage({ type: 'digital-loaded' }, '*');
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('Failed to load circuit:', msg);
+        showStatus(`Load error: ${msg}`, true);
         if (isIframe) {
           window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
         }
@@ -883,6 +974,117 @@ export function initApp(search?: string): void {
     };
     reader.readAsText(file);
   });
+
+  // -------------------------------------------------------------------------
+  // Open Folder — read all .dig files from a directory for subcircuit resolution
+  // -------------------------------------------------------------------------
+
+  const folderInput = document.getElementById('folder-input') as HTMLInputElement | null;
+
+  document.getElementById('btn-open-folder')?.addEventListener('click', () => {
+    folderInput?.click();
+  });
+
+  folderInput?.addEventListener('change', async () => {
+    const files = folderInput?.files;
+    if (!files || files.length === 0) return;
+
+    // Collect all .dig files from the selected directory
+    const digFiles = new Map<string, File>();
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f.name.endsWith('.dig')) {
+        // Use filename without extension as the circuit name
+        const name = f.name.replace(/\.dig$/, '');
+        digFiles.set(name, f);
+      }
+    }
+
+    if (digFiles.size === 0) {
+      showStatus('No .dig files found in selected folder', true);
+      return;
+    }
+
+    // If only one .dig file, open it directly
+    if (digFiles.size === 1) {
+      const [name, file] = [...digFiles.entries()][0];
+      await openDigFromFolder(name, file, digFiles);
+      return;
+    }
+
+    // Multiple .dig files — show a picker dialog
+    const overlay = document.createElement('div');
+    overlay.className = 'test-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'test-dialog';
+
+    const header = document.createElement('div');
+    header.className = 'test-dialog-header';
+    header.innerHTML = '<span>Select Main Circuit</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'prop-popup-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    header.appendChild(closeBtn);
+    dialog.appendChild(header);
+
+    const list = document.createElement('div');
+    list.style.cssText = 'max-height:300px;overflow-y:auto;padding:8px;';
+    for (const [name, file] of digFiles) {
+      const btn = document.createElement('div');
+      btn.className = 'menu-action';
+      btn.textContent = name + '.dig';
+      btn.style.cssText = 'padding:6px 12px;cursor:pointer;';
+      btn.addEventListener('click', async () => {
+        overlay.remove();
+        await openDigFromFolder(name, file, digFiles);
+      });
+      list.appendChild(btn);
+    }
+    dialog.appendChild(list);
+    overlay.appendChild(dialog);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+  });
+
+  /** Open a .dig file with all sibling .dig files available as subcircuit resolvers. */
+  async function openDigFromFolder(
+    mainName: string,
+    mainFile: File,
+    allDigFiles: Map<string, File>,
+  ): Promise<void> {
+    try {
+      const mainXml = await mainFile.text();
+
+      // Build an EmbeddedResolver from all sibling .dig files (excluding the main one).
+      // Register under both "Name" and "Name.dig" since .dig XML may use either form.
+      const siblingMap = new Map<string, string>();
+      for (const [name, file] of allDigFiles) {
+        if (name !== mainName) {
+          const content = await file.text();
+          siblingMap.set(name, content);
+          siblingMap.set(name + '.dig', content);
+        }
+      }
+      const folderResolver = new ChainResolver([
+        new EmbeddedResolver(siblingMap),
+        httpResolver,
+      ]);
+
+      const loaded = await loadWithSubcircuits(mainXml, folderResolver, registry);
+      applyLoadedCircuit(loaded);
+      circuit.metadata.name = mainName;
+      updateCircuitName();
+      showStatus(`Loaded ${mainName}.dig (${siblingMap.size} subcircuit file${siblingMap.size !== 1 ? 's' : ''} available)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Failed to load circuit from folder:', msg);
+      showStatus(`Load error: ${msg}`, true);
+    }
+  }
 
   document.getElementById('btn-save')?.addEventListener('click', () => {
     try {
@@ -961,6 +1163,183 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
+  // JS test script evaluator
+  // -------------------------------------------------------------------------
+
+  /**
+   * Detect whether test data is a JavaScript test script (vs plain format).
+   * Heuristic: contains `signals(` call.
+   */
+  function isJsTestScript(text: string): boolean {
+    return /\bsignals\s*\(/.test(text);
+  }
+
+  /**
+   * Evaluate a JavaScript test script and return the equivalent plain-format
+   * test data string. The script runs in a sandboxed Function() with helpers:
+   *   signals('A', 'B', 'Y')  — declare pin names (must be called once)
+   *   row(0, 1, 1)            — add a test vector row
+   *   X                       — don't-care value
+   *   C                       — clock pulse value
+   *   Z                       — high-impedance value
+   */
+  function evalJsTestScript(script: string): string {
+    let pinNames: string[] | null = null;
+    const rows: string[][] = [];
+
+    const sandbox = {
+      X: 'X',
+      C: 'C',
+      Z: 'Z',
+      signals: (...names: string[]) => {
+        if (pinNames !== null) throw new Error('signals() can only be called once');
+        if (names.length === 0) throw new Error('signals() requires at least one pin name');
+        pinNames = names;
+      },
+      row: (...values: (number | string)[]) => {
+        if (pinNames === null) throw new Error('Call signals() before row()');
+        if (values.length !== pinNames.length) {
+          throw new Error(
+            `row() expects ${pinNames.length} values (${pinNames.join(', ')}), got ${values.length}`,
+          );
+        }
+        rows.push(values.map(v => String(v)));
+      },
+    };
+
+    // Build and execute the sandboxed function
+    const argNames = Object.keys(sandbox);
+    const argValues = Object.values(sandbox);
+    const fn = new Function(...argNames, script);
+    fn(...argValues);
+
+    if (pinNames === null) throw new Error('Test script must call signals()');
+    if (rows.length === 0) throw new Error('Test script must add at least one row()');
+
+    // Build plain-format output
+    const names: string[] = pinNames;
+    const lines = [names.join(' ')];
+    for (const r of rows) {
+      lines.push(r.join(' '));
+    }
+    return lines.join('\n');
+  }
+
+  // -------------------------------------------------------------------------
+  // Test editor dialog
+  // -------------------------------------------------------------------------
+
+  document.getElementById('btn-tests')?.addEventListener('click', () => {
+    // Find existing Testcase component or create the dialog with empty content
+    let existingTestData = '';
+    for (const el of circuit.elements) {
+      if (el.typeId === 'Testcase') {
+        const props = el.getProperties();
+        if (props.has('testData')) {
+          existingTestData = String(props.get('testData'));
+        }
+        break;
+      }
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'test-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'test-dialog';
+
+    const header = document.createElement('div');
+    header.className = 'test-dialog-header';
+    header.innerHTML = '<span>Test Vectors</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'prop-popup-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    header.appendChild(closeBtn);
+    dialog.appendChild(header);
+
+    const help = document.createElement('div');
+    help.className = 'test-help';
+    help.innerHTML =
+      '<b>Plain format:</b> signal names on first line, then one row per test vector. Use 0/1, X (don\'t-care), C (clock).<br>' +
+      '<b>JavaScript:</b> use <code>signals(\'A\',\'B\',\'Y\')</code> then <code>row(0,0,1)</code>. ' +
+      'Use loops, variables, functions — full JS. Constants: <code>X</code> (don\'t-care), <code>C</code> (clock), <code>Z</code> (high-Z).';
+    dialog.appendChild(help);
+
+    const textarea = document.createElement('textarea');
+    textarea.value = existingTestData;
+    textarea.placeholder =
+      '// Plain format:\nA B Y\n0 0 0\n0 1 1\n\n// Or JavaScript:\nsignals(\'A\', \'B\', \'Y\');\nfor (let i = 0; i < 4; i++) {\n  row(i >> 1, i & 1, (i >> 1) ^ (i & 1));\n}';
+    dialog.appendChild(textarea);
+
+    const footer = document.createElement('div');
+    footer.className = 'test-dialog-footer';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => overlay.remove());
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'primary';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', () => {
+      const rawText = textarea.value;
+
+      // If the test data is a JS script, evaluate it to produce plain format
+      let testData: string;
+      if (isJsTestScript(rawText)) {
+        try {
+          testData = evalJsTestScript(rawText);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          showStatus(`Test script error: ${msg}`, true);
+          return; // Don't close dialog — let user fix the script
+        }
+      } else {
+        testData = rawText;
+      }
+
+      // Store the raw source (JS or plain) so the user sees their script when reopening
+      // Also store the evaluated plain-format data for the test executor
+      const storeValue = rawText;
+
+      // Find or create Testcase element
+      let testEl = circuit.elements.find(el => el.typeId === 'Testcase');
+      if (testEl) {
+        testEl.getProperties().set('testData', storeValue);
+        testEl.getProperties().set('testDataCompiled', testData);
+      } else {
+        const testDef = registry.get('Testcase');
+        if (testDef) {
+          const props = new PropertyBag();
+          props.set('testData', storeValue);
+          props.set('testDataCompiled', testData);
+          const el = testDef.factory(props);
+          el.position = { x: 0, y: -3 };
+          circuit.addElement(el);
+        }
+      }
+      invalidateCompiled();
+      overlay.remove();
+      if (isJsTestScript(rawText)) {
+        showStatus(`Test script evaluated: ${testData.split('\n').length - 1} test vectors generated`);
+      }
+    });
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(saveBtn);
+    dialog.appendChild(footer);
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+    textarea.focus();
+  });
+
+  // -------------------------------------------------------------------------
   // Keyboard: Ctrl+S save, Ctrl+O open
   // -------------------------------------------------------------------------
 
@@ -979,22 +1358,17 @@ export function initApp(search?: string): void {
   // postMessage listener
   // -------------------------------------------------------------------------
 
-  function loadCircuitFromXml(xml: string): void {
-    const loaded = loadDig(xml, registry);
-    circuit.elements.length = 0;
-    circuit.wires.length = 0;
-    for (const el of loaded.elements) circuit.addElement(el);
-    for (const w of loaded.wires) circuit.addWire(w);
-    circuit.metadata = loaded.metadata;
-    selection.clear();
-    viewport.fitToContent(circuit.elements, {
-      width: canvas.clientWidth,
-      height: canvas.clientHeight,
-    });
-    invalidateCompiled();
+  async function loadCircuitFromXml(xml: string): Promise<void> {
+    let loaded: Circuit;
+    try {
+      loaded = await loadWithSubcircuits(xml, httpResolver, registry);
+    } catch {
+      loaded = loadDig(xml, registry);
+    }
+    applyLoadedCircuit(loaded);
   }
 
-  function handleMessage(data: Record<string, unknown>): void {
+  async function handleMessage(data: Record<string, unknown>): Promise<void> {
     switch (data['type']) {
       case 'digital-load-url': {
         const url = String(data['url'] ?? '');
@@ -1002,19 +1376,16 @@ export function initApp(search?: string): void {
           window.parent.postMessage({ type: 'digital-error', error: 'No URL provided' }, '*');
           return;
         }
-        fetch(url)
-          .then((res) => {
-            if (!res.ok) throw new Error(`Failed to fetch: ${url}`);
-            return res.text();
-          })
-          .then((xml) => {
-            loadCircuitFromXml(xml);
-            window.parent.postMessage({ type: 'digital-loaded' }, '*');
-          })
-          .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
-          });
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Failed to fetch: ${url}`);
+          const xml = await res.text();
+          await loadCircuitFromXml(xml);
+          window.parent.postMessage({ type: 'digital-loaded' }, '*');
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
+        }
         break;
       }
 
@@ -1026,7 +1397,7 @@ export function initApp(search?: string): void {
         }
         try {
           const xml = atob(encoded);
-          loadCircuitFromXml(xml);
+          await loadCircuitFromXml(xml);
           window.parent.postMessage({ type: 'digital-loaded' }, '*');
         } catch {
           window.parent.postMessage({ type: 'digital-error', error: 'Invalid base64 data' }, '*');
@@ -1055,12 +1426,10 @@ export function initApp(search?: string): void {
   window.addEventListener('message', (event: MessageEvent) => {
     const data = event.data as Record<string, unknown>;
     if (typeof data !== 'object' || data === null) return;
-    try {
-      handleMessage(data);
-    } catch (err) {
+    handleMessage(data).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       window.parent.postMessage({ type: 'digital-error', error: message }, '*');
-    }
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1076,8 +1445,8 @@ export function initApp(search?: string): void {
         if (!res.ok) throw new Error(`Failed to fetch: ${fileUrl}`);
         return res.text();
       })
-      .then((xml) => {
-        loadCircuitFromXml(xml);
+      .then(async (xml) => {
+        await loadCircuitFromXml(xml);
         window.parent.postMessage({ type: 'digital-loaded' }, '*');
       })
       .catch((err: unknown) => {

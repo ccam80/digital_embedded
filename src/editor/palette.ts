@@ -42,13 +42,13 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
 
 /** All ComponentCategory values in display order. Used instead of Object.values() which doesn't work with const enums. */
 const ALL_CATEGORIES: readonly ComponentCategory[] = [
-  ComponentCategory.LOGIC,
-  ComponentCategory.IO,
-  ComponentCategory.FLIP_FLOPS,
-  ComponentCategory.MEMORY,
-  ComponentCategory.ARITHMETIC,
   ComponentCategory.WIRING,
+  ComponentCategory.IO,
+  ComponentCategory.LOGIC,
+  ComponentCategory.FLIP_FLOPS,
+  ComponentCategory.ARITHMETIC,
   ComponentCategory.SWITCHING,
+  ComponentCategory.MEMORY,
   ComponentCategory.PLD,
   ComponentCategory.MISC,
   ComponentCategory.GRAPHICS,

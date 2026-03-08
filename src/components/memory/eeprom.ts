@@ -119,11 +119,24 @@ const IS_PROGRAM_MEMORY_DEF: PropertyDefinition = {
   description: "Mark as program memory for CPU instruction fetch integration",
 };
 
+const DATA_DEF: PropertyDefinition = {
+  key: "data",
+  type: PropertyType.HEX_DATA,
+  label: "Data",
+  defaultValue: [],
+  description: "Initial memory contents as hex values (one word per entry)",
+};
+
 const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "dataBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "AddrBits", propertyKey: "addrBits", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
   { xmlName: "isProgramMemory", propertyKey: "isProgramMemory", convert: (v) => v === "true" },
+  { xmlName: "Data", propertyKey: "data", convert: (v) => {
+    try { const p = JSON.parse(v); if (Array.isArray(p)) return p.map(Number); } catch { /* ignore */ }
+    if (v.trim() === '') return [];
+    return v.trim().split(/[\s,]+/).map((s: string) => parseInt(s, 16));
+  }},
 ];
 
 // ---------------------------------------------------------------------------
@@ -314,6 +327,7 @@ const EEPROM_PROPERTY_DEFS: PropertyDefinition[] = [
   DATA_BITS_DEF,
   LABEL_DEF,
   IS_PROGRAM_MEMORY_DEF,
+  DATA_DEF,
 ];
 
 function eepromFactory(props: PropertyBag): EEPROMElement {
@@ -506,6 +520,7 @@ const EEPROM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
   DATA_BITS_DEF,
   LABEL_DEF,
   IS_PROGRAM_MEMORY_DEF,
+  DATA_DEF,
 ];
 
 function eepromDualPortFactory(props: PropertyBag): EEPROMDualPortElement {

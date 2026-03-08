@@ -10,6 +10,8 @@ import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
+import { pinWorldPosition } from "@/core/pin";
+import { worldBoundingBox } from "./hit-test.js";
 
 /** Radius of the filled circle drawn at each pin position (grid units). */
 const PIN_CIRCLE_RADIUS = 0.15;
@@ -25,7 +27,7 @@ const CLOCK_TRIANGLE_HALF = 0.2;
  * Both are in world (grid) coordinates.
  */
 function isVisible(element: CircuitElement, viewport: Rect): boolean {
-  const bb = element.getBoundingBox();
+  const bb = worldBoundingBox(element);
   return (
     bb.x < viewport.x + viewport.width &&
     bb.x + bb.width > viewport.x &&
@@ -92,10 +94,8 @@ export class ElementRenderer {
   renderPins(ctx: RenderContext, element: CircuitElement): void {
     ctx.setColor("PIN");
     for (const pin of element.getPins()) {
-      // Pin positions are resolved at origin (0,0); offset by element world position
-      const wx = element.position.x + pin.position.x;
-      const wy = element.position.y + pin.position.y;
-      ctx.drawCircle(wx, wy, PIN_CIRCLE_RADIUS, true);
+      const wp = pinWorldPosition(element, pin);
+      ctx.drawCircle(wp.x, wp.y, PIN_CIRCLE_RADIUS, true);
 
       if (pin.isNegated) {
         this._renderNegationBubble(ctx, pin, element);
@@ -109,15 +109,13 @@ export class ElementRenderer {
 
   /** Draw an unfilled negation bubble at the pin position. */
   private _renderNegationBubble(ctx: RenderContext, pin: Pin, element: CircuitElement): void {
-    const wx = element.position.x + pin.position.x;
-    const wy = element.position.y + pin.position.y;
-    ctx.drawCircle(wx, wy, NEGATION_BUBBLE_RADIUS, false);
+    const wp = pinWorldPosition(element, pin);
+    ctx.drawCircle(wp.x, wp.y, NEGATION_BUBBLE_RADIUS, false);
   }
 
   /** Draw a small filled triangle indicating a clock pin. */
   private _renderClockTriangle(ctx: RenderContext, pin: Pin, element: CircuitElement): void {
-    const x = element.position.x + pin.position.x;
-    const y = element.position.y + pin.position.y;
+    const { x, y } = pinWorldPosition(element, pin);
     ctx.drawPolygon(
       [
         { x: x - CLOCK_TRIANGLE_HALF, y: y - CLOCK_TRIANGLE_HALF },
@@ -128,9 +126,9 @@ export class ElementRenderer {
     );
   }
 
-  /** Draw a selection highlight outline around the element's bounding box. */
+  /** Draw a selection highlight outline around the element's world bounding box. */
   private _renderSelectionHighlight(ctx: RenderContext, element: CircuitElement): void {
-    const bb = element.getBoundingBox();
+    const bb = worldBoundingBox(element);
     ctx.setColor("SELECTION");
     ctx.setLineWidth(1);
     ctx.drawRect(bb.x, bb.y, bb.width, bb.height, false);

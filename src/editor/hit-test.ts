@@ -7,7 +7,9 @@
 
 import type { Point, Rect } from "@/core/renderer-interface";
 import type { CircuitElement } from "@/core/element";
+import type { Rotation } from "@/core/pin";
 import type { Pin } from "@/core/pin";
+import { pinWorldPosition } from "@/core/pin";
 import type { Wire } from "@/core/circuit";
 import type { Circuit } from "@/core/circuit";
 
@@ -35,7 +37,7 @@ export function hitTestElements(
 ): CircuitElement | undefined {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
-    const bb = el.getBoundingBox();
+    const bb = worldBoundingBox(el);
     if (pointInRect(point, bb)) {
       return el;
     }
@@ -75,9 +77,9 @@ export function hitTestPins(
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     for (const pin of el.getPins()) {
-      // Pin positions are resolved at origin (0,0); offset by element world position
-      const dx = point.x - (el.position.x + pin.position.x);
-      const dy = point.y - (el.position.y + pin.position.y);
+      const wp = pinWorldPosition(el, pin);
+      const dx = point.x - wp.x;
+      const dy = point.y - wp.y;
       if (Math.sqrt(dx * dx + dy * dy) <= threshold) {
         return { element: el, pin };
       }
@@ -119,7 +121,7 @@ export function elementsInRect(
   rect: Rect,
   elements: readonly CircuitElement[],
 ): CircuitElement[] {
-  return elements.filter((el) => rectsIntersect(el.getBoundingBox(), rect));
+  return elements.filter((el) => rectsIntersect(worldBoundingBox(el), rect));
 }
 
 /**
@@ -160,6 +162,39 @@ export function distancePointToSegment(p: Point, a: Point, b: Point): number {
   const fx = p.x - closestX;
   const fy = p.y - closestY;
   return Math.sqrt(fx * fx + fy * fy);
+}
+
+// ---------------------------------------------------------------------------
+// Rotation-aware bounding box
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the axis-aligned bounding box of an element in world coordinates,
+ * accounting for rotation. The renderer does translate(pos) then rotate(rot),
+ * so the local rect (0,0,w,h) corners are rotated around the element origin.
+ *
+ * Rotation values: 0 = 0°, 1 = 90° CW, 2 = 180°, 3 = 270° CW.
+ */
+export function worldBoundingBox(el: CircuitElement): Rect {
+  const bb = el.getBoundingBox();
+  const w = bb.width;
+  const h = bb.height;
+  const px = el.position.x;
+  const py = el.position.y;
+  const rot = el.rotation as Rotation;
+
+  switch (rot) {
+    case 0: // No rotation
+      return { x: px, y: py, width: w, height: h };
+    case 1: // 90° CW: (x,y) -> (y, -x)
+      return { x: px, y: py - w, width: h, height: w };
+    case 2: // 180°: (x,y) -> (-x, -y)
+      return { x: px - w, y: py - h, width: w, height: h };
+    case 3: // 270° CW: (x,y) -> (-y, x)
+      return { x: px - h, y: py, width: h, height: w };
+    default:
+      return { x: px, y: py, width: w, height: h };
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -174,7 +174,7 @@ describe("DigLoader", () => {
     expect(wire4.end).toEqual({ x: 21, y: 11 });
   });
 
-  it("unknownElementThrows", () => {
+  it("unknownElementSkipped", () => {
     const parsed: DigCircuit = {
       version: 2,
       attributes: [],
@@ -190,8 +190,9 @@ describe("DigLoader", () => {
 
     const registry = new ComponentRegistry();
 
-    expect(() => loadDigCircuit(parsed, registry)).toThrow(DigParserError);
-    expect(() => loadDigCircuit(parsed, registry)).toThrow("FutureComponent");
+    // Unknown elements are skipped gracefully (not thrown)
+    const circuit = loadDigCircuit(parsed, registry);
+    expect(circuit.elements).toHaveLength(0);
   });
 
   it("inverterConfigApplied", () => {
@@ -465,7 +466,7 @@ describe("DigLoader", () => {
     expect(el.rotation).toBe(2);
   });
 
-  it("unknownElementThrows", () => {
+  it("unknownElementSkipped", () => {
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <circuit>
   <version>2</version>
@@ -481,7 +482,9 @@ describe("DigLoader", () => {
 </circuit>`;
 
     const registry = new ComponentRegistry();
-    expect(() => loadDig(xml, registry)).toThrow("Bogus");
+    // Unknown elements are skipped gracefully (not thrown)
+    const circuit = loadDig(xml, registry);
+    expect(circuit.elements).toHaveLength(0);
   });
 
   it("missingAttributeUsesDefault", () => {

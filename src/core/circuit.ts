@@ -22,10 +22,16 @@ import type { CircuitElement } from "./element.js";
  * holds the Wire → netId mapping for the renderer.
  */
 export class Wire {
+  /** Bit width of this wire (1 = single-bit, >1 = bus). Set by net resolution. */
+  bitWidth: number;
+
   constructor(
     public start: Point,
     public end: Point,
-  ) {}
+    bitWidth: number = 1,
+  ) {
+    this.bitWidth = bitWidth;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +82,12 @@ export interface CircuitMetadata {
   isGeneric: boolean;
   /** When true, users may not add, move, delete, or edit elements or wires. */
   isLocked: boolean;
+  /** Subcircuit chip width in grid units (from Digital's Keys.WIDTH, default 3). */
+  chipWidth: number;
+  /** Subcircuit chip height in grid units (from Digital's Keys.HEIGHT, default 3). Used by LAYOUT shape. */
+  chipHeight: number;
+  /** Subcircuit shape type: DEFAULT, DIL, CUSTOM, LAYOUT. */
+  shapeType: string;
 }
 
 export function defaultCircuitMetadata(): CircuitMetadata {
@@ -86,6 +98,9 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     measurementOrdering: [],
     isGeneric: false,
     isLocked: false,
+    chipWidth: 3,
+    chipHeight: 3,
+    shapeType: "DEFAULT",
   };
 }
 

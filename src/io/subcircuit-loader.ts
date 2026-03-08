@@ -16,17 +16,13 @@
 
 import { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import { ComponentCategory } from "../core/registry.js";
-import type { ComponentDefinition } from "../core/registry.js";
-import { PropertyBag } from "../core/properties.js";
-import type { RenderContext } from "../core/renderer-interface.js";
-import type { Rect } from "../core/renderer-interface.js";
-import type { Pin } from "../core/pin.js";
-import { AbstractCircuitElement } from "../core/element.js";
 import { parseDigXml } from "./dig-parser.js";
 import { loadDigCircuit } from "./dig-loader.js";
 import type { FileResolver } from "./file-resolver.js";
-import { CacheResolver } from "./file-resolver.js";
+import { CacheResolver, ResolverNotFoundError } from "./file-resolver.js";
+import { deriveInterfacePins } from "../components/subcircuit/pin-derivation.js";
+import { registerSubcircuit } from "../components/subcircuit/subcircuit.js";
+import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -34,41 +30,6 @@ import { CacheResolver } from "./file-resolver.js";
 
 /** Maximum subcircuit nesting depth (matching Digital's limit). */
 const MAX_DEPTH = 30;
-
-// ---------------------------------------------------------------------------
-// SubcircuitHolderElement
-// ---------------------------------------------------------------------------
-
-/**
- * A minimal CircuitElement that holds a loaded subcircuit definition.
- *
- * Stores the subcircuit definition (the loaded Circuit) as a property so
- * the flattener and renderer can retrieve it.
- */
-export class SubcircuitHolderElement extends AbstractCircuitElement {
-  readonly subcircuitDefinition: Circuit;
-
-  constructor(typeId: string, definition: Circuit, props: PropertyBag) {
-    super(typeId, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    this.subcircuitDefinition = definition;
-  }
-
-  getPins(): readonly Pin[] {
-    return [];
-  }
-
-  draw(_ctx: RenderContext): void {
-    // Rendering is handled by the full SubcircuitElement (task 6.2.1)
-  }
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-
-  getHelpText(): string {
-    return `Subcircuit: ${this.typeId}`;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // SubcircuitCache
@@ -161,9 +122,19 @@ async function loadRecursive(
     }
   }
 
-  // Resolve and register all unknown subcircuits
+  // Resolve and register all unknown subcircuits.
+  // If a name can't be resolved (e.g. Digital built-in like GenericInitCode),
+  // skip it — loadDigCircuit will also skip unregistered elements gracefully.
   for (const name of unknownNames) {
-    await resolveAndRegister(name, resolver, registry, xmlCache, loadingStack, depth);
+    try {
+      await resolveAndRegister(name, resolver, registry, xmlCache, loadingStack, depth);
+    } catch (e) {
+      if (e instanceof ResolverNotFoundError) {
+        console.warn(`Skipping unresolvable element "${name}" (not a subcircuit file)`);
+        continue;
+      }
+      throw e;
+    }
   }
 
   // Now all elements should be registered — load the circuit normally
@@ -234,9 +205,9 @@ async function resolveAndRegister(
 /**
  * Register a loaded subcircuit as a ComponentDefinition in the registry.
  *
- * The factory creates a SubcircuitHolderElement with a reference to the
- * loaded circuit definition. The executeFn is a no-op because subcircuits
- * are flattened before simulation (task 6.2.3).
+ * Derives interface pins from the circuit's In/Out elements and registers
+ * using the proper SubcircuitElement factory so subcircuits render with
+ * their chip shape and pins.
  */
 function registerSubcircuitDefinition(
   name: string,
@@ -248,20 +219,14 @@ function registerSubcircuitDefinition(
     return;
   }
 
-  const def: ComponentDefinition = {
+  const pinLayout = deriveInterfacePins(definition);
+  const shapeType = definition.metadata.shapeType || "DEFAULT";
+  const subDef: SubcircuitDefinition = {
+    circuit: definition,
+    pinLayout,
+    shapeMode: shapeType as SubcircuitDefinition["shapeMode"],
     name,
-    typeId: -1,
-    factory: (props: PropertyBag) =>
-      new SubcircuitHolderElement(name, definition, props),
-    executeFn: () => {
-      // Subcircuits are flattened before simulation — no-op execute
-    },
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: ComponentCategory.MISC,
-    helpText: `Subcircuit: ${name}`,
   };
 
-  registry.register(def);
+  registerSubcircuit(registry, name, subDef);
 }

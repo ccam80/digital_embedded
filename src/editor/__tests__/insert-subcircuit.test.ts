@@ -11,7 +11,6 @@ import type { RenderContext, Rect } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyValue } from "@/core/properties";
 import type { SerializedElement } from "@/core/element";
-import { FacadeError } from "@/headless/types";
 import {
   analyzeBoundary,
   extractSubcircuit,
@@ -189,19 +188,16 @@ describe("InsertSubcircuit", () => {
     expect(extracted.elements).toContain(elementB);
   });
 
-  it("insertThrowsUntilPhase6", () => {
+  it("insertReturnsSubcircuitAndCommand", () => {
     const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
     const elementA = makeTestElement("el-A", [pinA]);
 
     const circuit = new Circuit();
     circuit.addElement(elementA);
 
-    expect(() => {
-      insertAsSubcircuit(circuit, [elementA], []);
-    }).toThrow(FacadeError);
-
-    expect(() => {
-      insertAsSubcircuit(circuit, [elementA], []);
-    }).toThrow("Subcircuit component type not yet available");
+    const result = insertAsSubcircuit(circuit, [elementA], []);
+    expect(result.subcircuit).toBeDefined();
+    expect(result.command).toBeDefined();
+    expect(result.command.description).toBe("Insert selection as subcircuit");
   });
 });

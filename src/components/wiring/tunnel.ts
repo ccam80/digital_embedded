@@ -4,6 +4,10 @@
  * Two Tunnels with the same label in the same circuit are electrically connected.
  * The net resolver (Phase 3) merges same-name Tunnel nets — no simulation behavior needed.
  * The executeFn is a no-op.
+ *
+ * Matches Digital's TunnelShape: a small triangle pointing right from the pin
+ * at the component origin (0,0), with the label drawn to the right.
+ * Total height is ~1 grid unit (0.4 above + 0.4 below center).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -14,7 +18,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -26,24 +29,32 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Layout constants
+// Layout constants — matching Digital's TunnelShape
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 2;
+/** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px ≈ 0.4 grid). */
+const ARROW_HALF_H = 0.4;
+
+/** Triangle width in grid units (Digital: HEIGHT * sqrt(3) ≈ 0.7 grid). */
+const ARROW_W = 0.7;
+
+/** Component logical width for bounding box (arrow + label space). */
+const COMP_WIDTH = 2;
+
+/** Component logical height (1 grid unit — fits Digital subcircuit pin spacing). */
+const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
-// Pin layout — single bidirectional pin on west face
+// Pin layout — single pin at component origin (0,0)
 // ---------------------------------------------------------------------------
 
 function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const positions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: bitWidth,
-      position: positions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -55,7 +66,6 @@ function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class TunnelElement extends AbstractCircuitElement {
-  private readonly _label: string;
   private readonly _bitWidth: number;
   private readonly _pins: readonly Pin[];
 
@@ -68,7 +78,6 @@ export class TunnelElement extends AbstractCircuitElement {
   ) {
     super("Tunnel", instanceId, position, rotation, mirror, props);
 
-    this._label = props.getOrDefault<string>("NetName", "");
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
 
     const decls = buildTunnelPinDeclarations(this._bitWidth);
@@ -84,7 +93,7 @@ export class TunnelElement extends AbstractCircuitElement {
 
   /** The tunnel net name used by the net resolver to merge same-label tunnels. */
   get netName(): string {
-    return this._label;
+    return this._properties.getOrDefault<string>("NetName", "");
   }
 
   getPins(): readonly Pin[] {
@@ -94,29 +103,24 @@ export class TunnelElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("NetName", "");
 
     ctx.save();
 
-    // Pentagon / flag shape pointing right
-    const tipX = COMP_WIDTH;
-    const midY = COMP_HEIGHT / 2;
-    const arrowDepth = 0.5;
-
+    // Triangle pointing right from origin, matching Digital's TunnelShape
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
         { x: 0, y: 0 },
-        { x: COMP_WIDTH - arrowDepth, y: 0 },
-        { x: tipX, y: midY },
-        { x: COMP_WIDTH - arrowDepth, y: COMP_HEIGHT },
-        { x: 0, y: COMP_HEIGHT },
+        { x: ARROW_W, y: ARROW_HALF_H },
+        { x: ARROW_W, y: -ARROW_HALF_H },
       ],
       true,
     );
@@ -125,21 +129,31 @@ export class TunnelElement extends AbstractCircuitElement {
     ctx.drawPolygon(
       [
         { x: 0, y: 0 },
-        { x: COMP_WIDTH - arrowDepth, y: 0 },
-        { x: tipX, y: midY },
-        { x: COMP_WIDTH - arrowDepth, y: COMP_HEIGHT },
-        { x: 0, y: COMP_HEIGHT },
+        { x: ARROW_W, y: ARROW_HALF_H },
+        { x: ARROW_W, y: -ARROW_HALF_H },
       ],
       false,
     );
 
-    if (this._label.length > 0) {
+    // Label to the right of the triangle, counter-rotated at 180° to stay upright
+    if (label.length > 0) {
       ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(this._label, (COMP_WIDTH - arrowDepth) / 2, midY, {
-        horizontal: "center",
-        vertical: "middle",
-      });
+      ctx.setFont({ family: "sans-serif", size: 0.6 });
+      if (this.rotation === 2) {
+        ctx.save();
+        ctx.translate(ARROW_W + 0.15, 0);
+        ctx.rotate(Math.PI);
+        ctx.drawText(label, 0, 0, {
+          horizontal: "right",
+          vertical: "middle",
+        });
+        ctx.restore();
+      } else {
+        ctx.drawText(label, ARROW_W + 0.15, 0, {
+          horizontal: "left",
+          vertical: "middle",
+        });
+      }
     }
 
     ctx.restore();

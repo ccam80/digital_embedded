@@ -7,15 +7,15 @@ import {
   loadWithSubcircuits,
   clearSubcircuitCache,
   subcircuitCacheSize,
-  SubcircuitHolderElement,
 } from "../subcircuit-loader.js";
+import { SubcircuitElement } from "../../components/subcircuit/subcircuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+
 import { EmbeddedResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
 
@@ -113,14 +113,14 @@ describe("subcircuit-loader", () => {
     expect(subADef).toBeDefined();
     expect(subADef!.name).toBe("SubA");
 
-    // The SubA element in the circuit should be a SubcircuitHolderElement
+    // The SubA element in the circuit should be a SubcircuitElement
     const subAEl = circuit.elements.find((el) => el.typeId === "SubA");
-    expect(subAEl).toBeInstanceOf(SubcircuitHolderElement);
+    expect(subAEl).toBeInstanceOf(SubcircuitElement);
 
-    // The holder has the loaded subcircuit definition
-    const holder = subAEl as SubcircuitHolderElement;
-    expect(holder.subcircuitDefinition).toBeDefined();
-    expect(holder.subcircuitDefinition.elements).toHaveLength(3); // In, And, Out
+    // The element has the loaded subcircuit definition
+    const subEl = subAEl as SubcircuitElement;
+    expect(subEl.definition).toBeDefined();
+    expect(subEl.definition.circuit.elements).toHaveLength(3); // In, And, Out
   });
 
   // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ describe("subcircuit-loader", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // SubcircuitHolderElement executeFn is no-op
+  // SubcircuitElement executeFn is no-op
   // ---------------------------------------------------------------------------
 
   it("subcircuitExecuteFnNoOp — registered subcircuit execute function does not throw", async () => {
@@ -317,46 +317,12 @@ describe("subcircuit-loader", () => {
     const mockState = new Uint32Array(10);
     const mockLayout = {
       wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 0,
+      inputCount: () => 0,
       inputOffset: () => 0,
       outputCount: () => 0,
       outputOffset: () => 0,
       stateOffset: () => 0,
     };
     expect(() => subADef!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// SubcircuitHolderElement direct tests
-// ---------------------------------------------------------------------------
-
-import { Circuit } from "../../core/circuit.js";
-
-describe("SubcircuitHolderElement", () => {
-  it("stores subcircuit definition", () => {
-    const def = new Circuit();
-    const element = new SubcircuitHolderElement("TestSub", def, new PropertyBag());
-
-    expect(element.subcircuitDefinition).toBe(def);
-    expect(element.typeId).toBe("TestSub");
-    expect(element.getPins()).toHaveLength(0);
-    expect(element.getHelpText()).toContain("TestSub");
-  });
-
-  it("getBoundingBox returns position-based rect", () => {
-    const def = new Circuit();
-    const element = new SubcircuitHolderElement("Sub", def, new PropertyBag());
-    element.position = { x: 10, y: 20 };
-
-    const bb = element.getBoundingBox();
-    expect(bb.x).toBe(10);
-    expect(bb.y).toBe(20);
-  });
-
-  it("draw is a no-op (does not throw)", () => {
-    const def = new Circuit();
-    const element = new SubcircuitHolderElement("Sub", def, new PropertyBag());
-    expect(() => element.draw({} as RenderContext)).not.toThrow();
   });
 });

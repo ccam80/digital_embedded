@@ -13,7 +13,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -35,7 +34,6 @@ export type IntFormat = "bin" | "dec" | "hex" | "oct";
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Value formatting
@@ -65,13 +63,14 @@ export function formatValue(value: number, bitWidth: number, format: IntFormat):
 // ---------------------------------------------------------------------------
 
 function buildOutPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
+  // Pin at (0, 0) — matching Digital's OutputShape where pin is at component origin y=0.
+  // The body is drawn centered around y=0.
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: bitWidth,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -119,7 +118,7 @@ export class OutElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y + 0.5,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: 1,
     };
@@ -131,8 +130,7 @@ export class OutElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const size = 1;
-    const yOff = 0.5;
-    const centerY = yOff + size / 2;
+    const yOff = -size / 2;
 
     ctx.save();
 
@@ -146,7 +144,7 @@ export class OutElement extends AbstractCircuitElement {
     const displayText = this._label.length > 0 ? this._label : "Out";
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: size * 0.6 });
-    ctx.drawText(displayText, COMP_WIDTH / 2, centerY, {
+    ctx.drawText(displayText, COMP_WIDTH / 2, 0, {
       horizontal: "center",
       vertical: "middle",
     });
