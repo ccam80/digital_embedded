@@ -34,11 +34,16 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 6;
+// Java GenericShape: 5 inputs, 2 outputs, symmetric=false, width=3
+// symmetric=false: offs=0, no even correction; outputs start at y=0
+// inputs: Set@y=0, J@y=1, C@y=2, K@y=3, Clr@y=4; outputs: Q@y=0, ~Q@y=1
+// max(5,2)=5, yBottom=(5-1)+0.5=4.5, height=4.5+0.5=5
+const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — symmetric=false, 5 inputs, 2 outputs
+// inputs: Set@y=0, J@y=1, C@y=2, K@y=3, Clr@y=4
+// outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
 
 const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -46,7 +51,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Set",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -54,7 +59,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "J",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -62,7 +67,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 2 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -70,7 +75,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "K",
     defaultBitWidth: 1,
-    position: { x: 0, y: 4 },
+    position: { x: 0, y: 3 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -78,7 +83,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Clr",
     defaultBitWidth: 1,
-    position: { x: 0, y: 5 },
+    position: { x: 0, y: 4 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -86,7 +91,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -94,7 +99,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 5 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -130,42 +135,48 @@ export class JKAsyncElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Java GenericShape: 5 inputs odd → body height=5, topBorder=0.5
+    const TOP = 0.5;
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - TOP,
       width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      height: 5,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const TOP = 0.5;
+    const BODY_H = 5;
+
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("Set", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("J", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Clr", 0.5, 5, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.5, 5, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("Set", 0.5, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("J", 0.5, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("C", 0.5, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("K", 0.5, 3, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Clr", 0.5, 4, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Q", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("~Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
 
+    // Clock triangle on C pin (y=2)
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 2.5, 0.5, 3);
-    ctx.drawLine(0.5, 3, 0, 3.5);
+    ctx.drawLine(0, 1.5, 0.5, 2);
+    ctx.drawLine(0.5, 2, 0, 2.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

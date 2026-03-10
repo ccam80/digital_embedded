@@ -3,6 +3,8 @@
  *
  * When sel=0 (enable active-low): output = input.
  * When sel=1: output = high-Z (all bits set in the highZ output slot).
+ *
+ * Dimensions match Java DriverShape (origin-centred, invertedInput=true).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -24,23 +26,23 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Layout constants
+// Layout constants — same as Driver (origin-centred)
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+const COMP_WIDTH = 2;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
-function buildDriverInvPinDeclarations(bitWidth: number): PinDeclaration[] {
+function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: bitWidth,
-      position: { x: 0, y: 1 },
+      position: { x: -1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -48,7 +50,7 @@ function buildDriverInvPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "sel",
       defaultBitWidth: 1,
-      position: { x: 1, y: COMP_HEIGHT },
+      position: { x: 0, y: flipSelPos ? 1 : -1 },
       isNegatable: true,
       isClockCapable: false,
     },
@@ -56,7 +58,7 @@ function buildDriverInvPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: { x: COMP_WIDTH, y: 1 },
+      position: { x: 1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -69,6 +71,7 @@ function buildDriverInvPinDeclarations(bitWidth: number): PinDeclaration[] {
 
 export class DriverInvSelElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
+  private readonly _flipSelPos: boolean;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -81,8 +84,9 @@ export class DriverInvSelElement extends AbstractCircuitElement {
     super("DriverInvSel", instanceId, position, rotation, mirror, props);
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
+    this._flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
 
-    const decls = buildDriverInvPinDeclarations(this._bitWidth);
+    const decls = buildDriverInvPinDeclarations(this._bitWidth, this._flipSelPos);
     this._pins = resolvePins(
       decls,
       position,
@@ -99,23 +103,27 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
+      x: this.position.x - 1,
+      y: this.position.y - 1,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
     ctx.save();
+
+    // Triangle body — same as Driver
+    const triLeft = -0.95;
+    const triRight = 0.95;
+    const triHalf = 0.6;
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
-        { x: 0, y: COMP_HEIGHT },
+        { x: triLeft, y: -triHalf },
+        { x: triRight, y: 0 },
+        { x: triLeft, y: triHalf },
       ],
       true,
     );
@@ -123,15 +131,23 @@ export class DriverInvSelElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(
       [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
-        { x: 0, y: COMP_HEIGHT },
+        { x: triLeft, y: -triHalf },
+        { x: triRight, y: 0 },
+        { x: triLeft, y: triHalf },
       ],
       false,
     );
 
-    // Inversion bubble on sel pin
-    ctx.drawCircle(1, COMP_HEIGHT + 0.3, 0.3, false);
+    // Sel pin stem with inversion bubble
+    const selY = this._flipSelPos ? 1 : -1;
+    // Java: drawCircle from (-SIZE2+4, ±SIZE) to (SIZE2-4, ±8)
+    // Grid: circle centre at (0, ±0.7), radius ≈ 0.3
+    const bubbleCy = selY > 0 ? 0.7 : -0.7;
+    ctx.drawCircle(0, bubbleCy, 0.3, false);
+    // Stem from bubble edge to sel pin
+    const stemStart = selY > 0 ? 1.0 : -1.0;
+    const stemEnd = selY > 0 ? 0.35 : -0.35;
+    ctx.drawLine(0, stemStart, 0, stemEnd);
 
     ctx.restore();
   }
@@ -181,6 +197,11 @@ export const DRIVER_INV_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "bitWidth",
     convert: (v) => parseInt(v, 10),
   },
+  {
+    xmlName: "flipSelPos",
+    propertyKey: "flipSelPos",
+    convert: (v) => v === "true",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -196,6 +217,13 @@ const DRIVER_INV_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the data signal",
+  },
+  {
+    key: "flipSelPos",
+    type: PropertyType.BOOLEAN,
+    label: "Flip Sel Position",
+    defaultValue: false,
+    description: "When true, the select pin is below the triangle instead of above",
   },
 ];
 

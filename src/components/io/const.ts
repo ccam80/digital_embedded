@@ -35,12 +35,13 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildConstPinDeclarations(bitWidth: number): PinDeclaration[] {
+  // Java ConstShape: pin at (0, 0), body extends to -x.
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -93,7 +94,7 @@ export class ConstElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x - COMP_WIDTH,
       y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
@@ -106,14 +107,14 @@ export class ConstElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText(this._value.toString(10), COMP_WIDTH / 2, 0, {
+    ctx.drawText(this._value.toString(10), -COMP_WIDTH / 2, 0, {
       horizontal: "center",
       vertical: "middle",
     });

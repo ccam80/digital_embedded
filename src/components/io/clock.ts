@@ -35,12 +35,13 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 function buildClockPinDeclarations(): PinDeclaration[] {
+  // Java ClockShape: pin at (0, 0), body extends to -x.
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: true,
     },
@@ -95,7 +96,7 @@ export class ClockElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x - COMP_WIDTH,
       y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
@@ -108,15 +109,15 @@ export class ClockElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Draw clock waveform symbol
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    const mx = COMP_WIDTH / 2;
+    const mx = -COMP_WIDTH / 2;
     const my = 0;
     const halfW = 0.6;
     const halfH = 0.4;
@@ -128,7 +129,7 @@ export class ClockElement extends AbstractCircuitElement {
     if (this._label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.3, {
+      ctx.drawText(this._label, -COMP_WIDTH / 2, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

@@ -39,11 +39,13 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 8;
+const COMP_WIDTH = 3;
+// Pins shifted -1: en@0,C@1,dir@2,in@3,ld@4,clr@6; out@0,ovf@6
+// bodyHeight = maxPinY + 1 = 6 + 1 = 7
+const COMP_HEIGHT = 7;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -51,7 +53,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "en",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -59,7 +61,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -67,7 +69,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "dir",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 2 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -75,7 +77,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "in",
     defaultBitWidth: 1,
-    position: { x: 0, y: 4 },
+    position: { x: 0, y: 3 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -83,7 +85,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "ld",
     defaultBitWidth: 1,
-    position: { x: 0, y: 5 },
+    position: { x: 0, y: 4 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -91,7 +93,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "clr",
     defaultBitWidth: 1,
-    position: { x: 0, y: 7 },
+    position: { x: 0, y: 6 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -99,7 +101,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -107,7 +109,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "ovf",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 7 },
+    position: { x: COMP_WIDTH, y: 6 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -147,7 +149,7 @@ export class CounterPresetElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -157,28 +159,28 @@ export class CounterPresetElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("en", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("dir", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("in", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ld", 0.5, 5, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("clr", 0.5, 7, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("out", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("ovf", COMP_WIDTH - 0.5, 7, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("en", 0.5, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("C", 0.5, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("dir", 0.5, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("in", 0.5, 3, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ld", 0.5, 4, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("clr", 0.5, 6, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("out", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("ovf", COMP_WIDTH - 0.5, 6, { horizontal: "right", vertical: "middle" });
 
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("CTR", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("CTR", COMP_WIDTH / 2, 3, { horizontal: "center", vertical: "middle" });
 
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 1.5, 0.5, 2);
-    ctx.drawLine(0.5, 2, 0, 2.5);
+    ctx.drawLine(0, 0.5, 0.5, 1);
+    ctx.drawLine(0.5, 1, 0, 1.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

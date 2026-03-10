@@ -37,9 +37,18 @@ export function buildMenuForElement(
     copy?: () => void;
     properties?: () => void;
     help?: () => void;
+    openSubcircuit?: () => void;
   } = {},
 ): MenuAction[] {
-  return [
+  const actions: MenuAction[] = [];
+  if (callbacks.openSubcircuit) {
+    actions.push({
+      label: "Open Subcircuit",
+      action: callbacks.openSubcircuit,
+      enabled: true,
+    });
+  }
+  actions.push(
     {
       label: "Rotate",
       shortcut: "R",
@@ -74,7 +83,8 @@ export function buildMenuForElement(
       action: callbacks.help ?? (() => {}),
       enabled: true,
     },
-  ];
+  );
+  return actions;
 }
 
 /**

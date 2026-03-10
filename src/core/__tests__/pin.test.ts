@@ -136,16 +136,16 @@ describe("rotatePoint", () => {
     expect(rotatePoint({ x: 3, y: 4 }, 0)).toEqual({ x: 3, y: 4 });
   });
 
-  it("rotation 1 (90° CW with y-down): (x,y) → (-y, x)", () => {
-    expect(rotatePoint({ x: 3, y: 4 }, 1)).toEqual({ x: -4, y: 3 });
+  it("rotation 1 (90° CW): (x,y) → (y, -x)", () => {
+    expect(rotatePoint({ x: 3, y: 4 }, 1)).toEqual({ x: 4, y: -3 });
   });
 
   it("rotation 2 (180°): (x,y) → (-x, -y)", () => {
     expect(rotatePoint({ x: 3, y: 4 }, 2)).toEqual({ x: -3, y: -4 });
   });
 
-  it("rotation 3 (270° CW): (x,y) → (y, -x)", () => {
-    expect(rotatePoint({ x: 3, y: 4 }, 3)).toEqual({ x: 4, y: -3 });
+  it("rotation 3 (270° CW): (x,y) → (-y, x)", () => {
+    expect(rotatePoint({ x: 3, y: 4 }, 3)).toEqual({ x: -4, y: 3 });
   });
 
   it("four rotations return to origin", () => {
@@ -341,15 +341,14 @@ describe("layoutPinsOnFace", () => {
   });
 
   it("AND gate 2-input standard layout: inputs straddle centre, output centred", () => {
-    // COMP_WIDTH=4, h=4 (2 inputs × 2 = 4)
-    // Inputs west: margin=1, step=2 → y=1,3
-    // Output east: centred → y=2
+    // Java-compatible: 2 inputs (even, symmetric) → y=0, y=2 (gap at midpoint)
+    // Output centred at y = floor(2/2) = 1
     const decls = standardGatePinLayout(["in0", "in1"], "out", 4, 4);
     const inputs = decls.filter((d) => d.direction === PinDirection.INPUT);
     const output = decls.find((d) => d.direction === PinDirection.OUTPUT)!;
-    expect(inputs[0].position.y).toBe(1);
-    expect(inputs[1].position.y).toBe(3);
-    expect(output.position.y).toBe(2);
+    expect(inputs[0].position.y).toBe(0);
+    expect(inputs[1].position.y).toBe(2);
+    expect(output.position.y).toBe(1);
     // x-coordinates
     expect(inputs[0].position.x).toBe(0);
     expect(output.position.x).toBe(4);
@@ -429,7 +428,7 @@ describe("Pin system integration", () => {
 
     expect(pinA.direction).toBe(PinDirection.INPUT);
     expect(pinA.isNegated).toBe(true);
-    expect(pinA.position.x).toBe(0); // west face x=0 (origin ignored)
+    expect(pinA.position.x).toBe(-1); // inverted input shifted 1 grid unit left (Java dx=-SIZE)
 
     expect(pinB.direction).toBe(PinDirection.INPUT);
     expect(pinB.isNegated).toBe(false);

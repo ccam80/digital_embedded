@@ -66,6 +66,7 @@ export class SubcircuitElement extends AbstractCircuitElement {
   private readonly _pins: readonly Pin[];
   private readonly _width: number;
   private readonly _height: number;
+  private readonly _effectiveShapeMode: ShapeMode;
 
   constructor(
     typeId: string,
@@ -79,10 +80,20 @@ export class SubcircuitElement extends AbstractCircuitElement {
     super(typeId, instanceId, position, rotation, mirror, props);
     this._definition = definition;
 
+    // Determine effective shape mode: instance override > definition default
+    const instanceShapeType = props.getOrDefault<string>("shapeType", "");
+    if (instanceShapeType && instanceShapeType !== "" && instanceShapeType !== "DEFAULT") {
+      this._effectiveShapeMode = instanceShapeType as ShapeMode;
+    } else {
+      // DEFAULT means "use circuit's own shape type"; if that's also DEFAULT, fall back to SIMPLE
+      const defMode = definition.shapeMode;
+      this._effectiveShapeMode = (defMode === "DEFAULT") ? "SIMPLE" : defMode;
+    }
+
     const chipWidth = definition.circuit.metadata.chipWidth ?? 3;
     const chipHeight = definition.circuit.metadata.chipHeight ?? 3;
 
-    if (definition.shapeMode === "LAYOUT") {
+    if (this._effectiveShapeMode === "LAYOUT") {
       // LAYOUT: faces from In/Out rotation, dimensions are max(pins+1, explicit attribute)
       const faceCounts = countPinsByFace(definition.pinLayout);
       this._width = Math.max(faceCounts.top + 1, faceCounts.bottom + 1, chipWidth);
@@ -99,7 +110,7 @@ export class SubcircuitElement extends AbstractCircuitElement {
       definition.pinLayout,
       this._width,
       this._height,
-      definition.shapeMode,
+      this._effectiveShapeMode,
     );
 
     this._pins = resolvePins(
@@ -116,7 +127,7 @@ export class SubcircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    if (this._definition.shapeMode === "LAYOUT") {
+    if (this._effectiveShapeMode === "LAYOUT") {
       // LAYOUT chip rect: origin at (0,0), full width × height
       return {
         x: this.position.x,
@@ -142,10 +153,10 @@ export class SubcircuitElement extends AbstractCircuitElement {
       this._definition.pinLayout,
       this._width,
       this._height,
-      this._definition.shapeMode,
+      this._effectiveShapeMode,
     );
 
-    switch (this._definition.shapeMode) {
+    switch (this._effectiveShapeMode) {
       case "DIL":
         drawDILShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
         break;
@@ -357,12 +368,24 @@ export function registerSubcircuit(
       defaultValue: "",
       description: "Optional label override for this instance",
     },
+    {
+      key: "shapeType",
+      type: PropertyType.STRING,
+      label: "Shape Type",
+      defaultValue: "",
+      description: "Shape mode override: DEFAULT, SIMPLE, DIL, LAYOUT, CUSTOM",
+    },
   ];
 
   const attributeMap: AttributeMapping[] = [
     {
       xmlName: "Label",
       propertyKey: "label",
+      convert: (v) => v,
+    },
+    {
+      xmlName: "shapeType",
+      propertyKey: "shapeType",
       convert: (v) => v,
     },
   ];

@@ -39,7 +39,7 @@ function buildGroundPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -79,7 +79,7 @@ export class GroundElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x - COMP_WIDTH,
       y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
@@ -87,7 +87,7 @@ export class GroundElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
+    const cx = -COMP_WIDTH / 2;
 
     ctx.save();
 

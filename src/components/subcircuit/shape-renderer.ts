@@ -79,75 +79,7 @@ function drawUprightText(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Bus width indicator
-// ---------------------------------------------------------------------------
-
-/**
- * Draw a small "/" slash with the bit width number near a pin position,
- * indicating a multi-bit bus. Only drawn when defaultBitWidth > 1.
- *
- * The indicator is drawn on the external (wire) side of the pin, not inside
- * the chip body. For left/right face pins, offset along x; for top/bottom
- * face pins, offset along y.
- */
-function drawBusIndicator(
-  ctx: RenderContext,
-  pin: PinDeclaration,
-): void {
-  if (pin.defaultBitWidth <= 1) return;
-
-  const face = pin.face ?? (pin.direction === PinDirection.INPUT ? "left" : "right");
-
-  let ix: number;
-  let iy: number;
-  let slashDx: number;
-  let slashDy: number;
-
-  switch (face) {
-    case "left":
-      // External side is to the left of the pin
-      ix = pin.position.x - 0.4;
-      iy = pin.position.y;
-      slashDx = 0.15;
-      slashDy = 0.2;
-      break;
-    case "right":
-      // External side is to the right of the pin
-      ix = pin.position.x + 0.4;
-      iy = pin.position.y;
-      slashDx = 0.15;
-      slashDy = 0.2;
-      break;
-    case "top":
-      // External side is above the pin
-      ix = pin.position.x;
-      iy = pin.position.y - 0.4;
-      slashDx = 0.2;
-      slashDy = 0.15;
-      break;
-    case "bottom":
-      // External side is below the pin
-      ix = pin.position.x;
-      iy = pin.position.y + 0.4;
-      slashDx = 0.2;
-      slashDy = 0.15;
-      break;
-  }
-
-  // Slash mark
-  ctx.setColor("COMPONENT");
-  ctx.setLineWidth(1);
-  ctx.drawLine(ix - slashDx, iy + slashDy, ix + slashDx, iy - slashDy);
-
-  // Bit width number
-  ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 0.4 });
-  ctx.drawText(String(pin.defaultBitWidth), ix + slashDx, iy - slashDy - 0.1, {
-    horizontal: "left",
-    vertical: "bottom",
-  });
-}
+// Bus width indicators are now drawn on wire segments by WireRenderer.renderBusWidthMarkers().
 
 // ---------------------------------------------------------------------------
 // Pin rendering helper
@@ -185,7 +117,6 @@ function drawPins(
         }, rotation);
       }
     }
-    drawBusIndicator(ctx, pin);
   }
 }
 
@@ -348,9 +279,10 @@ function drawLayoutPins(
         ctx.drawLine(pin.position.x, pin.position.y + 1, pin.position.x, pin.position.y);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y + 1);
+        ctx.translate(pin.position.x, pin.position.y + 1 + 0.2);  // 0.2 inside chip
         ctx.rotate(verticalAngle);
-        ctx.drawText(pin.label, 0.1, 0, { horizontal: "left", vertical: "middle" });
+        // "right" alignment: after -π/2 rotation, local -x = world +y = downward into chip
+        ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
         ctx.restore();
         break;
 
@@ -359,9 +291,9 @@ function drawLayoutPins(
         ctx.drawLine(pin.position.x, pin.position.y - 1, pin.position.x, pin.position.y);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y - 1);
+        ctx.translate(pin.position.x, pin.position.y - 1 - 0.2);  // 0.2 inside chip
         ctx.rotate(verticalAngle);
-        ctx.drawText(pin.label, -0.1, 0, { horizontal: "right", vertical: "middle" });
+        ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
         ctx.restore();
         break;
 
@@ -384,6 +316,5 @@ function drawLayoutPins(
         break;
     }
 
-    drawBusIndicator(ctx, pin);
   }
 }

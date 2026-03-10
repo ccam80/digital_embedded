@@ -118,9 +118,9 @@ export type Rotation = 0 | 1 | 2 | 3;
 export function rotatePoint(p: Point, rotation: Rotation): Point {
   switch (rotation) {
     case 0: return { x: p.x, y: p.y };
-    case 1: return { x: (-p.y) || 0, y: p.x || 0 };
+    case 1: return { x: p.y || 0, y: (-p.x) || 0 };
     case 2: return { x: (-p.x) || 0, y: (-p.y) || 0 };
-    case 3: return { x: p.y || 0, y: (-p.x) || 0 };
+    case 3: return { x: (-p.y) || 0, y: p.x || 0 };
   }
 }
 
@@ -173,7 +173,16 @@ export function resolvePins(
   bitWidth?: number,
 ): Pin[] {
   return declarations.map((decl) => {
-    const rotated = rotatePoint(decl.position, rotation);
+    // Java GenericShape: inverted input pins shift 1 grid unit left (dx = -SIZE)
+    let pos = decl.position;
+    if (
+      decl.direction === PinDirection.INPUT &&
+      decl.isNegatable &&
+      isPinInverted(inverterConfig, decl.label)
+    ) {
+      pos = { x: pos.x - 1, y: pos.y };
+    }
+    const rotated = rotatePoint(pos, rotation);
     return makePin(decl, rotated, inverterConfig, clockConfig, bitWidth);
   });
 }
@@ -265,40 +274,70 @@ export function layoutPinsOnFace(
  * Build PinDeclarations for a set of inputs on the west face and a single
  * output on the east face — the most common gate layout.
  *
+ * Pin positions match Java Digital's GenericShape.createPins():
+ *   - Input pins at x=0, spaced 1 grid unit apart starting at y=0
+ *   - For even input counts (symmetric): gap of 1 grid unit at the midpoint
+ *   - Output pin centred vertically: y = floor(inputCount / 2)
+ *
  * @param inputLabels   Labels for input pins (west face), top to bottom.
  * @param outputLabel   Label for the output pin (east face).
  * @param componentW    Component width in grid units.
- * @param componentH    Component height in grid units.
+ * @param _componentH   Unused (kept for API compat); height derives from input count.
  * @param defaultBitWidth  Default bit width for all pins.
  */
 export function standardGatePinLayout(
   inputLabels: readonly string[],
   outputLabel: string,
   componentW: number,
-  componentH: number,
+  _componentH: number = 0,
   defaultBitWidth: number = 1,
-  _outputBubbleOffset: number = 0,
+  outputBubbleOffset: number = 0,
 ): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", inputLabels.length, componentW, componentH);
-  const outputPositions = layoutPinsOnFace("east", 1, componentW, componentH);
+  const n = inputLabels.length;
+  const symmetric = true; // single output → symmetric
+  const even = n > 0 && (n & 1) === 0;
 
-  const inputs: PinDeclaration[] = inputLabels.map((label, i) => ({
-    direction: PinDirection.INPUT,
-    label,
-    defaultBitWidth,
-    position: inputPositions[i],
-    isNegatable: true,
-    isClockCapable: false,
-  }));
+  const inputs: PinDeclaration[] = inputLabels.map((label, i) => {
+    // Java: correct = SIZE when symmetric && even && i >= n/2
+    const correct = (symmetric && even && i >= n / 2) ? 1 : 0;
+    return {
+      direction: PinDirection.INPUT,
+      label,
+      defaultBitWidth,
+      position: { x: 0, y: i + correct },
+      isNegatable: true,
+      isClockCapable: false,
+    };
+  });
 
+  // Java: output y = floor(n / 2) * SIZE → grid: floor(n / 2)
+  // Java: non-inverted dx=0, inverted dx=SIZE (1 grid unit past body)
+  const outputY = Math.floor(n / 2);
   const output: PinDeclaration = {
     direction: PinDirection.OUTPUT,
     label: outputLabel,
     defaultBitWidth,
-    position: outputPositions[0],
+    position: { x: componentW + outputBubbleOffset, y: outputY },
     isNegatable: false,
     isClockCapable: false,
   };
 
   return [...inputs, output];
+}
+
+/**
+ * Compute the visual body height for a standard gate matching Java's GenericShape.
+ *
+ * Java body extends from y = -TOP_BORDER to y = maxPinY + TOP_BORDER
+ * (plus extra SIZE for even input counts in symmetric mode).
+ *
+ * @returns Object with topBorder (offset above y=0) and bodyHeight (total).
+ */
+export function gateBodyMetrics(inputCount: number): { topBorder: number; bodyHeight: number } {
+  const TOP_BORDER = 0.5; // Java SIZE2 / SIZE = 10/20
+  const max = inputCount;
+  // Java: yBottom = (max - 1) * SIZE + topBottomBorder; if even: yBottom += SIZE
+  const even = inputCount > 0 && (inputCount & 1) === 0;
+  const yBottom = (max - 1) + TOP_BORDER + (even ? 1 : 0);
+  return { topBorder: TOP_BORDER, bodyHeight: yBottom + TOP_BORDER };
 }

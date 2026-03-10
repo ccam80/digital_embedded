@@ -17,6 +17,7 @@ import {
   createInverterConfig,
   resolvePins,
 } from "../../core/pin.js";
+import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -132,10 +133,10 @@ export class ProbeElement extends AbstractCircuitElement {
     if (this._label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.3, {
+      drawUprightText(ctx, this._label, COMP_WIDTH / 2, -0.3, {
         horizontal: "center",
         vertical: "bottom",
-      });
+      }, this.rotation);
     }
 
     ctx.restore();

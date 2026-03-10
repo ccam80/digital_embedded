@@ -23,6 +23,7 @@ import {
   createClockConfig,
   resolvePins,
 } from "../../core/pin.js";
+import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -36,11 +37,14 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+// Java GenericShape: 2 inputs, 2 outputs, symmetric=false (multiple outputs), width=3
+// symmetric=false: offs=0, no even-input gap correction
+// inputs: D@y=0, C@y=1; outputs: Q@y=0, ~Q@y=1
+// max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
+const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — matches Java GenericShape.createPins() exactly
 // ---------------------------------------------------------------------------
 
 const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -48,7 +52,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "D",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -56,7 +60,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 1 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -64,7 +68,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -72,7 +76,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 3 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -110,39 +114,45 @@ export class DElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Java GenericShape: symmetric=false, max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
+    const TOP = 0.5;
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - TOP,
       width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      height: 2,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const TOP = 0.5;
+    const BODY_H = 2;
+
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("D", 0.6, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.6, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.6, 3, { horizontal: "right", vertical: "middle" });
+    drawUprightText(ctx, "D", 0.6, 0, { horizontal: "left", vertical: "middle" }, this.rotation);
+    drawUprightText(ctx, "C", 0.6, 1, { horizontal: "left", vertical: "middle" }, this.rotation);
+    drawUprightText(ctx, "Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" }, this.rotation);
+    drawUprightText(ctx, "~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" }, this.rotation);
 
+    // Clock triangle on C pin (y=1)
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 2.5, 0.5, 3);
-    ctx.drawLine(0.5, 3, 0, 3.5);
+    ctx.drawLine(0, 0.5, 0.5, 1);
+    ctx.drawLine(0.5, 1, 0, 1.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+      drawUprightText(ctx, label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" }, this.rotation);
     }
 
     ctx.restore();

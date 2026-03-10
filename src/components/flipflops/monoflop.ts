@@ -42,11 +42,16 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+const COMP_WIDTH = 3;
+// 2 inputs, 2 outputs, symmetric=false: offs=0, no even correction
+// inputs: C@y=0, R@y=1; outputs: Q@y=0, ~Q@y=1
+// max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — GenericShape positions (symmetric=false, 2 inputs, 2 outputs)
+// inputs: C@y=0, R@y=1
+// outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
 
 const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -54,7 +59,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -62,7 +67,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "R",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -70,7 +75,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -78,7 +83,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 3 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -116,7 +121,7 @@ export class MonoflopElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -126,24 +131,24 @@ export class MonoflopElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("C", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("R", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.5, 3, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("C", 0.5, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("R", 0.5, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Q", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("~Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("mono", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("mono", COMP_WIDTH / 2, 0.5, { horizontal: "center", vertical: "middle" });
 
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 0.5, 0.5, 1);
-    ctx.drawLine(0.5, 1, 0, 1.5);
+    ctx.drawLine(0, -0.5, 0.5, 0);
+    ctx.drawLine(0.5, 0, 0, 0.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

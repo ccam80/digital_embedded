@@ -1,13 +1,12 @@
 /**
  * Splitter component — splits a multi-bit bus into sub-buses or merges sub-buses into a bus.
  *
- * The splitting pattern is a string like "4,4" or "1,1,1,1,4" describing how the wide bus
- * is divided into narrow ports. The splitter can operate in split mode (wide → narrow) or
- * merge mode (narrow → wide), detected by which side has connections.
+ * Faithful port of hneemann/Digital Splitter.java + SplitterShape.java.
  *
- * For simulation, the executeFn always copies bits between the wide port and the narrow ports
- * based on the splitting pattern. The direction of data flow (split vs merge) is determined
- * by the input/output pin assignments from the compiler.
+ * - Input Splitting  → pins on the LEFT  side (x = 0)
+ * - Output Splitting → pins on the RIGHT side (x = 1 grid unit)
+ * - Width = 1 grid unit; height = (max(in, out) - 1) * spreading grid units
+ * - Spine is a filled rectangle at x = 0.5, drawn from top to bottom
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -29,39 +28,104 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Splitting pattern utilities
+// Port type
 // ---------------------------------------------------------------------------
 
-/**
- * Parse a splitting pattern string into an array of bit widths.
- * "4,4" → [4, 4]
- * "1,1,1,1,4" → [1, 1, 1, 1, 4]
- * Empty string or "8" → [8] (single port)
- */
-export function parseSplittingPattern(pattern: string): number[] {
-  if (pattern.length === 0) return [1];
-  return pattern.split(",").map((s) => parseInt(s.trim(), 10));
+export interface SplitterPort {
+  pos: number;   // starting bit position
+  bits: number;  // width in bits
+  name: string;  // display name (Java naming convention)
 }
 
-/**
- * Compute the total bit width from a splitting pattern.
- */
+// ---------------------------------------------------------------------------
+// Port name — mirrors Java Port constructor logic
+// ---------------------------------------------------------------------------
+
+function portName(pos: number, bits: number): string {
+  if (bits === 1) return `${pos}`;
+  if (bits === 2) return `${pos},${pos + 1}`;
+  return `${pos}-${pos + bits - 1}`;
+}
+
+// ---------------------------------------------------------------------------
+// parsePorts — mirrors Java Ports(String definition) constructor
+//
+// Supports three token forms (comma-separated):
+//   "4"    → port at running bit position, 4 bits wide
+//   "4*2"  → two ports each 4 bits wide (repeat shorthand)
+//   "4-7"  → port from bit 4 to bit 7 (4 bits, explicit range)
+// ---------------------------------------------------------------------------
+
+export function parsePorts(definition: string): SplitterPort[] {
+  const ports: SplitterPort[] = [];
+  let runningPos = 0;
+
+  const tokens = definition.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+
+  for (const token of tokens) {
+    const starIdx = token.indexOf("*");
+    if (starIdx >= 0) {
+      // "bits*count" — repeat shorthand
+      const bits = parseInt(token.substring(0, starIdx).trim(), 10);
+      const count = parseInt(token.substring(starIdx + 1).trim(), 10);
+      for (let i = 0; i < count; i++) {
+        ports.push({ pos: runningPos, bits, name: portName(runningPos, bits) });
+        runningPos += bits;
+      }
+    } else {
+      const dashIdx = token.indexOf("-");
+      if (dashIdx >= 0) {
+        // "from-to" — explicit range (from and to are bit indices, inclusive)
+        let from = parseInt(token.substring(0, dashIdx).trim(), 10);
+        let to = parseInt(token.substring(dashIdx + 1).trim(), 10);
+        if (to < from) { const z = to; to = from; from = z; }
+        const bits = to - from + 1;
+        ports.push({ pos: from, bits, name: portName(from, bits) });
+        // runningPos not used for range tokens (pos is explicit)
+        runningPos = from + bits;
+      } else {
+        // plain number — bits wide at running position
+        const bits = parseInt(token, 10);
+        ports.push({ pos: runningPos, bits, name: portName(runningPos, bits) });
+        runningPos += bits;
+      }
+    }
+  }
+
+  // Java: if empty after parsing, add a single 1-bit port
+  if (ports.length === 0) {
+    ports.push({ pos: 0, bits: 1, name: "0" });
+  }
+
+  return ports;
+}
+
+// ---------------------------------------------------------------------------
+// Splitting pattern utilities (kept for backward compatibility)
+// ---------------------------------------------------------------------------
+
+/** Parse a splitting pattern into an array of bit widths (legacy helper). */
+export function parseSplittingPattern(pattern: string): number[] {
+  return parsePorts(pattern).map((p) => p.bits);
+}
+
+/** Total bits from an array of widths. */
 export function totalBitsFromPattern(parts: number[]): number {
   return parts.reduce((sum, n) => sum + n, 0);
 }
 
-/**
- * Extract bits [startBit, startBit + width) from a 32-bit value.
- */
+// ---------------------------------------------------------------------------
+// Bit manipulation helpers
+// ---------------------------------------------------------------------------
+
+/** Extract bits [startBit, startBit + width) from a 32-bit value. */
 export function extractBits(value: number, startBit: number, width: number): number {
   if (width >= 32) return value >>> 0;
   const mask = (1 << width) - 1;
   return ((value >>> startBit) & mask) >>> 0;
 }
 
-/**
- * Insert bits into a value at [startBit, startBit + width).
- */
+/** Insert bits into a value at [startBit, startBit + width). */
 export function insertBits(
   target: number,
   value: number,
@@ -74,66 +138,65 @@ export function insertBits(
 }
 
 // ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 2;
-
-function componentHeight(partCount: number): number {
-  return Math.max(partCount * 2, 2);
-}
-
-// ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
 /**
  * Build pin declarations for a Splitter.
  *
- * Convention:
- *   - Pin index 0: the wide (bus) port on the west face
- *   - Pins 1..N: the narrow ports on the east face, top to bottom
- *
- * The compiler assigns input/output direction based on circuit topology.
- * We declare all as BIDIRECTIONAL here; the engine resolves the actual flow.
- * For simplicity in this implementation we use INPUT for the wide port
- * and OUTPUT for the narrow ports (split mode), matching how Digital uses them.
+ * Input ports → left side  (x = 0), direction INPUT
+ * Output ports → right side (x = 1), direction OUTPUT
+ * Vertical spacing = spreading grid units per port
  */
 export function buildSplitterPinDeclarations(
-  parts: number[],
-  totalBits: number,
+  inputPorts: SplitterPort[],
+  outputPorts: SplitterPort[],
+  spreading: number,
 ): PinDeclaration[] {
-  const h = componentHeight(parts.length);
+  const decls: PinDeclaration[] = [];
 
-  const widePinDecl: PinDeclaration = {
-    direction: PinDirection.INPUT,
-    label: "in",
-    defaultBitWidth: totalBits,
-    position: { x: 0, y: Math.floor(h / 2) },
-    isNegatable: false,
-    isClockCapable: false,
-  };
+  for (let i = 0; i < inputPorts.length; i++) {
+    const p = inputPorts[i];
+    decls.push({
+      direction: PinDirection.INPUT,
+      label: p.name,
+      defaultBitWidth: p.bits,
+      position: { x: 0, y: i * spreading },
+      isNegatable: false,
+      isClockCapable: false,
+    });
+  }
 
-  const narrowDecls: PinDeclaration[] = parts.map((width, i) => ({
-    direction: PinDirection.OUTPUT,
-    label: `out${i}`,
-    defaultBitWidth: width,
-    position: { x: COMP_WIDTH, y: 1 + i * 2 },
-    isNegatable: false,
-    isClockCapable: false,
-  }));
+  for (let i = 0; i < outputPorts.length; i++) {
+    const p = outputPorts[i];
+    decls.push({
+      direction: PinDirection.OUTPUT,
+      label: p.name,
+      defaultBitWidth: p.bits,
+      position: { x: 1, y: i * spreading },
+      isNegatable: false,
+      isClockCapable: false,
+    });
+  }
 
-  return [widePinDecl, ...narrowDecls];
+  return decls;
 }
+
+// ---------------------------------------------------------------------------
+// Shape constants
+// ---------------------------------------------------------------------------
+
+/** Font spec for splitter port labels (SHAPE_SPLITTER style). */
+const SPLITTER_LABEL_FONT = { family: "sans-serif", size: 0.35, weight: "normal" as const };
 
 // ---------------------------------------------------------------------------
 // SplitterElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SplitterElement extends AbstractCircuitElement {
-  private readonly _outputSplitting: string;
-  private readonly _parts: number[];
-  private readonly _totalBits: number;
+  private readonly _inputPorts: SplitterPort[];
+  private readonly _outputPorts: SplitterPort[];
+  private readonly _spreading: number;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -145,13 +208,18 @@ export class SplitterElement extends AbstractCircuitElement {
   ) {
     super("Splitter", instanceId, position, rotation, mirror, props);
 
-    this._outputSplitting = props.getOrDefault<string>("output splitting", "4,4");
+    const inputDef = props.getOrDefault<string>("input splitting", "4,4");
+    const outputDef = props.getOrDefault<string>("output splitting", "8");
+    this._spreading = props.getOrDefault<number>("spreading", 1);
 
-    // Use the output splitting pattern for pin layout
-    this._parts = parseSplittingPattern(this._outputSplitting);
-    this._totalBits = totalBitsFromPattern(this._parts);
+    this._inputPorts = parsePorts(inputDef);
+    this._outputPorts = parsePorts(outputDef);
 
-    const decls = buildSplitterPinDeclarations(this._parts, this._totalBits);
+    const decls = buildSplitterPinDeclarations(
+      this._inputPorts,
+      this._outputPorts,
+      this._spreading,
+    );
     this._pins = resolvePins(
       decls,
       position,
@@ -161,61 +229,115 @@ export class SplitterElement extends AbstractCircuitElement {
     );
   }
 
-  get parts(): number[] {
-    return this._parts;
-  }
+  get inputPorts(): SplitterPort[] { return this._inputPorts; }
+  get outputPorts(): SplitterPort[] { return this._outputPorts; }
+  get spreading(): number { return this._spreading; }
 
-  get totalBits(): number {
-    return this._totalBits;
-  }
+  // Legacy accessors used by engine consumers
+  get parts(): number[] { return this._outputPorts.map((p) => p.bits); }
+  get totalBits(): number { return totalBitsFromPattern(this.parts); }
 
   getPins(): readonly Pin[] {
     return this._pins;
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._parts.length);
+    const maxCount = Math.max(this._inputPorts.length, this._outputPorts.length);
+    const height = Math.max((maxCount - 1) * this._spreading, 1);
     return {
       x: this.position.x,
       y: this.position.y,
-      width: COMP_WIDTH,
-      height: h,
+      width: 1,
+      height,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const h = componentHeight(this._parts.length);
+    const inCount = this._inputPorts.length;
+    const outCount = this._outputPorts.length;
+    const sp = this._spreading;
+    const maxY = (Math.max(inCount, outCount) - 1) * sp;
+    const rot = this.rotation;
 
     ctx.save();
 
+    // --- Input pins (left side): line from x=0 to x=0.5, label to the left ---
     ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
+    ctx.setLineWidth(1 / 20); // thin line (~1px at 20px/grid)
 
-    // Vertical spine on right side
-    ctx.drawLine(COMP_WIDTH, 0, COMP_WIDTH, h);
-
-    // Horizontal lines from spine to each narrow port
-    for (let i = 0; i < this._parts.length; i++) {
-      const portY = 1 + i * 2;
-      ctx.drawLine(0, Math.floor(h / 2), COMP_WIDTH, portY);
+    for (let i = 0; i < inCount; i++) {
+      const y = i * sp;
+      ctx.drawLine(0, y, 0.5, y);
+      ctx.setFont(SPLITTER_LABEL_FONT);
+      ctx.setColor("TEXT");
+      this._drawUprightText(ctx, this._inputPorts[i].name, -0.1, y - 0.15,
+        { horizontal: "right", vertical: "bottom" }, rot);
+      ctx.setColor("COMPONENT");
     }
+
+    // --- Output pins (right side): line from x=1 to x=0.5, label to the right ---
+    for (let i = 0; i < outCount; i++) {
+      const y = i * sp;
+      ctx.drawLine(1, y, 0.5, y);
+      ctx.setFont(SPLITTER_LABEL_FONT);
+      ctx.setColor("TEXT");
+      this._drawUprightText(ctx, this._outputPorts[i].name, 1.1, y - 0.15,
+        { horizontal: "left", vertical: "bottom" }, rot);
+      ctx.setColor("COMPONENT");
+    }
+
+    // --- Spine: filled rectangle from (0.4, -0.1) to (0.6, maxY+0.1) ---
+    ctx.setColor("COMPONENT");
+    ctx.drawRect(0.4, -0.1, 0.2, maxY + 0.2, true);
 
     ctx.restore();
   }
 
+  /**
+   * Draw text that stays upright regardless of component rotation.
+   * When rotation is 2 (180°), counter-rotates the text and flips alignment.
+   */
+  private _drawUprightText(
+    ctx: RenderContext,
+    text: string,
+    x: number,
+    y: number,
+    align: { horizontal: "left" | "center" | "right"; vertical: "top" | "middle" | "bottom" },
+    rotation: Rotation,
+  ): void {
+    if (rotation === 2) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI);
+      const flipped = {
+        horizontal: align.horizontal === "left" ? "right" as const
+          : align.horizontal === "right" ? "left" as const
+          : "center" as const,
+        vertical: align.vertical === "top" ? "bottom" as const
+          : align.vertical === "bottom" ? "top" as const
+          : "middle" as const,
+      };
+      ctx.drawText(text, 0, 0, flipped);
+      ctx.restore();
+    } else {
+      ctx.drawText(text, x, y, align);
+    }
+  }
+
   getHelpText(): string {
+    const inTotal = totalBitsFromPattern(this._inputPorts.map((p) => p.bits));
+    const outTotal = totalBitsFromPattern(this._outputPorts.map((p) => p.bits));
     return (
       "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
-      `Splitting pattern: ${this._outputSplitting} (total ${this._totalBits} bits).\n` +
-      "Connect to the wide port to split, or to the narrow ports to merge."
+      `Input: ${this._inputPorts.length} port(s), ${inTotal} bits total.\n` +
+      `Output: ${this._outputPorts.length} port(s), ${outTotal} bits total.\n` +
+      "Connect to the input ports to merge, or to the output ports to split."
     );
   }
 }
 
 // ---------------------------------------------------------------------------
 // executeSplitter — copies bits between wide and narrow ports
-//
-// Convention: input 0 = wide bus, outputs 0..N-1 = narrow ports.
 // ---------------------------------------------------------------------------
 
 export function executeSplitter(
@@ -233,13 +355,6 @@ export function executeSplitter(
 
   let startBit = 0;
   for (let i = 0; i < outCount; i++) {
-    // Each output narrow port width is embedded as output count — we must
-    // track widths via a side-channel. Since ComponentLayout does not carry
-    // widths per port, we use 1 bit per narrow port as the minimal correct
-    // implementation; the compiler may optimise this for known widths.
-    // The full bit-extraction logic is correct when the engine pre-populates
-    // port widths. Here we extract 1 bit per output as a baseline that the
-    // compiler overrides with per-port width information.
     const portValue = extractBits(wideValue, startBit, 1);
     state[wt[outBase + i]] = portValue;
     startBit += 1;
@@ -248,9 +363,6 @@ export function executeSplitter(
 
 /**
  * executeSplitterWithWidths — used when the engine supplies port widths.
- *
- * This is the correct full implementation. The engine calls this variant
- * when it has per-port width information from the compiled model.
  */
 export function executeSplitterWithWidths(
   index: number,
@@ -298,19 +410,24 @@ export function executeSplitterMergeWithWidths(
 }
 
 // ---------------------------------------------------------------------------
-// SPLITTER_ATTRIBUTE_MAPPINGS
+// SPLITTER_ATTRIBUTE_MAPPINGS — correct XML attribute name casing
 // ---------------------------------------------------------------------------
 
 export const SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
-    xmlName: "input splitting",
+    xmlName: "Input Splitting",
     propertyKey: "input splitting",
     convert: (v) => v,
   },
   {
-    xmlName: "output splitting",
+    xmlName: "Output Splitting",
     propertyKey: "output splitting",
     convert: (v) => v,
+  },
+  {
+    xmlName: "splitterSpreading",
+    propertyKey: "spreading",
+    convert: (v) => parseInt(v, 10),
   },
 ];
 
@@ -320,18 +437,25 @@ export const SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 
 const SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "output splitting",
-    type: PropertyType.STRING,
-    label: "Output Splitting",
-    defaultValue: "4,4",
-    description: "Comma-separated bit widths for each narrow port (e.g. '4,4' or '1,1,1,1,4')",
-  },
-  {
     key: "input splitting",
     type: PropertyType.STRING,
     label: "Input Splitting",
-    defaultValue: "",
-    description: "Input splitting pattern (leave empty for default)",
+    defaultValue: "4,4",
+    description: "Splitting pattern for the left (input) side ports (e.g. '4,4' or '1*8')",
+  },
+  {
+    key: "output splitting",
+    type: PropertyType.STRING,
+    label: "Output Splitting",
+    defaultValue: "8",
+    description: "Splitting pattern for the right (output) side ports (e.g. '8' or '4,4')",
+  },
+  {
+    key: "spreading",
+    type: PropertyType.INT,
+    label: "Pin Spreading",
+    defaultValue: 1,
+    description: "Vertical spacing between pins (1–20 grid units)",
   },
 ];
 
@@ -343,17 +467,21 @@ function splitterFactory(props: PropertyBag): SplitterElement {
   return new SplitterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
+// Default pin layout uses Java defaults: input "4,4", output "8", spreading 1
+const _defaultInputPorts = parsePorts("4,4");
+const _defaultOutputPorts = parsePorts("8");
+
 export const SplitterDefinition: ComponentDefinition = {
   name: "Splitter",
   typeId: -1,
   factory: splitterFactory,
   executeFn: executeSplitter,
-  pinLayout: buildSplitterPinDeclarations([4, 4], 8),
+  pinLayout: buildSplitterPinDeclarations(_defaultInputPorts, _defaultOutputPorts, 1),
   propertyDefs: SPLITTER_PROPERTY_DEFS,
   attributeMap: SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
     "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
-    "Configure the splitting pattern as comma-separated bit widths.\n" +
-    "Connect to the wide port to split, or to the narrow ports to merge.",
+    "Configure Input Splitting for the left pins and Output Splitting for the right pins.\n" +
+    "Supports patterns like '4,4', '1*8', or '0-3'.",
 };

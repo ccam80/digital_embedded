@@ -161,6 +161,11 @@ export function createElementFromDig(
     element.rotation = rotation;
   }
 
+  const mirror = extractMirrorFromEntries(ve.elementAttributes);
+  if (mirror) {
+    element.mirror = true;
+  }
+
   return element;
 }
 
@@ -255,6 +260,21 @@ function extractRotationFromEntries(
   const v = entry.value;
   if (v.type !== "rotation") return undefined;
   return v.value;
+}
+
+/**
+ * Extract the mirror flag directly from DigEntry[], if present.
+ * Returns false when no Mirror attribute was in the XML.
+ */
+function extractMirrorFromEntries(
+  entries: { key: string; value: DigValue }[],
+): boolean {
+  const entry = entries.find((e) => e.key === "Mirror");
+  if (entry === undefined) return false;
+  if (entry.value.type === "boolean") return entry.value.value;
+  // Some .dig files may encode mirror as a string
+  if (entry.value.type === "string") return entry.value.value === "true";
+  return false;
 }
 
 /**

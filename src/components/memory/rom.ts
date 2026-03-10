@@ -35,7 +35,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -59,7 +58,7 @@ export { registerBackingStore, clearBackingStores } from "./ram.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 5;
+const COMP_WIDTH = 3;
 const COMP_HEIGHT = 6;
 
 // ---------------------------------------------------------------------------
@@ -166,33 +165,12 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 function buildROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 2, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
+  // GenericShape: 2 inputs, 1 output → symmetric=true, even=true
+  // offs = 2/2 = 1; A at y=0, sel at y=2 (even gap), D at y=offs=1
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "A",
-      defaultBitWidth: addrBits,
-      position: inputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "sel",
-      defaultBitWidth: 1,
-      position: inputPositions[1],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D",
-      defaultBitWidth: dataBits,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "sel", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -314,57 +292,22 @@ export const ROMDefinition: ComponentDefinition = {
 // ---------------------------------------------------------------------------
 
 function buildROMDualPortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
+  // GenericShape: 4 inputs, 2 outputs → symmetric=false (outputs!=1)
+  // No gap, no offset: inputs y=0,1,2,3; outputs y=0,1
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "A1",
-      defaultBitWidth: addrBits,
-      position: inputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "s1",
-      defaultBitWidth: 1,
-      position: inputPositions[1],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "A2",
-      defaultBitWidth: addrBits,
-      position: inputPositions[2],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT, label: "A1", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "s1", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A2", defaultBitWidth: addrBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
     {
       direction: PinDirection.INPUT,
       label: "s2",
       defaultBitWidth: 1,
-      position: inputPositions[3],
+      position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
     },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D1",
-      defaultBitWidth: dataBits,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D2",
-      defaultBitWidth: dataBits,
-      position: outputPositions[1],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.OUTPUT, label: "D1", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D2", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
   ];
 }
 

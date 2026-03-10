@@ -15,6 +15,7 @@ import { PropertyBag } from "@/core/properties";
 import { snapToGrid } from "@/editor/coordinates";
 import { renameLabelsOnCopy } from "@/editor/label-renamer";
 import type { EditCommand } from "@/editor/undo-redo";
+import { pinWorldPosition } from "@/core/pin";
 
 export type { EditCommand };
 
@@ -100,6 +101,58 @@ export function moveSelection(
 }
 
 // ---------------------------------------------------------------------------
+// rotateSelection
+// ---------------------------------------------------------------------------
+
+/**
+ * Rotate all selected elements by one quarter-turn clockwise (0→1→2→3→0).
+ * Returns a reversible EditCommand.
+ */
+export function rotateSelection(elements: CircuitElement[]): EditCommand {
+  const originalRotations = elements.map((el) => el.rotation);
+
+  return {
+    description: "Rotate",
+    execute(): void {
+      for (const el of elements) {
+        el.rotation = ((el.rotation + 1) % 4) as Rotation;
+      }
+    },
+    undo(): void {
+      for (let i = 0; i < elements.length; i++) {
+        elements[i]!.rotation = originalRotations[i]!;
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// mirrorSelection
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle the mirror flag on all selected elements.
+ * Returns a reversible EditCommand.
+ */
+export function mirrorSelection(elements: CircuitElement[]): EditCommand {
+  const originalMirrors = elements.map((el) => el.mirror);
+
+  return {
+    description: "Mirror",
+    execute(): void {
+      for (const el of elements) {
+        el.mirror = !el.mirror;
+      }
+    },
+    undo(): void {
+      for (let i = 0; i < elements.length; i++) {
+        elements[i]!.mirror = originalMirrors[i]!;
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // deleteSelection
 // ---------------------------------------------------------------------------
 
@@ -119,8 +172,9 @@ export function deleteSelection(
     for (const el of deletedElementSet) {
       const pins = el.getPins();
       for (const pin of pins) {
-        const pinWorldX = el.position.x + pin.position.x;
-        const pinWorldY = el.position.y + pin.position.y;
+        const wp = pinWorldPosition(el, pin);
+        const pinWorldX = wp.x;
+        const pinWorldY = wp.y;
         if (
           (wire.start.x === pinWorldX && wire.start.y === pinWorldY) ||
           (wire.end.x === pinWorldX && wire.end.y === pinWorldY)

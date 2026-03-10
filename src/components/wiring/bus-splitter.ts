@@ -9,11 +9,13 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin, Rotation } from "../../core/pin.js";
+import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
+  PinDirection,
   createInverterConfig,
   resolvePins,
 } from "../../core/pin.js";
+import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -25,7 +27,6 @@ import {
 import {
   parseSplittingPattern,
   totalBitsFromPattern,
-  buildSplitterPinDeclarations,
   extractBits,
 } from "./splitter.js";
 
@@ -62,7 +63,28 @@ export class BusSplitterElement extends AbstractCircuitElement {
     this._parts = parseSplittingPattern(this._outputSplitting);
     this._totalBits = totalBitsFromPattern(this._parts);
 
-    const decls = buildSplitterPinDeclarations(this._parts, this._totalBits);
+    // Java BusSplitterShape pin layout:
+    //   output[0] (combined bus out): (0, 0)
+    //   input[0]  (combined bus in):  (0, 1)
+    //   output[1..n] (sub-buses):     (1, i * spreading)
+    const spreading = props.getOrDefault<number>("spreading", 1);
+    const totalName = this._totalBits === 1 ? "0" : `0-${this._totalBits - 1}`;
+    const decls: PinDeclaration[] = [
+      { direction: PinDirection.OUTPUT, label: totalName, defaultBitWidth: this._totalBits,
+        position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: totalName, defaultBitWidth: this._totalBits,
+        position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    ];
+    let runPos = 0;
+    for (let i = 0; i < this._parts.length; i++) {
+      const bits = this._parts[i];
+      const name = bits === 1 ? `${runPos}` : `${runPos}-${runPos + bits - 1}`;
+      decls.push({
+        direction: PinDirection.OUTPUT, label: name, defaultBitWidth: bits,
+        position: { x: 1, y: i * spreading }, isNegatable: false, isClockCapable: false,
+      });
+      runPos += bits;
+    }
     this._pins = resolvePins(
       decls,
       position,
@@ -108,10 +130,10 @@ export class BusSplitterElement extends AbstractCircuitElement {
     // Label showing total bit width
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(`${this._totalBits}`, COMP_WIDTH / 2, h / 2, {
+    drawUprightText(ctx, `${this._totalBits}`, COMP_WIDTH / 2, h / 2, {
       horizontal: "center",
       vertical: "middle",
-    });
+    }, this.rotation);
 
     ctx.restore();
   }
@@ -199,7 +221,12 @@ export const BusSplitterDefinition: ComponentDefinition = {
   typeId: -1,
   factory: busSplitterFactory,
   executeFn: executeBusSplitter,
-  pinLayout: buildSplitterPinDeclarations([4, 4], 8),
+  pinLayout: [
+    { direction: PinDirection.OUTPUT, label: "0-7", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "0-7", defaultBitWidth: 8, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "0-3", defaultBitWidth: 4, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "4-7", defaultBitWidth: 4, position: { x: 1, y: 1 }, isNegatable: false, isClockCapable: false },
+  ],
   propertyDefs: BUS_SPLITTER_PROPERTY_DEFS,
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,

@@ -246,7 +246,7 @@ describe("AndGate", () => {
     it("input pins are labeled in0 and in1", () => {
       const el = makeAnd({ inputCount: 2 });
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs.map((p) => p.label)).toEqual(["in0", "in1"]);
+      expect(inputs.map((p) => p.label)).toEqual(["In_1", "In_2"]);
     });
 
     it("output pin is labeled out", () => {
@@ -277,7 +277,7 @@ describe("AndGate", () => {
     it("5-input pin labels are in0..in4", () => {
       const el = makeAnd({ inputCount: 5 });
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs.map((p) => p.label)).toEqual(["in0", "in1", "in2", "in3", "in4"]);
+      expect(inputs.map((p) => p.label)).toEqual(["In_1", "In_2", "In_3", "In_4", "In_5"]);
     });
   });
 
@@ -409,7 +409,7 @@ describe("AndGate", () => {
 
   describe("drawInverterBubble", () => {
     it("inverterConfig=['in0'] causes drawCircle to be called for the negated pin", () => {
-      const el = makeAnd({ invertedPins: ["in0"] });
+      const el = makeAnd({ invertedPins: ["In_1"] });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
@@ -427,7 +427,7 @@ describe("AndGate", () => {
     });
 
     it("inverterConfig=['in0','in1'] causes two drawCircle calls", () => {
-      const el = makeAnd({ inputCount: 3, invertedPins: ["in0", "in1"] });
+      const el = makeAnd({ inputCount: 3, invertedPins: ["In_1", "In_2"] });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
@@ -436,16 +436,16 @@ describe("AndGate", () => {
     });
 
     it("negated pin has isNegated=true in getPins()", () => {
-      const el = makeAnd({ invertedPins: ["in0"] });
+      const el = makeAnd({ invertedPins: ["In_1"] });
       const pins = el.getPins();
-      const in0 = pins.find((p) => p.label === "in0");
+      const in0 = pins.find((p) => p.label === "In_1");
       expect(in0?.isNegated).toBe(true);
     });
 
     it("non-negated pins have isNegated=false", () => {
-      const el = makeAnd({ invertedPins: ["in0"] });
+      const el = makeAnd({ invertedPins: ["In_1"] });
       const pins = el.getPins();
-      const in1 = pins.find((p) => p.label === "in1");
+      const in1 = pins.find((p) => p.label === "In_2");
       expect(in1?.isNegated).toBe(false);
     });
   });

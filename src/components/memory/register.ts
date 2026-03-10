@@ -34,11 +34,12 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+// Java GenericShape: 3 inputs, 1 output, symmetric, width=3
+const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — matches Java GenericShape.createPins() exactly
+// 3 inputs (odd), symmetric: offs = floor(3/2) = 1
 // ---------------------------------------------------------------------------
 
 const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -46,7 +47,7 @@ const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "D",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -54,7 +55,7 @@ const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -62,7 +63,7 @@ const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "en",
     defaultBitWidth: 1,
-    position: { x: 0, y: 4 },
+    position: { x: 0, y: 2 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -70,7 +71,7 @@ const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 2 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -108,42 +109,48 @@ export class RegisterElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Java GenericShape: body from -topBorder to yBottom, 3 inputs odd → height=3
+    const TOP = 0.5;
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - TOP,
       width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      height: 3,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const TOP = 0.5;
+    const BODY_H = 3;
+
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("D", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("en", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("D", 0.5, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("C", 0.5, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("en", 0.5, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("REG", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("REG", COMP_WIDTH / 2, 1, { horizontal: "center", vertical: "middle" });
 
+    // Clock triangle on C pin (y=1)
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 1.5, 0.5, 2);
-    ctx.drawLine(0.5, 2, 0, 2.5);
+    ctx.drawLine(0, 0.5, 0.5, 1);
+    ctx.drawLine(0.5, 1, 0, 1.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

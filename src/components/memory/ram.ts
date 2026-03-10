@@ -35,7 +35,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -136,23 +135,30 @@ export function clearBackingStores(): void {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 5;
-const COMP_HEIGHT = 8;
+const COMP_WIDTH = 3;
+// Heights per variant (bodyHeight = maxPinY + 1):
+// 4-input variants (RAMSinglePort, RAMSinglePortSel, BlockRAMDualPort): maxPinY=4, bodyHeight=5
+// 5-input variant (RAMDualPort): maxPinY=4, bodyHeight=5
+// 6-input variant (RAMDualAccess): maxPinY=6, bodyHeight=7
+// 3-input variant (RAMAsync): maxPinY=2, bodyHeight=3
+const COMP_HEIGHT_4IN = 5;
+const COMP_HEIGHT_6IN = 7;
+const COMP_HEIGHT_3IN = 3;
 
 // ---------------------------------------------------------------------------
 // Shared rendering helper
 // ---------------------------------------------------------------------------
 
-function drawMemoryBody(ctx: RenderContext, label: string, symbol: string): void {
+function drawMemoryBody(ctx: RenderContext, label: string, symbol: string, bodyHeight: number, textY: number): void {
   ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+  ctx.drawRect(0, -0.5, COMP_WIDTH, bodyHeight, true);
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+  ctx.drawRect(0, -0.5, COMP_WIDTH, bodyHeight, false);
 
   ctx.setColor("TEXT");
   ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-  ctx.drawText(symbol, COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+  ctx.drawText(symbol, COMP_WIDTH / 2, textY, { horizontal: "center", vertical: "middle" });
 
   if (label.length > 0) {
     ctx.setFont({ family: "sans-serif", size: 0.9 });
@@ -238,15 +244,14 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 //   +0: lastClk (previous clock value for edge detection)
 // ---------------------------------------------------------------------------
 
+// RAMSinglePort: 4 inputs (even, symmetric): offs=2; A@y=0,str@y=1,C@y=3,ld@y=4; D@y=2
 function buildRAMSinglePortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: inputPositions[3], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -270,12 +275,12 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
     ctx.restore();
   }
 
@@ -364,15 +369,14 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
 // internalStateCount: 0
 // ---------------------------------------------------------------------------
 
+// RAMSinglePortSel: 4 inputs (even, symmetric): offs=2; A@y=0,CS@y=1,WE@y=3,OE@y=4; D@y=2
 function buildRAMSinglePortSelPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "CS", defaultBitWidth: 1, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "WE", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "OE", defaultBitWidth: 1, position: inputPositions[3], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "CS", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "WE", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "OE", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -396,12 +400,12 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
     ctx.restore();
   }
 
@@ -479,16 +483,15 @@ export const RAMSinglePortSelDefinition: ComponentDefinition = {
 //   +0: lastClk
 // ---------------------------------------------------------------------------
 
+// RAMDualPort: 5 inputs (odd, symmetric): offs=2; A@y=0,Din@y=1,str@y=2,C@y=3,ld@y=4; D@y=2
 function buildRAMDualPortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 5, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: inputPositions[3], isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: inputPositions[4], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -512,12 +515,12 @@ export class RAMDualPortElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
     ctx.restore();
   }
 
@@ -608,18 +611,17 @@ export const RAMDualPortDefinition: ComponentDefinition = {
 //   +0: lastClk
 // ---------------------------------------------------------------------------
 
+// RAMDualAccess: 6 inputs (even, symmetric): offs=3; str@y=0,C@y=1,ld@y=2,1A@y=4,1Din@y=5,2A@y=6; 1D@y=3,2D@y=4
 function buildRAMDualAccessPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 6, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: inputPositions[1], isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "1A", defaultBitWidth: addrBits, position: inputPositions[3], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "1Din", defaultBitWidth: dataBits, position: inputPositions[4], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "2A", defaultBitWidth: addrBits, position: inputPositions[5], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "1D", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "2D", defaultBitWidth: dataBits, position: outputPositions[1], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "1A", defaultBitWidth: addrBits, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "1Din", defaultBitWidth: dataBits, position: { x: 0, y: 5 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "2A", defaultBitWidth: addrBits, position: { x: 0, y: 6 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "1D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "2D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 4 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -643,12 +645,12 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_6IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_6IN, 3);
     ctx.restore();
   }
 
@@ -734,14 +736,13 @@ export const RAMDualAccessDefinition: ComponentDefinition = {
 // internalStateCount: 0
 // ---------------------------------------------------------------------------
 
+// RAMAsync: 3 inputs (odd, symmetric): offs=1; A@y=0,D@y=1,we@y=2; Q@y=1
 function buildRAMAsyncPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 3, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: dataBits, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "we", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "Q", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: dataBits, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "we", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "Q", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -765,12 +766,12 @@ export class RAMAsyncElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_3IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_3IN, 1);
     ctx.restore();
   }
 
@@ -838,15 +839,14 @@ export const RAMAsyncDefinition: ComponentDefinition = {
 //   +1: outputVal (registered output from last clock edge)
 // ---------------------------------------------------------------------------
 
+// BlockRAMDualPort: 4 inputs (even, symmetric): offs=2; A@y=0,Din@y=1,str@y=3,C@y=4; D@y=2
 function buildBlockRAMDualPortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: inputPositions[3], isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -870,12 +870,12 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "BRAM");
+    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "BRAM", COMP_HEIGHT_4IN, 2);
     ctx.restore();
   }
 

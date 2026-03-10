@@ -45,7 +45,7 @@ function buildPullUpPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: { x: 0, y: COMP_HEIGHT },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },

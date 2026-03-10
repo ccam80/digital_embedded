@@ -39,12 +39,19 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT_NO_ENABLE = 3;
-const COMP_HEIGHT_WITH_ENABLE = 4;
+const COMP_WIDTH = 3;
+// No-enable: 1 input, 2 outputs, symmetric=false: offs=0; input C@y=0; outputs Q@y=0, ~Q@y=1
+// max(1,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
+const COMP_HEIGHT_NO_ENABLE = 2;
+// With-enable: 2 inputs, 2 outputs, symmetric=false: offs=0, no even correction
+// inputs T@y=0, C@y=1; outputs Q@y=0, ~Q@y=1
+// max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
+const COMP_HEIGHT_WITH_ENABLE = 2;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — GenericShape positions (symmetric=false)
+// No-enable: 1 input C@y=0; outputs Q@y=0, ~Q@y=1
+// With-enable: inputs T@y=0, C@y=1; outputs Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
 
 const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
@@ -52,7 +59,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -60,7 +67,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -68,7 +75,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 2 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -79,7 +86,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "T",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -87,7 +94,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -95,7 +102,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -103,7 +110,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 3 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -145,7 +152,7 @@ export class TElement extends AbstractCircuitElement {
     const h = this._withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: h,
     };
@@ -156,34 +163,34 @@ export class TElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, h, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, h, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
 
     if (this._withEnable) {
-      ctx.drawText("T", 0.6, 1, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("C", 0.6, 2, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-      ctx.drawText("~Q", COMP_WIDTH - 0.6, 3, { horizontal: "right", vertical: "middle" });
-      ctx.setColor("COMPONENT");
-      ctx.drawLine(0, 1.5, 0.5, 2);
-      ctx.drawLine(0.5, 2, 0, 2.5);
-    } else {
+      ctx.drawText("T", 0.6, 0, { horizontal: "left", vertical: "middle" });
       ctx.drawText("C", 0.6, 1, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-      ctx.drawText("~Q", COMP_WIDTH - 0.6, 2, { horizontal: "right", vertical: "middle" });
+      ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
+      ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
       ctx.setColor("COMPONENT");
       ctx.drawLine(0, 0.5, 0.5, 1);
       ctx.drawLine(0.5, 1, 0, 1.5);
+    } else {
+      ctx.drawText("C", 0.6, 0, { horizontal: "left", vertical: "middle" });
+      ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
+      ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
+      ctx.setColor("COMPONENT");
+      ctx.drawLine(0, -0.5, 0.5, 0);
+      ctx.drawLine(0.5, 0, 0, 0.5);
     }
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("T", COMP_WIDTH / 2, h / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("T", COMP_WIDTH / 2, (h - 0.5) / 2, { horizontal: "center", vertical: "middle" });
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

@@ -35,11 +35,13 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+const COMP_WIDTH = 3;
+// Pins shifted -1: in@y=0, sel@y=2, out@y=1
+// bodyHeight = maxPinY + 1 = 2 + 1 = 3
+const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclaration[] {
@@ -49,7 +51,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     direction: PinDirection.INPUT,
     label: "in",
     defaultBitWidth: dataBits,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -58,7 +60,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -67,7 +69,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 2 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -111,7 +113,7 @@ export class BitSelectorElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -122,14 +124,14 @@ export class BitSelectorElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("BSel", COMP_WIDTH / 2, COMP_HEIGHT / 2, {
+    ctx.drawText("BSel", COMP_WIDTH / 2, 1, {
       horizontal: "center",
       vertical: "middle",
     });

@@ -36,7 +36,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -55,8 +54,9 @@ export type { RAMLayout } from "./ram.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 5;
-const COMP_HEIGHT = 7;
+const COMP_WIDTH = 3;
+// 5-input variants (odd, symmetric): offs=2; inputs y=0,1,2,3,4; output y=2; maxPinY=4; bodyHeight=5
+const COMP_HEIGHT = 5;
 
 // ---------------------------------------------------------------------------
 // Shared rendering helper
@@ -64,14 +64,14 @@ const COMP_HEIGHT = 7;
 
 function drawEEPROMBody(ctx: RenderContext, label: string, symbol: string): void {
   ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+  ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+  ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
   ctx.setColor("TEXT");
   ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-  ctx.drawText(symbol, COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+  ctx.drawText(symbol, COMP_WIDTH / 2, 2, { horizontal: "center", vertical: "middle" });
 
   if (label.length > 0) {
     ctx.setFont({ family: "sans-serif", size: 0.9 });
@@ -164,58 +164,15 @@ export interface EEPROMLayout extends ComponentLayout {
 //   +1: writeAddr (address captured on WE rising edge)
 // ---------------------------------------------------------------------------
 
+// EEPROM: 5 inputs (odd, symmetric): offs=2; A@y=0,CS@y=1,WE@y=2,OE@y=3,Din@y=4; D@y=2
 function buildEEPROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 5, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "A",
-      defaultBitWidth: addrBits,
-      position: inputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "CS",
-      defaultBitWidth: 1,
-      position: inputPositions[1],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "WE",
-      defaultBitWidth: 1,
-      position: inputPositions[2],
-      isNegatable: false,
-      isClockCapable: true,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "OE",
-      defaultBitWidth: 1,
-      position: inputPositions[3],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "Din",
-      defaultBitWidth: dataBits,
-      position: inputPositions[4],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D",
-      defaultBitWidth: dataBits,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "CS", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "WE", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.INPUT, label: "OE", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -250,7 +207,7 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
@@ -365,58 +322,15 @@ export const EEPROMDefinition: ComponentDefinition = {
 //   +0: lastClk
 // ---------------------------------------------------------------------------
 
+// EEPROMDualPort: 5 inputs (odd, symmetric): offs=2; A@y=0,Din@y=1,str@y=2,C@y=3,ld@y=4; D@y=2
 function buildEEPROMDualPortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 5, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "A",
-      defaultBitWidth: addrBits,
-      position: inputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "Din",
-      defaultBitWidth: dataBits,
-      position: inputPositions[1],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "str",
-      defaultBitWidth: 1,
-      position: inputPositions[2],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "C",
-      defaultBitWidth: 1,
-      position: inputPositions[3],
-      isNegatable: false,
-      isClockCapable: true,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "ld",
-      defaultBitWidth: 1,
-      position: inputPositions[4],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D",
-      defaultBitWidth: dataBits,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "Din", defaultBitWidth: dataBits, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -451,7 +365,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {

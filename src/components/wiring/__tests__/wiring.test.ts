@@ -502,14 +502,14 @@ describe("Splitter", () => {
   });
 
   describe("attributeMapping", () => {
-    it("'output splitting' maps to 'output splitting'", () => {
-      const m = SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "output splitting");
+    it("'Output Splitting' maps to 'output splitting'", () => {
+      const m = SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Output Splitting");
       expect(m).toBeDefined();
       expect(m!.convert("4,4")).toBe("4,4");
     });
 
-    it("'input splitting' maps to 'input splitting'", () => {
-      const m = SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "input splitting");
+    it("'Input Splitting' maps to 'input splitting'", () => {
+      const m = SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Input Splitting");
       expect(m).toBeDefined();
       expect(m!.convert("8")).toBe("8");
     });

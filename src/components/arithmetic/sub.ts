@@ -22,7 +22,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,23 +36,28 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 6;
+const COMP_WIDTH = 3;
+// 3 inputs, 2 outputs, symmetric=false (multiple outputs):
+// no even-input gap, offs=0; outputs start at y=0
+// inputs: a@y=0, b@y=1, c_i@y=2
+// outputs: s@y=0, c_o@y=1
+// bodyHeight = max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
+const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
+// offs=0; no even correction
+// inputs: a@y=0, b@y=1, c_i@y=2
+// outputs: s@y=0, c_o@y=1
 // ---------------------------------------------------------------------------
 
 function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 3, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "a",
       defaultBitWidth: bitWidth,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -61,7 +65,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "b",
       defaultBitWidth: bitWidth,
-      position: inputPositions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -69,7 +73,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "c_i",
       defaultBitWidth: 1,
-      position: inputPositions[2],
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -77,7 +81,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "s",
       defaultBitWidth: bitWidth,
-      position: outputPositions[0],
+      position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -85,7 +89,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "c_o",
       defaultBitWidth: 1,
-      position: outputPositions[1],
+      position: { x: COMP_WIDTH, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -124,21 +128,21 @@ export class SubElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("-", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("-", COMP_WIDTH / 2, 1, { horizontal: "center", vertical: "middle" });
 
     this._drawLabel(ctx);
     ctx.restore();

@@ -39,10 +39,12 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 5;
-const COMP_HEIGHT = 8;
+// Pins shifted -1: Din@0,we@1,Rw@2,C@3,Ra@4,Rb@5; Da@1,Db@5
+// bodyHeight = maxPinY + 1 = 5 + 1 = 6
+const COMP_HEIGHT = 6;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -50,7 +52,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Din",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -58,7 +60,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "we",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -66,7 +68,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Rw",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -74,7 +76,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 4 },
+    position: { x: 0, y: 3 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -82,7 +84,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Ra",
     defaultBitWidth: 1,
-    position: { x: 0, y: 5 },
+    position: { x: 0, y: 4 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -90,7 +92,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "Rb",
     defaultBitWidth: 1,
-    position: { x: 0, y: 6 },
+    position: { x: 0, y: 5 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -98,7 +100,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Da",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 2 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -106,7 +108,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Db",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 6 },
+    position: { x: COMP_WIDTH, y: 5 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -146,7 +148,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -156,28 +158,28 @@ export class RegisterFileElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("Din", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("we", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Rw", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Ra", 0.5, 5, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Rb", 0.5, 6, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Da", COMP_WIDTH - 0.5, 2, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("Db", COMP_WIDTH - 0.5, 6, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("Din", 0.5, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("we", 0.5, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Rw", 0.5, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("C", 0.5, 3, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Ra", 0.5, 4, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Rb", 0.5, 5, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Da", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("Db", COMP_WIDTH - 0.5, 5, { horizontal: "right", vertical: "middle" });
 
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("RF", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("RF", COMP_WIDTH / 2, 2.5, { horizontal: "center", vertical: "middle" });
 
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 3.5, 0.5, 4);
-    ctx.drawLine(0.5, 4, 0, 4.5);
+    ctx.drawLine(0, 2.5, 0.5, 3);
+    ctx.drawLine(0.5, 3, 0, 3.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

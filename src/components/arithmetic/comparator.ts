@@ -28,18 +28,20 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+// Java GenericShape: 2 inputs, 3 outputs, symmetric, width=3
+// 2 inputs (even), symmetric: correct=1 for i>=1, offs=floor(2/2)=1
+const COMP_WIDTH = 3;
 
+// Java GenericShape: 2 inputs, 3 outputs → symmetric=false (outputs!=1)
+// Non-symmetric: no gap correction, offs=0
+// Inputs at y=0,1; Outputs at y=0,1,2
 function buildComparatorPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 2, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 3, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: bitWidth, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: bitWidth, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: ">", defaultBitWidth: 1, position: outputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "=", defaultBitWidth: 1, position: outputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "<", defaultBitWidth: 1, position: outputPositions[2], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: bitWidth, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: ">", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "=", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "<", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -63,19 +65,25 @@ export class ComparatorElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Java GenericShape: max(2,3)=3, non-symmetric (3 outputs), no even-input gap
+    // yBottom = (3-1) + 0.5 = 2.5, height = 2.5 + 0.5 = 3
+    const TOP = 0.5;
+    return { x: this.position.x, y: this.position.y - TOP, width: COMP_WIDTH, height: 3 };
   }
 
   draw(ctx: RenderContext): void {
+    const TOP = 0.5;
+    const BODY_H = 4;
+
     ctx.save();
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("A=B", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("A=B", COMP_WIDTH / 2, BODY_H / 2 - TOP, { horizontal: "center", vertical: "middle" });
     ctx.restore();
   }
 

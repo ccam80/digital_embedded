@@ -20,7 +20,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -35,11 +34,7 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-
-function componentHeight(inputCount: number): number {
-  return Math.max(inputCount * 2, 4);
-}
+const COMP_WIDTH = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -50,36 +45,56 @@ export function buildMuxPinDeclarations(
   bitWidth: number,
 ): PinDeclaration[] {
   const inputCount = 1 << selectorBits;
-  const h = componentHeight(inputCount);
 
+  // Selector pin: bottom center at (1, inputCount)
   const selPin: PinDeclaration = {
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: Math.floor(COMP_WIDTH / 2), y: h },
+    position: { x: 1, y: inputCount },
     isNegatable: false,
     isClockCapable: false,
   };
 
-  const inputPositions = layoutPinsOnFace("west", inputCount, COMP_WIDTH, h);
+  // Data input pins: left side
+  // Special case for 2 inputs: pins at (0,0) and (0,2) — gap at middle
   const inputPins: PinDeclaration[] = [];
-  for (let i = 0; i < inputCount; i++) {
+  if (inputCount === 2) {
     inputPins.push({
       direction: PinDirection.INPUT,
-      label: `in_${i}`,
+      label: "in_0",
       defaultBitWidth: bitWidth,
-      position: inputPositions[i],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     });
+    inputPins.push({
+      direction: PinDirection.INPUT,
+      label: "in_1",
+      defaultBitWidth: bitWidth,
+      position: { x: 0, y: 2 },
+      isNegatable: false,
+      isClockCapable: false,
+    });
+  } else {
+    for (let i = 0; i < inputCount; i++) {
+      inputPins.push({
+        direction: PinDirection.INPUT,
+        label: `in_${i}`,
+        defaultBitWidth: bitWidth,
+        position: { x: 0, y: i },
+        isNegatable: false,
+        isClockCapable: false,
+      });
+    }
   }
 
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, h);
+  // Output pin: right side, vertically centered at (2, floor(inputCount/2))
   const outPin: PinDeclaration = {
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: bitWidth,
-    position: outputPositions[0],
+    position: { x: 2, y: Math.floor(inputCount / 2) },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -124,43 +139,37 @@ export class MuxElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const inputCount = 1 << this._selectorBits;
-    const h = componentHeight(inputCount);
+    // Height spans from y=0 to y=inputCount (selector pin is at bottom)
+    // For 2 inputs the bottom pin is at y=2, so height = inputCount
     return {
       x: this.position.x,
       y: this.position.y,
       width: COMP_WIDTH,
-      height: h,
+      height: inputCount,
     };
   }
 
   draw(ctx: RenderContext): void {
     const inputCount = 1 << this._selectorBits;
-    const h = componentHeight(inputCount);
+    // h is the span used for the trapezoid body (inputCount grid units)
+    const h = inputCount;
 
     ctx.save();
 
+    // Trapezoid: (0,-0.2) -> (2,0.25) -> (2,h-0.25) -> (0,h+0.2)
+    const poly = [
+      { x: 0, y: -0.2 },
+      { x: COMP_WIDTH, y: 0.25 },
+      { x: COMP_WIDTH, y: h - 0.25 },
+      { x: 0, y: h + 0.2 },
+    ];
+
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawPolygon(
-      [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: 1 },
-        { x: COMP_WIDTH, y: h - 1 },
-        { x: 0, y: h },
-      ],
-      true,
-    );
+    ctx.drawPolygon(poly, true);
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawPolygon(
-      [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: 1 },
-        { x: COMP_WIDTH, y: h - 1 },
-        { x: 0, y: h },
-      ],
-      false,
-    );
+    ctx.drawPolygon(poly, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });

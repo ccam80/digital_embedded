@@ -29,7 +29,7 @@ import { darkColorScheme, lightColorScheme } from '../core/renderer-interface.js
 import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.js';
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
 import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
-import { deleteSelection } from '../editor/edit-operations.js';
+import { deleteSelection, rotateSelection, mirrorSelection } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
@@ -121,7 +121,7 @@ export function initApp(search?: string): void {
   }
 
   const registry = createDefaultRegistry();
-  const circuit = new Circuit();
+  let circuit = new Circuit();
   const colorScheme = params.dark ? darkColorScheme : lightColorScheme;
 
   const canvas = document.getElementById('sim-canvas') as HTMLCanvasElement;
@@ -348,6 +348,7 @@ export function initApp(search?: string): void {
       binding.isBound ? wireSignalAccessAdapter : undefined,
     );
     wireRenderer.renderJunctionDots(canvasRenderer, circuit.wires);
+    wireRenderer.renderBusWidthMarkers(canvasRenderer, circuit.wires);
 
     const ghost = placement.getGhost();
     if (ghost) {
@@ -676,6 +677,77 @@ export function initApp(search?: string): void {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Circuit navigation (subcircuit drill-down)
+  // -------------------------------------------------------------------------
+
+  let currentCircuitName = 'Main';
+  const circuitStack: Array<{ name: string; circuit: Circuit; zoom: number; pan: { x: number; y: number } }> = [];
+
+  function updateBreadcrumb(): void {
+    let breadcrumb = document.getElementById('circuit-breadcrumb');
+    if (!breadcrumb) {
+      breadcrumb = document.createElement('div');
+      breadcrumb.id = 'circuit-breadcrumb';
+      breadcrumb.style.cssText = 'position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:100;display:flex;gap:4px;align-items:center;font-family:sans-serif;font-size:13px;color:#ccc;background:rgba(0,0,0,0.55);padding:2px 10px;border-radius:4px;pointer-events:auto;';
+      canvas.parentElement!.appendChild(breadcrumb);
+    }
+    breadcrumb.innerHTML = '';
+
+    const allEntries = [...circuitStack.map(s => s.name), currentCircuitName];
+    for (let i = 0; i < allEntries.length; i++) {
+      if (i > 0) {
+        const sep = document.createElement('span');
+        sep.textContent = ' > ';
+        sep.style.color = '#666';
+        breadcrumb.appendChild(sep);
+      }
+      const crumb = document.createElement('span');
+      crumb.textContent = allEntries[i];
+      if (i < allEntries.length - 1) {
+        crumb.style.cssText = 'cursor:pointer;color:#88f;text-decoration:underline;';
+        const levelsBack = allEntries.length - 1 - i;
+        crumb.addEventListener('click', () => {
+          for (let j = 0; j < levelsBack; j++) navigateBack();
+        });
+      } else {
+        crumb.style.fontWeight = 'bold';
+      }
+      breadcrumb.appendChild(crumb);
+    }
+
+    breadcrumb.style.display = circuitStack.length === 0 ? 'none' : 'flex';
+  }
+
+  function openSubcircuit(name: string, subCircuit: Circuit): void {
+    circuitStack.push({
+      name: currentCircuitName,
+      circuit,
+      zoom: viewport.zoom,
+      pan: { x: viewport.pan.x, y: viewport.pan.y },
+    });
+    circuit = subCircuit;
+    currentCircuitName = name;
+    viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+    selection.clear();
+    closePopup();
+    updateBreadcrumb();
+    scheduleRender();
+  }
+
+  function navigateBack(): void {
+    if (circuitStack.length === 0) return;
+    const prev = circuitStack.pop()!;
+    circuit = prev.circuit;
+    currentCircuitName = prev.name;
+    viewport.zoom = prev.zoom;
+    viewport.pan = prev.pan;
+    selection.clear();
+    closePopup();
+    updateBreadcrumb();
+    scheduleRender();
+  }
+
   canvas.addEventListener('dblclick', (e: MouseEvent) => {
     const worldPt = canvasToWorld(e);
     const elementHit = hitTestElements(worldPt, circuit.elements);
@@ -683,6 +755,13 @@ export function initApp(search?: string): void {
 
     // During simulation, don't open properties for togglable components
     if (binding.isBound && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
+
+    // Subcircuit elements: navigate into them on double-click
+    if ('definition' in elementHit && (elementHit as any).definition?.circuit) {
+      const subDef = (elementHit as any).definition;
+      openSubcircuit(subDef.name, subDef.circuit);
+      return;
+    }
 
     const def = registry.get(elementHit.typeId);
     if (!def || def.propertyDefs.length === 0) return;
@@ -738,6 +817,8 @@ export function initApp(search?: string): void {
       } else if (wireDrawing.isActive()) {
         wireDrawing.cancel();
         scheduleRender();
+      } else if (circuitStack.length > 0) {
+        navigateBack();
       }
       return;
     }
@@ -746,6 +827,13 @@ export function initApp(search?: string): void {
       if (placement.isActive()) {
         placement.rotate();
         scheduleRender();
+      } else if (!selection.isEmpty()) {
+        const elements = [...selection.getSelectedElements()];
+        if (elements.length > 0) {
+          const cmd = rotateSelection(elements);
+          undoStack.push(cmd);
+          invalidateCompiled();
+        }
       }
       return;
     }
@@ -754,6 +842,13 @@ export function initApp(search?: string): void {
       if (placement.isActive()) {
         placement.mirror();
         scheduleRender();
+      } else if (!selection.isEmpty()) {
+        const elements = [...selection.getSelectedElements()];
+        if (elements.length > 0) {
+          const cmd = mirrorSelection(elements);
+          undoStack.push(cmd);
+          invalidateCompiled();
+        }
       }
       return;
     }

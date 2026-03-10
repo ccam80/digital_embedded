@@ -41,7 +41,7 @@ function buildButtonPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -86,7 +86,7 @@ export class ButtonElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x - COMP_WIDTH,
       y: this.position.y - COMP_HEIGHT / 2,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
@@ -103,20 +103,20 @@ export class ButtonElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
     // Draw button symbol: a smaller filled rect indicating a pushbutton
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
+    ctx.drawRect(-COMP_WIDTH + 0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
 
     if (this._label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.3, {
+      ctx.drawText(this._label, -COMP_WIDTH / 2, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

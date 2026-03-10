@@ -81,6 +81,53 @@ export class WireRenderer {
   }
 
   /**
+   * Draw bus width markers (slash + number) on wires with bitWidth > 1.
+   * The marker is placed on the wire itself, 0.5 grid units from the start
+   * endpoint, so it overlays the wire regardless of routing.
+   */
+  renderBusWidthMarkers(ctx: RenderContext, wires: readonly Wire[]): void {
+    ctx.save();
+
+    for (const wire of wires) {
+      if (wire.bitWidth <= 1) continue;
+
+      const dx = wire.end.x - wire.start.x;
+      const dy = wire.end.y - wire.start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.1) continue;
+
+      const t = Math.min(0.5 / len, 0.5);
+      const mx = wire.start.x + dx * t;
+      const my = wire.start.y + dy * t;
+
+      // Normal perpendicular to wire direction
+      const nx = -dy / len;
+      const ny = dx / len;
+      const slashSize = 0.2;
+
+      ctx.setColor("COMPONENT");
+      ctx.setLineWidth(1);
+      ctx.drawLine(
+        mx - nx * slashSize + ny * slashSize * 0.75,
+        my - ny * slashSize - nx * slashSize * 0.75,
+        mx + nx * slashSize - ny * slashSize * 0.75,
+        my + ny * slashSize + nx * slashSize * 0.75,
+      );
+
+      ctx.setColor("TEXT");
+      ctx.setFont({ family: "sans-serif", size: 0.4 });
+      ctx.drawText(
+        String(wire.bitWidth),
+        mx + nx * slashSize + 0.05,
+        my + ny * slashSize - 0.15,
+        { horizontal: "left", vertical: "bottom" },
+      );
+    }
+
+    ctx.restore();
+  }
+
+  /**
    * Draw value labels at the midpoint of bus wires when an engine is
    * connected and reporting active signal values.
    */

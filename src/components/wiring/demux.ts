@@ -20,7 +20,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -35,14 +34,19 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
+const COMP_WIDTH = 2;
 
+// Body height: N outputs spaced 1 unit apart starting at y=0, so height = outputCount-1+1 = outputCount.
+// Minimum height 2 for visual clarity.
 function componentHeight(outputCount: number): number {
-  return Math.max(outputCount * 2, 4);
+  return Math.max(outputCount, 2);
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — GenericShape-style positions
+// sel pin: bottom center at (floor(COMP_WIDTH/2), h)
+// in pin: west face, centered at y = floor((outputCount-1)/2) = offs
+// out_i pins: east face at y=i (i=0..N-1)
 // ---------------------------------------------------------------------------
 
 export function buildDemuxPinDeclarations(
@@ -51,6 +55,7 @@ export function buildDemuxPinDeclarations(
 ): PinDeclaration[] {
   const outputCount = 1 << selectorBits;
   const h = componentHeight(outputCount);
+  const inY = Math.floor(outputCount / 2);
 
   const selPin: PinDeclaration = {
     direction: PinDirection.INPUT,
@@ -61,27 +66,37 @@ export function buildDemuxPinDeclarations(
     isClockCapable: false,
   };
 
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, h);
   const inPin: PinDeclaration = {
     direction: PinDirection.INPUT,
     label: "in",
     defaultBitWidth: bitWidth,
-    position: inputPositions[0],
+    position: { x: 0, y: inY },
     isNegatable: false,
     isClockCapable: false,
   };
 
-  const outputPositions = layoutPinsOnFace("east", outputCount, COMP_WIDTH, h);
   const outputPins: PinDeclaration[] = [];
-  for (let i = 0; i < outputCount; i++) {
+  if (outputCount === 2) {
+    // Java DemuxerShape special case: 2 outputs at y=0 and y=2 (gap of 2)
     outputPins.push({
-      direction: PinDirection.OUTPUT,
-      label: `out_${i}`,
-      defaultBitWidth: bitWidth,
-      position: outputPositions[i],
-      isNegatable: false,
-      isClockCapable: false,
+      direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: bitWidth,
+      position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false,
     });
+    outputPins.push({
+      direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: bitWidth,
+      position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false,
+    });
+  } else {
+    for (let i = 0; i < outputCount; i++) {
+      outputPins.push({
+        direction: PinDirection.OUTPUT,
+        label: `out_${i}`,
+        defaultBitWidth: bitWidth,
+        position: { x: COMP_WIDTH, y: i },
+        isNegatable: false,
+        isClockCapable: false,
+      });
+    }
   }
 
   return [selPin, inPin, ...outputPins];
@@ -127,9 +142,9 @@ export class DemuxElement extends AbstractCircuitElement {
     const h = componentHeight(outputCount);
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
-      height: h,
+      height: h + 0.5,
     };
   }
 
@@ -142,10 +157,10 @@ export class DemuxElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
-        { x: 0, y: 1 },
+        { x: 0, y: -0.5 },
         { x: COMP_WIDTH, y: 0 },
-        { x: COMP_WIDTH, y: h },
-        { x: 0, y: h - 1 },
+        { x: COMP_WIDTH, y: h - 1 },
+        { x: 0, y: h - 0.5 },
       ],
       true,
     );
@@ -154,17 +169,17 @@ export class DemuxElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(
       [
-        { x: 0, y: 1 },
+        { x: 0, y: -0.5 },
         { x: COMP_WIDTH, y: 0 },
-        { x: COMP_WIDTH, y: h },
-        { x: 0, y: h - 1 },
+        { x: COMP_WIDTH, y: h - 1 },
+        { x: 0, y: h - 0.5 },
       ],
       false,
     );
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("DEMUX", COMP_WIDTH / 2, h / 2, {
+    ctx.drawText("DEMUX", COMP_WIDTH / 2, (h - 1) / 2, {
       horizontal: "center",
       vertical: "middle",
     });

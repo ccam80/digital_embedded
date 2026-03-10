@@ -16,9 +16,11 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   createInverterConfig,
+  gateBodyMetrics,
   resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
+import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -32,18 +34,24 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+/**
+ * Gate width matching Java GenericShape auto-width:
+ * 1-in/1-out with no pin labels → width=1 (narrow) or 2 (wide).
+ * Java: `inputs.size()==1 && outputs.size()==1 && !showPinLabels ? 1 : 3`
+ * Then .setWide(ws) adds 1 if wideShape.
+ */
+function compWidth(wideShape: boolean): number { return wideShape ? 2 : 1; }
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
-/** Output pin offset past the inversion bubble (2 * bubbleRadius). */
-const OUTPUT_BUBBLE_OFFSET = 0.6;
+/** Output pin 1 grid unit past body edge (matching Java GenericShape inverted dx=SIZE). */
+const OUTPUT_BUBBLE_OFFSET = 1;
 
-function buildPinDeclarations(bitWidth: number): PinDeclaration[] {
-  return standardGatePinLayout(["in"], "out", COMP_WIDTH, COMP_HEIGHT, bitWidth, OUTPUT_BUBBLE_OFFSET);
+function buildPinDeclarations(bitWidth: number, wideShape: boolean = true): PinDeclaration[] {
+  const { bodyHeight } = gateBodyMetrics(1);
+  return standardGatePinLayout(["in"], "out", compWidth(wideShape), bodyHeight, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,9 +73,9 @@ export class NotElement extends AbstractCircuitElement {
     super("Not", instanceId, position, rotation, mirror, props);
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", true);
+    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
 
-    const decls = buildPinDeclarations(this._bitWidth);
+    const decls = buildPinDeclarations(this._bitWidth, this._wideShape);
     this._pins = resolvePins(
       decls,
       position,
@@ -83,25 +91,27 @@ export class NotElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    const { topBorder, bodyHeight } = gateBodyMetrics(1);
     return {
       x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      y: this.position.y - topBorder,
+      width: compWidth(this._wideShape),
+      height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const w = compWidth(this._wideShape);
 
     ctx.save();
 
     if (this._wideShape) {
-      this._drawIEEE(ctx);
+      this._drawIEEE(ctx, w);
     } else {
-      this._drawIEC(ctx);
+      this._drawIEC(ctx, w);
     }
 
-    this._drawLabel(ctx);
+    this._drawLabel(ctx, w);
 
     ctx.restore();
   }
@@ -109,37 +119,40 @@ export class NotElement extends AbstractCircuitElement {
   /**
    * IEC/DIN shape: rectangle with "1" symbol inside, output bubble.
    */
-  private _drawIEC(ctx: RenderContext): void {
+  private _drawIEC(ctx: RenderContext, w: number): void {
+    const { topBorder, bodyHeight } = gateBodyMetrics(1);
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -topBorder, w, bodyHeight, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -topBorder, w, bodyHeight, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("1", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    drawUprightText(ctx, "1", w / 2, -topBorder + bodyHeight / 2, { horizontal: "center", vertical: "middle" }, this.rotation);
 
     // Output inversion bubble
     const BUBBLE_RADIUS = 0.3;
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(COMP_WIDTH + BUBBLE_RADIUS, COMP_HEIGHT / 2, BUBBLE_RADIUS, false);
+    ctx.drawCircle(w + BUBBLE_RADIUS, 0, BUBBLE_RADIUS, false);
   }
 
   /**
    * IEEE/US shape: triangle pointing right, with inversion bubble at output.
    */
-  private _drawIEEE(ctx: RenderContext): void {
-    const halfH = COMP_HEIGHT / 2;
+  private _drawIEEE(ctx: RenderContext, w: number): void {
+    const { topBorder, bodyHeight } = gateBodyMetrics(1);
+    const yTop = -topBorder;
+    const yBottom = -topBorder + bodyHeight;
     const BUBBLE_RADIUS = 0.3;
 
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPath({
       operations: [
-        { op: "moveTo", x: 0, y: 0 },
-        { op: "lineTo", x: COMP_WIDTH - BUBBLE_RADIUS * 2, y: halfH },
-        { op: "lineTo", x: 0, y: COMP_HEIGHT },
+        { op: "moveTo", x: 0, y: yTop },
+        { op: "lineTo", x: w - BUBBLE_RADIUS * 2, y: 0 },
+        { op: "lineTo", x: 0, y: yBottom },
         { op: "closePath" },
       ],
     }, true);
@@ -147,23 +160,23 @@ export class NotElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPath({
       operations: [
-        { op: "moveTo", x: 0, y: 0 },
-        { op: "lineTo", x: COMP_WIDTH - BUBBLE_RADIUS * 2, y: halfH },
-        { op: "lineTo", x: 0, y: COMP_HEIGHT },
+        { op: "moveTo", x: 0, y: yTop },
+        { op: "lineTo", x: w - BUBBLE_RADIUS * 2, y: 0 },
+        { op: "lineTo", x: 0, y: yBottom },
         { op: "closePath" },
       ],
     }, false);
 
-    ctx.drawCircle(COMP_WIDTH - BUBBLE_RADIUS, halfH, BUBBLE_RADIUS, false);
+    ctx.drawCircle(w - BUBBLE_RADIUS, 0, BUBBLE_RADIUS, false);
   }
 
-  private _drawLabel(ctx: RenderContext): void {
+  private _drawLabel(ctx: RenderContext, w: number): void {
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length === 0) return;
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+    drawUprightText(ctx, label, w / 2, -0.5, { horizontal: "center", vertical: "bottom" }, this.rotation);
   }
 
   getHelpText(): string {
@@ -259,7 +272,7 @@ export const NotDefinition: ComponentDefinition = {
   typeId: -1,
   factory: notFactory,
   executeFn: executeNot,
-  pinLayout: buildPinDeclarations(1),
+  pinLayout: buildPinDeclarations(1, false),
   propertyDefs: NOT_PROPERTY_DEFS,
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,

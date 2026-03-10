@@ -14,6 +14,7 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   createInverterConfig,
+  gateBodyMetrics,
   resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
@@ -27,10 +28,10 @@ import {
 } from "../../core/registry.js";
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
 
 function buildNegPinDeclarations(bitWidth: number): PinDeclaration[] {
-  return standardGatePinLayout(["in"], "out", COMP_WIDTH, COMP_HEIGHT, bitWidth);
+  const { bodyHeight } = gateBodyMetrics(1);
+  return standardGatePinLayout(["in"], "out", COMP_WIDTH, bodyHeight, bitWidth);
 }
 
 export class NegElement extends AbstractCircuitElement {
@@ -53,19 +54,21 @@ export class NegElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    const { topBorder, bodyHeight } = gateBodyMetrics(1);
+    return { x: this.position.x, y: this.position.y - topBorder, width: COMP_WIDTH, height: bodyHeight };
   }
 
   draw(ctx: RenderContext): void {
+    const { topBorder, bodyHeight } = gateBodyMetrics(1);
     ctx.save();
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -topBorder, COMP_WIDTH, bodyHeight, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -topBorder, COMP_WIDTH, bodyHeight, false);
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("-A", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("-A", COMP_WIDTH / 2, -topBorder + bodyHeight / 2, { horizontal: "center", vertical: "middle" });
     ctx.restore();
   }
 

@@ -37,11 +37,16 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+const COMP_WIDTH = 3;
+// 3 inputs, 2 outputs, symmetric=false: offs=0, no even correction
+// inputs: J@y=0, C@y=1, K@y=2; outputs: Q@y=0, ~Q@y=1
+// max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
+const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations
+// Pin declarations — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
+// inputs: J@y=0, C@y=1, K@y=2
+// outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
 
 export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -49,7 +54,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "J",
     defaultBitWidth: 1,
-    position: { x: 0, y: 1 },
+    position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -57,7 +62,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "C",
     defaultBitWidth: 1,
-    position: { x: 0, y: 2 },
+    position: { x: 0, y: 1 },
     isNegatable: false,
     isClockCapable: true,
   },
@@ -65,7 +70,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "K",
     defaultBitWidth: 1,
-    position: { x: 0, y: 3 },
+    position: { x: 0, y: 2 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -73,7 +78,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -81,7 +86,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "~Q",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 3 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -119,7 +124,7 @@ export class JKElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -129,22 +134,22 @@ export class JKElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("J", 0.6, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.6, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", 0.6, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.6, 3, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("J", 0.6, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("C", 0.6, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("K", 0.6, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 1.5, 0.5, 2);
-    ctx.drawLine(0.5, 2, 0, 2.5);
+    ctx.drawLine(0, 0.5, 0.5, 1);
+    ctx.drawLine(0.5, 1, 0, 1.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

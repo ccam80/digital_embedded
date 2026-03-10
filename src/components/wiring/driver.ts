@@ -30,20 +30,36 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+/**
+ * Driver dimensions in grid units, ported from Java DriverShape.
+ *
+ * Java SIZE = 20px = 1 grid unit.  SIZE2 = 10px = 0.5 grid units.
+ * Pin layout: input at (-1, 0), sel at (0, ±1), output at (1, 0).
+ * Triangle from roughly (-1, -0.6) → (1, 0) → (-1, 0.6).
+ * Component origin is at the center (where the sel pin stem meets the triangle).
+ */
+const COMP_WIDTH = 2;   // from input pin x=-1 to output pin x=1
+const COMP_HEIGHT = 2;  // from sel pin y=-1 to y=+1 (or 0 to 2 with bottom sel)
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
-function buildDriverPinDeclarations(bitWidth: number): PinDeclaration[] {
+/**
+ * Pin positions match Java DriverShape: origin at centre of component.
+ *
+ * Java coords (pixels):  input(-20,0), sel(0,±20), output(20,0)
+ * Grid units (/20):      input(-1,0),  sel(0,±1),  output(1,0)
+ *
+ * flipSelPos controls whether sel is above (default, y=-1) or below (y=+1).
+ */
+function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: bitWidth,
-      position: { x: 0, y: 1 },
+      position: { x: -1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -51,7 +67,7 @@ function buildDriverPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "sel",
       defaultBitWidth: 1,
-      position: { x: 1, y: COMP_HEIGHT },
+      position: { x: 0, y: flipSelPos ? 1 : -1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -59,7 +75,7 @@ function buildDriverPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: { x: COMP_WIDTH, y: 1 },
+      position: { x: 1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -72,6 +88,7 @@ function buildDriverPinDeclarations(bitWidth: number): PinDeclaration[] {
 
 export class DriverElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
+  private readonly _flipSelPos: boolean;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -84,8 +101,9 @@ export class DriverElement extends AbstractCircuitElement {
     super("Driver", instanceId, position, rotation, mirror, props);
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
+    this._flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
 
-    const decls = buildDriverPinDeclarations(this._bitWidth);
+    const decls = buildDriverPinDeclarations(this._bitWidth, this._flipSelPos);
     this._pins = resolvePins(
       decls,
       position,
@@ -101,25 +119,31 @@ export class DriverElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Origin-centred: pins span from -1 to +1 on both axes
     return {
-      x: this.position.x,
-      y: this.position.y,
+      x: this.position.x - 1,
+      y: this.position.y - 1,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
     ctx.save();
 
-    // Triangle body pointing right (buffer/driver symbol)
+    // Triangle body pointing right, centred on origin.
+    // Java: (-SIZE+1, -SIZE2-2) → (SIZE-1, 0) → (-SIZE+1, SIZE2+2)
+    // Grid: (-0.95, -0.6)      → (0.95, 0)    → (-0.95, 0.6)
+    const triLeft = -0.95;
+    const triRight = 0.95;
+    const triHalf = 0.6;
+
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
-        { x: 0, y: COMP_HEIGHT },
+        { x: triLeft, y: -triHalf },
+        { x: triRight, y: 0 },
+        { x: triLeft, y: triHalf },
       ],
       true,
     );
@@ -127,12 +151,16 @@ export class DriverElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(
       [
-        { x: 0, y: 0 },
-        { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
-        { x: 0, y: COMP_HEIGHT },
+        { x: triLeft, y: -triHalf },
+        { x: triRight, y: 0 },
+        { x: triLeft, y: triHalf },
       ],
       false,
     );
+
+    // Sel pin stem: line from centre to sel pin
+    const selY = this._flipSelPos ? 1 : -1;
+    ctx.drawLine(0, selY, 0, selY > 0 ? 0.35 : -0.35);
 
     ctx.restore();
   }
@@ -183,6 +211,11 @@ export const DRIVER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "bitWidth",
     convert: (v) => parseInt(v, 10),
   },
+  {
+    xmlName: "flipSelPos",
+    propertyKey: "flipSelPos",
+    convert: (v) => v === "true",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -198,6 +231,13 @@ const DRIVER_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the data signal",
+  },
+  {
+    key: "flipSelPos",
+    type: PropertyType.BOOLEAN,
+    label: "Flip Sel Position",
+    defaultValue: false,
+    description: "When true, the select pin is below the triangle instead of above",
   },
 ];
 
