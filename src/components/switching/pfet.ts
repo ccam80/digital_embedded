@@ -34,19 +34,27 @@ import type { FETLayout } from "./nfet.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+/** Java FETShapeP: Gate at (0,0), Drain at (SIZE,0), Source at (SIZE, SIZE*2).
+ *  SIZE = 20px = 1 grid unit. So width = 1, height = 2. */
+const COMP_WIDTH = 1;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
 // ---------------------------------------------------------------------------
 
+/**
+ * Java FETShapeP.getPins():
+ *   Gate  at (0, 0)        — input[0]
+ *   Drain at (SIZE, 0)     — output[0]  (1, 0) in grid
+ *   Source at (SIZE, SIZE*2) — output[1]  (1, 2) in grid
+ */
 const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
   {
     direction: PinDirection.INPUT,
     label: "G",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -104,32 +112,34 @@ export class PFETElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    // Java FETShapeP: SIZE=1 grid, SIZE2=0.5 grid
+    // Gate at (0, 0), vertical body from y=0 to y=2 (SIZE*2)
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line
-    ctx.drawLine(0, COMP_HEIGHT / 2, 1, COMP_HEIGHT / 2);
-    // Gate bar
-    ctx.drawLine(1, 0.5, 1, COMP_HEIGHT - 0.5);
-    // Channel line
-    ctx.drawLine(1.5, 0.5, 1.5, COMP_HEIGHT - 0.5);
-    // Source and drain connections
-    ctx.drawLine(1.5, 0.5, COMP_WIDTH, 0.5);
-    ctx.drawLine(1.5, COMP_HEIGHT - 0.5, COMP_WIDTH, COMP_HEIGHT - 0.5);
+    // Gate line: from gate pin (0,0) to gate bar
+    ctx.drawLine(0, 0, 0.4, 0);
+    // Gate bar (vertical insulator)
+    ctx.drawLine(0.4, 0.4, 0.4, 1.6);
+    // Channel line (parallel to gate bar, on drain/source side)
+    ctx.drawLine(0.6, 0.4, 0.6, 1.6);
+    // Drain connection: from channel to drain pin (1, 0)
+    ctx.drawLine(0.6, 0.4, 1, 0.4);
+    ctx.drawLine(1, 0.4, 1, 0);
+    // Source connection: from channel to source pin (1, 2)
+    ctx.drawLine(0.6, 1.6, 1, 1.6);
+    ctx.drawLine(1, 1.6, 1, 2);
 
-    // P-channel arrow pointing outward (away from channel)
-    ctx.drawLine(1.9, COMP_HEIGHT / 2, 1.5, COMP_HEIGHT / 2 - 0.3);
-    ctx.drawLine(1.9, COMP_HEIGHT / 2, 1.5, COMP_HEIGHT / 2 + 0.3);
-
-    // Inversion bubble on gate (P-channel)
-    ctx.drawCircle(0.8, COMP_HEIGHT / 2, 0.15, false);
+    // P-channel arrow (pointing from channel toward gate)
+    ctx.drawLine(0.4, 1, 0.6, 1 - 0.15);
+    ctx.drawLine(0.4, 1, 0.6, 1 + 0.15);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
+      ctx.setFont({ family: "sans-serif", size: 0.6 });
+      ctx.drawText(label, 0.5, -0.3, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

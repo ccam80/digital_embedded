@@ -103,9 +103,9 @@ export class TunnelElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      y: this.position.y - 0.4,
+      width: 1.0,
+      height: 0.8,
     };
   }
 
@@ -115,15 +115,6 @@ export class TunnelElement extends AbstractCircuitElement {
     ctx.save();
 
     // Triangle pointing right from origin, matching Digital's TunnelShape
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawPolygon(
-      [
-        { x: 0, y: 0 },
-        { x: ARROW_W, y: ARROW_HALF_H },
-        { x: ARROW_W, y: -ARROW_HALF_H },
-      ],
-      true,
-    );
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPolygon(
@@ -141,7 +132,7 @@ export class TunnelElement extends AbstractCircuitElement {
       ctx.setFont({ family: "sans-serif", size: 0.6 });
       if (this.rotation === 2) {
         ctx.save();
-        ctx.translate(ARROW_W + 0.15, 0);
+        ctx.translate(ARROW_W + 0.25, 0);
         ctx.rotate(Math.PI);
         ctx.drawText(label, 0, 0, {
           horizontal: "right",
@@ -149,7 +140,7 @@ export class TunnelElement extends AbstractCircuitElement {
         });
         ctx.restore();
       } else {
-        ctx.drawText(label, ARROW_W + 0.15, 0, {
+        ctx.drawText(label, ARROW_W + 0.25, 0, {
           horizontal: "left",
           vertical: "middle",
         });

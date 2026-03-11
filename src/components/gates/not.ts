@@ -91,83 +91,50 @@ export class NotElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(1);
+    const wide = this._wideShape;
     return {
       x: this.position.x,
-      y: this.position.y - topBorder,
-      width: compWidth(this._wideShape),
-      height: bodyHeight,
+      y: this.position.y - (wide ? 1.1 : 0.6),
+      width: wide ? 3 : 2,
+      height: wide ? 2.2 : 1.2,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const w = compWidth(this._wideShape);
-
     ctx.save();
-
-    if (this._wideShape) {
-      this._drawIEEE(ctx, w);
-    } else {
-      this._drawIEC(ctx, w);
-    }
-
-    this._drawLabel(ctx, w);
-
+    this._drawIEEE(ctx);
+    this._drawLabel(ctx, this._wideShape ? 3 : 2);
     ctx.restore();
   }
 
   /**
-   * IEC/DIN shape: rectangle with "1" symbol inside, output bubble.
-   */
-  private _drawIEC(ctx: RenderContext, w: number): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(1);
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -topBorder, w, bodyHeight, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -topBorder, w, bodyHeight, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    drawUprightText(ctx, "1", w / 2, -topBorder + bodyHeight / 2, { horizontal: "center", vertical: "middle" }, this.rotation);
-
-    // Output inversion bubble
-    const BUBBLE_RADIUS = 0.3;
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawCircle(w + BUBBLE_RADIUS, 0, BUBBLE_RADIUS, false);
-  }
-
-  /**
    * IEEE/US shape: triangle pointing right, with inversion bubble at output.
+   * Coordinates from Java IEEENotShape.
+   * Narrow: triangle (0.05,-0.6)→(0.95,0)→(0.05,0.6), bubble at (1.5,0) r=0.45.
+   * Wide: triangle (0.05,-1.1)→(1.95,0)→(0.05,1.1), bubble at (2.5,0) r=0.45.
    */
-  private _drawIEEE(ctx: RenderContext, w: number): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(1);
-    const yTop = -topBorder;
-    const yBottom = -topBorder + bodyHeight;
-    const BUBBLE_RADIUS = 0.3;
+  private _drawIEEE(ctx: RenderContext): void {
+    const wide = this._wideShape;
+    const BUBBLE_RADIUS = 0.45;
+
+    const triTipX = wide ? 1.95 : 0.95;
+    const triY = wide ? 1.1 : 0.6;
+    const bubbleCX = wide ? 2.5 : 1.5;
+
+    const ops = [
+      { op: "moveTo" as const, x: 0.05, y: -triY },
+      { op: "lineTo" as const, x: triTipX, y: 0 },
+      { op: "lineTo" as const, x: 0.05, y: triY },
+      { op: "closePath" as const },
+    ];
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: yTop },
-        { op: "lineTo", x: w - BUBBLE_RADIUS * 2, y: 0 },
-        { op: "lineTo", x: 0, y: yBottom },
-        { op: "closePath" },
-      ],
-    }, true);
+    ctx.drawPath({ operations: ops }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: yTop },
-        { op: "lineTo", x: w - BUBBLE_RADIUS * 2, y: 0 },
-        { op: "lineTo", x: 0, y: yBottom },
-        { op: "closePath" },
-      ],
-    }, false);
+    ctx.drawPath({ operations: ops }, false);
 
-    ctx.drawCircle(w - BUBBLE_RADIUS, 0, BUBBLE_RADIUS, false);
+    ctx.drawCircle(bubbleCX, 0, BUBBLE_RADIUS, false);
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {

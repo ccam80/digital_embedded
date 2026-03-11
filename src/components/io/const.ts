@@ -94,28 +94,20 @@ export class ConstElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 1.5,
+      y: this.position.y - 0.3,
+      width: 1.5,
+      height: 0.6,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const yOff = -COMP_HEIGHT / 2;
-
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
-
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText(this._value.toString(10), -COMP_WIDTH / 2, 0, {
-      horizontal: "center",
+    ctx.setFont({ family: "sans-serif", size: 0.9 });
+    ctx.drawText(this._value.toString(10), -0.15, 0, {
+      horizontal: "right",
       vertical: "middle",
     });
 

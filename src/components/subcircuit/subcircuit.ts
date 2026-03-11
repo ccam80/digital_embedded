@@ -28,7 +28,7 @@ import {
   type ComponentLayout,
   type ComponentRegistry,
 } from "../../core/registry.js";
-import type { Circuit } from "../../core/circuit.js";
+import type { Circuit, CustomShapeData } from "../../core/circuit.js";
 import type { ShapeMode } from "./shape-renderer.js";
 import {
   drawDefaultShape,
@@ -106,12 +106,22 @@ export class SubcircuitElement extends AbstractCircuitElement {
       this._height = Math.max(inputCount, outputCount, 1);
     }
 
-    const positionedPins = buildPositionedPinDeclarations(
-      definition.pinLayout,
-      this._width,
-      this._height,
-      this._effectiveShapeMode,
-    );
+    const customShape = definition.circuit.metadata.customShape;
+    let positionedPins: PinDeclaration[];
+
+    if (this._effectiveShapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
+      positionedPins = buildCustomPinPositions(definition.pinLayout, customShape);
+      const extents = computeCustomShapeExtents(customShape);
+      this._width = extents.width;
+      this._height = extents.height;
+    } else {
+      positionedPins = buildPositionedPinDeclarations(
+        definition.pinLayout,
+        this._width,
+        this._height,
+        this._effectiveShapeMode,
+      );
+    }
 
     this._pins = resolvePins(
       positionedPins,
@@ -149,19 +159,26 @@ export class SubcircuitElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    const positionedPins = buildPositionedPinDeclarations(
-      this._definition.pinLayout,
-      this._width,
-      this._height,
-      this._effectiveShapeMode,
-    );
+    const customShape = this._definition.circuit.metadata.customShape;
+    let positionedPins: PinDeclaration[];
+
+    if (this._effectiveShapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
+      positionedPins = buildCustomPinPositions(this._definition.pinLayout, customShape);
+    } else {
+      positionedPins = buildPositionedPinDeclarations(
+        this._definition.pinLayout,
+        this._width,
+        this._height,
+        this._effectiveShapeMode,
+      );
+    }
 
     switch (this._effectiveShapeMode) {
       case "DIL":
         drawDILShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
         break;
       case "CUSTOM":
-        drawCustomShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
+        drawCustomShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation, customShape);
         break;
       case "LAYOUT":
         drawLayoutShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
@@ -311,10 +328,11 @@ function buildLayoutPositions(
     positioned.push({ ...groups.right[i], position: { x: width, y: rightY[i] } });
   }
 
-  // Top face: y=-1 (stub extends above chip), x distributed across width
+  // Top face: y=0 (at chip edge, matching Java LayoutShape startPos=(0,0))
+  // Java: top.createPosition(map, new Vector(0, 0), width) — pins AT the edge.
   const topX = distribute(groups.top.length, width);
   for (let i = 0; i < groups.top.length; i++) {
-    positioned.push({ ...groups.top[i], position: { x: topX[i], y: -1 } });
+    positioned.push({ ...groups.top[i], position: { x: topX[i], y: 0 } });
   }
 
   // Bottom face: y=height (stub extends below chip), x distributed across width
@@ -324,6 +342,68 @@ function buildLayoutPositions(
   }
 
   return positioned;
+}
+
+// ---------------------------------------------------------------------------
+// CUSTOM shape pin positioning and extent computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Build pin declarations using positions from the custom shape data.
+ * Each interface pin is looked up by name in the custom shape's pin map.
+ * Pins not found in the custom shape map fall back to (0, 0).
+ */
+function buildCustomPinPositions(
+  pins: readonly PinDeclaration[],
+  customShape: CustomShapeData,
+): PinDeclaration[] {
+  return pins.map((pin) => {
+    const customPin = customShape.pins.get(pin.label);
+    if (customPin) {
+      const face = customPin.pos.x === 0 ? "left" as const : "right" as const;
+      return { ...pin, position: { x: customPin.pos.x, y: customPin.pos.y }, face };
+    }
+    return { ...pin, position: { x: 0, y: 0 }, face: "left" as const };
+  });
+}
+
+/**
+ * Compute width and height from the union of all custom pin positions
+ * and drawable extents. Returns grid-unit dimensions.
+ */
+function computeCustomShapeExtents(customShape: CustomShapeData): { width: number; height: number } {
+  let maxX = 0;
+  let maxY = 0;
+
+  for (const [, pin] of customShape.pins) {
+    if (pin.pos.x > maxX) maxX = pin.pos.x;
+    if (pin.pos.y > maxY) maxY = pin.pos.y;
+  }
+
+  for (const d of customShape.drawables) {
+    switch (d.type) {
+      case "line":
+        if (d.p1.x > maxX) maxX = d.p1.x;
+        if (d.p2.x > maxX) maxX = d.p2.x;
+        if (d.p1.y > maxY) maxY = d.p1.y;
+        if (d.p2.y > maxY) maxY = d.p2.y;
+        break;
+      case "circle":
+        if (d.p1.x > maxX) maxX = d.p1.x;
+        if (d.p2.x > maxX) maxX = d.p2.x;
+        if (d.p1.y > maxY) maxY = d.p1.y;
+        if (d.p2.y > maxY) maxY = d.p2.y;
+        break;
+      case "text":
+        if (d.pos.x > maxX) maxX = d.pos.x;
+        if (d.pos.y > maxY) maxY = d.pos.y;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { width: Math.max(maxX, 1), height: Math.max(maxY, 1) };
 }
 
 // ---------------------------------------------------------------------------

@@ -69,6 +69,32 @@ export class Net {
 // CircuitMetadata
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Custom shape data types (for CUSTOM subcircuit shape mode)
+// ---------------------------------------------------------------------------
+
+export interface RGBA {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+export type CustomDrawable =
+  | { type: "poly"; path: string; evenOdd: boolean; thickness: number; filled: boolean; color: RGBA }
+  | { type: "line"; p1: Point; p2: Point; thickness: number; color: RGBA }
+  | { type: "circle"; p1: Point; p2: Point; thickness: number; filled: boolean; color: RGBA }
+  | { type: "text"; pos: Point; text: string; orientation: string; size: number; color: RGBA };
+
+export interface CustomShapeData {
+  pins: Map<string, { pos: { x: number; y: number }; showLabel: boolean }>;
+  drawables: CustomDrawable[];
+}
+
+// ---------------------------------------------------------------------------
+// CircuitMetadata
+// ---------------------------------------------------------------------------
+
 export interface CircuitMetadata {
   /** Display name for this circuit. */
   name: string;
@@ -88,6 +114,8 @@ export interface CircuitMetadata {
   chipHeight: number;
   /** Subcircuit shape type: DEFAULT, DIL, CUSTOM, LAYOUT. */
   shapeType: string;
+  /** Custom shape data parsed from the <shape> element in CUSTOM mode subcircuits. */
+  customShape?: CustomShapeData;
 }
 
 export function defaultCircuitMetadata(): CircuitMetadata {

@@ -645,12 +645,15 @@ describe("ConstComponent", () => {
   });
 
   describe("draw", () => {
-    it("draw renders component body rect", () => {
+    it("draw renders text only, no body rect", () => {
       const el = makeConst({ value: 7 });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      expect(rectCalls.length).toBe(0);
+      const textCalls = calls.filter((c) => c.method === "drawText");
+      expect(textCalls.length).toBeGreaterThanOrEqual(1);
+      expect(textCalls.some((c) => c.args[0] === "7")).toBe(true);
     });
 
     it("draw renders the constant value as text", () => {

@@ -18,6 +18,9 @@ import type {
   DigWire,
   DigPoint,
   RomListData,
+  DigCustomShapeData,
+  DigCustomShapePin,
+  DigCustomShapeDrawable,
 } from "./dig-schema.js";
 import { createDomParser } from "./dom-parser.js";
 
@@ -202,6 +205,9 @@ export function parseAttributeValue(valueElement: Element, rootElement: Element)
     case "romList":
       return { type: "romList", value: parseRomList(valueElement) };
 
+    case "shape":
+      return { type: "customShape", value: parseCustomShape(valueElement) };
+
     default:
       // Preserve unknown types as enum (future-proofing).
       return { type: "enum", xmlTag: tag, value: textContent(valueElement) };
@@ -336,6 +342,134 @@ function parseRomList(romListEl: Element): RomListData {
   });
 
   return { files };
+}
+
+// ---------------------------------------------------------------------------
+// Custom shape parsing
+// ---------------------------------------------------------------------------
+
+function parseCustomShape(shapeEl: Element): DigCustomShapeData {
+  const pins = parseCustomShapePins(shapeEl);
+  const drawables = parseCustomShapeDrawables(shapeEl);
+  return { pins, drawables };
+}
+
+function parseCustomShapePins(shapeEl: Element): DigCustomShapePin[] {
+  const pinsEl = getChildElement(shapeEl, "pins");
+  if (!pinsEl) return [];
+
+  const result: DigCustomShapePin[] = [];
+  for (const entryEl of getChildElementsByTagName(pinsEl, "entry")) {
+    const children = childElements(entryEl);
+    if (children.length < 2) continue;
+    const nameEl = children[0];
+    if (nameEl.tagName !== "string") continue;
+    const name = textContent(nameEl);
+
+    const pinEl = children[1];
+    if (pinEl.tagName !== "pin") continue;
+
+    const posEl = getChildElement(pinEl, "pos");
+    const showLabelEl = getChildElement(pinEl, "showLabel");
+
+    const pos: DigPoint = posEl
+      ? { x: parseInt(posEl.getAttribute("x") ?? "0", 10), y: parseInt(posEl.getAttribute("y") ?? "0", 10) }
+      : { x: 0, y: 0 };
+
+    const showLabel = showLabelEl ? textContent(showLabelEl) === "true" : false;
+
+    result.push({ name, pos, showLabel });
+  }
+  return result;
+}
+
+function parseCustomShapeDrawables(shapeEl: Element): DigCustomShapeDrawable[] {
+  const drawablesEl = getChildElement(shapeEl, "drawables");
+  if (!drawablesEl) return [];
+
+  const result: DigCustomShapeDrawable[] = [];
+  for (const child of childElements(drawablesEl)) {
+    const drawable = parseOneDrawable(child);
+    if (drawable) result.push(drawable);
+  }
+  return result;
+}
+
+function parseOneDrawable(el: Element): DigCustomShapeDrawable | null {
+  switch (el.tagName) {
+    case "poly": {
+      const polyEl = getChildElement(el, "poly");
+      if (!polyEl) return null;
+      const path = polyEl.getAttribute("path") ?? "";
+      const evenOdd = polyEl.getAttribute("evenOdd") === "true";
+      const thickness = parseIntChild(el, "thickness", 4);
+      const filled = parseBoolChild(el, "filled", false);
+      const color = parseColorChild(el);
+      return { type: "poly", path, evenOdd, thickness, filled, color };
+    }
+
+    case "line": {
+      const p1El = getChildElement(el, "p1");
+      const p2El = getChildElement(el, "p2");
+      if (!p1El || !p2El) return null;
+      const p1 = extractPoint(p1El);
+      const p2 = extractPoint(p2El);
+      const thickness = parseIntChild(el, "thickness", 4);
+      const color = parseColorChild(el);
+      return { type: "line", p1, p2, thickness, color };
+    }
+
+    case "circle": {
+      const p1El = getChildElement(el, "p1");
+      const p2El = getChildElement(el, "p2");
+      if (!p1El || !p2El) return null;
+      const p1 = extractPoint(p1El);
+      const p2 = extractPoint(p2El);
+      const thickness = parseIntChild(el, "thickness", 4);
+      const filled = parseBoolChild(el, "filled", false);
+      const color = parseColorChild(el);
+      return { type: "circle", p1, p2, thickness, filled, color };
+    }
+
+    case "text": {
+      const p1El = getChildElement(el, "p1");
+      if (!p1El) return null;
+      const pos = extractPoint(p1El);
+      const textEl = getChildElement(el, "text");
+      const textStr = textEl ? textContent(textEl) : "";
+      const orientEl = getChildElement(el, "orientation");
+      const orientation = orientEl ? textContent(orientEl) : "LEFTCENTER";
+      const size = parseIntChild(el, "size", 20);
+      const color = parseColorChild(el);
+      return { type: "text", pos, text: textStr, orientation, size, color };
+    }
+
+    default:
+      return null;
+  }
+}
+
+function parseIntChild(parent: Element, tagName: string, defaultValue: number): number {
+  const el = getChildElement(parent, tagName);
+  if (!el) return defaultValue;
+  const n = parseInt(textContent(el), 10);
+  return isNaN(n) ? defaultValue : n;
+}
+
+function parseBoolChild(parent: Element, tagName: string, defaultValue: boolean): boolean {
+  const el = getChildElement(parent, tagName);
+  if (!el) return defaultValue;
+  return textContent(el) === "true";
+}
+
+function parseColorChild(parent: Element): { r: number; g: number; b: number; a: number } {
+  const colorEl = getChildElement(parent, "color");
+  if (!colorEl) return { r: 0, g: 0, b: 0, a: 255 };
+  const r = parseIntChild(colorEl, "red", 0);
+  const g = parseIntChild(colorEl, "green", 0);
+  const b = parseIntChild(colorEl, "blue", 0);
+  const a = parseIntChild(colorEl, "alpha", 255);
+  return { r, g, b, a };
 }
 
 // ---------------------------------------------------------------------------

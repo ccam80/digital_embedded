@@ -123,23 +123,18 @@ export class XNOrElement extends AbstractCircuitElement {
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape),
+      width: compWidth(this._wideShape) + 1,
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
     const w = compWidth(this._wideShape);
 
     ctx.save();
 
-    if (this._wideShape) {
-      this._drawIEEE(ctx, topBorder, bodyHeight, w);
-    } else {
-      this._drawIEC(ctx, topBorder, bodyHeight, w);
-    }
-
+    this._drawIEEE(ctx, w);
+    this._drawInputStubs(ctx);
     this._drawLabel(ctx, w);
     this._drawInversionBubbles(ctx);
 
@@ -147,107 +142,70 @@ export class XNOrElement extends AbstractCircuitElement {
   }
 
   /**
-   * IEC/DIN shape: rectangle with "=1" symbol inside, output inversion bubble.
+   * IEEE/US shape: XOR gate body with inversion bubble at output.
+   * Coordinates from Java IEEEXOrShape + IEEEGenericShape inversion bubble.
    */
-  private _drawIEC(ctx: RenderContext, top: number, h: number, w: number): void {
+  private _drawIEEE(ctx: RenderContext, w: number): void {
+    const outputY = Math.floor(this._inputCount / 2);
+    const wide = w === 4;
+    const BUBBLE_RADIUS = 0.45;
+
+    const bodyOps = wide ? [
+      { op: "moveTo" as const, x: 1.0, y: 2.5 },
+      { op: "lineTo" as const, x: 0.5, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: 1.7, cp2x: 1.0, cp2y: 0.3, x: 0.5, y: -0.5 },
+      { op: "lineTo" as const, x: 1.0, y: -0.5 },
+      { op: "curveTo" as const, cp1x: 2.0, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 3.0, cp1y: 2.0, cp2x: 2.0, cp2y: 2.5, x: 1.0, y: 2.5 },
+      { op: "closePath" as const },
+    ] : [
+      { op: "moveTo" as const, x: 1.0, y: 2.5 },
+      { op: "lineTo" as const, x: 0.55, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: 2.0, cp2x: 1.0, cp2y: 0, x: 0.55, y: -0.5 },
+      { op: "lineTo" as const, x: 1.0, y: -0.5 },
+      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.5, cp2y: 2.5, x: 1.0, y: 2.5 },
+      { op: "closePath" as const },
+    ];
+
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -top, w, h, true);
+    ctx.drawPath({ operations: bodyOps }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, -top, w, h, false);
+    ctx.drawPath({ operations: bodyOps }, false);
 
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("=1", w / 2, -top + h / 2, { horizontal: "center", vertical: "middle" });
+    const backCurveOps = wide ? [
+      { op: "moveTo" as const, x: 0.0, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 0.5, cp1y: 1.7, cp2x: 0.5, cp2y: 0.3, x: 0.0, y: -0.5 },
+    ] : [
+      { op: "moveTo" as const, x: 0.0, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 0.5, cp1y: 2.0, cp2x: 0.5, cp2y: 0, x: 0.0, y: -0.5 },
+    ];
 
-    // Output inversion bubble
-    const BUBBLE_RADIUS = 0.3;
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawCircle(w + BUBBLE_RADIUS, -top + h / 2, BUBBLE_RADIUS, false);
+    ctx.drawPath({ operations: backCurveOps }, false);
+
+    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
   }
 
   /**
-   * IEEE/US shape: XOR gate body (OR with extra curved line) and inversion bubble at output.
+   * Draw input wire stubs from pin position to body edge.
+   * XOR has longer stubs than OR because of the double-back gap:
+   * top/bottom: 0.7 grid, center (odd count): 0.85 grid.
    */
-  private _drawIEEE(ctx: RenderContext, top: number, h: number, w: number): void {
-    const y0 = -top;
-    const y1 = y0 + h;
-    const halfH = h / 2;
-    const BUBBLE_RADIUS = 0.3;
+  private _drawInputStubs(ctx: RenderContext): void {
+    const n = this._inputCount;
+    const even = n > 0 && (n & 1) === 0;
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: y0 },
-        { op: "lineTo", x: halfH, y: y0 },
-        {
-          op: "curveTo",
-          cp1x: w + 1,
-          cp1y: y0,
-          cp2x: w + 1,
-          cp2y: y1,
-          x: halfH,
-          y: y1,
-        },
-        { op: "lineTo", x: 0, y: y1 },
-        {
-          op: "curveTo",
-          cp1x: halfH * 0.5,
-          cp1y: y1,
-          cp2x: halfH * 0.5,
-          cp2y: y0,
-          x: 0,
-          y: y0,
-        },
-        { op: "closePath" },
-      ],
-    }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: y0 },
-        { op: "lineTo", x: halfH, y: y0 },
-        {
-          op: "curveTo",
-          cp1x: w + 1,
-          cp1y: y0,
-          cp2x: w + 1,
-          cp2y: y1,
-          x: halfH,
-          y: y1,
-        },
-        { op: "lineTo", x: 0, y: y1 },
-        {
-          op: "curveTo",
-          cp1x: halfH * 0.5,
-          cp1y: y1,
-          cp2x: halfH * 0.5,
-          cp2y: y0,
-          x: 0,
-          y: y0,
-        },
-        { op: "closePath" },
-      ],
-    }, false);
 
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: -0.5, y: y0 },
-        {
-          op: "curveTo",
-          cp1x: halfH * 0.5 - 0.5,
-          cp1y: y0,
-          cp2x: halfH * 0.5 - 0.5,
-          cp2y: y1,
-          x: -0.5,
-          y: y1,
-        },
-      ],
-    }, false);
-
-    ctx.drawCircle(w + BUBBLE_RADIUS, y0 + halfH, BUBBLE_RADIUS, false);
+    for (let i = 0; i < n; i++) {
+      const correct = (even && i >= n / 2) ? 1 : 0;
+      const pinY = i + correct;
+      const isCenter = !even && i === Math.floor(n / 2);
+      const stubLen = isCenter ? 0.85 : 0.7;
+      ctx.drawLine(0, pinY, stubLen, pinY);
+    }
   }
 
   private _drawInversionBubbles(ctx: RenderContext): void {

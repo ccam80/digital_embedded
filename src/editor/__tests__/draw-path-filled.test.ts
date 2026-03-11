@@ -242,14 +242,14 @@ describe("IEEE gate shapes emit filled drawPath calls", () => {
     expect(strokeCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("AND gate IEC shape does not call drawPath at all", () => {
+  it("AND gate narrow shape also uses drawPath (always IEEE now)", () => {
     const props = makeProps({ inputCount: 2, bitWidth: 1, wideShape: false });
     const el = new AndElement("test", { x: 0, y: 0 }, 0, false, props);
     const { ctx, pathCalls } = makeStubCtx();
 
     el.draw(ctx);
 
-    expect(pathCalls.length).toBe(0);
+    expect(pathCalls.length).toBeGreaterThanOrEqual(1);
   });
 
   it("OR gate IEEE shape emits at least one drawPath with filled=true", () => {

@@ -1,9 +1,8 @@
 /**
- * BusSplitter component — variant of Splitter with different visual representation.
+ * BusSplitter component — bidirectional bus splitter with Output Enable control.
  *
- * Functionally identical to Splitter but rendered as a box with labeled ports
- * rather than the diagonal-line splitter symbol. Used when the bus layout
- * needs to be visually distinct from the standard Splitter.
+ * Splits a multi-bit common bus D into individual bit lines D0..D(n-1),
+ * gated by an OE (Output Enable) input pin.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -24,30 +23,15 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import {
-  parseSplittingPattern,
-  totalBitsFromPattern,
-  extractBits,
-} from "./splitter.js";
-
-// ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 2;
-
-function componentHeight(partCount: number): number {
-  return Math.max(partCount * 2, 2);
-}
+import { extractBits } from "./splitter.js";
 
 // ---------------------------------------------------------------------------
 // BusSplitterElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class BusSplitterElement extends AbstractCircuitElement {
-  private readonly _outputSplitting: string;
-  private readonly _parts: number[];
-  private readonly _totalBits: number;
+  private readonly _bits: number;
+  private readonly _spreading: number;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -59,32 +43,39 @@ export class BusSplitterElement extends AbstractCircuitElement {
   ) {
     super("BusSplitter", instanceId, position, rotation, mirror, props);
 
-    this._outputSplitting = props.getOrDefault<string>("output splitting", "4,4");
-    this._parts = parseSplittingPattern(this._outputSplitting);
-    this._totalBits = totalBitsFromPattern(this._parts);
+    this._bits = props.getOrDefault<number>("bits", 8);
+    this._spreading = props.getOrDefault<number>("spreading", 1);
 
-    // Java BusSplitterShape pin layout:
-    //   output[0] (combined bus out): (0, 0)
-    //   input[0]  (combined bus in):  (0, 1)
-    //   output[1..n] (sub-buses):     (1, i * spreading)
-    const spreading = props.getOrDefault<number>("spreading", 1);
-    const totalName = this._totalBits === 1 ? "0" : `0-${this._totalBits - 1}`;
     const decls: PinDeclaration[] = [
-      { direction: PinDirection.OUTPUT, label: totalName, defaultBitWidth: this._totalBits,
-        position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-      { direction: PinDirection.INPUT, label: totalName, defaultBitWidth: this._totalBits,
-        position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+      {
+        direction: PinDirection.OUTPUT,
+        label: "D",
+        defaultBitWidth: this._bits,
+        position: { x: 0, y: 0 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "OE",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 1 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
     ];
-    let runPos = 0;
-    for (let i = 0; i < this._parts.length; i++) {
-      const bits = this._parts[i];
-      const name = bits === 1 ? `${runPos}` : `${runPos}-${runPos + bits - 1}`;
+
+    for (let i = 0; i < this._bits; i++) {
       decls.push({
-        direction: PinDirection.OUTPUT, label: name, defaultBitWidth: bits,
-        position: { x: 1, y: i * spreading }, isNegatable: false, isClockCapable: false,
+        direction: PinDirection.OUTPUT,
+        label: `D${i}`,
+        defaultBitWidth: 1,
+        position: { x: 1, y: i * this._spreading },
+        isNegatable: false,
+        isClockCapable: false,
       });
-      runPos += bits;
     }
+
     this._pins = resolvePins(
       decls,
       position,
@@ -94,12 +85,12 @@ export class BusSplitterElement extends AbstractCircuitElement {
     );
   }
 
-  get parts(): number[] {
-    return this._parts;
+  get bits(): number {
+    return this._bits;
   }
 
-  get totalBits(): number {
-    return this._totalBits;
+  get spreading(): number {
+    return this._spreading;
   }
 
   getPins(): readonly Pin[] {
@@ -107,30 +98,36 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._parts.length);
+    const h = Math.max(2, (this._bits - 1) * this._spreading + 1);
     return {
       x: this.position.x,
       y: this.position.y,
-      width: COMP_WIDTH,
+      width: 1,
       height: h,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const h = componentHeight(this._parts.length);
+    const lastY = (this._bits - 1) * this._spreading;
 
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
 
-    // Label showing total bit width
+    // Vertical spine on left at x=0 from y=0 to y=lastY
+    ctx.drawLine(0, 0, 0, lastY);
+
+    // Horizontal stubs from x=0 to x=1 at each bit position
+    for (let i = 0; i < this._bits; i++) {
+      const y = i * this._spreading;
+      ctx.drawLine(0, y, 1, y);
+    }
+
+    // Label "BS" centered on the spine
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    drawUprightText(ctx, `${this._totalBits}`, COMP_WIDTH / 2, h / 2, {
+    ctx.setFont({ family: "sans-serif", size: 0.6 });
+    drawUprightText(ctx, "BS", 0, lastY / 2, {
       horizontal: "center",
       vertical: "middle",
     }, this.rotation);
@@ -140,14 +137,14 @@ export class BusSplitterElement extends AbstractCircuitElement {
 
   getHelpText(): string {
     return (
-      "BusSplitter — bus splitter with box representation.\n" +
-      `Splitting pattern: ${this._outputSplitting} (total ${this._totalBits} bits).`
+      `BusSplitter — bidirectional bus splitter with OE control.\n` +
+      `${this._bits} bits, spreading ${this._spreading}.`
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// executeBusSplitter — identical logic to Splitter
+// executeBusSplitter
 // ---------------------------------------------------------------------------
 
 export function executeBusSplitter(
@@ -161,12 +158,21 @@ export function executeBusSplitter(
   const outBase = layout.outputOffset(index);
   const outCount = layout.outputCount(index);
 
-  const wideValue = state[wt[inBase]];
+  // Input: OE at inBase+0
+  const oe = state[wt[inBase]];
 
-  let startBit = 0;
-  for (let i = 0; i < outCount; i++) {
-    state[wt[outBase + i]] = extractBits(wideValue, startBit, 1);
-    startBit += 1;
+  if (oe) {
+    // OE=1: read common bus D (output slot 0) as source, split to individual bits
+    // In this unidirectional mode, D is treated as a source value
+    const dValue = state[wt[outBase]];
+    for (let i = 1; i < outCount; i++) {
+      state[wt[outBase + i]] = extractBits(dValue, i - 1, 1);
+    }
+  } else {
+    // OE=0: all individual bit outputs = 0
+    for (let i = 1; i < outCount; i++) {
+      state[wt[outBase + i]] = 0;
+    }
   }
 }
 
@@ -176,14 +182,14 @@ export function executeBusSplitter(
 
 export const BUS_SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
-    xmlName: "input splitting",
-    propertyKey: "input splitting",
-    convert: (v) => v,
+    xmlName: "Bits",
+    propertyKey: "bits",
+    convert: (v) => parseInt(v, 10),
   },
   {
-    xmlName: "output splitting",
-    propertyKey: "output splitting",
-    convert: (v) => v,
+    xmlName: "spreading",
+    propertyKey: "spreading",
+    convert: (v) => parseInt(v, 10),
   },
 ];
 
@@ -193,18 +199,18 @@ export const BUS_SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 
 const BUS_SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "output splitting",
-    type: PropertyType.STRING,
-    label: "Output Splitting",
-    defaultValue: "4,4",
-    description: "Comma-separated bit widths for each narrow port",
+    key: "bits",
+    type: PropertyType.INT,
+    label: "Bits",
+    defaultValue: 8,
+    description: "Number of bits in the common bus",
   },
   {
-    key: "input splitting",
-    type: PropertyType.STRING,
-    label: "Input Splitting",
-    defaultValue: "",
-    description: "Input splitting pattern",
+    key: "spreading",
+    type: PropertyType.INT,
+    label: "Spreading",
+    defaultValue: 1,
+    description: "Vertical spacing between individual bit pins",
   },
 ];
 
@@ -216,21 +222,48 @@ function busSplitterFactory(props: PropertyBag): BusSplitterElement {
   return new BusSplitterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
+function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[] {
+  const decls: PinDeclaration[] = [
+    {
+      direction: PinDirection.OUTPUT,
+      label: "D",
+      defaultBitWidth: bits,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "OE",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+  for (let i = 0; i < bits; i++) {
+    decls.push({
+      direction: PinDirection.OUTPUT,
+      label: `D${i}`,
+      defaultBitWidth: 1,
+      position: { x: 1, y: i * spreading },
+      isNegatable: false,
+      isClockCapable: false,
+    });
+  }
+  return decls;
+}
+
 export const BusSplitterDefinition: ComponentDefinition = {
   name: "BusSplitter",
   typeId: -1,
   factory: busSplitterFactory,
   executeFn: executeBusSplitter,
-  pinLayout: [
-    { direction: PinDirection.OUTPUT, label: "0-7", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "0-7", defaultBitWidth: 8, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "0-3", defaultBitWidth: 4, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "4-7", defaultBitWidth: 4, position: { x: 1, y: 1 }, isNegatable: false, isClockCapable: false },
-  ],
+  pinLayout: buildDefaultPinLayout(8, 1),
   propertyDefs: BUS_SPLITTER_PROPERTY_DEFS,
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "BusSplitter — bus splitter with box representation.\n" +
-    "Configure the splitting pattern as comma-separated bit widths.",
+    "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
+    "Splits a common bus into individual bit lines gated by OE.",
 };

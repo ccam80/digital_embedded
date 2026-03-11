@@ -19,7 +19,7 @@ import type { DigCircuit, DigVisualElement, DigWire, DigValue } from "./dig-sche
 import type { AttributeMapping } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CircuitElement } from "../core/element.js";
-import type { CircuitMetadata } from "../core/circuit.js";
+import type { CircuitMetadata, CustomShapeData, CustomDrawable } from "../core/circuit.js";
 import { Circuit, Wire } from "../core/circuit.js";
 import { PropertyBag } from "../core/properties.js";
 import type { Rotation } from "../core/pin.js";
@@ -240,6 +240,8 @@ function digValueToString(v: DigValue): string {
       return JSON.stringify({ value: v.value.value.toString(), highZ: v.value.highZ });
     case "romList":
       return JSON.stringify(v.value);
+    case "customShape":
+      return JSON.stringify(v.value);
     case "enum":
       return v.value;
   }
@@ -335,9 +337,69 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
     if (entry.key === "shapeType" && (entry.value.type === "string" || entry.value.type === "enum")) {
       metadata.shapeType = entry.value.value;
     }
+    if (entry.key === "customShape" && entry.value.type === "customShape") {
+      metadata.customShape = convertCustomShapeData(entry.value.value);
+    }
   }
 
   return metadata;
+}
+
+/**
+ * Convert raw parsed custom shape data (pixel coordinates) to grid units (÷ DIG_SIZE).
+ */
+function convertCustomShapeData(
+  raw: import("./dig-schema.js").DigCustomShapeData,
+): CustomShapeData {
+  const pins = new Map<string, { pos: { x: number; y: number }; showLabel: boolean }>();
+  for (const pin of raw.pins) {
+    pins.set(pin.name, {
+      pos: { x: pin.pos.x / DIG_SIZE, y: pin.pos.y / DIG_SIZE },
+      showLabel: pin.showLabel,
+    });
+  }
+
+  const drawables: CustomDrawable[] = raw.drawables.map((d) => {
+    switch (d.type) {
+      case "poly":
+        return {
+          type: "poly" as const,
+          path: d.path,
+          evenOdd: d.evenOdd,
+          thickness: d.thickness,
+          filled: d.filled,
+          color: d.color,
+        };
+      case "line":
+        return {
+          type: "line" as const,
+          p1: { x: d.p1.x / DIG_SIZE, y: d.p1.y / DIG_SIZE },
+          p2: { x: d.p2.x / DIG_SIZE, y: d.p2.y / DIG_SIZE },
+          thickness: d.thickness,
+          color: d.color,
+        };
+      case "circle":
+        return {
+          type: "circle" as const,
+          p1: { x: d.p1.x / DIG_SIZE, y: d.p1.y / DIG_SIZE },
+          p2: { x: d.p2.x / DIG_SIZE, y: d.p2.y / DIG_SIZE },
+          thickness: d.thickness,
+          filled: d.filled,
+          color: d.color,
+        };
+      case "text":
+        return {
+          type: "text" as const,
+          pos: { x: d.pos.x / DIG_SIZE, y: d.pos.y / DIG_SIZE },
+          text: d.text,
+          orientation: d.orientation,
+          size: d.size,
+          color: d.color,
+        };
+    }
+  });
+
+  return { pins, drawables };
 }
 
 // ---------------------------------------------------------------------------

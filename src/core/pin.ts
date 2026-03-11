@@ -134,9 +134,16 @@ export function translatePoint(p: Point, offset: Point): Point {
 /**
  * Compute the world-space position of a pin on a placed element.
  *
- * Pin positions from getPins() are relative to the component origin at
- * rotation 0. This helper applies the element's current rotation (and
- * mirror) to produce the correct world-space coordinate.
+ * Pin positions from getPins() are in LOCAL coordinates (resolvePins runs
+ * at construction time with rotation=0 because the factory creates elements
+ * before dig-loader sets position/rotation). This function applies the
+ * full transform: mirror → rotate → translate.
+ *
+ * Java Digital's transform order (VisualElement.getTransform):
+ *   1. Rotate + translate: TransformRotate(pos, rot)
+ *   2. If mirror: Transform.mul(mirror[1,0,0,-1], rotateTranslate)
+ * The composed result is equivalent to: mirror Y in local space, then
+ * rotate, then translate.
  *
  * All code that needs a pin's world position MUST use this function
  * instead of the raw `element.position + pin.position` pattern.
@@ -147,7 +154,8 @@ export function pinWorldPosition(
 ): Point {
   let p = pin.position;
   if (element.mirror) {
-    p = { x: -p.x, y: p.y };
+    // Java's mirror matrix [1,0;0,-1] negates Y in local space (before rotation).
+    p = { x: p.x, y: -p.y };
   }
   const rotated = rotatePoint(p, element.rotation);
   return { x: element.position.x + rotated.x, y: element.position.y + rotated.y };

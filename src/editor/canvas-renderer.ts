@@ -165,6 +165,11 @@ export class CanvasRenderer implements RenderContext {
     this._ctx.fillStyle = css;
   }
 
+  setRawColor(css: string): void {
+    this._ctx.strokeStyle = css;
+    this._ctx.fillStyle = css;
+  }
+
   setLineWidth(width: number): void {
     this._ctx.lineWidth = width * this._lineWidthScale;
   }

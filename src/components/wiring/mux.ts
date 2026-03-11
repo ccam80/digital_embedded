@@ -43,6 +43,7 @@ const COMP_WIDTH = 2;
 export function buildMuxPinDeclarations(
   selectorBits: number,
   bitWidth: number,
+  flipSelPos = false,
 ): PinDeclaration[] {
   const inputCount = 1 << selectorBits;
 
@@ -51,7 +52,7 @@ export function buildMuxPinDeclarations(
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: 1, y: inputCount },
+    position: { x: 1, y: flipSelPos ? 0 : inputCount },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -123,7 +124,8 @@ export class MuxElement extends AbstractCircuitElement {
     this._selectorBits = props.getOrDefault<number>("selectorBits", 1);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
 
-    const decls = buildMuxPinDeclarations(this._selectorBits, this._bitWidth);
+    const flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
+    const decls = buildMuxPinDeclarations(this._selectorBits, this._bitWidth, flipSelPos);
     this._pins = resolvePins(
       decls,
       position,
@@ -236,6 +238,11 @@ export const MUX_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "label",
     convert: (v) => v,
   },
+  {
+    xmlName: "flipSelPos",
+    propertyKey: "flipSelPos",
+    convert: (v) => v === "true",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -268,6 +275,13 @@ const MUX_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: "",
     description: "Optional label shown above the component",
   },
+  {
+    key: "flipSelPos",
+    type: PropertyType.BOOLEAN,
+    label: "Flip Selector Position",
+    defaultValue: false,
+    description: "When true, selector pin is at top instead of bottom",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -283,7 +297,7 @@ export const MuxDefinition: ComponentDefinition = {
   typeId: -1,
   factory: muxFactory,
   executeFn: executeMux,
-  pinLayout: buildMuxPinDeclarations(1, 1),
+  pinLayout: buildMuxPinDeclarations(1, 1, false),
   propertyDefs: MUX_PROPERTY_DEFS,
   attributeMap: MUX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,

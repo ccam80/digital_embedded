@@ -53,7 +53,7 @@ const COMP_HEIGHT = 2;  // from sel pin y=-1 to y=+1 (or 0 to 2 with bottom sel)
  *
  * flipSelPos controls whether sel is above (default, y=-1) or below (y=+1).
  */
-function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false): PinDeclaration[] {
+function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invertOutput = false): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
@@ -75,7 +75,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false): PinDe
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitWidth,
-      position: { x: 1, y: 0 },
+      position: { x: invertOutput ? 2 : 1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -89,6 +89,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false): PinDe
 export class DriverElement extends AbstractCircuitElement {
   private readonly _bitWidth: number;
   private readonly _flipSelPos: boolean;
+  private readonly _invertOutput: boolean;
   private readonly _pins: readonly Pin[];
 
   constructor(
@@ -102,8 +103,9 @@ export class DriverElement extends AbstractCircuitElement {
 
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
     this._flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
+    this._invertOutput = props.getOrDefault<boolean>("invertDriverOutput", false);
 
-    const decls = buildDriverPinDeclarations(this._bitWidth, this._flipSelPos);
+    const decls = buildDriverPinDeclarations(this._bitWidth, this._flipSelPos, this._invertOutput);
     this._pins = resolvePins(
       decls,
       position,
@@ -119,11 +121,11 @@ export class DriverElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Origin-centred: pins span from -1 to +1 on both axes
+    const w = this._invertOutput ? 3 : COMP_WIDTH;
     return {
       x: this.position.x - 1,
       y: this.position.y - 1,
-      width: COMP_WIDTH,
+      width: w,
       height: COMP_HEIGHT,
     };
   }
@@ -157,6 +159,11 @@ export class DriverElement extends AbstractCircuitElement {
       ],
       false,
     );
+
+    if (this._invertOutput) {
+      ctx.setColor("COMPONENT");
+      ctx.drawCircle(1.2, 0, 0.25, false);
+    }
 
     // Sel pin stem: line from centre to sel pin
     const selY = this._flipSelPos ? 1 : -1;
@@ -216,6 +223,11 @@ export const DRIVER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "flipSelPos",
     convert: (v) => v === "true",
   },
+  {
+    xmlName: "invertDriverOutput",
+    propertyKey: "invertDriverOutput",
+    convert: (v) => v === "true",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -238,6 +250,13 @@ const DRIVER_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Flip Sel Position",
     defaultValue: false,
     description: "When true, the select pin is below the triangle instead of above",
+  },
+  {
+    key: "invertDriverOutput",
+    type: PropertyType.BOOLEAN,
+    label: "Invert Output",
+    defaultValue: false,
+    description: "When true, adds an inversion bubble and shifts output pin to x=2",
   },
 ];
 

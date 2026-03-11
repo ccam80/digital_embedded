@@ -28,12 +28,12 @@ describe('DigSchema', () => {
       // If DigValue is extended with a new type, the satisfies clause in the
       // source file will produce a compile error, and the count check here
       // catches any runtime mismatch.
-      expect(DIG_VALUE_TYPES).toHaveLength(12);
+      expect(DIG_VALUE_TYPES).toHaveLength(13);
 
       const expected = [
         'string', 'int', 'long', 'boolean', 'rotation',
         'color', 'testData', 'inverterConfig', 'data',
-        'inValue', 'romList', 'enum',
+        'inValue', 'romList', 'customShape', 'enum',
       ];
       expect([...DIG_VALUE_TYPES].sort()).toEqual([...expected].sort());
     });

@@ -84,6 +84,7 @@ export interface RenderContext {
   scale(sx: number, sy: number): void;
 
   setColor(color: ThemeColor): void;
+  setRawColor?(css: string): void;
   setLineWidth(width: number): void;
   setFont(font: FontSpec): void;
   setLineDash(pattern: number[]): void;

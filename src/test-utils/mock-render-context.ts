@@ -30,6 +30,7 @@ export type DrawCall =
   | { kind: "rotate"; angle: number }
   | { kind: "scale"; sx: number; sy: number }
   | { kind: "setColor"; color: ThemeColor }
+  | { kind: "setRawColor"; css: string }
   | { kind: "setLineWidth"; width: number }
   | { kind: "setFont"; font: FontSpec }
   | { kind: "setLineDash"; pattern: number[] };
@@ -113,6 +114,10 @@ export class MockRenderContext implements RenderContext {
   setColor(color: ThemeColor): void {
     this._style = { ...this._style, color };
     this.calls.push({ kind: "setColor", color });
+  }
+
+  setRawColor(css: string): void {
+    this.calls.push({ kind: "setRawColor", css });
   }
 
   setLineWidth(width: number): void {

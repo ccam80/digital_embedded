@@ -280,26 +280,23 @@ describe("OrGate", () => {
   // Rendering — IEC/DIN
   // ---------------------------------------------------------------------------
 
-  describe("drawIEC", () => {
-    it("IEC shape calls drawRect and drawText with '≥1'", () => {
-      const el = makeOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      const textCalls = calls.filter((c) => c.method === "drawText");
-
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
-      expect(textCalls.some((c) => c.args[0] === "≥1")).toBe(true);
-    });
-
-    it("IEC shape does not call drawPath for the gate body", () => {
+  describe("drawNarrowIEEE", () => {
+    it("narrow IEEE shape calls drawPath for the curved body", () => {
       const el = makeOr({ wideShape: false });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
       const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls).toHaveLength(0);
+      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("narrow IEEE shape does not call drawRect", () => {
+      const el = makeOr({ wideShape: false });
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+
+      const rectCalls = calls.filter((c) => c.method === "drawRect");
+      expect(rectCalls).toHaveLength(0);
     });
   });
 

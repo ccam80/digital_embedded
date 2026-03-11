@@ -64,6 +64,26 @@ export interface RomListData {
  *     case 'enum':          entry.value.value + entry.value.xmlTag
  *   }
  */
+/** Raw parsed custom shape pin data. */
+export interface DigCustomShapePin {
+  name: string;
+  pos: DigPoint;
+  showLabel: boolean;
+}
+
+/** Raw parsed custom shape drawable element. */
+export type DigCustomShapeDrawable =
+  | { type: 'poly'; path: string; evenOdd: boolean; thickness: number; filled: boolean; color: { r: number; g: number; b: number; a: number } }
+  | { type: 'line'; p1: DigPoint; p2: DigPoint; thickness: number; color: { r: number; g: number; b: number; a: number } }
+  | { type: 'circle'; p1: DigPoint; p2: DigPoint; thickness: number; filled: boolean; color: { r: number; g: number; b: number; a: number } }
+  | { type: 'text'; pos: DigPoint; text: string; orientation: string; size: number; color: { r: number; g: number; b: number; a: number } };
+
+/** Raw parsed custom shape data from the <shape> XML element. */
+export interface DigCustomShapeData {
+  pins: DigCustomShapePin[];
+  drawables: DigCustomShapeDrawable[];
+}
+
 export type DigValue =
   | { type: 'string'; value: string }
   | { type: 'int'; value: number }
@@ -76,6 +96,7 @@ export type DigValue =
   | { type: 'data'; value: string }
   | { type: 'inValue'; value: { value: bigint; highZ: boolean } }
   | { type: 'romList'; value: RomListData }
+  | { type: 'customShape'; value: DigCustomShapeData }
   | { type: 'enum'; xmlTag: string; value: string };
 
 // ---------------------------------------------------------------------------
@@ -211,5 +232,6 @@ export const DIG_VALUE_TYPES = [
   'data',
   'inValue',
   'romList',
+  'customShape',
   'enum',
 ] as const satisfies ReadonlyArray<DigValue['type']>;

@@ -215,6 +215,10 @@ export class SVGRenderContext implements RenderContext {
     this._state.color = this._scheme.resolve(color);
   }
 
+  setRawColor(css: string): void {
+    this._state.color = css;
+  }
+
   setLineWidth(width: number): void {
     this._state.lineWidth = width;
   }

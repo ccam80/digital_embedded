@@ -26,7 +26,6 @@ import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -41,28 +40,20 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
 function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 2, COMP_WIDTH, COMP_HEIGHT);
-  // Product is 2*bitWidth bits — store in a single output pin with 2x width
-  // The output pin carries the full product (up to 64 bits).
-  // In the engine state array the product occupies one slot (low 32 bits)
-  // plus a second slot for the high 32 bits when bitWidth > 16.
-  // We declare 2 output pins: "mul" (low) and "mul_h" (high, only used when bitWidth > 16).
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "a",
       defaultBitWidth: bitWidth,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -70,7 +61,7 @@ function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "b",
       defaultBitWidth: bitWidth,
-      position: inputPositions[1],
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,7 +69,7 @@ function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "mul",
       defaultBitWidth: Math.min(bitWidth * 2, 32),
-      position: outputPositions[0],
+      position: { x: 3, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -119,24 +110,24 @@ export class MulElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
     ctx.drawText(
       this._signed ? "A*B" : "*",
       COMP_WIDTH / 2,
-      COMP_HEIGHT / 2,
+      -0.5 + COMP_HEIGHT / 2,
       { horizontal: "center", vertical: "middle" },
     );
 

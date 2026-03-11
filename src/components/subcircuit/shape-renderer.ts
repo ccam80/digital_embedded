@@ -8,9 +8,11 @@
  * matching Digital's topBottomBorder = SIZE2.
  */
 
-import type { RenderContext } from "../../core/renderer-interface.js";
+import type { RenderContext, PathData } from "../../core/renderer-interface.js";
 import type { PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
+import type { CustomShapeData, CustomDrawable, RGBA } from "../../core/circuit.js";
+import { parseSvgPath } from "./svg-path-parser.js";
 
 // ---------------------------------------------------------------------------
 // ShapeMode
@@ -191,12 +193,31 @@ export function drawDILShape(
 }
 
 // ---------------------------------------------------------------------------
-// CUSTOM shape — SVG-based placeholder
+// CUSTOM shape — renders custom drawables and pin labels
 // ---------------------------------------------------------------------------
 
 /**
- * Render the CUSTOM shape mode. When no SVG data is available, falls back to
- * the DEFAULT chip shape with a note that custom rendering is pending.
+ * Convert an RGBA color value to a CSS rgba() string.
+ */
+function rgbaToCss(color: RGBA): string {
+  return `rgba(${color.r},${color.g},${color.b},${(color.a / 255).toFixed(3)})`;
+}
+
+/**
+ * Set a raw RGBA color on the render context.
+ * Falls back to COMPONENT theme color if setRawColor is not available.
+ */
+function applyRawColor(ctx: RenderContext, color: RGBA): void {
+  if (ctx.setRawColor) {
+    ctx.setRawColor(rgbaToCss(color));
+  } else {
+    ctx.setColor("COMPONENT");
+  }
+}
+
+/**
+ * Render the CUSTOM shape mode. When no custom shape data is available,
+ * falls back to the DEFAULT chip shape.
  */
 export function drawCustomShape(
   ctx: RenderContext,
@@ -205,8 +226,124 @@ export function drawCustomShape(
   width: number,
   height: number,
   rotation: Rotation = 0,
+  customShape?: CustomShapeData,
 ): void {
-  drawDefaultShape(ctx, name, pins, width, height, rotation);
+  if (!customShape || customShape.drawables.length === 0) {
+    drawDefaultShape(ctx, name, pins, width, height, rotation);
+    return;
+  }
+
+  for (const drawable of customShape.drawables) {
+    renderDrawable(ctx, drawable);
+  }
+
+  renderCustomPinLabels(ctx, pins, customShape, rotation);
+}
+
+/**
+ * Render a single custom drawable element.
+ */
+function renderDrawable(ctx: RenderContext, drawable: CustomDrawable): void {
+  switch (drawable.type) {
+    case "poly": {
+      const ops = parseSvgPath(drawable.path);
+      const pathData: PathData = { operations: ops };
+      applyRawColor(ctx, drawable.color);
+      ctx.setLineWidth(drawable.thickness / 20);
+      if (drawable.filled) {
+        ctx.drawPath(pathData, true);
+      }
+      ctx.drawPath(pathData, false);
+      break;
+    }
+
+    case "line": {
+      applyRawColor(ctx, drawable.color);
+      ctx.setLineWidth(drawable.thickness / 20);
+      ctx.drawLine(drawable.p1.x, drawable.p1.y, drawable.p2.x, drawable.p2.y);
+      break;
+    }
+
+    case "circle": {
+      const cx = (drawable.p1.x + drawable.p2.x) / 2;
+      const cy = (drawable.p1.y + drawable.p2.y) / 2;
+      const rx = Math.abs(drawable.p2.x - drawable.p1.x) / 2;
+      const ry = Math.abs(drawable.p2.y - drawable.p1.y) / 2;
+      const radius = Math.max(rx, ry);
+      applyRawColor(ctx, drawable.color);
+      ctx.setLineWidth(drawable.thickness / 20);
+      ctx.drawCircle(cx, cy, radius, drawable.filled);
+      break;
+    }
+
+    case "text": {
+      applyRawColor(ctx, drawable.color);
+      const fontSize = drawable.size / 20;
+      ctx.setFont({ family: "sans-serif", size: fontSize });
+      const anchor = orientationToAnchor(drawable.orientation);
+      ctx.drawText(drawable.text, drawable.pos.x, drawable.pos.y, anchor);
+      break;
+    }
+  }
+}
+
+/**
+ * Map Digital's text orientation names to RenderContext TextAnchor values.
+ */
+function orientationToAnchor(
+  orientation: string,
+): { horizontal: "left" | "center" | "right"; vertical: "top" | "middle" | "bottom" } {
+  switch (orientation) {
+    case "LEFTCENTER":
+      return { horizontal: "left", vertical: "middle" };
+    case "RIGHTCENTER":
+      return { horizontal: "right", vertical: "middle" };
+    case "CENTERCENTER":
+      return { horizontal: "center", vertical: "middle" };
+    case "LEFTBOTTOM":
+      return { horizontal: "left", vertical: "bottom" };
+    case "RIGHTBOTTOM":
+      return { horizontal: "right", vertical: "bottom" };
+    case "CENTERBOTTOM":
+      return { horizontal: "center", vertical: "bottom" };
+    case "LEFTTOP":
+      return { horizontal: "left", vertical: "top" };
+    case "RIGHTTOP":
+      return { horizontal: "right", vertical: "top" };
+    case "CENTERTOP":
+      return { horizontal: "center", vertical: "top" };
+    default:
+      return { horizontal: "left", vertical: "middle" };
+  }
+}
+
+/**
+ * Render pin labels for CUSTOM shape mode. Only draws labels for pins
+ * where the custom shape data has showLabel=true.
+ */
+function renderCustomPinLabels(
+  ctx: RenderContext,
+  pins: readonly PinDeclaration[],
+  customShape: CustomShapeData,
+  rotation: Rotation,
+): void {
+  ctx.setColor("TEXT");
+  ctx.setFont({ family: "sans-serif", size: 0.5 });
+
+  for (const pin of pins) {
+    const customPin = customShape.pins.get(pin.label);
+    if (!customPin || !customPin.showLabel) continue;
+
+    const pos = pin.position;
+    const isLeftSide = pin.face === "left";
+    const labelX = isLeftSide ? pos.x + 0.2 : pos.x - 0.2;
+    const align = isLeftSide ? "left" as const : "right" as const;
+
+    drawUprightText(ctx, pin.label, labelX, pos.y, {
+      horizontal: align,
+      vertical: "middle",
+    }, rotation);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -275,23 +412,24 @@ function drawLayoutPins(
 
     switch (pin.face) {
       case "top":
-        // Vertical stub upward from chip edge
-        ctx.drawLine(pin.position.x, pin.position.y + 1, pin.position.x, pin.position.y);
+        // Pin at chip edge (y=0), matching Java LayoutShape.
+        // Short stub inward; label inside the chip.
+        ctx.drawLine(pin.position.x, pin.position.y, pin.position.x, pin.position.y + 0.5);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y + 1 + 0.2);  // 0.2 inside chip
+        ctx.translate(pin.position.x, pin.position.y + 0.2);
         ctx.rotate(verticalAngle);
-        // "right" alignment: after -π/2 rotation, local -x = world +y = downward into chip
         ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
         ctx.restore();
         break;
 
       case "bottom":
-        // Vertical stub downward from chip edge
-        ctx.drawLine(pin.position.x, pin.position.y - 1, pin.position.x, pin.position.y);
+        // Pin at chip edge (y=height), matching Java LayoutShape.
+        // Short stub inward; label inside the chip.
+        ctx.drawLine(pin.position.x, pin.position.y, pin.position.x, pin.position.y - 0.5);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y - 1 - 0.2);  // 0.2 inside chip
+        ctx.translate(pin.position.x, pin.position.y - 0.2);
         ctx.rotate(verticalAngle);
         ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
         ctx.restore();

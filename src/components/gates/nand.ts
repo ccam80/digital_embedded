@@ -123,23 +123,17 @@ export class NAndElement extends AbstractCircuitElement {
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape),
+      width: compWidth(this._wideShape) + 1,
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
     const w = compWidth(this._wideShape);
 
     ctx.save();
 
-    if (this._wideShape) {
-      this._drawIEEE(ctx, topBorder, bodyHeight, w);
-    } else {
-      this._drawIEC(ctx, topBorder, bodyHeight, w);
-    }
-
+    this._drawIEEE(ctx, w);
     this._drawLabel(ctx, w);
     this._drawInversionBubbles(ctx);
 
@@ -147,74 +141,31 @@ export class NAndElement extends AbstractCircuitElement {
   }
 
   /**
-   * IEC/DIN shape: rectangle with "&" symbol inside, output inversion bubble.
-   */
-  private _drawIEC(ctx: RenderContext, top: number, h: number, w: number): void {
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -top, w, h, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -top, w, h, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("&", w / 2, -top + h / 2, { horizontal: "center", vertical: "middle" });
-
-    // Output inversion bubble
-    const BUBBLE_RADIUS = 0.3;
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawCircle(w + BUBBLE_RADIUS, -top + h / 2, BUBBLE_RADIUS, false);
-  }
-
-  /**
    * IEEE/US shape: AND gate body with inversion bubble at output.
+   * Coordinates from Java IEEEAndShape + IEEEGenericShape inversion bubble.
    */
-  private _drawIEEE(ctx: RenderContext, top: number, h: number, w: number): void {
-    const y0 = -top;
-    const y1 = y0 + h;
-    const halfH = h / 2;
-    const BUBBLE_RADIUS = 0.3;
+  private _drawIEEE(ctx: RenderContext, w: number): void {
+    const midX = w === 3 ? 1.5 : 2.5;
+    const outputY = Math.floor(this._inputCount / 2);
+    const BUBBLE_RADIUS = 0.45;
+
+    const ops = [
+      { op: "moveTo" as const, x: midX, y: 2.5 },
+      { op: "lineTo" as const, x: 0.05, y: 2.5 },
+      { op: "lineTo" as const, x: 0.05, y: -0.5 },
+      { op: "lineTo" as const, x: midX, y: -0.5 },
+      { op: "curveTo" as const, cp1x: midX + 0.5, cp1y: -0.5, cp2x: w - 0.05, cp2y: 0, x: w - 0.05, y: 1.0 },
+      { op: "curveTo" as const, cp1x: w - 0.05, cp1y: 2.0, cp2x: midX + 0.5, cp2y: 2.5, x: midX, y: 2.5 },
+      { op: "closePath" as const },
+    ];
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: y0 },
-        { op: "lineTo", x: halfH, y: y0 },
-        {
-          op: "curveTo",
-          cp1x: w + 1,
-          cp1y: y0,
-          cp2x: w + 1,
-          cp2y: y1,
-          x: halfH,
-          y: y1,
-        },
-        { op: "lineTo", x: 0, y: y1 },
-        { op: "closePath" },
-      ],
-    }, true);
+    ctx.drawPath({ operations: ops }, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: y0 },
-        { op: "lineTo", x: halfH, y: y0 },
-        {
-          op: "curveTo",
-          cp1x: w + 1,
-          cp1y: y0,
-          cp2x: w + 1,
-          cp2y: y1,
-          x: halfH,
-          y: y1,
-        },
-        { op: "lineTo", x: 0, y: y1 },
-        { op: "closePath" },
-      ],
-    }, false);
+    ctx.drawPath({ operations: ops }, false);
 
-    ctx.drawCircle(w + BUBBLE_RADIUS, y0 + halfH, BUBBLE_RADIUS, false);
+    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
   }
 
   private _drawInversionBubbles(ctx: RenderContext): void {

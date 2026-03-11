@@ -100,9 +100,9 @@ export class ProbeElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      y: this.position.y - 0.3,
+      width: 1.5,
+      height: 0.6,
     };
   }
 
@@ -115,27 +115,24 @@ export class ProbeElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const yOff = -COMP_HEIGHT / 2;
-
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Probe symbol: circle with a dot (oscilloscope-style)
-    ctx.setColor("COMPONENT");
-    ctx.drawCircle(COMP_WIDTH / 2, 0, 0.5, false);
-    ctx.drawCircle(COMP_WIDTH / 2, 0, 0.1, true);
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
 
     if (this._label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      drawUprightText(ctx, this._label, COMP_WIDTH / 2, -0.3, {
-        horizontal: "center",
+      drawUprightText(ctx, this._label, 0.1, -0.2, {
+        horizontal: "left",
         vertical: "bottom",
+      }, this.rotation);
+      drawUprightText(ctx, "?", 0.1, 0.2, {
+        horizontal: "left",
+        vertical: "top",
+      }, this.rotation);
+    } else {
+      drawUprightText(ctx, "?", 0.1, -0.05, {
+        horizontal: "left",
+        vertical: "middle",
       }, this.rotation);
     }
 

@@ -232,20 +232,14 @@ describe("Probe", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw calls drawRect (component body)", () => {
+    it("draw renders text only, no body rect (matches Java ProbeShape)", () => {
       const el = makeProbe();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw calls drawCircle for probe symbol", () => {
-      const el = makeProbe();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
+      expect(rects).toHaveLength(0);
       const circles = calls.filter((c) => c.method === "drawCircle");
-      expect(circles.length).toBeGreaterThanOrEqual(1);
+      expect(circles).toHaveLength(0);
     });
 
     it("draw calls save and restore", () => {
@@ -264,12 +258,13 @@ describe("Probe", () => {
       expect(textCalls.some((c) => c.args[0] === "P1")).toBe(true);
     });
 
-    it("draw does not render text when label is empty", () => {
+    it("draw renders '?' placeholder when label is empty (matches Java ProbeShape)", () => {
       const el = makeProbe({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls).toHaveLength(0);
+      expect(textCalls.length).toBeGreaterThanOrEqual(1);
+      expect(textCalls.some((c) => c.args[0] === "?")).toBe(true);
     });
   });
 

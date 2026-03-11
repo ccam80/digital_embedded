@@ -41,6 +41,7 @@ import {
   BusSplitterElement,
   executeBusSplitter,
   BusSplitterDefinition,
+  BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
 } from "../bus-splitter.js";
 import {
   TunnelElement,
@@ -158,10 +159,10 @@ function makeSplitter(outputSplitting = "4,4"): SplitterElement {
   return new SplitterElement("test-spl-001", { x: 0, y: 0 }, 0, false, props);
 }
 
-function makeBusSplitter(outputSplitting = "4,4"): BusSplitterElement {
+function makeBusSplitter(bits = 8, spreading = 1): BusSplitterElement {
   const props = new PropertyBag();
-  props.set("output splitting", outputSplitting);
-  props.set("input splitting", "");
+  props.set("bits", bits);
+  props.set("spreading", spreading);
   return new BusSplitterElement("test-bspl-001", { x: 0, y: 0 }, 0, false, props);
 }
 
@@ -540,26 +541,138 @@ describe("Splitter", () => {
 // ===========================================================================
 
 describe("BusSplitter", () => {
-  describe("draw", () => {
-    it("draw renders a rect body with width text", () => {
-      const el = makeBusSplitter("4,4");
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
-      expect(textCalls.some((c) => c.args[0] === "8")).toBe(true);
-    });
-  });
-
   describe("pins", () => {
-    it("BusSplitter '4,4' has 1 input and 2 output pins", () => {
-      const el = makeBusSplitter("4,4");
+    it("default 8-bit BusSplitter has 1 input (OE) and 9 outputs (D + D0..D7)", () => {
+      const el = makeBusSplitter(8);
       const pins = el.getPins();
       const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
       const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
       expect(inputs).toHaveLength(1);
-      expect(outputs).toHaveLength(2);
+      expect(inputs[0].label).toBe("OE");
+      expect(inputs[0].bitWidth).toBe(1);
+      expect(outputs).toHaveLength(9);
+      expect(outputs[0].label).toBe("D");
+      expect(outputs[0].bitWidth).toBe(8);
+      for (let i = 1; i < 9; i++) {
+        expect(outputs[i].label).toBe(`D${i - 1}`);
+        expect(outputs[i].bitWidth).toBe(1);
+      }
+    });
+
+    it("4-bit BusSplitter has 1 input and 5 outputs", () => {
+      const el = makeBusSplitter(4);
+      const pins = el.getPins();
+      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
+      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
+      expect(inputs).toHaveLength(1);
+      expect(outputs).toHaveLength(5);
+    });
+
+    it("bits and spreading properties are accessible", () => {
+      const el = makeBusSplitter(4, 2);
+      expect(el.bits).toBe(4);
+      expect(el.spreading).toBe(2);
+    });
+  });
+
+  describe("boundingBox", () => {
+    it("8-bit default: width=1, height=8", () => {
+      const el = makeBusSplitter(8);
+      const bb = el.getBoundingBox();
+      expect(bb.width).toBe(1);
+      expect(bb.height).toBe(8);
+    });
+
+    it("2-bit: width=1, height=2", () => {
+      const el = makeBusSplitter(2);
+      const bb = el.getBoundingBox();
+      expect(bb.width).toBe(1);
+      expect(bb.height).toBe(2);
+    });
+
+    it("1-bit: width=1, height=2 (minimum)", () => {
+      const el = makeBusSplitter(1);
+      const bb = el.getBoundingBox();
+      expect(bb.width).toBe(1);
+      expect(bb.height).toBe(2);
+    });
+
+    it("4-bit spreading=2: height = (4-1)*2+1 = 7", () => {
+      const el = makeBusSplitter(4, 2);
+      const bb = el.getBoundingBox();
+      expect(bb.height).toBe(7);
+    });
+  });
+
+  describe("draw", () => {
+    it("draw renders vertical spine and horizontal stubs", () => {
+      const el = makeBusSplitter(4);
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const lineCalls = calls.filter((c) => c.method === "drawLine");
+      // 1 vertical spine + 4 horizontal stubs = 5 lines
+      expect(lineCalls).toHaveLength(5);
+    });
+
+    it("draw renders BS label", () => {
+      const el = makeBusSplitter(4);
+      const { ctx, calls } = makeStubCtx();
+      el.draw(ctx);
+      const textCalls = calls.filter((c) => c.method === "drawText");
+      expect(textCalls.some((c) => c.args[0] === "BS")).toBe(true);
+    });
+  });
+
+  describe("execute", () => {
+    it("OE=1: splits D value into individual bits", () => {
+      // Layout: 1 input (OE), 9 outputs (D + D0..D7)
+      const layout = makeLayout(1, 9);
+      // state: [OE=1, D=0b10110011, D0..D7=0...]
+      const state = makeState(1, 0b10110011, 0, 0, 0, 0, 0, 0, 0, 0);
+      const highZs = new Uint32Array(state.length);
+      executeBusSplitter(0, state, highZs, layout);
+      // D0 = bit 0 = 1
+      expect(state[2]).toBe(1);
+      // D1 = bit 1 = 1
+      expect(state[3]).toBe(1);
+      // D2 = bit 2 = 0
+      expect(state[4]).toBe(0);
+      // D3 = bit 3 = 0
+      expect(state[5]).toBe(0);
+      // D4 = bit 4 = 1
+      expect(state[6]).toBe(1);
+      // D5 = bit 5 = 1
+      expect(state[7]).toBe(1);
+      // D6 = bit 6 = 0
+      expect(state[8]).toBe(0);
+      // D7 = bit 7 = 1
+      expect(state[9]).toBe(1);
+    });
+
+    it("OE=0: all individual outputs are 0", () => {
+      const layout = makeLayout(1, 9);
+      const state = makeState(0, 0xFF, 1, 1, 1, 1, 1, 1, 1, 1);
+      const highZs = new Uint32Array(state.length);
+      executeBusSplitter(0, state, highZs, layout);
+      for (let i = 2; i <= 9; i++) {
+        expect(state[i]).toBe(0);
+      }
+    });
+  });
+
+  describe("attributeMapping", () => {
+    it("Bits maps to bits with integer conversion", () => {
+      const m = BUS_SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
+      expect(m).toBeDefined();
+      expect(m!.propertyKey).toBe("bits");
+      expect(m!.convert("8")).toBe(8);
+    });
+
+    it("spreading maps to spreading with integer conversion", () => {
+      const m = BUS_SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "spreading");
+      expect(m).toBeDefined();
+      expect(m!.propertyKey).toBe("spreading");
+      expect(m!.convert("2")).toBe(2);
     });
   });
 
@@ -570,6 +683,14 @@ describe("BusSplitter", () => {
 
     it("BusSplitterDefinition executeFn is executeBusSplitter", () => {
       expect(BusSplitterDefinition.executeFn).toBe(executeBusSplitter);
+    });
+
+    it("BusSplitterDefinition category is WIRING", () => {
+      expect(BusSplitterDefinition.category).toBe(ComponentCategory.WIRING);
+    });
+
+    it("BusSplitterDefinition pinLayout has 10 pins for default 8-bit", () => {
+      expect(BusSplitterDefinition.pinLayout).toHaveLength(10);
     });
 
     it("BusSplitterDefinition can be registered", () => {

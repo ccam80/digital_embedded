@@ -36,59 +36,60 @@ import {
 
 const COMP_WIDTH = 2;
 
-// Body height: N outputs spaced 1 unit apart starting at y=0, so height = outputCount-1+1 = outputCount.
-// Minimum height 2 for visual clarity.
+/**
+ * Body height matching Java DemuxerShape:
+ *   height = hasInput || (outputCount <= 2) ? outputCount * SIZE : (outputCount - 1) * SIZE
+ * We always have an input pin, so height = outputCount (in grid units).
+ */
 function componentHeight(outputCount: number): number {
-  return Math.max(outputCount, 2);
+  return outputCount;
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — GenericShape-style positions
-// sel pin: bottom center at (floor(COMP_WIDTH/2), h)
-// in pin: west face, centered at y = floor((outputCount-1)/2) = offs
-// out_i pins: east face at y=i (i=0..N-1)
+// Pin layout — matches Java DemuxerShape.getPins() order:
+//   sel (input[0]), outputs, then in (input[1]).
+//
+// Java positions (in SIZE=20px = 1 grid unit):
+//   sel: (SIZE, flip ? 0 : height) → (1, flip ? 0 : h)
+//   out_i: (SIZE*2, i*SIZE) → (2, i)  [special case for 2 outputs: y=0 and y=2]
+//   in: (0, (outputCount/2)*SIZE) → (0, floor(outputCount/2))
 // ---------------------------------------------------------------------------
 
 export function buildDemuxPinDeclarations(
   selectorBits: number,
   bitWidth: number,
+  flipSelPos = false,
 ): PinDeclaration[] {
   const outputCount = 1 << selectorBits;
   const h = componentHeight(outputCount);
   const inY = Math.floor(outputCount / 2);
 
-  const selPin: PinDeclaration = {
+  const pins: PinDeclaration[] = [];
+
+  // 1. Selector pin (Java: inputs.get(0))
+  pins.push({
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: Math.floor(COMP_WIDTH / 2), y: h },
+    position: { x: 1, y: flipSelPos ? 0 : h },
     isNegatable: false,
     isClockCapable: false,
-  };
+  });
 
-  const inPin: PinDeclaration = {
-    direction: PinDirection.INPUT,
-    label: "in",
-    defaultBitWidth: bitWidth,
-    position: { x: 0, y: inY },
-    isNegatable: false,
-    isClockCapable: false,
-  };
-
-  const outputPins: PinDeclaration[] = [];
+  // 2. Output pins (Java: outputs)
   if (outputCount === 2) {
-    // Java DemuxerShape special case: 2 outputs at y=0 and y=2 (gap of 2)
-    outputPins.push({
+    // Java special case: 2 outputs at y=0 and y=2*SIZE
+    pins.push({
       direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: bitWidth,
       position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false,
     });
-    outputPins.push({
+    pins.push({
       direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: bitWidth,
       position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false,
     });
   } else {
     for (let i = 0; i < outputCount; i++) {
-      outputPins.push({
+      pins.push({
         direction: PinDirection.OUTPUT,
         label: `out_${i}`,
         defaultBitWidth: bitWidth,
@@ -99,7 +100,17 @@ export function buildDemuxPinDeclarations(
     }
   }
 
-  return [selPin, inPin, ...outputPins];
+  // 3. Input pin LAST (Java: inputs.get(1), added after outputs)
+  pins.push({
+    direction: PinDirection.INPUT,
+    label: "in",
+    defaultBitWidth: bitWidth,
+    position: { x: 0, y: inY },
+    isNegatable: false,
+    isClockCapable: false,
+  });
+
+  return pins;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +133,9 @@ export class DemuxElement extends AbstractCircuitElement {
 
     this._selectorBits = props.getOrDefault<number>("selectorBits", 1);
     this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
+    const flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
 
-    const decls = buildDemuxPinDeclarations(this._selectorBits, this._bitWidth);
+    const decls = buildDemuxPinDeclarations(this._selectorBits, this._bitWidth, flipSelPos);
     this._pins = resolvePins(
       decls,
       position,
