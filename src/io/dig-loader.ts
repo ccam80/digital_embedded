@@ -271,7 +271,7 @@ function extractRotationFromEntries(
 function extractMirrorFromEntries(
   entries: { key: string; value: DigValue }[],
 ): boolean {
-  const entry = entries.find((e) => e.key === "Mirror");
+  const entry = entries.find((e) => e.key === "mirror");
   if (entry === undefined) return false;
   if (entry.value.type === "boolean") return entry.value.value;
   // Some .dig files may encode mirror as a string

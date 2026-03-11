@@ -102,8 +102,10 @@ export class SubcircuitElement extends AbstractCircuitElement {
       // DEFAULT/DIL/CUSTOM: all inputs on left, all outputs on right
       const inputCount = definition.pinLayout.filter(p => p.direction === PinDirection.INPUT).length;
       const outputCount = definition.pinLayout.filter(p => p.direction === PinDirection.OUTPUT).length;
+      const symmetric = outputCount === 1;
+      const evenGap = symmetric && inputCount % 2 === 0 ? 1 : 0;
       this._width = chipWidth;
-      this._height = Math.max(inputCount, outputCount, 1);
+      this._height = Math.max(inputCount + evenGap, outputCount, 1);
     }
 
     const customShape = definition.circuit.metadata.customShape;
@@ -236,7 +238,10 @@ function buildPositionedPinDeclarations(
 
 /**
  * DEFAULT/DIL/CUSTOM: all inputs on left, all outputs on right.
- * Sequential y positions (0, 1, 2, ...).
+ *
+ * Java GenericShape symmetric logic: when there is exactly 1 output and an
+ * even number of inputs, a gap is inserted at the midpoint so the single
+ * output aligns with the centre of the input column.
  */
 function buildDefaultPositions(
   pins: readonly PinDeclaration[],
@@ -254,15 +259,25 @@ function buildDefaultPositions(
     }
   }
 
+  const symmetric = outputs.length === 1;
+  const offs = symmetric ? Math.floor(inputs.length / 2) : 0;
+  const evenCorrect = symmetric && inputs.length % 2 === 0;
+
   const positioned: PinDeclaration[] = [];
 
-  // Inputs on left face: x=0, y=0,1,2,...
+  // Inputs on left face: x=0
   for (let i = 0; i < inputs.length; i++) {
-    positioned.push({ ...inputs[i], face: "left", position: { x: 0, y: i } });
+    let y = i;
+    if (evenCorrect && i >= inputs.length / 2) {
+      y = i + 1;
+    }
+    positioned.push({ ...inputs[i], face: "left", position: { x: 0, y } });
   }
-  // Outputs on right face: x=width, y=0,1,2,...
+
+  // Outputs on right face: x=width
   for (let i = 0; i < outputs.length; i++) {
-    positioned.push({ ...outputs[i], face: "right", position: { x: width, y: i } });
+    const y = i + offs;
+    positioned.push({ ...outputs[i], face: "right", position: { x: width, y } });
   }
 
   return positioned;
