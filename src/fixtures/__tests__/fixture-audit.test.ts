@@ -431,7 +431,62 @@ describe("fixture audit", () => {
     });
 
     // ------------------------------------------------------------------
-    // 7. Pin positions are unique per element
+    // 7. Tunnel pins connected (wire endpoint or pin-on-pin)
+    //
+    // Tunnels connect by name, but each tunnel pin must physically
+    // touch either a wire endpoint or another component's pin.
+    // A tunnel that touches neither is disconnected — usually caused
+    // by a shape/dimension bug in the adjacent component.
+    // ------------------------------------------------------------------
+
+    it("tunnel pins connected", () => {
+      requireCircuit(loadError, circuit);
+
+      // All wire endpoints
+      const wireEndpoints = new Set<string>();
+      for (const wire of circuit.wires) {
+        wireEndpoints.add(ptKey(wire.start.x, wire.start.y));
+        wireEndpoints.add(ptKey(wire.end.x, wire.end.y));
+      }
+
+      // All non-tunnel pin positions
+      const nonTunnelPins = new Set<string>();
+      for (const el of circuit.elements) {
+        if (el.typeId === "Tunnel") continue;
+        for (const pin of el.getPins()) {
+          const wp = pinWorldPosition(el, pin);
+          nonTunnelPins.add(ptKey(wp.x, wp.y));
+        }
+      }
+
+      // Check each tunnel's pin
+      const disconnected: string[] = [];
+      for (const el of circuit.elements) {
+        if (el.typeId !== "Tunnel") continue;
+        for (const pin of el.getPins()) {
+          const wp = pinWorldPosition(el, pin);
+          const key = ptKey(wp.x, wp.y);
+          const touchesWire = wireEndpoints.has(key);
+          const touchesOtherPin = nonTunnelPins.has(key);
+          if (!touchesWire && !touchesOtherPin) {
+            let label = "";
+            try {
+              label = (el as any)._properties?.getOrDefault?.("label", "") ?? "";
+            } catch { /* ignore */ }
+            disconnected.push(`Tunnel "${label}" @ (${wp.x}, ${wp.y})`);
+          }
+        }
+      }
+
+      if (disconnected.length > 0) {
+        throw new Error(
+          `${disconnected.length} disconnected tunnel(s):\n${disconnected.join("\n")}`,
+        );
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // 8. Pin positions are unique per element
     // ------------------------------------------------------------------
 
     it("no duplicate pin positions", () => {
