@@ -56,8 +56,8 @@ export function splitWiresAtPoint(point: Point, circuit: Circuit): Point | undef
   for (const wire of circuit.wires) {
     if (isPointOnSegmentInterior(point, wire.start, wire.end)) {
       circuit.removeWire(wire);
-      circuit.addWire(new Wire(wire.start, point));
-      circuit.addWire(new Wire(point, wire.end));
+      circuit.addWire(new Wire(wire.start, point, wire.bitWidth));
+      circuit.addWire(new Wire(point, wire.end, wire.bitWidth));
       return point;
     }
   }

@@ -26,7 +26,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -110,10 +110,6 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class RelayDTElement extends AbstractCircuitElement {
-  private readonly _poles: number;
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -122,29 +118,22 @@ export class RelayDTElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("RelayDT", instanceId, position, rotation, mirror, props);
-    this._poles = props.getOrDefault<number>("poles", 1);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._pins = resolvePins(
-      buildRelayDTPins(this._poles, this._bitWidth),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildRelayDTPins(poles), []);
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._poles);
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const h = componentHeight(poles);
     return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: h };
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._poles;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
 
     ctx.save();
     ctx.setColor("COMPONENT");

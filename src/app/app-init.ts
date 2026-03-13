@@ -29,12 +29,14 @@ import { darkColorScheme, lightColorScheme } from '../core/renderer-interface.js
 import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.js';
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
 import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
-import { deleteSelection, rotateSelection, mirrorSelection } from '../editor/edit-operations.js';
+import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard, pasteFromClipboard } from '../editor/edit-operations.js';
+import type { ClipboardData } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
 import { deserializeCircuit } from '../io/load.js';
 import { serializeCircuit } from '../io/save.js';
+import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
 import { compileCircuit } from '../engine/compiler.js';
 import { ClockManager } from '../engine/clock.js';
@@ -43,13 +45,15 @@ import { EngineState } from '../core/engine-interface.js';
 import { BitVector } from '../core/signal.js';
 import { PropertyBag } from '../core/properties.js';
 import { pinWorldPosition } from '../core/pin.js';
+import { resolveNets } from '../headless/netlist.js';
+import type { Diagnostic } from '../headless/netlist-types.js';
 import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
 import type { CompiledCircuitImpl } from '../engine/compiled-circuit.js';
 
 /** Component type names that are togglable during simulation — skip property popup on dblclick. */
-const TOGGLABLE_TYPES = new Set(["In", "Button", "Switch", "DipSwitch"]);
+const TOGGLABLE_TYPES = new Set(["In", "Clock", "Button", "Switch", "DipSwitch"]);
 
 /**
  * After completing a wire to a pin or junction, check if the newly added
@@ -145,6 +149,7 @@ export function initApp(search?: string): void {
   const statusBar = document.getElementById('status-bar')!;
   const statusMessage = document.getElementById('status-message')!;
   const statusDismiss = document.getElementById('status-dismiss')!;
+  const statusCoords = document.getElementById('status-coords')!;
 
   function showStatus(message: string, isError = false): void {
     statusMessage.textContent = message;
@@ -154,6 +159,15 @@ export function initApp(search?: string): void {
   function clearStatus(): void {
     statusMessage.textContent = 'Ready';
     statusBar.classList.remove('error');
+  }
+
+  function formatDiagnostics(diagnostics: Diagnostic[]): string {
+    if (diagnostics.length === 0) return '';
+    const first = diagnostics[0]!;
+    const base = diagnostics.length === 1
+      ? first.message
+      : `${diagnostics.length} errors: ${first.message}`;
+    return first.fix ? `${base} (fix: ${first.fix})` : base;
   }
 
   statusDismiss.addEventListener('click', clearStatus);
@@ -245,6 +259,14 @@ export function initApp(search?: string): void {
       engine.stop();
       binding.unbind();
       engine.dispose();
+    }
+    const { diagnostics } = resolveNets(circuit, registry);
+    const errors = diagnostics.filter(d => d.severity === 'error');
+    if (errors.length > 0) {
+      const msg = formatDiagnostics(errors);
+      console.error('Pre-compilation diagnostics:', msg);
+      showStatus(`Compilation error: ${msg}`, true);
+      return false;
     }
     try {
       compiled = compileCircuit(circuit, registry);
@@ -422,6 +444,8 @@ export function initApp(search?: string): void {
   let dragMode: DragMode = 'none';
   let dragStart: Point = { x: 0, y: 0 };
   let dragStartScreen: Point = { x: 0, y: 0 };
+  let clipboard: ClipboardData = { entries: [], wires: [] };
+  let lastWorldPt: Point = { x: 0, y: 0 };
 
   const boxSelect = {
     active: false,
@@ -445,6 +469,39 @@ export function initApp(search?: string): void {
     }
 
     if (e.button !== 0) return;
+
+    // During simulation, only allow toggling interactive components (In, Clock, etc.)
+    if (binding.isBound) {
+      const elementHit = hitTestElements(worldPt, circuit.elements);
+      if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock')) {
+        const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
+        try {
+          const current = binding.getPinValue(elementHit, 'out');
+          const newVal = bitWidth === 1
+            ? (current === 0 ? 1 : 0)
+            : ((current + 1) & ((1 << bitWidth) - 1));
+          binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
+          if (elementHit.typeId === 'Clock' && clockManager !== null && compiled !== null) {
+            // Sync ClockManager phase so it doesn't immediately revert
+            const netId = compiled.pinNetMap.get(`${elementHit.instanceId}:out`);
+            if (netId !== undefined) {
+              clockManager.setClockPhase(netId, newVal !== 0);
+            }
+          }
+          if (engine.getState() !== EngineState.RUNNING) {
+            // Skip advanceClocks when manually toggling a Clock
+            if (elementHit.typeId !== 'Clock' && clockManager !== null) {
+              clockManager.advanceClocks(engine.getSignalArray());
+            }
+            engine.step();
+          }
+          scheduleRender();
+        } catch {
+          scheduleRender();
+        }
+      }
+      return;
+    }
 
     if (placement.isActive()) {
       placement.updateCursor(worldPt);
@@ -499,28 +556,6 @@ export function initApp(search?: string): void {
       return;
     }
 
-    if (binding.isBound) {
-      const elementHit = hitTestElements(worldPt, circuit.elements);
-      if (elementHit && elementHit.typeId === 'In') {
-        const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
-        try {
-          const current = binding.getPinValue(elementHit, 'out');
-          const newVal = bitWidth === 1
-            ? (current === 0 ? 1 : 0)
-            : ((current + 1) & ((1 << bitWidth) - 1));
-          binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          if (engine.getState() !== EngineState.RUNNING) {
-            if (clockManager !== null) clockManager.advanceClocks(engine.getSignalArray());
-            engine.step();
-          }
-          scheduleRender();
-        } catch {
-          scheduleRender();
-        }
-        return;
-      }
-    }
-
     const pinHit = hitTestPins(worldPt, circuit.elements, HIT_THRESHOLD);
     if (pinHit) {
       wireDrawing.startFromPin(pinHit.element, pinHit.pin);
@@ -543,26 +578,13 @@ export function initApp(search?: string): void {
 
     const wireHit = hitTestWires(worldPt, circuit.wires, HIT_THRESHOLD);
     if (wireHit) {
+      // Clicking a wire selects it. Tee/split only happens when already in
+      // wire-drawing mode (handled above) or when starting from a pin.
       if (e.shiftKey) {
         selection.toggleSelect(wireHit);
-        scheduleRender();
-        return;
+      } else {
+        selection.select(wireHit);
       }
-      // Split wire at tap point or start from endpoint/corner
-      const snappedWirePt = snapToGrid(worldPt, 1);
-      const tappedPoint = splitWiresAtPoint(snappedWirePt, circuit);
-      if (tappedPoint !== undefined) {
-        invalidateCompiled();
-        wireDrawing.startFromPoint(tappedPoint);
-        scheduleRender();
-        return;
-      }
-      if (isWireEndpoint(snappedWirePt, circuit)) {
-        wireDrawing.startFromPoint(snappedWirePt);
-        scheduleRender();
-        return;
-      }
-      selection.select(wireHit);
       scheduleRender();
       return;
     }
@@ -580,6 +602,12 @@ export function initApp(search?: string): void {
   canvas.addEventListener('mousemove', (e: MouseEvent) => {
     const worldPt = canvasToWorld(e);
     const screenPt = canvasToScreen(e);
+    lastWorldPt = worldPt;
+
+    // Update cursor grid coordinates in status bar
+    const gx = Math.round(worldPt.x * 100) / 100;
+    const gy = Math.round(worldPt.y * 100) / 100;
+    statusCoords.textContent = `${gx}, ${gy}`;
 
     if (placement.isActive()) {
       placement.updateCursor(worldPt);
@@ -608,9 +636,43 @@ export function initApp(search?: string): void {
       const dx = snappedWorld.x - snappedStart.x;
       const dy = snappedWorld.y - snappedStart.y;
       if (dx !== 0 || dy !== 0) {
-        for (const el of selection.getSelectedElements()) {
+        const selectedElements = selection.getSelectedElements();
+        const selectedWires = selection.getSelectedWires();
+
+        // Collect world-space pin positions BEFORE moving elements.
+        const pinPositions = new Set<string>();
+        for (const el of selectedElements) {
+          for (const pin of el.getPins()) {
+            const wp = pinWorldPosition(el, pin);
+            pinPositions.add(`${wp.x},${wp.y}`);
+          }
+        }
+
+        // Move elements.
+        for (const el of selectedElements) {
           el.position = { x: el.position.x + dx, y: el.position.y + dy };
         }
+
+        // Stretch wires: move endpoints that were connected to moved pins.
+        // Skip wires that are part of the selection (they move with it).
+        for (const wire of circuit.wires) {
+          if (selectedWires.has(wire)) continue;
+          const startKey = `${wire.start.x},${wire.start.y}`;
+          const endKey = `${wire.end.x},${wire.end.y}`;
+          if (pinPositions.has(startKey)) {
+            wire.start = { x: wire.start.x + dx, y: wire.start.y + dy };
+          }
+          if (pinPositions.has(endKey)) {
+            wire.end = { x: wire.end.x + dx, y: wire.end.y + dy };
+          }
+        }
+
+        // Also move selected wires with the selection.
+        for (const wire of selectedWires) {
+          wire.start = { x: wire.start.x + dx, y: wire.start.y + dy };
+          wire.end = { x: wire.end.x + dx, y: wire.end.y + dy };
+        }
+
         dragStart = snappedWorld;
         invalidateCompiled();
       }
@@ -823,6 +885,9 @@ export function initApp(search?: string): void {
       return;
     }
 
+    // Block all edit shortcuts during simulation
+    if (binding.isBound) return;
+
     if (e.key === 'r' || e.key === 'R') {
       if (placement.isActive()) {
         placement.rotate();
@@ -877,6 +942,28 @@ export function initApp(search?: string): void {
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      e.preventDefault();
+      if (!selection.isEmpty()) {
+        clipboard = copyToClipboard(
+          [...selection.getSelectedElements()],
+          [...selection.getSelectedWires()],
+          (typeId: string) => registry.get(typeId),
+        );
+      }
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      e.preventDefault();
+      if (clipboard.entries.length > 0 || clipboard.wires.length > 0) {
+        const cmd = pasteFromClipboard(circuit, clipboard, lastWorldPt);
+        undoStack.push(cmd);
+        invalidateCompiled();
+      }
+      return;
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
       selection.selectAll(circuit);
@@ -927,6 +1014,7 @@ export function initApp(search?: string): void {
   let runRafHandle = -1;
 
   function startContinuousRun(): void {
+    selection.clear();
     engine.start();
     let lastTime = performance.now();
 
@@ -992,6 +1080,11 @@ export function initApp(search?: string): void {
   document.getElementById('btn-stop')?.addEventListener('click', () => {
     if (!binding.isBound) return;
     stopContinuousRun();
+    // Return to edit mode: unbind signals so wires go grey
+    binding.unbind();
+    engine.dispose();
+    compiledDirty = true;
+    scheduleRender();
   });
 
   // Toolbar Start/Step/Stop buttons (mirror the menu actions)
@@ -1080,18 +1173,155 @@ export function initApp(search?: string): void {
     folderInput?.click();
   });
 
+  // Track the currently-loaded folder's file contents (name→XML text).
+  // Populated on folder upload or IndexedDB restore.
+  let currentFolderFiles: Map<string, string> | null = null;
+  let currentFolderName = '';
+
+  const browseFolderMenu = document.getElementById('browse-folder-menu');
+  const folderSubmenu = document.getElementById('folder-submenu');
+  const closeFolderBtn = document.getElementById('btn-close-folder');
+
+  /** A directory tree node: files at this level + child directories. */
+  interface DirNode {
+    files: string[];          // base names (no extension) of .dig files here
+    children: Map<string, DirNode>;
+  }
+
+  /** Build the Browse Folder submenu from the current folder file map. */
+  function buildFolderSubmenu(files: Map<string, string>): void {
+    if (!folderSubmenu || !browseFolderMenu || !closeFolderBtn) return;
+    folderSubmenu.innerHTML = '';
+
+    // Build a nested tree from file keys (which may contain '/' separators)
+    const root: DirNode = { files: [], children: new Map() };
+    for (const key of files.keys()) {
+      if (key.endsWith('.dig')) continue; // skip .dig-suffixed duplicates
+      const parts = key.split('/');
+      const fileName = parts.pop()!;
+      let node = root;
+      for (const segment of parts) {
+        if (!node.children.has(segment)) {
+          node.children.set(segment, { files: [], children: new Map() });
+        }
+        node = node.children.get(segment)!;
+      }
+      node.files.push(fileName);
+    }
+
+    // Recursively populate a dropdown element from a DirNode
+    function populateDropdown(container: HTMLElement, node: DirNode, pathPrefix: string): void {
+      // Sort and add subdirectory submenus first
+      const sortedDirs = [...node.children.keys()].sort();
+      for (const dirName of sortedDirs) {
+        const childNode = node.children.get(dirName)!;
+        const sub = document.createElement('div');
+        sub.className = 'menu-submenu';
+
+        const label = document.createElement('div');
+        label.className = 'menu-action';
+        label.textContent = dirName;
+        sub.appendChild(label);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'menu-dropdown';
+        populateDropdown(dropdown, childNode, pathPrefix ? `${pathPrefix}/${dirName}` : dirName);
+        sub.appendChild(dropdown);
+
+        // Open/close submenu on hover
+        sub.addEventListener('mouseenter', () => sub.classList.add('open'));
+        sub.addEventListener('mouseleave', () => sub.classList.remove('open'));
+
+        container.appendChild(sub);
+      }
+
+      // Then add .dig file items sorted
+      const sortedFiles = [...node.files].sort();
+      if (sortedDirs.length > 0 && sortedFiles.length > 0) {
+        const sep = document.createElement('div');
+        sep.className = 'menu-separator';
+        container.appendChild(sep);
+      }
+      for (const name of sortedFiles) {
+        const fullKey = pathPrefix ? `${pathPrefix}/${name}` : name;
+        const item = document.createElement('div');
+        item.className = 'menu-action';
+        item.textContent = name + '.dig';
+        item.addEventListener('click', () => {
+          openFromStoredFolder(fullKey);
+        });
+        container.appendChild(item);
+      }
+    }
+
+    populateDropdown(folderSubmenu, root, '');
+
+    browseFolderMenu.style.display = '';
+    closeFolderBtn.style.display = '';
+  }
+
+  /** Hide the Browse Folder submenu and clear folder state. */
+  function hideFolderSubmenu(): void {
+    if (browseFolderMenu) browseFolderMenu.style.display = 'none';
+    if (closeFolderBtn) closeFolderBtn.style.display = 'none';
+    if (folderSubmenu) folderSubmenu.innerHTML = '';
+    currentFolderFiles = null;
+    currentFolderName = '';
+  }
+
+  /** Open a circuit by name from the current in-memory folder. */
+  async function openFromStoredFolder(name: string): Promise<void> {
+    if (!currentFolderFiles) return;
+    const xml = currentFolderFiles.get(name);
+    if (!xml) {
+      showStatus(`File "${name}.dig" not found in folder`, true);
+      return;
+    }
+    try {
+      // Build resolver from all OTHER files in the folder
+      const siblingMap = new Map<string, string>();
+      for (const [k, v] of currentFolderFiles) {
+        if (k !== name) {
+          siblingMap.set(k, v);
+          if (!k.endsWith('.dig')) siblingMap.set(k + '.dig', v);
+        }
+      }
+      const folderResolver = new ChainResolver([
+        new EmbeddedResolver(siblingMap),
+        httpResolver,
+      ]);
+      const loaded = await loadWithSubcircuits(xml, folderResolver, registry);
+      applyLoadedCircuit(loaded);
+      circuit.metadata.name = name.split('/').pop() || name;
+      updateCircuitName();
+      const scCount = siblingMap.size / 2; // each file registered twice
+      showStatus(`Loaded ${name}.dig (${scCount} subcircuit file${scCount !== 1 ? 's' : ''} available)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Failed to load circuit from folder:', msg);
+      showStatus(`Load error: ${msg}`, true);
+    }
+  }
+
   folderInput?.addEventListener('change', async () => {
     const files = folderInput?.files;
     if (!files || files.length === 0) return;
 
-    // Collect all .dig files from the selected directory
-    const digFiles = new Map<string, File>();
+    // Read all .dig files to text and collect in a map
+    const digFiles = new Map<string, string>();
+    let folderName = '';
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.endsWith('.dig')) {
-        // Use filename without extension as the circuit name
         const name = f.name.replace(/\.dig$/, '');
-        digFiles.set(name, f);
+        // Use webkitRelativePath for subfolder structure, fall back to name
+        const relPath = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
+        if (relPath && !folderName) {
+          folderName = relPath.split('/')[0] || name;
+        }
+        // Store under just the filename (no extension) for flat folders
+        const content = await f.text();
+        digFiles.set(name, content);
       }
     }
 
@@ -1100,86 +1330,51 @@ export function initApp(search?: string): void {
       return;
     }
 
-    // If only one .dig file, open it directly
+    if (!folderName) folderName = 'Folder';
+
+    // Persist to IndexedDB (single-slot replacement)
+    try {
+      await storeFolder(folderName, digFiles);
+    } catch (e) {
+      console.warn('Failed to persist folder to IndexedDB:', e);
+    }
+
+    // Set in-memory state and build menu
+    currentFolderFiles = digFiles;
+    currentFolderName = folderName;
+    buildFolderSubmenu(digFiles);
+
+    // If only one file, open it directly; otherwise let user pick from menu
     if (digFiles.size === 1) {
-      const [name, file] = [...digFiles.entries()][0];
-      await openDigFromFolder(name, file, digFiles);
-      return;
+      const [name] = [...digFiles.keys()];
+      await openFromStoredFolder(name);
+    } else {
+      showStatus(`Folder "${folderName}" loaded (${digFiles.size} .dig files). Use File → Browse Folder to open a circuit.`);
     }
-
-    // Multiple .dig files — show a picker dialog
-    const overlay = document.createElement('div');
-    overlay.className = 'test-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'test-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'test-dialog-header';
-    header.innerHTML = '<span>Select Main Circuit</span>';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
-
-    const list = document.createElement('div');
-    list.style.cssText = 'max-height:300px;overflow-y:auto;padding:8px;';
-    for (const [name, file] of digFiles) {
-      const btn = document.createElement('div');
-      btn.className = 'menu-action';
-      btn.textContent = name + '.dig';
-      btn.style.cssText = 'padding:6px 12px;cursor:pointer;';
-      btn.addEventListener('click', async () => {
-        overlay.remove();
-        await openDigFromFolder(name, file, digFiles);
-      });
-      list.appendChild(btn);
-    }
-    dialog.appendChild(list);
-    overlay.appendChild(dialog);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
-    document.body.appendChild(overlay);
   });
 
-  /** Open a .dig file with all sibling .dig files available as subcircuit resolvers. */
-  async function openDigFromFolder(
-    mainName: string,
-    mainFile: File,
-    allDigFiles: Map<string, File>,
-  ): Promise<void> {
+  // Close Folder handler
+  closeFolderBtn?.addEventListener('click', async () => {
+    hideFolderSubmenu();
     try {
-      const mainXml = await mainFile.text();
-
-      // Build an EmbeddedResolver from all sibling .dig files (excluding the main one).
-      // Register under both "Name" and "Name.dig" since .dig XML may use either form.
-      const siblingMap = new Map<string, string>();
-      for (const [name, file] of allDigFiles) {
-        if (name !== mainName) {
-          const content = await file.text();
-          siblingMap.set(name, content);
-          siblingMap.set(name + '.dig', content);
-        }
-      }
-      const folderResolver = new ChainResolver([
-        new EmbeddedResolver(siblingMap),
-        httpResolver,
-      ]);
-
-      const loaded = await loadWithSubcircuits(mainXml, folderResolver, registry);
-      applyLoadedCircuit(loaded);
-      circuit.metadata.name = mainName;
-      updateCircuitName();
-      showStatus(`Loaded ${mainName}.dig (${siblingMap.size} subcircuit file${siblingMap.size !== 1 ? 's' : ''} available)`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('Failed to load circuit from folder:', msg);
-      showStatus(`Load error: ${msg}`, true);
+      await clearFolder();
+    } catch (e) {
+      console.warn('Failed to clear folder from IndexedDB:', e);
     }
-  }
+    showStatus('Folder closed');
+  });
+
+  // Restore folder from IndexedDB on startup
+  loadFolder().then((stored) => {
+    if (!stored) return;
+    const files = new Map(Object.entries(stored.files));
+    currentFolderFiles = files;
+    currentFolderName = stored.name;
+    buildFolderSubmenu(files);
+    showStatus(`Folder "${stored.name}" restored (${files.size} .dig files). Use File → Browse Folder to open a circuit.`);
+  }).catch((e) => {
+    console.warn('Failed to restore folder from IndexedDB:', e);
+  });
 
   document.getElementById('btn-save')?.addEventListener('click', () => {
     try {

@@ -118,11 +118,6 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class VGAElement extends AbstractCircuitElement {
-  private readonly _colorBits: number;
-  private readonly _frameWidth: number;
-  private readonly _frameHeight: number;
-  private readonly _pins: readonly Pin[];
-
   /** Framebuffer: packed RGB32 values, row-major [y * frameWidth + x]. */
   private readonly _framebuffer: Uint32Array;
 
@@ -148,37 +143,27 @@ export class VGAElement extends AbstractCircuitElement {
   ) {
     super("VGA", instanceId, position, rotation, mirror, props);
 
-    this._colorBits = props.getOrDefault<number>("colorBits", DEFAULT_COLOR_BITS);
-    this._frameWidth = props.getOrDefault<number>("frameWidth", DEFAULT_WIDTH);
-    this._frameHeight = props.getOrDefault<number>("frameHeight", DEFAULT_HEIGHT);
+    const frameWidth = props.getOrDefault<number>("frameWidth", DEFAULT_WIDTH);
+    const frameHeight = props.getOrDefault<number>("frameHeight", DEFAULT_HEIGHT);
 
-    this._framebuffer = new Uint32Array(this._frameWidth * this._frameHeight);
+    this._framebuffer = new Uint32Array(frameWidth * frameHeight);
     this._xPos = 0;
     this._yPos = 0;
     this._lastClock = false;
     this._lastHSync = false;
     this._lastVSync = false;
-
-    const decls = buildVgaPinDeclarations(this._colorBits);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>(["C"]) },
-    );
   }
 
   get colorBits(): number {
-    return this._colorBits;
+    return this._properties.getOrDefault<number>("colorBits", DEFAULT_COLOR_BITS);
   }
 
   get frameWidth(): number {
-    return this._frameWidth;
+    return this._properties.getOrDefault<number>("frameWidth", DEFAULT_WIDTH);
   }
 
   get frameHeight(): number {
-    return this._frameHeight;
+    return this._properties.getOrDefault<number>("frameHeight", DEFAULT_HEIGHT);
   }
 
   /**
@@ -227,15 +212,15 @@ export class VGAElement extends AbstractCircuitElement {
   }
 
   private _writePixel(x: number, y: number, r: number, g: number, b: number): void {
-    if (x < 0 || x >= this._frameWidth || y < 0 || y >= this._frameHeight) return;
+    if (x < 0 || x >= this.frameWidth || y < 0 || y >= this.frameHeight) return;
 
-    const maxVal = (1 << this._colorBits) - 1;
+    const maxVal = (1 << this.colorBits) - 1;
     const r8 = Math.round((r / maxVal) * 255);
     const g8 = Math.round((g / maxVal) * 255);
     const b8 = Math.round((b / maxVal) * 255);
 
     const packed = ((r8 & 0xFF) << 16) | ((g8 & 0xFF) << 8) | (b8 & 0xFF);
-    this._framebuffer[y * this._frameWidth + x] = packed;
+    this._framebuffer[y * this.frameWidth + x] = packed;
   }
 
   /**
@@ -243,8 +228,8 @@ export class VGAElement extends AbstractCircuitElement {
    * Used for testing and direct framebuffer access.
    */
   writePixelAt(x: number, y: number, rgb: number): void {
-    if (x >= 0 && x < this._frameWidth && y >= 0 && y < this._frameHeight) {
-      this._framebuffer[y * this._frameWidth + x] = rgb >>> 0;
+    if (x >= 0 && x < this.frameWidth && y >= 0 && y < this.frameHeight) {
+      this._framebuffer[y * this.frameWidth + x] = rgb >>> 0;
     }
   }
 
@@ -252,8 +237,8 @@ export class VGAElement extends AbstractCircuitElement {
    * Read the packed RGB32 value at (x, y).
    */
   readPixelAt(x: number, y: number): number {
-    if (x < 0 || x >= this._frameWidth || y < 0 || y >= this._frameHeight) return 0;
-    return this._framebuffer[y * this._frameWidth + x];
+    if (x < 0 || x >= this.frameWidth || y < 0 || y >= this.frameHeight) return 0;
+    return this._framebuffer[y * this.frameWidth + x];
   }
 
   /** Returns a snapshot of the framebuffer. */
@@ -272,7 +257,13 @@ export class VGAElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return resolvePins(
+      buildVgaPinDeclarations(this.colorBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>(["C"]) },
+    );
   }
 
   getBoundingBox(): Rect {

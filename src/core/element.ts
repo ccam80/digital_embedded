@@ -12,8 +12,13 @@
  */
 
 import type { Point, Rect, RenderContext } from "./renderer-interface.js";
-import type { Pin } from "./pin.js";
+import type { Pin, PinDeclaration } from "./pin.js";
 import type { Rotation } from "./pin.js";
+import {
+  resolvePins,
+  createInverterConfig,
+  createClockConfig,
+} from "./pin.js";
 import type { PropertyBag, PropertyValue } from "./properties.js";
 import { propertyBagToJson } from "./properties.js";
 
@@ -207,4 +212,33 @@ export abstract class AbstractCircuitElement implements CircuitElement {
   abstract draw(ctx: RenderContext): void;
   abstract getBoundingBox(): Rect;
   abstract getHelpText(): string;
+
+  /**
+   * Derive pins from declarations + current properties. Pins are in LOCAL
+   * coordinates (rotation=0); pinWorldPosition() applies mirror/rotate/translate.
+   *
+   * Reads _inverterLabels from properties (the standard .dig inverterConfig
+   * attribute mapping). Components override getPins() and call this helper.
+   *
+   * @param declarations  Static pin layout for this component variant.
+   * @param clockLabels   Pin labels that are clock-capable (e.g. ["C"]).
+   */
+  protected derivePins(
+    declarations: readonly PinDeclaration[],
+    clockLabels: readonly string[] = [],
+  ): Pin[] {
+    const invLabels = this._properties.has("_inverterLabels")
+      ? this._properties.get<string>("_inverterLabels").split(",")
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0)
+          .map((s: string) => /^\d+$/.test(s) ? `In_${s}` : s)
+      : [];
+    return resolvePins(
+      declarations,
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig(invLabels),
+      createClockConfig(clockLabels),
+    );
+  }
 }

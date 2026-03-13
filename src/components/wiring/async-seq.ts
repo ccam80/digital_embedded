@@ -18,10 +18,6 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import {
-  createInverterConfig,
-  resolvePins,
-} from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -51,10 +47,6 @@ export function buildAsyncSeqPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class AsyncSeqElement extends AbstractCircuitElement {
-  private readonly _runAtRealTime: boolean;
-  private readonly _frequency: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -63,30 +55,18 @@ export class AsyncSeqElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("AsyncSeq", instanceId, position, rotation, mirror, props);
-
-    this._runAtRealTime = props.getOrDefault<boolean>("runAtRealTime", false);
-    this._frequency = props.getOrDefault<number>("frequency", 1);
-
-    const decls = buildAsyncSeqPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   get runAtRealTime(): boolean {
-    return this._runAtRealTime;
+    return this._properties.getOrDefault<boolean>("runAtRealTime", false);
   }
 
   get frequency(): number {
-    return this._frequency;
+    return this._properties.getOrDefault<number>("frequency", 1);
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildAsyncSeqPinDeclarations());
   }
 
   getBoundingBox(): Rect {
@@ -119,11 +99,13 @@ export class AsyncSeqElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
+    const runAtRealTime = this._properties.getOrDefault<boolean>("runAtRealTime", false);
+    const frequency = this._properties.getOrDefault<number>("frequency", 1);
     return (
       "AsyncSeq — marks circuit as asynchronous sequential.\n" +
       "Propagation is triggered by input changes only (no explicit clock).\n" +
-      (this._runAtRealTime
-        ? `Runs at real-time frequency: ${this._frequency} Hz.`
+      (runAtRealTime
+        ? `Runs at real-time frequency: ${frequency} Hz.`
         : "Level-by-level (event-driven) propagation mode.")
     );
   }

@@ -77,10 +77,6 @@ function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class LookUpTableElement extends AbstractCircuitElement {
-  private readonly _inputCount: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -89,19 +85,18 @@ export class LookUpTableElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("LookUpTable", instanceId, position, rotation, mirror, props);
-    this._inputCount = props.getOrDefault<number>("inputCount", 2);
-    this._dataBits = props.getOrDefault<number>("dataBits", 1);
-    this._pins = resolvePins(
-      buildLUTPins(this._inputCount, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 1);
+    return resolvePins(
+      buildLUTPins(inputCount, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>() },
+    );
   }
 
   getBoundingBox(): Rect {

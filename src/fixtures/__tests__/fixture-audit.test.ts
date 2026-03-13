@@ -143,14 +143,11 @@ for (const dir of FIXTURE_DIRS) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared state
+// Registry factory — each fixture gets a fresh registry so subcircuit
+// registrations from one fixture don't leak into another (different
+// fixture directories may contain different versions of same-named
+// subcircuits like control.dig).
 // ---------------------------------------------------------------------------
-
-let registry: ComponentRegistry;
-
-beforeAll(() => {
-  registry = createDefaultRegistry();
-});
 
 // ---------------------------------------------------------------------------
 // Intercept console.warn to detect unexpected skipped elements
@@ -211,6 +208,7 @@ describe("fixture audit", () => {
 
     beforeAll(async () => {
       clearSubcircuitCache();
+      const registry = createDefaultRegistry();
       const xml = readFileSync(path, "utf-8");
       const resolver = new FixtureTreeResolver(digIndex, dir);
 

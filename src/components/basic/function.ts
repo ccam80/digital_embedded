@@ -36,8 +36,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -166,7 +164,6 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
   private readonly _inputCount: number;
   private readonly _outputCount: number;
   private readonly _truthTable: readonly number[];
-  private readonly _pins: readonly Pin[];
 
   constructor(
     instanceId: string,
@@ -188,19 +185,11 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
       table.push(stored[i] ?? 0);
     }
     this._truthTable = table;
-
-    const decls = buildFunctionPinDeclarations(this._inputCount, this._outputCount);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const decls = buildFunctionPinDeclarations(this._inputCount, this._outputCount);
+    return this.derivePins(decls);
   }
 
   getBoundingBox(): Rect {

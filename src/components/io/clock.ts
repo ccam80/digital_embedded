@@ -1,8 +1,9 @@
 /**
- * Clock component — periodic signal source.
+ * Clock component — periodic signal source or manual toggle.
  *
- * The clock value is managed by ClockManager (Phase 3). The executeFn is a
- * no-op: the clock signal value is set by the engine on each tick.
+ * When autoRun is true (default), the ClockManager toggles the output
+ * automatically at the configured frequency. When autoRun is false, the
+ * clock behaves like a manual digital input — user clicks to toggle.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -11,8 +12,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -53,11 +52,6 @@ function buildClockPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class ClockElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _frequency: number;
-  private readonly _runRealTime: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -66,32 +60,22 @@ export class ClockElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Clock", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._frequency = props.getOrDefault<number>("Frequency", 1);
-    this._runRealTime = props.getOrDefault<boolean>("runRealTime", false);
-
-    const decls = buildClockPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>(["out"]) },
-      1,
-    );
   }
 
   get frequency(): number {
-    return this._frequency;
+    return this._properties.getOrDefault<number>("Frequency", 1);
+  }
+
+  get autoRun(): boolean {
+    return this._properties.getOrDefault<boolean>("autoRun", true);
   }
 
   get runRealTime(): boolean {
-    return this._runRealTime;
+    return this._properties.getOrDefault<boolean>("runRealTime", false);
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildClockPinDeclarations(), ["out"]);
   }
 
   getBoundingBox(): Rect {
@@ -126,10 +110,11 @@ export class ClockElement extends AbstractCircuitElement {
     ctx.drawLine(mx, my - halfH, mx, my + halfH);
     ctx.drawLine(mx, my + halfH, mx + halfW, my + halfH);
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(this._label, -COMP_WIDTH / 2, -0.3, {
+      ctx.drawText(label, -COMP_WIDTH / 2, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });
@@ -172,6 +157,11 @@ export const CLOCK_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     convert: (v) => parseInt(v, 10),
   },
   {
+    xmlName: "autoRun",
+    propertyKey: "autoRun",
+    convert: (v) => v === "true",
+  },
+  {
     xmlName: "runRealTime",
     propertyKey: "runRealTime",
     convert: (v) => v === "true",
@@ -197,6 +187,13 @@ const CLOCK_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: 1,
     min: 1,
     description: "Clock frequency (cycles per simulation step, or Hz in real-time mode)",
+  },
+  {
+    key: "autoRun",
+    type: PropertyType.BOOLEAN,
+    label: "Auto-run",
+    defaultValue: true,
+    description: "When true, clock toggles automatically at the configured frequency. When false, acts as a manual digital input.",
   },
   {
     key: "runRealTime",

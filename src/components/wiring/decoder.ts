@@ -16,8 +16,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -77,9 +75,6 @@ export function buildDecoderPinDeclarations(selectorBits: number): PinDeclaratio
 // ---------------------------------------------------------------------------
 
 export class DecoderElement extends AbstractCircuitElement {
-  private readonly _selectorBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -88,25 +83,16 @@ export class DecoderElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Decoder", instanceId, position, rotation, mirror, props);
-
-    this._selectorBits = props.getOrDefault<number>("selectorBits", 2);
-
-    const decls = buildDecoderPinDeclarations(this._selectorBits);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    return this.derivePins(buildDecoderPinDeclarations(selectorBits));
   }
 
   getBoundingBox(): Rect {
-    const outputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const outputCount = 1 << selectorBits;
     const h = componentHeight(outputCount);
     return {
       x: this.position.x,
@@ -117,7 +103,8 @@ export class DecoderElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const outputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const outputCount = 1 << selectorBits;
     const h = componentHeight(outputCount);
 
     ctx.save();
@@ -139,9 +126,10 @@ export class DecoderElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const outputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const outputCount = 1 << selectorBits;
     return (
-      `Decoder — ${this._selectorBits}-bit input produces ${outputCount} one-hot outputs.\n` +
+      `Decoder — ${selectorBits}-bit input produces ${outputCount} one-hot outputs.\n` +
       "Only output[input_value] is 1; all others are 0."
     );
   }

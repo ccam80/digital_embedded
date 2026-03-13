@@ -13,8 +13,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -64,10 +62,6 @@ function buildButtonLEDPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class ButtonLEDElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _activeLow: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -76,23 +70,10 @@ export class ButtonLEDElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("ButtonLED", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._activeLow = props.getOrDefault<boolean>("activeLow", false);
-
-    const decls = buildButtonLEDPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildButtonLEDPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -105,10 +86,11 @@ export class ButtonLEDElement extends AbstractCircuitElement {
   }
 
   get activeLow(): boolean {
-    return this._activeLow;
+    return this._properties.getOrDefault<boolean>("activeLow", false);
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
     const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
@@ -128,10 +110,10 @@ export class ButtonLEDElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawCircle(COMP_WIDTH - 0.4, yOff + 0.4, 0.25, false);
 
-    if (this._label.length > 0) {
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, yOff - 0.3, {
+      ctx.drawText(label, COMP_WIDTH / 2, yOff - 0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

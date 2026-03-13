@@ -1,5 +1,14 @@
 # Engine Remaining Work — Progress
 
+## Architectural Refactor: Derive-on-Read (spec/architectural-refactor-derive-on-read.md)
+- [x] Step 1: getPins() derives from properties (97 component files)
+- [x] Step 2: getBoundingBox()/draw() derive from properties (~95 component files)
+- [x] Step 3: SubcircuitDefinition.pinLayout is live (createLiveDefinition + deriveInterfacePins)
+- [x] Step 4: SubcircuitElement derives width/height/shapeMode on demand
+- [x] Step 5: Wire bitWidth propagation extracted and reusable (wire-propagation.ts + afterMutate hook)
+- [x] Step 6: Registry supports update/registerOrUpdate for live re-registration
+- [x] Step 7: Per-subcircuit cache invalidation (invalidateSubcircuit)
+
 ## Pre-requisite: ExecuteFunction Signature Update
 - [x] Update ExecuteFunction signature to include highZs
 
@@ -233,3 +242,25 @@
 - **Files modified**: none (sync logic was implemented in Task 5.1's worker.ts changes)
 - **Tests**: 2/2 passing (worker-signal.test.ts)
 - **Changes summary**: Signal synchronization logic was already implemented in Task 5.1 (syncSharedBuffer() in worker.ts using Atomics.store(), continuous run via MessageChannel, Atomics.load() reads in worker-engine.ts). This task adds the dedicated test file with two integration tests: `main_thread_reads_signal_after_step` verifies that after the worker writes values to the SharedArrayBuffer via Atomics.store(), the main thread reads correct values through getSignalRaw() and getSignalValue() (including proper BitVector width from stored netWidths). `setSignalValue_propagates_to_worker` verifies that setSignalValue() updates the SharedArrayBuffer immediately (main-thread side via Atomics.store) and posts a setSignal message to the worker with correct netId and value fields.
+
+## Fix 4: Mul — Wrong Pin Layout
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/arithmetic/mul.ts
+- **Tests**: 229/229 passing (arithmetic suite)
+
+## Task fix3-probe: Probe — Remove Body Rect, Text Only
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/components/io/probe.ts
+- **Tests**: 30/33 passing (3 failures are tests asserting old fabricated behavior — drawRect, drawCircle, no-text-when-empty — which conflict with the Java reference. These tests need updating to assert the new text-only rendering.)
+- **Notes**: io.test.ts ConstComponent failure is not caused by this task (const.ts was not modified here).
+
+## Task fix-6: Driver invertDriverOutput Not Supported
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/wiring/driver.ts
+- **Tests**: 280/282 passing (2 BusSplitter failures are pre-existing per test-baseline.md)

@@ -31,8 +31,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -94,8 +92,6 @@ function buildKeyboardPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class KeyboardElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
   private readonly _keyQueue: number[];
 
   constructor(
@@ -107,18 +103,7 @@ export class KeyboardElement extends AbstractCircuitElement {
   ) {
     super("Keyboard", instanceId, position, rotation, mirror, props);
 
-    this._label = props.getOrDefault<string>("label", "");
     this._keyQueue = [];
-
-    const decls = buildKeyboardPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>(["rd"]) },
-      1,
-    );
   }
 
   /** Enqueue a key code (called by the keyboard panel on user key press). */
@@ -162,7 +147,7 @@ export class KeyboardElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildKeyboardPinDeclarations(), ["rd"]);
   }
 
   getBoundingBox(): Rect {
@@ -198,10 +183,11 @@ export class KeyboardElement extends AbstractCircuitElement {
     ctx.drawRect(0.3, 0.7, 0.45, 0.3, false);
     ctx.drawRect(0.85, 0.7, 1.0, 0.3, false);
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.6 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
+      ctx.drawText(label, COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
         horizontal: "center",
         vertical: "top",
       });

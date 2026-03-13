@@ -28,7 +28,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { createInverterConfig, resolvePins } from "../../core/pin.js";
+// No pin imports needed — derivePins() is inherited from AbstractCircuitElement
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -37,6 +37,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { testDataConverter } from "../../io/attribute-map.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -109,12 +110,6 @@ function buildTestcasePinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class TestcaseElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _testData: string;
-  private readonly _pins: readonly Pin[];
-
-  private readonly _testDataCompiled: string;
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -123,40 +118,28 @@ export class TestcaseElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Testcase", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "Testcase");
-    this._testData = props.getOrDefault<string>("testData", "");
-    this._testDataCompiled = props.getOrDefault<string>("testDataCompiled", "");
-
-    const decls = buildTestcasePinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   /** The raw test data string. */
   get testData(): string {
-    return this._testData;
+    return this._properties.getOrDefault<string>("testData", "");
   }
 
   /** The compiled (plain-format) test data, if the source was a JS script. */
   get testDataCompiled(): string {
-    return this._testDataCompiled;
+    return this._properties.getOrDefault<string>("testDataCompiled", "");
   }
 
   /** Parse and return the structured test data. Uses compiled data if available. */
   getParsedTestData(): TestcaseData {
-    const data = this._testDataCompiled || this._testData;
+    const compiled = this._properties.getOrDefault<string>("testDataCompiled", "");
+    const raw = this._properties.getOrDefault<string>("testData", "");
+    const data = compiled || raw;
     return parseTestData(data);
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildTestcasePinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -197,7 +180,7 @@ export class TestcaseElement extends AbstractCircuitElement {
     // Label
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(this._label, COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
+    ctx.drawText(this._properties.getOrDefault<string>("label", "Testcase"), COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
       horizontal: "center",
       vertical: "top",
     });
@@ -238,11 +221,7 @@ export const TESTCASE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "label",
     convert: (v) => v,
   },
-  {
-    xmlName: "testData",
-    propertyKey: "testData",
-    convert: (v) => v,
-  },
+  testDataConverter(),
 ];
 
 // ---------------------------------------------------------------------------

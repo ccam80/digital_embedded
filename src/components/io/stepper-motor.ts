@@ -26,8 +26,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -158,9 +156,6 @@ function drawMotorBody(ctx: RenderContext, label: string, typeLabel: string): vo
 // ---------------------------------------------------------------------------
 
 export class StepperMotorBipolarElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -169,20 +164,10 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("StepperMotorBipolar", instanceId, position, rotation, mirror, props);
-    this._label = props.getOrDefault<string>("label", "");
-    const decls = buildBipolarPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildBipolarPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -190,8 +175,9 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
     ctx.save();
-    drawMotorBody(ctx, this._label, "Bipolar");
+    drawMotorBody(ctx, label, "Bipolar");
     ctx.restore();
   }
 
@@ -209,9 +195,6 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export class StepperMotorUnipolarElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -220,20 +203,10 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("StepperMotorUnipolar", instanceId, position, rotation, mirror, props);
-    this._label = props.getOrDefault<string>("label", "");
-    const decls = buildUnipolarPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildUnipolarPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -241,8 +214,9 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
     ctx.save();
-    drawMotorBody(ctx, this._label, "Unipolar");
+    drawMotorBody(ctx, label, "Unipolar");
     ctx.restore();
   }
 

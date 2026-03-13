@@ -117,11 +117,14 @@ function mergeOnAxis(axis: "x" | "y", a: Wire, b: Wire): Wire | undefined {
   const mergedMin = Math.min(aMin, bMin);
   const mergedMax = Math.max(aMax, bMax);
 
+  // Preserve bus width from either wire (take the wider one)
+  const bitWidth = Math.max(a.bitWidth, b.bitWidth);
+
   if (axis === "x") {
     const y = a.start.y;
-    return new Wire({ x: mergedMin, y }, { x: mergedMax, y });
+    return new Wire({ x: mergedMin, y }, { x: mergedMax, y }, bitWidth);
   } else {
     const x = a.start.x;
-    return new Wire({ x, y: mergedMin }, { x, y: mergedMax });
+    return new Wire({ x, y: mergedMin }, { x, y: mergedMax }, bitWidth);
   }
 }

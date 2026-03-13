@@ -108,11 +108,6 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
 // ---------------------------------------------------------------------------
 
 export class ProgramMemoryElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _isProgramMemory: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -121,20 +116,18 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("ProgramMemory", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 8);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._isProgramMemory = props.getOrDefault<boolean>("isProgramMemory", true);
-    this._pins = resolvePins(
-      buildProgramMemoryPins(this._addrBits, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set(["C"]) },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 8);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildProgramMemoryPins(addrBits, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set(["C"]) },
+    );
   }
 
   getBoundingBox(): Rect {
@@ -164,7 +157,7 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
   }
 
   get isProgramMemory(): boolean {
-    return this._isProgramMemory;
+    return this._properties.getOrDefault<boolean>("isProgramMemory", true);
   }
 
   getHelpText(): string {

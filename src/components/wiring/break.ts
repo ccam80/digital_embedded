@@ -22,8 +22,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -63,7 +61,6 @@ export function buildBreakPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class BreakElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
   constructor(
     instanceId: string,
@@ -73,19 +70,10 @@ export class BreakElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Break", instanceId, position, rotation, mirror, props);
-
-    const decls = buildBreakPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildBreakPinDeclarations());
   }
 
   getBoundingBox(): Rect {

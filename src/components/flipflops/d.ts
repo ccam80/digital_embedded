@@ -19,9 +19,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -61,7 +58,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     label: "C",
     defaultBitWidth: 1,
     position: { x: 0, y: 1 },
-    isNegatable: false,
+    isNegatable: true,
     isClockCapable: true,
   },
   {
@@ -87,9 +84,6 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class DElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -98,19 +92,11 @@ export class DElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("D_FF", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._pins = resolvePins(
-      D_FF_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(D_FF_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {

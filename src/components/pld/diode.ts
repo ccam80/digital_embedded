@@ -28,7 +28,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -216,9 +216,6 @@ const DIODE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 export class DiodeElement extends AbstractCircuitElement {
-  private readonly _blown: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -227,21 +224,10 @@ export class DiodeElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Diode", instanceId, position, rotation, mirror, props);
-
-    this._blown = props.getOrDefault<boolean>("blown", false);
-
-    const decls = buildDiodePinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildDiodePinDeclarations());
   }
 
   getBoundingBox(): Rect {
@@ -254,12 +240,13 @@ export class DiodeElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBody(ctx, label);
 
-    if (this._blown) {
+    if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);
@@ -269,7 +256,7 @@ export class DiodeElement extends AbstractCircuitElement {
   }
 
   isBlown(): boolean {
-    return this._blown;
+    return this._properties.getOrDefault<boolean>("blown", false);
   }
 
   getHelpText(): string {
@@ -287,9 +274,6 @@ export class DiodeElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export class DiodeForwardElement extends AbstractCircuitElement {
-  private readonly _blown: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -298,21 +282,10 @@ export class DiodeForwardElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("DiodeForward", instanceId, position, rotation, mirror, props);
-
-    this._blown = props.getOrDefault<boolean>("blown", false);
-
-    const decls = buildUnidirectionalPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildUnidirectionalPinDeclarations());
   }
 
   getBoundingBox(): Rect {
@@ -325,12 +298,13 @@ export class DiodeForwardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBody(ctx, label);
 
-    if (this._blown) {
+    if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);
@@ -354,9 +328,6 @@ export class DiodeForwardElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export class DiodeBackwardElement extends AbstractCircuitElement {
-  private readonly _blown: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -365,21 +336,10 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("DiodeBackward", instanceId, position, rotation, mirror, props);
-
-    this._blown = props.getOrDefault<boolean>("blown", false);
-
-    const decls = buildUnidirectionalPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildUnidirectionalPinDeclarations());
   }
 
   getBoundingBox(): Rect {
@@ -392,12 +352,13 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
     const label = this._properties.getOrDefault<string>("label", "");
     drawDiodeBodyBackward(ctx, label);
 
-    if (this._blown) {
+    if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
       ctx.drawLine(0.8, 0.4, 1.2, 1.6);

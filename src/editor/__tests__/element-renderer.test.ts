@@ -129,12 +129,12 @@ describe("ElementRenderer", () => {
     );
     expect(translateIdx).toBeGreaterThan(saveIdx);
 
-    // rotate(Math.PI / 2) for rotation=1
+    // rotate(-Math.PI / 2) for rotation=1 (negated to match rotatePoint convention)
     const rotateIdx = calls.findIndex(
       (c, i) =>
         i > translateIdx &&
         c.kind === "rotate" &&
-        Math.abs((c as { kind: "rotate"; angle: number }).angle - Math.PI / 2) < 1e-10,
+        Math.abs((c as { kind: "rotate"; angle: number }).angle + Math.PI / 2) < 1e-10,
     );
     expect(rotateIdx).toBeGreaterThan(translateIdx);
 
@@ -180,10 +180,10 @@ describe("ElementRenderer", () => {
 
     renderer.render(ctx, circuit, new Set(), fullViewport);
 
-    // There must be at least one unfilled circle at the pin position
+    // Negation bubble is offset 0.5 grid units toward body (+x for rotation=0)
     const unfilledCircles = ctx
       .callsOfKind("circle")
-      .filter((c) => !c.filled && c.cx === 3 && c.cy === 2);
+      .filter((c) => !c.filled && c.cx === 3.5 && c.cy === 2);
 
     expect(unfilledCircles).toHaveLength(1);
   });

@@ -57,10 +57,20 @@ function outputFace(rotation: Rotation): Face {
  * Derive the interface PinDeclarations for a subcircuit from its In/Out
  * components, respecting element rotation for face assignment.
  *
+ * IMPORTANT: The result array preserves **document order** (the order In/Out
+ * elements appear in the circuit's element list). Java Digital's
+ * getInputDescription/getOutputDescriptions returns pins in document order,
+ * and DEFAULT-mode subcircuits use array position to assign pin y-coordinates.
+ * Emitting in face-grouped order (left, right, top, bottom) would swap pins
+ * when a subcircuit has inputs on multiple faces (e.g. sysreg with left + top
+ * inputs).
+ *
+ * Each pin is tagged with its face (from In/Out rotation) and a sortPos
+ * (element position along the face axis) so that LAYOUT mode can sort within
+ * each face independently.
+ *
  * @param circuit  The loaded subcircuit definition.
- * @returns        PinDeclaration[] with face-aware positions. Pin positions
- *                 are slot indices (0, 1, 2, ...) — the caller computes
- *                 final world positions using the chip dimensions.
+ * @returns        PinDeclaration[] in document order, with face tags.
  */
 export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
   const facedPins: FacedPin[] = [];
@@ -72,7 +82,7 @@ export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
       const rot = (element.rotation ?? 0) as Rotation;
       const face = inputFace(rot);
 
-      // Sort by position along the face axis (y for left/right, x for top/bottom)
+      // Sort key: element position along the face axis (y for left/right, x for top/bottom)
       const sortPos = (face === "left" || face === "right")
         ? element.position.y
         : element.position.x;
@@ -104,38 +114,17 @@ export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
     }
   }
 
-  // Sort pins within each face by their position in the circuit
-  facedPins.sort((a, b) => a.sortPos - b.sortPos);
-
-  // Convert to PinDeclarations with slot-based positions.
-  // The face is encoded in the position: left/right pins get x=0 or x=chipWidth
-  // (assigned later by buildPositionedPinDeclarations), top/bottom get y=0 or y=chipHeight.
-  // We use a convention: position.x < 0 means "use face" encoding.
-  const result: PinDeclaration[] = [];
-
-  // Group by face and assign sequential slot indices
-  const faceGroups: Record<Face, FacedPin[]> = {
-    left: [], right: [], top: [], bottom: [],
-  };
-  for (const p of facedPins) {
-    faceGroups[p.face].push(p);
-  }
-
-  for (const [face, pins] of Object.entries(faceGroups) as [Face, FacedPin[]][]) {
-    pins.forEach((p, i) => {
-      result.push({
-        direction: p.direction,
-        label: p.label,
-        defaultBitWidth: p.bitWidth,
-        position: { x: 0, y: i }, // placeholder — real position set by subcircuit
-        isNegatable: false,
-        isClockCapable: false,
-        face: face as Face, // extra field for face routing
-      });
-    });
-  }
-
-  return result;
+  // Emit in document order. Store sortPos in placeholder position.y so that
+  // buildLayoutPositions can sort within each face group for LAYOUT mode.
+  return facedPins.map(p => ({
+    direction: p.direction,
+    label: p.label,
+    defaultBitWidth: p.bitWidth,
+    position: { x: 0, y: p.sortPos }, // sortPos placeholder — overwritten by subcircuit
+    isNegatable: false,
+    isClockCapable: false,
+    face: p.face,
+  }));
 }
 
 /**

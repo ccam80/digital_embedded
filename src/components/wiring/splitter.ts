@@ -15,8 +15,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -196,8 +194,6 @@ const SPLITTER_LABEL_FONT = { family: "sans-serif", size: 0.35, weight: "normal"
 export class SplitterElement extends AbstractCircuitElement {
   private readonly _inputPorts: SplitterPort[];
   private readonly _outputPorts: SplitterPort[];
-  private readonly _spreading: number;
-  private readonly _pins: readonly Pin[];
 
   constructor(
     instanceId: string,
@@ -210,40 +206,32 @@ export class SplitterElement extends AbstractCircuitElement {
 
     const inputDef = props.getOrDefault<string>("input splitting", "4,4");
     const outputDef = props.getOrDefault<string>("output splitting", "8");
-    this._spreading = props.getOrDefault<number>("spreading", 1);
 
     this._inputPorts = parsePorts(inputDef);
     this._outputPorts = parsePorts(outputDef);
-
-    const decls = buildSplitterPinDeclarations(
-      this._inputPorts,
-      this._outputPorts,
-      this._spreading,
-    );
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   get inputPorts(): SplitterPort[] { return this._inputPorts; }
   get outputPorts(): SplitterPort[] { return this._outputPorts; }
-  get spreading(): number { return this._spreading; }
+  get spreading(): number { return this._properties.getOrDefault<number>("spreading", 1); }
 
   // Legacy accessors used by engine consumers
   get parts(): number[] { return this._outputPorts.map((p) => p.bits); }
   get totalBits(): number { return totalBitsFromPattern(this.parts); }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
+    return this.derivePins(buildSplitterPinDeclarations(
+      this._inputPorts,
+      this._outputPorts,
+      spreading,
+    ));
   }
 
   getBoundingBox(): Rect {
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
     const maxCount = Math.max(this._inputPorts.length, this._outputPorts.length);
-    const height = Math.max((maxCount - 1) * this._spreading, 1);
+    const height = Math.max((maxCount - 1) * spreading, 1);
     return {
       x: this.position.x,
       y: this.position.y,
@@ -255,7 +243,7 @@ export class SplitterElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     const inCount = this._inputPorts.length;
     const outCount = this._outputPorts.length;
-    const sp = this._spreading;
+    const sp = this._properties.getOrDefault<number>("spreading", 1);
     const maxY = (Math.max(inCount, outCount) - 1) * sp;
     const rot = this.rotation;
 

@@ -13,9 +13,6 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  PinDirection,
-  createInverterConfig,
-  resolvePins,
   standardGatePinLayout,
   gateBodyMetrics,
 } from "../../core/pin.js";
@@ -59,35 +56,11 @@ function buildPinDeclarations(inputCount: number, bitWidth: number, wideShape: b
   return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
-function parseInvertedPins(props: PropertyBag, inputCount: number): string[] {
-  if (props.has("_inverterLabels")) {
-    const raw = props.get<string>("_inverterLabels");
-    return raw.length > 0 ? raw.split(",") : [];
-  }
-  if (props.has("inverterConfig")) {
-    const cfg = props.get<number[]>("inverterConfig");
-    return cfg
-      .map((v, i) => (v !== 0 ? `In_${i + 1}` : null))
-      .filter((x): x is string => x !== null);
-  }
-  const inputLabels = buildInputLabels(inputCount);
-  return inputLabels.filter((label) => {
-    const key = `invert_${label}`;
-    return props.has(key) && props.get<boolean>(key) === true;
-  });
-}
-
 // ---------------------------------------------------------------------------
 // NAndElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NAndElement extends AbstractCircuitElement {
-  private readonly _inputCount: number;
-  private readonly _bitWidth: number;
-  private readonly _wideShape: boolean;
-  private readonly _invertedPins: readonly string[];
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -96,58 +69,69 @@ export class NAndElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("NAnd", instanceId, position, rotation, mirror, props);
-
-    this._inputCount = props.getOrDefault<number>("inputCount", 2);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
-    this._invertedPins = parseInvertedPins(props, this._inputCount);
-
-    const inverterConfig = createInverterConfig(this._invertedPins);
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      inverterConfig,
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const decls = buildPinDeclarations(inputCount, bitWidth, wideShape);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape) + 1,
+      width: compWidth(wideShape) + 1,
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const w = compWidth(this._wideShape);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const w = compWidth(wideShape);
+    const offs = Math.floor(inputCount / 2) - 1;
+    const outputY = Math.floor(inputCount / 2);
+    const BUBBLE_RADIUS = 0.45;
 
     ctx.save();
 
+    // Java IEEEGenericShape: vertical extension lines for >2 inputs
+    if (offs > 0) {
+      const h = Math.floor(inputCount / 2) * 2;
+      ctx.setColor("COMPONENT");
+      ctx.setLineWidth(1);
+      ctx.drawLine(0.05, 0, 0.05, offs - 0.55);
+      ctx.drawLine(0.05, h, 0.05, h - offs + 0.55);
+    }
+
+    // Draw body translated to center position
+    if (offs > 0) ctx.save();
+    if (offs > 0) ctx.translate(0, offs);
     this._drawIEEE(ctx, w);
+    if (offs > 0) ctx.restore();
+
+    // Inversion bubble at output pin position (untranslated)
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
+
     this._drawLabel(ctx, w);
-    this._drawInversionBubbles(ctx);
 
     ctx.restore();
   }
 
   /**
-   * IEEE/US shape: AND gate body with inversion bubble at output.
-   * Coordinates from Java IEEEAndShape + IEEEGenericShape inversion bubble.
+   * IEEE/US shape: AND gate body (fixed 2-input base shape, output at y=1).
+   * For >2 inputs the body is translated by IEEEGenericShape scaling in draw().
    */
   private _drawIEEE(ctx: RenderContext, w: number): void {
     const midX = w === 3 ? 1.5 : 2.5;
-    const outputY = Math.floor(this._inputCount / 2);
-    const BUBBLE_RADIUS = 0.45;
 
     const ops = [
       { op: "moveTo" as const, x: midX, y: 2.5 },
@@ -164,25 +148,6 @@ export class NAndElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({ operations: ops }, false);
-
-    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
-  }
-
-  private _drawInversionBubbles(ctx: RenderContext): void {
-    if (this._invertedPins.length === 0) return;
-
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    const invertedSet = new Set(this._invertedPins);
-    const BUBBLE_RADIUS = 0.3;
-
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-
-    for (const decl of decls) {
-      if (decl.direction === PinDirection.INPUT && invertedSet.has(decl.label)) {
-        ctx.drawCircle(decl.position.x, decl.position.y, BUBBLE_RADIUS, false);
-      }
-    }
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {
@@ -284,6 +249,13 @@ const NAND_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Wide shape",
     defaultValue: false,
     description: "Use IEEE/US (curved with bubble) shape instead of IEC/DIN (rectangular)",
+  },
+  {
+    key: "_inverterLabels",
+    type: PropertyType.STRING,
+    label: "Invert inputs",
+    defaultValue: "",
+    description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
   },
   {
     key: "label",

@@ -16,7 +16,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -87,12 +87,6 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
 // ---------------------------------------------------------------------------
 
 export class SwitchDTElement extends AbstractCircuitElement {
-  private readonly _poles: number;
-  private readonly _bitWidth: number;
-  private readonly _closed: boolean;
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -101,29 +95,17 @@ export class SwitchDTElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("SwitchDT", instanceId, position, rotation, mirror, props);
-
-    this._poles = props.getOrDefault<number>("poles", 1);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._closed = props.getOrDefault<boolean>("closed", false);
-    this._label = props.getOrDefault<string>("label", "");
-
-    const decls = buildPinDeclarations(this._poles, this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildPinDeclarations(poles), []);
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._poles);
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const h = componentHeight(poles);
     return {
       x: this.position.x,
       y: this.position.y,
@@ -133,7 +115,9 @@ export class SwitchDTElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._poles;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const closed = this._properties.getOrDefault<boolean>("closed", false);
+    const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
 
@@ -149,9 +133,9 @@ export class SwitchDTElement extends AbstractCircuitElement {
     }
 
     // yOffs for open state
-    const yOffs = this._closed ? 0 : -0.5;
+    const yOffs = closed ? 0 : -0.5;
 
-    if (this._closed) {
+    if (closed) {
       // Closed (A-B): straight horizontal line from A to B
       for (let p = 0; p < poles; p++) {
         ctx.drawLine(0, p * POLE_HEIGHT, COMP_WIDTH, p * POLE_HEIGHT);
@@ -176,11 +160,11 @@ export class SwitchDTElement extends AbstractCircuitElement {
     // Grip indicator: short horizontal bar
     ctx.drawLine(COMP_WIDTH / 4, -yOffs - 1, (COMP_WIDTH * 3) / 4, -yOffs - 1);
 
-    if (this._label.length > 0) {
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
       ctx.drawText(
-        this._label,
+        label,
         COMP_WIDTH / 2,
         4 + (poles - 1) * POLE_HEIGHT + C_OFFSET,
         { horizontal: "center", vertical: "top" },
@@ -191,7 +175,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
   }
 
   isClosed(): boolean {
-    return this._closed;
+    return this._properties.getOrDefault<boolean>("closed", false);
   }
 
   getHelpText(): string {

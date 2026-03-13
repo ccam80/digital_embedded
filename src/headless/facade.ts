@@ -10,7 +10,15 @@ import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
 import type { PropertyValue } from '../core/properties.js';
+import type { ComponentDefinition } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
+import type {
+  Netlist,
+  Diagnostic,
+  CircuitSpec,
+  CircuitPatch,
+  PatchOptions,
+} from './netlist-types.js';
 
 /**
  * The primary interface for programmatic circuit building and simulation
@@ -189,4 +197,87 @@ export interface SimulatorFacade {
    * @throws FacadeError if JSON is invalid
    */
   deserialize(json: string): Circuit;
+
+  // ============================================
+  // Introspection: Inspect circuit structure
+  // ============================================
+
+  /**
+   * Extract a netlist view of the circuit: components, nets, and diagnostics.
+   *
+   * Runs wire tracing and net resolution (compiler steps 1-5) WITHOUT full
+   * compilation. Returns every component with its pins, every net with all
+   * connected pins and inferred widths, and pre-compilation diagnostics
+   * (width mismatches, unconnected pins, etc.).
+   *
+   * Each pin shows `connectedTo`: all other pins on the same net. This is
+   * the primary introspection tool for LLM agents — no coordinate tracing
+   * required.
+   *
+   * @param circuit - The circuit to inspect
+   * @returns Netlist with components, nets, and diagnostics
+   */
+  netlist(circuit: Circuit): Netlist;
+
+  /**
+   * Validate circuit structure, returning all diagnostics.
+   *
+   * Convenience wrapper: equivalent to `netlist(circuit).diagnostics`.
+   * Collects ALL errors instead of throwing on the first one.
+   *
+   * @param circuit - The circuit to validate
+   * @returns Array of diagnostics (empty = valid)
+   */
+  validate(circuit: Circuit): Diagnostic[];
+
+  /**
+   * Query the registry for a component type's definition.
+   *
+   * Returns pin layout, property definitions, category, and help text
+   * for a registered component type. Useful for understanding expected
+   * pin interfaces before inspecting a circuit.
+   *
+   * @param typeName - Component type name (e.g. "And", "FlipflopD")
+   * @returns ComponentDefinition, or undefined if not registered
+   */
+  describeComponent(typeName: string): ComponentDefinition | undefined;
+
+  // ============================================
+  // Declarative building: Topology-first design
+  // ============================================
+
+  /**
+   * Build a circuit from a declarative spec.
+   *
+   * No coordinates, no object references — pure topology. The builder
+   * auto-lays-out components and auto-routes wires. Components are
+   * addressed by their `spec.id`, pins by `"id:pinLabel"`.
+   *
+   * @param spec - Declarative circuit description
+   * @returns Assembled Circuit ready for compile() or netlist()
+   * @throws FacadeError if types are unknown, pin labels invalid, or widths mismatch
+   */
+  build(spec: CircuitSpec): Circuit;
+
+  // ============================================
+  // Patching: Edit existing circuits
+  // ============================================
+
+  /**
+   * Apply patch operations to an existing circuit.
+   *
+   * Targets use the same `label` / `label:pin` addressing as netlist output.
+   * Operations are applied in order. Returns diagnostics for the patched
+   * circuit (empty = valid).
+   *
+   * For subcircuit edits, set `opts.scope` to the hierarchy path
+   * (e.g. "MCU/sysreg") to scope target resolution.
+   *
+   * @param circuit - The circuit to modify (mutated in place)
+   * @param ops - Patch operations to apply
+   * @param opts - Optional scope for subcircuit targeting
+   * @returns Post-patch diagnostics
+   * @throws FacadeError if targets cannot be resolved
+   */
+  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): Diagnostic[];
 }

@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\circuits\\\\AND.dig\"}",
-  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
-  "timestamp": "2026-03-10T03:51:28.073Z",
-  "retry_count": 1
+  "tool_name": "mcp__circuit-simulator__circuit_build",
+  "tool_input_preview": "{\"spec\":{\"name\":\"counter-test\",\"components\":[{\"id\":\"en\",\"type\":\"Const\",\"props\":{\"value\":1}},{\"id\":\"clk\",\"type\":\"Clock\",\"props\":{\"label\":\"C\"}},{\"id\":\"ctr\",\"type\":\"Counter\",\"props\":{\"bitWidth\":8}},{\"id\"...",
+  "error": "Error building circuit: Bit width mismatch: 'out' is 1-bit, 'in' is 8-bit",
+  "timestamp": "2026-03-13T02:08:00.112Z",
+  "retry_count": 2
 }

@@ -19,9 +19,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -93,9 +90,6 @@ const COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class CounterElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -104,19 +98,15 @@ export class CounterElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Counter", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 4);
-    this._pins = resolvePins(
-      COUNTER_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 4);
+    // Override 'out' pin width based on the bitWidth property
+    const decls = COUNTER_PIN_DECLARATIONS.map((d) =>
+      d.label === "out" ? { ...d, defaultBitWidth: bitWidth } : d,
+    );
+    return this.derivePins(decls, ["C"]);
   }
 
   getBoundingBox(): Rect {

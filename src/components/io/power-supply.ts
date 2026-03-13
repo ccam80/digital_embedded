@@ -13,8 +13,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -65,9 +63,6 @@ function buildPowerSupplyPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class PowerSupplyElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -76,22 +71,10 @@ export class PowerSupplyElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("PowerSupply", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-
-    const decls = buildPowerSupplyPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildPowerSupplyPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -127,9 +110,10 @@ export class PowerSupplyElement extends AbstractCircuitElement {
       vertical: "middle",
     });
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.3, {
+      ctx.drawText(label, COMP_WIDTH / 2, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

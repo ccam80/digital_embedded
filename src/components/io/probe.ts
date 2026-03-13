@@ -14,8 +14,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -36,9 +34,6 @@ export type ProbeMode = "VALUE" | "UP" | "DOWN" | "BOTH";
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout — one input on west face, no outputs
@@ -62,12 +57,6 @@ function buildProbePinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class ProbeElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _bitWidth: number;
-  private readonly _intFormat: string;
-  private readonly _probeMode: ProbeMode;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -76,25 +65,12 @@ export class ProbeElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Probe", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._intFormat = props.getOrDefault<string>("intFormat", "hex");
-    this._probeMode = props.getOrDefault<string>("probeMode", "VALUE") as ProbeMode;
-
-    const decls = buildProbePinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls = buildProbePinDeclarations(bitWidth);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
@@ -107,21 +83,22 @@ export class ProbeElement extends AbstractCircuitElement {
   }
 
   get intFormat(): string {
-    return this._intFormat;
+    return this._properties.getOrDefault<string>("intFormat", "hex");
   }
 
   get probeMode(): ProbeMode {
-    return this._probeMode;
+    return this._properties.getOrDefault<string>("probeMode", "VALUE") as ProbeMode;
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
     ctx.save();
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
 
-    if (this._label.length > 0) {
-      drawUprightText(ctx, this._label, 0.1, -0.2, {
+    if (label.length > 0) {
+      drawUprightText(ctx, label, 0.1, -0.2, {
         horizontal: "left",
         vertical: "bottom",
       }, this.rotation);

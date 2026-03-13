@@ -19,7 +19,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -73,10 +73,6 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class FGPFETElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _blown: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -85,20 +81,11 @@ export class FGPFETElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("FGPFET", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._blown = props.getOrDefault<boolean>("blown", false);
-    this._pins = resolvePins(
-      FGPFET_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(FGPFET_PIN_DECLARATIONS, []);
   }
 
   getBoundingBox(): Rect {
@@ -106,6 +93,8 @@ export class FGPFETElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const blown = this._properties.getOrDefault<boolean>("blown", false);
+
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
@@ -130,7 +119,7 @@ export class FGPFETElement extends AbstractCircuitElement {
     ctx.drawLine(1.9, COMP_HEIGHT / 2, 1.5, COMP_HEIGHT / 2 + 0.3);
 
     // Blown indicator
-    if (this._blown) {
+    if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.drawLine(0.5, 0.5, 1.0, 1.0);
       ctx.drawLine(1.0, 0.5, 0.5, 1.0);
@@ -147,7 +136,7 @@ export class FGPFETElement extends AbstractCircuitElement {
   }
 
   get blown(): boolean {
-    return this._blown;
+    return this._properties.getOrDefault<boolean>("blown", false);
   }
 
   getHelpText(): string {

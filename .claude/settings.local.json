@@ -17,7 +17,19 @@
       "WebFetch(domain:simulator-docs.circuitverse.org)",
       "WebFetch(domain:wcours.gel.ulaval.ca)",
       "mcp__plugin_oh-my-claudecode_t__notepad_write_working",
-      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics"
+      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics",
+      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics_directory",
+      "WebFetch(domain:bundlephobia.com)",
+      "mcp__circuit-simulator__circuit_load",
+      "mcp__circuit-simulator__circuit_validate",
+      "mcp__circuit-simulator__circuit_netlist",
+      "mcp__circuit-simulator__circuit_patch",
+      "mcp__circuit-simulator__circuit_describe",
+      "mcp__circuit-simulator__circuit_build"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "circuit-simulator"
+  ]
 }

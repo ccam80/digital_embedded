@@ -12,8 +12,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -55,11 +53,6 @@ function buildInPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class InElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _label: string;
-  private readonly _small: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -68,28 +61,17 @@ export class InElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("In", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._label = props.getOrDefault<string>("label", "");
-    this._small = props.getOrDefault<boolean>("small", true);
-
-    const decls = buildInPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls = buildInPinDeclarations(bitWidth);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const size = this._small ? 1 : COMP_HEIGHT;
+    const small = this._properties.getOrDefault<boolean>("small", true);
+    const size = small ? 1 : COMP_HEIGHT;
     return {
       x: this.position.x - COMP_WIDTH,
       y: this.position.y - size / 2,
@@ -99,7 +81,9 @@ export class InElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const size = this._small ? 1 : COMP_HEIGHT;
+    const label = this._properties.getOrDefault<string>("label", "");
+    const small = this._properties.getOrDefault<boolean>("small", true);
+    const size = small ? 1 : COMP_HEIGHT;
     const yOff = -size / 2;
 
     ctx.save();
@@ -111,7 +95,7 @@ export class InElement extends AbstractCircuitElement {
     ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, size, false);
 
     // Draw label inside the component body (or type name if no label)
-    const displayText = this._label.length > 0 ? this._label : "In";
+    const displayText = label.length > 0 ? label : "In";
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: size * 0.6 });
     drawUprightText(ctx, displayText, -COMP_WIDTH / 2, 0, {

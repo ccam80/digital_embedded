@@ -20,8 +20,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -70,10 +68,6 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class DelayElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _delayTime: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -82,22 +76,11 @@ export class DelayElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Delay", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._delayTime = props.getOrDefault<number>("delayTime", 1);
-
-    const decls = buildDelayPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildDelayPinDeclarations(bitWidth), []);
   }
 
   getBoundingBox(): Rect {
@@ -110,6 +93,7 @@ export class DelayElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const delayTime = this._properties.getOrDefault<number>("delayTime", 1);
 
     ctx.save();
 
@@ -121,7 +105,7 @@ export class DelayElement extends AbstractCircuitElement {
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText(`D${this._delayTime}`, COMP_WIDTH / 2, COMP_HEIGHT / 2, {
+    ctx.drawText(`D${delayTime}`, COMP_WIDTH / 2, COMP_HEIGHT / 2, {
       horizontal: "center",
       vertical: "middle",
     });
@@ -130,8 +114,9 @@ export class DelayElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
+    const delayTime = this._properties.getOrDefault<number>("delayTime", 1);
     return (
-      `Delay — passes input to output with a delay of ${this._delayTime} gate-delay units.\n` +
+      `Delay — passes input to output with a delay of ${delayTime} gate-delay units.\n` +
       "In level-by-level mode: pass-through (no delay applied).\n" +
       "In timed mode: output is scheduled at currentTime + delayTime."
     );

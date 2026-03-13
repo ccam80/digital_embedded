@@ -13,10 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  PinDirection,
-  createInverterConfig,
   gateBodyMetrics,
-  resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -56,35 +53,11 @@ function buildPinDeclarations(inputCount: number, bitWidth: number, wideShape: b
   return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth);
 }
 
-function parseInvertedPins(props: PropertyBag, inputCount: number): string[] {
-  if (props.has("_inverterLabels")) {
-    const raw = props.get<string>("_inverterLabels");
-    return raw.length > 0 ? raw.split(",") : [];
-  }
-  if (props.has("inverterConfig")) {
-    const cfg = props.get<number[]>("inverterConfig");
-    return cfg
-      .map((v, i) => (v !== 0 ? `In_${i + 1}` : null))
-      .filter((x): x is string => x !== null);
-  }
-  const inputLabels = buildInputLabels(inputCount);
-  return inputLabels.filter((label) => {
-    const key = `invert_${label}`;
-    return props.has(key) && props.get<boolean>(key) === true;
-  });
-}
-
 // ---------------------------------------------------------------------------
 // OrElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class OrElement extends AbstractCircuitElement {
-  private readonly _inputCount: number;
-  private readonly _bitWidth: number;
-  private readonly _wideShape: boolean;
-  private readonly _invertedPins: readonly string[];
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -93,58 +66,64 @@ export class OrElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Or", instanceId, position, rotation, mirror, props);
-
-    this._inputCount = props.getOrDefault<number>("inputCount", 2);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
-    this._invertedPins = parseInvertedPins(props, this._inputCount);
-
-    const inverterConfig = createInverterConfig(this._invertedPins);
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      inverterConfig,
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const decls = buildPinDeclarations(inputCount, bitWidth, wideShape);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape),
+      width: compWidth(wideShape),
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const w = compWidth(this._wideShape);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const w = compWidth(wideShape);
+    const offs = Math.floor(inputCount / 2) - 1;
 
     ctx.save();
 
+    // Java IEEEGenericShape: vertical extension lines for >2 inputs
+    if (offs > 0) {
+      const h = Math.floor(inputCount / 2) * 2;
+      ctx.setColor("COMPONENT");
+      ctx.setLineWidth(1);
+      ctx.drawLine(0.05, 0, 0.05, offs - 0.55);
+      ctx.drawLine(0.05, h, 0.05, h - offs + 0.55);
+    }
+
+    // Draw body translated to center position
+    if (offs > 0) ctx.save();
+    if (offs > 0) ctx.translate(0, offs);
     this._drawIEEE(ctx, w);
-    this._drawInputStubs(ctx);
+    this._drawBodyStubs(ctx, inputCount);
+    if (offs > 0) ctx.restore();
+
     this._drawLabel(ctx, w);
-    this._drawInversionBubbles(ctx);
 
     ctx.restore();
   }
 
   /**
-   * IEEE/US shape: classic curved OR gate body.
-   * Concave back (left) edge, pointed front meeting at x=w.
+   * IEEE/US shape: classic curved OR gate body (fixed 2-input base shape).
+   * Concave back (left) edge, pointed front meeting at x=w, output at y=1.
+   * For >2 inputs the body is translated by IEEEGenericShape scaling in draw().
    * Coordinates from Java IEEEOrShape.
    */
   private _drawIEEE(ctx: RenderContext, w: number): void {
-    const outputY = Math.floor(this._inputCount / 2);
     const wide = w === 4;
 
     const ops = wide ? [
@@ -152,7 +131,7 @@ export class OrElement extends AbstractCircuitElement {
       { op: "lineTo" as const, x: 0.0, y: 2.5 },
       { op: "curveTo" as const, cp1x: 0.5, cp1y: 1.7, cp2x: 0.5, cp2y: 0.3, x: 0.0, y: -0.5 },
       { op: "lineTo" as const, x: 0.5, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: 1.0 },
       { op: "curveTo" as const, cp1x: 3.0, cp1y: 2.0, cp2x: 1.5, cp2y: 2.5, x: 0.5, y: 2.5 },
       { op: "closePath" as const },
     ] : [
@@ -160,7 +139,7 @@ export class OrElement extends AbstractCircuitElement {
       { op: "lineTo" as const, x: 0.0, y: 2.5 },
       { op: "curveTo" as const, cp1x: 0.5, cp1y: 2.0, cp2x: 0.5, cp2y: 0, x: 0.0, y: -0.5 },
       { op: "lineTo" as const, x: 0.5, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 1.0, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: 1.0 },
       { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.0, cp2y: 2.5, x: 0.5, y: 2.5 },
       { op: "closePath" as const },
     ];
@@ -173,41 +152,17 @@ export class OrElement extends AbstractCircuitElement {
   }
 
   /**
-   * Draw short input wire stubs from pin position to body edge.
-   * OR back edge is concave, so pins at x=0 don't touch the body.
-   * Top/bottom: 0.2 grid stub, center (odd input count): 0.35 grid stub.
+   * Draw short input wire stubs for pins adjacent to the body (in body-local
+   * coordinates). Java IEEEOrShape draws stubs at y=0, y=2, and optionally y=1.
+   * Outer pins connect to extension lines instead.
    */
-  private _drawInputStubs(ctx: RenderContext): void {
-    const n = this._inputCount;
-    const even = n > 0 && (n & 1) === 0;
-
+  private _drawBodyStubs(ctx: RenderContext, inputCount: number): void {
+    const center = (inputCount & 1) !== 0;
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-
-    for (let i = 0; i < n; i++) {
-      const correct = (even && i >= n / 2) ? 1 : 0;
-      const pinY = i + correct;
-      const isCenter = !even && i === Math.floor(n / 2);
-      const stubLen = isCenter ? 0.35 : 0.2;
-      ctx.drawLine(0, pinY, stubLen, pinY);
-    }
-  }
-
-  private _drawInversionBubbles(ctx: RenderContext): void {
-    if (this._invertedPins.length === 0) return;
-
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    const invertedSet = new Set(this._invertedPins);
-    const BUBBLE_RADIUS = 0.3;
-
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-
-    for (const decl of decls) {
-      if (decl.direction === PinDirection.INPUT && invertedSet.has(decl.label)) {
-        ctx.drawCircle(decl.position.x, decl.position.y, BUBBLE_RADIUS, false);
-      }
-    }
+    ctx.drawLine(0, 0, 0.2, 0);
+    ctx.drawLine(0, 2, 0.2, 2);
+    if (center) ctx.drawLine(0, 1, 0.35, 1);
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {
@@ -307,6 +262,13 @@ const OR_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Wide shape",
     defaultValue: false,
     description: "Use IEEE/US (curved) shape instead of IEC/DIN (rectangular)",
+  },
+  {
+    key: "_inverterLabels",
+    type: PropertyType.STRING,
+    label: "Invert inputs",
+    defaultValue: "",
+    description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
   },
   {
     key: "label",

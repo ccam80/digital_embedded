@@ -256,23 +256,20 @@ function buildRAMSinglePortPins(addrBits: number, dataBits: number): PinDeclarat
 }
 
 export class RAMSinglePortElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("RAMSinglePort", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildRAMSinglePortPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildRAMSinglePortPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set(["C"]) },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
@@ -381,23 +378,20 @@ function buildRAMSinglePortSelPins(addrBits: number, dataBits: number): PinDecla
 }
 
 export class RAMSinglePortSelElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("RAMSinglePortSel", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildRAMSinglePortSelPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildRAMSinglePortSelPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set<string>() },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
@@ -496,23 +490,20 @@ function buildRAMDualPortPins(addrBits: number, dataBits: number): PinDeclaratio
 }
 
 export class RAMDualPortElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("RAMDualPort", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildRAMDualPortPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildRAMDualPortPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set(["C"]) },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
@@ -626,23 +617,20 @@ function buildRAMDualAccessPins(addrBits: number, dataBits: number): PinDeclarat
 }
 
 export class RAMDualAccessElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("RAMDualAccess", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildRAMDualAccessPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildRAMDualAccessPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set(["C"]) },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_6IN };
@@ -747,23 +735,20 @@ function buildRAMAsyncPins(addrBits: number, dataBits: number): PinDeclaration[]
 }
 
 export class RAMAsyncElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("RAMAsync", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildRAMAsyncPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildRAMAsyncPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set<string>() },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_3IN };
@@ -851,23 +836,20 @@ function buildBlockRAMDualPortPins(addrBits: number, dataBits: number): PinDecla
 }
 
 export class BlockRAMDualPortElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
     super("BlockRAMDualPort", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._pins = resolvePins(
-      buildBlockRAMDualPortPins(this._addrBits, this._dataBits),
-      position, rotation,
+  }
+
+  getPins(): readonly Pin[] {
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildBlockRAMDualPortPins(addrBits, dataBits),
+      { x: 0, y: 0 }, 0,
       createInverterConfig([]),
       { clockPins: new Set(["C"]) },
     );
   }
-
-  getPins(): readonly Pin[] { return this._pins; }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };

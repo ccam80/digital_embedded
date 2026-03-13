@@ -18,7 +18,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -57,9 +57,6 @@ function buildPullUpPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class PullUpElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -68,22 +65,11 @@ export class PullUpElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("PullUp", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-
-    const decls = buildPullUpPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildPullUpPinDeclarations(bitWidth), []);
   }
 
   getBoundingBox(): Rect {

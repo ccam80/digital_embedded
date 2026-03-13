@@ -175,12 +175,6 @@ function buildROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
 }
 
 export class ROMElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _isProgramMemory: boolean;
-  private readonly _autoReload: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -189,21 +183,18 @@ export class ROMElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("ROM", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._isProgramMemory = props.getOrDefault<boolean>("isProgramMemory", false);
-    this._autoReload = props.getOrDefault<boolean>("autoReload", false);
-    this._pins = resolvePins(
-      buildROMPins(this._addrBits, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildROMPins(addrBits, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>() },
+    );
   }
 
   getBoundingBox(): Rect {
@@ -217,11 +208,11 @@ export class ROMElement extends AbstractCircuitElement {
   }
 
   get isProgramMemory(): boolean {
-    return this._isProgramMemory;
+    return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
   get autoReload(): boolean {
-    return this._autoReload;
+    return this._properties.getOrDefault<boolean>("autoReload", false);
   }
 
   getHelpText(): string {
@@ -312,12 +303,6 @@ function buildROMDualPortPins(addrBits: number, dataBits: number): PinDeclaratio
 }
 
 export class ROMDualPortElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _isProgramMemory: boolean;
-  private readonly _autoReload: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -326,21 +311,18 @@ export class ROMDualPortElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("ROMDualPort", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._isProgramMemory = props.getOrDefault<boolean>("isProgramMemory", false);
-    this._autoReload = props.getOrDefault<boolean>("autoReload", false);
-    this._pins = resolvePins(
-      buildROMDualPortPins(this._addrBits, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildROMDualPortPins(addrBits, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>() },
+    );
   }
 
   getBoundingBox(): Rect {
@@ -354,11 +336,11 @@ export class ROMDualPortElement extends AbstractCircuitElement {
   }
 
   get isProgramMemory(): boolean {
-    return this._isProgramMemory;
+    return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
   get autoReload(): boolean {
-    return this._autoReload;
+    return this._properties.getOrDefault<boolean>("autoReload", false);
   }
 
   getHelpText(): string {

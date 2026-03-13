@@ -19,7 +19,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -64,10 +64,6 @@ const FUSE_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class FuseElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _blown: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -76,20 +72,11 @@ export class FuseElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Fuse", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._blown = props.getOrDefault<boolean>("blown", false);
-    this._pins = resolvePins(
-      FUSE_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(FUSE_PIN_DECLARATIONS, []);
   }
 
   getBoundingBox(): Rect {
@@ -97,6 +84,8 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const blown = this._properties.getOrDefault<boolean>("blown", false);
+
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
@@ -110,7 +99,7 @@ export class FuseElement extends AbstractCircuitElement {
     // Fuse body rectangle
     ctx.drawRect(0.5, cy - 0.3, 2.0, 0.6, false);
 
-    if (this._blown) {
+    if (blown) {
       // Blown: X mark inside the body
       ctx.setColor("WIRE_ERROR");
       ctx.drawLine(0.7, cy - 0.2, 1.3, cy + 0.2);
@@ -131,7 +120,7 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   get blown(): boolean {
-    return this._blown;
+    return this._properties.getOrDefault<boolean>("blown", false);
   }
 
   getHelpText(): string {

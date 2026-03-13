@@ -22,9 +22,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -120,9 +117,6 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class CounterPresetElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -131,19 +125,11 @@ export class CounterPresetElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("CounterPreset", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 4);
-    this._pins = resolvePins(
-      COUNTER_PRESET_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 4);
+    return this.derivePins(COUNTER_PRESET_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {

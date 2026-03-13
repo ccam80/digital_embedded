@@ -11,8 +11,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -26,9 +24,6 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -53,10 +48,6 @@ function buildConstPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class ConstElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _value: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -65,31 +56,16 @@ export class ConstElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Const", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-
-    // Value stored as number (Uint32 range). BigInt properties are converted
-    // at attribute mapping time.
-    const rawValue = props.getOrDefault<number>("value", 1);
-    this._value = rawValue >>> 0;
-
-    const decls = buildConstPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   get value(): number {
-    return this._value;
+    return this._properties.getOrDefault<number>("value", 1) >>> 0;
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls = buildConstPinDeclarations(bitWidth);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
@@ -102,11 +78,12 @@ export class ConstElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const value = this._properties.getOrDefault<number>("value", 1) >>> 0;
     ctx.save();
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9 });
-    ctx.drawText(this._value.toString(10), -0.15, 0, {
+    ctx.drawText(value.toString(10), -0.15, 0, {
       horizontal: "right",
       vertical: "middle",
     });

@@ -11,8 +11,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -61,10 +59,6 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class PolarityLedElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _color: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -73,27 +67,14 @@ export class PolarityLedElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("PolarityAwareLED", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._color = props.getOrDefault<string>("color", "red");
-
-    const decls = buildPolarityLedPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   get color(): string {
-    return this._color;
+    return this._properties.getOrDefault<string>("color", "red");
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildPolarityLedPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -122,9 +103,10 @@ export class PolarityLedElement extends AbstractCircuitElement {
     ctx.drawText("A", 0.2, 0, { horizontal: "left", vertical: "middle" });
     ctx.drawText("K", COMP_WIDTH - 0.2, 0, { horizontal: "right", vertical: "middle" });
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, cx, -0.3, {
+      ctx.drawText(label, cx, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

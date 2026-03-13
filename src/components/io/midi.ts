@@ -34,6 +34,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
   createInverterConfig,
+  createClockConfig,
   resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
@@ -161,12 +162,6 @@ function buildMidiPinDeclarations(progChangeEnable: boolean): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class MidiElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _midiChannel: number;
-  private readonly _midiInstrument: string;
-  private readonly _progChangeEnable: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -176,25 +171,23 @@ export class MidiElement extends AbstractCircuitElement {
   ) {
     super("MIDI", instanceId, position, rotation, mirror, props);
 
-    this._label = props.getOrDefault<string>("label", "");
-    this._midiChannel = props.getOrDefault<number>("midiChannel", 1);
-    this._midiInstrument = props.getOrDefault<string>("midiInstrument", "");
-    this._progChangeEnable = props.getOrDefault<boolean>("progChangeEnable", false);
-
-    const decls = buildMidiPinDeclarations(this._progChangeEnable);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set(["C"]) },
-    );
-
     MidiOutputManager.getInstance().requestAccess();
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const progChangeEnable = this._properties.getOrDefault<boolean>("progChangeEnable", false);
+    const decls = buildMidiPinDeclarations(progChangeEnable);
+    const invLabels = this._properties.has("_inverterLabels")
+      ? this._properties.get<string>("_inverterLabels").split(",").filter((s: string) => s.length > 0)
+      : [];
+    return resolvePins(
+      decls,
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig(invLabels),
+      createClockConfig(["C"]),
+      // No global bitWidth override — pins have heterogeneous defaultBitWidth (N/V=7, others=1)
+    );
   }
 
   getBoundingBox(): Rect {
@@ -219,24 +212,25 @@ export class MidiElement extends AbstractCircuitElement {
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
     ctx.drawText("MIDI", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(this._label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();
   }
 
   get midiChannel(): number {
-    return this._midiChannel;
+    return this._properties.getOrDefault<number>("midiChannel", 1);
   }
 
   get midiInstrument(): string {
-    return this._midiInstrument;
+    return this._properties.getOrDefault<string>("midiInstrument", "");
   }
 
   get progChangeEnable(): boolean {
-    return this._progChangeEnable;
+    return this._properties.getOrDefault<boolean>("progChangeEnable", false);
   }
 
   getHelpText(): string {

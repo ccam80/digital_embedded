@@ -50,6 +50,8 @@ export interface ClockInfo {
    * advanceClocks calls. Derived from the Clock element's Frequency property.
    */
   readonly frequency: number;
+  /** Whether this clock auto-toggles. When false, acts as manual input. */
+  readonly autoRun: boolean;
   /** Current output phase (false = low, true = high). */
   currentPhase: boolean;
   /** Steps elapsed since the last toggle. */
@@ -153,6 +155,24 @@ export class ClockManager {
   }
 
   /**
+   * Manually override a clock's phase (e.g. when the user clicks a Clock
+   * component to toggle it). Updates the internal phase tracking so that
+   * subsequent advanceClocks() calls continue from the new state.
+   *
+   * @param netId  The output net ID of the clock component.
+   * @param phase  The new phase value (true=high, false=low).
+   */
+  setClockPhase(netId: number, phase: boolean): void {
+    for (const clock of this._clocks) {
+      if (clock.netId === netId) {
+        clock.currentPhase = phase;
+        clock.stepsSinceToggle = 0;
+        break;
+      }
+    }
+  }
+
+  /**
    * Enable or disable real-time clock pacing.
    *
    * When enabled, advanceClocks() uses Date.now() to determine whether the
@@ -194,10 +214,14 @@ export class ClockManager {
         frequency = freqAttr;
       }
 
+      const autoRunAttr = element.getAttribute("autoRun");
+      const autoRun = autoRunAttr === undefined ? true : Boolean(autoRunAttr);
+
       clocks.push({
         componentIndex,
         netId,
         frequency,
+        autoRun,
         currentPhase: false,
         stepsSinceToggle: 0,
       });
@@ -210,6 +234,7 @@ export class ClockManager {
     const fired: FiredEdge[] = [];
 
     for (const clock of this._clocks) {
+      if (!clock.autoRun) continue; // manual clocks are user-toggled only
       clock.stepsSinceToggle++;
 
       if (clock.stepsSinceToggle >= clock.frequency) {
@@ -237,6 +262,7 @@ export class ClockManager {
     const fired: FiredEdge[] = [];
 
     for (const clock of this._clocks) {
+      if (!clock.autoRun) continue; // manual clocks are user-toggled only
       this._toggleClock(clock, state, fired);
     }
 

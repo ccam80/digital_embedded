@@ -30,7 +30,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -106,11 +106,6 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class RelayElement extends AbstractCircuitElement {
-  private readonly _poles: number;
-  private readonly _bitWidth: number;
-  private readonly _normallyClosed: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -119,30 +114,23 @@ export class RelayElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Relay", instanceId, position, rotation, mirror, props);
-    this._poles = props.getOrDefault<number>("poles", 1);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-    this._pins = resolvePins(
-      buildRelayPins(this._poles, this._bitWidth),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildRelayPins(poles), []);
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._poles);
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const h = componentHeight(poles);
     return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: h };
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._poles;
+    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const normallyClosed = this._properties.getOrDefault<boolean>("normallyClosed", false);
 
     ctx.save();
     ctx.setColor("COMPONENT");
@@ -152,18 +140,18 @@ export class RelayElement extends AbstractCircuitElement {
     ctx.drawRect(0.5, 0, COMP_WIDTH - 1, COIL_HEIGHT, false);
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(this._normallyClosed ? "NC" : "NO", COMP_WIDTH / 2, COIL_HEIGHT / 2, {
+    ctx.drawText(normallyClosed ? "NC" : "NO", COMP_WIDTH / 2, COIL_HEIGHT / 2, {
       horizontal: "center",
       vertical: "middle",
     });
 
     ctx.setColor("COMPONENT");
-    const yOffs = this._normallyClosed ? 0 : 0.5;
+    const yOffs = normallyClosed ? 0 : 0.5;
 
     // Contact poles
     for (let p = 0; p < poles; p++) {
       const py = COIL_HEIGHT + p * POLE_HEIGHT;
-      if (this._normallyClosed) {
+      if (normallyClosed) {
         // Normally closed: straight line (contact is closed at rest)
         ctx.drawLine(0, py, COMP_WIDTH, py);
       } else {
@@ -186,7 +174,7 @@ export class RelayElement extends AbstractCircuitElement {
   }
 
   get normallyClosed(): boolean {
-    return this._normallyClosed;
+    return this._properties.getOrDefault<boolean>("normallyClosed", false);
   }
 
   getHelpText(): string {

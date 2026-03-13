@@ -13,8 +13,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -55,9 +53,6 @@ function buildLightBulbPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class LightBulbElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -66,22 +61,10 @@ export class LightBulbElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("LightBulb", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-
-    const decls = buildLightBulbPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildLightBulbPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {
@@ -111,10 +94,11 @@ export class LightBulbElement extends AbstractCircuitElement {
     ctx.drawLine(cx - r, -r, cx + r, r);
     ctx.drawLine(cx + r, -r, cx - r, r);
 
-    if (this._label.length > 0) {
+    const label = this._properties.getOrDefault<string>("label", "");
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, cx, -0.3, {
+      ctx.drawText(label, cx, -0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

@@ -16,8 +16,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -38,11 +36,6 @@ const ARROW_HALF_H = 0.4;
 /** Triangle width in grid units (Digital: HEIGHT * sqrt(3) ≈ 0.7 grid). */
 const ARROW_W = 0.7;
 
-/** Component logical width for bounding box (arrow + label space). */
-const COMP_WIDTH = 2;
-
-/** Component logical height (1 grid unit — fits Digital subcircuit pin spacing). */
-const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
 // Pin layout — single pin at component origin (0,0)
@@ -66,9 +59,6 @@ function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class TunnelElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -77,18 +67,6 @@ export class TunnelElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Tunnel", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-
-    const decls = buildTunnelPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   /** The tunnel net name used by the net resolver to merge same-label tunnels. */
@@ -97,7 +75,8 @@ export class TunnelElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildTunnelPinDeclarations(bitWidth), []);
   }
 
   getBoundingBox(): Rect {

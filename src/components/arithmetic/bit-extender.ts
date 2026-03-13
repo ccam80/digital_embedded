@@ -17,8 +17,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -43,10 +41,6 @@ function buildBitExtenderPinDeclarations(inputBits: number, outputBits: number):
 }
 
 export class BitExtenderElement extends AbstractCircuitElement {
-  private readonly _inputBits: number;
-  private readonly _outputBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -55,13 +49,13 @@ export class BitExtenderElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("BitExtender", instanceId, position, rotation, mirror, props);
-    this._inputBits = props.getOrDefault<number>("inputBits", 4);
-    this._outputBits = props.getOrDefault<number>("outputBits", 8);
-    const decls = buildBitExtenderPinDeclarations(this._inputBits, this._outputBits);
-    this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });
   }
 
-  getPins(): readonly Pin[] { return this._pins; }
+  getPins(): readonly Pin[] {
+    const inputBits = this._properties.getOrDefault<number>("inputBits", 4);
+    const outputBits = this._properties.getOrDefault<number>("outputBits", 8);
+    return this.derivePins(buildBitExtenderPinDeclarations(inputBits, outputBits), []);
+  }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };

@@ -405,13 +405,12 @@ describe("AndGate", () => {
   // ---------------------------------------------------------------------------
 
   describe("drawInverterBubble", () => {
-    it("inverterConfig=['in0'] causes drawCircle to be called for the negated pin", () => {
+    it("inverterConfig=['In_1'] sets isNegated on the pin and shifts its position", () => {
       const el = makeAnd({ invertedPins: ["In_1"] });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls.length).toBeGreaterThanOrEqual(1);
+      const pin = el.getPins().find((p) => p.label === "In_1");
+      expect(pin?.isNegated).toBe(true);
+      // Inverted input is shifted 1 grid unit left (Java: dx = -SIZE)
+      expect(pin?.position.x).toBe(-1);
     });
 
     it("no inverterConfig means no drawCircle calls for bubbles", () => {
@@ -423,13 +422,12 @@ describe("AndGate", () => {
       expect(circleCalls).toHaveLength(0);
     });
 
-    it("inverterConfig=['in0','in1'] causes two drawCircle calls", () => {
+    it("inverterConfig=['In_1','In_2'] sets isNegated on both pins", () => {
       const el = makeAnd({ inputCount: 3, invertedPins: ["In_1", "In_2"] });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls).toHaveLength(2);
+      const pins = el.getPins();
+      const negated = pins.filter((p) => p.isNegated);
+      expect(negated).toHaveLength(2);
+      expect(negated.every((p) => p.position.x === -1)).toBe(true);
     });
 
     it("negated pin has isNegated=true in getPins()", () => {

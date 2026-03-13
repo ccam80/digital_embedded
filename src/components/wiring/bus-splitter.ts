@@ -30,10 +30,6 @@ import { extractBits } from "./splitter.js";
 // ---------------------------------------------------------------------------
 
 export class BusSplitterElement extends AbstractCircuitElement {
-  private readonly _bits: number;
-  private readonly _spreading: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -42,15 +38,24 @@ export class BusSplitterElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("BusSplitter", instanceId, position, rotation, mirror, props);
+  }
 
-    this._bits = props.getOrDefault<number>("bits", 8);
-    this._spreading = props.getOrDefault<number>("spreading", 1);
+  get bits(): number {
+    return this._properties.getOrDefault<number>("bits", 8);
+  }
 
+  get spreading(): number {
+    return this._properties.getOrDefault<number>("spreading", 1);
+  }
+
+  getPins(): readonly Pin[] {
+    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
     const decls: PinDeclaration[] = [
       {
         direction: PinDirection.OUTPUT,
         label: "D",
-        defaultBitWidth: this._bits,
+        defaultBitWidth: bits,
         position: { x: 0, y: 0 },
         isNegatable: false,
         isClockCapable: false,
@@ -64,41 +69,29 @@ export class BusSplitterElement extends AbstractCircuitElement {
         isClockCapable: false,
       },
     ];
-
-    for (let i = 0; i < this._bits; i++) {
+    for (let i = 0; i < bits; i++) {
       decls.push({
         direction: PinDirection.OUTPUT,
         label: `D${i}`,
         defaultBitWidth: 1,
-        position: { x: 1, y: i * this._spreading },
+        position: { x: 1, y: i * spreading },
         isNegatable: false,
         isClockCapable: false,
       });
     }
-
-    this._pins = resolvePins(
+    return resolvePins(
       decls,
-      position,
-      rotation,
+      { x: 0, y: 0 },
+      0,
       createInverterConfig([]),
       { clockPins: new Set<string>() },
     );
   }
 
-  get bits(): number {
-    return this._bits;
-  }
-
-  get spreading(): number {
-    return this._spreading;
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
   getBoundingBox(): Rect {
-    const h = Math.max(2, (this._bits - 1) * this._spreading + 1);
+    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
+    const h = Math.max(2, (bits - 1) * spreading + 1);
     return {
       x: this.position.x,
       y: this.position.y,
@@ -108,7 +101,9 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const lastY = (this._bits - 1) * this._spreading;
+    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
+    const lastY = (bits - 1) * spreading;
 
     ctx.save();
 
@@ -119,8 +114,8 @@ export class BusSplitterElement extends AbstractCircuitElement {
     ctx.drawLine(0, 0, 0, lastY);
 
     // Horizontal stubs from x=0 to x=1 at each bit position
-    for (let i = 0; i < this._bits; i++) {
-      const y = i * this._spreading;
+    for (let i = 0; i < bits; i++) {
+      const y = i * spreading;
       ctx.drawLine(0, y, 1, y);
     }
 
@@ -136,9 +131,11 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
+    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const spreading = this._properties.getOrDefault<number>("spreading", 1);
     return (
       `BusSplitter — bidirectional bus splitter with OE control.\n` +
-      `${this._bits} bits, spreading ${this._spreading}.`
+      `${bits} bits, spreading ${spreading}.`
     );
   }
 }

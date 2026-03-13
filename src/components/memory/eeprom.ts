@@ -177,11 +177,6 @@ function buildEEPROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
 }
 
 export class EEPROMElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _isProgramMemory: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -190,20 +185,18 @@ export class EEPROMElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("EEPROM", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._isProgramMemory = props.getOrDefault<boolean>("isProgramMemory", false);
-    this._pins = resolvePins(
-      buildEEPROMPins(this._addrBits, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set(["WE"]) },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildEEPROMPins(addrBits, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set(["WE"]) },
+    );
   }
 
   getBoundingBox(): Rect {
@@ -217,7 +210,7 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 
   get isProgramMemory(): boolean {
-    return this._isProgramMemory;
+    return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
   getHelpText(): string {
@@ -335,11 +328,6 @@ function buildEEPROMDualPortPins(addrBits: number, dataBits: number): PinDeclara
 }
 
 export class EEPROMDualPortElement extends AbstractCircuitElement {
-  private readonly _addrBits: number;
-  private readonly _dataBits: number;
-  private readonly _isProgramMemory: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -348,20 +336,18 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("EEPROMDualPort", instanceId, position, rotation, mirror, props);
-    this._addrBits = props.getOrDefault<number>("addrBits", 4);
-    this._dataBits = props.getOrDefault<number>("dataBits", 8);
-    this._isProgramMemory = props.getOrDefault<boolean>("isProgramMemory", false);
-    this._pins = resolvePins(
-      buildEEPROMDualPortPins(this._addrBits, this._dataBits),
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set(["C"]) },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 4);
+    const dataBits = this._properties.getOrDefault<number>("dataBits", 8);
+    return resolvePins(
+      buildEEPROMDualPortPins(addrBits, dataBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set(["C"]) },
+    );
   }
 
   getBoundingBox(): Rect {
@@ -375,7 +361,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 
   get isProgramMemory(): boolean {
-    return this._isProgramMemory;
+    return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
   getHelpText(): string {

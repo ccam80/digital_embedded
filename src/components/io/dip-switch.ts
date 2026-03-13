@@ -12,8 +12,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -58,11 +56,6 @@ function buildDipSwitchPinDeclarations(bitCount: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class DipSwitchElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _bitCount: number;
-  private readonly _defaultValue: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -71,28 +64,17 @@ export class DipSwitchElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("DipSwitch", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._bitCount = props.getOrDefault<number>("bitCount", 1);
-    this._defaultValue = props.getOrDefault<number>("defaultValue", 0);
-
-    const decls = buildDipSwitchPinDeclarations(this._bitCount);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitCount,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitCount = this._properties.getOrDefault<number>("bitCount", 1);
+    const decls = buildDipSwitchPinDeclarations(bitCount);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const w = componentWidth(this._bitCount);
+    const bitCount = this._properties.getOrDefault<number>("bitCount", 1);
+    const w = componentWidth(bitCount);
     return {
       x: this.position.x,
       y: this.position.y - COMP_HEIGHT / 2,
@@ -102,15 +84,18 @@ export class DipSwitchElement extends AbstractCircuitElement {
   }
 
   get bitCount(): number {
-    return this._bitCount;
+    return this._properties.getOrDefault<number>("bitCount", 1);
   }
 
   get defaultValue(): number {
-    return this._defaultValue;
+    return this._properties.getOrDefault<number>("defaultValue", 0);
   }
 
   draw(ctx: RenderContext): void {
-    const w = componentWidth(this._bitCount);
+    const bitCount = this._properties.getOrDefault<number>("bitCount", 1);
+    const defaultValue = this._properties.getOrDefault<number>("defaultValue", 0);
+    const label = this._properties.getOrDefault<string>("label", "");
+    const w = componentWidth(bitCount);
     const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
@@ -122,10 +107,10 @@ export class DipSwitchElement extends AbstractCircuitElement {
     ctx.drawRect(0, yOff, w, COMP_HEIGHT, false);
 
     // Draw individual switch slots — one per bit
-    for (let i = 0; i < this._bitCount; i++) {
+    for (let i = 0; i < bitCount; i++) {
       const slotX = i * BIT_WIDTH_PX + 0.15;
       const slotW = BIT_WIDTH_PX - 0.3;
-      const bitOn = ((this._defaultValue >>> i) & 1) === 1;
+      const bitOn = ((defaultValue >>> i) & 1) === 1;
 
       ctx.setColor("COMPONENT");
       ctx.drawRect(slotX, yOff + 0.2, slotW, COMP_HEIGHT - 0.4, false);
@@ -146,10 +131,10 @@ export class DipSwitchElement extends AbstractCircuitElement {
       }
     }
 
-    if (this._label.length > 0) {
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(this._label, w / 2, yOff - 0.3, {
+      ctx.drawText(label, w / 2, yOff - 0.3, {
         horizontal: "center",
         vertical: "bottom",
       });

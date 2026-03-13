@@ -22,8 +22,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -63,9 +61,6 @@ export function buildResetPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class ResetElement extends AbstractCircuitElement {
-  private readonly _invertOutput: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -74,21 +69,10 @@ export class ResetElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Reset", instanceId, position, rotation, mirror, props);
-
-    this._invertOutput = props.getOrDefault<boolean>("invertOutput", false);
-
-    const decls = buildResetPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildResetPinDeclarations());
   }
 
   getBoundingBox(): Rect {
@@ -101,6 +85,7 @@ export class ResetElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const invertOutput = this._properties.getOrDefault<boolean>("invertOutput", false);
 
     ctx.save();
 
@@ -117,7 +102,7 @@ export class ResetElement extends AbstractCircuitElement {
       vertical: "middle",
     });
 
-    if (this._invertOutput) {
+    if (invertOutput) {
       ctx.drawCircle(COMP_WIDTH + 0.3, COMP_HEIGHT / 2, 0.3, false);
     }
 
@@ -125,10 +110,11 @@ export class ResetElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
+    const invertOutput = this._properties.getOrDefault<boolean>("invertOutput", false);
     return (
       "Reset — output is held in reset state during initialization.\n" +
       "After init, output transitions to its post-reset value.\n" +
-      `Output polarity: ${this._invertOutput ? "inverted (active-low reset)" : "normal (active-high reset)"}.`
+      `Output polarity: ${invertOutput ? "inverted (active-low reset)" : "normal (active-high reset)"}.`
     );
   }
 }

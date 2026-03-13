@@ -92,10 +92,10 @@ describe("makePin", () => {
     expect(pin.isNegated).toBe(false);
   });
 
-  it("uses provided bitWidth over defaultBitWidth", () => {
+  it("uses decl.defaultBitWidth", () => {
     const config = createInverterConfig([]);
-    const pin = makePin(decl, { x: 0, y: 0 }, config, createClockConfig([]), 8);
-    expect(pin.bitWidth).toBe(8);
+    const pin = makePin(decl, { x: 0, y: 0 }, config, createClockConfig([]));
+    expect(pin.bitWidth).toBe(1); // decl.defaultBitWidth
   });
 
   it("falls back to defaultBitWidth when bitWidth is not provided", () => {
@@ -232,11 +232,11 @@ describe("resolvePins", () => {
     expect(pins[1].isNegated).toBe(false);
   });
 
-  it("applies custom bitWidth to all pins", () => {
+  it("uses each declaration's defaultBitWidth", () => {
     const config = createInverterConfig([]);
-    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config, createClockConfig([]), 4);
-    expect(pins[0].bitWidth).toBe(4);
-    expect(pins[1].bitWidth).toBe(4);
+    const pins = resolvePins(decls, { x: 0, y: 0 }, 0, config, createClockConfig([]));
+    expect(pins[0].bitWidth).toBe(1);
+    expect(pins[1].bitWidth).toBe(1);
   });
 
   it("returns empty array for empty declarations", () => {

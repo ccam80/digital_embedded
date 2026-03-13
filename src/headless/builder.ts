@@ -3,10 +3,11 @@
  */
 
 import { Circuit, Wire } from '../core/circuit.js';
-import type { ComponentRegistry } from '../core/registry.js';
+import type { ComponentRegistry, ComponentDefinition } from '../core/registry.js';
 import type { PropertyValue } from '../core/properties.js';
 import { PropertyBag } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
+import { pinWorldPosition } from '../core/pin.js';
 import type { CircuitElement } from '../core/element.js';
 import { FacadeError } from './types.js';
 import type { CircuitBuildOptions, TestResults } from './types.js';
@@ -16,6 +17,10 @@ import { SimulationRunner } from './runner.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
+import type { CircuitSpec, CircuitPatch, PatchOptions, Diagnostic, Netlist } from './netlist-types.js';
+import { resolveComponent, resolvePin, resolveScope } from './address.js';
+import { resolveNets } from './netlist.js';
+import { autoLayout } from './auto-layout.js';
 
 const AUTO_POSITION_Y_STEP = 4;
 
@@ -140,6 +145,13 @@ export class CircuitBuilder {
     }
 
     const element = definition.factory(bag);
+
+    // Factories create elements at (0,0) — apply the position from the bag.
+    const pos = bag.has('position') ? bag.get<number[]>('position') : undefined;
+    if (pos && pos.length >= 2) {
+      element.position = { x: pos[0], y: pos[1] };
+    }
+
     circuit.elements.push(element);
     this.elementPositionCounter++;
 
@@ -250,6 +262,306 @@ export class CircuitBuilder {
     const parsed = parseTestData(resolvedData);
     const runner = new SimulationRunner(this.registry);
     return executeTests(runner, engine, circuit, parsed);
+  }
+
+  // ---------------------------------------------------------------------------
+  // build() — declarative circuit construction
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build a Circuit from a declarative CircuitSpec.
+   *
+   * 1. Creates a new circuit with the spec's name/description.
+   * 2. Adds each component (auto-positioned).
+   * 3. Connects pins using "id:pin" addresses resolved against the local spec id map.
+   */
+  build(spec: CircuitSpec): Circuit {
+    const circuitOpts: CircuitBuildOptions = {};
+    if (spec.name !== undefined) circuitOpts.name = spec.name;
+    if (spec.description !== undefined) circuitOpts.description = spec.description;
+    const circuit = this.createCircuit(circuitOpts);
+
+    // id → element map (spec-local ids, not necessarily user labels)
+    const idMap = new Map<string, CircuitElement>();
+
+    for (const comp of spec.components) {
+      const element = this.addComponent(circuit, comp.type, comp.props);
+      idMap.set(comp.id, element);
+    }
+
+    for (const [fromAddr, toAddr] of spec.connections) {
+      const fromColon = fromAddr.indexOf(':');
+      const toColon = toAddr.indexOf(':');
+
+      if (fromColon === -1 || toColon === -1) {
+        throw new FacadeError(
+          `Connection address must be "id:pin". Got: "${fromAddr}" → "${toAddr}"`,
+        );
+      }
+
+      const srcId = fromAddr.slice(0, fromColon);
+      const srcPinLabel = fromAddr.slice(fromColon + 1);
+      const dstId = toAddr.slice(0, toColon);
+      const dstPinLabel = toAddr.slice(toColon + 1);
+
+      const src = idMap.get(srcId);
+      if (!src) {
+        throw new FacadeError(
+          `Connection references unknown component id '${srcId}'. Known ids: ${[...idMap.keys()].join(', ')}`,
+        );
+      }
+
+      const dst = idMap.get(dstId);
+      if (!dst) {
+        throw new FacadeError(
+          `Connection references unknown component id '${dstId}'. Known ids: ${[...idMap.keys()].join(', ')}`,
+        );
+      }
+
+      this.connect(circuit, src, srcPinLabel, dst, dstPinLabel);
+    }
+
+    // Auto-layout when there are connections to arrange
+    if (spec.connections.length > 0) {
+      autoLayout(circuit);
+    }
+
+    return circuit;
+  }
+
+  // ---------------------------------------------------------------------------
+  // patch() — incremental circuit editing
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Apply a list of patch operations to an existing circuit in order.
+   * After all ops, runs net resolution diagnostics and returns them.
+   *
+   * @param circuit  The circuit to modify (mutated in place).
+   * @param ops      Ordered list of patch operations.
+   * @param opts     Options (scope is reserved for future subcircuit support).
+   * @returns        Diagnostics from net resolution after the patch.
+   */
+  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): Diagnostic[] {
+    // Resolve the target circuit: top-level unless opts.scope narrows to a subcircuit.
+    const targetCircuit =
+      opts?.scope !== undefined
+        ? resolveScope(circuit, this.registry, opts.scope)
+        : circuit;
+
+    for (const op of ops) {
+      switch (op.op) {
+        case 'set': {
+          const { element } = resolveComponent(targetCircuit, op.target);
+
+          // Re-instantiate the element so pin widths reflect the new
+          // properties (e.g. changing Bits must rebuild pins).
+          const oldPosition = element.position;
+          const oldRotation = element.rotation;
+          const oldMirror = element.mirror;
+
+          // Merge existing properties with the patch props.
+          // Order: old bag first, then new props override, then position
+          // (position must come last to prevent the old bag overwriting it).
+          const mergedProps: Record<string, PropertyValue> = {};
+          const oldBag = element.getProperties();
+          for (const [key, value] of oldBag.entries()) {
+            mergedProps[key] = value;
+          }
+          for (const [key, value] of Object.entries(op.props)) {
+            mergedProps[key] = value;
+          }
+          mergedProps['position'] = [oldPosition.x, oldPosition.y];
+
+          // Collect wire records (same as replace)
+          const setWireRecords: { wire: Wire; pinLabel: string; atStart: boolean }[] = [];
+          for (const pin of element.getPins()) {
+            const pinPos = pinWorldPosition(element, pin);
+            for (const wire of targetCircuit.wires) {
+              if (wire.start.x === pinPos.x && wire.start.y === pinPos.y) {
+                setWireRecords.push({ wire, pinLabel: pin.label, atStart: true });
+              } else if (wire.end.x === pinPos.x && wire.end.y === pinPos.y) {
+                setWireRecords.push({ wire, pinLabel: pin.label, atStart: false });
+              }
+            }
+          }
+
+          // Remove old wires and element
+          for (const { wire } of setWireRecords) {
+            targetCircuit.removeWire(wire);
+          }
+          targetCircuit.removeElement(element);
+
+          // Create new element with merged properties
+          const newSetElement = this.addComponent(targetCircuit, element.typeId, mergedProps);
+          newSetElement.rotation = oldRotation;
+          newSetElement.mirror = oldMirror;
+
+          // Reconnect wires where pin labels match
+          for (const { wire, pinLabel, atStart } of setWireRecords) {
+            const newPin = newSetElement.getPins().find((p: Pin) => p.label === pinLabel);
+            if (!newPin) continue;
+            const newPinPos = pinWorldPosition(newSetElement, newPin);
+            const newWire = atStart
+              ? new Wire(newPinPos, wire.end)
+              : new Wire(wire.start, newPinPos);
+            targetCircuit.wires.push(newWire);
+          }
+          break;
+        }
+
+        case 'add': {
+          const newElement = this.addComponent(targetCircuit, op.spec.type, op.spec.props);
+
+          if (op.connect) {
+            for (const [newPinLabel, targetAddr] of Object.entries(op.connect)) {
+              const { element: targetElement, pin: targetPin } = resolvePin(targetCircuit, targetAddr);
+              // Connect new component pin to the target pin.
+              // We need the new element's pin label and the target's element + pin.
+              const srcPin = newElement.getPins().find((p: Pin) => p.label === newPinLabel);
+              if (!srcPin) {
+                const validPins = Array.from(newElement.getPins()).map((p: Pin) => p.label).join(', ');
+                throw new FacadeError(
+                  `Pin '${newPinLabel}' not found on newly added component '${op.spec.type}'. Valid pins: ${validPins}`,
+                  op.spec.type,
+                  newPinLabel,
+                );
+              }
+
+              const srcWorldPos = pinWorldPosition(newElement, srcPin);
+              const dstWorldPos = pinWorldPosition(targetElement, targetPin);
+              targetCircuit.wires.push(new Wire(srcWorldPos, dstWorldPos));
+            }
+          }
+          break;
+        }
+
+        case 'remove': {
+          const { element } = resolveComponent(targetCircuit, op.target);
+
+          // Collect all pin world positions for this element.
+          const pinPositions = element.getPins().map((p: Pin) => pinWorldPosition(element, p));
+
+          // Remove wires that touch any of the element's pin positions.
+          const wiresToRemove = targetCircuit.wires.filter((w) =>
+            pinPositions.some(
+              (pos) =>
+                (w.start.x === pos.x && w.start.y === pos.y) ||
+                (w.end.x === pos.x && w.end.y === pos.y),
+            ),
+          );
+          for (const wire of wiresToRemove) {
+            targetCircuit.removeWire(wire);
+          }
+
+          targetCircuit.removeElement(element);
+          break;
+        }
+
+        case 'connect': {
+          const { element: srcElement, pin: srcPin } = resolvePin(targetCircuit, op.from);
+          const { element: dstElement, pin: dstPin } = resolvePin(targetCircuit, op.to);
+
+          const srcWorldPos = pinWorldPosition(srcElement, srcPin);
+          const dstWorldPos = pinWorldPosition(dstElement, dstPin);
+
+          targetCircuit.wires.push(new Wire(srcWorldPos, dstWorldPos));
+          break;
+        }
+
+        case 'disconnect': {
+          const { element, pin } = resolvePin(targetCircuit, op.pin);
+          const pinPos = pinWorldPosition(element, pin);
+
+          const wiresToRemove = targetCircuit.wires.filter(
+            (w) =>
+              (w.start.x === pinPos.x && w.start.y === pinPos.y) ||
+              (w.end.x === pinPos.x && w.end.y === pinPos.y),
+          );
+          for (const wire of wiresToRemove) {
+            targetCircuit.removeWire(wire);
+          }
+          break;
+        }
+
+        case 'replace': {
+          const { element: oldElement } = resolveComponent(targetCircuit, op.target);
+          const oldPosition = oldElement.position;
+
+          // Collect wires connected to the old element, recording which pin
+          // labels (by world-position match) they were attached to.
+          interface WireRecord {
+            wire: Wire;
+            oldPinLabel: string;
+            /** true if the wire's start was at the old pin; false if end was */
+            atStart: boolean;
+          }
+          const wireRecords: WireRecord[] = [];
+          for (const oldPin of oldElement.getPins()) {
+            const pinPos = pinWorldPosition(oldElement, oldPin);
+            for (const wire of targetCircuit.wires) {
+              if (wire.start.x === pinPos.x && wire.start.y === pinPos.y) {
+                wireRecords.push({ wire, oldPinLabel: oldPin.label, atStart: true });
+              } else if (wire.end.x === pinPos.x && wire.end.y === pinPos.y) {
+                wireRecords.push({ wire, oldPinLabel: oldPin.label, atStart: false });
+              }
+            }
+          }
+
+          // Remove wires that were attached to the old element.
+          for (const { wire } of wireRecords) {
+            targetCircuit.removeWire(wire);
+          }
+
+          // Remove old element.
+          targetCircuit.removeElement(oldElement);
+
+          // Add new element at the same position.
+          const propsWithPosition: Record<string, PropertyValue> = {
+            position: [oldPosition.x, oldPosition.y],
+            ...(op.props ?? {}),
+          };
+          const newElement = this.addComponent(targetCircuit, op.newType, propsWithPosition);
+
+          // Reconnect wires where pin labels match between old and new types.
+          for (const { wire, oldPinLabel, atStart } of wireRecords) {
+            const newPin = newElement.getPins().find((p: Pin) => p.label === oldPinLabel);
+            if (!newPin) continue; // pin label doesn't exist on new type — skip
+
+            const newPinPos = pinWorldPosition(newElement, newPin);
+            const newWire = atStart
+              ? new Wire(newPinPos, wire.end)
+              : new Wire(wire.start, newPinPos);
+            targetCircuit.wires.push(newWire);
+          }
+          break;
+        }
+      }
+    }
+
+    // Validate the top-level circuit (not just the scoped subcircuit).
+    return resolveNets(circuit, this.registry).diagnostics;
+  }
+
+  /**
+   * Extract a netlist view of the circuit: components, nets, and diagnostics.
+   */
+  netlist(circuit: Circuit): Netlist {
+    return resolveNets(circuit, this.registry);
+  }
+
+  /**
+   * Validate circuit structure, returning all diagnostics.
+   */
+  validate(circuit: Circuit): Diagnostic[] {
+    return resolveNets(circuit, this.registry).diagnostics;
+  }
+
+  /**
+   * Query the registry for a component type's definition.
+   */
+  describeComponent(typeName: string): ComponentDefinition | undefined {
+    return this.registry.get(typeName);
   }
 
   /**

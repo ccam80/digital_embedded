@@ -20,8 +20,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -66,11 +64,6 @@ export type BarrelShifterMode = "logical" | "rotate" | "arithmetic";
 export type ShiftDirection = "left" | "right";
 
 export class BarrelShifterElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _signed: boolean;
-  private readonly _direction: ShiftDirection;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -79,20 +72,20 @@ export class BarrelShifterElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("BarrelShifter", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
-    this._signed = props.getOrDefault<boolean>("signed", false);
-    this._direction = props.getOrDefault<string>("direction", "left") as ShiftDirection;
-    const decls = buildBarrelShifterPinDeclarations(this._bitWidth, this._signed);
-    this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });
   }
 
-  getPins(): readonly Pin[] { return this._pins; }
+  getPins(): readonly Pin[] {
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
+    const signed = this._properties.getOrDefault<boolean>("signed", false);
+    return this.derivePins(buildBarrelShifterPinDeclarations(bitWidth, signed), []);
+  }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
+    const direction = this._properties.getOrDefault<string>("direction", "left") as ShiftDirection;
     ctx.save();
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
@@ -101,7 +94,7 @@ export class BarrelShifterElement extends AbstractCircuitElement {
     ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    const symbol = this._direction === "left" ? "<<" : ">>";
+    const symbol = direction === "left" ? "<<" : ">>";
     ctx.drawText(symbol, COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
     ctx.restore();
   }

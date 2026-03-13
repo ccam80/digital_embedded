@@ -20,9 +20,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -89,8 +86,6 @@ const RS_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class RSAsyncElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -99,18 +94,10 @@ export class RSAsyncElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("RS_FF_AS", instanceId, position, rotation, mirror, props);
-    this._pins = resolvePins(
-      RS_FF_AS_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig([]),
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(RS_FF_AS_PIN_DECLARATIONS, []);
   }
 
   getBoundingBox(): Rect {

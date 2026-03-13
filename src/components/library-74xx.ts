@@ -275,5 +275,5 @@ export function register74xxSubcircuit(
     helpText: `${name}: ${description}`,
   };
 
-  registry.register(componentDef);
+  registry.registerOrUpdate(componentDef);
 }

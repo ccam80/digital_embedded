@@ -36,7 +36,7 @@ import {
   drawCustomShape,
   drawLayoutShape,
 } from "./shape-renderer.js";
-import { countPinsByFace } from "./pin-derivation.js";
+import { countPinsByFace, deriveInterfacePins } from "./pin-derivation.js";
 
 // ---------------------------------------------------------------------------
 // SubcircuitDefinition
@@ -57,16 +57,36 @@ export interface SubcircuitDefinition {
   name: string;
 }
 
+/**
+ * Create a SubcircuitDefinition whose pinLayout is derived live from the
+ * circuit's In/Out elements on each access. This is the standard constructor
+ * for subcircuit definitions loaded from .dig files.
+ *
+ * For special cases (e.g. extractSubcircuit where no In/Out elements exist
+ * yet), callers may still construct a literal SubcircuitDefinition with a
+ * static pinLayout.
+ */
+export function createLiveDefinition(
+  circuit: Circuit,
+  shapeMode: ShapeMode,
+  name: string,
+): SubcircuitDefinition {
+  return {
+    circuit,
+    shapeMode,
+    name,
+    get pinLayout() {
+      return deriveInterfacePins(circuit);
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // SubcircuitElement
 // ---------------------------------------------------------------------------
 
 export class SubcircuitElement extends AbstractCircuitElement {
   private readonly _definition: SubcircuitDefinition;
-  private readonly _pins: readonly Pin[];
-  private readonly _width: number;
-  private readonly _height: number;
-  private readonly _effectiveShapeMode: ShapeMode;
 
   constructor(
     typeId: string,
@@ -79,117 +99,117 @@ export class SubcircuitElement extends AbstractCircuitElement {
   ) {
     super(typeId, instanceId, position, rotation, mirror, props);
     this._definition = definition;
+  }
 
-    // Determine effective shape mode: instance override > definition default
-    const instanceShapeType = props.getOrDefault<string>("shapeType", "");
+  // --- Derived helpers (Step 3+4: compute from live definition each call) ---
+
+  /** Effective shape mode: instance override > definition default. */
+  private _getEffectiveShapeMode(): ShapeMode {
+    const instanceShapeType = this._properties.getOrDefault<string>("shapeType", "");
     if (instanceShapeType && instanceShapeType !== "" && instanceShapeType !== "DEFAULT") {
-      this._effectiveShapeMode = instanceShapeType as ShapeMode;
-    } else {
-      // DEFAULT means "use circuit's own shape type"; if that's also DEFAULT, fall back to SIMPLE
-      const defMode = definition.shapeMode;
-      this._effectiveShapeMode = (defMode === "DEFAULT") ? "SIMPLE" : defMode;
+      return instanceShapeType as ShapeMode;
     }
+    const defMode = this._definition.shapeMode;
+    return (defMode === "DEFAULT") ? "SIMPLE" : defMode;
+  }
 
-    const chipWidth = definition.circuit.metadata.chipWidth ?? 3;
-    const chipHeight = definition.circuit.metadata.chipHeight ?? 3;
+  /** Chip dimensions derived from current pinLayout + circuit metadata. */
+  private _getDimensions(): { width: number; height: number } {
+    const shapeMode = this._getEffectiveShapeMode();
+    const chipWidth = this._definition.circuit.metadata.chipWidth ?? 3;
+    const chipHeight = this._definition.circuit.metadata.chipHeight ?? 3;
+    const pinLayout = this._definition.pinLayout;
 
-    if (this._effectiveShapeMode === "LAYOUT") {
-      // LAYOUT: faces from In/Out rotation, dimensions are max(pins+1, explicit attribute)
-      const faceCounts = countPinsByFace(definition.pinLayout);
-      this._width = Math.max(faceCounts.top + 1, faceCounts.bottom + 1, chipWidth);
-      this._height = Math.max(faceCounts.left + 1, faceCounts.right + 1, chipHeight);
+    let w: number;
+    let h: number;
+
+    if (shapeMode === "LAYOUT") {
+      const faceCounts = countPinsByFace(pinLayout);
+      w = Math.max(faceCounts.top + 1, faceCounts.bottom + 1, chipWidth);
+      h = Math.max(faceCounts.left + 1, faceCounts.right + 1, chipHeight);
     } else {
-      // DEFAULT/DIL/CUSTOM: all inputs on left, all outputs on right
-      const inputCount = definition.pinLayout.filter(p => p.direction === PinDirection.INPUT).length;
-      const outputCount = definition.pinLayout.filter(p => p.direction === PinDirection.OUTPUT).length;
+      const inputCount = pinLayout.filter(p => p.direction === PinDirection.INPUT).length;
+      const outputCount = pinLayout.filter(p => p.direction === PinDirection.OUTPUT).length;
       const symmetric = outputCount === 1;
       const evenGap = symmetric && inputCount % 2 === 0 ? 1 : 0;
-      this._width = chipWidth;
-      this._height = Math.max(inputCount + evenGap, outputCount, 1);
+      w = chipWidth;
+      h = Math.max(inputCount + evenGap, outputCount, 1);
     }
 
-    const customShape = definition.circuit.metadata.customShape;
-    let positionedPins: PinDeclaration[];
-
-    if (this._effectiveShapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
-      positionedPins = buildCustomPinPositions(definition.pinLayout, customShape);
+    const customShape = this._definition.circuit.metadata.customShape;
+    if (shapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
       const extents = computeCustomShapeExtents(customShape);
-      this._width = extents.width;
-      this._height = extents.height;
-    } else {
-      positionedPins = buildPositionedPinDeclarations(
-        definition.pinLayout,
-        this._width,
-        this._height,
-        this._effectiveShapeMode,
-      );
+      w = extents.width;
+      h = extents.height;
     }
 
-    this._pins = resolvePins(
-      positionedPins,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
+    return { width: w, height: h };
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const shapeMode = this._getEffectiveShapeMode();
+    const { width, height } = this._getDimensions();
+    const pinLayout = this._definition.pinLayout;
+    let positionedPins: PinDeclaration[];
+    const customShape = this._definition.circuit.metadata.customShape;
+    if (shapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
+      positionedPins = buildCustomPinPositions(pinLayout, customShape);
+    } else {
+      positionedPins = buildPositionedPinDeclarations(pinLayout, width, height, shapeMode);
+    }
+    return resolvePins(positionedPins, { x: 0, y: 0 }, 0, createInverterConfig([]), { clockPins: new Set<string>() });
   }
 
   getBoundingBox(): Rect {
-    if (this._effectiveShapeMode === "LAYOUT") {
-      // LAYOUT chip rect: origin at (0,0), full width × height
+    const shapeMode = this._getEffectiveShapeMode();
+    const { width, height } = this._getDimensions();
+    if (shapeMode === "LAYOUT") {
       return {
         x: this.position.x,
         y: this.position.y,
-        width: this._width,
-        height: this._height,
+        width,
+        height,
       };
     }
-    // DEFAULT/DIL/CUSTOM: chip rect has 0.5 border above and below pin area
     return {
       x: this.position.x,
       y: this.position.y - 0.5,
-      width: this._width,
-      height: this._height - 1 + 1, // pinRows - 1 + 2 * BORDER
+      width,
+      height: height - 1 + 1, // pinRows - 1 + 2 * BORDER
     };
   }
 
   draw(ctx: RenderContext): void {
+    const shapeMode = this._getEffectiveShapeMode();
+    const { width, height } = this._getDimensions();
+    const pinLayout = this._definition.pinLayout;
 
     ctx.save();
 
     const customShape = this._definition.circuit.metadata.customShape;
     let positionedPins: PinDeclaration[];
 
-    if (this._effectiveShapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
-      positionedPins = buildCustomPinPositions(this._definition.pinLayout, customShape);
+    if (shapeMode === "CUSTOM" && customShape && customShape.pins.size > 0) {
+      positionedPins = buildCustomPinPositions(pinLayout, customShape);
     } else {
-      positionedPins = buildPositionedPinDeclarations(
-        this._definition.pinLayout,
-        this._width,
-        this._height,
-        this._effectiveShapeMode,
-      );
+      positionedPins = buildPositionedPinDeclarations(pinLayout, width, height, shapeMode);
     }
 
-    switch (this._effectiveShapeMode) {
+    switch (shapeMode) {
       case "DIL":
-        drawDILShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
+        drawDILShape(ctx, this._definition.name, positionedPins, width, height, this.rotation);
         break;
       case "CUSTOM":
-        drawCustomShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation, customShape);
+        drawCustomShape(ctx, this._definition.name, positionedPins, width, height, this.rotation, customShape);
         break;
       case "LAYOUT":
-        drawLayoutShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
+        drawLayoutShape(ctx, this._definition.name, positionedPins, width, height, this.rotation);
         break;
       case "DEFAULT":
       case "SIMPLE":
       case "MINIMIZED":
       default:
-        drawDefaultShape(ctx, this._definition.name, positionedPins, this._width, this._height, this.rotation);
+        drawDefaultShape(ctx, this._definition.name, positionedPins, width, height, this.rotation);
         break;
     }
 
@@ -300,7 +320,10 @@ function buildLayoutPositions(
 ): PinDeclaration[] {
   type Face = "left" | "right" | "top" | "bottom";
 
-  // Group by face, preserving sort order from deriveInterfacePins
+  // Group by face, then sort within each group by position (sortPos encoded
+  // in placeholder position.y by deriveInterfacePins). This ensures LAYOUT
+  // pin distribution matches Java's LayoutShape which sorts by element
+  // position along the face axis.
   const groups: Record<Face, PinDeclaration[]> = {
     left: [], right: [], top: [], bottom: [],
   };
@@ -308,6 +331,9 @@ function buildLayoutPositions(
     const face: Face = pin.face ??
       (pin.direction === PinDirection.INPUT ? "left" : "right");
     groups[face].push(pin);
+  }
+  for (const facePins of Object.values(groups)) {
+    facePins.sort((a, b) => a.position.y - b.position.y);
   }
 
   /**
@@ -509,5 +535,5 @@ export function registerSubcircuit(
       "This component is flattened into its constituent gates before simulation.",
   };
 
-  registry.register(componentDef);
+  registry.registerOrUpdate(componentDef);
 }

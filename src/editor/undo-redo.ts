@@ -40,6 +40,15 @@ export class UndoRedoStack {
   private _maxDepth = 100;
 
   /**
+   * Optional callback fired after every mutation (push, undo, redo).
+   *
+   * The editor sets this to `() => propagateWireBitWidths(circuit)` so that
+   * wire bit-widths stay consistent after any circuit edit. This is the
+   * Option A hook from the architectural refactor spec (Step 5).
+   */
+  afterMutate: (() => void) | undefined;
+
+  /**
    * Execute the command and push it onto the undo stack.
    * Clears the redo stack.
    */
@@ -48,6 +57,7 @@ export class UndoRedoStack {
     this._undoStack.push(command);
     this._redoStack = [];
     this._trimToDepth();
+    this.afterMutate?.();
   }
 
   /**
@@ -61,6 +71,7 @@ export class UndoRedoStack {
     }
     command.undo();
     this._redoStack.push(command);
+    this.afterMutate?.();
     return true;
   }
 
@@ -75,6 +86,7 @@ export class UndoRedoStack {
     }
     command.execute();
     this._undoStack.push(command);
+    this.afterMutate?.();
     return true;
   }
 

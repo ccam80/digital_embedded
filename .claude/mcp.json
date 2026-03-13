@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "circuit-simulator": {
+      "command": "npx",
+      "args": ["tsx", "scripts/circuit-mcp-server.ts"],
+      "cwd": "C:/local_working_projects/digital_in_browser"
+    }
+  }
+}

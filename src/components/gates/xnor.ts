@@ -13,10 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  PinDirection,
-  createInverterConfig,
   gateBodyMetrics,
-  resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -59,35 +56,11 @@ function buildPinDeclarations(inputCount: number, bitWidth: number, wideShape: b
   return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
-function parseInvertedPins(props: PropertyBag, inputCount: number): string[] {
-  if (props.has("_inverterLabels")) {
-    const raw = props.get<string>("_inverterLabels");
-    return raw.length > 0 ? raw.split(",") : [];
-  }
-  if (props.has("inverterConfig")) {
-    const cfg = props.get<number[]>("inverterConfig");
-    return cfg
-      .map((v, i) => (v !== 0 ? `In_${i + 1}` : null))
-      .filter((x): x is string => x !== null);
-  }
-  const inputLabels = buildInputLabels(inputCount);
-  return inputLabels.filter((label) => {
-    const key = `invert_${label}`;
-    return props.has(key) && props.get<boolean>(key) === true;
-  });
-}
-
 // ---------------------------------------------------------------------------
 // XNOrElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class XNOrElement extends AbstractCircuitElement {
-  private readonly _inputCount: number;
-  private readonly _bitWidth: number;
-  private readonly _wideShape: boolean;
-  private readonly _invertedPins: readonly string[];
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -96,66 +69,77 @@ export class XNOrElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("XNOr", instanceId, position, rotation, mirror, props);
-
-    this._inputCount = props.getOrDefault<number>("inputCount", 2);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
-    this._invertedPins = parseInvertedPins(props, this._inputCount);
-
-    const inverterConfig = createInverterConfig(this._invertedPins);
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      inverterConfig,
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const decls = buildPinDeclarations(inputCount, bitWidth, wideShape);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape) + 1,
+      width: compWidth(wideShape) + 1,
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const w = compWidth(this._wideShape);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const w = compWidth(wideShape);
+    const offs = Math.floor(inputCount / 2) - 1;
+    const outputY = Math.floor(inputCount / 2);
+    const BUBBLE_RADIUS = 0.45;
 
     ctx.save();
 
+    // Java IEEEGenericShape: vertical extension lines for >2 inputs
+    if (offs > 0) {
+      const h = Math.floor(inputCount / 2) * 2;
+      ctx.setColor("COMPONENT");
+      ctx.setLineWidth(1);
+      ctx.drawLine(0.05, 0, 0.05, offs - 0.55);
+      ctx.drawLine(0.05, h, 0.05, h - offs + 0.55);
+    }
+
+    // Draw body translated to center position
+    if (offs > 0) ctx.save();
+    if (offs > 0) ctx.translate(0, offs);
     this._drawIEEE(ctx, w);
-    this._drawInputStubs(ctx);
+    this._drawBodyStubs(ctx, inputCount);
+    if (offs > 0) ctx.restore();
+
+    // Inversion bubble at output pin position (untranslated)
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
+
     this._drawLabel(ctx, w);
-    this._drawInversionBubbles(ctx);
 
     ctx.restore();
   }
 
   /**
-   * IEEE/US shape: XOR gate body with inversion bubble at output.
-   * Coordinates from Java IEEEXOrShape + IEEEGenericShape inversion bubble.
+   * IEEE/US shape: XOR gate body (fixed 2-input base shape, output at y=1)
+   * with back curve. For >2 inputs the body is translated in draw().
    */
   private _drawIEEE(ctx: RenderContext, w: number): void {
-    const outputY = Math.floor(this._inputCount / 2);
     const wide = w === 4;
-    const BUBBLE_RADIUS = 0.45;
 
     const bodyOps = wide ? [
       { op: "moveTo" as const, x: 1.0, y: 2.5 },
       { op: "lineTo" as const, x: 0.5, y: 2.5 },
       { op: "curveTo" as const, cp1x: 1.0, cp1y: 1.7, cp2x: 1.0, cp2y: 0.3, x: 0.5, y: -0.5 },
       { op: "lineTo" as const, x: 1.0, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 2.0, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 2.0, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: 1.0 },
       { op: "curveTo" as const, cp1x: 3.0, cp1y: 2.0, cp2x: 2.0, cp2y: 2.5, x: 1.0, y: 2.5 },
       { op: "closePath" as const },
     ] : [
@@ -163,7 +147,7 @@ export class XNOrElement extends AbstractCircuitElement {
       { op: "lineTo" as const, x: 0.55, y: 2.5 },
       { op: "curveTo" as const, cp1x: 1.0, cp1y: 2.0, cp2x: 1.0, cp2y: 0, x: 0.55, y: -0.5 },
       { op: "lineTo" as const, x: 1.0, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: outputY },
+      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: 1.0 },
       { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.5, cp2y: 2.5, x: 1.0, y: 2.5 },
       { op: "closePath" as const },
     ];
@@ -183,46 +167,19 @@ export class XNOrElement extends AbstractCircuitElement {
     ];
 
     ctx.drawPath({ operations: backCurveOps }, false);
-
-    ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
   }
 
   /**
-   * Draw input wire stubs from pin position to body edge.
-   * XOR has longer stubs than OR because of the double-back gap:
-   * top/bottom: 0.7 grid, center (odd count): 0.85 grid.
+   * Draw input wire stubs for pins adjacent to the body (in body-local coords).
+   * XOR has longer stubs than OR because of the double-back gap.
    */
-  private _drawInputStubs(ctx: RenderContext): void {
-    const n = this._inputCount;
-    const even = n > 0 && (n & 1) === 0;
-
+  private _drawBodyStubs(ctx: RenderContext, inputCount: number): void {
+    const center = (inputCount & 1) !== 0;
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-
-    for (let i = 0; i < n; i++) {
-      const correct = (even && i >= n / 2) ? 1 : 0;
-      const pinY = i + correct;
-      const isCenter = !even && i === Math.floor(n / 2);
-      const stubLen = isCenter ? 0.85 : 0.7;
-      ctx.drawLine(0, pinY, stubLen, pinY);
-    }
-  }
-
-  private _drawInversionBubbles(ctx: RenderContext): void {
-    if (this._invertedPins.length === 0) return;
-
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    const invertedSet = new Set(this._invertedPins);
-    const BUBBLE_RADIUS = 0.3;
-
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-
-    for (const decl of decls) {
-      if (decl.direction === PinDirection.INPUT && invertedSet.has(decl.label)) {
-        ctx.drawCircle(decl.position.x, decl.position.y, BUBBLE_RADIUS, false);
-      }
-    }
+    ctx.drawLine(0, 0, 0.7, 0);
+    ctx.drawLine(0, 2, 0.7, 2);
+    if (center) ctx.drawLine(0, 1, 0.85, 1);
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {
@@ -324,6 +281,13 @@ const XNOR_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Wide shape",
     defaultValue: false,
     description: "Use IEEE/US (curved with bubble) shape instead of IEC/DIN (rectangular)",
+  },
+  {
+    key: "_inverterLabels",
+    type: PropertyType.STRING,
+    label: "Invert inputs",
+    defaultValue: "",
+    description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
   },
   {
     key: "label",

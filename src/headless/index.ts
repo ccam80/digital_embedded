@@ -18,10 +18,36 @@ export {
 } from './types.js';
 
 // ============================================
+// Netlist, diagnostics, and editing types
+// ============================================
+
+export type {
+  Netlist,
+  NetDescriptor,
+  NetPin,
+  ComponentDescriptor,
+  PinDescriptor,
+  Diagnostic,
+  DiagnosticCode,
+  CircuitSpec,
+  ComponentSpec,
+  CircuitPatch,
+  PatchOp,
+  PatchSet,
+  PatchAdd,
+  PatchRemove,
+  PatchConnect,
+  PatchDisconnect,
+  PatchReplace,
+  PatchOptions,
+} from './netlist-types.js';
+
+// ============================================
 // Builder
 // ============================================
 
 export { CircuitBuilder } from './builder.js';
+export { autoLayout, type LayoutOptions } from './auto-layout.js';
 
 // ============================================
 // Core types (re-exported for convenience)

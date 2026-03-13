@@ -324,8 +324,8 @@ describe("Testcase", () => {
       expect(mapping!.convert("MyTest")).toBe("MyTest");
     });
 
-    it("testData attribute maps to testData property", () => {
-      const mapping = TESTCASE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "testData");
+    it("Testdata attribute maps to testData property via testDataConverter", () => {
+      const mapping = TESTCASE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Testdata");
       expect(mapping).not.toBeUndefined();
       expect(mapping!.propertyKey).toBe("testData");
       expect(mapping!.convert("A B | Y\n0 0 0")).toBe("A B | Y\n0 0 0");

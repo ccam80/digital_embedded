@@ -148,10 +148,10 @@ export function drawDefaultShape(
   ctx.setLineWidth(1);
   ctx.drawRect(0, rectY, width, rectH, false);
 
-  // Name label (centered in chip rect, stays upright at 180°)
+  // Name label (below chip rect, stays upright at 180°)
   ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 0.8, weight: "bold" });
-  drawUprightText(ctx, name, width / 2, (height - 1) / 2, { horizontal: "center", vertical: "middle" }, rotation);
+  ctx.setFont({ family: "sans-serif", size: 0.6 });
+  drawUprightText(ctx, name, width / 2, height - 0.3, { horizontal: "center", vertical: "top" }, rotation);
 
   // Pin stubs and labels
   drawPins(ctx, pins, width, 0.5, true, 0.55, rotation);

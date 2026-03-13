@@ -37,11 +37,6 @@ const DEFAULT_HEIGHT = 4;
 // ---------------------------------------------------------------------------
 
 export class RectangleElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _rectWidth: number;
-  private readonly _rectHeight: number;
-  private readonly _lineWidth: number;
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -50,11 +45,6 @@ export class RectangleElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Rectangle", instanceId, position, rotation, mirror, props);
-
-    this._label = props.getOrDefault<string>("label", "");
-    this._rectWidth = props.getOrDefault<number>("rectWidth", DEFAULT_WIDTH);
-    this._rectHeight = props.getOrDefault<number>("rectHeight", DEFAULT_HEIGHT);
-    this._lineWidth = props.getOrDefault<number>("lineWidth", 1);
   }
 
   getPins(): readonly Pin[] {
@@ -62,26 +52,32 @@ export class RectangleElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    const rectWidth = this._properties.getOrDefault<number>("rectWidth", DEFAULT_WIDTH);
+    const rectHeight = this._properties.getOrDefault<number>("rectHeight", DEFAULT_HEIGHT);
     return {
       x: this.position.x,
       y: this.position.y,
-      width: this._rectWidth,
-      height: this._rectHeight,
+      width: rectWidth,
+      height: rectHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
+    const rectWidth = this._properties.getOrDefault<number>("rectWidth", DEFAULT_WIDTH);
+    const rectHeight = this._properties.getOrDefault<number>("rectHeight", DEFAULT_HEIGHT);
+    const lineWidth = this._properties.getOrDefault<number>("lineWidth", 1);
 
     ctx.save();
 
     ctx.setColor("COMPONENT");
-    ctx.setLineWidth(this._lineWidth);
-    ctx.drawRect(0, 0, this._rectWidth, this._rectHeight, false);
+    ctx.setLineWidth(lineWidth);
+    ctx.drawRect(0, 0, rectWidth, rectHeight, false);
 
-    if (this._label.length > 0) {
+    if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(this._label, this._rectWidth / 2, -0.5, {
+      ctx.drawText(label, rectWidth / 2, -0.5, {
         horizontal: "center",
         vertical: "bottom",
       });

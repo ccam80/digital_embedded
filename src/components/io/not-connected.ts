@@ -11,8 +11,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -54,8 +52,6 @@ function buildNotConnectedPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class NotConnectedElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -64,20 +60,10 @@ export class NotConnectedElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("NotConnected", instanceId, position, rotation, mirror, props);
-
-    const decls = buildNotConnectedPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildNotConnectedPinDeclarations(), []);
   }
 
   getBoundingBox(): Rect {

@@ -350,6 +350,11 @@ function buildFacade(registry: ComponentRegistry): SimulatorFacade {
     loadDig: () => { throw new Error('not used'); },
     serialize: () => { throw new Error('not used'); },
     deserialize: () => { throw new Error('not used'); },
+    netlist: () => { throw new Error('not used'); },
+    validate: () => { throw new Error('not used'); },
+    describeComponent: () => { throw new Error('not used'); },
+    build: () => { throw new Error('not used'); },
+    patch: () => { throw new Error('not used'); },
   };
 }
 

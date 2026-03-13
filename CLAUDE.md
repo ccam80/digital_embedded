@@ -73,3 +73,199 @@ Iframe → parent:
   { type: 'digital-loaded' }                       — Circuit file loaded
   { type: 'digital-error', error: '...' }          — Error occurred
 ~~~
+
+## Agent Circuit API (Headless Facade)
+
+A string-addressed facade for LLM agents to inspect and modify circuits without touching wire coordinates or object references.
+
+### CRITICAL: How to Work with Circuits
+
+**NEVER read .dig XML files directly to understand circuit topology.** The XML contains wire coordinates, pixel positions, and rendering metadata — none of which tells you what's connected to what. Reading XML to debug a circuit is like reading a bitmap to understand a spreadsheet.
+
+**ALWAYS use the MCP circuit tools.** The circuit simulator MCP server (`scripts/circuit-mcp-server.ts`) keeps circuits in memory across tool calls. Load once, then inspect/patch/compile without re-parsing.
+
+**MCP tools:**
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `circuit_list` | `{ category? }` | All component types grouped by category |
+| `circuit_describe` | `{ typeName }` | Pin layout, properties (with descriptions, min/max), help text |
+| `circuit_load` | `{ path }` | Handle + summary |
+| `circuit_netlist` | `{ handle }` | Components, nets with connectivity, diagnostics |
+| `circuit_validate` | `{ handle }` | Diagnostics only |
+| `circuit_patch` | `{ handle, ops, scope? }` | Post-patch diagnostics |
+| `circuit_build` | `{ spec }` | Handle + diagnostics |
+| `circuit_compile` | `{ handle }` | Success or structured errors |
+| `circuit_test` | `{ handle, testData? }` | Pass/fail results |
+| `circuit_save` | `{ handle, path }` | Confirmation |
+
+**Discovery workflow:** `circuit_list` (browse types) → `circuit_describe` (learn pins + properties) → `circuit_build` (create)
+
+**Edit workflow:** `circuit_load` → `circuit_netlist` (inspect) → `circuit_patch` (fix) → `circuit_validate` (confirm) → `circuit_compile` (simulate)
+
+A width mismatch that takes 20 minutes to find by reading XML takes one `circuit_validate` call.
+
+### MCP Server Config
+
+Add to `.claude/mcp.json`:
+~~~json
+{
+  "mcpServers": {
+    "circuit-simulator": {
+      "command": "npx",
+      "args": ["tsx", "scripts/circuit-mcp-server.ts"],
+      "cwd": "<project-root>"
+    }
+  }
+}
+~~~
+
+### Read-Modify-Verify Workflow
+
+```
+1. circuit_load({ path })           → handle
+2. circuit_netlist({ handle })      → components, nets, diagnostics
+3. circuit_patch({ handle, ops })   → apply fixes, get new diagnostics
+4. circuit_validate({ handle })     → confirm clean
+5. circuit_compile({ handle })      → simulate / test
+```
+
+### Addressing Scheme
+
+Everything uses the same string addresses — read format equals write format.
+
+| Target | Address format | Example |
+|--------|---------------|---------|
+| Component | `"label"` (user label) or `"instanceId"` (fallback) | `"gate1"` |
+| Pin | `"label:pinLabel"` | `"gate:A"`, `"sysreg:ADD"` |
+| Subcircuit scope | `"parent/child"` prefix | `"cpu/alu:A"` |
+
+If `netlist()` reports `sysreg:ADD [1-bit]`, the patch target is `{ op: 'set', target: 'ADD', props: { Bits: 16 } }`.
+
+### Introspection Methods
+
+- `netlist(circuit)` — returns `Netlist` with components, nets (all connected pins per net), and diagnostics
+- `validate(circuit)` — returns `Diagnostic[]`; convenience wrapper for `netlist().diagnostics`
+- `describeComponent(typeName)` — queries registry for pin layout and configurable properties
+
+### Editing Methods
+
+- `build(spec)` — create a circuit from a declarative `CircuitSpec` (no coordinates required)
+- `patch(circuit, ops, opts?)` — apply one or more `PatchOp` edits using label:pin addressing; returns updated diagnostics
+
+### Patch Operations
+
+| Op | Target | Purpose | Example |
+|----|--------|---------|---------|
+| `set` | component label | Change properties | `{"op":"set","target":"ADD","props":{"Bits":16}}` |
+| `add` | — | Add component + wire it | `{"op":"add","spec":{"id":"U1","type":"And"},"connect":{"A":"in1:out"}}` |
+| `remove` | component label | Remove component + wires | `{"op":"remove","target":"old_gate"}` |
+| `connect` | `from`, `to` pins | Wire two pins | `{"op":"connect","from":"gate:out","to":"output:in"}` |
+| `disconnect` | pin address | Remove wires at pin | `{"op":"disconnect","pin":"gate:out"}` |
+| `replace` | component label | Swap type, keep wires | `{"op":"replace","target":"U1","newType":"Or"}` |
+
+### Building New Circuits (`circuit_build`)
+
+Pass a `CircuitSpec` to `circuit_build`. No coordinates — pure topology.
+
+**CircuitSpec format:**
+
+```
+{
+  "name": "optional circuit name",
+  "components": [ ComponentSpec, ... ],
+  "connections": [ ["srcId:pin", "dstId:pin"], ... ]
+}
+```
+
+**ComponentSpec fields:**
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `id` | yes | Local reference for wiring (only used within this spec, not persisted) |
+| `type` | yes | Registry type name — use `circuit_list` to browse, `circuit_describe` for details |
+| `props` | no | Component properties — use `circuit_describe` to see available keys, types, defaults, and ranges |
+
+**Discovering types and properties:**
+
+1. `circuit_list()` → browse all 229 component types by category (LOGIC, IO, MEMORY, etc.)
+2. `circuit_list({ category: "LOGIC" })` → filter to one category
+3. `circuit_describe({ typeName: "NAnd" })` → get pin labels, property keys with types/defaults/min/max/descriptions
+
+**Property keys** use internal names from `circuit_describe`, not XML attribute names. Common ones:
+
+| Property | Type | Used by | Purpose |
+|----------|------|---------|---------|
+| `label` | STRING | most types | Display label |
+| `bitWidth` | BIT_WIDTH | gates, arithmetic | Signal width (1–32) |
+| `inputCount` | INT | gates | Number of inputs (2–5) |
+| `_inverterLabels` | STRING | gates | Invert specific inputs: `"1,3"` or `"In_1,In_3"` |
+| `Bits` | BIT_WIDTH | In, Out, memory | Signal width |
+| `defaultValue` | INT | In, Const | Initial value |
+
+**Connections** are pairs of `"id:pinLabel"` strings. Pin labels must match the component type's declared pins exactly. Use `circuit_describe({ typeName: "..." })` to look up pin labels before connecting.
+
+**Example** — 2-input AND gate with labeled I/O:
+
+~~~json
+{
+  "components": [
+    { "id": "A",    "type": "In",  "props": { "label": "A", "Bits": 1 } },
+    { "id": "B",    "type": "In",  "props": { "label": "B", "Bits": 1 } },
+    { "id": "gate", "type": "And" },
+    { "id": "Y",    "type": "Out", "props": { "label": "Y" } }
+  ],
+  "connections": [
+    ["A:out", "gate:In_1"],
+    ["B:out", "gate:In_2"],
+    ["gate:out", "Y:in"]
+  ]
+}
+~~~
+
+**Example** — NAND gate with inverted first input (no separate NOT needed):
+
+~~~json
+{ "id": "G1", "type": "NAnd", "props": { "_inverterLabels": "1" } }
+~~~
+
+Circuits are automatically laid out left-to-right using Sugiyama-style graph layout when built via `circuit_build`. The layout engine handles crossing minimization, body-clearance wire routing, and feedback path routing.
+
+Common component types: `In`, `Out`, `And`, `Or`, `XOr`, `Not`, `NAnd`, `NOr`, `FlipflopD`, `FlipflopJK`, `Mux`, `Demux`, `Counter`, `Register`, `ROM`, `RAM`, `Const`, `Clock`, `Splitter`, `Tunnel`.
+
+### Diagnostic Codes
+
+| Code | Meaning |
+|------|---------|
+| `width-mismatch` | Connected pins have different bit widths |
+| `unconnected-input` | Input pin has no driving source |
+| `unconnected-output` | Output pin is not connected to anything |
+| `multi-driver-no-tristate` | Multiple outputs drive the same net without tristate |
+| `missing-subcircuit` | Referenced subcircuit file not found |
+| `label-collision` | Two components share the same label |
+| `combinational-loop` | Combinational path with no register break |
+| `missing-property` | Required component property not set |
+| `unknown-component` | Component type not found in registry |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `scripts/circuit-mcp-server.ts` | MCP server — agent circuit interface |
+| `scripts/circuit-cli.ts` | CLI tool — `list`, `describe`, `build`, `netlist`, `validate`, `compile`, `test` |
+| `src/headless/facade.ts` | `SimulatorFacade` interface |
+| `src/headless/netlist-types.ts` | `Netlist`, `Diagnostic`, `CircuitSpec`, `PatchOp` types |
+| `src/headless/netlist.ts` | `resolveNets()` implementation |
+| `src/headless/address.ts` | Address resolution utilities |
+| `src/headless/builder.ts` | `CircuitBuilder` with `build()` and `patch()` |
+| `src/headless/auto-layout.ts` | Sugiyama-style auto-layout engine for `build()` |
+| `src/headless/types.ts` | `FacadeError`, `TestResults` |
+| `src/headless/index.ts` | Public API exports |
+
+### Design Principles
+
+- **Never read .dig XML for topology** — use `circuit_netlist` / `circuit_validate` MCP tools
+- **Same vocabulary for read and write** — netlist addresses = patch targets
+- **Validate after every edit** — `patch()` returns diagnostics automatically
+- **No object references** — everything is string-addressed for LLM compatibility
+- **Diagnostics, not exceptions** — `validate()` collects all issues instead of throwing on the first

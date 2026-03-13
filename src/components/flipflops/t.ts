@@ -22,9 +22,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -60,7 +57,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     label: "C",
     defaultBitWidth: 1,
     position: { x: 0, y: 0 },
-    isNegatable: false,
+    isNegatable: true,
     isClockCapable: true,
   },
   {
@@ -95,7 +92,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     label: "C",
     defaultBitWidth: 1,
     position: { x: 0, y: 1 },
-    isNegatable: false,
+    isNegatable: true,
     isClockCapable: true,
   },
   {
@@ -121,9 +118,6 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class TElement extends AbstractCircuitElement {
-  private readonly _withEnable: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -132,24 +126,17 @@ export class TElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("T_FF", instanceId, position, rotation, mirror, props);
-    this._withEnable = props.getOrDefault<boolean>("withEnable", false);
-    const decls = this._withEnable ? T_FF_PINS_WITH_ENABLE : T_FF_PINS_NO_ENABLE;
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const withEnable = this._properties.getOrDefault<boolean>("withEnable", true);
+    const decls = withEnable ? T_FF_PINS_WITH_ENABLE : T_FF_PINS_NO_ENABLE;
+    return this.derivePins(decls, ["C"]);
   }
 
   getBoundingBox(): Rect {
-    const h = this._withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
+    const withEnable = this._properties.getOrDefault<boolean>("withEnable", true);
+    const h = withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
     return {
       x: this.position.x,
       y: this.position.y - 0.5,
@@ -159,7 +146,8 @@ export class TElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const h = this._withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
+    const withEnable = this._properties.getOrDefault<boolean>("withEnable", true);
+    const h = withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
@@ -171,7 +159,7 @@ export class TElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
 
-    if (this._withEnable) {
+    if (withEnable) {
       ctx.drawText("T", 0.6, 0, { horizontal: "left", vertical: "middle" });
       ctx.drawText("C", 0.6, 1, { horizontal: "left", vertical: "middle" });
       ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
@@ -279,7 +267,7 @@ const T_FF_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "withEnable",
     type: PropertyType.BOOLEAN,
     label: "With Enable",
-    defaultValue: false,
+    defaultValue: true,
     description: "Add T (toggle enable) input pin",
   },
   {
@@ -305,7 +293,7 @@ export const TDefinition: ComponentDefinition = {
   factory: tFactory,
   executeFn: executeT,
   sampleFn: sampleT,
-  pinLayout: T_FF_PINS_NO_ENABLE,
+  pinLayout: T_FF_PINS_WITH_ENABLE,
   propertyDefs: T_FF_PROPERTY_DEFS,
   attributeMap: T_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,

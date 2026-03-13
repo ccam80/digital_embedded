@@ -84,13 +84,12 @@ export function makePin(
   position: Point,
   inverterConfig: InverterConfig,
   clockConfig: ClockConfig,
-  bitWidth?: number,
 ): Pin {
   return {
     direction: decl.direction,
     position,
     label: decl.label,
-    bitWidth: bitWidth ?? decl.defaultBitWidth,
+    bitWidth: decl.defaultBitWidth,
     isNegated: decl.isNegatable && isPinInverted(inverterConfig, decl.label),
     isClock: decl.isClockCapable && isPinClock(clockConfig, decl.label),
   };
@@ -178,7 +177,6 @@ export function resolvePins(
   rotation: Rotation,
   inverterConfig: InverterConfig,
   clockConfig: ClockConfig,
-  bitWidth?: number,
 ): Pin[] {
   return declarations.map((decl) => {
     // Java GenericShape: inverted input pins shift 1 grid unit left (dx = -SIZE)
@@ -191,7 +189,7 @@ export function resolvePins(
       pos = { x: pos.x - 1, y: pos.y };
     }
     const rotated = rotatePoint(pos, rotation);
-    return makePin(decl, rotated, inverterConfig, clockConfig, bitWidth);
+    return makePin(decl, rotated, inverterConfig, clockConfig);
   });
 }
 

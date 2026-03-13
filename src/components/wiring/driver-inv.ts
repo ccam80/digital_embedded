@@ -70,10 +70,6 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
 // ---------------------------------------------------------------------------
 
 export class DriverInvSelElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _flipSelPos: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -82,23 +78,19 @@ export class DriverInvSelElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("DriverInvSel", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
-
-    const decls = buildDriverInvPinDeclarations(this._bitWidth, this._flipSelPos);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig(["sel"]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+    return resolvePins(
+      buildDriverInvPinDeclarations(bitWidth, flipSelPos),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig(["sel"]),
+      { clockPins: new Set<string>() },
+      bitWidth,
+    );
   }
 
   getBoundingBox(): Rect {
@@ -111,6 +103,8 @@ export class DriverInvSelElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+
     ctx.save();
 
     // Triangle body — same as Driver
@@ -139,7 +133,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
     );
 
     // Sel pin stem with inversion bubble
-    const selY = this._flipSelPos ? 1 : -1;
+    const selY = flipSelPos ? 1 : -1;
     // Java: drawCircle from (-SIZE2+4, ±SIZE) to (SIZE2-4, ±8)
     // Grid: circle centre at (0, ±0.7), radius ≈ 0.3
     const bubbleCy = selY > 0 ? 0.7 : -0.7;

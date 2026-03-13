@@ -17,9 +17,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -68,7 +65,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     label: "C",
     defaultBitWidth: 1,
     position: { x: 0, y: 2 },
-    isNegatable: false,
+    isNegatable: true,
     isClockCapable: true,
   },
   {
@@ -110,8 +107,6 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class JKAsyncElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -120,18 +115,10 @@ export class JKAsyncElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("JK_FF_AS", instanceId, position, rotation, mirror, props);
-    this._pins = resolvePins(
-      JK_FF_AS_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(JK_FF_AS_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {

@@ -24,9 +24,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -114,10 +111,6 @@ const PROGRAM_COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class ProgramCounterElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _isProgramCounter: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -126,20 +119,11 @@ export class ProgramCounterElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("ProgramCounter", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
-    this._isProgramCounter = props.getOrDefault<boolean>("isProgramCounter", true);
-    this._pins = resolvePins(
-      PROGRAM_COUNTER_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
+    return this.derivePins(PROGRAM_COUNTER_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {
@@ -182,7 +166,7 @@ export class ProgramCounterElement extends AbstractCircuitElement {
   }
 
   get isProgramCounter(): boolean {
-    return this._isProgramCounter;
+    return this._properties.getOrDefault<boolean>("isProgramCounter", true);
   }
 
   getHelpText(): string {

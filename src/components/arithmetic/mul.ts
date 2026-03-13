@@ -24,8 +24,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -81,10 +79,6 @@ function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class MulElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _signed: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -93,20 +87,11 @@ export class MulElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Mul", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._signed = props.getOrDefault<boolean>("signed", false);
-    const decls = buildMulPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildMulPinDeclarations(bitWidth), []);
   }
 
   getBoundingBox(): Rect {
@@ -114,6 +99,7 @@ export class MulElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const signed = this._properties.getOrDefault<boolean>("signed", false);
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
@@ -125,7 +111,7 @@ export class MulElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
     ctx.drawText(
-      this._signed ? "A*B" : "*",
+      signed ? "A*B" : "*",
       COMP_WIDTH / 2,
       -0.5 + COMP_HEIGHT / 2,
       { horizontal: "center", vertical: "middle" },

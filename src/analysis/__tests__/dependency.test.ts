@@ -155,6 +155,11 @@ function buildFacade(registry: ComponentRegistry): SimulatorFacade {
     loadDig: () => { throw new Error('not implemented'); },
     serialize: () => { throw new Error('not implemented'); },
     deserialize: () => { throw new Error('not implemented'); },
+    netlist: () => { throw new Error('not implemented'); },
+    validate: () => { throw new Error('not implemented'); },
+    describeComponent: () => { throw new Error('not implemented'); },
+    build: () => { throw new Error('not implemented'); },
+    patch: () => { throw new Error('not implemented'); },
   };
 }
 

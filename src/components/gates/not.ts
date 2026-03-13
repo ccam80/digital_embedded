@@ -15,9 +15,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  createInverterConfig,
   gateBodyMetrics,
-  resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
@@ -59,10 +57,6 @@ function buildPinDeclarations(bitWidth: number, wideShape: boolean = true): PinD
 // ---------------------------------------------------------------------------
 
 export class NotElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _wideShape: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -71,27 +65,17 @@ export class NotElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Not", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
-
-    const decls = buildPinDeclarations(this._bitWidth, this._wideShape);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const decls = buildPinDeclarations(bitWidth, wideShape);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const wide = this._wideShape;
+    const wide = this._properties.getOrDefault<boolean>("wideShape", false);
     return {
       x: this.position.x,
       y: this.position.y - (wide ? 1.1 : 0.6),
@@ -101,9 +85,10 @@ export class NotElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     ctx.save();
-    this._drawIEEE(ctx);
-    this._drawLabel(ctx, this._wideShape ? 3 : 2);
+    this._drawIEEE(ctx, wideShape);
+    this._drawLabel(ctx, wideShape ? 3 : 2);
     ctx.restore();
   }
 
@@ -113,8 +98,7 @@ export class NotElement extends AbstractCircuitElement {
    * Narrow: triangle (0.05,-0.6)→(0.95,0)→(0.05,0.6), bubble at (1.5,0) r=0.45.
    * Wide: triangle (0.05,-1.1)→(1.95,0)→(0.05,1.1), bubble at (2.5,0) r=0.45.
    */
-  private _drawIEEE(ctx: RenderContext): void {
-    const wide = this._wideShape;
+  private _drawIEEE(ctx: RenderContext, wide: boolean): void {
     const BUBBLE_RADIUS = 0.45;
 
     const triTipX = wide ? 1.95 : 0.95;

@@ -170,31 +170,54 @@ export function distancePointToSegment(p: Point, a: Point, b: Point): number {
 
 /**
  * Compute the axis-aligned bounding box of an element in world coordinates,
- * accounting for rotation. The renderer does translate(pos) then rotate(rot),
- * so the local rect (0,0,w,h) corners are rotated around the element origin.
+ * accounting for mirror and rotation.
+ *
+ * The renderer applies transforms as: translate(pos) → rotate(rot) → scale(-1,1).
+ * Canvas transforms compose right-to-left, so the effective order on local
+ * coordinates is: mirror → rotate → translate.
+ *
+ * getBoundingBox() returns world coordinates (includes element position),
+ * so we extract the local offset, apply mirror+rotation, then translate back.
  *
  * Rotation values: 0 = 0°, 1 = 90° CW, 2 = 180°, 3 = 270° CW.
  */
 export function worldBoundingBox(el: CircuitElement): Rect {
   const bb = el.getBoundingBox();
-  const w = bb.width;
-  const h = bb.height;
   const px = el.position.x;
   const py = el.position.y;
+
+  // Local bounding box offset from element origin
+  let lx = bb.x - px;
+  let ly = bb.y - py;
+  const w = bb.width;
+  const h = bb.height;
+
+  // Mirror is applied before rotation (canvas: translate * rotate * scale(-1,1) * local)
+  if (el.mirror) {
+    lx = -(lx + w);
+  }
+
   const rot = el.rotation as Rotation;
+  let rx: number, ry: number, rw: number, rh: number;
 
   switch (rot) {
-    case 0: // No rotation
-      return { x: px, y: py, width: w, height: h };
-    case 1: // 90° CW: (x,y) -> (y, -x)
-      return { x: px, y: py - w, width: h, height: w };
-    case 2: // 180°: (x,y) -> (-x, -y)
-      return { x: px - w, y: py - h, width: w, height: h };
-    case 3: // 270° CW: (x,y) -> (-y, x)
-      return { x: px - h, y: py, width: h, height: w };
+    case 0:
+      rx = lx; ry = ly; rw = w; rh = h;
+      break;
+    case 1: // 90° CW: (x,y) → (y, -x)
+      rx = ly; ry = -(lx + w); rw = h; rh = w;
+      break;
+    case 2: // 180°: (x,y) → (-x, -y)
+      rx = -(lx + w); ry = -(ly + h); rw = w; rh = h;
+      break;
+    case 3: // 270° CW: (x,y) → (-y, x)
+      rx = -(ly + h); ry = lx; rw = h; rh = w;
+      break;
     default:
-      return { x: px, y: py, width: w, height: h };
+      rx = lx; ry = ly; rw = w; rh = h;
   }
+
+  return { x: px + rx, y: py + ry, width: rw, height: rh };
 }
 
 // ---------------------------------------------------------------------------

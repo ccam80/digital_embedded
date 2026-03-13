@@ -25,8 +25,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -98,9 +96,6 @@ export function buildPriorityEncoderPinDeclarations(
 // ---------------------------------------------------------------------------
 
 export class PriorityEncoderElement extends AbstractCircuitElement {
-  private readonly _selectorBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -109,25 +104,16 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("PriorityEncoder", instanceId, position, rotation, mirror, props);
-
-    this._selectorBits = props.getOrDefault<number>("selectorBits", 2);
-
-    const decls = buildPriorityEncoderPinDeclarations(this._selectorBits);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    return this.derivePins(buildPriorityEncoderPinDeclarations(selectorBits));
   }
 
   getBoundingBox(): Rect {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const inputCount = 1 << selectorBits;
     const h = componentHeight(inputCount);
     return {
       x: this.position.x,
@@ -138,7 +124,8 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const inputCount = 1 << selectorBits;
     const h = componentHeight(inputCount);
 
     ctx.save();
@@ -160,7 +147,8 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const inputCount = 1 << selectorBits;
     return (
       `PriorityEncoder — ${inputCount} inputs, outputs index of highest-priority active input.\n` +
       "num: index of highest active input (last active wins).\n" +

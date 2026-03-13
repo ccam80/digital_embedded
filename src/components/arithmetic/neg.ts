@@ -13,9 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  createInverterConfig,
   gateBodyMetrics,
-  resolvePins,
   standardGatePinLayout,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -35,9 +33,6 @@ function buildNegPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 export class NegElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -46,12 +41,12 @@ export class NegElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Neg", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    const decls = buildNegPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });
   }
 
-  getPins(): readonly Pin[] { return this._pins; }
+  getPins(): readonly Pin[] {
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildNegPinDeclarations(bitWidth), []);
+  }
 
   getBoundingBox(): Rect {
     const { topBorder, bodyHeight } = gateBodyMetrics(1);

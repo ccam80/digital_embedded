@@ -365,6 +365,13 @@
     }
     #status-dismiss:hover { opacity: 1; }
     #status-bar.error #status-dismiss { display: inline; }
+    #status-coords {
+      margin-left: auto;
+      opacity: 0.6;
+      font-family: monospace;
+      font-size: 10px;
+      white-space: nowrap;
+    }
     /* ---- Palette ---- */
     .palette-search {
       padding: 4px 6px;
@@ -476,6 +483,11 @@
           <div class="menu-action" id="btn-new">New<span class="menu-shortcut"></span></div>
           <div class="menu-action" id="btn-open">Open<span class="menu-shortcut">Ctrl+O</span></div>
           <div class="menu-action" id="btn-open-folder">Open Folder...</div>
+          <div class="menu-submenu" id="browse-folder-menu" style="display:none">
+            <div class="menu-action">Browse Folder</div>
+            <div class="menu-dropdown" id="folder-submenu"></div>
+          </div>
+          <div class="menu-action" id="btn-close-folder" style="display:none">Close Folder</div>
           <div class="menu-separator"></div>
           <div class="menu-action" id="btn-save">Save<span class="menu-shortcut">Ctrl+S</span></div>
           <div class="menu-action" id="btn-save-as">Save As...</div>
@@ -533,6 +545,7 @@
       <span class="status-icon"></span>
       <span id="status-message">Ready</span>
       <button id="status-dismiss" title="Dismiss">&times;</button>
+      <span id="status-coords"></span>
     </div>
   </div>
   <input id="file-input" type="file" accept=".dig,.digb,.json,.digj" style="display:none" />

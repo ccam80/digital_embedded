@@ -129,6 +129,7 @@ function buildGenericShapePins(
   width: number,
   invert: boolean,
   invertedLabels: ReadonlySet<string>,
+  inputLabels?: readonly string[],
 ): JavaPinRef[] {
   const symmetric = outputCount === 1;
   const even = inputCount > 0 && (inputCount & 1) === 0;
@@ -138,7 +139,7 @@ function buildGenericShapePins(
 
   for (let i = 0; i < inputCount; i++) {
     const correct = (symmetric && even && i >= inputCount / 2) ? 1 : 0;
-    const label = `In_${i + 1}`;
+    const label = inputLabels?.[i] ?? `In_${i + 1}`;
     const dx = invertedLabels.has(label) ? -1 : 0;
     pins.push({ label, x: dx, y: i + correct });
   }
@@ -404,37 +405,38 @@ function getJavaPinPositions(
 
     case "D_FF":
       // Inputs: D, C; Outputs: Q, ~Q
-      return buildGenericShapePins(2, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 2, 3, false, invertedLabels, ["D", "C"]);
 
     case "JK_FF":
       // Inputs: J, C, K; Outputs: Q, ~Q
-      return buildGenericShapePins(3, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(3, 2, 3, false, invertedLabels, ["J", "C", "K"]);
 
     case "RS_FF":
       // Inputs: S, C, R; Outputs: Q, ~Q
-      return buildGenericShapePins(3, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(3, 2, 3, false, invertedLabels, ["S", "C", "R"]);
 
     case "T_FF": {
-      // With enable: T, C; Without: C only
-      const withEnable = !!(props["withEnable"] ?? false);
-      return buildGenericShapePins(withEnable ? 2 : 1, 2, 3, false, invertedLabels);
+      // With enable: T, C; Without: C only — Java default is true
+      const withEnable = !!(props["withEnable"] ?? true);
+      return buildGenericShapePins(withEnable ? 2 : 1, 2, 3, false, invertedLabels,
+        withEnable ? ["T", "C"] : ["C"]);
     }
 
     case "D_FF_AS":
       // Inputs: Set, D, C, Clr; Outputs: Q, ~Q
-      return buildGenericShapePins(4, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(4, 2, 3, false, invertedLabels, ["Set", "D", "C", "Clr"]);
 
     case "JK_FF_AS":
       // Inputs: Set, J, C, K, Clr; Outputs: Q, ~Q
-      return buildGenericShapePins(5, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(5, 2, 3, false, invertedLabels, ["Set", "J", "C", "K", "Clr"]);
 
     case "RS_FF_AS":
       // Inputs: S, R; Outputs: Q, ~Q (fully async, no clock)
-      return buildGenericShapePins(2, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 2, 3, false, invertedLabels, ["S", "R"]);
 
     case "Monoflop":
       // Inputs: C, ~Q; Outputs: Q, ~Q
-      return buildGenericShapePins(2, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 2, 3, false, invertedLabels, ["C", "~Q"]);
 
     // ===================================================================
     // Arithmetic — GenericShape, width=3
@@ -443,15 +445,15 @@ function getJavaPinPositions(
     case "Add":
     case "Sub":
       // Inputs: a, b, c_i; Outputs: s, c_o
-      return buildGenericShapePins(3, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(3, 2, 3, false, invertedLabels, ["a", "b", "c_i"]);
 
     case "Comparator":
       // Inputs: a, b; Outputs: >, =, <
-      return buildGenericShapePins(2, 3, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 3, 3, false, invertedLabels, ["a", "b"]);
 
     case "Mul":
       // Inputs: a, b; Output: mul (Java: width=3, showPinLabels=true)
-      return buildGenericShapePins(2, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 1, 3, false, invertedLabels, ["a", "b"]);
 
     // ===================================================================
     // Memory — GenericShape, width=3
@@ -459,35 +461,35 @@ function getJavaPinPositions(
 
     case "Register":
       // Inputs: D, C, en; Output: Q (symmetric, offs=1)
-      return buildGenericShapePins(3, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(3, 1, 3, false, invertedLabels, ["D", "C", "en"]);
 
     case "Counter":
       // Inputs: en, C, clr; Outputs: out, ovf
-      return buildGenericShapePins(3, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(3, 2, 3, false, invertedLabels, ["en", "C", "clr"]);
 
     case "CounterPreset":
       // Inputs: en, C, dir, in, ld, clr; Outputs: out, ovf
-      return buildGenericShapePins(6, 2, 3, false, invertedLabels);
+      return buildGenericShapePins(6, 2, 3, false, invertedLabels, ["en", "C", "dir", "in", "ld", "clr"]);
 
     case "ROM":
       // Inputs: A, sel; Output: D (symmetric, offs=1)
-      return buildGenericShapePins(2, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(2, 1, 3, false, invertedLabels, ["A", "sel"]);
 
     case "RAMSinglePort":
       // Inputs: A, str, C, ld; Output: D (symmetric, offs=2)
-      return buildGenericShapePins(4, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(4, 1, 3, false, invertedLabels, ["A", "str", "C", "ld"]);
 
     case "RAMDualPort":
       // Inputs: A, Din, str, C, ld; Output: D (symmetric, offs=2)
-      return buildGenericShapePins(5, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(5, 1, 3, false, invertedLabels, ["A", "Din", "str", "C", "ld"]);
 
     case "EEPROM":
       // Inputs: A, CS, WE, OE, D_in; Output: D (symmetric, offs=2)
-      return buildGenericShapePins(5, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(5, 1, 3, false, invertedLabels, ["A", "CS", "WE", "OE", "D_in"]);
 
     case "EEPROMDualPort":
       // Inputs: A, CS, WE, OE, D_in, ld; Output: D (symmetric, offs=3)
-      return buildGenericShapePins(6, 1, 3, false, invertedLabels);
+      return buildGenericShapePins(6, 1, 3, false, invertedLabels, ["A", "CS", "WE", "OE", "D_in", "ld"]);
 
     // ===================================================================
     // Wiring — specialized shapes already covered above; add Decoder

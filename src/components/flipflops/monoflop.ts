@@ -25,9 +25,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  createClockConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -60,7 +57,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
     label: "C",
     defaultBitWidth: 1,
     position: { x: 0, y: 0 },
-    isNegatable: false,
+    isNegatable: true,
     isClockCapable: true,
   },
   {
@@ -94,8 +91,6 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class MonoflopElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -104,18 +99,10 @@ export class MonoflopElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Monoflop", instanceId, position, rotation, mirror, props);
-    this._pins = resolvePins(
-      MONOFLOP_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig(["C"]),
-      1,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(MONOFLOP_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {

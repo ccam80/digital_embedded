@@ -4,7 +4,7 @@ These instructions supplement `spec/plan.md`. All implementation agents must rea
 
 ## Porting Approach: Informed Port, Not Straight Port
 
-Read the Java source to understand *what it does and why*, then write idiomatic TypeScript that preserves the semantics but uses TS-native patterns. Do not translate Java line-by-line.
+Read the Java source to understand *what it does and why*, then write idiomatic TypeScript that preserves the semantics but uses TS-native patterns. Do not translate Java line-by-line.df
 
 ### TypeScript Idiom Guide
 

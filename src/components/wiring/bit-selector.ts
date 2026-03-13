@@ -19,8 +19,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -82,9 +80,6 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
 // ---------------------------------------------------------------------------
 
 export class BitSelectorElement extends AbstractCircuitElement {
-  private readonly _selectorBits: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -93,21 +88,11 @@ export class BitSelectorElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("BitSelector", instanceId, position, rotation, mirror, props);
-
-    this._selectorBits = props.getOrDefault<number>("selectorBits", 3);
-
-    const decls = buildBitSelectorPinDeclarations(this._selectorBits);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 3);
+    return this.derivePins(buildBitSelectorPinDeclarations(selectorBits));
   }
 
   getBoundingBox(): Rect {
@@ -140,11 +125,12 @@ export class BitSelectorElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const dataBits = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 3);
+    const dataBits = 1 << selectorBits;
     return (
       `BitSelector — selects a single bit from a ${dataBits}-bit input.\n` +
       `Output = (input >> selector) & 1.\n` +
-      `Selector bits: ${this._selectorBits}.`
+      `Selector bits: ${selectorBits}.`
     );
   }
 }

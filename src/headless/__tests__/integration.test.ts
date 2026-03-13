@@ -428,8 +428,7 @@ describe("Integration", () => {
   // oscillatingCircuitDetected
   // -------------------------------------------------------------------------
 
-  it.skip("oscillatingCircuitDetected — ring oscillator throws OscillationError", () => {
-    // Skip: requires full engine compilation pipeline with feedback/SCC handling
+  it("oscillatingCircuitDetected — ring oscillator throws OscillationError", () => {
     const registry = buildRegistry();
     const runner = new SimulationRunner(registry);
     const circuit = buildRingOscillator();

@@ -198,26 +198,80 @@ export class HttpResolver implements FileResolver {
 export class NodeResolver implements FileResolver {
   private readonly _basePath: string;
   private readonly _readFileFn: (path: string) => Promise<string>;
+  private readonly _readdirFn?: (path: string) => Promise<string[]>;
+  /** Lazily populated: subdirectory names under _basePath. */
+  private _subdirs: string[] | null = null;
 
   /**
    * @param basePath    Directory path, e.g. "circuits/" or "./test-fixtures/"
    * @param readFileFn  Async function that reads a file path and returns its content
+   * @param readdirFn   Optional async function that lists entries in a directory.
+   *                    When provided, the resolver searches subdirectories if the
+   *                    file is not found in the base directory (matching Digital's
+   *                    subcircuit search behavior).
    */
   constructor(
     basePath: string,
     readFileFn: (path: string) => Promise<string>,
+    readdirFn?: (path: string) => Promise<string[]>,
   ) {
     this._basePath = basePath;
     this._readFileFn = readFileFn;
+    this._readdirFn = readdirFn;
   }
 
   async resolve(name: string): Promise<string> {
     const suffix = name.endsWith('.dig') ? '' : '.dig';
-    const path = `${this._basePath}${name}${suffix}`;
+    const fileName = `${name}${suffix}`;
+
+    // Try base directory first
     try {
-      return await this._readFileFn(path);
+      return await this._readFileFn(`${this._basePath}${fileName}`);
     } catch {
-      throw new ResolverNotFoundError(name);
+      // fall through to subdirectory search
+    }
+
+    // Search subdirectories if readdirFn was provided
+    if (this._readdirFn) {
+      if (this._subdirs === null) {
+        this._subdirs = await this._discoverSubdirs();
+      }
+      for (const subdir of this._subdirs) {
+        try {
+          return await this._readFileFn(`${this._basePath}${subdir}/${fileName}`);
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    throw new ResolverNotFoundError(name);
+  }
+
+  /**
+   * Discover immediate subdirectories under _basePath.
+   * Filters to directories by attempting to readdir each entry.
+   */
+  private async _discoverSubdirs(): Promise<string[]> {
+    if (!this._readdirFn) return [];
+    try {
+      const entries = await this._readdirFn(this._basePath);
+      const dirs: string[] = [];
+      for (const entry of entries) {
+        // Heuristic: if entry has no extension, try it as a directory
+        // by attempting to list its contents. This avoids requiring stat().
+        if (!entry.includes('.')) {
+          try {
+            await this._readdirFn(`${this._basePath}${entry}`);
+            dirs.push(entry);
+          } catch {
+            // not a directory or not accessible
+          }
+        }
+      }
+      return dirs;
+    } catch {
+      return [];
     }
   }
 }

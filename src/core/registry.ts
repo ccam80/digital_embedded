@@ -229,6 +229,58 @@ export class ComponentRegistry {
   }
 
   /**
+   * Update an existing component definition, preserving its typeId.
+   *
+   * Used when a subcircuit .dig file is reloaded or modified. The existing
+   * typeId is retained so that compiled models referencing the old typeId
+   * remain valid. All other fields are replaced.
+   *
+   * Throws if the name is not already registered.
+   */
+  update(def: ComponentDefinition): void {
+    const existing = this._byName.get(def.name);
+    if (existing === undefined) {
+      throw new Error(`ComponentRegistry: "${def.name}" is not registered — use register()`);
+    }
+
+    const updated: ComponentDefinition = { ...def, typeId: existing.typeId };
+    this._byName.set(updated.name, updated);
+
+    // Update category list entry
+    if (existing.category !== updated.category) {
+      // Category changed — move between lists
+      const oldList = this._byCategory.get(existing.category);
+      if (oldList) {
+        const idx = oldList.indexOf(existing);
+        if (idx >= 0) oldList.splice(idx, 1);
+      }
+      let newList = this._byCategory.get(updated.category);
+      if (!newList) { newList = []; this._byCategory.set(updated.category, newList); }
+      newList.push(updated);
+    } else {
+      const list = this._byCategory.get(updated.category);
+      if (list) {
+        const idx = list.indexOf(existing);
+        if (idx >= 0) list[idx] = updated;
+      }
+    }
+  }
+
+  /**
+   * Register a new definition, or update an existing one.
+   *
+   * Convenience method for subcircuit loading where the caller doesn't know
+   * (or care) whether the name was previously registered.
+   */
+  registerOrUpdate(def: ComponentDefinition): void {
+    if (this._byName.has(def.name)) {
+      this.update(def);
+    } else {
+      this.register(def);
+    }
+  }
+
+  /**
    * Look up a component definition by its type name.
    * Returns undefined when the name is not registered.
    */

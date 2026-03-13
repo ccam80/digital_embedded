@@ -1,0 +1,111 @@
+
+> digital-sim@0.1.0 test
+> vitest run fixture-audit.test.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/fixtures/__tests__/fixture-audit.test.ts [2m([22m[2m612 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 620[2mms[22m[39m
+[31m   [31m×[31m fixture audit[2m > [22m'Sim/Processor/cpu_final.dig'[2m > [22mwire endpoints meet pins or junctions[90m 7[2mms[22m[31m[39m
+[31m     → 3 orphan wire endpoint(s): (-38, 48), (-38, 36), (-38, 44)[39m
+[31m   [31m×[31m fixture audit[2m > [22m'Sim/TC.dig'[2m > [22mwire endpoints meet pins or junctions[90m 1[2mms[22m[31m[39m
+[31m     → 1 orphan wire endpoint(s): (135, 18)[39m
+[31m   [31m×[31m fixture audit[2m > [22m'Sim/TC_testing.dig'[2m > [22mwire endpoints meet pins or junctions[90m 1[2mms[22m[31m[39m
+[31m     → 1 orphan wire endpoint(s): (135, 18)[39m
+[31m   [31m×[31m fixture audit[2m > [22m'mod3/Sim/cpu_layout_final.dig'[2m > [22mtunnel pins connected[90m 1[2mms[22m[31m[39m
+[31m     → 25 disconnected tunnel(s):
+Tunnel "" @ (-31, 34)
+Tunnel "" @ (-31, 35)
+Tunnel "" @ (-31, 36)
+Tunnel "" @ (-31, 37)
+Tunnel "" @ (-43, 34)
+Tunnel "" @ (-31, 39)
+Tunnel "" @ (-31, 38)
+Tunnel "" @ (-31, 40)
+Tunnel "" @ (-31, 41)
+Tunnel "" @ (-31, 42)
+Tunnel "" @ (-31, 44)
+Tunnel "" @ (-31, 43)
+Tunnel "" @ (-31, 45)
+Tunnel "" @ (-31, 46)
+Tunnel "" @ (-31, 48)
+Tunnel "" @ (-32, 49)
+Tunnel "" @ (-33, 49)
+Tunnel "" @ (-31, 47)
+Tunnel "" @ (-34, 49)
+Tunnel "" @ (-35, 49)
+Tunnel "" @ (-36, 49)
+Tunnel "" @ (-37, 49)
+Tunnel "" @ (-38, 49)
+Tunnel "" @ (-39, 49)
+Tunnel "" @ (-40, 49)[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 4 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/fixtures/__tests__/fixture-audit.test.ts[2m > [22mfixture audit[2m > [22m'Sim/Processor/cpu_final.dig'[2m > [22mwire endpoints meet pins or junctions
+[31m[1mError[22m: 3 orphan wire endpoint(s): (-38, 48), (-38, 36), (-38, 44)[39m
+[36m [2m❯[22m src/fixtures/__tests__/fixture-audit.test.ts:[2m288:15[22m[39m
+    [90m286| [39m      [35mconst[39m unique [33m=[39m [[33m...[39m[35mnew[39m [33mSet[39m(orphans)][33m;[39m
+    [90m287| [39m      [35mif[39m (unique[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m288| [39m        [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   | [39m              [31m^[39m
+    [90m289| [39m          [32m`[39m[36m${[39munique[33m.[39mlength[36m}[39m[32m orphan wire endpoint(s): [39m[36m${[39munique[33m.[39m[34mslice[39m([34m0[39m[33m,[39m…
+    [90m290| [39m        )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/fixtures/__tests__/fixture-audit.test.ts[2m > [22mfixture audit[2m > [22m'Sim/TC.dig'[2m > [22mwire endpoints meet pins or junctions
+[31m[1m[7m FAIL [27m[22m[39m src/fixtures/__tests__/fixture-audit.test.ts[2m > [22mfixture audit[2m > [22m'Sim/TC_testing.dig'[2m > [22mwire endpoints meet pins or junctions
+[31m[1mError[22m: 1 orphan wire endpoint(s): (135, 18)[39m
+[36m [2m❯[22m src/fixtures/__tests__/fixture-audit.test.ts:[2m288:15[22m[39m
+    [90m286| [39m      [35mconst[39m unique [33m=[39m [[33m...[39m[35mnew[39m [33mSet[39m(orphans)][33m;[39m
+    [90m287| [39m      [35mif[39m (unique[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m288| [39m        [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   | [39m              [31m^[39m
+    [90m289| [39m          [32m`[39m[36m${[39munique[33m.[39mlength[36m}[39m[32m orphan wire endpoint(s): [39m[36m${[39munique[33m.[39m[34mslice[39m([34m0[39m[33m,[39m…
+    [90m290| [39m        )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/fixtures/__tests__/fixture-audit.test.ts[2m > [22mfixture audit[2m > [22m'mod3/Sim/cpu_layout_final.dig'[2m > [22mtunnel pins connected
+[31m[1mError[22m: 25 disconnected tunnel(s):
+Tunnel "" @ (-31, 34)
+Tunnel "" @ (-31, 35)
+Tunnel "" @ (-31, 36)
+Tunnel "" @ (-31, 37)
+Tunnel "" @ (-43, 34)
+Tunnel "" @ (-31, 39)
+Tunnel "" @ (-31, 38)
+Tunnel "" @ (-31, 40)
+Tunnel "" @ (-31, 41)
+Tunnel "" @ (-31, 42)
+Tunnel "" @ (-31, 44)
+Tunnel "" @ (-31, 43)
+Tunnel "" @ (-31, 45)
+Tunnel "" @ (-31, 46)
+Tunnel "" @ (-31, 48)
+Tunnel "" @ (-32, 49)
+Tunnel "" @ (-33, 49)
+Tunnel "" @ (-31, 47)
+Tunnel "" @ (-34, 49)
+Tunnel "" @ (-35, 49)
+Tunnel "" @ (-36, 49)
+Tunnel "" @ (-37, 49)
+Tunnel "" @ (-38, 49)
+Tunnel "" @ (-39, 49)
+Tunnel "" @ (-40, 49)[39m
+[36m [2m❯[22m src/fixtures/__tests__/fixture-audit.test.ts:[2m480:15[22m[39m
+    [90m478| [39m
+    [90m479| [39m      [35mif[39m (disconnected[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m480| [39m        [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   | [39m              [31m^[39m
+    [90m481| [39m          [32m`[39m[36m${[39mdisconnected[33m.[39mlength[36m}[39m[32m disconnected tunnel(s):\n[39m[36m${[39mdisconnec…
+    [90m482| [39m        )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m608 passed[39m[22m[90m (612)[39m
+[2m   Start at [22m 22:23:37
+[2m   Duration [22m 2.63s[2m (transform 844ms, setup 0ms, collect 1.28s, tests 620ms, environment 0ms, prepare 238ms)[22m
+

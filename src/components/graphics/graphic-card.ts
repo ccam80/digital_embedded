@@ -151,13 +151,6 @@ function buildGraphicCardPinDeclarations(
 // ---------------------------------------------------------------------------
 
 export class GraphicCardElement extends AbstractCircuitElement {
-  private readonly _dataBits: number;
-  private readonly _graphicWidth: number;
-  private readonly _graphicHeight: number;
-  private readonly _bankSize: number;
-  private readonly _addrBits: number;
-  private readonly _pins: readonly Pin[];
-
   /**
    * Flat memory array holding both banks:
    *   bank 0: indices [0, bankSize)
@@ -180,48 +173,33 @@ export class GraphicCardElement extends AbstractCircuitElement {
   ) {
     super("GraphicCard", instanceId, position, rotation, mirror, props);
 
-    this._dataBits = props.getOrDefault<number>("dataBits", DEFAULT_DATA_BITS);
-    this._graphicWidth = props.getOrDefault<number>("graphicWidth", DEFAULT_GRAPHIC_WIDTH);
-    this._graphicHeight = props.getOrDefault<number>("graphicHeight", DEFAULT_GRAPHIC_HEIGHT);
-    this._bankSize = this._graphicWidth * this._graphicHeight;
-    this._addrBits = computeAddrBits(this._bankSize * 2);
+    const graphicWidth = props.getOrDefault<number>("graphicWidth", DEFAULT_GRAPHIC_WIDTH);
+    const graphicHeight = props.getOrDefault<number>("graphicHeight", DEFAULT_GRAPHIC_HEIGHT);
+    const bankSize = graphicWidth * graphicHeight;
 
-    this._memory = new Uint32Array(this._bankSize * 2);
+    this._memory = new Uint32Array(bankSize * 2);
     this._lastClk = false;
     this._dataOut = 0;
-
-    const decls = buildGraphicCardPinDeclarations(
-      this._dataBits,
-      this._graphicWidth,
-      this._graphicHeight,
-    );
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>(["C"]) },
-    );
   }
 
   get dataBits(): number {
-    return this._dataBits;
+    return this._properties.getOrDefault<number>("dataBits", DEFAULT_DATA_BITS);
   }
 
   get graphicWidth(): number {
-    return this._graphicWidth;
+    return this._properties.getOrDefault<number>("graphicWidth", DEFAULT_GRAPHIC_WIDTH);
   }
 
   get graphicHeight(): number {
-    return this._graphicHeight;
+    return this._properties.getOrDefault<number>("graphicHeight", DEFAULT_GRAPHIC_HEIGHT);
   }
 
   get bankSize(): number {
-    return this._bankSize;
+    return this.graphicWidth * this.graphicHeight;
   }
 
   get addrBits(): number {
-    return this._addrBits;
+    return computeAddrBits(this.bankSize * 2);
   }
 
   /**
@@ -243,13 +221,13 @@ export class GraphicCardElement extends AbstractCircuitElement {
 
     if (risingClk && str) {
       // Clamp addr to valid range
-      const memSize = this._bankSize * 2;
+      const memSize = this.bankSize * 2;
       const safeAddr = addr % memSize;
       this._memory[safeAddr] = dataIn >>> 0;
     }
 
     if (ld) {
-      const memSize = this._bankSize * 2;
+      const memSize = this.bankSize * 2;
       const safeAddr = addr % memSize;
       this._dataOut = this._memory[safeAddr] >>> 0;
     } else {
@@ -272,7 +250,7 @@ export class GraphicCardElement extends AbstractCircuitElement {
    * addr is a flat index into the double-buffered memory.
    */
   readMemory(addr: number): number {
-    const memSize = this._bankSize * 2;
+    const memSize = this.bankSize * 2;
     if (addr < 0 || addr >= memSize) return 0;
     return this._memory[addr] >>> 0;
   }
@@ -282,7 +260,7 @@ export class GraphicCardElement extends AbstractCircuitElement {
    * Used for testing and pre-loading.
    */
   writeMemory(addr: number, value: number): void {
-    const memSize = this._bankSize * 2;
+    const memSize = this.bankSize * 2;
     if (addr >= 0 && addr < memSize) {
       this._memory[addr] = value >>> 0;
     }
@@ -294,8 +272,8 @@ export class GraphicCardElement extends AbstractCircuitElement {
    * bank=true  → bank 1 (indices bankSize..2*bankSize-1)
    */
   getDisplayBank(bank: boolean): Uint32Array {
-    const offset = bank ? this._bankSize : 0;
-    return new Uint32Array(this._memory.buffer, offset * 4, this._bankSize);
+    const offset = bank ? this.bankSize : 0;
+    return new Uint32Array(this._memory.buffer, offset * 4, this.bankSize);
   }
 
   /**
@@ -313,7 +291,13 @@ export class GraphicCardElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return resolvePins(
+      buildGraphicCardPinDeclarations(this.dataBits, this.graphicWidth, this.graphicHeight),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>(["C"]) },
+    );
   }
 
   getBoundingBox(): Rect {

@@ -19,7 +19,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -81,9 +81,6 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export class PFETElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -92,19 +89,11 @@ export class PFETElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("PFET", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._pins = resolvePins(
-      PFET_PIN_DECLARATIONS,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(PFET_PIN_DECLARATIONS, []);
   }
 
   getBoundingBox(): Rect {
@@ -118,8 +107,10 @@ export class PFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line: from gate pin (0,0) to gate bar
-    ctx.drawLine(0, 0, 0.4, 0);
+    // Gate line: from gate pin (0,0) to inversion bubble
+    ctx.drawLine(0, 0, 0.25, 0);
+    // P-channel inversion bubble on gate
+    ctx.drawCircle(0.32, 0, 0.07, false);
     // Gate bar (vertical insulator)
     ctx.drawLine(0.4, 0.4, 0.4, 1.6);
     // Channel line (parallel to gate bar, on drain/source side)

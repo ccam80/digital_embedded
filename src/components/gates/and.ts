@@ -13,9 +13,6 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
-  PinDirection,
-  createInverterConfig,
-  resolvePins,
   standardGatePinLayout,
   gateBodyMetrics,
 } from "../../core/pin.js";
@@ -57,43 +54,11 @@ function buildPinDeclarations(inputCount: number, bitWidth: number, wideShape: b
   return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth);
 }
 
-/**
- * Parse inverterConfig from a PropertyBag.
- *
- * .dig format stores inverterConfig as a comma-separated string of pin labels
- * in the "_inverterLabels" key (set by AND_ATTRIBUTE_MAPPINGS). Programmatic
- * construction may pass a number[] under "inverterConfig" where non-zero
- * entries indicate negated pins. Both forms are accepted.
- */
-function parseInvertedPins(props: PropertyBag, inputCount: number): string[] {
-  if (props.has("_inverterLabels")) {
-    const raw = props.get<string>("_inverterLabels");
-    return raw.length > 0 ? raw.split(",") : [];
-  }
-  if (props.has("inverterConfig")) {
-    const cfg = props.get<number[]>("inverterConfig");
-    return cfg
-      .map((v, i) => (v !== 0 ? `In_${i + 1}` : null))
-      .filter((x): x is string => x !== null);
-  }
-  const inputLabels = buildInputLabels(inputCount);
-  return inputLabels.filter((label) => {
-    const key = `invert_${label}`;
-    return props.has(key) && props.get<boolean>(key) === true;
-  });
-}
-
 // ---------------------------------------------------------------------------
 // AndElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class AndElement extends AbstractCircuitElement {
-  private readonly _inputCount: number;
-  private readonly _bitWidth: number;
-  private readonly _wideShape: boolean;
-  private readonly _invertedPins: readonly string[];
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -102,57 +67,63 @@ export class AndElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("And", instanceId, position, rotation, mirror, props);
-
-    this._inputCount = props.getOrDefault<number>("inputCount", 2);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._wideShape = props.getOrDefault<boolean>("wideShape", false);
-    this._invertedPins = parseInvertedPins(props, this._inputCount);
-
-    const inverterConfig = createInverterConfig(this._invertedPins);
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      inverterConfig,
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const decls = buildPinDeclarations(inputCount, bitWidth, wideShape);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
-      width: compWidth(this._wideShape),
+      width: compWidth(wideShape),
       height: bodyHeight,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(this._inputCount);
-    const w = compWidth(this._wideShape);
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
+    const w = compWidth(wideShape);
+    const offs = Math.floor(inputCount / 2) - 1;
 
     ctx.save();
 
-    this._drawIEEE(ctx, topBorder, bodyHeight, w);
+    // Java IEEEGenericShape: vertical extension lines for >2 inputs
+    if (offs > 0) {
+      const h = Math.floor(inputCount / 2) * 2;
+      ctx.setColor("COMPONENT");
+      ctx.setLineWidth(1);
+      ctx.drawLine(0.05, 0, 0.05, offs - 0.55);
+      ctx.drawLine(0.05, h, 0.05, h - offs + 0.55);
+    }
+
+    // Draw body translated to center position
+    if (offs > 0) ctx.save();
+    if (offs > 0) ctx.translate(0, offs);
+    this._drawIEEE(ctx, w);
+    if (offs > 0) ctx.restore();
+
     this._drawLabel(ctx, w);
-    this._drawInversionBubbles(ctx);
 
     ctx.restore();
   }
 
   /**
-   * IEEE/US shape: classic curved AND gate body.
+   * IEEE/US shape: classic curved AND gate body (fixed 2-input base shape).
    * Flat left edge at x=0.05, straight top/bottom, then two cubic bezier
    * curves forming a D-shape on the right. Coordinates from Java IEEEAndShape.
+   * For >2 inputs the body is translated by IEEEGenericShape scaling in draw().
    */
-  private _drawIEEE(ctx: RenderContext, _top: number, _h: number, w: number): void {
+  private _drawIEEE(ctx: RenderContext, w: number): void {
     const midX = w === 3 ? 1.5 : 2.5;
     const ops = [
       { op: "moveTo" as const, x: midX, y: 2.5 },
@@ -169,27 +140,6 @@ export class AndElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({ operations: ops }, false);
-  }
-
-  /**
-   * Draw inversion bubbles on negated input pins.
-   * A small circle is drawn at the pin's connection point on the left edge.
-   */
-  private _drawInversionBubbles(ctx: RenderContext): void {
-    if (this._invertedPins.length === 0) return;
-
-    const decls = buildPinDeclarations(this._inputCount, this._bitWidth, this._wideShape);
-    const invertedSet = new Set(this._invertedPins);
-    const BUBBLE_RADIUS = 0.3;
-
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-
-    for (const decl of decls) {
-      if (decl.direction === PinDirection.INPUT && invertedSet.has(decl.label)) {
-        ctx.drawCircle(decl.position.x, decl.position.y, BUBBLE_RADIUS, false);
-      }
-    }
   }
 
   /**
@@ -298,6 +248,13 @@ const AND_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Wide shape",
     defaultValue: false,
     description: "Use IEEE/US (curved) shape instead of IEC/DIN (rectangular)",
+  },
+  {
+    key: "_inverterLabels",
+    type: PropertyType.STRING,
+    label: "Invert inputs",
+    defaultValue: "",
+    description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
   },
   {
     key: "label",

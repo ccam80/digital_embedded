@@ -81,10 +81,6 @@ function buildLedMatrixPinDeclarations(
 // ---------------------------------------------------------------------------
 
 export class LedMatrixElement extends AbstractCircuitElement {
-  private readonly _rowDataBits: number;
-  private readonly _colAddrBits: number;
-  private readonly _numCols: number;
-  private readonly _pins: readonly Pin[];
   /** Column-addressed pixel data: data[col] is a bitmask of row bits. */
   private readonly _data: Uint32Array;
 
@@ -97,31 +93,21 @@ export class LedMatrixElement extends AbstractCircuitElement {
   ) {
     super("LedMatrix", instanceId, position, rotation, mirror, props);
 
-    this._rowDataBits = props.getOrDefault<number>("rowDataBits", 8);
-    this._colAddrBits = props.getOrDefault<number>("colAddrBits", 3);
-    this._numCols = 1 << this._colAddrBits;
-    this._data = new Uint32Array(this._numCols);
-
-    const decls = buildLedMatrixPinDeclarations(this._rowDataBits, this._colAddrBits);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
+    const colAddrBits = props.getOrDefault<number>("colAddrBits", 3);
+    const numCols = 1 << colAddrBits;
+    this._data = new Uint32Array(numCols);
   }
 
   get rowDataBits(): number {
-    return this._rowDataBits;
+    return this._properties.getOrDefault<number>("rowDataBits", 8);
   }
 
   get colAddrBits(): number {
-    return this._colAddrBits;
+    return this._properties.getOrDefault<number>("colAddrBits", 3);
   }
 
   get numCols(): number {
-    return this._numCols;
+    return 1 << this._properties.getOrDefault<number>("colAddrBits", 3);
   }
 
   /**
@@ -129,7 +115,7 @@ export class LedMatrixElement extends AbstractCircuitElement {
    * Called by the engine post-step hook after executeLedMatrix runs.
    */
   setColumnData(col: number, rowData: number): void {
-    if (col >= 0 && col < this._numCols) {
+    if (col >= 0 && col < this.numCols) {
       this._data[col] = rowData >>> 0;
     }
   }
@@ -148,7 +134,13 @@ export class LedMatrixElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return resolvePins(
+      buildLedMatrixPinDeclarations(this.rowDataBits, this.colAddrBits),
+      { x: 0, y: 0 },
+      0,
+      createInverterConfig([]),
+      { clockPins: new Set<string>() },
+    );
   }
 
   getBoundingBox(): Rect {

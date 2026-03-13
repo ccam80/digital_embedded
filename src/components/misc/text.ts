@@ -36,9 +36,6 @@ const COMP_HEIGHT = 2;
 // ---------------------------------------------------------------------------
 
 export class TextElement extends AbstractCircuitElement {
-  private readonly _text: string;
-  private readonly _fontSize: number;
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -47,9 +44,6 @@ export class TextElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Text", instanceId, position, rotation, mirror, props);
-
-    this._text = props.getOrDefault<string>("text", "");
-    this._fontSize = props.getOrDefault<number>("fontSize", 1.0);
   }
 
   getPins(): readonly Pin[] {
@@ -66,12 +60,14 @@ export class TextElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const text = this._properties.getOrDefault<string>("text", "");
+    const fontSize = this._properties.getOrDefault<number>("fontSize", 1.0);
 
     ctx.save();
 
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: this._fontSize });
-    ctx.drawText(this._text, 0, 0, { horizontal: "left", vertical: "top" });
+    ctx.setFont({ family: "sans-serif", size: fontSize });
+    ctx.drawText(text, 0, 0, { horizontal: "left", vertical: "top" });
 
     ctx.restore();
   }

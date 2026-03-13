@@ -23,8 +23,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -78,10 +76,6 @@ function buildScopePinDeclarations(channelCount: number, bitWidth: number): PinD
 // ---------------------------------------------------------------------------
 
 export class ScopeElement extends AbstractCircuitElement {
-  private readonly _channelCount: number;
-  private readonly _bitWidth: number;
-  private readonly _timeScale: number;
-  private readonly _pins: readonly Pin[];
   private readonly _channels: WaveformChannel[];
 
   constructor(
@@ -93,35 +87,22 @@ export class ScopeElement extends AbstractCircuitElement {
   ) {
     super("Scope", instanceId, position, rotation, mirror, props);
 
-    this._channelCount = Math.min(
+    const channelCount = Math.min(
       Math.max(props.getOrDefault<number>("channelCount", 1), 1),
       MAX_CHANNELS,
     );
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._timeScale = props.getOrDefault<number>("timeScale", 1);
-
-    this._channels = Array.from({ length: this._channelCount }, (_, i) => ({
+    this._channels = Array.from({ length: channelCount }, (_, i) => ({
       label: `in${i}`,
       samples: [],
     }));
-
-    const decls = buildScopePinDeclarations(this._channelCount, this._bitWidth);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   get channelCount(): number {
-    return this._channelCount;
+    return this._properties.getOrDefault<number>("channelCount", 1);
   }
 
   get timeScale(): number {
-    return this._timeScale;
+    return this._properties.getOrDefault<number>("timeScale", 1);
   }
 
   /** Returns the waveform sample buffers for all channels. */
@@ -135,7 +116,8 @@ export class ScopeElement extends AbstractCircuitElement {
    * Oldest samples are dropped when MAX_SAMPLES is reached.
    */
   recordSamples(values: readonly number[]): void {
-    for (let i = 0; i < this._channelCount && i < values.length; i++) {
+    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
+    for (let i = 0; i < channelCount && i < values.length; i++) {
       const ch = this._channels[i];
       ch.samples.push(values[i]);
       if (ch.samples.length > MAX_SAMPLES) {
@@ -152,11 +134,15 @@ export class ScopeElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls = buildScopePinDeclarations(channelCount, bitWidth);
+    return this.derivePins(decls, []);
   }
 
   getBoundingBox(): Rect {
-    const h = componentHeight(this._channelCount);
+    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
+    const h = componentHeight(channelCount);
     return {
       x: this.position.x,
       y: this.position.y,
@@ -166,7 +152,8 @@ export class ScopeElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const h = componentHeight(this._channelCount);
+    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
+    const h = componentHeight(channelCount);
 
     ctx.save();
 

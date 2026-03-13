@@ -18,8 +18,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -108,10 +106,6 @@ export function buildMuxPinDeclarations(
 // ---------------------------------------------------------------------------
 
 export class MuxElement extends AbstractCircuitElement {
-  private readonly _selectorBits: number;
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -120,27 +114,18 @@ export class MuxElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Multiplexer", instanceId, position, rotation, mirror, props);
-
-    this._selectorBits = props.getOrDefault<number>("selectorBits", 1);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-
-    const flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
-    const decls = buildMuxPinDeclarations(this._selectorBits, this._bitWidth, flipSelPos);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+    return this.derivePins(buildMuxPinDeclarations(selectorBits, bitWidth, flipSelPos), []);
   }
 
   getBoundingBox(): Rect {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
+    const inputCount = 1 << selectorBits;
     // Height spans from y=0 to y=inputCount (selector pin is at bottom)
     // For 2 inputs the bottom pin is at y=2, so height = inputCount
     return {
@@ -152,7 +137,8 @@ export class MuxElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
+    const inputCount = 1 << selectorBits;
     // h is the span used for the trapezoid body (inputCount grid units)
     const h = inputCount;
 
@@ -184,11 +170,13 @@ export class MuxElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const inputCount = 1 << this._selectorBits;
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const inputCount = 1 << selectorBits;
     return (
       `Multiplexer — selects one of ${inputCount} inputs based on the selector.\n` +
       `Output = input[selector].\n` +
-      `Selector bits: ${this._selectorBits}, data bit width: ${this._bitWidth}.`
+      `Selector bits: ${selectorBits}, data bit width: ${bitWidth}.`
     );
   }
 }

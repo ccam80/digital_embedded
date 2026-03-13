@@ -34,8 +34,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -127,10 +125,6 @@ function buildTerminalPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 export class TerminalElement extends AbstractCircuitElement {
-  private readonly _label: string;
-  private readonly _columns: number;
-  private readonly _rows: number;
-  private readonly _pins: readonly Pin[];
   private readonly _charBuffer: number[];
   private readonly _keyQueue: number[];
 
@@ -143,30 +137,16 @@ export class TerminalElement extends AbstractCircuitElement {
   ) {
     super("Terminal", instanceId, position, rotation, mirror, props);
 
-    this._label = props.getOrDefault<string>("label", "");
-    this._columns = props.getOrDefault<number>("columns", 80);
-    this._rows = props.getOrDefault<number>("rows", 24);
-
     this._charBuffer = [];
     this._keyQueue = [];
-
-    const decls = buildTerminalPinDeclarations();
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>(["wr", "rd"]) },
-      1,
-    );
   }
 
   get columns(): number {
-    return this._columns;
+    return this._properties.getOrDefault<number>("columns", 80);
   }
 
   get rows(): number {
-    return this._rows;
+    return this._properties.getOrDefault<number>("rows", 24);
   }
 
   /** Append a character code to the display buffer. Called by the engine step. */
@@ -214,7 +194,7 @@ export class TerminalElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    return this.derivePins(buildTerminalPinDeclarations(), ["wr", "rd"]);
   }
 
   getBoundingBox(): Rect {
@@ -246,10 +226,11 @@ export class TerminalElement extends AbstractCircuitElement {
     ctx.drawLine(0.7, COMP_HEIGHT - 1.2, 1.3, COMP_HEIGHT - 1.2);
 
     // Label
+    const label = this._properties.getOrDefault<string>("label", "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText(
-      this._label.length > 0 ? this._label : "Terminal",
+      label.length > 0 ? label : "Terminal",
       COMP_WIDTH / 2,
       COMP_HEIGHT + 0.3,
       { horizontal: "center", vertical: "top" },

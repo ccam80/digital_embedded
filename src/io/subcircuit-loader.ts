@@ -20,8 +20,8 @@ import { parseDigXml } from "./dig-parser.js";
 import { loadDigCircuit } from "./dig-loader.js";
 import type { FileResolver } from "./file-resolver.js";
 import { CacheResolver, ResolverNotFoundError } from "./file-resolver.js";
-import { deriveInterfacePins } from "../components/subcircuit/pin-derivation.js";
-import { registerSubcircuit } from "../components/subcircuit/subcircuit.js";
+
+import { registerSubcircuit, createLiveDefinition } from "../components/subcircuit/subcircuit.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +52,18 @@ const _subcircuitCache = new Map<string, Circuit>();
  */
 export function clearSubcircuitCache(): void {
   _subcircuitCache.clear();
+}
+
+/**
+ * Invalidate a single subcircuit from the cache.
+ *
+ * Call when a subcircuit .dig file is modified or reloaded so the next
+ * loadWithSubcircuits() re-resolves and re-registers the definition.
+ * The registry entry is NOT removed — re-registration via registerOrUpdate()
+ * will replace it with the new definition while preserving the typeId.
+ */
+export function invalidateSubcircuit(name: string): void {
+  _subcircuitCache.delete(name);
 }
 
 /**
@@ -149,12 +161,7 @@ async function resolveAndRegister(
   loadingStack: string[],
   depth: number,
 ): Promise<void> {
-  // Already registered (another branch registered it)
-  if (registry.get(name) !== undefined) {
-    return;
-  }
-
-  // Return cached circuit if already loaded
+  // Return cached circuit if already loaded (and re-register via registerOrUpdate)
   if (_subcircuitCache.has(name)) {
     const cachedDef = _subcircuitCache.get(name)!;
     registerSubcircuitDefinition(name, cachedDef, registry);
@@ -196,10 +203,9 @@ async function resolveAndRegister(
   // Cache the loaded definition
   _subcircuitCache.set(name, subcircuit);
 
-  // Register in the registry if not already registered
-  if (registry.get(name) === undefined) {
-    registerSubcircuitDefinition(name, subcircuit, registry);
-  }
+  // Register or update in the registry (re-registration replaces the old
+  // definition while preserving the typeId — Step 6 of the refactor).
+  registerSubcircuitDefinition(name, subcircuit, registry);
 }
 
 /**
@@ -208,25 +214,21 @@ async function resolveAndRegister(
  * Derives interface pins from the circuit's In/Out elements and registers
  * using the proper SubcircuitElement factory so subcircuits render with
  * their chip shape and pins.
+ *
+ * Uses registerOrUpdate so that re-loading a modified subcircuit replaces
+ * the old definition while preserving the typeId.
  */
 function registerSubcircuitDefinition(
   name: string,
   definition: Circuit,
   registry: ComponentRegistry,
 ): void {
-  // Skip if already registered (can happen when two branches converge)
-  if (registry.get(name) !== undefined) {
-    return;
-  }
-
-  const pinLayout = deriveInterfacePins(definition);
   const shapeType = definition.metadata.shapeType || "DEFAULT";
-  const subDef: SubcircuitDefinition = {
-    circuit: definition,
-    pinLayout,
-    shapeMode: shapeType as SubcircuitDefinition["shapeMode"],
+  const subDef = createLiveDefinition(
+    definition,
+    shapeType as SubcircuitDefinition["shapeMode"],
     name,
-  };
+  );
 
   registerSubcircuit(registry, name, subDef);
 }

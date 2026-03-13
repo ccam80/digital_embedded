@@ -9,15 +9,19 @@
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
-import type { Pin } from "@/core/pin";
-import { pinWorldPosition } from "@/core/pin";
+import type { Pin, Rotation } from "@/core/pin";
+import { pinWorldPosition, rotatePoint } from "@/core/pin";
 import { worldBoundingBox } from "./hit-test.js";
 
 /** Radius of the filled circle drawn at each pin position (grid units). */
 const PIN_CIRCLE_RADIUS = 0.15;
 
-/** Radius of the unfilled negation bubble drawn outside the pin circle (grid units). */
-const NEGATION_BUBBLE_RADIUS = 0.2;
+/**
+ * Radius of the unfilled negation bubble (grid units).
+ * Java: drawCircle from (pinX+2, pinY-SIZE2+2) to (pinX+SIZE-2, pinY+SIZE2-2)
+ * → diameter = SIZE-4 = 16px = 0.8 grid → radius = 0.4 grid.
+ */
+const NEGATION_BUBBLE_RADIUS = 0.4;
 
 /** Half-size of the clock triangle indicator (grid units). */
 const CLOCK_TRIANGLE_HALF = 0.2;
@@ -64,10 +68,14 @@ export class ElementRenderer {
       ctx.translate(element.position.x, element.position.y);
 
       if (element.rotation !== 0) {
-        ctx.rotate((element.rotation * Math.PI) / 2);
+        // Negate the angle: rotatePoint uses (x,y)→(y,-x) for rot=1,
+        // which corresponds to rotate(-PI/2) in Canvas2D coordinates.
+        ctx.rotate(-(element.rotation * Math.PI) / 2);
       }
       if (element.mirror) {
-        ctx.scale(-1, 1);
+        // Java Digital mirrors Y: TransformMatrix(1,0,0,-1,0,0).
+        // pinWorldPosition also mirrors Y: {x: p.x, y: -p.y}.
+        ctx.scale(1, -1);
       }
 
       element.draw(ctx);
@@ -107,10 +115,23 @@ export class ElementRenderer {
     }
   }
 
-  /** Draw an unfilled negation bubble at the pin position. */
+  /**
+   * Draw an unfilled negation bubble between the pin and the body edge.
+   *
+   * Java GenericShape.drawInputInvert: bubble centered at (pinX + SIZE2, pinY),
+   * i.e. 0.5 grid units toward the body from the (shifted) pin position.
+   * Input pins are always on the west face, so "toward body" = +x in local space.
+   */
   private _renderNegationBubble(ctx: RenderContext, pin: Pin, element: CircuitElement): void {
     const wp = pinWorldPosition(element, pin);
-    ctx.drawCircle(wp.x, wp.y, NEGATION_BUBBLE_RADIUS, false);
+    // Offset 0.5 grid units from pin toward body (+x local, transformed to world)
+    const offset = rotatePoint({ x: 0.5, y: 0 }, element.rotation as Rotation);
+    // Java drawInputInvert uses Style.NORMAL (component color), not pin color
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+    ctx.drawCircle(wp.x + offset.x, wp.y + offset.y, NEGATION_BUBBLE_RADIUS, false);
+    // Restore pin color for subsequent pin drawing
+    ctx.setColor("PIN");
   }
 
   /** Draw a small filled triangle indicating a clock pin. */

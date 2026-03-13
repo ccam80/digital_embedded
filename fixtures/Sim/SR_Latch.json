@@ -1,0 +1,175 @@
+{
+  "elements": [
+    {
+      "instanceId": "d2c519fe-339d-4721-ae37-6c72b2f5b276",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "properties": {
+        "label": "S",
+        "position": [
+          0,
+          0
+        ]
+      },
+      "rotation": 0,
+      "typeName": "In"
+    },
+    {
+      "instanceId": "985398ac-3315-4303-98f9-f23aae29144d",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 4
+      },
+      "properties": {
+        "label": "R",
+        "position": [
+          0,
+          4
+        ]
+      },
+      "rotation": 0,
+      "typeName": "In"
+    },
+    {
+      "instanceId": "f637bc0e-71c1-42a4-bdfb-61953083a17a",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 8
+      },
+      "properties": {
+        "label": "NOR1",
+        "position": [
+          0,
+          8
+        ]
+      },
+      "rotation": 0,
+      "typeName": "NOr"
+    },
+    {
+      "instanceId": "18bfa867-07d7-478e-aa51-7bdbafc35976",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 12
+      },
+      "properties": {
+        "label": "NOR2",
+        "position": [
+          0,
+          12
+        ]
+      },
+      "rotation": 0,
+      "typeName": "NOr"
+    },
+    {
+      "instanceId": "db69bdb7-a3d1-46ea-a652-a85b741bf05a",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 16
+      },
+      "properties": {
+        "label": "Q",
+        "position": [
+          0,
+          16
+        ]
+      },
+      "rotation": 0,
+      "typeName": "Out"
+    },
+    {
+      "instanceId": "e9de4093-d75d-4c00-afda-04731b481f01",
+      "mirror": false,
+      "position": {
+        "x": 0,
+        "y": 20
+      },
+      "properties": {
+        "label": "~Q",
+        "position": [
+          0,
+          20
+        ]
+      },
+      "rotation": 0,
+      "typeName": "Out"
+    }
+  ],
+  "metadata": {
+    "description": "",
+    "isGeneric": false,
+    "measurementOrdering": [],
+    "name": "SR Latch"
+  },
+  "version": 1,
+  "wires": [
+    {
+      "p1": {
+        "x": 0,
+        "y": 4
+      },
+      "p2": {
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "p1": {
+        "x": 4,
+        "y": 13
+      },
+      "p2": {
+        "x": 0,
+        "y": 10
+      }
+    },
+    {
+      "p1": {
+        "x": 0,
+        "y": 0
+      },
+      "p2": {
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "p1": {
+        "x": 4,
+        "y": 9
+      },
+      "p2": {
+        "x": 0,
+        "y": 14
+      }
+    },
+    {
+      "p1": {
+        "x": 4,
+        "y": 9
+      },
+      "p2": {
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "p1": {
+        "x": 4,
+        "y": 13
+      },
+      "p2": {
+        "x": 0,
+        "y": 20
+      }
+    }
+  ]
+}

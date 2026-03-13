@@ -14,8 +14,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -52,9 +50,6 @@ function buildBitCountPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 export class BitCountElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -63,12 +58,12 @@ export class BitCountElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("BitCount", instanceId, position, rotation, mirror, props);
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 8);
-    const decls = buildBitCountPinDeclarations(this._bitWidth);
-    this._pins = resolvePins(decls, position, rotation, createInverterConfig([]), { clockPins: new Set<string>() });
   }
 
-  getPins(): readonly Pin[] { return this._pins; }
+  getPins(): readonly Pin[] {
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
+    return this.derivePins(buildBitCountPinDeclarations(bitWidth), []);
+  }
 
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };

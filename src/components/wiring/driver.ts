@@ -14,8 +14,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  createInverterConfig,
-  resolvePins,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -87,11 +85,6 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invert
 // ---------------------------------------------------------------------------
 
 export class DriverElement extends AbstractCircuitElement {
-  private readonly _bitWidth: number;
-  private readonly _flipSelPos: boolean;
-  private readonly _invertOutput: boolean;
-  private readonly _pins: readonly Pin[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -100,28 +93,18 @@ export class DriverElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Driver", instanceId, position, rotation, mirror, props);
-
-    this._bitWidth = props.getOrDefault<number>("bitWidth", 1);
-    this._flipSelPos = props.getOrDefault<boolean>("flipSelPos", false);
-    this._invertOutput = props.getOrDefault<boolean>("invertDriverOutput", false);
-
-    const decls = buildDriverPinDeclarations(this._bitWidth, this._flipSelPos, this._invertOutput);
-    this._pins = resolvePins(
-      decls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      { clockPins: new Set<string>() },
-      this._bitWidth,
-    );
   }
 
   getPins(): readonly Pin[] {
-    return this._pins;
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+    const invertOutput = this._properties.getOrDefault<boolean>("invertDriverOutput", false);
+    return this.derivePins(buildDriverPinDeclarations(bitWidth, flipSelPos, invertOutput), []);
   }
 
   getBoundingBox(): Rect {
-    const w = this._invertOutput ? 3 : COMP_WIDTH;
+    const invertOutput = this._properties.getOrDefault<boolean>("invertDriverOutput", false);
+    const w = invertOutput ? 3 : COMP_WIDTH;
     return {
       x: this.position.x - 1,
       y: this.position.y - 1,
@@ -131,6 +114,9 @@ export class DriverElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+    const invertOutput = this._properties.getOrDefault<boolean>("invertDriverOutput", false);
+
     ctx.save();
 
     // Triangle body pointing right, centred on origin.
@@ -160,13 +146,13 @@ export class DriverElement extends AbstractCircuitElement {
       false,
     );
 
-    if (this._invertOutput) {
+    if (invertOutput) {
       ctx.setColor("COMPONENT");
       ctx.drawCircle(1.2, 0, 0.25, false);
     }
 
     // Sel pin stem: line from centre to sel pin
-    const selY = this._flipSelPos ? 1 : -1;
+    const selY = flipSelPos ? 1 : -1;
     ctx.drawLine(0, selY, 0, selY > 0 ? 0.35 : -0.35);
 
     ctx.restore();
