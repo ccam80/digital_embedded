@@ -30,6 +30,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -141,30 +142,10 @@ const COMP_WIDTH = 3;
 // 5-input variant (RAMDualPort): maxPinY=4, bodyHeight=5
 // 6-input variant (RAMDualAccess): maxPinY=6, bodyHeight=7
 // 3-input variant (RAMAsync): maxPinY=2, bodyHeight=3
-const COMP_HEIGHT_4IN = 5;
-const COMP_HEIGHT_6IN = 7;
-const COMP_HEIGHT_3IN = 3;
-
-// ---------------------------------------------------------------------------
-// Shared rendering helper
-// ---------------------------------------------------------------------------
-
-function drawMemoryBody(ctx: RenderContext, label: string, symbol: string, bodyHeight: number, textY: number): void {
-  ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, -0.5, COMP_WIDTH, bodyHeight, true);
-  ctx.setColor("COMPONENT");
-  ctx.setLineWidth(1);
-  ctx.drawRect(0, -0.5, COMP_WIDTH, bodyHeight, false);
-
-  ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-  ctx.drawText(symbol, COMP_WIDTH / 2, textY, { horizontal: "center", vertical: "middle" });
-
-  if (label.length > 0) {
-    ctx.setFont({ family: "sans-serif", size: 0.9 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-  }
-}
+const COMP_HEIGHT_4IN = 5;   // 4-input variants: Java rect height = 5 (y=-0.5 to 4.5)
+const COMP_HEIGHT_5IN = 5;   // RAMDualPort: max(5,1)=5
+const COMP_HEIGHT_6IN = 6;   // RAMDualAccess: max(6,2)=6
+const COMP_HEIGHT_3IN = 3;   // RAMAsync: max(3,1)=3
 
 // ---------------------------------------------------------------------------
 // Shared property definitions and attribute mappings
@@ -272,13 +253,18 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "str", "C", "ld"],
+      outputLabels: ["D"],
+      clockInputIndices: [2],
+      componentName: "RAM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {
@@ -394,13 +380,18 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "CS", "WE", "OE"],
+      outputLabels: ["D"],
+      clockInputIndices: [],
+      componentName: "RAM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {
@@ -506,13 +497,18 @@ export class RAMDualPortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_5IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_4IN, 2);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "Din", "str", "C", "ld"],
+      outputLabels: ["D"],
+      clockInputIndices: [3],
+      componentName: "RAM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {
@@ -602,17 +598,17 @@ export const RAMDualPortDefinition: ComponentDefinition = {
 //   +0: lastClk
 // ---------------------------------------------------------------------------
 
-// RAMDualAccess: 6 inputs (even, symmetric): offs=3; str@y=0,C@y=1,ld@y=2,1A@y=4,1Din@y=5,2A@y=6; 1D@y=3,2D@y=4
+// RAMDualAccess: 6 inputs (even, symmetric=false since 2 outputs): offs=0; str@y=0,C@y=1,ld@y=2,1A@y=3,1Din@y=4,2A@y=5; 1D@y=0,2D@y=1
 function buildRAMDualAccessPins(addrBits: number, dataBits: number): PinDeclaration[] {
   return [
     { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
     { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: true },
     { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "1A", defaultBitWidth: addrBits, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "1Din", defaultBitWidth: dataBits, position: { x: 0, y: 5 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "2A", defaultBitWidth: addrBits, position: { x: 0, y: 6 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "1D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 3 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "2D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "1A", defaultBitWidth: addrBits, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "1Din", defaultBitWidth: dataBits, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "2A", defaultBitWidth: addrBits, position: { x: 0, y: 5 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "1D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "2D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -633,13 +629,18 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_6IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_6IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_6IN, 3);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["str", "C", "ld", "1A", "1Din", "2A"],
+      outputLabels: ["1D", "2D"],
+      clockInputIndices: [1],
+      componentName: "RAM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {
@@ -751,13 +752,18 @@ export class RAMAsyncElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_3IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_3IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "RAM", COMP_HEIGHT_3IN, 1);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "D", "we"],
+      outputLabels: ["Q"],
+      clockInputIndices: [],
+      componentName: "RAM, async.",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {
@@ -852,13 +858,18 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT_4IN };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_4IN };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawMemoryBody(ctx, this._properties.getOrDefault<string>("label", ""), "BRAM", COMP_HEIGHT_4IN, 2);
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "Din", "str", "C"],
+      outputLabels: ["D"],
+      clockInputIndices: [3],
+      componentName: "RAM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

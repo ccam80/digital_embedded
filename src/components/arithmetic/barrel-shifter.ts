@@ -20,8 +20,8 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -46,17 +46,17 @@ function shiftBitsFor(bitWidth: number): number {
   return Math.max(1, bits);
 }
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 3;
 
+// GenericShape: 2 inputs, 1 output, symmetric=true, even=true, offs=floor(2/2)=1
+// in@(0,0), shift@(0,2) [gap at i=1], out@(3,1)
 function buildBarrelShifterPinDeclarations(bitWidth: number, signed: boolean): PinDeclaration[] {
   const sBits = shiftBitsFor(bitWidth) + (signed ? 1 : 0);
-  const inputPositions = layoutPinsOnFace("west", 2, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "shift", defaultBitWidth: sBits, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: bitWidth, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "shift", defaultBitWidth: sBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: bitWidth, position: { x: 3, y: 1 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -81,22 +81,18 @@ export class BarrelShifterElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    const direction = this._properties.getOrDefault<string>("direction", "left") as ShiftDirection;
-    ctx.save();
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    const symbol = direction === "left" ? "<<" : ">>";
-    ctx.drawText(symbol, COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["in", "shift"],
+      outputLabels: ["out"],
+      clockInputIndices: [],
+      componentName: "Shift",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

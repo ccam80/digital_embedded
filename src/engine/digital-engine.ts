@@ -73,7 +73,7 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   /** Total signal array size: netCount + totalStateSlots. */
   readonly signalArraySize: number;
   /** Type ID per component slot (index into executeFns). */
-  readonly typeIds: Uint8Array;
+  readonly typeIds: Uint16Array;
   /** Function table indexed by type ID. */
   readonly executeFns: ExecuteFunction[];
   /** Sample function table indexed by type ID. Non-null for sequential components. */
@@ -243,8 +243,8 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     return this._initSnapshotBuffer;
   }
 
-  get typeIds(): Uint8Array {
-    return this._compiled !== null ? this._compiled.typeIds : new Uint8Array(0);
+  get typeIds(): Uint16Array {
+    return this._compiled !== null ? this._compiled.typeIds : new Uint16Array(0);
   }
 
   get executeFns(): ExecuteFunction[] {
@@ -661,7 +661,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _evaluateGroupOnce(
     group: EvaluationGroup,
     executeFns: ExecuteFunction[],
-    typeIds: Uint8Array,
+    typeIds: Uint16Array,
     layout: ComponentLayout,
     state: Uint32Array,
   ): void {
@@ -684,7 +684,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _evaluateFeedbackGroup(
     group: EvaluationGroup,
     executeFns: ExecuteFunction[],
-    typeIds: Uint8Array,
+    typeIds: Uint16Array,
     layout: ComponentLayout,
     state: Uint32Array,
   ): void {

@@ -20,7 +20,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { drawUprightText } from "../../core/upright-text.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -95,7 +95,6 @@ export class DElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(D_FF_PIN_DECLARATIONS, ["C"]);
   }
 
@@ -103,45 +102,22 @@ export class DElement extends AbstractCircuitElement {
     // Java GenericShape: symmetric=false, max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
     const TOP = 0.5;
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - TOP,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: 2,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const TOP = 0.5;
-    const BODY_H = 2;
-
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    drawUprightText(ctx, "D", 0.6, 0, { horizontal: "left", vertical: "middle" }, this.rotation);
-    drawUprightText(ctx, "C", 0.6, 1, { horizontal: "left", vertical: "middle" }, this.rotation);
-    drawUprightText(ctx, "Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" }, this.rotation);
-    drawUprightText(ctx, "~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" }, this.rotation);
-
-    // Clock triangle on C pin (y=1)
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 0.5, 0.5, 1);
-    ctx.drawLine(0.5, 1, 0, 1.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      drawUprightText(ctx, label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" }, this.rotation);
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["D", "C"],
+      outputLabels: ["Q", "~Q"],
+      clockInputIndices: [1],
+      componentName: "D",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

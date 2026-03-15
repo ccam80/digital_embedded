@@ -107,7 +107,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   readonly signalArraySize: number;
 
   /** Type ID per component slot — indexes into executeFns. */
-  readonly typeIds: Uint8Array;
+  readonly typeIds: Uint16Array;
 
   /** Function table indexed by type ID. Populated from registry. */
   readonly executeFns: ExecuteFunction[];
@@ -180,7 +180,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     netCount: number;
     componentCount: number;
     totalStateSlots?: number;
-    typeIds: Uint8Array;
+    typeIds: Uint16Array;
     executeFns: ExecuteFunction[];
     sampleFns?: (ExecuteFunction | null)[];
     wiringTable: Int32Array;

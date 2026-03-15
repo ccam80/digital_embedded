@@ -35,8 +35,9 @@ import type { FETLayout } from "./nfet.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Java FETShapeN: Gate at (0,SIZE*2)=(0,2), Drain at (SIZE,0)=(1,0), Source at (SIZE,SIZE*2)=(1,2)
+const COMP_WIDTH = 1;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -47,7 +48,7 @@ const FGNFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "G",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -55,7 +56,7 @@ const FGNFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "D",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 0 },
+    position: { x: 1, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -63,7 +64,7 @@ const FGNFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "S",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: COMP_HEIGHT },
+    position: { x: 1, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -85,12 +86,14 @@ export class FGNFETElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(FGNFET_PIN_DECLARATIONS, []);
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Drawn geometry: oxide bar at x=0.05 (min), gate lead to x=1.15 (max).
+    // Arrow tip at x=0.75, base at x=1.0. Drain/source leads at x=1.
+    // Height: y=0 to y=2.
+    return { x: this.position.x + 0.05, y: this.position.y, width: 1.1, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
@@ -100,20 +103,34 @@ export class FGNFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line and bar (same as NFET)
-    ctx.drawLine(0, COMP_HEIGHT / 2, 1, COMP_HEIGHT / 2);
-    ctx.drawLine(1, 0.5, 1, COMP_HEIGHT - 0.5);
-    // Floating gate bar (second bar to indicate floating gate)
-    ctx.drawLine(1.25, 0.5, 1.25, COMP_HEIGHT - 0.5);
-    // Channel line
-    ctx.drawLine(1.5, 0.5, 1.5, COMP_HEIGHT - 0.5);
-    // Drain and source connections
-    ctx.drawLine(1.5, 0.5, COMP_WIDTH, 0.5);
-    ctx.drawLine(1.5, COMP_HEIGHT - 0.5, COMP_WIDTH, COMP_HEIGHT - 0.5);
+    // Drain lead: (1,0) → (0.55,0) → (0.55,0.25)
+    ctx.drawLine(1, 0, 0.55, 0);
+    ctx.drawLine(0.55, 0, 0.55, 0.25);
 
-    // N-channel arrow
-    ctx.drawLine(1.5, COMP_HEIGHT / 2, 1.9, COMP_HEIGHT / 2 - 0.3);
-    ctx.drawLine(1.5, COMP_HEIGHT / 2, 1.9, COMP_HEIGHT / 2 + 0.3);
+    // Source lead: (1,2) → (0.55,2) → (0.55,1.75)
+    ctx.drawLine(1, 2, 0.55, 2);
+    ctx.drawLine(0.55, 2, 0.55, 1.75);
+
+    // Channel gap line: (0.55,0.75) to (0.55,1.25)
+    ctx.drawLine(0.55, 0.75, 0.55, 1.25);
+
+    // Gate oxide bar: vertical line at x=0.05 from y=0 to y=2
+    ctx.drawLine(0.05, 0, 0.05, 2);
+
+    // Floating gate bar (THIN): (0.3,1.8) to (0.3,0.2)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.3, 1.8, 0.3, 0.2);
+
+    // Gate lead (THIN): (0.9,1) to (1.15,1) — extends to x=1.15 per Java fixture
+    ctx.drawLine(0.9, 1, 1.15, 1);
+
+    // N-channel arrow (THIN_FILLED): tip at (0.75,1), base at (1,0.9)→(1,1.1)
+    ctx.drawPolygon([
+      { x: 0.75, y: 1 },
+      { x: 1, y: 0.9 },
+      { x: 1, y: 1.1 },
+    ], true);
+    ctx.setLineWidth(1);
 
     // Blown indicator: X mark
     if (blown) {

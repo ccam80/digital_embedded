@@ -11,7 +11,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -26,22 +25,20 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 3;
-const LED_RADIUS = 0.7;
+const LED_OUTER_RADIUS = 0.75;
+const LED_INNER_RADIUS = 0.65;
 
 // ---------------------------------------------------------------------------
-// Pin layout — R, G, B inputs on the west face, evenly spaced
+// Pin layout — R, G, B inputs at Java RGBLEDShape positions: R(0,-1), G(0,0), B(0,1)
 // ---------------------------------------------------------------------------
 
 function buildRgbLedPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 3, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "R",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -49,7 +46,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: 1,
-      position: inputPositions[1],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -57,7 +54,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "B",
       defaultBitWidth: 1,
-      position: inputPositions[2],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -86,56 +83,39 @@ export class RgbLedElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      y: this.position.y - 1,
+      width: 0.8 + LED_OUTER_RADIUS,
+      height: 2,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
+    // LED center at (0.8, 0) — pins R@(0,-1), G@(0,0), B@(0,1)
+    const cx = 0.8;
+    const cy = 0;
 
     ctx.save();
 
-    // Outer circle body
+    // Lead lines converging to LED center
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+    ctx.drawLine(0, -1, cx, cy);
+    ctx.drawLine(0, 1, cx, cy);
+
+    // Filled outer circle (LED body)
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, cy, LED_RADIUS, true);
+    ctx.drawCircle(cx, cy, LED_OUTER_RADIUS, true);
     ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawCircle(cx, cy, LED_RADIUS, false);
+    ctx.drawCircle(cx, cy, LED_OUTER_RADIUS, false);
 
-    // Three arcs representing R, G, B sectors
-    // R: top-right third (0 to 2π/3)
-    // G: bottom-right third (2π/3 to 4π/3)
-    // B: left third (4π/3 to 2π)
-    const TWO_PI = Math.PI * 2;
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawArc(cx, cy, LED_RADIUS * 0.6, 0, TWO_PI / 3);
-    ctx.drawArc(cx, cy, LED_RADIUS * 0.6, TWO_PI / 3, (2 * TWO_PI) / 3);
-    ctx.drawArc(cx, cy, LED_RADIUS * 0.6, (2 * TWO_PI) / 3, TWO_PI);
-
-    // Channel labels
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.4 });
-    ctx.drawText("R", cx + LED_RADIUS * 0.4, cy - LED_RADIUS * 0.4, {
-      horizontal: "center",
-      vertical: "middle",
-    });
-    ctx.drawText("G", cx + LED_RADIUS * 0.4, cy + LED_RADIUS * 0.4, {
-      horizontal: "center",
-      vertical: "middle",
-    });
-    ctx.drawText("B", cx - LED_RADIUS * 0.5, cy, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    // Inner circle (color zone)
+    ctx.drawCircle(cx, cy, LED_INNER_RADIUS, false);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
+      ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, cx, -0.3, {
+      ctx.drawText(label, cx, -1.3, {
         horizontal: "center",
         vertical: "bottom",
       });

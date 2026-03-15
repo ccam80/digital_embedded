@@ -41,33 +41,34 @@ function componentHeight(outputCount: number): number {
 // Pin layout
 // ---------------------------------------------------------------------------
 
-export function buildDecoderPinDeclarations(selectorBits: number): PinDeclaration[] {
-  const outputCount = 1 << selectorBits;
-  const h = componentHeight(outputCount);
+export function buildDecoderPinDeclarations(selectorBits: number, flipSelPos = false): PinDeclaration[] {
+  const outCount = 1 << selectorBits;
+  const height = outCount;
 
-  const selPin: PinDeclaration = {
+  // Java DemuxerShape layout (same as Demultiplexer but without data input)
+  const pins: PinDeclaration[] = [];
+
+  // Selector pin
+  pins.push({
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: 0, y: Math.floor(h / 2) },
+    position: { x: 1, y: flipSelPos ? 0 : height },
     isNegatable: false,
     isClockCapable: false,
-  };
+  });
 
-  const outputPositions = layoutPinsOnFace("east", outputCount, COMP_WIDTH, h);
-  const outputPins: PinDeclaration[] = [];
-  for (let i = 0; i < outputCount; i++) {
-    outputPins.push({
-      direction: PinDirection.OUTPUT,
-      label: `out_${i}`,
-      defaultBitWidth: 1,
-      position: outputPositions[i],
-      isNegatable: false,
-      isClockCapable: false,
-    });
+  // Output pins — 2 outputs get gap (y=0, y=2), otherwise sequential
+  if (outCount === 2) {
+    pins.push({ direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false });
+    pins.push({ direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: 1, position: { x: 2, y: 2 }, isNegatable: false, isClockCapable: false });
+  } else {
+    for (let i = 0; i < outCount; i++) {
+      pins.push({ direction: PinDirection.OUTPUT, label: `out_${i}`, defaultBitWidth: 1, position: { x: 2, y: i }, isNegatable: false, isClockCapable: false });
+    }
   }
 
-  return [selPin, ...outputPins];
+  return pins;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,47 +87,63 @@ export class DecoderElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     return this.derivePins(buildDecoderPinDeclarations(selectorBits));
   }
 
   getBoundingBox(): Rect {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
-    const h = componentHeight(outputCount);
+    const h = outputCount;
+    // Trapezoid: (0.05,0.25) -> (1.95,-0.2) -> (1.95,h+0.2) -> (0.05,h-0.25).
+    // MinX=0.05, maxX=1.95, minY=-0.2, maxY=h+0.2.
+    // height = (h+0.2) - (-0.2) to avoid float cancellation in y + height.
+    const minY = -0.2;
+    const maxY = h + 0.2;
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: h,
+      x: this.position.x + 0.05,
+      y: this.position.y + minY,
+      width: 1.9,
+      height: maxY - minY,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
-    const h = componentHeight(outputCount);
+    // Java DecoderShape uses a trapezoid scaled to outputCount outputs.
+    // Reference (2-output / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
+    // Left edge height = 1.5, right edge height = 2.4 for 2 outputs.
+    // Scale: left inset = 0.25, right overshoot = 0.2 * h/2
+    const h = outputCount; // right-edge total height in grid units
+    const leftInset = 0.25;  // how far the left edge is inset from 0 and h
+    const rightOver = 0.2;   // how far the right edge extends past 0 and h
+
+    const poly = [
+      { x: 0.05, y: leftInset },
+      { x: 1.95, y: -rightOver },
+      { x: 1.95, y: h + rightOver },
+      { x: 0.05, y: h - leftInset },
+    ];
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
+    ctx.drawPolygon(poly, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
+    ctx.drawPolygon(poly, false);
 
+    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("DEC", COMP_WIDTH / 2, h / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
+    ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });
 
     ctx.restore();
   }
 
   getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
     return (
       `Decoder — ${selectorBits}-bit input produces ${outputCount} one-hot outputs.\n` +
@@ -187,7 +204,7 @@ const DECODER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "selectorBits",
     type: PropertyType.INT,
     label: "Selector Bits",
-    defaultValue: 2,
+    defaultValue: 1,
     min: 1,
     max: 4,
     description: "Number of input bits (determines number of outputs: 2^selectorBits)",
@@ -214,7 +231,7 @@ export const DecoderDefinition: ComponentDefinition = {
   typeId: -1,
   factory: decoderFactory,
   executeFn: executeDecoder,
-  pinLayout: buildDecoderPinDeclarations(2),
+  pinLayout: buildDecoderPinDeclarations(1),
   propertyDefs: DECODER_PROPERTY_DEFS,
   attributeMap: DECODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,

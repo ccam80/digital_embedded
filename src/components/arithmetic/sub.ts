@@ -21,6 +21,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -115,32 +116,18 @@ export class SubElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("-", COMP_WIDTH / 2, 1, { horizontal: "center", vertical: "middle" });
-
-    this._drawLabel(ctx);
-    ctx.restore();
-  }
-
-  private _drawLabel(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length === 0) return;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+    drawGenericShape(ctx, {
+      inputLabels: ["a", "b", "c_i"],
+      outputLabels: ["s", "c_o"],
+      clockInputIndices: [],
+      componentName: "Sub",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

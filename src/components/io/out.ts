@@ -98,11 +98,14 @@ export class OutElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Circles at cx=0.8 r=0.75: minX = 0.8-0.75, maxX = 0.8+0.75, minY = -0.75, maxY = 0.75.
+    // Use cx-r and cx+r arithmetic to match ellipseSegments cardinal sentinel values exactly.
+    const cx = 0.8, r = 0.75;
     return {
-      x: this.position.x,
-      y: this.position.y - 0.5,
-      width: COMP_WIDTH,
-      height: 1,
+      x: this.position.x + (cx - r),
+      y: this.position.y - r,
+      width: 2 * r,
+      height: 2 * r,
     };
   }
 
@@ -112,23 +115,21 @@ export class OutElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const label = this._properties.getOrDefault<string>("label", "");
-    const size = 1;
-    const yOff = -size / 2;
 
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, size, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, size, false);
+    // Outer circle at (0.8, 0) r=0.75
+    ctx.drawCircle(0.8, 0, 0.75, false);
+    // Inner circle at (0.8, 0) r=0.45
+    ctx.drawCircle(0.8, 0, 0.45, false);
 
-    // Draw label inside the component body (or type name if no label)
-    const displayText = label.length > 0 ? label : "Out";
+    // Label to the right
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: size * 0.6 });
-    drawUprightText(ctx, displayText, COMP_WIDTH / 2, 0, {
-      horizontal: "center",
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    drawUprightText(ctx, label, 2.25, 0, {
+      horizontal: "left",
       vertical: "middle",
     }, this.rotation);
 

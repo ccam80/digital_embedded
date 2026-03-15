@@ -28,22 +28,23 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock (6 inputs, 1 output)
+// Helpers — ComponentLayout mock (5 inputs, 1 output)
+// GraphicCard has 5 inputs (A, str, C, ld, B) and 1 output (D)
 // ---------------------------------------------------------------------------
 
 function makeLayout(): ComponentLayout {
   return {
     wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 6,
+    inputCount: () => 5,
     inputOffset: () => 0,
     outputCount: () => 1,
-    outputOffset: () => 6,
+    outputOffset: () => 5,
     stateOffset: () => 0,
   };
 }
 
 /**
- * Build state: [A, str, C, ld, B, D_in, output_slot]
+ * Build state: [A, str, C, ld, B, output_slot]
  */
 function makeState(
   addr: number,
@@ -51,16 +52,15 @@ function makeState(
   clk: number,
   ld: number,
   bank: number,
-  dataIn: number,
+  _dataIn: number,
 ): Uint32Array {
-  const arr = new Uint32Array(7);
+  const arr = new Uint32Array(6);
   arr[0] = addr >>> 0;
   arr[1] = str & 1;
   arr[2] = clk & 1;
   arr[3] = ld & 1;
   arr[4] = bank & 1;
-  arr[5] = dataIn >>> 0;
-  arr[6] = 0;
+  arr[5] = 0; // output slot
   return arr;
 }
 
@@ -312,26 +312,26 @@ describe("GraphicCard", () => {
       const state = makeState(0, 0, 0, 0, 0, 0);
       const highZs = new Uint32Array(state.length);
       executeGraphicCard(0, state, highZs, layout);
-      expect(state[6]).toBe(0);
+      expect(state[5]).toBe(0);
     });
 
     it("non-zero inputs produce non-zero output slot", () => {
       const layout = makeLayout();
-      const state = makeState(5, 1, 1, 0, 0, 0xAB);
+      const state = makeState(5, 1, 1, 0, 0, 0);
       const highZs = new Uint32Array(state.length);
       executeGraphicCard(0, state, highZs, layout);
-      expect(state[6]).not.toBe(0);
+      expect(state[5]).not.toBe(0);
     });
 
     it("str flag is encoded in output slot", () => {
       const layout = makeLayout();
       const stateStr = makeState(0, 1, 0, 0, 0, 0);
       executeGraphicCard(0, stateStr, new Uint32Array(stateStr.length), layout);
-      const withStr = stateStr[6];
+      const withStr = stateStr[5];
 
       const stateNoStr = makeState(0, 0, 0, 0, 0, 0);
       executeGraphicCard(0, stateNoStr, new Uint32Array(stateNoStr.length), layout);
-      const withoutStr = stateNoStr[6];
+      const withoutStr = stateNoStr[5];
 
       expect(withStr).not.toBe(withoutStr);
     });
@@ -340,11 +340,11 @@ describe("GraphicCard", () => {
       const layout = makeLayout();
       const stateLd = makeState(0, 0, 0, 1, 0, 0);
       executeGraphicCard(0, stateLd, new Uint32Array(stateLd.length), layout);
-      const withLd = stateLd[6];
+      const withLd = stateLd[5];
 
       const stateNoLd = makeState(0, 0, 0, 0, 0, 0);
       executeGraphicCard(0, stateNoLd, new Uint32Array(stateNoLd.length), layout);
-      const withoutLd = stateNoLd[6];
+      const withoutLd = stateNoLd[5];
 
       expect(withLd).not.toBe(withoutLd);
     });
@@ -353,11 +353,11 @@ describe("GraphicCard", () => {
       const layout = makeLayout();
       const stateB1 = makeState(0, 0, 0, 0, 1, 0);
       executeGraphicCard(0, stateB1, new Uint32Array(stateB1.length), layout);
-      const withB1 = stateB1[6];
+      const withB1 = stateB1[5];
 
       const stateB0 = makeState(0, 0, 0, 0, 0, 0);
       executeGraphicCard(0, stateB0, new Uint32Array(stateB0.length), layout);
-      const withB0 = stateB0[6];
+      const withB0 = stateB0[5];
 
       expect(withB1).not.toBe(withB0);
     });
@@ -371,7 +371,7 @@ describe("GraphicCard", () => {
         state[2] = i & 1;
         executeGraphicCard(0, state, highZs, layout);
       }
-      expect(typeof state[6]).toBe("number");
+      expect(typeof state[5]).toBe("number");
     });
   });
 
@@ -380,14 +380,14 @@ describe("GraphicCard", () => {
   // ---------------------------------------------------------------------------
 
   describe("pinLayout", () => {
-    it("has exactly 6 input pins", () => {
+    it("has exactly 5 input pins", () => {
       const el = makeCard();
       const pins = el.getPins();
       const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(6);
+      expect(inputs).toHaveLength(5);
     });
 
-    it("input pins are labeled A, str, C, ld, B, D", () => {
+    it("input pins are labeled A, str, C, ld, B", () => {
       const el = makeCard();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
       const labels = inputs.map((p) => p.label);
@@ -396,7 +396,6 @@ describe("GraphicCard", () => {
       expect(labels).toContain("C");
       expect(labels).toContain("ld");
       expect(labels).toContain("B");
-      expect(labels).toContain("D");
     });
 
     it("has exactly 1 output pin labeled D", () => {
@@ -439,8 +438,8 @@ describe("GraphicCard", () => {
       expect(aPin?.bitWidth).toBe(el.addrBits);
     });
 
-    it("GraphicCardDefinition.pinLayout has 7 entries (6 in + 1 out)", () => {
-      expect(GraphicCardDefinition.pinLayout).toHaveLength(7);
+    it("GraphicCardDefinition.pinLayout has 6 entries (5 in + 1 out)", () => {
+      expect(GraphicCardDefinition.pinLayout).toHaveLength(6);
     });
   });
 
@@ -458,14 +457,14 @@ describe("GraphicCard", () => {
       expect(rectCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawText containing 'Graphic'", () => {
+    it("draw() calls drawText containing 'Gr-RAM'", () => {
       const el = makeCard();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
       const textCalls = calls.filter((c) => c.method === "drawText");
       expect(
-        textCalls.some((c) => (c.args[0] as string).includes("Graphic")),
+        textCalls.some((c) => (c.args[0] as string).includes("Gr-RAM")),
       ).toBe(true);
     });
 
@@ -507,7 +506,7 @@ describe("GraphicCard", () => {
       const el = new GraphicCardElement("inst", { x: 2, y: 7 }, 0, false, props);
       const box = el.getBoundingBox();
       expect(box.x).toBe(2);
-      expect(box.y).toBe(7);
+      expect(box.y).toBe(7 - 0.5);
     });
 
     it("bounding box has positive dimensions", () => {
@@ -601,8 +600,8 @@ describe("GraphicCard", () => {
       expect(GraphicCardDefinition.executeFn).toBe(executeGraphicCard);
     });
 
-    it("GraphicCardDefinition pinLayout has 7 entries", () => {
-      expect(GraphicCardDefinition.pinLayout).toHaveLength(7);
+    it("GraphicCardDefinition pinLayout has 6 entries", () => {
+      expect(GraphicCardDefinition.pinLayout).toHaveLength(6);
     });
 
     it("GraphicCardDefinition propertyDefs include dataBits, graphicWidth, graphicHeight", () => {

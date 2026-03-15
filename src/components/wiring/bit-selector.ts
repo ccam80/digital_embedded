@@ -33,10 +33,9 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-// Pins shifted -1: in@y=0, sel@y=2, out@y=1
-// bodyHeight = maxPinY + 1 = 2 + 1 = 3
-const COMP_HEIGHT = 3;
+// Java BitSelShape: width=2, in@(0,0), sel@(1,flip?-1:1), out@(2,0)
+const COMP_WIDTH = 2;
+const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
 // Pin layout — y-positions shifted down by 1 from previous layout
@@ -58,7 +57,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
-    position: { x: 0, y: 2 },
+    position: { x: 1, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -67,7 +66,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -96,30 +95,33 @@ export class BitSelectorElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Trapezoid: (0.05,-1.2) -> (1.95,-0.75) -> (1.95,0.75) -> (0.05,1.2).
+    // MinX=0.05, maxX=1.95, minY=-1.2, maxY=1.2.
     return {
-      x: this.position.x,
-      y: this.position.y - 0.5,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + 0.05,
+      y: this.position.y - 1.2,
+      width: 1.9,
+      height: 2.4,
     };
   }
 
   draw(ctx: RenderContext): void {
+    // Java BitSelShape trapezoid: wider on left, narrower on right.
+    // Exact Java coords: (0.05,-1.2)→(1.95,-0.75)→(1.95,0.75)→(0.05,1.2)
+    const poly = [
+      { x: 0.05, y: -1.2 },
+      { x: 1.95, y: -0.75 },
+      { x: 1.95, y: 0.75 },
+      { x: 0.05, y: 1.2 },
+    ];
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawPolygon(poly, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("BSel", COMP_WIDTH / 2, 1, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    ctx.drawPolygon(poly, false);
 
     ctx.restore();
   }

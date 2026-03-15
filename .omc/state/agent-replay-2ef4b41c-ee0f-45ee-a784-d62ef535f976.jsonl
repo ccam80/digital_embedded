@@ -1,4 +1,0 @@
-{"t":0,"agent":"a2fb7db","agent_type":"claude-orchestrator:review-spec","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"a2fb7db","agent_type":"claude-orchestrator:review-spec","event":"agent_stop","success":true,"duration_ms":258596}
-{"t":0,"agent":"ae4c93f","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"ae4c93f","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":86239}

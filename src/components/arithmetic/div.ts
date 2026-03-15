@@ -17,8 +17,8 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -32,23 +32,22 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
+// GenericShape: 2 inputs, 2 outputs, symmetric=false, offs=0
+// a@(0,0), b@(0,1), q@(3,0), r@(3,1)
 function buildDivPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 2, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "a",
       defaultBitWidth: bitWidth,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -56,7 +55,7 @@ function buildDivPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "b",
       defaultBitWidth: bitWidth,
-      position: inputPositions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -64,7 +63,7 @@ function buildDivPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "q",
       defaultBitWidth: bitWidth,
-      position: outputPositions[0],
+      position: { x: 3, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -72,7 +71,7 @@ function buildDivPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "r",
       defaultBitWidth: bitWidth,
-      position: outputPositions[1],
+      position: { x: 3, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -100,38 +99,18 @@ export class DivElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    const signed = this._properties.getOrDefault<boolean>("signed", false);
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText(
-      signed ? "A/B" : "/",
-      COMP_WIDTH / 2,
-      COMP_HEIGHT / 2,
-      { horizontal: "center", vertical: "middle" },
-    );
-
-    this._drawLabel(ctx);
-    ctx.restore();
-  }
-
-  private _drawLabel(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length === 0) return;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+    drawGenericShape(ctx, {
+      inputLabels: ["a", "b"],
+      outputLabels: ["q", "r"],
+      clockInputIndices: [],
+      componentName: "Div",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

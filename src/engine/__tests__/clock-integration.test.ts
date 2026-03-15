@@ -223,7 +223,7 @@ function buildClockDFFCircuit(
   const layout = new StaticLayout(inputNets, outputNets, stateOffsets);
 
   // Type IDs: 0 = Clock executeFn, 1 = DFF executeFn
-  const typeIds = new Uint8Array(componentCount);
+  const typeIds = new Uint16Array(componentCount);
   for (let i = 0; i < numClocks; i++) typeIds[i] = 0;
   for (let i = 0; i < numDFFs; i++) typeIds[numClocks + i] = 1;
 

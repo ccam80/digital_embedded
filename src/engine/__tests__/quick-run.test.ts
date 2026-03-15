@@ -56,7 +56,7 @@ function buildMinimalCircuit(): ConcreteCompiledCircuit {
   return {
     netCount: 2,
     componentCount: 1,
-    typeIds: new Uint8Array([0]),
+    typeIds: new Uint16Array([0]),
     executeFns: [noopFn],
     sampleFns: [null],
     wiringTable: layout.wiringTable,

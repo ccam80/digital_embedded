@@ -31,10 +31,10 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -47,73 +47,46 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java Terminal uses GenericShape: 3 inputs, 0 outputs, width=3
+// → COMP_WIDTH=3, COMP_HEIGHT=3
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 4;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 3;
 const MAX_BUFFER_CHARS = 4096;
 const MAX_KEY_QUEUE = 64;
 
 // ---------------------------------------------------------------------------
-// Pin indices (fixed positions in the pin array)
-// ---------------------------------------------------------------------------
-
-/** Index within the terminal's pin array for each pin. */
-export const TERMINAL_PIN = {
-  DIN: 0,
-  WR: 1,
-  RD: 2,
-  DOUT: 0,
-  RDY: 1,
-} as const;
-
-// ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — Java GenericShape(3 inputs, 0 outputs, width=3):
+//   D  at (0, 0)
+//   C  at (0, 1)
+//   en at (0, 2)
+// No outputs.
 // ---------------------------------------------------------------------------
 
 function buildTerminalPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 3, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
   return [
-    // Inputs
     {
       direction: PinDirection.INPUT,
-      label: "din",
+      label: "D",
       defaultBitWidth: 8,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
       direction: PinDirection.INPUT,
-      label: "wr",
+      label: "C",
       defaultBitWidth: 1,
-      position: inputPositions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: true,
     },
     {
       direction: PinDirection.INPUT,
-      label: "rd",
+      label: "en",
       defaultBitWidth: 1,
-      position: inputPositions[2],
-      isNegatable: false,
-      isClockCapable: true,
-    },
-    // Outputs
-    {
-      direction: PinDirection.OUTPUT,
-      label: "dout",
-      defaultBitWidth: 8,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "rdy",
-      defaultBitWidth: 1,
-      position: outputPositions[1],
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -194,49 +167,28 @@ export class TerminalElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildTerminalPinDeclarations(), ["wr", "rd"]);
+    return this.derivePins(buildTerminalPinDeclarations(), ["C"]);
   }
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
-    ctx.save();
-
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Terminal screen symbol — inner rectangle representing the CRT
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0.4, 0.6, COMP_WIDTH - 0.8, COMP_HEIGHT - 1.4, false);
-
-    // Cursor blink indicator line inside the screen
-    ctx.drawLine(0.7, COMP_HEIGHT - 1.2, 1.3, COMP_HEIGHT - 1.2);
-
-    // Label
     const label = this._properties.getOrDefault<string>("label", "");
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(
-      label.length > 0 ? label : "Terminal",
-      COMP_WIDTH / 2,
-      COMP_HEIGHT + 0.3,
-      { horizontal: "center", vertical: "top" },
-    );
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["D", "C", "en"],
+      outputLabels: [],
+      clockInputIndices: [1],
+      componentName: "Terminal",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
+    });
   }
 
   getHelpText(): string {
@@ -269,54 +221,14 @@ export class TerminalElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeTerminal(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inBase = layout.inputOffset(index);
-  const outBase = layout.outputOffset(index);
-
-  const din = state[wt[inBase]];          // 8-bit character
-  const wr = state[wt[inBase + 1]] & 1;  // write strobe
-  const rd = state[wt[inBase + 2]] & 1;  // read strobe
-
-  // Internal state: previous wr and rd for edge detection
-  // stateOffset not available in this layout interface — store in output scratch
-  // We use two extra output slots beyond dout/rdy for previous wr/rd state.
-  // Slot: outBase+0=dout, outBase+1=rdy, outBase+2=prev_wr, outBase+3=prev_rd
-  const prevWr = state[wt[outBase + 2]] & 1;
-  const prevRd = state[wt[outBase + 3]] & 1;
-
-  // Rising edge on wr: character din should be appended to buffer.
-  // The engine's post-step hook calls element.appendChar(din) when it detects
-  // this transition. We encode the "new char" signal in the output so the
-  // engine can read it: we write din to dout temporarily on the wr edge.
-  // (The actual buffer append is engine-side; this function just sets signals.)
-
-  // Rising edge on rd: dequeue one key.
-  // Again, actual dequeue is engine-side. We just update rdy/dout.
-
-  // For the signal-level outputs that the engine sees each step:
-  //   dout = current front key code (0 if empty, exposed via side channel)
-  //   rdy  = 1 if queue non-empty, 0 if empty
-  // These are updated by the engine after dequeue. Here we preserve them.
-  // On a rising wr edge, mark pending write in a scratch slot.
-  if (wr === 1 && prevWr === 0) {
-    // Encode pending character write in scratch area (outBase+4)
-    state[wt[outBase + 4]] = din;
-    state[wt[outBase + 5]] = 1; // pending_wr flag
-  }
-
-  // On a rising rd edge, signal dequeue request
-  if (rd === 1 && prevRd === 0) {
-    state[wt[outBase + 6]] = 1; // pending_rd flag
-  }
-
-  // Update previous strobe values
-  state[wt[outBase + 2]] = wr;
-  state[wt[outBase + 3]] = rd;
+  // Terminal has no outputs — it is a display-only sink component.
+  // The display panel reads inputs D, C, en directly via the engine's
+  // post-step hook accessing the element. No output slots to write.
 }
 
 // ---------------------------------------------------------------------------

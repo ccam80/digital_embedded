@@ -33,7 +33,7 @@ import type { EvaluationMode } from "./evaluation-mode.js";
 interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly totalStateSlots: number;
   readonly signalArraySize: number;
-  readonly typeIds: Uint8Array;
+  readonly typeIds: Uint16Array;
   readonly executeFns: Array<unknown>;
   readonly sampleFns: Array<unknown>;
   readonly wiringTable: Int32Array;

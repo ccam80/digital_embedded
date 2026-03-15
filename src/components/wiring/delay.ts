@@ -34,8 +34,9 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 3;
+// Java DelayShape: in(0,0), out(SIZE*2,0)=(2,0); SIZE=1 grid unit
+const COMP_WIDTH = 2;
+const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -46,7 +47,7 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
     direction: PinDirection.INPUT,
     label: "in",
     defaultBitWidth: bitWidth,
-    position: { x: 0, y: Math.floor(COMP_HEIGHT / 2) },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -55,7 +56,7 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: bitWidth,
-    position: { x: COMP_WIDTH, y: Math.floor(COMP_HEIGHT / 2) },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -84,31 +85,49 @@ export class DelayElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Rectangle polygon: (0.05,-0.5) to (1.95,0.5).
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: 1.9,
+      height: 1,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const delayTime = this._properties.getOrDefault<number>("delayTime", 1);
-
     ctx.save();
 
+    // Rectangle: (0.05,-0.5) → (1.95,0.5)
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawPolygon(
+      [
+        { x: 0.05, y: -0.5 },
+        { x: 1.95, y: -0.5 },
+        { x: 1.95, y: 0.5 },
+        { x: 0.05, y: 0.5 },
+      ],
+      true,
+    );
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawPolygon(
+      [
+        { x: 0.05, y: -0.5 },
+        { x: 1.95, y: -0.5 },
+        { x: 1.95, y: 0.5 },
+        { x: 0.05, y: 0.5 },
+      ],
+      false,
+    );
 
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText(`D${delayTime}`, COMP_WIDTH / 2, COMP_HEIGHT / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    // Three THIN lines forming H-bar delay symbol
+    ctx.setLineWidth(0.5); // THIN
+    // Horizontal center bar
+    ctx.drawLine(0.5, 0, 1.5, 0);
+    // Left vertical serif
+    ctx.drawLine(0.5, 0.25, 0.5, -0.25);
+    // Right vertical serif
+    ctx.drawLine(1.5, 0.25, 1.5, -0.25);
 
     ctx.restore();
   }

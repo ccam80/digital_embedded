@@ -62,7 +62,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: Array<(i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout) => void>,
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
 ): ConcreteCompiledCircuit {
   const layout = new StaticLayout(inputNets, outputNets);
@@ -120,7 +120,7 @@ describe("MicroStep", () => {
       [[0], [2]],  // input nets per component
       [[1], [3]],  // output nets per component
       [executeFn0, executeFn1],
-      new Uint8Array([0, 1]),
+      new Uint16Array([0, 1]),
       [singleGroup([0, 1])],
     );
 
@@ -155,7 +155,7 @@ describe("MicroStep", () => {
       [[0]],
       [[1]],
       [executeFn],
-      new Uint8Array([0]),
+      new Uint16Array([0]),
       [singleGroup([0])],
     );
 
@@ -182,7 +182,7 @@ describe("MicroStep", () => {
       [[0], [1]],
       [[1], [2]],
       [executeFn, executeFn],
-      new Uint8Array([0, 0]),
+      new Uint16Array([0, 0]),
       [singleGroup([0, 1])],
     );
 
@@ -225,7 +225,7 @@ describe("MicroStep", () => {
       [[0], [1], [2]],
       [[1], [2], [3]],
       [executeFn, executeFn, executeFn],
-      new Uint8Array([0, 0, 0]),
+      new Uint16Array([0, 0, 0]),
       [singleGroup([0, 1, 2])],
     );
 
@@ -256,7 +256,7 @@ describe("MicroStep", () => {
       [[0]],
       [[1]],
       [executeFn],
-      new Uint8Array([0]),
+      new Uint16Array([0]),
       [singleGroup([0])],
     );
 

@@ -42,6 +42,10 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
+// Java DiodeShape: vertical layout
+// Diode:         out1(0,0), out2(0,-1)  [cathode at y=0, anode at y=-1]
+// DiodeBackward: in(0,0),   out(0,-1)
+// DiodeForeward: in(0,0),   out(0,1)
 const COMP_WIDTH = 2;
 const COMP_HEIGHT = 2;
 
@@ -53,30 +57,30 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.BIDIRECTIONAL,
-      label: "cathode",
+      label: "out1",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
       direction: PinDirection.BIDIRECTIONAL,
-      label: "anode",
+      label: "out2",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 1 },
+      position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },
   ];
 }
 
-function buildUnidirectionalPinDeclarations(): PinDeclaration[] {
+function buildDiodeBackwardPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -84,7 +88,28 @@ function buildUnidirectionalPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 1 },
+      position: { x: 0, y: -1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "in",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "out",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -97,7 +122,7 @@ function buildUnidirectionalPinDeclarations(): PinDeclaration[] {
 
 /**
  * Draw the diode triangle symbol body (cathode on left, anode on right).
- * The triangle tip points right (anode side).
+ * Used by the bidirectional Diode — kept horizontal for that component.
  */
 function drawDiodeBody(ctx: RenderContext, label: string): void {
   ctx.setColor("COMPONENT_FILL");
@@ -138,42 +163,60 @@ function drawDiodeBody(ctx: RenderContext, label: string): void {
 }
 
 /**
- * Draw a backward diode (cathode on right, triangle pointing left).
+ * Draw DiodeForward: vertical orientation, pin "in" at top (0,0), pin "out" at bottom (0,1).
+ * Downward-pointing triangle with cathode bar at bottom.
+ * Matches Java DiodeShape for DiodeForward.
  */
-function drawDiodeBodyBackward(ctx: RenderContext, label: string): void {
-  ctx.setColor("COMPONENT_FILL");
-  ctx.drawPath({
-    operations: [
-      { op: "moveTo", x: 1.7, y: 0.2 },
-      { op: "lineTo", x: 0.3, y: 1 },
-      { op: "lineTo", x: 1.7, y: 1.8 },
-      { op: "closePath" },
-    ],
-  });
-
+function drawDiodeBodyForward(ctx: RenderContext, label: string): void {
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
 
+  // Downward-pointing triangle: top-left → top-right → bottom-centre
   ctx.drawPath({
     operations: [
-      { op: "moveTo", x: 1.7, y: 0.2 },
-      { op: "lineTo", x: 0.3, y: 1 },
-      { op: "lineTo", x: 1.7, y: 1.8 },
+      { op: "moveTo", x: -0.5, y: 0.05 },
+      { op: "lineTo", x: 0.5, y: 0.05 },
+      { op: "lineTo", x: 0, y: 0.95 },
       { op: "closePath" },
     ],
   });
 
-  // Cathode bar (vertical line at left/cathode tip)
-  ctx.drawLine(0.3, 0.2, 0.3, 1.8);
-
-  // Lead lines
-  ctx.drawLine(0, 1, 0.3, 1);
-  ctx.drawLine(1.7, 1, COMP_WIDTH, 1);
+  // Cathode bar at bottom of triangle
+  ctx.drawLine(-0.5, 0.95, 0.5, 0.95);
 
   if (label.length > 0) {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.3, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText(label, 0, -0.1, { horizontal: "center", vertical: "bottom" });
+  }
+}
+
+/**
+ * Draw DiodeBackward: vertical orientation, pin "in" at bottom (0,0), pin "out" at top (0,-1).
+ * Upward-pointing triangle with cathode bar at top.
+ * Matches Java DiodeShape for DiodeBackward.
+ */
+function drawDiodeBodyBackward(ctx: RenderContext, label: string): void {
+  ctx.setColor("COMPONENT");
+  ctx.setLineWidth(1);
+
+  // Upward-pointing triangle: bottom-left → bottom-right → top-centre
+  ctx.drawPath({
+    operations: [
+      { op: "moveTo", x: -0.5, y: -0.95 },
+      { op: "lineTo", x: 0.5, y: -0.95 },
+      { op: "lineTo", x: 0, y: -0.05 },
+      { op: "closePath" },
+    ],
+  });
+
+  // Cathode bar at top of triangle
+  ctx.drawLine(-0.5, -0.05, 0.5, -0.05);
+
+  if (label.length > 0) {
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.8 });
+    ctx.drawText(label, 0, 0.1, { horizontal: "center", vertical: "top" });
   }
 }
 
@@ -285,15 +328,17 @@ export class DiodeForwardElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildUnidirectionalPinDeclarations());
+    return this.derivePins(buildDiodeForwardPinDeclarations());
   }
 
   getBoundingBox(): Rect {
+    // Triangle spans x: -0.5 to 0.5, y: 0.05 to 0.95
+    // Cathode bar at y=0.95, triangle top at y=0.05
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y + 0.05,
+      width: 1,
+      height: 0.9,
     };
   }
 
@@ -302,12 +347,12 @@ export class DiodeForwardElement extends AbstractCircuitElement {
     ctx.save();
 
     const label = this._properties.getOrDefault<string>("label", "");
-    drawDiodeBody(ctx, label);
+    drawDiodeBodyForward(ctx, label);
 
     if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
-      ctx.drawLine(0.8, 0.4, 1.2, 1.6);
+      ctx.drawLine(-0.2, 0.2, 0.2, 0.8);
     }
 
     ctx.restore();
@@ -339,15 +384,17 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildUnidirectionalPinDeclarations());
+    return this.derivePins(buildDiodeBackwardPinDeclarations());
   }
 
   getBoundingBox(): Rect {
+    // Triangle spans x: -0.5 to 0.5, y: -0.95 to -0.05
+    // Cathode bar at y=-0.05, triangle bottom at y=-0.95
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y - 0.95,
+      width: 1,
+      height: 0.9,
     };
   }
 
@@ -361,7 +408,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
-      ctx.drawLine(0.8, 0.4, 1.2, 1.6);
+      ctx.drawLine(-0.2, -0.8, 0.2, -0.2);
     }
 
     ctx.restore();
@@ -535,7 +582,7 @@ export const DiodeForwardDefinition: ComponentDefinition = {
   typeId: -1,
   factory: diodeForwardFactory,
   executeFn: executeDiodeForward,
-  pinLayout: buildUnidirectionalPinDeclarations(),
+  pinLayout: buildDiodeForwardPinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
@@ -551,7 +598,7 @@ export const DiodeBackwardDefinition: ComponentDefinition = {
   typeId: -1,
   factory: diodeBackwardFactory,
   executeFn: executeDiodeBackward,
-  pinLayout: buildUnidirectionalPinDeclarations(),
+  pinLayout: buildDiodeBackwardPinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,

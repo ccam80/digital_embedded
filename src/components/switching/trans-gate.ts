@@ -36,8 +36,9 @@ import type { FETLayout } from "./nfet.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Java TransGateShape: p1(SIZE,−SIZE)=(1,−1), p2(SIZE,SIZE)=(1,1), out1(0,0), out2(SIZE*2,0)=(2,0)
+const COMP_WIDTH = 2;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -46,33 +47,33 @@ const COMP_HEIGHT = 3;
 const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
   {
     direction: PinDirection.INPUT,
-    label: "S",
+    label: "p1",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH / 2, y: 0 },
+    position: { x: 1, y: -1 },
     isNegatable: false,
     isClockCapable: false,
   },
   {
     direction: PinDirection.INPUT,
-    label: "~S",
+    label: "p2",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH / 2, y: COMP_HEIGHT },
+    position: { x: 1, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
-    label: "A",
+    label: "out1",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
-    label: "B",
+    label: "out2",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
+    position: { x: 2, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -99,7 +100,11 @@ export class TransGateElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Gate line extends up to y=-1 (pin p1 at y=-1).
+    // Label text at y=-1.4 doesn't produce segments; drawn geometry min y=-1.
+    // Starting bbox at y=-1.4 caused overflow = tsBounds.minY - by0 = -1 - (-1.4) = 0.4.
+    // Circle at (1, 0.75) r=0.2 means max drawn y=0.95; bbox bottom at y=1 covers it.
+    return { x: this.position.x, y: this.position.y - 1, width: COMP_WIDTH, height: 2 };
   }
 
   draw(ctx: RenderContext): void {
@@ -107,34 +112,35 @@ export class TransGateElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Channel body — horizontal line through center
-    ctx.drawLine(0, COMP_HEIGHT / 2, COMP_WIDTH, COMP_HEIGHT / 2);
+    // Upper NFET bowtie polygon (closed): (0,0)→(0,-1)→(2,0)→(2,-1)→(0,0)
+    ctx.drawPolygon([
+      { x: 0, y: 0 },
+      { x: 0, y: -1 },
+      { x: 2, y: 0 },
+      { x: 2, y: -1 },
+      { x: 0, y: 0 },
+    ], false);
 
-    // Gate bar (vertical, NFET side — top)
-    ctx.drawLine(COMP_WIDTH / 2 - 0.5, COMP_HEIGHT / 2 - 0.5, COMP_WIDTH / 2 + 0.5, COMP_HEIGHT / 2 - 0.5);
-    // Gate bar (vertical, PFET side — bottom)
-    ctx.drawLine(COMP_WIDTH / 2 - 0.5, COMP_HEIGHT / 2 + 0.5, COMP_WIDTH / 2 + 0.5, COMP_HEIGHT / 2 + 0.5);
+    // Lower PFET bowtie polygon (closed): (0,0)→(0,1)→(2,0)→(2,1)→(0,0)
+    ctx.drawPolygon([
+      { x: 0, y: 0 },
+      { x: 0, y: 1 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 0, y: 0 },
+    ], false);
 
-    // S gate line (top)
-    ctx.drawLine(COMP_WIDTH / 2, 0, COMP_WIDTH / 2, COMP_HEIGHT / 2 - 0.5);
+    // Gate line (top): p1 pin at (1,-1) connects to upper polygon at (1,-0.5)
+    ctx.drawLine(1, -1, 1, -0.5);
 
-    // ~S gate line (bottom) with inversion bubble
-    ctx.drawLine(COMP_WIDTH / 2, COMP_HEIGHT / 2 + 0.5, COMP_WIDTH / 2, COMP_HEIGHT - 0.15);
-    ctx.drawCircle(COMP_WIDTH / 2, COMP_HEIGHT - 0.15, 0.15, false);
-
-    // NFET arrow (top, pointing inward toward channel)
-    ctx.drawLine(COMP_WIDTH / 2, COMP_HEIGHT / 2 - 0.5, COMP_WIDTH / 2 - 0.2, COMP_HEIGHT / 2 - 0.8);
-    ctx.drawLine(COMP_WIDTH / 2, COMP_HEIGHT / 2 - 0.5, COMP_WIDTH / 2 + 0.2, COMP_HEIGHT / 2 - 0.8);
-
-    // PFET arrow (bottom, pointing outward away from channel)
-    ctx.drawLine(COMP_WIDTH / 2 - 0.2, COMP_HEIGHT / 2 + 0.8, COMP_WIDTH / 2, COMP_HEIGHT / 2 + 0.5);
-    ctx.drawLine(COMP_WIDTH / 2 + 0.2, COMP_HEIGHT / 2 + 0.8, COMP_WIDTH / 2, COMP_HEIGHT / 2 + 0.5);
+    // Inversion bubble circle for p2 (bottom gate) at (1,0.75) r=0.2
+    ctx.drawCircle(1, 0.75, 0.2, false);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, COMP_WIDTH / 2, -1.4, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

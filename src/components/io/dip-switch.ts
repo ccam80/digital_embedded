@@ -26,25 +26,25 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const BIT_WIDTH_PX = 1;
-const COMP_HEIGHT = 2;
+const BIT_SLOT_WIDTH = 2.9;
+const COMP_HEIGHT = 1;
 
 function componentWidth(bitCount: number): number {
-  return Math.max(bitCount * BIT_WIDTH_PX, 2);
+  return bitCount * BIT_SLOT_WIDTH;
 }
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
+// Java DipSwitchShape: single output pin at (0,0)
 function buildDipSwitchPinDeclarations(bitCount: number): PinDeclaration[] {
-  const w = componentWidth(bitCount);
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
       defaultBitWidth: bitCount,
-      position: { x: w, y: 0 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -74,11 +74,13 @@ export class DipSwitchElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const bitCount = this._properties.getOrDefault<number>("bitCount", 1);
-    const w = componentWidth(bitCount);
+    // Use integer arithmetic to match Java fixture coordinates exactly.
+    // bodyLeft = -(bitCount * 58 + 1) / 20  (avoids -(bitCount*2.9 + 0.05) float error).
+    const bodyLeft = -(bitCount * 58 + 1) / 20;
     return {
-      x: this.position.x,
+      x: this.position.x + bodyLeft,
       y: this.position.y - COMP_HEIGHT / 2,
-      width: w,
+      width: -bodyLeft,
       height: COMP_HEIGHT,
     };
   }
@@ -96,45 +98,49 @@ export class DipSwitchElement extends AbstractCircuitElement {
     const defaultValue = this._properties.getOrDefault<number>("defaultValue", 0);
     const label = this._properties.getOrDefault<string>("label", "");
     const w = componentWidth(bitCount);
-    const yOff = -COMP_HEIGHT / 2;
+
+    // Java DipSwitchShape: body is LEFT of pin at (0,0).
+    // Outer rect: (-0.05, 0.5) → (-w-0.05, 0.5) → (-w-0.05, -0.5) → (-0.05, -0.5)
+    // i.e. x from -(w+0.05) to -0.05, y from -0.5 to 0.5 (height=1)
+    const bodyRight = -0.05;
+    // Compute bodyLeft via integer arithmetic to avoid float error in -(w + 0.05).
+    // w = bitCount * 2.9 = bitCount * 58/20, so w+0.05 = (bitCount*58+1)/20.
+    const bodyLeft = -(bitCount * 58 + 1) / 20;
 
     ctx.save();
-
+    // Use drawPolygon with explicit corner coordinates to avoid drawRect float error
+    // (bodyLeft + (bodyRight-bodyLeft) != bodyRight due to IEEE 754).
+    const outerCorners = [
+      { x: bodyLeft, y: -0.5 },
+      { x: bodyRight, y: -0.5 },
+      { x: bodyRight, y: 0.5 },
+      { x: bodyLeft, y: 0.5 },
+    ];
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, w, COMP_HEIGHT, true);
+    ctx.drawPolygon(outerCorners, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, w, COMP_HEIGHT, false);
+    ctx.drawPolygon(outerCorners, false);
 
-    // Draw individual switch slots — one per bit
-    for (let i = 0; i < bitCount; i++) {
-      const slotX = i * BIT_WIDTH_PX + 0.15;
-      const slotW = BIT_WIDTH_PX - 0.3;
-      const bitOn = ((defaultValue >>> i) & 1) === 1;
+    // Switch slider: Java fixture shows (-2.75,0.3) → (-1.5,0.3) → (-1.5,-0.3) → (-2.75,-0.3)
+    // Slider width = 1.25, height = 0.6 (y from -0.3 to 0.3)
+    // OFF: slider at left end of body (bodyLeft+0.2)
+    // ON:  slider at right end of body (bodyRight-0.2-1.25)
+    const defaultOn = (defaultValue & 1) === 1;
+    const sliderWidth = 1.25;
+    const sliderX = defaultOn
+      ? bodyRight - 0.2 - sliderWidth   // right position (ON)
+      : bodyLeft + 0.2;                  // left position (OFF)
 
-      ctx.setColor("COMPONENT");
-      ctx.drawRect(slotX, yOff + 0.2, slotW, COMP_HEIGHT - 0.4, false);
-
-      if (bitOn) {
-        // Switch paddle in upper position (ON)
-        ctx.setColor("COMPONENT_FILL");
-        ctx.drawRect(slotX + 0.05, yOff + 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, true);
-        ctx.setColor("COMPONENT");
-        ctx.drawRect(slotX + 0.05, yOff + 0.25, slotW - 0.1, (COMP_HEIGHT - 0.5) / 2, false);
-      } else {
-        // Switch paddle in lower position (OFF)
-        const halfH = (COMP_HEIGHT - 0.5) / 2;
-        ctx.setColor("COMPONENT_FILL");
-        ctx.drawRect(slotX + 0.05, yOff + 0.25 + halfH, slotW - 0.1, halfH, true);
-        ctx.setColor("COMPONENT");
-        ctx.drawRect(slotX + 0.05, yOff + 0.25 + halfH, slotW - 0.1, halfH, false);
-      }
-    }
+    ctx.setColor("COMPONENT_FILL");
+    ctx.drawRect(sliderX, -0.3, sliderWidth, 0.6, true);
+    ctx.setColor("COMPONENT");
+    ctx.drawRect(sliderX, -0.3, sliderWidth, 0.6, false);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, w / 2, yOff - 0.3, {
+      ctx.drawText(label, (bodyLeft + bodyRight) / 2, -0.8, {
         horizontal: "center",
         vertical: "bottom",
       });

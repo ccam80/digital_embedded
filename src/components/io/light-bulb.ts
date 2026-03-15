@@ -27,21 +27,28 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
-const BULB_RADIUS = 0.7;
+const BULB_RADIUS = 0.9;
 
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
 function buildLightBulbPinDeclarations(): PinDeclaration[] {
+  // Java LightBulbShape: A at (0,0), B at (0,2)
   return [
     {
       direction: PinDirection.INPUT,
-      label: "in",
+      label: "A",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "B",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -68,39 +75,39 @@ export class LightBulbElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Circle at cx=0, cy=1, r=0.9: minX=-0.9, maxX=0.9, minY=1-0.9, maxY=1+0.9.
+    // Use cy-r arithmetic to match ellipseSegments cardinal sentinel values exactly.
+    const cy = 1, r = BULB_RADIUS;
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - r,
+      y: this.position.y + (cy - r),
+      width: 2 * r,
+      height: 2 * r,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
-
     ctx.save();
 
-    // Bulb body
+    // Bulb body — centered between pins A@(0,0) and B@(0,2)
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, 0, BULB_RADIUS, true);
+    ctx.drawCircle(0, 1, BULB_RADIUS, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(cx, 0, BULB_RADIUS, false);
+    ctx.drawCircle(0, 1, BULB_RADIUS, false);
 
-    // Filament cross lines (incandescent bulb symbol)
-    const r = BULB_RADIUS * 0.5;
-    ctx.setLineWidth(1);
-    ctx.drawLine(cx - r, -r, cx + r, r);
-    ctx.drawLine(cx + r, -r, cx - r, r);
+    // Diagonal X cross lines inside the bulb
+    ctx.drawLine(-0.55, 0.45, 0.55, 1.55);
+    ctx.drawLine(-0.55, 1.55, 0.55, 0.45);
 
+    // Label text at right side
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, cx, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
+      ctx.drawText(label, 1.5, 1, {
+        horizontal: "left",
+        vertical: "middle",
       });
     }
 

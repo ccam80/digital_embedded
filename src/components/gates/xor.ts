@@ -80,6 +80,7 @@ export class XOrElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
+    // Back curve starts at x=0.0; body and stubs also start at x=0.0.
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
@@ -126,21 +127,20 @@ export class XOrElement extends AbstractCircuitElement {
   private _drawIEEE(ctx: RenderContext, w: number): void {
     const wide = w === 4;
 
+    // Java IEEEXOrShape body: pure Bezier curves matching Java pixel path exactly.
+    // Java path (scaled 1/20): M(x0,2.5) C(1,2)(1,0)(x0,-0.5) C(1,-0.5)(2,0)(w,1) C(2,2)(1,2.5)(x0,2.5) Z
+    // where x0=0.5 (wide) or x0=0.55 (narrow), w=4 (wide) or w=3 (narrow).
     const bodyOps = wide ? [
-      { op: "moveTo" as const, x: 1.0, y: 2.5 },
-      { op: "lineTo" as const, x: 0.5, y: 2.5 },
-      { op: "curveTo" as const, cp1x: 1.0, cp1y: 1.7, cp2x: 1.0, cp2y: 0.3, x: 0.5, y: -0.5 },
-      { op: "lineTo" as const, x: 1.0, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 2.0, cp1y: -0.5, cp2x: 3.0, cp2y: 0, x: 4.0, y: 1.0 },
-      { op: "curveTo" as const, cp1x: 3.0, cp1y: 2.0, cp2x: 2.0, cp2y: 2.5, x: 1.0, y: 2.5 },
+      { op: "moveTo" as const, x: 0.5, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: 2.0, cp2x: 1.0, cp2y: 0.0, x: 0.5, y: -0.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: -0.5, cp2x: 2.0, cp2y: 0.0, x: 4.0, y: 1.0 },
+      { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.0, cp2y: 2.5, x: 0.5, y: 2.5 },
       { op: "closePath" as const },
     ] : [
-      { op: "moveTo" as const, x: 1.0, y: 2.5 },
-      { op: "lineTo" as const, x: 0.55, y: 2.5 },
-      { op: "curveTo" as const, cp1x: 1.0, cp1y: 2.0, cp2x: 1.0, cp2y: 0, x: 0.55, y: -0.5 },
-      { op: "lineTo" as const, x: 1.0, y: -0.5 },
-      { op: "curveTo" as const, cp1x: 1.5, cp1y: -0.5, cp2x: 2.0, cp2y: 0, x: 3.0, y: 1.0 },
-      { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.5, cp2y: 2.5, x: 1.0, y: 2.5 },
+      { op: "moveTo" as const, x: 0.55, y: 2.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: 2.0, cp2x: 1.0, cp2y: 0.0, x: 0.55, y: -0.5 },
+      { op: "curveTo" as const, cp1x: 1.0, cp1y: -0.5, cp2x: 2.0, cp2y: 0.0, x: 3.0, y: 1.0 },
+      { op: "curveTo" as const, cp1x: 2.0, cp1y: 2.0, cp2x: 1.0, cp2y: 2.5, x: 0.55, y: 2.5 },
       { op: "closePath" as const },
     ];
 

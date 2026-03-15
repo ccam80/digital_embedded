@@ -44,13 +44,16 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const POLE_HEIGHT = 2;
-const COIL_HEIGHT = 2;
+// Java RelayShape (1-pole, default):
+//   Contact pins A1 at (0,0), B1 at (2,0)   — contacts on the right side of component origin
+//   Coil pins in1 at (0,-2), in2 at (2,-2)   — coil terminals ABOVE (negative y)
+//   Contact arm: (0,0) → (1.8,-0.5)
+//   Dashed linkage: (1,-0.5) → (1,-0.95)
+//   Coil rect: x 0.5..1.5, y -1..-3
+//   Coil diagonal: (0.5,-1.5) → (1.5,-2.5)
+//   Coil leads: (0.5,-2)→(0,-2) and (1.5,-2)→(2,-2)
 
-function componentHeight(poles: number): number {
-  return Math.max(poles * POLE_HEIGHT, COIL_HEIGHT) + COIL_HEIGHT;
-}
+const COMP_WIDTH = 2;   // contact pins at x=0 and x=2
 
 // ---------------------------------------------------------------------------
 // Pin layout helper
@@ -59,12 +62,12 @@ function componentHeight(poles: number): number {
 function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
   const decls: PinDeclaration[] = [];
 
-  // Coil input pins at top (in1 left, in2 right)
+  // Coil input pins above (negative y): in1 at (0,-2), in2 at (2,-2)
   decls.push({
     direction: PinDirection.INPUT,
     label: "in1",
     defaultBitWidth: 1,
-    position: { x: 0, y: 0 },
+    position: { x: 0, y: -2 },
     isNegatable: false,
     isClockCapable: false,
   });
@@ -72,14 +75,14 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
     direction: PinDirection.INPUT,
     label: "in2",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 0 },
+    position: { x: COMP_WIDTH, y: -2 },
     isNegatable: false,
     isClockCapable: false,
   });
 
-  // Contact poles
+  // Contact poles: A at x=0, B at x=2, one row per pole (y=0 for pole 1)
   for (let p = 0; p < poles; p++) {
-    const yPos = COIL_HEIGHT + p * POLE_HEIGHT;
+    const yPos = p * 2;
     decls.push({
       direction: PinDirection.BIDIRECTIONAL,
       label: `A${p + 1}`,
@@ -119,13 +122,20 @@ export class RelayElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    return this.derivePins(buildRelayPins(poles), []);
+    return this.derivePins(buildRelayPins(poles, bitWidth), []);
   }
 
   getBoundingBox(): Rect {
+    // Coil is ABOVE contact pins (negative y), from y=-3 to y=0 for the coil+linkage,
+    // contact pins at y=0. For multi-pole, contacts extend downward.
     const poles = this._properties.getOrDefault<number>("poles", 1);
-    const h = componentHeight(poles);
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: h };
+    const contactSpan = (poles - 1) * 2;
+    return {
+      x: this.position.x,
+      y: this.position.y - 3,
+      width: COMP_WIDTH,
+      height: 3 + contactSpan,
+    };
   }
 
   draw(ctx: RenderContext): void {
@@ -136,27 +146,34 @@ export class RelayElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Coil symbol: rectangle at top
-    ctx.drawRect(0.5, 0, COMP_WIDTH - 1, COIL_HEIGHT, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(normallyClosed ? "NC" : "NO", COMP_WIDTH / 2, COIL_HEIGHT / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    // Contact arm: (0,0) → (1.8,-0.5) — switch arm angled upward from pin
+    ctx.drawLine(0, 0, 1.8, -0.5);
 
-    ctx.setColor("COMPONENT");
-    const yOffs = normallyClosed ? 0 : 0.5;
+    // Dashed linkage: (1,-0.5) → (1,-0.95)
+    ctx.drawLine(1, -0.5, 1, -0.95);
 
-    // Contact poles
-    for (let p = 0; p < poles; p++) {
-      const py = COIL_HEIGHT + p * POLE_HEIGHT;
+    // Coil rectangle: x 0.5..1.5, y -1..-3
+    ctx.drawRect(0.5, -3, 1, 2, false);
+
+    // Coil diagonal: (0.5,-1.5) → (1.5,-2.5)
+    ctx.drawLine(0.5, -1.5, 1.5, -2.5);
+
+    // Coil terminal leads: (0.5,-2)→(0,-2) and (1.5,-2)→(2,-2)
+    ctx.drawLine(0.5, -2, 0, -2);
+    ctx.drawLine(1.5, -2, 2, -2);
+
+    // For normally-closed: draw a straight line at y=0 across the contacts
+    // (contacts closed at rest). For normally-open the arm is already angled.
+    if (normallyClosed) {
+      ctx.drawLine(0, 0, COMP_WIDTH, 0);
+    }
+
+    // Additional contact poles (below y=0, spaced by 2 grid units)
+    for (let p = 1; p < poles; p++) {
+      const py = p * 2;
+      ctx.drawLine(0, py, 1.8, py - 0.5);
       if (normallyClosed) {
-        // Normally closed: straight line (contact is closed at rest)
         ctx.drawLine(0, py, COMP_WIDTH, py);
-      } else {
-        // Normally open: angled line (contact is open at rest)
-        ctx.drawLine(0, py, COMP_WIDTH - 0.2, py - yOffs * 2);
       }
     }
 
@@ -164,7 +181,7 @@ export class RelayElement extends AbstractCircuitElement {
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, COMP_WIDTH / 2, componentHeight(poles) + 0.3, {
+      ctx.drawText(label, COMP_WIDTH / 2, (poles - 1) * 2 + 0.5, {
         horizontal: "center",
         vertical: "top",
       });

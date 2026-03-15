@@ -132,7 +132,7 @@ function buildClockCircuit(
   return {
     netCount,
     componentCount,
-    typeIds: new Uint8Array(componentCount),
+    typeIds: new Uint16Array(componentCount),
     executeFns: [],
     sampleFns: [],
     wiringTable: layout.wiringTable,

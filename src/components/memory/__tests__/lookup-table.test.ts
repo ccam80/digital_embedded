@@ -250,7 +250,7 @@ describe("LookUpTable", () => {
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(2);
-    expect(bb.y).toBe(3);
+    expect(bb.y).toBe(3 - 0.5);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });

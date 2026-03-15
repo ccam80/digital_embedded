@@ -80,7 +80,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
   delays?: Uint32Array,
 ): ConcreteCompiledCircuit {
@@ -157,7 +157,7 @@ describe("DigitalEngine", () => {
       [],
       [],
       [],
-      new Uint8Array(0),
+      new Uint16Array(0),
       [],
     );
 
@@ -192,7 +192,7 @@ describe("DigitalEngine", () => {
     };
 
     const executeFns: ExecuteFunction[] = [andExecute, orExecute];
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
     const inputNets = [[0, 1], [2, 3]];
     const outputNets = [[2], [4]];
     const evaluationOrder: EvaluationGroup[] = [singleGroup([0, 1])];
@@ -226,7 +226,7 @@ describe("DigitalEngine", () => {
     };
 
     const executeFns: ExecuteFunction[] = [notExecute];
-    const typeIds = new Uint8Array([0]);
+    const typeIds = new Uint16Array([0]);
     const inputNets = [[0]];
     const outputNets = [[1]];
     const evaluationOrder: EvaluationGroup[] = [singleGroup([0])];
@@ -266,7 +266,7 @@ describe("DigitalEngine", () => {
     };
 
     const executeFns: ExecuteFunction[] = [nor1Execute, nor2Execute];
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
     const inputNets = [[0, 3], [1, 2]];
     const outputNets = [[2], [3]];
     const evaluationOrder: EvaluationGroup[] = [feedbackGroup([0, 1])];
@@ -310,7 +310,7 @@ describe("DigitalEngine", () => {
     };
 
     const executeFns: ExecuteFunction[] = [gate0Execute, gate1Execute];
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
     const inputNets = [[0], [1]];
     const outputNets = [[1], [2]];
     const evaluationOrder: EvaluationGroup[] = [singleGroup([0, 1])];
@@ -340,7 +340,7 @@ describe("DigitalEngine", () => {
     // Initial state before init
     expect(engine.getState()).toBe(EngineState.STOPPED);
 
-    const circuit = buildCircuit(1, [], [], [], new Uint8Array(0), []);
+    const circuit = buildCircuit(1, [], [], [], new Uint16Array(0), []);
     engine.init(circuit);
 
     // After init, still STOPPED
@@ -365,7 +365,7 @@ describe("DigitalEngine", () => {
   it("changeListenerFires", () => {
     const engine = new DigitalEngine("level");
 
-    const circuit = buildCircuit(2, [], [], [], new Uint8Array(0), []);
+    const circuit = buildCircuit(2, [], [], [], new Uint16Array(0), []);
     engine.init(circuit);
 
     const receivedStates: EngineState[] = [];
@@ -395,7 +395,7 @@ describe("DigitalEngine", () => {
     };
 
     const executeFns: ExecuteFunction[] = [notExecute];
-    const typeIds = new Uint8Array([0]);
+    const typeIds = new Uint16Array([0]);
     const inputNets = [[0]];
     const outputNets = [[1]];
     const evaluationOrder: EvaluationGroup[] = [singleGroup([0])];

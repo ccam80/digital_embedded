@@ -55,12 +55,13 @@ function componentHeight(poles: number): number {
 function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
   const decls: PinDeclaration[] = [];
 
-  // Coil input pins at top
+  // Coil input pins above the body (in1 left, in2 right)
+  // Java RelayDTShape: coil pins at y=-2 (above component origin), x=0 and x=2
   decls.push({
     direction: PinDirection.INPUT,
     label: "in1",
     defaultBitWidth: 1,
-    position: { x: 0, y: 0 },
+    position: { x: 0, y: -2 },
     isNegatable: false,
     isClockCapable: false,
   });
@@ -68,35 +69,35 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
     direction: PinDirection.INPUT,
     label: "in2",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 0 },
+    position: { x: 2, y: -2 },
     isNegatable: false,
     isClockCapable: false,
   });
 
-  // Contact poles: C (common, left), T (throw, right top), R (rest, right bottom)
+  // Contact poles: A (common, left), B (throw, right top), C (rest, right bottom)
+  // Java RelayDTShape: per pole p: A${p+1}@(0, 2*p), B${p+1}@(2, 2*p), C${p+1}@(2, 1+2*p)
   for (let p = 0; p < poles; p++) {
-    const py = COIL_HEIGHT + p * POLE_HEIGHT;
+    decls.push({
+      direction: PinDirection.BIDIRECTIONAL,
+      label: `A${p + 1}`,
+      defaultBitWidth: bitWidth,
+      position: { x: 0, y: 2 * p },
+      isNegatable: false,
+      isClockCapable: false,
+    });
+    decls.push({
+      direction: PinDirection.BIDIRECTIONAL,
+      label: `B${p + 1}`,
+      defaultBitWidth: bitWidth,
+      position: { x: 2, y: 2 * p },
+      isNegatable: false,
+      isClockCapable: false,
+    });
     decls.push({
       direction: PinDirection.BIDIRECTIONAL,
       label: `C${p + 1}`,
       defaultBitWidth: bitWidth,
-      position: { x: 0, y: py + 1 },
-      isNegatable: false,
-      isClockCapable: false,
-    });
-    decls.push({
-      direction: PinDirection.BIDIRECTIONAL,
-      label: `T${p + 1}`,
-      defaultBitWidth: bitWidth,
-      position: { x: COMP_WIDTH, y: py },
-      isNegatable: false,
-      isClockCapable: false,
-    });
-    decls.push({
-      direction: PinDirection.BIDIRECTIONAL,
-      label: `R${p + 1}`,
-      defaultBitWidth: bitWidth,
-      position: { x: COMP_WIDTH, y: py + 2 },
+      position: { x: 2, y: 1 + 2 * p },
       isNegatable: false,
       isClockCapable: false,
     });
@@ -123,52 +124,67 @@ export class RelayDTElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    return this.derivePins(buildRelayDTPins(poles), []);
+    return this.derivePins(buildRelayDTPins(poles, bitWidth), []);
   }
 
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
-    const h = componentHeight(poles);
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: h };
+    // Drawn geometry per pole: contact arm to y=0.5, pole stub to y=1 at x=2.
+    // Coil (always present): rect (0.5,-1)→(1.5,-3), leads to x=0,x=2 at y=-2.
+    // MaxY = poles * 2 - 1 (topmost pole stub) but for 1 pole = 1.
+    const maxY = poles === 1 ? 1 : (poles - 1) * 2 + 1;
+    return { x: this.position.x, y: this.position.y - 3, width: COMP_WIDTH, height: maxY + 3 };
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._properties.getOrDefault<number>("poles", 1);
+    const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Coil symbol: rectangle at top
-    ctx.drawRect(0.5, 0, COMP_WIDTH - 1, COIL_HEIGHT, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("DT", COMP_WIDTH / 2, COIL_HEIGHT / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    // Pole stub (open L): (2,1) → (1.75,1) → (1.75,0.6) — use drawPath so the
+    // rasterizer treats it as an open polyline matching the Java fixture (closed=false).
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 2, y: 1 },
+      { op: "lineTo", x: 1.75, y: 1 },
+      { op: "lineTo", x: 1.75, y: 0.6 },
+    ] });
 
-    ctx.setColor("COMPONENT");
+    // Contact arm line: (0,0) to (1.8,0.5) — same as SwitchDT
+    ctx.drawLine(0, 0, 1.8, 0.5);
 
-    // Contact poles: C on left, T (throw) on right top, R (rest) on right bottom
-    for (let p = 0; p < poles; p++) {
-      const py = COIL_HEIGHT + p * POLE_HEIGHT;
-      // Common arm: line from C toward T position (de-energised = toward R)
-      ctx.drawLine(0, py + 1, COMP_WIDTH - 0.5, py + 2); // de-energised position toward R
-      // T pin marker
-      ctx.drawLine(COMP_WIDTH - 0.5, py, COMP_WIDTH, py);
-      // R pin marker
-      ctx.drawLine(COMP_WIDTH - 0.5, py + 2, COMP_WIDTH, py + 2);
-    }
+    // Dashed linkage: (1,0.25) to (1,-0.95) — longer than SwitchDT, reaches coil
+    ctx.setLineDash([0.2, 0.2]);
+    ctx.drawLine(1, 0.25, 1, -0.95);
+    ctx.setLineDash([]);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    // Coil rectangle (closed, NORMAL — outline only per Java fixture)
+    ctx.drawPolygon(
+      [
+        { x: 0.5, y: -1 },
+        { x: 0.5, y: -3 },
+        { x: 1.5, y: -3 },
+        { x: 1.5, y: -1 },
+      ],
+      false,
+    );
+
+    // Coil diagonal (THIN): (0.5,-1.5) to (1.5,-2.5)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.5, -1.5, 1.5, -2.5);
+    ctx.setLineWidth(1);
+
+    // Coil lead left: (0.5,-2) to (0,-2)
+    ctx.drawLine(0.5, -2, 0, -2);
+
+    // Coil lead right: (1.5,-2) to (2,-2)
+    ctx.drawLine(1.5, -2, 2, -2);
+
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, COMP_WIDTH / 2, componentHeight(poles) + 0.3, {
-        horizontal: "center",
-        vertical: "top",
-      });
+      ctx.drawText(label, 1, 2, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

@@ -80,45 +80,59 @@ export class ClockElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 1.55,
+      y: this.position.y - 0.75,
+      width: 1.55,
+      height: 1.5,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const yOff = -COMP_HEIGHT / 2;
+    const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
 
+    // Body rectangle: (-1.55,-0.75) → (-0.05,0.75), closed, NORMAL — same as In
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawPolygon([
+      { x: -1.55, y: -0.75 },
+      { x: -0.05, y: -0.75 },
+      { x: -0.05, y:  0.75 },
+      { x: -1.55, y:  0.75 },
+    ], true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawPolygon([
+      { x: -1.55, y: -0.75 },
+      { x: -0.05, y: -0.75 },
+      { x: -0.05, y:  0.75 },
+      { x: -1.55, y:  0.75 },
+    ], false);
 
-    // Draw clock waveform symbol
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    const mx = -COMP_WIDTH / 2;
-    const my = 0;
-    const halfW = 0.6;
-    const halfH = 0.4;
-    ctx.drawLine(mx - halfW, my + halfH, mx - halfW, my - halfH);
-    ctx.drawLine(mx - halfW, my - halfH, mx, my - halfH);
-    ctx.drawLine(mx, my - halfH, mx, my + halfH);
-    ctx.drawLine(mx, my + halfH, mx + halfW, my + halfH);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, -COMP_WIDTH / 2, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
-      });
+    // Clock waveform (open polyline, THIN): square wave inside the box
+    // Points: (-1.25,0.25)→(-1,0.25)→(-1,-0.25)→(-0.75,-0.25)→(-0.75,0.25)→(-0.5,0.25)→(-0.5,-0.25)→(-0.25,-0.25)
+    ctx.setLineWidth(0.5);
+    const pts = [
+      { x: -1.25, y:  0.25 },
+      { x: -1.00, y:  0.25 },
+      { x: -1.00, y: -0.25 },
+      { x: -0.75, y: -0.25 },
+      { x: -0.75, y:  0.25 },
+      { x: -0.50, y:  0.25 },
+      { x: -0.50, y: -0.25 },
+      { x: -0.25, y: -0.25 },
+    ];
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
+
+    // Label to the left, right-aligned
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(label, -2.25, 0, {
+      horizontal: "right",
+      vertical: "middle",
+    });
 
     ctx.restore();
   }

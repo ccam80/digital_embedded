@@ -185,25 +185,22 @@ describe("LedMatrix", () => {
   // ---------------------------------------------------------------------------
 
   describe("executeLedMatrix", () => {
-    it("encodes r-data and c-addr into output slot", () => {
+    it("is a no-op (display-only sink: no outputs to write)", () => {
       const layout = makeLayout();
       const state = makeState(0xAB, 3);
       const highZs = new Uint32Array(state.length);
+      const before = Array.from(state);
       executeLedMatrix(0, state, highZs, layout);
-      expect(typeof state[2]).toBe("number");
-      // Output encodes both values
-      const colAddr = state[2] & 0xFFFF;
-      const rowData = (state[2] >>> 16) & 0xFFFF;
-      expect(colAddr).toBe(3);
-      expect(rowData).toBe(0xAB);
+      expect(Array.from(state)).toEqual(before);
     });
 
-    it("r-data=0, c-addr=0 produces output=0", () => {
+    it("r-data=0, c-addr=0: state unchanged", () => {
       const layout = makeLayout();
       const state = makeState(0, 0);
       const highZs = new Uint32Array(state.length);
       executeLedMatrix(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
+      expect(state[0]).toBe(0);
+      expect(state[1]).toBe(0);
     });
 
     it("can be called 1000 times without error (zero-allocation path)", () => {
@@ -215,7 +212,8 @@ describe("LedMatrix", () => {
         state[1] = i & 0x7;
         executeLedMatrix(0, state, highZs, layout);
       }
-      expect(typeof state[2]).toBe("number");
+      // inputs unchanged by execute (no-op)
+      expect(typeof state[0]).toBe("number");
     });
   });
 
@@ -275,13 +273,15 @@ describe("LedMatrix", () => {
       expect(rectCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawCircle for the LED dot icons", () => {
+    it("draw() calls drawText with 'LED-Matrix' component name", () => {
       const el = makeLedMatrix();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls.length).toBeGreaterThanOrEqual(1);
+      const textCalls = calls.filter((c) => c.method === "drawText");
+      expect(
+        textCalls.some((c) => (c.args[0] as string).includes("LED-Matrix")),
+      ).toBe(true);
     });
 
     it("draw() calls drawText for label", () => {
@@ -327,7 +327,7 @@ describe("LedMatrix", () => {
       const el = new LedMatrixElement("inst", { x: 4, y: 6 }, 0, false, props);
       const box = el.getBoundingBox();
       expect(box.x).toBe(4);
-      expect(box.y).toBe(6);
+      expect(box.y).toBe(6 - 0.5);
     });
 
     it("bounding box has positive dimensions", () => {

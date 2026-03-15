@@ -60,12 +60,12 @@ export interface WaveformChannel {
 // ---------------------------------------------------------------------------
 
 function buildScopePinDeclarations(channelCount: number, bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", channelCount, COMP_WIDTH, componentHeight(channelCount));
+  // Java Scope: single pin "clk" at (0,0). Multi-channel pins at (0, i).
   return Array.from({ length: channelCount }, (_, i) => ({
     direction: PinDirection.INPUT,
-    label: `in${i}`,
+    label: channelCount === 1 ? "clk" : `in${i}`,
     defaultBitWidth: bitWidth,
-    position: inputPositions[i],
+    position: { x: 0, y: i },
     isNegatable: false,
     isClockCapable: false,
   }));

@@ -1041,7 +1041,7 @@ describe("RAMAsync", () => {
       const el = new RAMAsyncElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter(c => c.method === "drawText").some(c => c.args[0] === "RAM")).toBe(true);
+      expect(calls.filter(c => c.method === "drawText").some(c => (c.args[0] as string).includes("RAM"))).toBe(true);
     });
   });
 
@@ -1213,12 +1213,12 @@ describe("BlockRAMDualPort", () => {
   });
 
   describe("rendering", () => {
-    it("draw calls drawText with BRAM symbol", () => {
+    it("draw calls drawText with RAM symbol", () => {
       const props = new PropertyBag();
       const el = new BlockRAMDualPortElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter(c => c.method === "drawText").some(c => c.args[0] === "BRAM")).toBe(true);
+      expect(calls.filter(c => c.method === "drawText").some(c => (c.args[0] as string).includes("RAM"))).toBe(true);
     });
 
     it("draw calls drawRect for body", () => {

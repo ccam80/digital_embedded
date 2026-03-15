@@ -71,10 +71,10 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + 0.5,
+      y: this.position.y + 0.5,
+      width: 4,
+      height: 2,
     };
   }
 
@@ -82,15 +82,41 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
     ctx.save();
 
+    // Filled rectangle: (0.5,0.5) → (4.5,2.5) — 4x2 box
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawPolygon(
+      [
+        { x: 0.5, y: 0.5 },
+        { x: 4.5, y: 0.5 },
+        { x: 4.5, y: 2.5 },
+        { x: 0.5, y: 2.5 },
+      ],
+      true,
+    );
 
+    // Outline rectangle: same coords, THIN
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(0.5); // THIN
+    ctx.drawPolygon(
+      [
+        { x: 0.5, y: 0.5 },
+        { x: 4.5, y: 0.5 },
+        { x: 4.5, y: 2.5 },
+        { x: 0.5, y: 2.5 },
+      ],
+      false,
+    );
+
+    // Text "Async" centered at (2.5, 1.5)
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7, weight: "bold" });
-    ctx.drawText("AS", COMP_WIDTH / 2, COMP_HEIGHT / 2, {
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText("Async", 2.5, 1.5, {
+      horizontal: "center",
+      vertical: "middle",
+    });
+
+    // Empty label text at (2.5, 0)
+    ctx.drawText("", 2.5, 0, {
       horizontal: "center",
       vertical: "middle",
     });

@@ -197,105 +197,34 @@ describe("Terminal", () => {
   });
 
   describe("executeTerminal", () => {
-    it("no wr edge — pending_wr flag not set", () => {
-      // wr=0 throughout, prev_wr was already 0
-      const layout = makeLayout(3, 7);
-      const state = makeState([0x41, 0, 0], 7);
+    it("executeTerminal is a no-op — Terminal is a display sink with no outputs", () => {
+      // Terminal has 3 inputs (D, C, en) and 0 outputs.
+      // The executeFn does nothing — display is driven by engine side-channel.
+      const layout = makeLayout(3, 0);
+      const state = makeState([0x41, 1, 1], 0);
       const highZs = new Uint32Array(state.length);
-      // outBase = 3, outBase+2=prev_wr=0
-      state[3 + 2] = 0; // prev_wr = 0
+      // Should not throw and should not modify state
+      const before = [...state];
       executeTerminal(0, state, highZs, layout);
-      // pending_wr (outBase+5) should be 0
-      expect(state[3 + 5]).toBe(0);
-    });
-
-    it("rising wr edge — sets pending_wr flag with character", () => {
-      const layout = makeLayout(3, 7);
-      // inputs: din=0x41, wr=1, rd=0
-      const state = makeState([0x41, 1, 0], 7);
-      const highZs = new Uint32Array(state.length);
-      // outBase=3, prev_wr (outBase+2)=0 initially → rising edge
-      state[3 + 2] = 0;
-      state[3 + 5] = 0;
-      executeTerminal(0, state, highZs, layout);
-      // pending char stored at outBase+4
-      expect(state[3 + 4]).toBe(0x41);
-      // pending_wr flag set at outBase+5
-      expect(state[3 + 5]).toBe(1);
-    });
-
-    it("wr=1 stays high — no repeated pending_wr (not a new edge)", () => {
-      const layout = makeLayout(3, 7);
-      const state = makeState([0x42, 1, 0], 7);
-      const highZs = new Uint32Array(state.length);
-      // prev_wr=1 means wr was already high → no rising edge
-      state[3 + 2] = 1;
-      state[3 + 4] = 0;
-      state[3 + 5] = 0;
-      executeTerminal(0, state, highZs, layout);
-      expect(state[3 + 5]).toBe(0); // pending_wr NOT set
-    });
-
-    it("rising rd edge — sets pending_rd flag", () => {
-      const layout = makeLayout(3, 7);
-      // inputs: din=0, wr=0, rd=1
-      const state = makeState([0, 0, 1], 7);
-      const highZs = new Uint32Array(state.length);
-      state[3 + 3] = 0; // prev_rd = 0
-      state[3 + 6] = 0;
-      executeTerminal(0, state, highZs, layout);
-      expect(state[3 + 6]).toBe(1); // pending_rd flag
-    });
-
-    it("no rd edge — pending_rd flag not set", () => {
-      const layout = makeLayout(3, 7);
-      const state = makeState([0, 0, 0], 7);
-      const highZs = new Uint32Array(state.length);
-      state[3 + 3] = 0; // prev_rd = 0
-      state[3 + 6] = 0;
-      executeTerminal(0, state, highZs, layout);
-      expect(state[3 + 6]).toBe(0);
-    });
-
-    it("executeTerminal updates prev_wr after step", () => {
-      const layout = makeLayout(3, 7);
-      const state = makeState([0x41, 1, 0], 7);
-      const highZs = new Uint32Array(state.length);
-      state[3 + 2] = 0;
-      executeTerminal(0, state, highZs, layout);
-      // prev_wr should now be 1
-      expect(state[3 + 2]).toBe(1);
-    });
-
-    it("executeTerminal updates prev_rd after step", () => {
-      const layout = makeLayout(3, 7);
-      const state = makeState([0, 0, 1], 7);
-      const highZs = new Uint32Array(state.length);
-      state[3 + 3] = 0;
-      executeTerminal(0, state, highZs, layout);
-      // prev_rd should now be 1
-      expect(state[3 + 3]).toBe(1);
+      expect([...state]).toEqual(before);
     });
   });
 
   describe("pinLayout", () => {
-    it("Terminal has 3 input pins: din, wr, rd", () => {
+    it("Terminal has 3 input pins: D, C, en", () => {
       const el = makeTerminal();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
       expect(inputs).toHaveLength(3);
       const labels = inputs.map((p) => p.label);
-      expect(labels).toContain("din");
-      expect(labels).toContain("wr");
-      expect(labels).toContain("rd");
+      expect(labels).toContain("D");
+      expect(labels).toContain("C");
+      expect(labels).toContain("en");
     });
 
-    it("Terminal has 2 output pins: dout, rdy", () => {
+    it("Terminal has 0 output pins", () => {
       const el = makeTerminal();
       const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs).toHaveLength(2);
-      const labels = outputs.map((p) => p.label);
-      expect(labels).toContain("dout");
-      expect(labels).toContain("rdy");
+      expect(outputs).toHaveLength(0);
     });
 
     it("columns property accessible", () => {
@@ -414,7 +343,7 @@ describe("Terminal", () => {
       expect(el.getHelpText()).toContain("Terminal");
     });
 
-    it("TerminalDefinition has pinLayout with 3 inputs and 2 outputs", () => {
+    it("TerminalDefinition has pinLayout with 3 inputs and 0 outputs", () => {
       const inputs = TerminalDefinition.pinLayout.filter(
         (p) => p.direction === PinDirection.INPUT,
       );
@@ -422,7 +351,7 @@ describe("Terminal", () => {
         (p) => p.direction === PinDirection.OUTPUT,
       );
       expect(inputs).toHaveLength(3);
-      expect(outputs).toHaveLength(2);
+      expect(outputs).toHaveLength(0);
     });
   });
 });
@@ -511,74 +440,87 @@ describe("Keyboard", () => {
   });
 
   describe("executeKeyboard", () => {
-    it("no rd edge — pending_rd flag not set", () => {
-      // rd=0, prev_rd=0 → no edge
-      const layout = makeLayout(1, 4);
-      const state = makeState([0], 4);
+    // Keyboard: 2 inputs (C at inBase+0, en at inBase+1), 2 outputs (D at outBase+0, av at outBase+1)
+    // Scratch: prev_clk at outBase+2, pending_rd at outBase+3
+    // inBase=0, outBase=2
+
+    it("no clock edge (C=0, en=1) — pending_rd flag not set", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([0, 1], 4); // C=0, en=1
       const highZs = new Uint32Array(state.length);
-      // outBase=1, outBase+2=prev_rd=0
-      state[1 + 2] = 0;
-      state[1 + 3] = 0;
+      // outBase=2, prev_clk at outBase+2=4
+      state[2 + 2] = 0; // prev_clk = 0
+      state[2 + 3] = 0; // pending_rd = 0
       executeKeyboard(0, state, highZs, layout);
-      expect(state[1 + 3]).toBe(0);
+      expect(state[2 + 3]).toBe(0); // no rising edge → no pending_rd
     });
 
-    it("rising rd edge — sets pending_rd flag", () => {
-      // rd=1, prev_rd=0 → rising edge
-      const layout = makeLayout(1, 4);
-      const state = makeState([1], 4);
+    it("rising clock edge with en=1 — sets pending_rd flag", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([1, 1], 4); // C=1, en=1
       const highZs = new Uint32Array(state.length);
-      state[1 + 2] = 0; // prev_rd = 0
-      state[1 + 3] = 0;
+      state[2 + 2] = 0; // prev_clk = 0 → rising edge
+      state[2 + 3] = 0;
       executeKeyboard(0, state, highZs, layout);
-      expect(state[1 + 3]).toBe(1);
+      expect(state[2 + 3]).toBe(1); // pending_rd set
     });
 
-    it("rd=1 stays high — no repeated pending_rd", () => {
-      // rd=1, prev_rd=1 → no new edge
-      const layout = makeLayout(1, 4);
-      const state = makeState([1], 4);
+    it("rising clock edge with en=0 — pending_rd NOT set", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([1, 0], 4); // C=1, en=0
       const highZs = new Uint32Array(state.length);
-      state[1 + 2] = 1; // prev_rd = 1
-      state[1 + 3] = 0;
+      state[2 + 2] = 0; // prev_clk = 0 → rising edge but en=0
+      state[2 + 3] = 0;
       executeKeyboard(0, state, highZs, layout);
-      expect(state[1 + 3]).toBe(0);
+      expect(state[2 + 3]).toBe(0); // en=0 suppresses pending_rd
     });
 
-    it("executeKeyboard updates prev_rd after step", () => {
-      const layout = makeLayout(1, 4);
-      const state = makeState([1], 4);
+    it("C stays high (prev_clk=1) — no repeated pending_rd", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([1, 1], 4); // C=1, en=1
       const highZs = new Uint32Array(state.length);
-      state[1 + 2] = 0;
+      state[2 + 2] = 1; // prev_clk = 1 → no new edge
+      state[2 + 3] = 0;
       executeKeyboard(0, state, highZs, layout);
-      expect(state[1 + 2]).toBe(1);
+      expect(state[2 + 3]).toBe(0);
     });
 
-    it("executeKeyboard with rd=0 updates prev_rd to 0", () => {
-      const layout = makeLayout(1, 4);
-      const state = makeState([0], 4);
+    it("executeKeyboard updates prev_clk after rising edge", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([1, 1], 4);
       const highZs = new Uint32Array(state.length);
-      state[1 + 2] = 1; // was high
+      state[2 + 2] = 0; // prev_clk was 0
       executeKeyboard(0, state, highZs, layout);
-      expect(state[1 + 2]).toBe(0);
+      expect(state[2 + 2]).toBe(1); // now updated to C=1
+    });
+
+    it("executeKeyboard updates prev_clk to 0 when C=0", () => {
+      const layout = makeLayout(2, 4);
+      const state = makeState([0, 1], 4);
+      const highZs = new Uint32Array(state.length);
+      state[2 + 2] = 1; // prev_clk was 1
+      executeKeyboard(0, state, highZs, layout);
+      expect(state[2 + 2]).toBe(0);
     });
   });
 
   describe("pinLayout", () => {
-    it("Keyboard has 1 input pin: rd", () => {
+    it("Keyboard has 2 input pins: C, en", () => {
       const el = makeKeyboard();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(1);
-      expect(inputs[0].label).toBe("rd");
+      expect(inputs).toHaveLength(2);
+      const labels = inputs.map((p) => p.label);
+      expect(labels).toContain("C");
+      expect(labels).toContain("en");
     });
 
-    it("Keyboard has 2 output pins: dout, rdy", () => {
+    it("Keyboard has 2 output pins: D, av", () => {
       const el = makeKeyboard();
       const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
       expect(outputs).toHaveLength(2);
       const labels = outputs.map((p) => p.label);
-      expect(labels).toContain("dout");
-      expect(labels).toContain("rdy");
+      expect(labels).toContain("D");
+      expect(labels).toContain("av");
     });
   });
 
@@ -599,12 +541,12 @@ describe("Keyboard", () => {
       expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders keyboard key symbol rects", () => {
+    it("draw renders component name 'Keyboard'", () => {
       const el = makeKeyboard();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(4);
+      const textCalls = calls.filter((c) => c.method === "drawText");
+      expect(textCalls.some((c) => (c.args[0] as string).includes("Keyboard"))).toBe(true);
     });
 
     it("draw renders custom label when set", () => {
@@ -663,14 +605,14 @@ describe("Keyboard", () => {
       expect(el.getHelpText()).toContain("Keyboard");
     });
 
-    it("KeyboardDefinition has pinLayout with 1 input and 2 outputs", () => {
+    it("KeyboardDefinition has pinLayout with 2 inputs and 2 outputs", () => {
       const inputs = KeyboardDefinition.pinLayout.filter(
         (p) => p.direction === PinDirection.INPUT,
       );
       const outputs = KeyboardDefinition.pinLayout.filter(
         (p) => p.direction === PinDirection.OUTPUT,
       );
-      expect(inputs).toHaveLength(1);
+      expect(inputs).toHaveLength(2);
       expect(outputs).toHaveLength(2);
     });
   });

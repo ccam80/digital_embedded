@@ -25,19 +25,21 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
-const LED_RADIUS = 0.7;
+// Component spans x:[-0.5,0.5] (centered on x=0), y:[0,4]
+// Pins: A at (0,0), K at (0,4)
+const COMP_WIDTH = 1;
+const COMP_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------
 // Pin layout — anode on west, cathode on east
 // ---------------------------------------------------------------------------
 
+// Java PolarityAwareLEDShape: A(0,0), K(0,SIZE*4)=(0,4)
 function buildPolarityLedPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "anode",
+      label: "A",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
@@ -45,9 +47,9 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.INPUT,
-      label: "cathode",
+      label: "K",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,38 +80,60 @@ export class PolarityLedElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Light rays extend to x=1.35 on the right side.
+    // Body spans x: -0.5 to 0.5, rays add to x=1.35, total width = 1.35 - (-0.5) = 1.85.
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
+      x: this.position.x - 0.5,
+      y: this.position.y,
+      width: 1.85,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
-
+    // Java PolarityAwareLEDShape fixture (grid units, origin at pin A=(0,0)):
+    // LED indicator box (closed): (-0.35,3.45)->(-0.35,2.2)->(0.35,2.2)->(0.35,3.45)
+    // Lead to K:                  (0,3.5) to (0,4)   [3.45->3.5 gap then to pin]
+    // Diode triangle (closed):    (-0.5,0.55)->(0.5,0.55)->(0,1.45)
+    // Cathode bar:                (-0.5,1.45) to (0.5,1.45)
+    // Stem:                       (0,1.45) to (0,2.2)
+    // Lead from A:                (0,0) to (0,0.45)
+    // Light rays (THIN): 6 short angled lines at top-right
     ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, 0, LED_RADIUS, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(cx, 0, LED_RADIUS, false);
 
-    // Draw A/K polarity markers
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("A", 0.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", COMP_WIDTH - 0.2, 0, { horizontal: "right", vertical: "middle" });
+    // Lead from A pin down to diode
+    ctx.drawLine(0, 0, 0, 0.45);
+    // Diode triangle (filled), pointing down
+    ctx.drawPolygon([{ x: -0.5, y: 0.55 }, { x: 0.5, y: 0.55 }, { x: 0, y: 1.45 }], true);
+    // Cathode bar
+    ctx.drawLine(-0.5, 1.45, 0.5, 1.45);
+    // Stem from cathode bar to LED box
+    ctx.drawLine(0, 1.45, 0, 2.2);
+    // LED indicator box (outline only)
+    ctx.drawPolygon(
+      [{ x: -0.35, y: 2.2 }, { x: 0.35, y: 2.2 }, { x: 0.35, y: 3.45 }, { x: -0.35, y: 3.45 }],
+      false
+    );
+    // Lead from LED box to K pin
+    ctx.drawLine(0, 3.45, 0, 4);
+
+    // Light ray lines (THIN style)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(1, 0.6, 0.55, 1.05);
+    ctx.drawLine(0.9, 0.55, 1.05, 0.55);
+    ctx.drawLine(1.05, 0.7, 1.05, 0.55);
+    ctx.drawLine(1.3, 0.9, 0.85, 1.35);
+    ctx.drawLine(1.2, 0.85, 1.35, 0.85);
+    ctx.drawLine(1.35, 1, 1.35, 0.85);
+    ctx.setLineWidth(1);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
+      ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, cx, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
-      });
+      ctx.drawText(label, 0, -0.3, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

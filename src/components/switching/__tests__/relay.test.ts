@@ -295,7 +295,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("pinLayout — 2 coil inputs + 3 bidirectional pins per pole (C, T, R)", () => {
+  it("pinLayout — 2 coil inputs + 3 bidirectional pins per pole (A, B, C)", () => {
     const props = new PropertyBag();
     props.set("poles", 1);
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -303,13 +303,13 @@ describe("RelayDT", () => {
     const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
     const bidirectional = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
     expect(inputs.length).toBe(2); // in1, in2
-    expect(bidirectional.length).toBe(3); // C1, T1, R1
+    expect(bidirectional.length).toBe(3); // A1, B1, C1
     const labels = pins.map(p => p.label);
     expect(labels).toContain("in1");
     expect(labels).toContain("in2");
+    expect(labels).toContain("A1");
+    expect(labels).toContain("B1");
     expect(labels).toContain("C1");
-    expect(labels).toContain("T1");
-    expect(labels).toContain("R1");
   });
 
   it("pinLayout2Poles — 2 coil inputs + 6 bidirectional pins for 2 poles", () => {
@@ -317,7 +317,7 @@ describe("RelayDT", () => {
     props.set("poles", 2);
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const bidirectional = el.getPins().filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    expect(bidirectional.length).toBe(6); // C1, T1, R1, C2, T2, R2
+    expect(bidirectional.length).toBe(6); // A1, B1, C1, A2, B2, C2
   });
 
   it("attributeMapping — Bits, Label, Poles map correctly", () => {

@@ -64,14 +64,79 @@ python3 -m http.server 8080
 This API must be preserved by the native JS simulator:
 
 ~~~
-Parent → iframe:
-  { type: 'digital-load-url', url: '<url>' }     — Load a .dig circuit file
-  { type: 'digital-load-data', data: '<base64>' } — Load inline circuit data
+Parent → iframe (core):
+  { type: 'digital-load-url', url: '<url>' }          — Load a .dig circuit file
+  { type: 'digital-load-data', data: '<base64>' }     — Load inline circuit data (base64 .dig XML)
+  { type: 'digital-set-base', basePath: '<path>' }    — Set HTTP base path for file resolution
+  { type: 'digital-set-locked', locked: true|false }  — Lock/unlock editor
+  { type: 'digital-set-palette', components: [...] }  — Restrict palette to listed types (null = show all)
+
+Parent → iframe (tutorial):
+  { type: 'digital-test', testData: '<test vectors>' }              — Run test vectors, get results back
+  { type: 'digital-get-circuit' }                                    — Export current circuit as base64
+  { type: 'digital-highlight', labels: [...], duration?: ms }       — Highlight components by label
+  { type: 'digital-clear-highlight' }                                — Clear all highlights
+  { type: 'digital-set-readonly-components', labels: [...] | null } — Lock specific components
+  { type: 'digital-set-instructions', markdown: '...' | null }      — Show/hide instructions panel
 
 Iframe → parent:
   { type: 'digital-ready' }                        — Simulator initialized
-  { type: 'digital-loaded' }                       — Circuit file loaded
+  { type: 'digital-loaded' }                       — Circuit/setting applied
   { type: 'digital-error', error: '...' }          — Error occurred
+  { type: 'digital-test-result', passed, failed, total, details: [...] }  — Test results
+  { type: 'digital-circuit-data', data: '<base64>', format: 'dig-xml-base64' }  — Circuit export
+~~~
+
+## Tutorial System
+
+Structured tutorial authoring and runtime for step-by-step circuit-building exercises.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/tutorial/types.ts` | Tutorial data model — `TutorialManifest`, `TutorialStep`, type guards |
+| `src/tutorial/validate.ts` | Manifest validation against registry |
+| `src/tutorial/presets.ts` | Named palette presets (`basic-gates`, `sequential-intro`, etc.) |
+| `src/tutorial/tutorial-host.ts` | Tutorial host page manager |
+
+### MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `tutorial_list_presets` | List available palette presets with their components |
+| `tutorial_validate` | Validate a manifest JSON against schema + registry |
+| `tutorial_create` | Create a complete tutorial package (validate, build circuits, verify tests, write files) |
+| `circuit_test_equivalence` | Check behavioral equivalence of two circuits (exhaustive) |
+
+### Authoring Workflow
+
+1. Use `tutorial_list_presets` to pick palette presets for each step
+2. Use `circuit_build` + `circuit_test` to develop and verify goal circuits
+3. Assemble a `TutorialManifest` JSON (see template in `src/tutorial/types.ts`)
+4. Use `tutorial_validate` to check for errors
+5. Use `tutorial_create` to generate the tutorial package (manifest.json + .dig files)
+
+### Tutorial Manifest Structure
+
+~~~json
+{
+  "id": "sr-to-flipflop",
+  "version": 1,
+  "title": "From SR Latch to D Flip-Flop",
+  "description": "Build sequential logic from first principles.",
+  "difficulty": "intermediate",
+  "steps": [{
+    "id": "step-1-sr-latch",
+    "title": "Build an SR Latch",
+    "instructions": "# SR Latch\nUsing two NAND gates...",
+    "palette": "nand-only",
+    "startCircuit": null,
+    "goalCircuit": { "components": [...], "connections": [...] },
+    "validation": "test-vectors",
+    "testData": "S R | Q nQ\n0 1 | 1 0\n1 0 | 0 1"
+  }]
+}
 ~~~
 
 ## Agent Circuit API (Headless Facade)
@@ -185,6 +250,7 @@ Pass a `CircuitSpec` to `circuit_build`. No coordinates — pure topology.
 | `id` | yes | Local reference for wiring (only used within this spec, not persisted) |
 | `type` | yes | Registry type name — use `circuit_list` to browse, `circuit_describe` for details |
 | `props` | no | Component properties — use `circuit_describe` to see available keys, types, defaults, and ranges |
+| `layout` | no | Layout constraints: `{ col?, row? }`. `col` pins the column (0 = leftmost), `row` pins vertical position within the column (0 = topmost). Either/both/neither. Unconstrained axes are auto-assigned. |
 
 **Discovering types and properties:**
 
@@ -229,7 +295,23 @@ Pass a `CircuitSpec` to `circuit_build`. No coordinates — pure topology.
 { "id": "G1", "type": "NAnd", "props": { "_inverterLabels": "1" } }
 ~~~
 
-Circuits are automatically laid out left-to-right using Sugiyama-style graph layout when built via `circuit_build`. The layout engine handles crossing minimization, body-clearance wire routing, and feedback path routing.
+**Example** — layout constraints to control placement:
+
+~~~json
+{
+  "components": [
+    { "id": "clk", "type": "Clock", "props": { "label": "CLK" }, "layout": { "col": 0, "row": 0 } },
+    { "id": "D",   "type": "In",    "props": { "label": "D" },   "layout": { "col": 0 } },
+    { "id": "ff",  "type": "FlipflopD", "layout": { "col": 1 } },
+    { "id": "Q",   "type": "Out",   "props": { "label": "Q" },   "layout": { "col": 2 } }
+  ],
+  "connections": [["clk:out", "ff:C"], ["D:out", "ff:D"], ["ff:Q", "Q:in"]]
+}
+~~~
+
+`col` controls the column (left-to-right order), `row` controls vertical position within a column. Use `col` alone for most cases — the auto-layouter handles vertical ordering. Add `row` when vertical position matters (e.g. clock always at top).
+
+Circuits are automatically laid out left-to-right using Sugiyama-style graph layout when built via `circuit_build`. The layout engine handles crossing minimization, body-clearance wire routing, and feedback path routing. Layout constraints override the auto-assignment for pinned axes while the algorithm fills in the rest.
 
 Common component types: `In`, `Out`, `And`, `Or`, `XOr`, `Not`, `NAnd`, `NOr`, `FlipflopD`, `FlipflopJK`, `Mux`, `Demux`, `Counter`, `Register`, `ROM`, `RAM`, `Const`, `Clock`, `Splitter`, `Tunnel`.
 

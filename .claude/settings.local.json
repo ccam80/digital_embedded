@@ -25,7 +25,15 @@
       "mcp__circuit-simulator__circuit_netlist",
       "mcp__circuit-simulator__circuit_patch",
       "mcp__circuit-simulator__circuit_describe",
-      "mcp__circuit-simulator__circuit_build"
+      "mcp__circuit-simulator__circuit_build",
+      "mcp__circuit-simulator__circuit_compile",
+      "mcp__circuit-simulator__circuit_test",
+      "mcp__circuit-simulator__circuit_save",
+      "mcp__circuit-simulator__circuit_list",
+      "mcp__plugin_oh-my-claudecode_t__state_clear",
+      "mcp__circuit-simulator__tutorial_list_presets",
+      "mcp__circuit-simulator__tutorial_validate",
+      "mcp__circuit-simulator__tutorial_create"
     ]
   },
   "enableAllProjectMcpServers": true,

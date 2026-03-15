@@ -81,10 +81,6 @@
           <string>Label</string>
           <string>ADD</string>
         </entry>
-        <entry>
-          <string>Bits</string>
-          <int>16</int>
-        </entry>
       </elementAttributes>
       <pos x="280" y="160"/>
     </visualElement>

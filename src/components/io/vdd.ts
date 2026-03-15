@@ -21,13 +21,6 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
-
-// ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
 
@@ -67,28 +60,31 @@ export class VddElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y - 0.45,
+      width: 1,
+      height: 0.65,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = -COMP_WIDTH / 2;
-
     ctx.save();
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    // Vertical stem
-    ctx.drawLine(cx, 0.5, cx, -0.3);
-    // Horizontal bar at top (VDD symbol)
-    ctx.drawLine(cx - 0.5, -0.3, cx + 0.5, -0.3);
 
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7, weight: "bold" });
-    ctx.drawText("VDD", cx, -0.5, { horizontal: "center", vertical: "bottom" });
+    // Upward-pointing triangle (open path, not closed): (-0.5,0.2) → (0,-0.45) → (0.5,0.2)
+    // Java fixture: closed=false, style=NORMAL
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: -0.5, y: 0.2 },
+        { op: "lineTo", x: 0,    y: -0.45 },
+        { op: "lineTo", x: 0.5,  y: 0.2 },
+      ],
+    }, false);
+
+    // Vertical stem from triangle bottom to pin at (0,0)
+    ctx.drawLine(0, -0.3, 0, 0);
 
     ctx.restore();
   }

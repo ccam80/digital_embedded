@@ -69,11 +69,15 @@ export class ConstElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // draw() is text-only — tsCallsToSegments produces no segments, so the
+    // computed draw-bounds collapses to (0,0,0,0) at the pin origin.
+    // The bbox must start at x=0 (not negative) to avoid a false overflow on
+    // the left side, and extend rightward to cover label text.
     return {
-      x: this.position.x - 1.5,
-      y: this.position.y - 0.3,
+      x: this.position.x,
+      y: this.position.y,
       width: 1.5,
-      height: 0.6,
+      height: 0.5,
     };
   }
 

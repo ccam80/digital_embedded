@@ -30,6 +30,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -52,7 +53,7 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 4;
+const COMP_HEIGHT = 5;
 
 // ---------------------------------------------------------------------------
 // Web MIDI API types (minimal, for graceful degradation)
@@ -192,33 +193,23 @@ export class MidiElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("MIDI", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-
     const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["N", "V", "OnOff", "en", "C"],
+      outputLabels: [],
+      clockInputIndices: [4],
+      componentName: "MIDI",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
+    });
   }
 
   get midiChannel(): number {

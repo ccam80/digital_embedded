@@ -68,26 +68,23 @@ export class NotConnectedElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.3,
+      y: this.position.y - 0.3,
+      width: 0.6,
+      height: 0.6,
     };
   }
 
   draw(ctx: RenderContext): void {
-
     ctx.save();
-
-    const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
-    const r = 0.3;
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    // Draw an X mark to indicate intentionally not connected
-    ctx.drawLine(cx - r, cy - r, cx + r, cy + r);
-    ctx.drawLine(cx + r, cy - r, cx - r, cy + r);
+
+    // Java NotConnectedShape: X cross through pin at (0,0)
+    // Lines: (-0.3,-0.3) -> (0.3,0.3) and (-0.3,0.3) -> (0.3,-0.3)
+    ctx.drawLine(-0.3, -0.3, 0.3, 0.3);
+    ctx.drawLine(-0.3,  0.3, 0.3, -0.3);
 
     ctx.restore();
   }

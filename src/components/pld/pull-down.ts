@@ -73,11 +73,13 @@ export class PullDownElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Resistor rect: (-0.35,0.05) to (0.35,1.3). Ground bar: (-0.5,2) to (0.5,2).
+    // Min x=-0.5 (ground bar), min y=0.05 (resistor top), max y=2 (ground bar).
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y + 0.05,
+      width: 1,
+      height: 1.95,
     };
   }
 
@@ -87,29 +89,28 @@ export class PullDownElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // GND rail (bottom horizontal bar)
-    ctx.drawLine(-0.4, COMP_HEIGHT, 0.4, COMP_HEIGHT);
+    // Pin at (0,0). Everything below is positive y.
+    // Java PullDownShape:
+    //   Resistor body rectangle: (-0.35,0.05) -> (-0.35,1.3) -> (0.35,1.3) -> (0.35,0.05)
+    //   Lead line: (0,1.3) to (0,2)
+    //   Ground bar (thick horizontal line): (-0.5,2) to (0.5,2)
 
-    // Resistor body (zigzag from y=0 to y=1.8)
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: 0 },
-        { op: "lineTo", x: 0, y: 0.7 },
-        { op: "lineTo", x: 0.3, y: 0.85 },
-        { op: "lineTo", x: -0.3, y: 1.05 },
-        { op: "lineTo", x: 0.3, y: 1.25 },
-        { op: "lineTo", x: -0.3, y: 1.45 },
-        { op: "lineTo", x: 0.3, y: 1.65 },
-        { op: "lineTo", x: 0, y: 1.8 },
-        { op: "lineTo", x: 0, y: COMP_HEIGHT },
-      ],
-    });
+    // Resistor body (closed rectangle)
+    ctx.drawRect(-0.35, 0.05, 0.7, 1.25, false);
+
+    // Lead from bottom of resistor body down to ground bar
+    ctx.drawLine(0, 1.3, 0, 2);
+
+    // Ground bar (thick horizontal line at y=2)
+    ctx.setLineWidth(2);
+    ctx.drawLine(-0.5, 2, 0.5, 2);
+    ctx.setLineWidth(1);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.6, COMP_HEIGHT / 2, { horizontal: "left", vertical: "middle" });
+      ctx.drawText(label, 0.6, 1.2, { horizontal: "left", vertical: "middle" });
     }
 
     ctx.restore();

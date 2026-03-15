@@ -90,47 +90,43 @@ function makePowerSupply(overrides?: { label?: string }): PowerSupplyElement {
 
 describe("PowerSupply", () => {
   describe("execute", () => {
-    it("VDD=1, GND=0 → status output = 0 (OK)", () => {
-      // inputs: [VDD=1, GND=0], output slot at index 2
-      const layout = makeLayout(2, 1);
-      const state = makeState([1, 0], 1);
+    it("is a no-op (validation-only sink: no output slots written)", () => {
+      // executePowerSupply is a display/validation sink — state is unchanged
+      const layout = makeLayout(2, 0);
+      const state = makeState([1, 0], 0);
       const highZs = new Uint32Array(state.length);
+      const before = Array.from(state);
       executePowerSupply(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
+      expect(Array.from(state)).toEqual(before);
     });
 
-    it("VDD=0 (wrong) → status output = 1 (VDD error)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0, 0], 1);
+    it("inputs are preserved after execute (VDD=1, GND=0)", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([1, 0], 0);
       const highZs = new Uint32Array(state.length);
       executePowerSupply(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
+      expect(state[0]).toBe(1); // VDD
+      expect(state[1]).toBe(0); // GND
     });
 
-    it("VDD=1, GND=1 (wrong) → status output = 2 (GND error)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([1, 1], 1);
+    it("inputs are preserved after execute (VDD=0, GND=1)", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([0, 1], 0);
       const highZs = new Uint32Array(state.length);
       executePowerSupply(0, state, highZs, layout);
-      expect(state[2]).toBe(2);
+      expect(state[0]).toBe(0); // VDD
+      expect(state[1]).toBe(1); // GND
     });
 
-    it("VDD=0, GND=1 (both wrong) → status output = 1 (VDD error takes priority)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0, 1], 1);
-      const highZs = new Uint32Array(state.length);
-      executePowerSupply(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
-
-    it("VDD=1, GND=0 in a loop produces consistent OK status", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([1, 0], 1);
+    it("can be called 100 times without error", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([1, 0], 0);
       const highZs = new Uint32Array(state.length);
       for (let i = 0; i < 100; i++) {
         executePowerSupply(0, state, highZs, layout);
-        expect(state[2]).toBe(0);
       }
+      expect(state[0]).toBe(1);
+      expect(state[1]).toBe(0);
     });
   });
 

@@ -192,9 +192,6 @@ const SPLITTER_LABEL_FONT = { family: "sans-serif", size: 0.35, weight: "normal"
 // ---------------------------------------------------------------------------
 
 export class SplitterElement extends AbstractCircuitElement {
-  private readonly _inputPorts: SplitterPort[];
-  private readonly _outputPorts: SplitterPort[];
-
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -203,46 +200,51 @@ export class SplitterElement extends AbstractCircuitElement {
     props: PropertyBag,
   ) {
     super("Splitter", instanceId, position, rotation, mirror, props);
-
-    const inputDef = props.getOrDefault<string>("input splitting", "4,4");
-    const outputDef = props.getOrDefault<string>("output splitting", "8");
-
-    this._inputPorts = parsePorts(inputDef);
-    this._outputPorts = parsePorts(outputDef);
   }
 
-  get inputPorts(): SplitterPort[] { return this._inputPorts; }
-  get outputPorts(): SplitterPort[] { return this._outputPorts; }
+  /** Re-parse input ports from current property bag on every access. */
+  get inputPorts(): SplitterPort[] {
+    return parsePorts(this._properties.getOrDefault<string>("input splitting", "4,4"));
+  }
+  /** Re-parse output ports from current property bag on every access. */
+  get outputPorts(): SplitterPort[] {
+    return parsePorts(this._properties.getOrDefault<string>("output splitting", "8"));
+  }
   get spreading(): number { return this._properties.getOrDefault<number>("spreading", 1); }
 
   // Legacy accessors used by engine consumers
-  get parts(): number[] { return this._outputPorts.map((p) => p.bits); }
+  get parts(): number[] { return this.outputPorts.map((p) => p.bits); }
   get totalBits(): number { return totalBitsFromPattern(this.parts); }
 
   getPins(): readonly Pin[] {
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     return this.derivePins(buildSplitterPinDeclarations(
-      this._inputPorts,
-      this._outputPorts,
+      this.inputPorts,
+      this.outputPorts,
       spreading,
     ));
   }
 
   getBoundingBox(): Rect {
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
-    const maxCount = Math.max(this._inputPorts.length, this._outputPorts.length);
-    const height = Math.max((maxCount - 1) * spreading, 1);
+    const maxCount = Math.max(this.inputPorts.length, this.outputPorts.length);
+    const maxY = (maxCount - 1) * spreading;
+    const spineBottom = Math.max(maxY, 1) + 0.1;
+    // Spine rect extends from y=-0.1 to y=spineBottom. Pin lines: x=0 to x=1.
+    // height = spineBottom + 0.1 so that bbox.y + bbox.height = -0.1 + (spineBottom+0.1)
+    // = -0.1 + spineBottom + 0.1. Adding spineBottom+0.1 first (which rounds up for
+    // integer maxY) then subtracting 0.1 yields spineBottom exactly in IEEE 754.
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.1,
       width: 1,
-      height,
+      height: spineBottom + 0.1,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const inCount = this._inputPorts.length;
-    const outCount = this._outputPorts.length;
+    const inCount = this.inputPorts.length;
+    const outCount = this.outputPorts.length;
     const sp = this._properties.getOrDefault<number>("spreading", 1);
     const maxY = (Math.max(inCount, outCount) - 1) * sp;
     const rot = this.rotation;
@@ -258,7 +260,7 @@ export class SplitterElement extends AbstractCircuitElement {
       ctx.drawLine(0, y, 0.5, y);
       ctx.setFont(SPLITTER_LABEL_FONT);
       ctx.setColor("TEXT");
-      this._drawUprightText(ctx, this._inputPorts[i].name, -0.1, y - 0.15,
+      this._drawUprightText(ctx, this.inputPorts[i].name, -0.1, y - 0.15,
         { horizontal: "right", vertical: "bottom" }, rot);
       ctx.setColor("COMPONENT");
     }
@@ -269,14 +271,21 @@ export class SplitterElement extends AbstractCircuitElement {
       ctx.drawLine(1, y, 0.5, y);
       ctx.setFont(SPLITTER_LABEL_FONT);
       ctx.setColor("TEXT");
-      this._drawUprightText(ctx, this._outputPorts[i].name, 1.1, y - 0.15,
+      this._drawUprightText(ctx, this.outputPorts[i].name, 1.1, y - 0.15,
         { horizontal: "left", vertical: "bottom" }, rot);
       ctx.setColor("COMPONENT");
     }
 
     // --- Spine: filled rectangle from (0.4, -0.1) to (0.6, maxY+0.1) ---
+    // Use drawPolygon with explicit coords to avoid drawRect float error
+    // (0.4+0.2 != 0.6 and -0.1+(maxY+0.2) != maxY+0.1 in IEEE 754).
     ctx.setColor("COMPONENT");
-    ctx.drawRect(0.4, -0.1, 0.2, maxY + 0.2, true);
+    ctx.drawPolygon([
+      { x: 0.4, y: -0.1 },
+      { x: 0.6, y: -0.1 },
+      { x: 0.6, y: maxY + 0.1 },
+      { x: 0.4, y: maxY + 0.1 },
+    ], true);
 
     ctx.restore();
   }
@@ -313,12 +322,12 @@ export class SplitterElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const inTotal = totalBitsFromPattern(this._inputPorts.map((p) => p.bits));
-    const outTotal = totalBitsFromPattern(this._outputPorts.map((p) => p.bits));
+    const inTotal = totalBitsFromPattern(this.inputPorts.map((p) => p.bits));
+    const outTotal = totalBitsFromPattern(this.outputPorts.map((p) => p.bits));
     return (
       "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
-      `Input: ${this._inputPorts.length} port(s), ${inTotal} bits total.\n` +
-      `Output: ${this._outputPorts.length} port(s), ${outTotal} bits total.\n` +
+      `Input: ${this.inputPorts.length} port(s), ${inTotal} bits total.\n` +
+      `Output: ${this.outputPorts.length} port(s), ${outTotal} bits total.\n` +
       "Connect to the input ports to merge, or to the output ports to split."
     );
   }

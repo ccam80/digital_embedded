@@ -36,8 +36,17 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Body: rect from (-2.55, -0.75) to (-1.05, 0.75) — 1.5 wide, 1.5 tall
+// Inversion bubble: circle at (-0.5, 0) r=0.45
+// Pin at (0, 0) on the right edge
+const BODY_X1 = -2.55;
+const BODY_Y1 = -0.75;
+const BODY_X2 = -1.05;
+const BODY_Y2 = 0.75;
+const BODY_W = BODY_X2 - BODY_X1; // 1.5
+const BODY_H = BODY_Y2 - BODY_Y1; // 1.5
+const BUBBLE_CX = -0.5;
+const BUBBLE_R = 0.45;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -48,7 +57,7 @@ export function buildResetPinDeclarations(): PinDeclaration[] {
     direction: PinDirection.OUTPUT,
     label: "Reset",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: Math.floor(COMP_HEIGHT / 2) },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -77,34 +86,36 @@ export class ResetElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + BODY_X1,
+      y: this.position.y + BODY_Y1,
+      width: -BODY_X1, // from BODY_X1 to pin at 0
+      height: BODY_H,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const invertOutput = this._properties.getOrDefault<boolean>("invertOutput", false);
-
     ctx.save();
 
+    // Body rectangle to the left of pin
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(BODY_X1, BODY_Y1, BODY_W, BODY_H, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(BODY_X1, BODY_Y1, BODY_W, BODY_H, false);
 
+    // "R" text centered in body
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8, weight: "bold" });
-    ctx.drawText("RST", COMP_WIDTH / 2, COMP_HEIGHT / 2, {
+    const bodyCx = BODY_X1 + BODY_W / 2;
+    const bodyCy = (BODY_Y1 + BODY_Y2) / 2;
+    ctx.drawText("R", bodyCx, bodyCy, {
       horizontal: "center",
       vertical: "middle",
     });
 
-    if (invertOutput) {
-      ctx.drawCircle(COMP_WIDTH + 0.3, COMP_HEIGHT / 2, 0.3, false);
-    }
+    // Inversion bubble between body and pin
+    ctx.setColor("COMPONENT");
+    ctx.drawCircle(BUBBLE_CX, 0, BUBBLE_R, false);
 
     ctx.restore();
   }

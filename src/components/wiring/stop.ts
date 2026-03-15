@@ -13,6 +13,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -28,26 +29,30 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java Stop uses GenericShape: 1 input (stop), 0 outputs, width=3
+// Non-symmetric → offs=0. stop@(0,0)
+// → COMP_WIDTH=3, COMP_HEIGHT=1
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — Java GenericShape(1 input, 0 outputs, width=3):
+//   stop at (0, 0)
 // ---------------------------------------------------------------------------
 
 export function buildStopPinDeclarations(): PinDeclaration[] {
-  const stopPin: PinDeclaration = {
-    direction: PinDirection.INPUT,
-    label: "stop",
-    defaultBitWidth: 1,
-    position: { x: 0, y: Math.floor(COMP_HEIGHT / 2) },
-    isNegatable: false,
-    isClockCapable: false,
-  };
-
-  return [stopPin];
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "stop",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -72,31 +77,23 @@ export class StopElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.8, weight: "bold" });
-    ctx.drawText("STP", COMP_WIDTH / 2, COMP_HEIGHT / 2, {
-      horizontal: "center",
-      vertical: "middle",
+    const label = this._properties.getOrDefault<string>("label", "");
+    drawGenericShape(ctx, {
+      inputLabels: ["stop"],
+      outputLabels: [],
+      clockInputIndices: [],
+      componentName: "Stop",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
     });
-
-    ctx.restore();
   }
 
   getHelpText(): string {
@@ -124,6 +121,8 @@ export function executeStop(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
+  // Stop has no output pins declared, but the engine allocates an internal
+  // output slot used to signal termination. Write 1 when input is non-zero.
   const wt = layout.wiringTable;
   const inIdx = layout.inputOffset(index);
   const outIdx = layout.outputOffset(index);

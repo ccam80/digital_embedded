@@ -13,7 +13,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -26,24 +25,28 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java PowerSupply uses GenericShape: 2 inputs (VDD, GND), 0 outputs, width=3
+// Non-symmetric (0 outputs) → offs=0
+// VDD@(0,0), GND@(0,1)
+// → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 3;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
-// Pin layout — VDD on north face, GND on south face
+// Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):
+//   VDD at (0, 0)
+//   GND at (0, 1)
 // ---------------------------------------------------------------------------
 
 function buildPowerSupplyPinDeclarations(): PinDeclaration[] {
-  const vddPositions = layoutPinsOnFace("north", 1, COMP_WIDTH, COMP_HEIGHT);
-  const gndPositions = layoutPinsOnFace("south", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
     {
       direction: PinDirection.INPUT,
       label: "VDD",
       defaultBitWidth: 1,
-      position: vddPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -51,7 +54,7 @@ function buildPowerSupplyPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "GND",
       defaultBitWidth: 1,
-      position: gndPositions[0],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,11 +81,13 @@ export class PowerSupplyElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Polygon: (0.05,-0.5) to (2.95,1.5). Use exact polygon vertex arithmetic.
+    const minX = 0.05, maxX = 2.95, minY = -0.5, maxY = 1.5;
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + minX,
+      y: this.position.y + minY,
+      width: maxX - minX,
+      height: maxY - minY,
     };
   }
 
@@ -90,34 +95,36 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    // Rectangle (NORMAL — outline only, no fill per Java fixture)
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawPolygon(
+      [
+        { x: 0.05, y: -0.5 },
+        { x: 2.95, y: -0.5 },
+        { x: 2.95, y: 1.5 },
+        { x: 0.05, y: 1.5 },
+      ],
+      false,
+    );
 
-    // VCC symbol: upward-pointing symbol at top
+    // Pin labels left-aligned
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.65, weight: "bold" });
-    ctx.drawText("VDD", COMP_WIDTH / 2, 0.7, {
-      horizontal: "center",
+    ctx.setFont({ family: "sans-serif", size: 0.55 });
+    ctx.drawText("VDD", 0.2, 0, {
+      horizontal: "left",
+      vertical: "middle",
+    });
+    ctx.drawText("GND", 0.2, 1, {
+      horizontal: "left",
       vertical: "middle",
     });
 
-    // GND symbol: horizontal lines at bottom
-    ctx.drawText("GND", COMP_WIDTH / 2, COMP_HEIGHT - 0.7, {
+    // Component name centered at top
+    ctx.drawText("Power", 1.5, 1.7, {
       horizontal: "center",
       vertical: "middle",
     });
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
-      });
-    }
 
     ctx.restore();
   }
@@ -142,24 +149,13 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executePowerSupply(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  const vdd = state[wt[inputStart]];     // index 0: VDD
-  const gnd = state[wt[inputStart + 1]]; // index 1: GND
-  const outputIdx = layout.outputOffset(index);
-
-  if (vdd !== 1) {
-    state[wt[outputIdx]] = 1; // VDD error
-  } else if (gnd !== 0) {
-    state[wt[outputIdx]] = 2; // GND error
-  } else {
-    state[wt[outputIdx]] = 0; // OK
-  }
+  // PowerSupply has no outputs — it is a validation-only sink component.
+  // The engine may check VDD/GND inputs via a post-step hook on the element.
 }
 
 // ---------------------------------------------------------------------------

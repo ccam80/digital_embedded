@@ -7,6 +7,7 @@
  *   dark=0         Override to light color scheme (default: dark=true)
  *   locked=1       Start in locked mode
  *   panels=none    Hide all panels (presentation mode)
+ *   palette=And,Or,Not  Restrict palette to listed component types
  */
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,12 @@ export interface SimulatorParams {
   locked: boolean;
   /** Panel display mode. Default: "default". */
   panels: 'default' | 'none';
+  /**
+   * Palette override — comma-separated list of component type names to show.
+   * When set, only these types appear in the palette. Undefined means show all.
+   * Example: "And,Or,Not,In,Out,Clock,Led"
+   */
+  palette: string[] | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,5 +74,11 @@ export function parseUrlParams(
   const panelsRaw = params.get('panels');
   const panels: 'default' | 'none' = panelsRaw === 'none' ? 'none' : 'default';
 
-  return { base, file, dark, locked, panels };
+  const paletteRaw = params.get('palette');
+  const palette =
+    paletteRaw !== null && paletteRaw.length > 0
+      ? paletteRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+      : undefined;
+
+  return { base, file, dark, locked, panels, palette };
 }

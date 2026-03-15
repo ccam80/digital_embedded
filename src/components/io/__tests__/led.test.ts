@@ -337,13 +337,13 @@ describe("PolarityAwareLED", () => {
   });
 
   describe("pinLayout", () => {
-    it("PolarityAwareLED has 2 input pins: anode and cathode", () => {
+    it("PolarityAwareLED has 2 input pins: A (anode) and K (cathode)", () => {
       const el = makePolarityLed();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
       expect(inputs).toHaveLength(2);
       const labels = inputs.map((p) => p.label);
-      expect(labels).toContain("anode");
-      expect(labels).toContain("cathode");
+      expect(labels).toContain("A");
+      expect(labels).toContain("K");
     });
   });
 
@@ -471,11 +471,13 @@ describe("LightBulb", () => {
   });
 
   describe("pinLayout", () => {
-    it("LightBulb has 1 input pin labeled 'in'", () => {
+    it("LightBulb has 2 input pins: A and B", () => {
       const el = makeLightBulb();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(1);
-      expect(inputs[0].label).toBe("in");
+      expect(inputs).toHaveLength(2);
+      const labels = inputs.map((p) => p.label);
+      expect(labels).toContain("A");
+      expect(labels).toContain("B");
     });
   });
 

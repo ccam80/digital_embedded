@@ -28,10 +28,10 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -44,6 +44,10 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java Keyboard uses GenericShape: 2 inputs (C, en), 2 outputs (D, av), width=3
+// Non-symmetric (2 outputs) → offs=0
+// Input C@(0,0), en@(0,1); Output D@(3,0), av@(3,1)
+// → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -51,36 +55,44 @@ const COMP_HEIGHT = 2;
 const MAX_KEY_QUEUE = 64;
 
 // ---------------------------------------------------------------------------
-// Pin layout
+// Pin layout — Java GenericShape(2 inputs, 2 outputs, width=3, non-symmetric):
+//   C  (input)  at (0, 0)
+//   en (input)  at (0, 1)
+//   D  (output) at (3, 0)
+//   av (output) at (3, 1)
 // ---------------------------------------------------------------------------
 
 function buildKeyboardPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
   return [
-    // Input
     {
       direction: PinDirection.INPUT,
-      label: "rd",
+      label: "C",
       defaultBitWidth: 1,
-      position: inputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: true,
     },
-    // Outputs
     {
-      direction: PinDirection.OUTPUT,
-      label: "dout",
-      defaultBitWidth: 8,
-      position: outputPositions[0],
+      direction: PinDirection.INPUT,
+      label: "en",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "rdy",
+      label: "D",
+      defaultBitWidth: 16,
+      position: { x: COMP_WIDTH, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "av",
       defaultBitWidth: 1,
-      position: outputPositions[1],
+      position: { x: COMP_WIDTH, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -147,53 +159,28 @@ export class KeyboardElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildKeyboardPinDeclarations(), ["rd"]);
+    return this.derivePins(buildKeyboardPinDeclarations(), ["C"]);
   }
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
-    ctx.save();
-
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Keyboard symbol: three rows of small key rectangles
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-
-    // Top row: 3 keys
-    ctx.drawRect(0.3, 0.25, 0.45, 0.3, false);
-    ctx.drawRect(0.85, 0.25, 0.45, 0.3, false);
-    ctx.drawRect(1.4, 0.25, 0.45, 0.3, false);
-
-    // Bottom row: 2 keys + spacebar
-    ctx.drawRect(0.3, 0.7, 0.45, 0.3, false);
-    ctx.drawRect(0.85, 0.7, 1.0, 0.3, false);
-
     const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.6 });
-      ctx.drawText(label, COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
-        horizontal: "center",
-        vertical: "top",
-      });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["C", "en"],
+      outputLabels: ["D", "av"],
+      clockInputIndices: [0],
+      componentName: "Keyboard",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
+    });
   }
 
   getHelpText(): string {
@@ -236,21 +223,22 @@ export function executeKeyboard(
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
-  const rd = state[wt[inBase]] & 1;
-  const prevRd = state[wt[outBase + 2]] & 1;
+  // Inputs: C (clock, inBase+0), en (enable, inBase+1)
+  const clk = state[wt[inBase]] & 1;
+  const en  = state[wt[inBase + 1]] & 1;
 
-  // Detect rising edge of rd strobe
-  if (rd === 1 && prevRd === 0) {
-    // Signal dequeue request via scratch slot
+  // Outputs: D (key code, outBase+0), av (available, outBase+1)
+  // D and av are kept up to date by the engine's step loop which calls
+  // element.currentKeyCode() / element.readyFlag() and writes back.
+  // On rising clock edge with en=1, signal a dequeue request.
+  const prevClk = state[wt[outBase + 2]] & 1;
+
+  if (clk === 1 && prevClk === 0 && en === 1) {
     state[wt[outBase + 3]] = 1; // pending_rd flag for engine side-channel
   }
 
-  // Update previous rd value
-  state[wt[outBase + 2]] = rd;
-
-  // dout and rdy (outBase+0, outBase+1) are kept up to date by the engine's
-  // step loop which calls element.currentKeyCode() / element.readyFlag()
-  // and writes back to these slots after processing the pending_rd flag.
+  // Update previous clock value
+  state[wt[outBase + 2]] = clk;
 }
 
 // ---------------------------------------------------------------------------

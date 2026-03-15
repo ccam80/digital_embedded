@@ -66,7 +66,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
   options?: {
     resetComponentIndices?: Uint32Array;
@@ -150,7 +150,7 @@ describe("InitSequence", () => {
     };
 
     const executeFns: ExecuteFunction[] = [nor1Execute, nor2Execute];
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
     const inputNets = [[0, 3], [1, 2]];
     const outputNets = [[2], [3]];
     const evaluationOrder: EvaluationGroup[] = [feedbackGroup([0, 1])];
@@ -204,7 +204,7 @@ describe("InitSequence", () => {
     };
 
     const executeFns: ExecuteFunction[] = [nor1Execute, nor2Execute, resetExecute];
-    const typeIds = new Uint8Array([0, 1, 2]);
+    const typeIds = new Uint16Array([0, 1, 2]);
     const inputNets = [[0, 3], [1, 2], []];
     const outputNets = [[2], [3], [0]];
     const evaluationOrder: EvaluationGroup[] = [
@@ -246,7 +246,7 @@ describe("InitSequence", () => {
     };
 
     const executeFns: ExecuteFunction[] = [makeNot(), makeNot(), makeNot()];
-    const typeIds = new Uint8Array([0, 1, 2]);
+    const typeIds = new Uint16Array([0, 1, 2]);
     const inputNets = [[2], [0], [1]];
     const outputNets = [[0], [1], [2]];
     const evaluationOrder: EvaluationGroup[] = [feedbackGroup([0, 1, 2])];
@@ -291,7 +291,7 @@ describe("InitSequence", () => {
     };
 
     const executeFns: ExecuteFunction[] = [nor1Execute, nor2Execute];
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
     const inputNets = [[0, 3], [1, 2]];
     const outputNets = [[2], [3]];
     const evaluationOrder: EvaluationGroup[] = [feedbackGroup([0, 1])];

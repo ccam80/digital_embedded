@@ -18,6 +18,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -104,48 +105,22 @@ export class RegisterElement extends AbstractCircuitElement {
     // Java GenericShape: body from -topBorder to yBottom, 3 inputs odd → height=3
     const TOP = 0.5;
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - TOP,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: 3,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const TOP = 0.5;
-    const BODY_H = 3;
-
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("D", 0.5, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("en", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-
-    ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("REG", COMP_WIDTH / 2, 1, { horizontal: "center", vertical: "middle" });
-
-    // Clock triangle on C pin (y=1)
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 0.5, 0.5, 1);
-    ctx.drawLine(0.5, 1, 0, 1.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["D", "C", "en"],
+      outputLabels: ["Q"],
+      clockInputIndices: [1],
+      componentName: "Reg",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

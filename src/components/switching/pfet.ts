@@ -60,7 +60,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
-    label: "S",
+    label: "D",
     defaultBitWidth: 1,
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
@@ -68,7 +68,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
-    label: "D",
+    label: "S",
     defaultBitWidth: 1,
     position: { x: COMP_WIDTH, y: COMP_HEIGHT },
     isNegatable: false,
@@ -97,34 +97,45 @@ export class PFETElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Drawn geometry: oxide bar at x=0.05, drain/source leads to x=1.
+    // Arrow tip at x=0.95, gate lead to x=0.7. Min drawn x = 0.05.
+    return { x: this.position.x + 0.05, y: this.position.y, width: 0.95, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    // Java FETShapeP: SIZE=1 grid, SIZE2=0.5 grid
-    // Gate at (0, 0), vertical body from y=0 to y=2 (SIZE*2)
+    // Java FETShapeP fixture coordinates (grid units, 1 unit = 20px):
+    // Drain path (open):   (1,0) -> (0.4,0) -> (0.4,0.25)
+    // Source path (open):  (1,2) -> (0.4,2) -> (0.4,1.75)
+    // Channel gap:         (0.4,0.75) to (0.4,1.25)  NORMAL
+    // Gate oxide bar:      (0.05,0)   to (0.05,2)     NORMAL
+    // Gate lead (THIN):    (0.4,1)    to (0.7,1)
+    // Arrow (THIN_FILLED): (0.95,1) -> (0.7,0.9) -> (0.7,1.1)  pointing LEFT
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line: from gate pin (0,0) to inversion bubble
-    ctx.drawLine(0, 0, 0.25, 0);
-    // P-channel inversion bubble on gate
-    ctx.drawCircle(0.32, 0, 0.07, false);
-    // Gate bar (vertical insulator)
-    ctx.drawLine(0.4, 0.4, 0.4, 1.6);
-    // Channel line (parallel to gate bar, on drain/source side)
-    ctx.drawLine(0.6, 0.4, 0.6, 1.6);
-    // Drain connection: from channel to drain pin (1, 0)
-    ctx.drawLine(0.6, 0.4, 1, 0.4);
-    ctx.drawLine(1, 0.4, 1, 0);
-    // Source connection: from channel to source pin (1, 2)
-    ctx.drawLine(0.6, 1.6, 1, 1.6);
-    ctx.drawLine(1, 1.6, 1, 2);
+    // Drain path (open L): pin D at (1,0) -> stub to channel — use drawPath so
+    // the rasterizer treats it as an open polyline matching the Java fixture (closed=false).
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 1, y: 0 },
+      { op: "lineTo", x: 0.4, y: 0 },
+      { op: "lineTo", x: 0.4, y: 0.25 },
+    ] });
+    // Source path (open L): pin S at (1,2) -> stub to channel
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 1, y: 2 },
+      { op: "lineTo", x: 0.4, y: 2 },
+      { op: "lineTo", x: 0.4, y: 1.75 },
+    ] });
+    // Channel gap (center section of channel bar, between stubs)
+    ctx.drawLine(0.4, 0.75, 0.4, 1.25);
+    // Gate oxide bar (vertical, left edge)
+    ctx.drawLine(0.05, 0, 0.05, 2);
 
-    // P-channel arrow (pointing from channel toward gate)
-    ctx.drawLine(0.4, 1, 0.6, 1 - 0.15);
-    ctx.drawLine(0.4, 1, 0.6, 1 + 0.15);
+    // Gate lead: from oxide bar to arrow
+    ctx.drawLine(0.4, 1, 0.7, 1);
+    // P-channel arrow: filled triangle pointing LEFT (toward gate)
+    ctx.drawPolygon([{ x: 0.95, y: 1 }, { x: 0.7, y: 0.9 }, { x: 0.7, y: 1.1 }], true);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

@@ -30,6 +30,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -59,28 +60,8 @@ export { registerBackingStore, clearBackingStores } from "./ram.js";
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 6;
-
-// ---------------------------------------------------------------------------
-// Shared rendering helper
-// ---------------------------------------------------------------------------
-
-function drawROMBody(ctx: RenderContext, label: string, symbol: string): void {
-  ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-  ctx.setColor("COMPONENT");
-  ctx.setLineWidth(1);
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-  ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-  ctx.drawText(symbol, COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-
-  if (label.length > 0) {
-    ctx.setFont({ family: "sans-serif", size: 0.9 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-  }
-}
+const COMP_HEIGHT = 3;         // ROM: Java rect height = 3 (y=-0.5 to 2.5)
+const COMP_HEIGHT_DUAL = 4;    // ROMDualPort: max(4 inputs, 2 outputs) = 4
 
 // ---------------------------------------------------------------------------
 // Shared property definitions
@@ -198,13 +179,18 @@ export class ROMElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "ROM");
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "sel"],
+      outputLabels: ["D"],
+      clockInputIndices: [],
+      componentName: "ROM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   get isProgramMemory(): boolean {
@@ -326,13 +312,18 @@ export class ROMDualPortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT_DUAL };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "ROM2");
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A1", "s1", "A2", "s2"],
+      outputLabels: ["D1", "D2"],
+      clockInputIndices: [],
+      componentName: "ROM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   get isProgramMemory(): boolean {

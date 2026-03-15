@@ -19,12 +19,12 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -37,31 +37,33 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java LedMatrix uses GenericShape: 2 inputs (r-data, c-addr), 0 outputs, width=3
+// Non-symmetric → offs=0. r-data@(0,0), c-addr@(0,1)
+// → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
+const COMP_WIDTH = 3;
 
 function componentHeight(): number {
-  return 4;
+  return 2;
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — r-data (input 0) and c-addr (input 1) on west face
+// Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):
+//   r-data at (0, 0)
+//   c-addr at (0, 1)
 // ---------------------------------------------------------------------------
 
 function buildLedMatrixPinDeclarations(
   rowDataBits: number,
   colAddrBits: number,
 ): PinDeclaration[] {
-  const h = componentHeight();
-  const positions = layoutPinsOnFace("west", 2, COMP_WIDTH, h);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "r-data",
       defaultBitWidth: rowDataBits,
-      position: positions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -69,7 +71,7 @@ function buildLedMatrixPinDeclarations(
       direction: PinDirection.INPUT,
       label: "c-addr",
       defaultBitWidth: colAddrBits,
-      position: positions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -145,46 +147,23 @@ export class LedMatrixElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: componentHeight(),
     };
   }
 
   draw(ctx: RenderContext): void {
-    const h = componentHeight();
-
-    ctx.save();
-
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
-
-    // LED grid icon (simplified 3x3 dot pattern)
-    const dotSpacing = (COMP_WIDTH - 1) / 3;
-    const dotRadius = 0.15;
-    ctx.setColor("COMPONENT");
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        const cx = 0.5 + col * dotSpacing;
-        const cy = 1.0 + row * dotSpacing;
-        ctx.drawCircle(cx, cy, dotRadius, true);
-      }
-    }
-
-    // Label
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("LED Matrix", COMP_WIDTH / 2, h + 0.3, {
-      horizontal: "center",
-      vertical: "top",
+    const label = this._properties.getOrDefault<string>("label", "");
+    drawGenericShape(ctx, {
+      inputLabels: ["r-data", "c-addr"],
+      outputLabels: [],
+      clockInputIndices: [],
+      componentName: "LED-Matrix",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
     });
-
-    ctx.restore();
   }
 
   getHelpText(): string {
@@ -207,19 +186,14 @@ export class LedMatrixElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeLedMatrix(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  // input 0: r-data, input 1: c-addr
-  const rowData = state[wt[inputStart]] >>> 0;
-  const colAddr = state[wt[inputStart + 1]] >>> 0;
-  // Write the addressed col and row data to output slot for engine tracking
-  const outputIdx = layout.outputOffset(index);
-  state[wt[outputIdx]] = (colAddr & 0xFFFF) | ((rowData & 0xFFFF) << 16);
+  // LedMatrix has no outputs — it is a display-only sink component.
+  // The display panel reads r-data and c-addr inputs via the engine's
+  // post-step hook accessing the element. No output slots to write.
 }
 
 // ---------------------------------------------------------------------------

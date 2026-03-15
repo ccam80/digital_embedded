@@ -33,7 +33,8 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
+// Java FuseShape: out1(0,0), out2(SIZE,0)=(1,0); SIZE=1 grid unit
+const COMP_WIDTH = 1;
 const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
@@ -45,7 +46,7 @@ const FUSE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "out1",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -53,7 +54,7 @@ const FUSE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "out2",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: COMP_HEIGHT / 2 },
+    position: { x: 1, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -80,34 +81,38 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x, y: this.position.y - 0.25, width: COMP_WIDTH, height: 0.5 };
   }
 
   draw(ctx: RenderContext): void {
-    const blown = this._properties.getOrDefault<boolean>("blown", false);
-
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const cy = COMP_HEIGHT / 2;
-
-    // Left wire
-    ctx.drawLine(0, cy, 0.5, cy);
-    // Right wire
-    ctx.drawLine(2.5, cy, COMP_WIDTH, cy);
-    // Fuse body rectangle
-    ctx.drawRect(0.5, cy - 0.3, 2.0, 0.6, false);
-
-    if (blown) {
-      // Blown: X mark inside the body
-      ctx.setColor("WIRE_ERROR");
-      ctx.drawLine(0.7, cy - 0.2, 1.3, cy + 0.2);
-      ctx.drawLine(1.3, cy - 0.2, 0.7, cy + 0.2);
-    } else {
-      // Intact: wire through the middle
-      ctx.drawLine(0.5, cy, 2.5, cy);
-    }
+    // Wavy S-curve from pin at (0,0) to pin at (1,0).
+    // Java FuseShape: M(0,0) C(0.25,-0.25) C(0.5,0) C(0.75,0.25) C(1,0)
+    // Each CurveTo in Java takes one control point and one end point (quadratic-style),
+    // but Digital's Polygon.CurveTo maps to a cubic bezier with symmetric control points.
+    // Translating the 4 cubic segments:
+    //   Seg 1: (0,0) -> (0.25,-0.25): cp1=(0.1,-0.25) cp2=(0.15,-0.25)
+    //   Seg 2: (0.25,-0.25) -> (0.5,0): cp1=(0.35,-0.25) cp2=(0.4,0)
+    //   Seg 3: (0.5,0) -> (0.75,0.25): cp1=(0.6,0) cp2=(0.65,0.25)
+    //   Seg 4: (0.75,0.25) -> (1,0): cp1=(0.85,0.25) cp2=(0.9,0)
+    // Using the SVG path from Java fixture (pixel scale 20px = 1 grid unit):
+    // "M 0,0 C 2,-5 3,-5 5,-5 C 8,-5 8,0 10,0 C 12,0 12,5 15,5 C 18,5 18,0 20,0"
+    // Dividing by 20: cp1=(0.1,-0.25) cp2=(0.15,-0.25) end=(0.25,-0.25)
+    //                 cp1=(0.4,-0.25) cp2=(0.4,0)       end=(0.5,0)
+    //                 cp1=(0.6,0)     cp2=(0.6,0.25)    end=(0.75,0.25)
+    //                 cp1=(0.9,0.25)  cp2=(0.9,0)       end=(1,0)
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0, y: 0 },
+        { op: "curveTo", cp1x: 0.1, cp1y: -0.25, cp2x: 0.15, cp2y: -0.25, x: 0.25, y: -0.25 },
+        { op: "curveTo", cp1x: 0.4, cp1y: -0.25, cp2x: 0.4,  cp2y: 0,     x: 0.5,  y: 0 },
+        { op: "curveTo", cp1x: 0.6, cp1y: 0,     cp2x: 0.6,  cp2y: 0.25,  x: 0.75, y: 0.25 },
+        { op: "curveTo", cp1x: 0.9, cp1y: 0.25,  cp2x: 0.9,  cp2y: 0,     x: 1,    y: 0 },
+      ],
+    });
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

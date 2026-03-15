@@ -710,7 +710,7 @@ export function compileCircuit(
   const executeFnsMap = new Map<number, ExecuteFunction>();
   const sampleFnsMap = new Map<number, ExecuteFunction>();
   const typeNameMap = new Map<number, string>();
-  const typeIds = new Uint8Array(componentCount);
+  const typeIds = new Uint16Array(componentCount);
 
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;

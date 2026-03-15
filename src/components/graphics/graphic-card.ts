@@ -28,12 +28,12 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -46,10 +46,15 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java GraphicCard uses GenericShape: 5 inputs (A, str, C, ld, B), 1 output (D), width=3
+// symmetric (1 output) → offs = floor(5/2) = 2
+// Input positions: A@(0,0), str@(0,1), C@(0,2), ld@(0,3), B@(0,4)
+// Output position: D@(3,2)  [offs=2]
+// → COMP_WIDTH=3, COMP_HEIGHT=5
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 6;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 5;
 
 const DEFAULT_DATA_BITS = 8;
 const DEFAULT_GRAPHIC_WIDTH = 160;
@@ -70,8 +75,14 @@ function computeAddrBits(size: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — 6 inputs on west face: A, str, C, ld, B, D(in)
-//             1 output on east face: D(out)
+// Pin layout — Java GenericShape(5 inputs, 1 output, width=3, symmetric):
+//   offs = floor(5/2) = 2
+//   A   (input)  at (0, 0)
+//   str (input)  at (0, 1)
+//   C   (input)  at (0, 2)
+//   ld  (input)  at (0, 3)
+//   B   (input)  at (0, 4)
+//   D   (output) at (3, 2)   [offs=2]
 // ---------------------------------------------------------------------------
 
 function buildGraphicCardPinDeclarations(
@@ -83,15 +94,12 @@ function buildGraphicCardPinDeclarations(
   const size = bankSize * 2;
   const addrBits = computeAddrBits(size);
 
-  const inPositions = layoutPinsOnFace("west", 6, COMP_WIDTH, COMP_HEIGHT);
-  const outPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "A",
       defaultBitWidth: addrBits,
-      position: inPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -99,7 +107,7 @@ function buildGraphicCardPinDeclarations(
       direction: PinDirection.INPUT,
       label: "str",
       defaultBitWidth: 1,
-      position: inPositions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -107,7 +115,7 @@ function buildGraphicCardPinDeclarations(
       direction: PinDirection.INPUT,
       label: "C",
       defaultBitWidth: 1,
-      position: inPositions[2],
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: true,
     },
@@ -115,7 +123,7 @@ function buildGraphicCardPinDeclarations(
       direction: PinDirection.INPUT,
       label: "ld",
       defaultBitWidth: 1,
-      position: inPositions[3],
+      position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -123,15 +131,7 @@ function buildGraphicCardPinDeclarations(
       direction: PinDirection.INPUT,
       label: "B",
       defaultBitWidth: 1,
-      position: inPositions[4],
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "D",
-      defaultBitWidth: dataBits,
-      position: inPositions[5],
+      position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -139,7 +139,7 @@ function buildGraphicCardPinDeclarations(
       direction: PinDirection.OUTPUT,
       label: "D",
       defaultBitWidth: dataBits,
-      position: outPositions[0],
+      position: { x: COMP_WIDTH, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -302,52 +302,23 @@ export class GraphicCardElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
-    ctx.save();
-
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Screen icon — small rectangle representing a display
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0.5, 0.8, COMP_WIDTH - 1, COMP_HEIGHT - 2.0, false);
-
-    // Pixel grid icon (2x2 dot pattern)
-    const dotRadius = 0.12;
-    const gridOffsets = [0.9, 1.7];
-    ctx.setColor("COMPONENT");
-    for (const gy of gridOffsets) {
-      for (const gx of [0.9, 1.7, 2.5]) {
-        ctx.drawCircle(gx, gy, dotRadius, true);
-      }
-    }
-
-    // Label
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.55 });
-    ctx.drawText("Graphic", COMP_WIDTH / 2, COMP_HEIGHT - 1.0, {
-      horizontal: "center",
-      vertical: "top",
+    const label = this._properties.getOrDefault<string>("label", "");
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "str", "C", "ld", "B"],
+      outputLabels: ["D"],
+      clockInputIndices: [2],
+      componentName: "Gr-RAM",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
     });
-    ctx.drawText("Card", COMP_WIDTH / 2, COMP_HEIGHT - 0.4, {
-      horizontal: "center",
-      vertical: "top",
-    });
-
-    ctx.restore();
   }
 
   getHelpText(): string {
@@ -376,15 +347,14 @@ export function executeGraphicCard(
 ): void {
   const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  // Inputs: [A=0, str=1, C=2, ld=3, B=4, D=5]
+  // Inputs: [A=0, str=1, C=2, ld=3, B=4]
   const addr = state[wt[inputStart]] >>> 0;
   const str = state[wt[inputStart + 1]] & 1;
   const clk = state[wt[inputStart + 2]] & 1;
   const ld = state[wt[inputStart + 3]] & 1;
   const bank = state[wt[inputStart + 4]] & 1;
-  const dataIn = state[wt[inputStart + 5]] >>> 0;
 
-  // Pack control signals and low bits of addr/data into output slot
+  // Pack control signals and low bits of addr into output slot (D)
   // for change detection by the engine post-step hook
   const outputIdx = layout.outputOffset(index);
   state[wt[outputIdx]] =
@@ -392,8 +362,7 @@ export function executeGraphicCard(
     (str << 16) |
     (clk << 17) |
     (ld << 18) |
-    (bank << 19) |
-    ((dataIn & 0xFF) << 20);
+    (bank << 19);
 }
 
 // ---------------------------------------------------------------------------

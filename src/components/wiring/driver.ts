@@ -104,12 +104,19 @@ export class DriverElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const invertOutput = this._properties.getOrDefault<boolean>("invertDriverOutput", false);
-    const w = invertOutput ? 3 : COMP_WIDTH;
+    const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
+    // Triangle: (-0.95,-0.6) to (0.95,0.6). Sel stem extends to y=-1 or y=+1.
+    // For invertOutput: bubble at (1.2,0) r=0.25 → maxX=1.45; output pin at x=2.
+    const maxX = invertOutput ? 2 : 0.95;
+    const selMinY = flipSelPos ? -0.6 : -1;
+    const selMaxY = flipSelPos ? 1 : 0.6;
+    const minY = Math.min(-0.6, selMinY);
+    const maxY = Math.max(0.6, selMaxY);
     return {
-      x: this.position.x - 1,
-      y: this.position.y - 1,
-      width: w,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.95,
+      y: this.position.y + minY,
+      width: 0.95 + maxX,
+      height: maxY - minY,
     };
   }
 

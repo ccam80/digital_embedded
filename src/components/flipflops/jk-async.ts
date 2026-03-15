@@ -18,6 +18,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -125,48 +126,22 @@ export class JKAsyncElement extends AbstractCircuitElement {
     // Java GenericShape: 5 inputs odd → body height=5, topBorder=0.5
     const TOP = 0.5;
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - TOP,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: 5,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const TOP = 0.5;
-    const BODY_H = 5;
-
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -TOP, COMP_WIDTH, BODY_H, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("Set", 0.5, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("J", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Clr", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-
-    // Clock triangle on C pin (y=2)
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 1.5, 0.5, 2);
-    ctx.drawLine(0.5, 2, 0, 2.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -TOP - 0.3, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["Set", "J", "C", "K", "Clr"],
+      outputLabels: ["Q", "~Q"],
+      clockInputIndices: [2],
+      componentName: "JK-AS",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

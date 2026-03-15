@@ -56,7 +56,7 @@ function makeCompiledCircuit(): CompiledCircuitImpl {
     netCount,
     componentCount,
     totalStateSlots: 2,
-    typeIds: new Uint8Array([0, 1]),
+    typeIds: new Uint16Array([0, 1]),
     executeFns: [executeFn0, executeFn1],
     sampleFns: [null, null],
     wiringTable,
@@ -135,7 +135,7 @@ describe("WorkerInit", () => {
       expect(msg["signalArraySize"]).toBe(6);
 
       // Verify typed arrays are present
-      expect(msg["typeIds"]).toBeInstanceOf(Uint8Array);
+      expect(msg["typeIds"]).toBeInstanceOf(Uint16Array);
       expect(msg["wiringTable"]).toBeInstanceOf(Int32Array);
       expect(msg["inputOffsets"]).toBeInstanceOf(Int32Array);
       expect(msg["outputOffsets"]).toBeInstanceOf(Int32Array);
@@ -168,7 +168,7 @@ describe("WorkerInit", () => {
       expect(mockWorker.lastTransfer[0]).toBe(msg["sharedBuffer"]);
 
       // Verify typed array values match compiled circuit
-      expect(Array.from(msg["typeIds"] as Uint8Array)).toEqual([0, 1]);
+      expect(Array.from(msg["typeIds"] as Uint16Array)).toEqual([0, 1]);
       expect(Array.from(msg["wiringTable"] as Int32Array)).toEqual([0, 1, 2, 3]);
       expect(Array.from(msg["netWidths"] as Uint8Array)).toEqual([1, 1, 1, 1]);
 
@@ -211,7 +211,7 @@ describe("WorkerInit", () => {
         netCount: number;
         componentCount: number;
         signalArraySize: number;
-        typeIds: Uint8Array;
+        typeIds: Uint16Array;
         typeNames: string[];
         inputOffsets: Int32Array;
         outputOffsets: Int32Array;

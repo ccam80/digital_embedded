@@ -136,51 +136,48 @@ export class DemuxElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
-    const h = componentHeight(outputCount);
+    const h = outputCount;
+    // Trapezoid: (0.05,0.25) -> (1.95,-0.2) -> (1.95,h+0.2) -> (0.05,h-0.25).
+    // MinX=0.05, maxX=1.95, minY=-0.2, maxY=h+0.2.
+    // height = (h+0.2) - (-0.2) to avoid float cancellation in y + height.
+    const minY = -0.2;
+    const maxY = h + 0.2;
     return {
-      x: this.position.x,
-      y: this.position.y - 0.5,
-      width: COMP_WIDTH,
-      height: h + 0.5,
+      x: this.position.x + 0.05,
+      y: this.position.y + minY,
+      width: 1.9,
+      height: maxY - minY,
     };
   }
 
   draw(ctx: RenderContext): void {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
-    const h = componentHeight(outputCount);
+    // Java DemuxerShape uses same trapezoid as DecoderShape: narrower left, wider right.
+    // Reference (2 outputs / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
+    const h = outputCount; // right-edge total height in grid units
+    const leftInset = 0.25;
+    const rightOver = 0.2;
+
+    const poly = [
+      { x: 0.05, y: leftInset },
+      { x: 1.95, y: -rightOver },
+      { x: 1.95, y: h + rightOver },
+      { x: 0.05, y: h - leftInset },
+    ];
 
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawPolygon(
-      [
-        { x: 0, y: -0.5 },
-        { x: COMP_WIDTH, y: 0 },
-        { x: COMP_WIDTH, y: h - 1 },
-        { x: 0, y: h - 0.5 },
-      ],
-      true,
-    );
-
+    ctx.drawPolygon(poly, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawPolygon(
-      [
-        { x: 0, y: -0.5 },
-        { x: COMP_WIDTH, y: 0 },
-        { x: COMP_WIDTH, y: h - 1 },
-        { x: 0, y: h - 0.5 },
-      ],
-      false,
-    );
+    ctx.drawPolygon(poly, false);
 
+    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("DEMUX", COMP_WIDTH / 2, (h - 1) / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
+    ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });
 
     ctx.restore();
   }

@@ -70,36 +70,44 @@ export class InElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const small = this._properties.getOrDefault<boolean>("small", true);
-    const size = small ? 1 : COMP_HEIGHT;
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - size / 2,
-      width: COMP_WIDTH,
-      height: size,
+      x: this.position.x - 1.55,
+      y: this.position.y - 0.75,
+      width: 1.55,
+      height: 1.5,
     };
   }
 
   draw(ctx: RenderContext): void {
     const label = this._properties.getOrDefault<string>("label", "");
-    const small = this._properties.getOrDefault<boolean>("small", true);
-    const size = small ? 1 : COMP_HEIGHT;
-    const yOff = -size / 2;
 
     ctx.save();
 
+    // Body rectangle: (-1.55,-0.75) → (-0.05,0.75), closed, NORMAL fill then stroke
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, size, true);
+    ctx.drawPolygon([
+      { x: -1.55, y: -0.75 },
+      { x: -0.05, y: -0.75 },
+      { x: -0.05, y:  0.75 },
+      { x: -1.55, y:  0.75 },
+    ], true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, size, false);
+    ctx.drawPolygon([
+      { x: -1.55, y: -0.75 },
+      { x: -0.05, y: -0.75 },
+      { x: -0.05, y:  0.75 },
+      { x: -1.55, y:  0.75 },
+    ], false);
 
-    // Draw label inside the component body (or type name if no label)
-    const displayText = label.length > 0 ? label : "In";
+    // Inner circle at (-0.8, 0) r=0.45
+    ctx.drawCircle(-0.8, 0, 0.45, false);
+
+    // Label to the left, right-aligned
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: size * 0.6 });
-    drawUprightText(ctx, displayText, -COMP_WIDTH / 2, 0, {
-      horizontal: "center",
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    drawUprightText(ctx, label, -2.25, 0, {
+      horizontal: "right",
       vertical: "middle",
     }, this.rotation);
 

@@ -40,6 +40,7 @@ export type {
   PatchDisconnect,
   PatchReplace,
   PatchOptions,
+  PatchResult,
 } from './netlist-types.js';
 
 // ============================================
@@ -47,7 +48,7 @@ export type {
 // ============================================
 
 export { CircuitBuilder } from './builder.js';
-export { autoLayout, type LayoutOptions } from './auto-layout.js';
+export { autoLayout, type LayoutOptions, type LayoutConstraint } from './auto-layout.js';
 
 // ============================================
 // Core types (re-exported for convenience)

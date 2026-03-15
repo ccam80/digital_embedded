@@ -60,7 +60,7 @@ function makeCompiledCircuit(): CompiledCircuitImpl {
     netCount,
     componentCount,
     totalStateSlots: 1,
-    typeIds: new Uint8Array([0]),
+    typeIds: new Uint16Array([0]),
     executeFns: [executeFn],
     sampleFns: [null],
     wiringTable,

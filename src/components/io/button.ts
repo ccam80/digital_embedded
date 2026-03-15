@@ -66,11 +66,12 @@ export class ButtonElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Outer polygon spans x: -1.9 to 0, y: -1.1 to 0.75.
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 1.9,
+      y: this.position.y - 1.1,
+      width: 1.9,
+      height: 1.85,
     };
   }
 
@@ -80,27 +81,38 @@ export class ButtonElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const label = this._properties.getOrDefault<string>("label", "");
-    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(-COMP_WIDTH, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
-    // Draw button symbol: a smaller filled rect indicating a pushbutton
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(-COMP_WIDTH + 0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
+    // Outer 3D button polygon (body to left of pin at x=0):
+    // (-1.9,-1.1) → (-0.4,-1.1) → (-0.05,-0.75) → (-0.05,0.75) → (-1.55,0.75) → (-1.9,0.4)
+    ctx.drawPolygon(
+      [
+        { x: -1.9, y: -1.1 },
+        { x: -0.4, y: -1.1 },
+        { x: -0.05, y: -0.75 },
+        { x: -0.05, y: 0.75 },
+        { x: -1.55, y: 0.75 },
+        { x: -1.9, y: 0.4 },
+      ],
+      true,
+    );
+
+    // Inner button face open path: (-0.4,-1.05) → (-0.4,0.4) → (-1.85,0.4)
+    ctx.drawLine(-0.4, -1.05, -0.4, 0.4);
+    ctx.drawLine(-0.4, 0.4, -1.85, 0.4);
+
+    // Line: (-0.4,0.4) to (-0.1,0.7)
+    ctx.drawLine(-0.4, 0.4, -0.1, 0.7);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, -COMP_WIDTH / 2, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
+      ctx.drawText(label, -2.25, -0.2, {
+        horizontal: "right",
+        vertical: "middle",
       });
     }
 

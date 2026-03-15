@@ -36,21 +36,22 @@ const COMP_HEIGHT = 2;
 // output "out" on east face: button output
 // ---------------------------------------------------------------------------
 
+// Java ButtonLEDShape: out(0,0), in(0,SIZE)=(0,1)
 function buildButtonLEDPinDeclarations(): PinDeclaration[] {
   return [
     {
-      direction: PinDirection.INPUT,
-      label: "in",
+      direction: PinDirection.OUTPUT,
+      label: "out",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
-      direction: PinDirection.OUTPUT,
-      label: "out",
+      direction: PinDirection.INPUT,
+      label: "in",
       defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -77,11 +78,14 @@ export class ButtonLEDElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Drawn geometry: outer polygon x:[-1.9,-0.05], y:[-1.1,0.75]
+    // Circle at cx=-1.15,r=0.5 → x:[-1.65,-0.65] (inside outer polygon)
+    // Line (-0.4,0.4)→(-0.1,0.7): maxX=-0.05 (outer polygon is rightmost)
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 1.9,
+      y: this.position.y - 1.1,
+      width: 1.85,
+      height: 1.85,
     };
   }
 
@@ -91,33 +95,50 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     const label = this._properties.getOrDefault<string>("label", "");
-    const yOff = -COMP_HEIGHT / 2;
 
     ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
 
-    // Button symbol: inner rect
-    ctx.drawRect(0.4, yOff + 0.4, COMP_WIDTH - 0.8, COMP_HEIGHT - 0.8, false);
+    // Outer 3D button polygon (body to left of pin at x=0):
+    // (-1.9,-1.1) → (-0.4,-1.1) → (-0.05,-0.75) → (-0.05,0.75) → (-1.55,0.75) → (-1.9,0.4)
+    ctx.drawPolygon(
+      [
+        { x: -1.9, y: -1.1 },
+        { x: -0.4, y: -1.1 },
+        { x: -0.05, y: -0.75 },
+        { x: -0.05, y: 0.75 },
+        { x: -1.55, y: 0.75 },
+        { x: -1.9, y: 0.4 },
+      ],
+      true,
+    );
 
-    // LED indicator: small circle in top-right area
+    // Inner button face open path: (-0.4,-1.05) → (-0.4,0.4) → (-1.85,0.4)
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: -0.4,  y: -1.05 },
+        { op: "lineTo", x: -0.4,  y: 0.4 },
+        { op: "lineTo", x: -1.85, y: 0.4 },
+      ],
+    }, false);
+
+    // Line: (-0.4,0.4) to (-0.1,0.7)
+    ctx.drawLine(-0.4, 0.4, -0.1, 0.7);
+
+    // LED circles at (-1.15,-0.35): filled (OTHER(0,true)) then outline (THIN), both r=0.5
     ctx.setColor("WIRE_Z");
-    ctx.drawCircle(COMP_WIDTH - 0.4, yOff + 0.4, 0.25, true);
+    ctx.drawCircle(-1.15, -0.35, 0.5, true);
     ctx.setColor("COMPONENT");
-    ctx.drawCircle(COMP_WIDTH - 0.4, yOff + 0.4, 0.25, false);
+    ctx.drawCircle(-1.15, -0.35, 0.5, false);
 
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, COMP_WIDTH / 2, yOff - 0.3, {
-        horizontal: "center",
-        vertical: "bottom",
-      });
-    }
+    // Text label (always drawn, even if empty — Java always emits text call)
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(label, -2.25, -0.2, {
+      horizontal: "right",
+      vertical: "middle",
+    });
 
     ctx.restore();
   }

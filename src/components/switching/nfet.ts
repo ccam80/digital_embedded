@@ -41,8 +41,10 @@ export interface FETLayout extends ComponentLayout {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Java FETShapeN: Gate at (1,1) right-center, Drain at (1,0) top-right, Source at (1,2) bottom-right
+// Component spans x:[0,1], y:[0,2]
+const COMP_WIDTH = 1;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -53,7 +55,7 @@ const NFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "G",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -61,7 +63,7 @@ const NFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "D",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 0 },
+    position: { x: 1, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -69,7 +71,7 @@ const NFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "S",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: COMP_HEIGHT },
+    position: { x: 1, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -98,7 +100,9 @@ export class NFETElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Gate oxide bar at x=0.05; drain/source leads reach x=1.0.
+    // Width = 1.0 - 0.05 = 0.95.
+    return { x: this.position.x + 0.05, y: this.position.y, width: 0.95, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
@@ -106,19 +110,29 @@ export class NFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line (horizontal from left)
-    ctx.drawLine(0, COMP_HEIGHT / 2, 1, COMP_HEIGHT / 2);
-    // Gate bar (vertical)
-    ctx.drawLine(1, 0.5, 1, COMP_HEIGHT - 0.5);
-    // Channel line (vertical, offset from gate bar)
-    ctx.drawLine(1.5, 0.5, 1.5, COMP_HEIGHT - 0.5);
-    // Drain and source connections
-    ctx.drawLine(1.5, 0.5, COMP_WIDTH, 0.5);
-    ctx.drawLine(1.5, COMP_HEIGHT - 0.5, COMP_WIDTH, COMP_HEIGHT - 0.5);
+    // Drain lead: (1,0) → (0.4,0) → (0.4,0.25)
+    ctx.drawLine(1, 0, 0.4, 0);
+    ctx.drawLine(0.4, 0, 0.4, 0.25);
 
-    // N-channel arrow pointing inward (toward channel)
-    ctx.drawLine(1.5, COMP_HEIGHT / 2, 1.9, COMP_HEIGHT / 2 - 0.3);
-    ctx.drawLine(1.5, COMP_HEIGHT / 2, 1.9, COMP_HEIGHT / 2 + 0.3);
+    // Source lead: (1,2) → (0.4,2) → (0.4,1.75)
+    ctx.drawLine(1, 2, 0.4, 2);
+    ctx.drawLine(0.4, 2, 0.4, 1.75);
+
+    // Channel gap line: (0.4,0.75) to (0.4,1.25)
+    ctx.drawLine(0.4, 0.75, 0.4, 1.25);
+
+    // Gate oxide bar: vertical line at x=0.05 from y=0 to y=2
+    ctx.drawLine(0.05, 0, 0.05, 2);
+
+    // Gate lead (THIN): (0.75,1) to (1,1) — connects channel to G pin at (1,1)
+    ctx.drawLine(0.75, 1, 1, 1);
+
+    // N-channel arrow (filled triangle): (0.6,1) → (0.85,0.9) → (0.85,1.1)
+    ctx.drawPolygon([
+      { x: 0.6, y: 1 },
+      { x: 0.85, y: 0.9 },
+      { x: 0.85, y: 1.1 },
+    ], true);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {

@@ -19,6 +19,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -37,12 +38,12 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-// Pins shifted -1: en@0,C@1,dir@2,in@3,ld@4,clr@6; out@0,ovf@6
-// bodyHeight = maxPinY + 1 = 6 + 1 = 7
-const COMP_HEIGHT = 7;
+// Java GenericShape: 6 inputs, 2 outputs, non-symmetric (offs=0)
+// en@y=0, C@y=1, dir@y=2, in@y=3, ld@y=4, clr@y=5; out@y=0, ovf@y=1
+const COMP_HEIGHT = 6;
 
 // ---------------------------------------------------------------------------
-// Pin declarations — y-positions shifted down by 1 from previous layout
+// Pin declarations — matching Java GenericShape layout
 // ---------------------------------------------------------------------------
 
 const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -90,7 +91,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "clr",
     defaultBitWidth: 1,
-    position: { x: 0, y: 6 },
+    position: { x: 0, y: 5 },
     isNegatable: true,
     isClockCapable: false,
   },
@@ -106,7 +107,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "ovf",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 6 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -129,53 +130,32 @@ export class CounterPresetElement extends AbstractCircuitElement {
 
   getPins(): readonly Pin[] {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 4);
-    return this.derivePins(COUNTER_PRESET_PIN_DECLARATIONS, ["C"]);
+    const decls = COUNTER_PRESET_PIN_DECLARATIONS.map((d) =>
+      d.label === "in" || d.label === "out"
+        ? { ...d, defaultBitWidth: bitWidth }
+        : d,
+    );
+    return this.derivePins(decls, ["C"]);
   }
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("en", 0.5, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("dir", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("in", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ld", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("clr", 0.5, 6, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("out", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("ovf", COMP_WIDTH - 0.5, 6, { horizontal: "right", vertical: "middle" });
-
-    ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("CTR", COMP_WIDTH / 2, 3, { horizontal: "center", vertical: "middle" });
-
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 0.5, 0.5, 1);
-    ctx.drawLine(0.5, 1, 0, 1.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["en", "C", "dir", "in", "ld", "clr"],
+      outputLabels: ["out", "ovf"],
+      clockInputIndices: [1],
+      componentName: "Counter",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

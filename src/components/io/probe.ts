@@ -74,11 +74,15 @@ export class ProbeElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // draw() is text-only — tsCallsToSegments produces no segments so
+    // tsBounds collapses to (0,0,0,0). Starting y below 0 caused
+    // overflow = tsBounds.minY - by0 = 0 - (-0.4) = 0.4.
+    // Keep y=0 so the bbox top aligns with the collapsed draw bounds.
     return {
       x: this.position.x,
-      y: this.position.y - 0.3,
+      y: this.position.y,
       width: 1.5,
-      height: 0.6,
+      height: 0.8,
     };
   }
 

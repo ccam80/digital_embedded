@@ -63,7 +63,7 @@ export function evaluateWithNoise(
   state: Uint32Array,
   highZs: Uint32Array,
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   layout: ComponentLayout,
 ): void {
   // Work on a copy so the caller's ordering is not disturbed between calls
@@ -109,7 +109,7 @@ export function evaluateSynchronized(
   highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   layout: ComponentLayout,
 ): void {
   // Snapshot input values before any writes

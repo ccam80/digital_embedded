@@ -275,36 +275,40 @@ describe("StepperMotorBipolar", () => {
       expect(BIPOLAR_STEP_SEQUENCE.length).toBe(4);
     });
 
-    it("step 0 pattern: A+=1, A-=0, B+=1, B-=0 → output=0", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([1, 0, 1, 0], 1);
+    it("step 0 pattern: A+=1, A-=0, B+=1, B-=0 → S0=0, S1=0", () => {
+      const layout = makeLayout(4, 2);
+      const state = makeState([1, 0, 1, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorBipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
+      expect(state[4]).toBe(0); // S0 = stepIndex & 0x3 = 0
+      expect(state[5]).toBe(0); // S1 = (stepIndex >> 2) & 0x3 = 0
     });
 
-    it("step 1 pattern: A+=0, A-=1, B+=1, B-=0 → output=1", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([0, 1, 1, 0], 1);
+    it("step 1 pattern: A+=0, A-=1, B+=1, B-=0 → S0=1, S1=0", () => {
+      const layout = makeLayout(4, 2);
+      const state = makeState([0, 1, 1, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorBipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(1);
+      expect(state[4]).toBe(1); // S0 = 1 & 0x3
+      expect(state[5]).toBe(0); // S1 = 0
     });
 
-    it("step 2 pattern: A+=0, A-=1, B+=0, B-=1 → output=2", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([0, 1, 0, 1], 1);
+    it("step 2 pattern: A+=0, A-=1, B+=0, B-=1 → S0=2, S1=0", () => {
+      const layout = makeLayout(4, 2);
+      const state = makeState([0, 1, 0, 1], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorBipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(2);
+      expect(state[4]).toBe(2); // S0 = 2 & 0x3
+      expect(state[5]).toBe(0); // S1 = 0
     });
 
-    it("step 3 pattern: A+=1, A-=0, B+=0, B-=1 → output=3", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([1, 0, 0, 1], 1);
+    it("step 3 pattern: A+=1, A-=0, B+=0, B-=1 → S0=3, S1=0", () => {
+      const layout = makeLayout(4, 2);
+      const state = makeState([1, 0, 0, 1], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorBipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(3);
+      expect(state[4]).toBe(3); // S0 = 3 & 0x3
+      expect(state[5]).toBe(0); // S1 = 0
     });
   });
 
@@ -324,11 +328,13 @@ describe("StepperMotorBipolar", () => {
       expect(labels).toContain("B-");
     });
 
-    it("bipolar motor has 1 output pin 'step'", () => {
+    it("bipolar motor has 2 output pins S0 and S1", () => {
       const el = makeBipolarMotor();
       const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs).toHaveLength(1);
-      expect(outputs[0].label).toBe("step");
+      expect(outputs).toHaveLength(2);
+      const labels = outputs.map((p) => p.label);
+      expect(labels).toContain("S0");
+      expect(labels).toContain("S1");
     });
   });
 
@@ -349,12 +355,15 @@ describe("StepperMotorBipolar", () => {
       expect(circles.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders M label", () => {
+    it("draw renders motor circle and pointer line", () => {
       const el = makeBipolarMotor();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "M")).toBe(true);
+      const circles = calls.filter((c) => c.method === "drawCircle");
+      const lines = calls.filter((c) => c.method === "drawLine");
+      // circle at (0.5,1) r=2 and vertical pointer line
+      expect(circles.length).toBeGreaterThanOrEqual(1);
+      expect(lines.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -399,60 +408,67 @@ describe("StepperMotorUnipolar", () => {
       expect(UNIPOLAR_STEP_SEQUENCE.length).toBe(4);
     });
 
-    it("step 0: A=1,B=0,C=0,D=0 → output=0", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([1, 0, 0, 0], 1);
+    it("step 0: P0=1,P1=0,P2=0,P3=0,com=0 → S0=0, S1=0", () => {
+      const layout = makeLayout(5, 2);
+      const state = makeState([1, 0, 0, 0, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorUnipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
+      expect(state[5]).toBe(0); // S0
+      expect(state[6]).toBe(0); // S1
     });
 
-    it("step 1: A=0,B=1,C=0,D=0 → output=1", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([0, 1, 0, 0], 1);
+    it("step 1: P0=0,P1=1,P2=0,P3=0,com=0 → S0=1, S1=0", () => {
+      const layout = makeLayout(5, 2);
+      const state = makeState([0, 1, 0, 0, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorUnipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(1);
+      expect(state[5]).toBe(1); // S0
+      expect(state[6]).toBe(0); // S1
     });
 
-    it("step 2: A=0,B=0,C=1,D=0 → output=2", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([0, 0, 1, 0], 1);
+    it("step 2: P0=0,P1=0,P2=1,P3=0,com=0 → S0=2, S1=0", () => {
+      const layout = makeLayout(5, 2);
+      const state = makeState([0, 0, 1, 0, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorUnipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(2);
+      expect(state[5]).toBe(2); // S0
+      expect(state[6]).toBe(0); // S1
     });
 
-    it("step 3: A=0,B=0,C=0,D=1 → output=3", () => {
-      const layout = makeLayout(4, 1);
-      const state = makeState([0, 0, 0, 1], 1);
+    it("step 3: P0=0,P1=0,P2=0,P3=1,com=0 → S0=3, S1=0", () => {
+      const layout = makeLayout(5, 2);
+      const state = makeState([0, 0, 0, 1, 0], 2);
       const highZs = new Uint32Array(state.length);
       executeStepperMotorUnipolar(0, state, highZs, layout);
-      expect(state[4]).toBe(3);
+      expect(state[5]).toBe(3); // S0
+      expect(state[6]).toBe(0); // S1
     });
   });
 
   describe("pinLayout", () => {
-    it("unipolar motor has 4 input pins", () => {
+    it("unipolar motor has 5 input pins", () => {
       const el = makeUnipolarMotor();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(4);
+      expect(inputs).toHaveLength(5);
     });
 
-    it("unipolar motor input labels are A, B, C, D", () => {
+    it("unipolar motor input labels include P0, P3, and com", () => {
       const el = makeUnipolarMotor();
       const labels = el.getPins()
         .filter((p) => p.direction === PinDirection.INPUT)
         .map((p) => p.label);
-      expect(labels).toContain("A");
-      expect(labels).toContain("D");
+      expect(labels).toContain("P0");
+      expect(labels).toContain("P3");
+      expect(labels).toContain("com");
     });
 
-    it("unipolar motor has 1 output pin 'step'", () => {
+    it("unipolar motor has 2 output pins S0 and S1", () => {
       const el = makeUnipolarMotor();
       const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs).toHaveLength(1);
-      expect(outputs[0].label).toBe("step");
+      expect(outputs).toHaveLength(2);
+      const labels = outputs.map((p) => p.label);
+      expect(labels).toContain("S0");
+      expect(labels).toContain("S1");
     });
   });
 

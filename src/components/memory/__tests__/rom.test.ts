@@ -278,7 +278,7 @@ describe("ROM", () => {
     const el = new ROMElement(crypto.randomUUID(), { x: 5, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(5);
-    expect(bb.y).toBe(3);
+    expect(bb.y).toBe(3 - 0.5);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });

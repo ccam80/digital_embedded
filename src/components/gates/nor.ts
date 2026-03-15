@@ -83,6 +83,7 @@ export class NOrElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
+    // Body back arc starts at x=0.0; bubble adds 1 to right extent.
     return {
       x: this.position.x,
       y: this.position.y - topBorder,

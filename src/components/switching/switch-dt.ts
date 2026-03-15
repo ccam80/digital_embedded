@@ -106,69 +106,48 @@ export class SwitchDTElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
+    // Thin bar at (0.5,-0.75)→(1.5,-0.75); contact arm to (1.8,0.5); pole stub to (2,1).
+    // MinX=0, MaxX=2, MinY=-0.75, MaxY=max(h, 1).
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.75,
       width: COMP_WIDTH,
-      height: h,
+      height: Math.max(h, 1) + 0.75,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._properties.getOrDefault<number>("poles", 1);
-    const closed = this._properties.getOrDefault<boolean>("closed", false);
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Draw the C-contact stub for each pole (shows DT nature, always visible)
-    for (let p = 0; p < poles; p++) {
-      const yBase = p * POLE_HEIGHT;
-      // Stub: small polygon from C terminal position toward the contact area
-      ctx.drawLine(COMP_WIDTH, yBase + C_OFFSET, COMP_WIDTH - 0.5, yBase + C_OFFSET);
-      ctx.drawLine(COMP_WIDTH - 0.5, yBase + C_OFFSET, COMP_WIDTH - 0.5, yBase + 0.6);
-    }
+    // Pole stub (open L): (2,1) → (1.75,1) → (1.75,0.6) — use drawPath so the
+    // rasterizer treats it as an open polyline matching the Java fixture (closed=false).
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 2, y: 1 },
+      { op: "lineTo", x: 1.75, y: 1 },
+      { op: "lineTo", x: 1.75, y: 0.6 },
+    ] });
 
-    // yOffs for open state
-    const yOffs = closed ? 0 : -0.5;
+    // Contact arm line: (0,0) to (1.8,0.5)
+    ctx.drawLine(0, 0, 1.8, 0.5);
 
-    if (closed) {
-      // Closed (A-B): straight horizontal line from A to B
-      for (let p = 0; p < poles; p++) {
-        ctx.drawLine(0, p * POLE_HEIGHT, COMP_WIDTH, p * POLE_HEIGHT);
-      }
-    } else {
-      // Open (A-C): angled line from A toward C
-      for (let p = 0; p < poles; p++) {
-        ctx.drawLine(0, p * POLE_HEIGHT, COMP_WIDTH - 0.2, p * POLE_HEIGHT - yOffs * 2);
-      }
-    }
-
-    // Lever indicator: dashed vertical line
+    // Dashed linkage: (1,0.25) to (1,-0.75)
     ctx.setLineDash([0.2, 0.2]);
-    ctx.drawLine(
-      COMP_WIDTH / 2,
-      -yOffs + (poles - 1) * POLE_HEIGHT,
-      COMP_WIDTH / 2,
-      -yOffs - 1,
-    );
+    ctx.drawLine(1, 0.25, 1, -0.75);
     ctx.setLineDash([]);
 
-    // Grip indicator: short horizontal bar
-    ctx.drawLine(COMP_WIDTH / 4, -yOffs - 1, (COMP_WIDTH * 3) / 4, -yOffs - 1);
+    // Thin bar: (0.5,-0.75) to (1.5,-0.75)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.5, -0.75, 1.5, -0.75);
+    ctx.setLineWidth(1);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(
-        label,
-        COMP_WIDTH / 2,
-        4 + (poles - 1) * POLE_HEIGHT + C_OFFSET,
-        { horizontal: "center", vertical: "top" },
-      );
+      ctx.drawText(label, COMP_WIDTH / 2, 2, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

@@ -30,15 +30,24 @@ export type HitResult =
 /**
  * Returns the topmost element whose bounding box contains the point.
  * Front-to-back order: last element in the array is considered on top.
+ *
+ * @param margin  Optional bounding-box inflation in grid units (for touch targets).
  */
 export function hitTestElements(
   point: Point,
   elements: readonly CircuitElement[],
+  margin = 0,
 ): CircuitElement | undefined {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     const bb = worldBoundingBox(el);
-    if (pointInRect(point, bb)) {
+    const inflated: Rect = {
+      x: bb.x - margin,
+      y: bb.y - margin,
+      width: bb.width + margin * 2,
+      height: bb.height + margin * 2,
+    };
+    if (pointInRect(point, inflated)) {
       return el;
     }
   }
@@ -90,18 +99,21 @@ export function hitTestPins(
 
 /**
  * Unified hit test with priority: pin > element > wire > none.
+ *
+ * @param margin  Optional bounding-box inflation for element hit testing (touch targets).
  */
 export function hitTestAll(
   point: Point,
   circuit: Circuit,
   threshold: number,
+  margin = 0,
 ): HitResult {
   const pinHit = hitTestPins(point, circuit.elements, threshold);
   if (pinHit !== undefined) {
     return { type: "pin", element: pinHit.element, pin: pinHit.pin };
   }
 
-  const elementHit = hitTestElements(point, circuit.elements);
+  const elementHit = hitTestElements(point, circuit.elements, margin);
   if (elementHit !== undefined) {
     return { type: "element", element: elementHit };
   }
@@ -192,9 +204,10 @@ export function worldBoundingBox(el: CircuitElement): Rect {
   const w = bb.width;
   const h = bb.height;
 
-  // Mirror is applied before rotation (canvas: translate * rotate * scale(-1,1) * local)
+  // Mirror negates Y in local space (vertical flip), matching Java Digital's
+  // TransformMatrix(1,0,0,-1) convention, before rotation.
   if (el.mirror) {
-    lx = -(lx + w);
+    ly = -(ly + h);
   }
 
   const rot = el.rotation as Rotation;

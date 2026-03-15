@@ -138,7 +138,7 @@ export type EngineMessage =
       netCount: number;
       componentCount: number;
       signalArraySize: number;
-      typeIds: Uint8Array;
+      typeIds: Uint16Array;
       typeNames: string[];
       inputOffsets: Int32Array;
       outputOffsets: Int32Array;

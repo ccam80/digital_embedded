@@ -23,10 +23,10 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -87,18 +87,20 @@ function lfsrNext(state: number, taps: number, mask: number): number {
   return (next & mask) >>> 0;
 }
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 6;
+const COMP_WIDTH = 3;
+const COMP_HEIGHT = 5;
 
+// GenericShape: 4 inputs, 1 output, symmetric=true, even=true (4 inputs), offs=floor(4/2)=2
+// i=0: y=0, i=1: y=1, i=2: y=2+1=3 (gap), i=3: y=3+1=4
+// R: y=0+offs=2
+// S@(0,0), se@(0,1), ne@(0,3), C@(0,4), R@(3,2)
 function buildPRNGPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: bitWidth, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "se", defaultBitWidth: 1, position: inputPositions[1], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "ne", defaultBitWidth: 1, position: inputPositions[2], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: inputPositions[3], isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.OUTPUT, label: "R", defaultBitWidth: bitWidth, position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "se", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "ne", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: true },
+    { direction: PinDirection.OUTPUT, label: "R", defaultBitWidth: bitWidth, position: { x: 3, y: 2 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -119,20 +121,18 @@ export class PRNGElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("PRNG", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["S", "se", "ne", "C"],
+      outputLabels: ["R"],
+      clockInputIndices: [3],
+      componentName: "PRNG",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

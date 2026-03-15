@@ -16,6 +16,7 @@ import {
   gateBodyMetrics,
   standardGatePinLayout,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -49,22 +50,19 @@ export class NegElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const { topBorder, bodyHeight } = gateBodyMetrics(1);
-    return { x: this.position.x, y: this.position.y - topBorder, width: COMP_WIDTH, height: bodyHeight };
+    // GenericShape: 1 input, 1 output, symmetric, odd → maxY=1, height=1
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: 1 };
   }
 
   draw(ctx: RenderContext): void {
-    const { topBorder, bodyHeight } = gateBodyMetrics(1);
-    ctx.save();
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -topBorder, COMP_WIDTH, bodyHeight, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -topBorder, COMP_WIDTH, bodyHeight, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.2, weight: "bold" });
-    ctx.drawText("-A", COMP_WIDTH / 2, -topBorder + bodyHeight / 2, { horizontal: "center", vertical: "middle" });
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["in"],
+      outputLabels: ["out"],
+      clockInputIndices: [],
+      componentName: "Neg",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

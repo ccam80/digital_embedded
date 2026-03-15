@@ -14,7 +14,6 @@ import {
   createInverterConfig,
   resolvePins,
 } from "../../core/pin.js";
-import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -41,7 +40,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   get bits(): number {
-    return this._properties.getOrDefault<number>("bits", 8);
+    return this._properties.getOrDefault<number>("bits", 1);
   }
 
   get spreading(): number {
@@ -49,7 +48,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const bits = this._properties.getOrDefault<number>("bits", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     const decls: PinDeclaration[] = [
       {
@@ -89,49 +88,71 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const bits = this._properties.getOrDefault<number>("bits", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
+    // Original height formula covers OE pin at y=1 and all bit pins
     const h = Math.max(2, (bits - 1) * spreading + 1);
+    // Filled bar top extends to y=-0.1 above origin, so shift bbox top up by 0.1.
+    // Keep height = h so the bottom edge is unchanged.
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.1,
       width: 1,
       height: h,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const bits = this._properties.getOrDefault<number>("bits", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
-    const lastY = (bits - 1) * spreading;
+    const lastBitY = (bits - 1) * spreading;
 
     ctx.save();
+
+    const labelFont = { family: "sans-serif", size: 0.35 };
 
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Vertical spine on left at x=0 from y=0 to y=lastY
-    ctx.drawLine(0, 0, 0, lastY);
+    // Left side: D pin lead (0,0)→(0.5,0) and OE pin lead (0,1)→(0.5,1)
+    ctx.drawLine(0, 0, 0.5, 0);
+    ctx.drawLine(0, 1, 0.5, 1);
 
-    // Horizontal stubs from x=0 to x=1 at each bit position
+    // Text labels for D and OE on the left (RIGHTBOTTOM anchor → right,bottom)
+    ctx.setFont(labelFont);
+    ctx.setColor("TEXT");
+    ctx.drawText("D",  -0.1, -0.15, { horizontal: "right", vertical: "bottom" });
+    ctx.drawText("OE", -0.1,  0.85, { horizontal: "right", vertical: "bottom" });
+
+    // Right side: lead lines from (1,y)→(0.5,y) and labels for each bit
+    ctx.setColor("COMPONENT");
     for (let i = 0; i < bits; i++) {
       const y = i * spreading;
-      ctx.drawLine(0, y, 1, y);
+      ctx.drawLine(1, y, 0.5, y);
+      ctx.setFont(labelFont);
+      ctx.setColor("TEXT");
+      // LEFTBOTTOM anchor → left,bottom; label offset mirrors Java: x=1.1, y=bitY-0.15
+      ctx.drawText(`D${i}`, 1.1, y - 0.15, { horizontal: "left", vertical: "bottom" });
+      ctx.setColor("COMPONENT");
     }
 
-    // Label "BS" centered on the spine
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    drawUprightText(ctx, "BS", 0, lastY / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    }, this.rotation);
+    // Filled vertical bar: (0.4,-0.1)→(0.6,-0.1)→(0.6,barBottom)→(0.4,barBottom), FILLED
+    // Use drawPolygon with explicit coords to avoid drawRect float error
+    // (0.4+0.2 != 0.6 and -0.1+barHeight != barBottom in IEEE 754).
+    const barBottom = Math.max(1, lastBitY) + 0.1;
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon([
+      { x: 0.4, y: -0.1 },
+      { x: 0.6, y: -0.1 },
+      { x: 0.6, y: barBottom },
+      { x: 0.4, y: barBottom },
+    ], true);
 
     ctx.restore();
   }
 
   getHelpText(): string {
-    const bits = this._properties.getOrDefault<number>("bits", 8);
+    const bits = this._properties.getOrDefault<number>("bits", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     return (
       `BusSplitter — bidirectional bus splitter with OE control.\n` +
@@ -199,7 +220,7 @@ const BUS_SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "bits",
     type: PropertyType.INT,
     label: "Bits",
-    defaultValue: 8,
+    defaultValue: 1,
     description: "Number of bits in the common bus",
   },
   {
@@ -256,7 +277,7 @@ export const BusSplitterDefinition: ComponentDefinition = {
   typeId: -1,
   factory: busSplitterFactory,
   executeFn: executeBusSplitter,
-  pinLayout: buildDefaultPinLayout(8, 1),
+  pinLayout: buildDefaultPinLayout(1, 1),
   propertyDefs: BUS_SPLITTER_PROPERTY_DEFS,
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,

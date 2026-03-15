@@ -80,6 +80,8 @@ export class OrElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
+    // Body polygon starts at x=0.0 (back curve and stubs); bbox matches drawn geometry.
+    // The concave back arc extends to x=0.0, stubs draw from x=0. Min x = 0.
     return {
       x: this.position.x,
       y: this.position.y - topBorder,

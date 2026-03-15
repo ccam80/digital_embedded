@@ -17,12 +17,12 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -40,23 +40,27 @@ export { DataField, registerBackingStore, clearBackingStores } from "./ram.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
+const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout helper
 // ---------------------------------------------------------------------------
 
+// GenericShape formula: 1 output → symmetric=true
+// even = inputCount % 2 === 0; offs = floor(inputCount/2)
+// Input i: y = i + (symmetric && even && i >= floor(inputCount/2) ? 1 : 0)
+// Output:  y = offs = floor(inputCount/2)
 function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", inputCount, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   const decls: PinDeclaration[] = [];
+  const even = inputCount % 2 === 0;
+  const offs = Math.floor(inputCount / 2);
   for (let i = 0; i < inputCount; i++) {
+    const gap = even && i >= offs ? 1 : 0;
     decls.push({
       direction: PinDirection.INPUT,
       label: String(i),
       defaultBitWidth: 1,
-      position: inputPositions[i],
+      position: { x: 0, y: i + gap },
       isNegatable: false,
       isClockCapable: false,
     });
@@ -65,7 +69,7 @@ function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: dataBits,
-    position: outputPositions[0],
+    position: { x: COMP_WIDTH, y: offs },
     isNegatable: false,
     isClockCapable: false,
   });
@@ -100,29 +104,26 @@ export class LookUpTableElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const even = inputCount % 2 === 0;
+    const height = inputCount + (even ? 1 : 0);
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("LUT", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+    const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
+    const inputLabels: string[] = [];
+    for (let i = 0; i < inputCount; i++) {
+      inputLabels.push(String(i));
     }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels,
+      outputLabels: ["out"],
+      clockInputIndices: [],
+      componentName: "LUT",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

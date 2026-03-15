@@ -31,6 +31,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -57,27 +58,6 @@ export type { RAMLayout } from "./ram.js";
 const COMP_WIDTH = 3;
 // 5-input variants (odd, symmetric): offs=2; inputs y=0,1,2,3,4; output y=2; maxPinY=4; bodyHeight=5
 const COMP_HEIGHT = 5;
-
-// ---------------------------------------------------------------------------
-// Shared rendering helper
-// ---------------------------------------------------------------------------
-
-function drawEEPROMBody(ctx: RenderContext, label: string, symbol: string): void {
-  ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-  ctx.setColor("COMPONENT");
-  ctx.setLineWidth(1);
-  ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-  ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-  ctx.drawText(symbol, COMP_WIDTH / 2, 2, { horizontal: "center", vertical: "middle" });
-
-  if (label.length > 0) {
-    ctx.setFont({ family: "sans-serif", size: 0.9 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Shared property definitions
@@ -200,13 +180,18 @@ export class EEPROMElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawEEPROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "EEPROM");
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "CS", "WE", "OE"],
+      outputLabels: ["D"],
+      clockInputIndices: [2],
+      componentName: "EEPROM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   get isProgramMemory(): boolean {
@@ -351,13 +336,18 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.5, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    drawEEPROMBody(ctx, this._properties.getOrDefault<string>("label", ""), "EEPROM2");
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["A", "Din", "str", "C", "ld"],
+      outputLabels: ["D"],
+      clockInputIndices: [3],
+      componentName: "EEPROM",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   get isProgramMemory(): boolean {

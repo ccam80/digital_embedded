@@ -91,61 +91,39 @@ export class SwitchElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
+    // Dashed linkage and thin bar extend up to y=-1.25 above the origin.
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 1.25,
       width: COMP_WIDTH,
-      height: h,
+      height: h + 1.25,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const poles = this._properties.getOrDefault<number>("poles", 1);
-    const closed = this._properties.getOrDefault<boolean>("closed", false);
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // yOffs: vertical offset applied when open to show angled contact
-    const yOffs = closed ? 0 : 0.5;
+    // Contact arm line: (0,0) to (1.8,-0.5) — angled switch arm (open state)
+    ctx.drawLine(0, 0, 1.8, -0.5);
 
-    if (closed) {
-      // Closed state: straight horizontal line from A to B for each pole
-      for (let p = 0; p < poles; p++) {
-        ctx.drawLine(0, p * POLE_HEIGHT, COMP_WIDTH, p * POLE_HEIGHT);
-      }
-    } else {
-      // Open state: angled line from A, not reaching B (classic knife-switch symbol)
-      for (let p = 0; p < poles; p++) {
-        ctx.drawLine(0, p * POLE_HEIGHT, COMP_WIDTH - 0.2, p * POLE_HEIGHT - yOffs * 2);
-      }
-    }
-
-    // Lever indicator: dashed vertical line connecting all poles
+    // Dashed linkage line: (1,-0.25) to (1,-1.25)
     ctx.setLineDash([0.2, 0.2]);
-    ctx.drawLine(
-      COMP_WIDTH / 2,
-      -yOffs + (poles - 1) * POLE_HEIGHT,
-      COMP_WIDTH / 2,
-      -yOffs - 1,
-    );
+    ctx.drawLine(1, -0.25, 1, -1.25);
     ctx.setLineDash([]);
 
-    // Grip indicator: short horizontal bar
-    ctx.drawLine(COMP_WIDTH / 4, -yOffs - 1, (COMP_WIDTH * 3) / 4, -yOffs - 1);
+    // Thin bar: (0.5,-1.25) to (1.5,-1.25)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.5, -1.25, 1.5, -1.25);
+    ctx.setLineWidth(1);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(
-        label,
-        COMP_WIDTH / 2,
-        4 + (poles - 1) * POLE_HEIGHT,
-        { horizontal: "center", vertical: "top" },
-      );
+      ctx.drawText(label, COMP_WIDTH / 2, 2, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

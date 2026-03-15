@@ -13,6 +13,7 @@ import { ComponentCategory } from '../core/registry.js';
 import { executeSubcircuit } from './subcircuit/subcircuit.js';
 import { PropertyType } from '../core/properties.js';
 import type { PropertyBag } from '../core/properties.js';
+import type { PinDeclaration } from '../core/pin.js';
 import { SubcircuitElement } from './subcircuit/subcircuit.js';
 import type { SubcircuitDefinition } from './subcircuit/subcircuit.js';
 
@@ -180,9 +181,19 @@ export const LIBRARY_74XX: Library74xxEntry[] = [
  * loaded on demand (lazy) when the user places the component — the file path
  * stored in the manifest drives the loader.
  *
+ * If `pinMap` is provided, the stub's `pinLayout` is populated from the
+ * pre-scanned pin declarations. This allows `circuit_describe` and other
+ * introspection to return real pin metadata without loading the full
+ * subcircuit. Use `scanDigPins()` from `io/dig-pin-scanner.ts` to build
+ * the map.
+ *
  * @param registry - The component registry to register into.
+ * @param pinMap   - Optional map of IC name → pre-scanned PinDeclaration[].
  */
-export function register74xxLibrary(registry: ComponentRegistry): void {
+export function register74xxLibrary(
+  registry: ComponentRegistry,
+  pinMap?: ReadonlyMap<string, PinDeclaration[]>,
+): void {
   for (const entry of LIBRARY_74XX) {
     const componentDef = {
       name: entry.name,
@@ -193,7 +204,7 @@ export function register74xxLibrary(registry: ComponentRegistry): void {
         );
       },
       executeFn: executeSubcircuit,
-      pinLayout: [],
+      pinLayout: pinMap?.get(entry.name) ?? [],
       propertyDefs: [
         {
           key: "label",

@@ -70,35 +70,37 @@ export class LedElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Circle at cx=0.8 r=0.75: minX = 0.8-0.75, maxX = 0.8+0.75, minY = -0.75, maxY = 0.75.
+    // Use cx-r arithmetic to match ellipseSegments cardinal sentinel values exactly.
+    const cx = 0.8, r = 0.75;
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + (cx - r),
+      y: this.position.y - r,
+      width: 2 * r,
+      height: 2 * r,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
-    const cy = 0;
+    const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawCircle(cx, cy, LED_RADIUS, true);
+    // Outer filled circle (body) at (0.8, 0) r=0.75
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(cx, cy, LED_RADIUS, false);
+    ctx.drawCircle(0.8, 0, 0.75, true);
 
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, cx, -0.3, {
-        horizontal: "center",
-        vertical: "bottom",
-      });
-    }
+    // Inner color zone circle at (0.8, 0) r=0.65 (OTHER/filled)
+    ctx.drawCircle(0.8, 0, 0.65, true);
+
+    // Label to the right
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(label, 2.25, 0, {
+      horizontal: "left",
+      vertical: "middle",
+    });
 
     ctx.restore();
   }

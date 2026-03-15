@@ -62,7 +62,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: Array<(i: number, s: Uint32Array, _hz: Uint32Array, l: ComponentLayout) => void>,
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
   componentElements: Map<number, Partial<CircuitElement>>,
 ): ConcreteCompiledCircuit {
@@ -128,7 +128,7 @@ describe("RunToBreak", () => {
       [[], [0]],        // component 0: no inputs; component 1 (Break): input net 0
       [[1], []],        // component 0: output net 1; component 1: no outputs
       [driverFn, breakFn],
-      new Uint8Array([0, 1]),
+      new Uint16Array([0, 1]),
       [singleGroup([0, 1])],
       new Map([[1, { typeId: "Break" } as unknown as CircuitElement]]),
     );
@@ -156,7 +156,7 @@ describe("RunToBreak", () => {
       [[], [0]],
       [[1], []],
       [noopFn, noopFn],
-      new Uint8Array([0, 1]),
+      new Uint16Array([0, 1]),
       [singleGroup([0, 1])],
       new Map([[1, { typeId: "Break" } as unknown as CircuitElement]]),
     );
@@ -193,7 +193,7 @@ describe("RunToBreak", () => {
       [[], [], [0]],    // component 0: no inputs; 1: no inputs; 2 (Break): input net 0
       [[0], [1], [2]],  // each component has one output (not relevant for Break detection)
       [driverFn, noopFn, noopFn],
-      new Uint8Array([0, 1, 2]),
+      new Uint16Array([0, 1, 2]),
       [singleGroup([0, 1, 2])],
       new Map([
         [1, { typeId: "NotBreak" } as unknown as CircuitElement],

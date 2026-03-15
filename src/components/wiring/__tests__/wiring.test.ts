@@ -605,21 +605,24 @@ describe("BusSplitter", () => {
   });
 
   describe("draw", () => {
-    it("draw renders vertical spine and horizontal stubs", () => {
+    it("draw renders D/OE lead lines on left and bit lead lines on right", () => {
       const el = makeBusSplitter(4);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const lineCalls = calls.filter((c) => c.method === "drawLine");
-      // 1 vertical spine + 4 horizontal stubs = 5 lines
-      expect(lineCalls).toHaveLength(5);
+      // D lead (0→0.5), OE lead (0→0.5), and 4 bit leads (1→0.5 each) = 6 lines
+      expect(lineCalls).toHaveLength(6);
     });
 
-    it("draw renders BS label", () => {
+    it("draw renders D, OE and bit labels", () => {
       const el = makeBusSplitter(4);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "BS")).toBe(true);
+      const texts = textCalls.map((c) => c.args[0] as string);
+      expect(texts).toContain("D");
+      expect(texts).toContain("OE");
+      expect(texts).toContain("D0");
     });
   });
 
@@ -689,8 +692,8 @@ describe("BusSplitter", () => {
       expect(BusSplitterDefinition.category).toBe(ComponentCategory.WIRING);
     });
 
-    it("BusSplitterDefinition pinLayout has 10 pins for default 8-bit", () => {
-      expect(BusSplitterDefinition.pinLayout).toHaveLength(10);
+    it("BusSplitterDefinition pinLayout has 3 pins for default 1-bit (D, OE, D0)", () => {
+      expect(BusSplitterDefinition.pinLayout).toHaveLength(3);
     });
 
     it("BusSplitterDefinition can be registered", () => {

@@ -25,7 +25,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -59,13 +58,13 @@ export const QUADRATURE_TABLE: readonly [number, number][] = [
 // ---------------------------------------------------------------------------
 
 function buildRotaryEncoderPinDeclarations(): PinDeclaration[] {
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, COMP_HEIGHT);
+  // Java RotEncoderShape: A at (0,0), B at (0,1)
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "A",
       defaultBitWidth: 1,
-      position: outputPositions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -73,7 +72,7 @@ function buildRotaryEncoderPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "B",
       defaultBitWidth: 1,
-      position: outputPositions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -100,40 +99,37 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Body is LEFT of pins: x from -3 to 0, y from -1 to 2
     return {
-      x: this.position.x,
-      y: this.position.y,
+      x: this.position.x - COMP_WIDTH,
+      y: this.position.y - 1,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = COMP_WIDTH / 2;
-    const cy = COMP_HEIGHT / 2;
-
     ctx.save();
 
-    // Component body — circle representing the encoder knob
+    // Outer rectangle: (0,-1) → (0,2) → (-3,2) → (-3,-1)
+    // body LEFT of pins at x=0
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawRect(-3, -1, 3, 3, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawRect(-3, -1, 3, 3, false);
 
-    // Encoder knob circle
-    ctx.drawCircle(cx, cy, 0.8, false);
+    // Filled circle (dial): cx=-1.5, cy=0.5, r=1
+    ctx.drawCircle(-1.5, 0.5, 1, true);
 
-    // Direction arrow indicator
-    ctx.setLineWidth(1);
-    ctx.drawLine(cx, cy - 0.4, cx + 0.3, cy);
-    ctx.drawLine(cx, cy - 0.4, cx - 0.3, cy);
+    // Pointer/needle line: (-1.5,0.5) to (-0.5,0.5)
+    ctx.drawLine(-1.5, 0.5, -0.5, 0.5);
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, cx, -0.3, {
+      ctx.drawText(label, -1.5, 2.2, {
         horizontal: "center",
         vertical: "bottom",
       });

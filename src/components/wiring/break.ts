@@ -36,8 +36,10 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Circle at (0.85, 0) radius 0.75, pin at (0, 0) on left edge
+// X lines: (0.5, 0.35)→(1.2, -0.35) and (0.5, -0.35)→(1.2, 0.35)
+const CIRCLE_CX = 0.85;
+const CIRCLE_R = 0.75;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -48,7 +50,7 @@ export function buildBreakPinDeclarations(): PinDeclaration[] {
     direction: PinDirection.INPUT,
     label: "brk",
     defaultBitWidth: 1,
-    position: { x: 0, y: Math.floor(COMP_HEIGHT / 2) },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -77,31 +79,28 @@ export class BreakElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Circle at cx=0.85, r=0.75 → x spans [0.1, 1.6]
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + CIRCLE_CX - CIRCLE_R,
+      y: this.position.y - CIRCLE_R,
+      width: CIRCLE_R * 2,
+      height: CIRCLE_R * 2,
     };
   }
 
   draw(ctx: RenderContext): void {
-
     ctx.save();
 
+    // Circle body
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+    ctx.drawCircle(CIRCLE_CX, 0, CIRCLE_R, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawCircle(CIRCLE_CX, 0, CIRCLE_R, false);
 
-    const label = this._properties.getOrDefault<string>("label", "");
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.8, weight: "bold" });
-    ctx.drawText(label.length > 0 ? label : "BRK", COMP_WIDTH / 2, COMP_HEIGHT / 2, {
-      horizontal: "center",
-      vertical: "middle",
-    });
+    // X lines inside circle
+    ctx.drawLine(0.5, 0.35, 1.2, -0.35);
+    ctx.drawLine(0.5, -0.35, 1.2, 0.35);
 
     ctx.restore();
   }

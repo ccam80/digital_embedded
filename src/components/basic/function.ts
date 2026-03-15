@@ -36,7 +36,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -51,10 +50,11 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
+// Java GenericShape: width=3 for multi-input, 1 for single-input single-output
+const COMP_WIDTH = 3;
 
 function componentHeight(inputCount: number, outputCount: number): number {
-  return Math.max(inputCount, outputCount, 2) * 2;
+  return Math.max(inputCount, outputCount);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,27 +79,32 @@ function buildOutputLabels(outputCount: number): string[] {
 }
 
 function buildFunctionPinDeclarations(inputCount: number, outputCount: number): PinDeclaration[] {
-  const h = componentHeight(inputCount, outputCount);
-  const inputPositions = layoutPinsOnFace("west", inputCount, COMP_WIDTH, h);
-  const outputPositions = layoutPinsOnFace("east", outputCount, COMP_WIDTH, h);
+  // Java GenericShape formula: symmetric when outputCount==1
+  const symmetric = outputCount === 1;
+  const even = inputCount > 0 && (inputCount & 1) === 0;
+  const offs = symmetric ? Math.floor(inputCount / 2) : 0;
+  const w = (inputCount === 1 && outputCount === 1 ? 1 : 3);
 
   const inputLabels = buildInputLabels(inputCount);
   const outputLabels = buildOutputLabels(outputCount);
 
-  const inputs: PinDeclaration[] = inputLabels.map((label, i) => ({
-    direction: PinDirection.INPUT,
-    label,
-    defaultBitWidth: 1,
-    position: inputPositions[i],
-    isNegatable: false,
-    isClockCapable: false,
-  }));
+  const inputs: PinDeclaration[] = inputLabels.map((label, i) => {
+    const correct = (symmetric && even && i >= inputCount / 2) ? 1 : 0;
+    return {
+      direction: PinDirection.INPUT,
+      label,
+      defaultBitWidth: 1,
+      position: { x: 0, y: i + correct },
+      isNegatable: false,
+      isClockCapable: false,
+    };
+  });
 
   const outputs: PinDeclaration[] = outputLabels.map((label, i) => ({
     direction: PinDirection.OUTPUT,
     label,
     defaultBitWidth: 1,
-    position: outputPositions[i],
+    position: { x: w, y: i + offs },
     isNegatable: false,
     isClockCapable: false,
   }));
@@ -196,7 +201,7 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
     const h = componentHeight(this._inputCount, this._outputCount);
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.5,
       width: COMP_WIDTH,
       height: h,
     };
@@ -208,10 +213,10 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
     ctx.save();
 
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, h, true);
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
+    ctx.drawRect(0, -0.5, COMP_WIDTH, h, false);
 
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });

@@ -23,6 +23,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -138,55 +139,34 @@ export class TElement extends AbstractCircuitElement {
     const withEnable = this._properties.getOrDefault<boolean>("withEnable", true);
     const h = withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: h,
     };
   }
 
   draw(ctx: RenderContext): void {
     const withEnable = this._properties.getOrDefault<boolean>("withEnable", true);
-    const h = withEnable ? COMP_HEIGHT_WITH_ENABLE : COMP_HEIGHT_NO_ENABLE;
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, h, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, h, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-
     if (withEnable) {
-      ctx.drawText("T", 0.6, 0, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("C", 0.6, 1, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
-      ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-      ctx.setColor("COMPONENT");
-      ctx.drawLine(0, 0.5, 0.5, 1);
-      ctx.drawLine(0.5, 1, 0, 1.5);
+      drawGenericShape(ctx, {
+        inputLabels: ["T", "C"],
+        outputLabels: ["Q", "~Q"],
+        clockInputIndices: [1],
+        componentName: "T",
+        width: 3,
+        label: this._properties.getOrDefault<string>("label", ""),
+      });
     } else {
-      ctx.drawText("C", 0.6, 0, { horizontal: "left", vertical: "middle" });
-      ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
-      ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-      ctx.setColor("COMPONENT");
-      ctx.drawLine(0, -0.5, 0.5, 0);
-      ctx.drawLine(0.5, 0, 0, 0.5);
+      drawGenericShape(ctx, {
+        inputLabels: ["C"],
+        outputLabels: ["Q", "~Q"],
+        clockInputIndices: [0],
+        componentName: "T",
+        width: 3,
+        label: this._properties.getOrDefault<string>("label", ""),
+      });
     }
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("T", COMP_WIDTH / 2, (h - 0.5) / 2, { horizontal: "center", vertical: "middle" });
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
   }
 
   getHelpText(): string {

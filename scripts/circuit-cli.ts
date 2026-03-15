@@ -16,8 +16,9 @@
  */
 
 import { readFileSync, writeFileSync, readFile, readdir } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { createDefaultRegistry } from '@/components/register-all.js';
+import { scan74xxPinMap } from '@/io/dig-pin-scanner.js';
 import { CircuitBuilder } from '@/headless/builder.js';
 import { SimulationRunner } from '@/headless/runner.js';
 import { FacadeError } from '@/headless/types.js';
@@ -43,7 +44,9 @@ import type { ComponentDefinition } from '@/core/registry.js';
 // Initialise registry + builder
 // ---------------------------------------------------------------------------
 
-const registry = createDefaultRegistry();
+const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
+const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
+const registry = createDefaultRegistry(pinMap74xx);
 const builder = new CircuitBuilder(registry);
 const runner = new SimulationRunner(registry);
 
@@ -224,7 +227,7 @@ async function cmdPatch(
   }
 
   const patchOpts = opts.scope ? { scope: opts.scope } : undefined;
-  const diagnostics = builder.patch(circuit, ops, patchOpts);
+  const { diagnostics } = builder.patch(circuit, ops, patchOpts);
 
   if (opts.save) {
     // Serialize back: we don't have a .dig serializer, so warn the user.

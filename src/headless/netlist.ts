@@ -21,6 +21,7 @@ import type {
 } from './netlist-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import { UnionFind } from '../engine/union-find.js';
+import { getComponentLabel } from './address.js';
 
 // ---------------------------------------------------------------------------
 // resolveNets — public entry point
@@ -228,11 +229,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
   const makeNetPin = (elemIdx: number, pinIdx: number): NetPin => {
     const el = elements[elemIdx]!;
     const pin = allPins[elemIdx]![pinIdx]!;
-    const labelAttr = el.getAttribute("label");
-    const componentLabel =
-      typeof labelAttr === "string" && labelAttr.length > 0
-        ? labelAttr
-        : el.instanceId;
+    const componentLabel = getComponentLabel(el) ?? el.instanceId;
     return {
       componentIndex: elemIdx,
       componentType: el.typeId,
@@ -271,12 +268,19 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
     const widths = Array.from(pinsByWidth.keys());
     const w0 = widths[0]!;
     const w1 = widths[1] ?? widths[0]!;
+    // Build a human-readable description of which pins are involved
+    const pinDescs = entries.map(({ elemIdx, pinIdx }) => {
+      const np = makeNetPin(elemIdx, pinIdx);
+      const w = allPins[elemIdx]![pinIdx]!.bitWidth;
+      const name = np.componentLabel || np.componentType;
+      return `${name}:${np.pinLabel} [${w}-bit]`;
+    });
     diagnostics.push({
       severity: "error",
       code: "width-mismatch",
       message:
-        `Bit-width mismatch on net ${netId}: ` +
-        `pins disagree (widths found: ${widths.join(", ")})`,
+        `Bit-width mismatch: ${pinDescs.join(" \u2194 ")} ` +
+        `(widths: ${widths.join(", ")})`,
       netId,
       pins: allNetPins,
       fix: `Ensure all pins on this net have the same bit width (e.g. ${w0} or ${w1}).`,
@@ -365,11 +369,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
       }
     }
 
-    const labelAttr = el.getAttribute("label");
-    const label =
-      typeof labelAttr === "string" && labelAttr.length > 0
-        ? labelAttr
-        : undefined;
+    const label = getComponentLabel(el);
 
     const pinDescriptors: PinDescriptor[] = pins.map((pin, j) => {
       const slot = slotOf(i, j);

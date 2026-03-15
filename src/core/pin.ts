@@ -153,7 +153,9 @@ export function pinWorldPosition(
 ): Point {
   let p = pin.position;
   if (element.mirror) {
-    // Java's mirror matrix [1,0;0,-1] negates Y in local space (before rotation).
+    // Mirror negates Y in local space (vertical flip), matching Java Digital's
+    // TransformMatrix(1,0,0,-1) convention.  Wire positions in .dig files are
+    // authored to match this transform.
     p = { x: p.x, y: -p.y };
   }
   const rotated = rotatePoint(p, element.rotation);

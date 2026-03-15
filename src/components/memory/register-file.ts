@@ -18,6 +18,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -35,9 +36,10 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 5;
-// Pins shifted -1: Din@0,we@1,Rw@2,C@3,Ra@4,Rb@5; Da@1,Db@5
-// bodyHeight = maxPinY + 1 = 5 + 1 = 6
+const COMP_WIDTH = 4;
+// GenericShape: 6 inputs, 2 outputs, width=4, symmetric=false (2 outputs)
+// offs=0; Din@0,we@1,Rw@2,C@3,Ra@4,Rb@5; Da@(4,0),Db@(4,1)
+// bodyHeight = max(6,2) = 6
 const COMP_HEIGHT = 6;
 
 // ---------------------------------------------------------------------------
@@ -97,7 +99,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Da",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 1 },
+    position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -105,7 +107,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.OUTPUT,
     label: "Db",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 5 },
+    position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -127,54 +129,27 @@ export class RegisterFileElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
     return this.derivePins(REGISTER_FILE_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("Din", 0.5, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("we", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Rw", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Ra", 0.5, 4, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Rb", 0.5, 5, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Da", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("Db", COMP_WIDTH - 0.5, 5, { horizontal: "right", vertical: "middle" });
-
-    ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("RF", COMP_WIDTH / 2, 2.5, { horizontal: "center", vertical: "middle" });
-
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 2.5, 0.5, 3);
-    ctx.drawLine(0.5, 3, 0, 3.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["Din", "we", "Rw", "C", "Ra", "Rb"],
+      outputLabels: ["Da", "Db"],
+      clockInputIndices: [3],
+      componentName: "Register",
+      width: 4,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

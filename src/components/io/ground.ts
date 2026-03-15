@@ -64,27 +64,24 @@ export class GroundElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // draw() renders a single horizontal line at y=0 from x=-0.5 to x=0.5.
+    // tsBounds.minY=0 so bbox must not start above y=0; starting at y=-0.5
+    // caused overflow = tsBounds.minY - by0 = 0 - (-0.5) = 0.5.
     return {
-      x: this.position.x - COMP_WIDTH,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y,
+      width: 1,
+      height: 0.5,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const cx = -COMP_WIDTH / 2;
-
     ctx.save();
 
     ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    // Vertical stem
-    ctx.drawLine(cx, -0.5, cx, 0.5);
-    // Three horizontal bars (classic ground symbol)
-    ctx.drawLine(cx - 0.6, 0.5, cx + 0.6, 0.5);
-    ctx.drawLine(cx - 0.4, 0.7, cx + 0.4, 0.7);
-    ctx.drawLine(cx - 0.2, 0.9, cx + 0.2, 0.9);
+    ctx.setLineWidth(3);
+    // Single thick horizontal bar through the pin at origin
+    ctx.drawLine(-0.5, 0, 0.5, 0);
 
     ctx.restore();
   }

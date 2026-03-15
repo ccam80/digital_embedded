@@ -141,8 +141,15 @@ import { register74xxLibrary } from "./library-74xx.js";
 
 /**
  * Create a ComponentRegistry populated with every built-in component type.
+ *
+ * @param pinMap74xx - Optional pre-scanned pin declarations for 74xx ICs.
+ *   When provided, 74xx stub entries include real pin metadata so that
+ *   `describeComponent()` returns pins without loading the full subcircuit.
+ *   Use `scan74xxPinMap()` from `io/dig-pin-scanner.ts` to build this.
  */
-export function createDefaultRegistry(): ComponentRegistry {
+export function createDefaultRegistry(
+  pinMap74xx?: ReadonlyMap<string, import('../core/pin.js').PinDeclaration[]>,
+): ComponentRegistry {
   const registry = new ComponentRegistry();
 
   // Gates
@@ -278,7 +285,7 @@ export function createDefaultRegistry(): ComponentRegistry {
   registry.register(BooleanFunctionDefinition);
 
   // 74xx ICs
-  register74xxLibrary(registry);
+  register74xxLibrary(registry, pinMap74xx);
 
   return registry;
 }

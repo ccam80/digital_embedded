@@ -185,11 +185,11 @@ describe("Scope", () => {
   });
 
   describe("pinLayout", () => {
-    it("1-channel Scope has 1 input pin labeled 'in0'", () => {
+    it("1-channel Scope has 1 input pin labeled 'clk'", () => {
       const el = makeScope({ channelCount: 1 });
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
       expect(inputs).toHaveLength(1);
-      expect(inputs[0].label).toBe("in0");
+      expect(inputs[0].label).toBe("clk");
     });
 
     it("3-channel Scope has 3 input pins", () => {
@@ -312,66 +312,30 @@ describe("Scope", () => {
 
 describe("ScopeTrigger", () => {
   describe("triggerDetection", () => {
-    it("rising edge: 0→1 produces output=1", () => {
-      const layout = makeLayout(1, 2);
-      const state = makeState([1], 2);
+    // ScopeTrigger has no outputs (Java ScopeShape: single input pin "T" at origin).
+    // The execute function is a no-op; edge detection is handled by the engine side-channel.
+    it("executeScopeTrigger does not modify state", () => {
+      const layout = makeLayout(1, 0);
+      const state = makeState([1], 0);
       const highZs = new Uint32Array(state.length);
-      state[2] = 0; // previous value = 0 (no edge yet)
+      const before = Array.from(state);
       executeScopeTrigger(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
-
-    it("no edge: 1→1 produces output=0", () => {
-      const layout = makeLayout(1, 2);
-      const state = makeState([1], 2);
-      const highZs = new Uint32Array(state.length);
-      state[2] = 1; // previous value = 1 (no edge)
-      executeScopeTrigger(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
-
-    it("falling edge: 1→0 produces output=1", () => {
-      const layout = makeLayout(1, 2);
-      const state = makeState([0], 2);
-      const highZs = new Uint32Array(state.length);
-      state[2] = 1; // previous value = 1
-      executeScopeTrigger(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
-
-    it("no edge: 0→0 produces output=0", () => {
-      const layout = makeLayout(1, 2);
-      const state = makeState([0], 2);
-      const highZs = new Uint32Array(state.length);
-      state[2] = 0; // previous value = 0
-      executeScopeTrigger(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
-
-    it("previous value is updated after each step", () => {
-      const layout = makeLayout(1, 2);
-      const state = makeState([1], 2);
-      const highZs = new Uint32Array(state.length);
-      state[2] = 0;
-      executeScopeTrigger(0, state, highZs, layout);
-      // After step, previous value should be 1
-      expect(state[2]).toBe(1);
+      expect(Array.from(state)).toEqual(before);
     });
   });
 
   describe("pinLayout", () => {
-    it("ScopeTrigger has 1 input pin 'in'", () => {
+    it("ScopeTrigger has 1 input pin 'T'", () => {
       const el = makeScopeTrigger();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
       expect(inputs).toHaveLength(1);
-      expect(inputs[0].label).toBe("in");
+      expect(inputs[0].label).toBe("T");
     });
 
-    it("ScopeTrigger has 1 output pin 'out'", () => {
+    it("ScopeTrigger has 0 output pins", () => {
       const el = makeScopeTrigger();
       const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs).toHaveLength(1);
-      expect(outputs[0].label).toBe("out");
+      expect(outputs).toHaveLength(0);
     });
 
     it("triggerMode property is accessible", () => {
@@ -397,12 +361,13 @@ describe("ScopeTrigger", () => {
       expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders edge symbol lines", () => {
+    it("draw renders step waveform and trigger curve via drawPath", () => {
       const el = makeScopeTrigger();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const lines = calls.filter((c) => c.method === "drawLine");
-      expect(lines.length).toBeGreaterThanOrEqual(1);
+      const paths = calls.filter((c) => c.method === "drawPath");
+      // step waveform polyline + trigger curve = 2 drawPath calls
+      expect(paths.length).toBeGreaterThanOrEqual(2);
     });
   });
 

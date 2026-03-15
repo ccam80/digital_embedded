@@ -260,12 +260,12 @@ describe("MidiElement", () => {
       expect(textCalls.some((c) => c.args[0] === "Speaker")).toBe(true);
     });
 
-    it("draw() without label only draws 'MIDI' text", () => {
+    it("draw() without label draws 'MIDI' component name", () => {
       const midi = makeMidi();
       const { ctx, calls } = makeStubCtx();
       midi.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.every((c) => c.args[0] === "MIDI")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "MIDI")).toBe(true);
     });
 
     it("draw() saves and restores context", () => {

@@ -51,7 +51,7 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
       label: "sel",
       defaultBitWidth: 1,
       position: { x: 0, y: flipSelPos ? 1 : -1 },
-      isNegatable: true,
+      isNegatable: false,
       isClockCapable: false,
     },
     {
@@ -94,11 +94,13 @@ export class DriverInvSelElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Triangle: x:[-0.95,0.95], y:[-0.6,0.6]
+    // Circle at (0,-0.7) r=0.3 → y:[-1.0,-0.4] (extends below triangle)
     return {
-      x: this.position.x - 1,
-      y: this.position.y - 1,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.95,
+      y: this.position.y - 1.0,
+      width: 1.9,
+      height: 1.6,
     };
   }
 
@@ -107,20 +109,11 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Triangle body — same as Driver
+    // Triangle body (NORMAL — outline only, no fill per Java fixture)
     const triLeft = -0.95;
     const triRight = 0.95;
     const triHalf = 0.6;
 
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawPolygon(
-      [
-        { x: triLeft, y: -triHalf },
-        { x: triRight, y: 0 },
-        { x: triLeft, y: triHalf },
-      ],
-      true,
-    );
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPolygon(
@@ -132,16 +125,10 @@ export class DriverInvSelElement extends AbstractCircuitElement {
       false,
     );
 
-    // Sel pin stem with inversion bubble
-    const selY = flipSelPos ? 1 : -1;
-    // Java: drawCircle from (-SIZE2+4, ±SIZE) to (SIZE2-4, ±8)
-    // Grid: circle centre at (0, ±0.7), radius ≈ 0.3
-    const bubbleCy = selY > 0 ? 0.7 : -0.7;
+    // Inversion bubble at (0, -0.7) for sel above, (0, +0.7) for sel below
+    // Java fixture: single circle at (0,-0.7), radius=0.3, style=NORMAL
+    const bubbleCy = flipSelPos ? 0.7 : -0.7;
     ctx.drawCircle(0, bubbleCy, 0.3, false);
-    // Stem from bubble edge to sel pin
-    const stemStart = selY > 0 ? 1.0 : -1.0;
-    const stemEnd = selY > 0 ? 0.35 : -0.35;
-    ctx.drawLine(0, stemStart, 0, stemEnd);
 
     ctx.restore();
   }

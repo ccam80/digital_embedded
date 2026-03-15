@@ -44,8 +44,10 @@ export function createInput(
       return new NumberInput(definition, currentValue);
 
     case PropertyType.STRING:
-    case PropertyType.FILE:
       return new TextInput(currentValue);
+
+    case PropertyType.FILE:
+      return new FileInput(definition, currentValue);
 
     case PropertyType.ENUM:
     case PropertyType.INTFORMAT:
@@ -299,6 +301,90 @@ export class HexDataEditor implements PropertyInput {
     const trimmed = text.trim();
     if (trimmed === "") return [];
     return trimmed.split(/\s+/).map((hex) => parseInt(hex, 16));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FileInput — for FILE (text input + Browse... button)
+// ---------------------------------------------------------------------------
+
+export class FileInput implements PropertyInput {
+  element: HTMLElement;
+  private readonly _input: HTMLInputElement;
+  private _callbacks: Array<(v: PropertyValue) => void> = [];
+
+  constructor(_definition: PropertyDefinition, initial: PropertyValue) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "prop-input prop-file";
+    wrapper.style.display = "flex";
+    wrapper.style.gap = "4px";
+    wrapper.style.alignItems = "center";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = String(initial);
+    input.style.flex = "1";
+    input.style.minWidth = "0";
+
+    input.addEventListener("change", () => {
+      for (const cb of this._callbacks) {
+        cb(input.value);
+      }
+    });
+
+    const browseBtn = document.createElement("button");
+    browseBtn.type = "button";
+    browseBtn.textContent = "...";
+    browseBtn.title = "Browse file";
+    browseBtn.style.padding = "2px 6px";
+    browseBtn.style.flexShrink = "0";
+    browseBtn.style.background = "var(--toolbar-bg)";
+    browseBtn.style.border = "1px solid var(--panel-border)";
+    browseBtn.style.color = "var(--fg)";
+    browseBtn.style.borderRadius = "3px";
+    browseBtn.style.cursor = "pointer";
+    browseBtn.style.fontSize = "11px";
+
+    const hiddenFileInput = document.createElement("input");
+    hiddenFileInput.type = "file";
+    hiddenFileInput.accept = ".hex,.bin,.dat";
+    hiddenFileInput.style.display = "none";
+
+    browseBtn.addEventListener("click", () => {
+      hiddenFileInput.click();
+    });
+
+    hiddenFileInput.addEventListener("change", () => {
+      const file = hiddenFileInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result as string;
+        input.value = content;
+        for (const cb of this._callbacks) {
+          cb(content);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    this._input = input;
+    wrapper.appendChild(input);
+    wrapper.appendChild(browseBtn);
+    wrapper.appendChild(hiddenFileInput);
+    this.element = wrapper;
+  }
+
+  getValue(): PropertyValue {
+    return this._input.value;
+  }
+
+  setValue(v: PropertyValue): void {
+    this._input.value = String(v);
+  }
+
+  onChange(cb: (value: PropertyValue) => void): void {
+    this._callbacks.push(cb);
   }
 }
 

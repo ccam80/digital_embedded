@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1773365904150,
+  "lastScanned": 1773458275395,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -73,7 +73,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1773365904075,
+      "lastAccessed": 1773458275283,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -84,7 +84,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1773365904076,
+      "lastAccessed": 1773458275284,
       "keyFiles": [
         "main.js"
       ]
@@ -92,45 +92,42 @@
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 3,
-      "lastAccessed": 1773365904113,
-      "keyFiles": [
-        "d-flipflop-nand.json",
-        "d-flipflop-spec.json",
-        "test-invert.json"
-      ]
+      "fileCount": 0,
+      "lastAccessed": 1773458275343,
+      "keyFiles": []
     },
     "lib": {
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1773365904114,
+      "lastAccessed": 1773458275345,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1773365904114,
+      "lastAccessed": 1773458275345,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 4,
-      "lastAccessed": 1773365904115,
+      "fileCount": 6,
+      "lastAccessed": 1773458275346,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
         "pin-diagnostic.js",
-        "transform-compare.js"
+        "test-rtc-build.ts",
+        "test-set-patch.ts"
       ]
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 7,
-      "lastAccessed": 1773365904115,
+      "lastAccessed": 1773458275346,
       "keyFiles": [
         "architectural-refactor-derive-on-read.md",
         "author_instructions.md",
@@ -143,14 +140,14 @@
       "path": "specs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1773365904115,
+      "lastAccessed": 1773458275347,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1773365904116,
+      "lastAccessed": 1773458275347,
       "keyFiles": [
         "main.ts"
       ]
@@ -159,7 +156,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 2,
-      "lastAccessed": 1773365904118,
+      "lastAccessed": 1773458275351,
       "keyFiles": [
         "app-init.ts",
         "url-params.ts"
@@ -169,7 +166,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 2,
-      "lastAccessed": 1773365904119,
+      "lastAccessed": 1773458275351,
       "keyFiles": [
         "library-74xx.ts",
         "register-all.ts"
@@ -179,87 +176,309 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1773365904120,
+      "lastAccessed": 1773458275352,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "CLAUDE.md",
-      "accessCount": 5,
-      "lastAccessed": 1773366018867,
+      "path": "src\\fixtures\\__tests__\\shape-audit.test.ts",
+      "accessCount": 112,
+      "lastAccessed": 1773531167355,
       "type": "file"
     },
     {
-      "path": "scripts\\test-set-patch.ts",
-      "accessCount": 5,
-      "lastAccessed": 1773366578389,
-      "type": "file"
-    },
-    {
-      "path": "src/core/element.ts",
-      "accessCount": 3,
-      "lastAccessed": 1773366493811,
+      "path": "src",
+      "accessCount": 41,
+      "lastAccessed": 1773542141103,
       "type": "directory"
     },
     {
-      "path": "src\\components\\memory\\register.ts",
-      "accessCount": 3,
-      "lastAccessed": 1773366508221,
+      "path": "scripts\\circuit-mcp-server.ts",
+      "accessCount": 35,
+      "lastAccessed": 1773534952084,
       "type": "file"
     },
     {
-      "path": "src/components/memory/register.ts",
-      "accessCount": 2,
-      "lastAccessed": 1773366562773,
+      "path": "src\\components",
+      "accessCount": 27,
+      "lastAccessed": 1773542151891,
       "type": "directory"
     },
     {
-      "path": "fixtures\\Sim\\sysreg.dig",
-      "accessCount": 2,
-      "lastAccessed": 1773366607566,
+      "path": "src\\editor\\element-renderer.ts",
+      "accessCount": 16,
+      "lastAccessed": 1773538329581,
       "type": "file"
     },
     {
-      "path": "src\\components\\memory\\counter.ts",
-      "accessCount": 2,
-      "lastAccessed": 1773367216502,
+      "path": "src\\engine\\digital-engine.ts",
+      "accessCount": 16,
+      "lastAccessed": 1773542215635,
       "type": "file"
     },
     {
-      "path": "src/core/properties.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773366268114,
+      "path": "src\\core\\pin.ts",
+      "accessCount": 15,
+      "lastAccessed": 1773533082621,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\engine-interface.ts",
+      "accessCount": 14,
+      "lastAccessed": 1773542209088,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\arithmetic\\mul.ts",
+      "accessCount": 12,
+      "lastAccessed": 1773529165828,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\mux.ts",
+      "accessCount": 12,
+      "lastAccessed": 1773531764589,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\register-all.ts",
+      "accessCount": 12,
+      "lastAccessed": 1773533667115,
       "type": "directory"
     },
     {
       "path": "src\\core\\element.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773366499234,
+      "accessCount": 12,
+      "lastAccessed": 1773536071743,
       "type": "file"
     },
     {
-      "path": "src/components/io/in.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773366525301,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/memory/counter.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773367201865,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/arithmetic/comparator.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773367257494,
-      "type": "directory"
-    },
-    {
       "path": "src\\headless\\auto-layout.ts",
+      "accessCount": 11,
+      "lastAccessed": 1773460157745,
+      "type": "file"
+    },
+    {
+      "path": "src\\core",
+      "accessCount": 11,
+      "lastAccessed": 1773539970086,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\memory\\counter-preset.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773529167465,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\memory\\counter.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773529167689,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\library-74xx.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773535111695,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\generate-all-components-fixture.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773464958570,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 9,
+      "lastAccessed": 1773533663513,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773542161697,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\worker-engine.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1773461395936,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\const.ts",
+      "accessCount": 7,
+      "lastAccessed": 1773522586904,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiled-circuit.ts",
+      "accessCount": 7,
+      "lastAccessed": 1773542319946,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\probe.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773522547854,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\memory\\register.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773529217581,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\netlist.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773529834264,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\netlist-types.ts",
+      "accessCount": 5,
+      "lastAccessed": 1773529800770,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\driver.ts",
+      "accessCount": 5,
+      "lastAccessed": 1773531775418,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 5,
+      "lastAccessed": 1773537487142,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\index.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773460416793,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\circuit-cli.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773463144304,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\dig-pin-scanner.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773463265702,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\init-sequence.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773537455302,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\noise-mode.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773461211264,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\snapshot.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773461341651,
+      "type": "file"
+    },
+    {
+      "path": "src\\io",
+      "accessCount": 3,
+      "lastAccessed": 1773466968815,
+      "type": "directory"
+    },
+    {
+      "path": "src\\engine",
+      "accessCount": 3,
+      "lastAccessed": 1773539403802,
+      "type": "directory"
+    },
+    {
+      "path": "test-layout.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773460357902,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\worker-engine.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773461212015,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\digital-engine.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773461318140,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-serializer.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773461706561,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-parser.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773462945347,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\dig-schema.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773463246628,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\shape-fix-spec.md",
+      "accessCount": 2,
+      "lastAccessed": 1773464575804,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\tunnel.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773531775034,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__",
       "accessCount": 1,
-      "lastAccessed": 1773367301833,
+      "lastAccessed": 1773461179753,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fixtures\\__tests__\\orphan-debug.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773461667382,
+      "type": "file"
+    },
+    {
+      "path": "ref\\Digital\\src\\main\\dig\\lib\\DIL Chips\\74xx\\basic\\7400.dig",
+      "accessCount": 1,
+      "lastAccessed": 1773462911115,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\subcircuit-loader.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773462984805,
+      "type": "directory"
+    },
+    {
+      "path": "scripts\\pin-diagnostic.js",
+      "accessCount": 1,
+      "lastAccessed": 1773464539230,
       "type": "file"
     }
   ],

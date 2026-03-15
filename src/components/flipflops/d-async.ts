@@ -18,6 +18,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -110,49 +111,27 @@ export class DAsyncElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(D_FF_AS_PIN_DECLARATIONS, ["C"]);
   }
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("Set", 0.5, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("D", 0.5, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.5, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Clr", 0.5, 3, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.5, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.5, 1, { horizontal: "right", vertical: "middle" });
-
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 1.5, 0.5, 2);
-    ctx.drawLine(0.5, 2, 0, 2.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["Set", "D", "C", "Clr"],
+      outputLabels: ["Q", "~Q"],
+      clockInputIndices: [2],
+      componentName: "D-AS",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

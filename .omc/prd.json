@@ -1,0 +1,61 @@
+{
+  "title": "Fix shape-render-audit test failures",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Create drawGenericShape utility matching Java GenericShape rendering",
+      "acceptanceCriteria": [
+        "drawGenericShape() function exists in src/components/generic-shape.ts",
+        "Draws body rect with 0.05 insets on left/right (matching Java)",
+        "Draws input pin labels at x=0.2 (regular) and x=0.55 (clock) with LEFTCENTER",
+        "Draws output pin labels at x=width-0.2 with RIGHTCENTER",
+        "Draws clock triangles at (0.05, y+0.35)->(0.4, y)->(0.05, y-0.35)",
+        "Draws component name at (width/2, maxY-0.3) with CENTERTOP",
+        "Handles symmetric layout (1 output, offs=floor(inputCount/2))"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Update all GenericShape components to use correct rendering",
+      "acceptanceCriteria": [
+        "All ~40 GenericShape components draw matching Java text/body",
+        "Zero missing/extra text in test results",
+        "Zero text overlaps",
+        "+0.1 width delta eliminated for all components"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Fix FET pin positions",
+      "acceptanceCriteria": [
+        "PFET gate pin at (0,0) not (0,1)",
+        "NFET gate pin at (0,2) not (1,1)",
+        "FGNFET gate pin at (0,2) not (1,1)",
+        "Zero pin position mismatches in test",
+        "Zero pin transform mismatches (21->0)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Fix remaining low-Dice components",
+      "acceptanceCriteria": [
+        "All components have Dice >= 0.99",
+        "All extent maxDelta = 0",
+        "All BBox overflow = 0"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "All shape-render-audit tests pass",
+      "acceptanceCriteria": [
+        "npx vitest run shape-render-audit.test.ts exits with 0 failures",
+        "196+ tests pass, 0 fail"
+      ],
+      "passes": false
+    }
+  ]
+}

@@ -183,6 +183,17 @@ export interface ComponentSpec {
   readonly type: string;
   /** Optional properties (Bits, label, Inputs, etc.). */
   readonly props?: Record<string, PropertyValue>;
+  /**
+   * Optional layout constraints for auto-layout.
+   *
+   * - `col` pins the component to a specific column (0 = leftmost).
+   * - `row` pins the vertical position within its column (0 = topmost).
+   * - Either or both can be specified; omitted axes are auto-assigned.
+   *
+   * Example: `{ col: 0 }` forces input-side placement;
+   *          `{ col: 0, row: 0 }` forces top-left corner.
+   */
+  readonly layout?: { readonly col?: number; readonly row?: number };
 }
 
 // ===========================================================================
@@ -288,4 +299,18 @@ export interface PatchOptions {
    * When absent, targets are resolved at the top level.
    */
   readonly scope?: string;
+}
+
+/**
+ * Result of a `patch()` operation.
+ */
+export interface PatchResult {
+  /** Post-patch diagnostics from net resolution. */
+  readonly diagnostics: Diagnostic[];
+  /**
+   * Map of spec.id → instanceId for each `add` op.
+   * Enables callers to address just-added components by their instanceId
+   * in follow-up operations.
+   */
+  readonly addedIds: Record<string, string>;
 }

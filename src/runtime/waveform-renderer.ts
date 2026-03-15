@@ -125,6 +125,8 @@ export interface WaveformViewport {
   laneHeight: number;
   /** Pixel offset from the left edge of the canvas to the waveform drawing area. */
   leftMargin: number;
+  /** Simulation steps per real second. Used for time axis labels. Default: 1000. */
+  stepsPerSecond?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,20 +300,49 @@ export function drawTimeAxis(
   ctx.lineTo(ctx.width, axisY);
   ctx.stroke();
 
-  // Tick marks — approximately every 50 pixels
-  const tickCount = Math.max(2, Math.floor(drawWidth / 50));
-  const tickInterval = Math.ceil(timeRange / tickCount);
+  const sps = vp.stepsPerSecond ?? 1000;
+
+  // Tick marks — approximately every 80 pixels
+  const tickCount = Math.max(2, Math.floor(drawWidth / 80));
+  const rawInterval = timeRange / tickCount;
+  // Snap to a nice real-time interval
+  const tickInterval = _niceTickInterval(rawInterval, sps);
+
+  const firstTick = Math.ceil(startTime / tickInterval) * tickInterval;
 
   ctx.setFillStyle(COLOR_LABEL);
-  for (let t = startTime; t <= endTime; t += tickInterval) {
+  for (let t = firstTick; t <= endTime; t += tickInterval) {
     const x = timeToX(t);
     ctx.beginPath();
     ctx.setStrokeStyle(COLOR_AXIS);
     ctx.moveTo(x, axisY - 4);
     ctx.lineTo(x, axisY + 4);
     ctx.stroke();
-    ctx.fillText(String(t), x, axisY + 14);
+    ctx.fillText(_formatTime(t - startTime, sps), x, axisY + 14);
   }
+}
+
+/** Choose a nice tick interval in steps that maps to a clean real-time value. */
+function _niceTickInterval(rawStepInterval: number, sps: number): number {
+  const rawSeconds = rawStepInterval / sps;
+  // Find the order of magnitude and round to 1, 2, or 5
+  const mag = Math.pow(10, Math.floor(Math.log10(rawSeconds)));
+  const norm = rawSeconds / mag;
+  let nice: number;
+  if (norm < 1.5) nice = 1;
+  else if (norm < 3.5) nice = 2;
+  else if (norm < 7.5) nice = 5;
+  else nice = 10;
+  return Math.max(1, Math.round(nice * mag * sps));
+}
+
+/** Format a step delta as a human-readable time string. */
+function _formatTime(steps: number, sps: number): string {
+  const seconds = steps / sps;
+  if (seconds < 0.001) return `${(seconds * 1_000_000).toFixed(0)}\u00b5s`;
+  if (seconds < 1) return `${(seconds * 1000).toFixed(1)}ms`;
+  if (seconds < 60) return `${seconds.toFixed(2)}s`;
+  return `${(seconds / 60).toFixed(1)}m`;
 }
 
 /**
@@ -378,7 +409,8 @@ export function drawTimeCursor(
   ctx.stroke();
 
   // Build tooltip lines
-  const timeLabel = `t = ${cursorTime}`;
+  const sps = vp.stepsPerSecond ?? 1000;
+  const timeLabel = `t = ${_formatTime(cursorTime - vp.startTime, sps)}`;
   const lines: string[] = [timeLabel];
   for (const row of rows) {
     const digits = Math.ceil(row.width / 4);

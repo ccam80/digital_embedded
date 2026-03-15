@@ -76,7 +76,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
 ): ConcreteCompiledCircuit {
   const layout = new StaticLayout(inputNets, outputNets);
@@ -155,7 +155,7 @@ describe("OscillationDetection", () => {
     const netCount = 3;
     const inputNets = [[0], [1], [2]];
     const outputNets = [[1], [2], [0]];
-    const typeIds = new Uint8Array([0, 0, 0]);
+    const typeIds = new Uint16Array([0, 0, 0]);
     const executeFns: ExecuteFunction[] = [executeNot];
     const order = [feedbackGroup([0, 1, 2])];
 
@@ -179,7 +179,7 @@ describe("OscillationDetection", () => {
     // NOR1: inputs [R=net1, Q=net2], output [Q~=net3]
     const inputNets = [[0, 3], [1, 2]];
     const outputNets = [[2], [3]];
-    const typeIds = new Uint8Array([0, 0]);
+    const typeIds = new Uint16Array([0, 0]);
     const executeFns: ExecuteFunction[] = [executeNor];
     const order = [feedbackGroup([0, 1])];
 
@@ -202,7 +202,7 @@ describe("OscillationDetection", () => {
     const netCount = 3;
     const inputNets = [[0], [1], [2]];
     const outputNets = [[1], [2], [0]];
-    const typeIds = new Uint8Array([0, 0, 0]);
+    const typeIds = new Uint16Array([0, 0, 0]);
     const executeFns: ExecuteFunction[] = [executeNot];
     const order = [feedbackGroup([0, 1, 2])];
 

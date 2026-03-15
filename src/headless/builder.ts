@@ -17,10 +17,11 @@ import { SimulationRunner } from './runner.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
-import type { CircuitSpec, CircuitPatch, PatchOptions, Diagnostic, Netlist } from './netlist-types.js';
+import type { CircuitSpec, CircuitPatch, PatchOptions, PatchResult, Diagnostic, Netlist } from './netlist-types.js';
 import { resolveComponent, resolvePin, resolveScope } from './address.js';
 import { resolveNets } from './netlist.js';
 import { autoLayout } from './auto-layout.js';
+import type { LayoutConstraint } from './auto-layout.js';
 
 const AUTO_POSITION_Y_STEP = 4;
 
@@ -197,8 +198,12 @@ export class CircuitBuilder {
 
     // Validate bit width match
     if (srcPin.bitWidth !== dstPin.bitWidth) {
+      const srcBag = src.getProperties();
+      const srcLabel = (srcBag.has('label') ? srcBag.get<string>('label') : '') || src.instanceId;
+      const dstBag = dst.getProperties();
+      const dstLabel = (dstBag.has('label') ? dstBag.get<string>('label') : '') || dst.instanceId;
       throw new FacadeError(
-        `Bit width mismatch: '${srcPinLabel}' is ${srcPin.bitWidth}-bit, '${dstPinLabel}' is ${dstPin.bitWidth}-bit`,
+        `Bit width mismatch on connection "${srcLabel}:${srcPinLabel}" [${srcPin.bitWidth}-bit] → "${dstLabel}:${dstPinLabel}" [${dstPin.bitWidth}-bit]`,
         src.typeId,
         srcPinLabel,
         undefined,
@@ -318,12 +323,39 @@ export class CircuitBuilder {
         );
       }
 
-      this.connect(circuit, src, srcPinLabel, dst, dstPinLabel);
+      try {
+        this.connect(circuit, src, srcPinLabel, dst, dstPinLabel);
+      } catch (err) {
+        // Re-throw with connection address context so agents can identify
+        // which spec connection failed (connect() only knows pin labels).
+        if (err instanceof FacadeError) {
+          throw new FacadeError(
+            `${err.message} (connection: "${fromAddr}" → "${toAddr}")`,
+            err.componentName,
+            err.pinLabel,
+          );
+        }
+        throw err;
+      }
+    }
+
+    // Collect layout constraints keyed by instanceId
+    const constraints = new Map<string, LayoutConstraint>();
+    for (const comp of spec.components) {
+      if (comp.layout) {
+        const el = idMap.get(comp.id);
+        if (el) {
+          const lc: LayoutConstraint = {};
+          if (comp.layout.col !== undefined) lc.col = comp.layout.col;
+          if (comp.layout.row !== undefined) lc.row = comp.layout.row;
+          constraints.set(el.instanceId, lc);
+        }
+      }
     }
 
     // Auto-layout when there are connections to arrange
     if (spec.connections.length > 0) {
-      autoLayout(circuit);
+      autoLayout(circuit, constraints.size > 0 ? { constraints } : undefined);
     }
 
     return circuit;
@@ -337,17 +369,26 @@ export class CircuitBuilder {
    * Apply a list of patch operations to an existing circuit in order.
    * After all ops, runs net resolution diagnostics and returns them.
    *
+   * Components added via `add` ops are tracked by their `spec.id`. Later
+   * ops in the same patch batch can reference them by `spec.id` in
+   * `connect` fields and target addresses. The returned `PatchResult`
+   * includes a map of `spec.id → instanceId` for all added components.
+   *
    * @param circuit  The circuit to modify (mutated in place).
    * @param ops      Ordered list of patch operations.
    * @param opts     Options (scope is reserved for future subcircuit support).
-   * @returns        Diagnostics from net resolution after the patch.
+   * @returns        PatchResult with diagnostics and addedIds map.
    */
-  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): Diagnostic[] {
+  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): PatchResult {
     // Resolve the target circuit: top-level unless opts.scope narrows to a subcircuit.
     const targetCircuit =
       opts?.scope !== undefined
         ? resolveScope(circuit, this.registry, opts.scope)
         : circuit;
+
+    // Track spec.id → CircuitElement for components added in this batch,
+    // so later ops can reference them by spec.id.
+    const addedElements = new Map<string, CircuitElement>();
 
     for (const op of ops) {
       switch (op.op) {
@@ -411,13 +452,53 @@ export class CircuitBuilder {
         }
 
         case 'add': {
-          const newElement = this.addComponent(targetCircuit, op.spec.type, op.spec.props);
+          // Place new component outside the existing circuit bounding box
+          // to avoid coordinate collisions that merge unrelated nets.
+          let addProps = op.spec.props;
+          if (!addProps?.position) {
+            const bbox = this.circuitBoundingBox(targetCircuit);
+            addProps = {
+              ...addProps,
+              position: [bbox.maxX + 40, bbox.maxY + 40 + this.elementPositionCounter * AUTO_POSITION_Y_STEP],
+            };
+          }
+          const newElement = this.addComponent(targetCircuit, op.spec.type, addProps);
+
+          // Track by spec.id so later ops in this batch can reference it.
+          addedElements.set(op.spec.id, newElement);
 
           if (op.connect) {
             for (const [newPinLabel, targetAddr] of Object.entries(op.connect)) {
-              const { element: targetElement, pin: targetPin } = resolvePin(targetCircuit, targetAddr);
+              // Resolve the target pin. First check if the target component
+              // was added in this same batch (forward reference by spec.id).
+              const colonIdx = targetAddr.indexOf(':');
+              const targetCompId = colonIdx !== -1 ? targetAddr.slice(0, colonIdx) : targetAddr;
+              const targetPinLabel = colonIdx !== -1 ? targetAddr.slice(colonIdx + 1) : undefined;
+
+              let targetElement: CircuitElement;
+              let targetPin: Pin;
+
+              const addedTarget = addedElements.get(targetCompId);
+              if (addedTarget && targetPinLabel) {
+                targetElement = addedTarget;
+                const foundPin = addedTarget.getPins().find((p: Pin) => p.label === targetPinLabel);
+                if (!foundPin) {
+                  const validPins = Array.from(addedTarget.getPins()).map((p: Pin) => p.label).join(', ');
+                  throw new FacadeError(
+                    `Pin '${targetPinLabel}' not found on component '${targetCompId}' (type: ${addedTarget.typeId}). Valid pins: ${validPins}`,
+                    targetCompId,
+                    targetPinLabel,
+                  );
+                }
+                targetPin = foundPin;
+              } else {
+                // Fall back to normal circuit-wide resolution
+                const resolved = resolvePin(targetCircuit, targetAddr);
+                targetElement = resolved.element;
+                targetPin = resolved.pin;
+              }
+
               // Connect new component pin to the target pin.
-              // We need the new element's pin label and the target's element + pin.
               const srcPin = newElement.getPins().find((p: Pin) => p.label === newPinLabel);
               if (!srcPin) {
                 const validPins = Array.from(newElement.getPins()).map((p: Pin) => p.label).join(', ');
@@ -539,8 +620,17 @@ export class CircuitBuilder {
       }
     }
 
+    // Build the addedIds map: spec.id → instanceId
+    const addedIds: Record<string, string> = {};
+    for (const [specId, element] of addedElements) {
+      addedIds[specId] = element.instanceId;
+    }
+
     // Validate the top-level circuit (not just the scoped subcircuit).
-    return resolveNets(circuit, this.registry).diagnostics;
+    return {
+      diagnostics: resolveNets(circuit, this.registry).diagnostics,
+      addedIds,
+    };
   }
 
   /**
@@ -565,6 +655,44 @@ export class CircuitBuilder {
   }
 
   /**
+   * Compute the bounding box of all element positions and wire endpoints
+   * in a circuit. Used to place new patch-added components outside the
+   * existing coordinate space so wires don't accidentally merge nets.
+   */
+  private circuitBoundingBox(circuit: Circuit): { minX: number; minY: number; maxX: number; maxY: number } {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const el of circuit.elements) {
+      const pos = el.position;
+      if (pos.x < minX) minX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.x > maxX) maxX = pos.x;
+      if (pos.y > maxY) maxY = pos.y;
+      for (const pin of el.getPins()) {
+        const wp = pinWorldPosition(el, pin);
+        if (wp.x < minX) minX = wp.x;
+        if (wp.y < minY) minY = wp.y;
+        if (wp.x > maxX) maxX = wp.x;
+        if (wp.y > maxY) maxY = wp.y;
+      }
+    }
+
+    for (const w of circuit.wires) {
+      for (const p of [w.start, w.end]) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+
+    // Empty circuit fallback
+    if (minX === Infinity) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+    return { minX, minY, maxX, maxY };
+  }
+
+  /**
    * Find a pin by label on a component
    */
   private findPin(element: CircuitElement, label: string): Pin | undefined {
@@ -572,11 +700,20 @@ export class CircuitBuilder {
   }
 
   /**
-   * Validate that pin directions are compatible for connection
+   * Validate that pin directions are compatible for connection.
+   *
+   * Allows OUTPUT-to-OUTPUT connections for tri-state bus patterns where
+   * multiple drivers share a net (e.g. bidirectional data buses with
+   * tri-state buffers). The multi-driver diagnostic in net resolution
+   * will flag cases that aren't legitimate tri-state usage.
    */
   private validatePinConnection(srcPin: Pin, dstPin: Pin): void {
     const srcOut = srcPin.direction === 'OUTPUT' || srcPin.direction === 'BIDIRECTIONAL';
+    const dstOut = dstPin.direction === 'OUTPUT' || dstPin.direction === 'BIDIRECTIONAL';
     const dstIn = dstPin.direction === 'INPUT' || dstPin.direction === 'BIDIRECTIONAL';
+
+    // Allow OUTPUT-to-OUTPUT (tri-state bus pattern)
+    if (srcOut && dstOut) return;
 
     if (!srcOut || !dstIn) {
       throw new FacadeError(

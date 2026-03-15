@@ -27,12 +27,12 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
   createInverterConfig,
   resolvePins,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -45,9 +45,12 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java VGA uses GenericShape: 6 inputs (R,G,B,H,V,C), 0 outputs, width=3
+// Non-symmetric → offs=0. R@(0,0), G@(0,1), B@(0,2), H@(0,3), V@(0,4), C@(0,5)
+// → COMP_WIDTH=3, COMP_HEIGHT=6
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
+const COMP_WIDTH = 3;
 const COMP_HEIGHT = 6;
 
 const DEFAULT_COLOR_BITS = 4;
@@ -55,18 +58,17 @@ const DEFAULT_WIDTH = 640;
 const DEFAULT_HEIGHT = 480;
 
 // ---------------------------------------------------------------------------
-// Pin layout — 6 inputs on the west face: R, G, B, H, V, C
+// Pin layout — Java GenericShape(6 inputs, 0 outputs, width=3):
+//   R at (0, 0), G at (0, 1), B at (0, 2), H at (0, 3), V at (0, 4), C at (0, 5)
 // ---------------------------------------------------------------------------
 
 function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
-  const positions = layoutPinsOnFace("west", 6, COMP_WIDTH, COMP_HEIGHT);
-
   return [
     {
       direction: PinDirection.INPUT,
       label: "R",
       defaultBitWidth: colorBits,
-      position: positions[0],
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -74,7 +76,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: colorBits,
-      position: positions[1],
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -82,7 +84,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "B",
       defaultBitWidth: colorBits,
-      position: positions[2],
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -90,7 +92,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "H",
       defaultBitWidth: 1,
-      position: positions[3],
+      position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -98,7 +100,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "V",
       defaultBitWidth: 1,
-      position: positions[4],
+      position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -106,7 +108,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "C",
       defaultBitWidth: 1,
-      position: positions[5],
+      position: { x: 0, y: 5 },
       isNegatable: false,
       isClockCapable: true,
     },
@@ -268,45 +270,23 @@ export class VGAElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-
-    ctx.save();
-
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Screen representation: a small rectangle with scan lines
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0.5, 0.8, COMP_WIDTH - 1, COMP_HEIGHT - 1.8, false);
-
-    // Scan line icon
-    const scanY = 1.4;
-    const scanStep = 0.4;
-    for (let i = 0; i < 4; i++) {
-      ctx.drawLine(0.7, scanY + i * scanStep, COMP_WIDTH - 0.7, scanY + i * scanStep);
-    }
-
-    // Label
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("VGA", COMP_WIDTH / 2, COMP_HEIGHT + 0.3, {
-      horizontal: "center",
-      vertical: "top",
+    const label = this._properties.getOrDefault<string>("label", "");
+    drawGenericShape(ctx, {
+      inputLabels: ["R", "G", "B", "H", "V", "C"],
+      outputLabels: [],
+      clockInputIndices: [5],
+      componentName: "VGA",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
     });
-
-    ctx.restore();
   }
 
   getHelpText(): string {
@@ -326,25 +306,14 @@ export class VGAElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeVga(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  // Inputs: [R=0, G=1, B=2, H=3, V=4, C=5]
-  const r = state[wt[inputStart]] >>> 0;
-  const g = state[wt[inputStart + 1]] >>> 0;
-  const b = state[wt[inputStart + 2]] >>> 0;
-  const h = state[wt[inputStart + 3]] & 1;
-  const v = state[wt[inputStart + 4]] & 1;
-  const c = state[wt[inputStart + 5]] & 1;
-
-  // Pack all signals into output slot for change detection
-  state[wt[layout.outputOffset(index)]] =
-    ((r & 0xF) << 8) | ((g & 0xF) << 4) | (b & 0xF) |
-    (h << 16) | (v << 17) | (c << 18);
+  // VGA has no outputs — it is a display-only sink component.
+  // The display panel reads R, G, B, H, V, C inputs via the engine's
+  // post-step hook accessing the element. No output slots to write.
 }
 
 // ---------------------------------------------------------------------------

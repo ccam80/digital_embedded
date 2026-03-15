@@ -14,8 +14,8 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -38,14 +38,14 @@ function outBitsFor(bitWidth: number): number {
 }
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+const COMP_HEIGHT = 1;
 
+// GenericShape: 1 input, 1 output, symmetric=true, even=false, offs=0
+// in@(0,0), out@(3,0)
 function buildBitCountPinDeclarations(bitWidth: number): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 1, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: inputPositions[0], isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: outBitsFor(bitWidth), position: outputPositions[0], isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: outBitsFor(bitWidth), position: { x: 3, y: 0 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
@@ -66,20 +66,18 @@ export class BitCountElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    return { x: this.position.x + 0.05, y: this.position.y - 0.5, width: (COMP_WIDTH - 0.05) - 0.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("#1", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["in"],
+      outputLabels: ["out"],
+      clockInputIndices: [],
+      componentName: "Bit count",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

@@ -311,6 +311,14 @@ describe("EEPROM", () => {
       setFont: () => {},
       drawRect: () => calls.push("drawRect"),
       drawText: (text: string) => texts.push(text),
+      drawPolygon: () => {},
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
@@ -540,6 +548,14 @@ describe("EEPROMDualPort", () => {
       setFont: () => {},
       drawRect: () => {},
       drawText: (text: string) => texts.push(text),
+      drawPolygon: () => {},
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
     };
     el.draw(ctx as never);
     expect(texts.some(t => t.includes("EEPROM"))).toBe(true);

@@ -22,10 +22,10 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawGenericShape } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -43,7 +43,9 @@ import {
 const COMP_WIDTH = 4;
 
 function componentHeight(inputCount: number): number {
-  return Math.max(inputCount * 2, 4);
+  // Java GenericShape height = max(inputCount, outputCount + offs)
+  // For non-symmetric (2 outputs): height = inputCount (no gap correction)
+  return inputCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,27 +56,26 @@ export function buildPriorityEncoderPinDeclarations(
   selectorBits: number,
 ): PinDeclaration[] {
   const inputCount = 1 << selectorBits;
-  const h = componentHeight(inputCount);
 
-  const inputPositions = layoutPinsOnFace("west", inputCount, COMP_WIDTH, h);
+  // Java GenericShape(inputCount inputs, 2 outputs, width=3, non-symmetric):
+  // offs = 0 (non-symmetric), inputs at (0, i), outputs at (3, i)
   const inputPins: PinDeclaration[] = [];
   for (let i = 0; i < inputCount; i++) {
     inputPins.push({
       direction: PinDirection.INPUT,
       label: `in${i}`,
       defaultBitWidth: 1,
-      position: inputPositions[i],
+      position: { x: 0, y: i },
       isNegatable: false,
       isClockCapable: false,
     });
   }
 
-  const outputPositions = layoutPinsOnFace("east", 2, COMP_WIDTH, h);
   const numPin: PinDeclaration = {
     direction: PinDirection.OUTPUT,
     label: "num",
     defaultBitWidth: selectorBits,
-    position: outputPositions[0],
+    position: { x: 3.9, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -83,7 +84,7 @@ export function buildPriorityEncoderPinDeclarations(
     direction: PinDirection.OUTPUT,
     label: "any",
     defaultBitWidth: 1,
-    position: outputPositions[1],
+    position: { x: 3.9, y: 1 },
     isNegatable: false,
     isClockCapable: false,
   };
@@ -107,47 +108,42 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     return this.derivePins(buildPriorityEncoderPinDeclarations(selectorBits));
   }
 
   getBoundingBox(): Rect {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const inputCount = 1 << selectorBits;
     const h = componentHeight(inputCount);
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
+      x: this.position.x + 0.05,
+      y: this.position.y - 0.5,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: h,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const inputCount = 1 << selectorBits;
-    const h = componentHeight(inputCount);
-
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.85, weight: "bold" });
-    ctx.drawText("PRIO", COMP_WIDTH / 2, h / 2, {
-      horizontal: "center",
-      vertical: "middle",
+    const inputLabels: string[] = [];
+    for (let i = 0; i < inputCount; i++) {
+      inputLabels.push(`in${i}`);
+    }
+    const label = this._properties.getOrDefault<string>("label", "");
+    drawGenericShape(ctx, {
+      inputLabels,
+      outputLabels: ["num", "any"],
+      clockInputIndices: [],
+      componentName: "Priority",
+      width: COMP_WIDTH,
+      ...(label.length > 0 ? { label } : {}),
     });
-
-    ctx.restore();
   }
 
   getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 2);
+    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const inputCount = 1 << selectorBits;
     return (
       `PriorityEncoder — ${inputCount} inputs, outputs index of highest-priority active input.\n` +
@@ -220,7 +216,7 @@ const PRIORITY_ENCODER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "selectorBits",
     type: PropertyType.INT,
     label: "Selector Bits",
-    defaultValue: 2,
+    defaultValue: 1,
     min: 1,
     max: 4,
     description: "Number of output bits (input count = 2^selectorBits)",
@@ -253,7 +249,7 @@ export const PriorityEncoderDefinition: ComponentDefinition = {
   typeId: -1,
   factory: priorityEncoderFactory,
   executeFn: executePriorityEncoder,
-  pinLayout: buildPriorityEncoderPinDeclarations(2),
+  pinLayout: buildPriorityEncoderPinDeclarations(1),
   propertyDefs: PRIORITY_ENCODER_PROPERTY_DEFS,
   attributeMap: PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,

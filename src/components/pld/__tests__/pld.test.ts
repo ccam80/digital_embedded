@@ -155,11 +155,11 @@ describe("Diode", () => {
       expect(d.getPins()).toHaveLength(2);
     });
 
-    it("Diode pins are labeled 'cathode' and 'anode'", () => {
+    it("Diode pins are labeled 'out1' and 'out2'", () => {
       const d = makeDiode();
       const labels = d.getPins().map((p) => p.label);
-      expect(labels).toContain("cathode");
-      expect(labels).toContain("anode");
+      expect(labels).toContain("out1");
+      expect(labels).toContain("out2");
     });
 
     it("Diode pins are BIDIRECTIONAL", () => {

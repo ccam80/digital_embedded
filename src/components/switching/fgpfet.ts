@@ -34,8 +34,9 @@ import type { FETLayout } from "./nfet.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+// Java FETShapeP: Gate at (0,0), Source at (SIZE,0)=(1,0), Drain at (SIZE,SIZE*2)=(1,2)
+const COMP_WIDTH = 1;
+const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -46,7 +47,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "G",
     defaultBitWidth: 1,
-    position: { x: 0, y: COMP_HEIGHT / 2 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -54,7 +55,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "S",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: 0 },
+    position: { x: 1, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -62,7 +63,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     direction: PinDirection.BIDIRECTIONAL,
     label: "D",
     defaultBitWidth: 1,
-    position: { x: COMP_WIDTH, y: COMP_HEIGHT },
+    position: { x: 1, y: 2 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -89,40 +90,56 @@ export class FGPFETElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Drawn geometry: oxide bar at x=0.05 (min x), arrow tip at x=1.1 (max x).
+    // Drain/source leads reach x=1. Height: y=0 to y=2.
+    return { x: this.position.x + 0.05, y: this.position.y, width: 1.05, height: COMP_HEIGHT };
   }
 
   draw(ctx: RenderContext): void {
+    // Java FGPFETShape fixture coordinates (grid units):
+    // Drain path (open):    (1,0) -> (0.55,0) -> (0.55,0.25)
+    // Source path (open):   (1,2) -> (0.55,2) -> (0.55,1.75)
+    // Channel gap:          (0.55,0.75) to (0.55,1.25)  NORMAL
+    // Gate oxide bar:       (0.05,0)    to (0.05,2)      NORMAL
+    // Floating gate (THIN): (0.3,1.8)   to (0.3,0.2)
+    // Gate lead (THIN):     (0.55,1)    to (0.85,1)
+    // Arrow (THIN_FILLED):  (1.1,1) -> (0.85,0.9) -> (0.85,1.1)  pointing LEFT
     const blown = this._properties.getOrDefault<boolean>("blown", false);
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Gate line and bars (same as PFET with floating gate indicator)
-    ctx.drawLine(0, COMP_HEIGHT / 2, 0.65, COMP_HEIGHT / 2);
-    // Inversion bubble on gate
-    ctx.drawCircle(0.8, COMP_HEIGHT / 2, 0.15, false);
-    ctx.drawLine(0.95, COMP_HEIGHT / 2, 1, COMP_HEIGHT / 2);
-    // Gate bar
-    ctx.drawLine(1, 0.5, 1, COMP_HEIGHT - 0.5);
-    // Floating gate bar
-    ctx.drawLine(1.25, 0.5, 1.25, COMP_HEIGHT - 0.5);
-    // Channel line
-    ctx.drawLine(1.5, 0.5, 1.5, COMP_HEIGHT - 0.5);
-    // Source and drain connections
-    ctx.drawLine(1.5, 0.5, COMP_WIDTH, 0.5);
-    ctx.drawLine(1.5, COMP_HEIGHT - 0.5, COMP_WIDTH, COMP_HEIGHT - 0.5);
+    // Drain path (open L): use drawPath so rasterizer treats it as open polyline
+    // matching Java fixture (closed=false).
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 1, y: 0 },
+      { op: "lineTo", x: 0.55, y: 0 },
+      { op: "lineTo", x: 0.55, y: 0.25 },
+    ] });
+    // Source path (open L)
+    ctx.drawPath({ operations: [
+      { op: "moveTo", x: 1, y: 2 },
+      { op: "lineTo", x: 0.55, y: 2 },
+      { op: "lineTo", x: 0.55, y: 1.75 },
+    ] });
+    // Channel gap
+    ctx.drawLine(0.55, 0.75, 0.55, 1.25);
+    // Gate oxide bar
+    ctx.drawLine(0.05, 0, 0.05, 2);
 
-    // P-channel arrow (outward)
-    ctx.drawLine(1.9, COMP_HEIGHT / 2, 1.5, COMP_HEIGHT / 2 - 0.3);
-    ctx.drawLine(1.9, COMP_HEIGHT / 2, 1.5, COMP_HEIGHT / 2 + 0.3);
+    // Floating gate bar
+    ctx.drawLine(0.3, 1.8, 0.3, 0.2);
+    // Gate lead: from channel to arrow
+    ctx.drawLine(0.55, 1, 0.85, 1);
+    // P-channel arrow: filled triangle pointing LEFT
+    ctx.drawPolygon([{ x: 1.1, y: 1 }, { x: 0.85, y: 0.9 }, { x: 0.85, y: 1.1 }], true);
 
     // Blown indicator
     if (blown) {
       ctx.setColor("WIRE_ERROR");
-      ctx.drawLine(0.5, 0.5, 1.0, 1.0);
-      ctx.drawLine(1.0, 0.5, 0.5, 1.0);
+      ctx.drawLine(0.2, 0.5, 0.7, 1.0);
+      ctx.drawLine(0.7, 0.5, 0.2, 1.0);
     }
 
     const label = this._properties.getOrDefault<string>("label", "");

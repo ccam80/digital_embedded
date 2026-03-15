@@ -14,6 +14,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
+import { drawSevenSegShape } from "./seven-seg.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -31,8 +32,8 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 5;
+const COMP_WIDTH = 4;
+const COMP_HEIGHT = 7;
 
 // ---------------------------------------------------------------------------
 // 7-segment decoder table for hex digits 0–F
@@ -64,12 +65,21 @@ export const HEX_SEGMENT_TABLE: readonly number[] = [
 // ---------------------------------------------------------------------------
 
 function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
+  // Java SevenSegHexShape: d@(2,7), dp@(3,7)
   return [
     {
       direction: PinDirection.INPUT,
-      label: "in",
+      label: "d",
       defaultBitWidth: 4,
-      position: { x: 0, y: 0 },
+      position: { x: 2, y: 7 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "dp",
+      defaultBitWidth: 1,
+      position: { x: 3, y: 7 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -100,53 +110,18 @@ export class SevenSegHexElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Outer rect spans x: -0.5 to 3.5, y: 0.05 to 6.95 (same shape as SevenSeg).
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y + 0.05,
+      width: COMP_WIDTH + 0.5,
+      height: 6.9,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const yOff = -COMP_HEIGHT / 2;
-
     ctx.save();
-
-    // Background
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
-
-    // Static 7-segment shape
-    const top = yOff + 0.3;
-    const mid = 0;
-    const bot = yOff + COMP_HEIGHT - 0.3;
-    // Top (a)
-    ctx.drawLine(0.4, top, COMP_WIDTH - 0.4, top);
-    // Middle (g)
-    ctx.drawLine(0.4, mid, COMP_WIDTH - 0.4, mid);
-    // Bottom (d)
-    ctx.drawLine(0.4, bot, COMP_WIDTH - 0.4, bot);
-    // Upper-left (f)
-    ctx.drawLine(0.4, top, 0.4, mid);
-    // Upper-right (b)
-    ctx.drawLine(COMP_WIDTH - 0.4, top, COMP_WIDTH - 0.4, mid);
-    // Lower-left (e)
-    ctx.drawLine(0.4, mid, 0.4, bot);
-    // Lower-right (c)
-    ctx.drawLine(COMP_WIDTH - 0.4, mid, COMP_WIDTH - 0.4, bot);
-
-    // Label indicating hex decoder
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("hex", COMP_WIDTH / 2, yOff + COMP_HEIGHT + 0.3, {
-      horizontal: "center",
-      vertical: "top",
-    });
-
+    drawSevenSegShape(ctx);
     ctx.restore();
   }
 

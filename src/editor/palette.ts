@@ -84,6 +84,11 @@ export class ComponentPalette {
   /** Recent placements — most recent first. Max 10 unique type names. */
   private readonly _recentHistory: string[] = [];
   private _collapsed = false;
+  /**
+   * When non-null, only component types whose names are in this set appear
+   * in the palette. Null means show everything (default behavior).
+   */
+  private _allowlist: Set<string> | null = null;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -100,6 +105,32 @@ export class ComponentPalette {
   }
 
   // ---------------------------------------------------------------------------
+  // Allowlist (palette override)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Set an allowlist of component type names. When set, only these types
+   * appear in the palette tree and search results. Pass null to clear.
+   */
+  setAllowlist(typeNames: string[] | null): void {
+    this._allowlist = typeNames !== null ? new Set(typeNames) : null;
+  }
+
+  /**
+   * Returns the current allowlist as an array of type names, or null if
+   * no override is active (all components shown).
+   */
+  getAllowlist(): string[] | null {
+    return this._allowlist !== null ? Array.from(this._allowlist) : null;
+  }
+
+  /** Apply the allowlist filter to a list of component definitions. */
+  private _applyAllowlist(defs: ComponentDefinition[]): ComponentDefinition[] {
+    if (this._allowlist === null) return defs;
+    return defs.filter((d) => this._allowlist!.has(d.name));
+  }
+
+  // ---------------------------------------------------------------------------
   // Tree access
   // ---------------------------------------------------------------------------
 
@@ -112,8 +143,12 @@ export class ComponentPalette {
     const nodes: PaletteNode[] = [];
 
     for (const category of ALL_CATEGORIES) {
-      if (PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
-      const children = this._registry.getByCategory(category);
+      // When an allowlist is active, show all categories that have matching
+      // components — don't hide the default-hidden categories since the
+      // allowlist is the explicit override.
+      if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
+      const all = this._registry.getByCategory(category);
+      const children = this._applyAllowlist(all);
       if (children.length === 0) {
         continue;
       }
@@ -145,7 +180,7 @@ export class ComponentPalette {
 
     for (const category of ALL_CATEGORIES) {
       const cat = category as ComponentCategory;
-      const all = this._registry.getByCategory(cat);
+      const all = this._applyAllowlist(this._registry.getByCategory(cat));
       const matched = all.filter((def) =>
         def.name.toLowerCase().includes(lowerQuery),
       );

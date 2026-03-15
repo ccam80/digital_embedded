@@ -93,7 +93,7 @@ function buildCompiled(
   return new CompiledCircuitImpl({
     netCount: 0,
     componentCount,
-    typeIds: new Uint8Array(componentCount),
+    typeIds: new Uint16Array(componentCount),
     executeFns: [],
     wiringTable: emptyWiringTable,
     layout: emptyLayout,

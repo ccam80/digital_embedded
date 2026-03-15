@@ -86,6 +86,8 @@ export interface TimingDiagramOptions {
   laneHeight?: number;
   /** Pixel width of the left label margin. Default: 80. */
   leftMargin?: number;
+  /** Simulation steps per real second. Used to size viewport and label time axis. Default: 1000. */
+  stepsPerSecond?: number;
 }
 
 /**
@@ -105,6 +107,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
   private readonly _snapshotInterval: number;
   private readonly _laneHeight: number;
   private readonly _leftMargin: number;
+  private readonly _stepsPerSecond: number;
 
   /** All snapshot tags in order of recording. */
   private readonly _snapshots: SnapshotTag[] = [];
@@ -112,9 +115,15 @@ export class TimingDiagramPanel implements MeasurementObserver {
   /** Current simulation step count (updated on each onStep call). */
   private _currentTime = 0;
 
-  /** Viewport state for rendering. */
+  /** Whether we've received any step data yet (for auto-fitting viewport). */
+  private _hasReceivedData = false;
+
+  /** Viewport state for rendering. Default range set in constructor. */
   private _viewStartTime = 0;
-  private _viewEndTime = 100;
+  private _viewEndTime = 5000; // overridden in constructor
+
+  /** Render throttle: only repaint once per animation frame. */
+  private _renderScheduled = false;
 
   /** Zoom scale: pixels per time unit. Derived from viewport. */
   private _isDragging = false;
@@ -138,6 +147,9 @@ export class TimingDiagramPanel implements MeasurementObserver {
     this._snapshotInterval = options.snapshotInterval ?? 1;
     this._laneHeight = options.laneHeight ?? 60;
     this._leftMargin = options.leftMargin ?? 80;
+    this._stepsPerSecond = options.stepsPerSecond ?? 1000;
+    // Default viewport: 5 seconds of real time
+    this._viewEndTime = this._stepsPerSecond * 5;
 
     const capacity = options.channelCapacity ?? 1024;
     this._channels = channels.map(
@@ -168,23 +180,44 @@ export class TimingDiagramPanel implements MeasurementObserver {
       this._snapshots.push({ snapshotId: id, time: stepCount });
     }
 
-    // Expand viewport to show new data
-    if (stepCount > this._viewEndTime) {
-      this._viewEndTime = stepCount + 10;
+    // Auto-fit viewport on first data so we don't start at time 0
+    if (!this._hasReceivedData) {
+      this._hasReceivedData = true;
+      this._viewStartTime = Math.max(0, stepCount - 1);
+      this._viewEndTime = this._viewStartTime + this._stepsPerSecond * 5;
     }
 
-    this._render();
+    // Scroll viewport to keep new data visible
+    if (stepCount > this._viewEndTime) {
+      const range = this._viewEndTime - this._viewStartTime;
+      this._viewEndTime = stepCount + range * 0.1;
+      this._viewStartTime = this._viewEndTime - range;
+    }
+
+    // Throttle rendering to once per animation frame
+    this._scheduleRender();
   }
 
   onReset(): void {
     this._currentTime = 0;
     this._viewStartTime = 0;
-    this._viewEndTime = 100;
+    this._viewEndTime = this._stepsPerSecond * 5;
+    this._hasReceivedData = false;
     for (const ch of this._channels) {
       ch.clear();
     }
     this._snapshots.length = 0;
     this._render();
+  }
+
+  /** Throttle rendering: schedule at most one repaint per animation frame. */
+  private _scheduleRender(): void {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    requestAnimationFrame(() => {
+      this._renderScheduled = false;
+      this._render();
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -328,6 +361,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
       endTime: this._viewEndTime,
       laneHeight: this._laneHeight,
       leftMargin: this._leftMargin,
+      stepsPerSecond: this._stepsPerSecond,
     };
 
     for (let i = 0; i < this._channels.length; i++) {
@@ -365,13 +399,13 @@ export class TimingDiagramPanel implements MeasurementObserver {
     this.zoom(factor, pivotTime);
   };
 
-  private _onMouseDown = (e: MouseEvent): void => {
+  private _onPointerDown = (e: PointerEvent): void => {
     this._isDragging = true;
     this._dragStartX = e.offsetX;
     this._dragStartViewStart = this._viewStartTime;
   };
 
-  private _onMouseMove = (e: MouseEvent): void => {
+  private _onPointerMove = (e: PointerEvent): void => {
     this._cursorX = e.offsetX;
 
     if (this._isDragging) {
@@ -386,12 +420,16 @@ export class TimingDiagramPanel implements MeasurementObserver {
     this._render();
   };
 
-  private _onMouseLeave = (_e: MouseEvent): void => {
+  private _onPointerLeave = (_e: PointerEvent): void => {
     this._cursorX = null;
     this._render();
   };
 
-  private _onMouseUp = (_e: MouseEvent): void => {
+  private _onPointerUp = (_e: PointerEvent): void => {
+    this._isDragging = false;
+  };
+
+  private _onPointerCancel = (_e: PointerEvent): void => {
     this._isDragging = false;
   };
 
@@ -410,19 +448,21 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
   private _attachEvents(canvas: HTMLCanvasElement): void {
     canvas.addEventListener("wheel", this._onWheel, { passive: false });
-    canvas.addEventListener("mousedown", this._onMouseDown);
-    canvas.addEventListener("mousemove", this._onMouseMove);
-    canvas.addEventListener("mouseleave", this._onMouseLeave);
-    canvas.addEventListener("mouseup", this._onMouseUp);
+    canvas.addEventListener("pointerdown", this._onPointerDown);
+    canvas.addEventListener("pointermove", this._onPointerMove);
+    canvas.addEventListener("pointerleave", this._onPointerLeave);
+    canvas.addEventListener("pointerup", this._onPointerUp);
+    canvas.addEventListener("pointercancel", this._onPointerCancel);
     canvas.addEventListener("click", this._onClick);
   }
 
   private _detachEvents(canvas: HTMLCanvasElement): void {
     canvas.removeEventListener("wheel", this._onWheel);
-    canvas.removeEventListener("mousedown", this._onMouseDown);
-    canvas.removeEventListener("mousemove", this._onMouseMove);
-    canvas.removeEventListener("mouseleave", this._onMouseLeave);
-    canvas.removeEventListener("mouseup", this._onMouseUp);
+    canvas.removeEventListener("pointerdown", this._onPointerDown);
+    canvas.removeEventListener("pointermove", this._onPointerMove);
+    canvas.removeEventListener("pointerleave", this._onPointerLeave);
+    canvas.removeEventListener("pointerup", this._onPointerUp);
+    canvas.removeEventListener("pointercancel", this._onPointerCancel);
     canvas.removeEventListener("click", this._onClick);
   }
 }

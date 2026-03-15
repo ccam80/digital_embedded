@@ -411,17 +411,16 @@ describe("TimingDiagramPanel", () => {
         snapshotInterval: 0,
       });
 
-      // Default viewport: startTime=0, endTime=100, canvas width=800, leftMargin=80
-      // drawWidth = 800 - 80 = 720
-      // cursorX=80 → time = 0 + ((80 - 80) / 720) * 100 = 0
-      // cursorX=440 → time = 0 + ((440 - 80) / 720) * 100 = 50
-      const moveEvent = new MouseEvent("mousemove", { bubbles: true });
+      // Default viewport: startTime=0, endTime=5000 (5s at default 1000 steps/s)
+      // canvas width=800, leftMargin=80, drawWidth = 720
+      // cursorX=440 → time = 0 + ((440 - 80) / 720) * 5000 = 2500
+      const moveEvent = new PointerEvent("pointermove", { bubbles: true });
       Object.defineProperty(moveEvent, "offsetX", { value: 440 });
       canvas.dispatchEvent(moveEvent);
 
       const cursorTime = panel.getCursorTime();
       expect(cursorTime).not.toBeNull();
-      expect(cursorTime!).toBeCloseTo(50, 1);
+      expect(cursorTime!).toBeCloseTo(2500, 0);
 
       teardownCanvas(canvas);
       panel.dispose();
@@ -436,12 +435,12 @@ describe("TimingDiagramPanel", () => {
         snapshotInterval: 0,
       });
 
-      const moveEvent = new MouseEvent("mousemove", { bubbles: true });
+      const moveEvent = new PointerEvent("pointermove", { bubbles: true });
       Object.defineProperty(moveEvent, "offsetX", { value: 400 });
       canvas.dispatchEvent(moveEvent);
       expect(panel.getCursorTime()).not.toBeNull();
 
-      const leaveEvent = new MouseEvent("mouseleave", { bubbles: false });
+      const leaveEvent = new PointerEvent("pointerleave", { bubbles: false });
       canvas.dispatchEvent(leaveEvent);
       expect(panel.getCursorTime()).toBeNull();
 

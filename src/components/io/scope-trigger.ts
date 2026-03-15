@@ -32,10 +32,12 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java ScopeTriggerShape: outer rect (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5)
+// Width = 3.9, height = 2.5, origin at pin position (0,0) which is at left edge
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
+const COMP_WIDTH = 3.9;
+const COMP_HEIGHT = 2.5;
 
 // ---------------------------------------------------------------------------
 // Trigger mode
@@ -44,26 +46,18 @@ const COMP_HEIGHT = 3;
 export type TriggerMode = "rising" | "falling" | "both";
 
 // ---------------------------------------------------------------------------
-// Pin layout — 1 input, 1 output
+// Pin layout — 1 input pin "T" at origin (Java ScopeShape: single pin at (0,0))
 // ---------------------------------------------------------------------------
 
 function buildScopeTriggerPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "in",
+      label: "T",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: true,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "out",
-      defaultBitWidth: 1,
-      position: { x: COMP_WIDTH, y: 0 },
-      isNegatable: false,
-      isClockCapable: false,
     },
   ];
 }
@@ -88,36 +82,71 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildScopeTriggerPinDeclarations(), []);
+    return this.derivePins(buildScopeTriggerPinDeclarations(), ["T"]);
   }
 
   getBoundingBox(): Rect {
+    // Java: outer rect (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5)
+    // Pin "T" is at (0,0). Box left edge at x=0.1, top at y=-2, right at x=4, bottom at y=0.5
     return {
-      x: this.position.x,
-      y: this.position.y - COMP_HEIGHT / 2,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x + 0.1,
+      y: this.position.y - 2,
+      width: 3.9,
+      height: 2.5,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const yOff = -COMP_HEIGHT / 2;
-    const cx = COMP_WIDTH / 2;
-
     ctx.save();
 
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, true);
+    // Outer rectangle: (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5), closed, NORMAL (outline only)
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, yOff, COMP_WIDTH, COMP_HEIGHT, false);
+    ctx.drawPolygon([
+      { x: 0.1, y: 0.5 },
+      { x: 0.1, y: -2 },
+      { x: 4,   y: -2 },
+      { x: 4,   y: 0.5 },
+    ], false);
 
-    // Rising edge symbol
-    ctx.setLineWidth(1);
-    ctx.drawLine(cx - 0.5, 0.3, cx - 0.5, -0.3);
-    ctx.drawLine(cx - 0.5, -0.3, cx + 0.5, -0.3);
-    ctx.drawLine(cx + 0.5, -0.3, cx + 0.5, 0.3);
+    // Step waveform polyline: open, OTHER(2,false) — thin line width
+    // (0.45,-0.3)→(1.3,-0.3)→(1.3,-1.3)→(2.3,-1.3)→(2.3,-0.3)→(2.65,-0.3)
+    ctx.setLineWidth(0.5);
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.45, y: -0.3 },
+        { op: "lineTo", x: 1.3,  y: -0.3 },
+        { op: "lineTo", x: 1.3,  y: -1.3 },
+        { op: "lineTo", x: 2.3,  y: -1.3 },
+        { op: "lineTo", x: 2.3,  y: -0.3 },
+        { op: "lineTo", x: 2.65, y: -0.3 },
+      ],
+    }, false);
+
+    // Trigger indicator rounded rectangle: Java uses QuadTo curves for corners.
+    // Path: M(0.4,-0.4) L(0.4,-1.1) Q(0.4,-1.7)→(1,-1.7) L(2.1,-1.7)
+    //        Q(2.7,-1.7)→(2.7,-1.1) L(2.7,-0.4) Q(2.7,0.2)→(2.1,0.2) L(1,0.2)
+    //        Q(0.4,0.2)→(0.4,-0.4) Z
+    // QuadTo promoted to cubic: cp1 = P0 + 2/3*(Pq-P0), cp2 = Pend + 2/3*(Pq-Pend).
+    ctx.setLineWidth(0.5);
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.4, y: -0.4 },
+        { op: "lineTo", x: 0.4, y: -1.1 },
+        // Q cp=(0.4,-1.7) end=(1.0,-1.7): cubic cp1=(0.4,-1.5) cp2=(0.6,-1.7)
+        { op: "curveTo", cp1x: 0.4, cp1y: -1.5, cp2x: 0.6, cp2y: -1.7, x: 1.0, y: -1.7 },
+        { op: "lineTo", x: 2.1, y: -1.7 },
+        // Q cp=(2.7,-1.7) end=(2.7,-1.1): cubic cp1=(2.5,-1.7) cp2=(2.7,-1.5)
+        { op: "curveTo", cp1x: 2.5, cp1y: -1.7, cp2x: 2.7, cp2y: -1.5, x: 2.7, y: -1.1 },
+        { op: "lineTo", x: 2.7, y: -0.4 },
+        // Q cp=(2.7,0.2) end=(2.1,0.2): cubic cp1=(2.7,0.0) cp2=(2.5,0.2)
+        { op: "curveTo", cp1x: 2.7, cp1y: 0.0, cp2x: 2.5, cp2y: 0.2, x: 2.1, y: 0.2 },
+        { op: "lineTo", x: 1.0, y: 0.2 },
+        // Q cp=(0.4,0.2) end=(0.4,-0.4): cubic cp1=(0.6,0.2) cp2=(0.4,0.0)
+        { op: "curveTo", cp1x: 0.6, cp1y: 0.2, cp2x: 0.4, cp2y: 0.0, x: 0.4, y: -0.4 },
+        { op: "closePath" },
+      ],
+    }, false);
 
     ctx.restore();
   }
@@ -142,23 +171,13 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeScopeTrigger(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputVal = state[wt[layout.inputOffset(index)]];
-  const outputIdx = layout.outputOffset(index);
-  // Previous value stored in slot outputIdx+1 (scratch slot, allocated by engine)
-  const prevVal = state[wt[outputIdx + 1]];
-
-  const risingEdge = prevVal === 0 && inputVal !== 0;
-  const fallingEdge = prevVal !== 0 && inputVal === 0;
-
-  // Default to rising edge trigger (mode not accessible in flat fn without closure)
-  state[wt[outputIdx]] = risingEdge || fallingEdge ? 1 : 0;
-  state[wt[outputIdx + 1]] = inputVal;
+  // ScopeTrigger has no outputs — it is a display-only trigger marker.
+  // The scope panel reads the T input directly; no output slots to write.
 }
 
 // ---------------------------------------------------------------------------

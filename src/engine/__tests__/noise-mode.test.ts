@@ -133,7 +133,7 @@ describe("NoiseMode", () => {
     const STATE_SIZE = 6;
     const state = new Uint32Array(STATE_SIZE);
     const snapshotBuffer = new Uint32Array(STATE_SIZE);
-    const typeIds = new Uint8Array([0, 1]); // comp0=type0, comp1=type1
+    const typeIds = new Uint16Array([0, 1]); // comp0=type0, comp1=type1
 
     // NOR gate execute: output = NOR(input0, input1) = ~(input0 | input1) & 1
     // Also propagates cross-connections: Q->slot4, Qbar->slot1
@@ -228,7 +228,7 @@ describe("NoiseMode", () => {
     const snapshotBuffer = new Uint32Array(STATE_SIZE);
 
     // 3 components: comp0=NOR_Q, comp1=NOR_Qbar, comp2=Reset
-    const typeIds = new Uint8Array([0, 1, 2]);
+    const typeIds = new Uint16Array([0, 1, 2]);
 
     const executeFns: ExecuteFunction[] = [
       // comp0: NOR_Q — Q = NOR(R, Qbar)
@@ -336,7 +336,7 @@ describe("NoiseMode", () => {
     // Both must produce identical output.
 
     const STATE_SIZE = 4;
-    const typeIds = new Uint8Array([0, 1]);
+    const typeIds = new Uint16Array([0, 1]);
 
     const executeFns: ExecuteFunction[] = [
       // comp0: reads inputOffset(0)=0 → slot 0; writes outputOffset(0)=1 → slot 1

@@ -50,7 +50,7 @@ function buildCircuit(
   inputNets: number[][],
   outputNets: number[][],
   executeFns: ExecuteFunction[],
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   evaluationOrder: EvaluationGroup[],
 ): ConcreteCompiledCircuit {
   const layout = new StaticLayout(inputNets, outputNets);
@@ -92,7 +92,7 @@ function buildEmptyCircuit(netCount: number): ConcreteCompiledCircuit {
     [],
     [],
     [],
-    new Uint8Array(0),
+    new Uint16Array(0),
     [],
   );
 }
@@ -121,7 +121,7 @@ describe("saveAndRestore", () => {
       [[]],
       [[0]],
       executeFns,
-      new Uint8Array([0]),
+      new Uint16Array([0]),
       [{ componentIndices: new Uint32Array([0]), isFeedback: false }],
     );
 
@@ -167,7 +167,7 @@ describe("multipleSnapshots", () => {
       [[]],
       [[0]],
       executeFns,
-      new Uint8Array([0]),
+      new Uint16Array([0]),
       [{ componentIndices: new Uint32Array([0]), isFeedback: false }],
     );
 
@@ -222,7 +222,7 @@ describe("ringBufferEviction", () => {
       [[]],
       [[0]],
       executeFns,
-      new Uint8Array([0]),
+      new Uint16Array([0]),
       [{ componentIndices: new Uint32Array([0]), isFeedback: false }],
     );
 

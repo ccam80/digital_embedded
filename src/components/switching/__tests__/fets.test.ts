@@ -190,7 +190,7 @@ describe("NFET", () => {
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(2);
     expect(bb.y).toBe(3);
-    expect(bb.width).toBeGreaterThanOrEqual(2);
+    expect(bb.width).toBeGreaterThanOrEqual(1);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });
 });
@@ -665,7 +665,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(0); // open
   });
 
-  it("pinLayout — 2 inputs (S, ~S) + 2 bidirectional (A, B)", () => {
+  it("pinLayout — 2 inputs (p1, p2) + 2 bidirectional (out1, out2)", () => {
     const props = new PropertyBag();
     const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -674,10 +674,10 @@ describe("TransGate", () => {
     expect(inputs.length).toBe(2);
     expect(bidirectional.length).toBe(2);
     const labels = pins.map(p => p.label);
-    expect(labels).toContain("S");
-    expect(labels).toContain("~S");
-    expect(labels).toContain("A");
-    expect(labels).toContain("B");
+    expect(labels).toContain("p1");
+    expect(labels).toContain("p2");
+    expect(labels).toContain("out1");
+    expect(labels).toContain("out2");
   });
 
   it("attributeMapping — Bits and Label map correctly", () => {

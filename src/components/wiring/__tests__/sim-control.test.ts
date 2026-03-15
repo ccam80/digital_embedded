@@ -374,13 +374,13 @@ describe("Stop", () => {
   });
 
   describe("draw", () => {
-    it("draw() renders 'STP' text", () => {
+    it("draw() renders 'Stop' component name", () => {
       const props = new PropertyBag();
       const el = new StopElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "STP")).toBe(true);
+      expect(textCalls.some((c) => (c.args[0] as string).includes("Stop"))).toBe(true);
     });
   });
 

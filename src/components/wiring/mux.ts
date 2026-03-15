@@ -126,13 +126,16 @@ export class MuxElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const inputCount = 1 << selectorBits;
-    // Height spans from y=0 to y=inputCount (selector pin is at bottom)
-    // For 2 inputs the bottom pin is at y=2, so height = inputCount
+    // Trapezoid: (0.05,-0.2) -> (1.95,0.25) -> (1.95,h-0.25) -> (0.05,h+0.2).
+    // MinX=0.05, maxX=1.95, minY=-0.2, maxY=h+0.2.
+    // height = (h+0.2) - (-0.2) to avoid float cancellation in y + height.
+    const minY = -0.2;
+    const maxY = inputCount + 0.2;
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: inputCount,
+      x: this.position.x + 0.05,
+      y: this.position.y + minY,
+      width: 1.9,
+      height: maxY - minY,
     };
   }
 
@@ -144,12 +147,13 @@ export class MuxElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Trapezoid: (0,-0.2) -> (2,0.25) -> (2,h-0.25) -> (0,h+0.2)
+    // Trapezoid with Java's 0.05 horizontal insets:
+    // (0.05,-0.2) -> (1.95,0.25) -> (1.95,h-0.25) -> (0.05,h+0.2)
     const poly = [
-      { x: 0, y: -0.2 },
-      { x: COMP_WIDTH, y: 0.25 },
-      { x: COMP_WIDTH, y: h - 0.25 },
-      { x: 0, y: h + 0.2 },
+      { x: 0.05, y: -0.2 },
+      { x: COMP_WIDTH - 0.05, y: 0.25 },
+      { x: COMP_WIDTH - 0.05, y: h - 0.25 },
+      { x: 0.05, y: h + 0.2 },
     ];
 
     ctx.setColor("COMPONENT_FILL");
@@ -159,11 +163,12 @@ export class MuxElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(poly, false);
 
+    // Java draws only "0" at (0.15, 0.1) with left/top anchor
     ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("MUX", COMP_WIDTH / 2, h / 2, {
-      horizontal: "center",
-      vertical: "middle",
+    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
+    ctx.drawText("0", 0.15, 0.1, {
+      horizontal: "left",
+      vertical: "top",
     });
 
     ctx.restore();

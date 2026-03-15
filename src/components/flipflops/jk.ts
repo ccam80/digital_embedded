@@ -21,6 +21,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
+import { drawGenericShape } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -110,42 +111,22 @@ export class JKElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: (COMP_WIDTH - 0.05) - 0.05,
       height: COMP_HEIGHT,
     };
   }
 
   draw(ctx: RenderContext): void {
-    ctx.save();
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, COMP_HEIGHT, false);
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0, weight: "bold" });
-    ctx.drawText("J", 0.6, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("C", 0.6, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("K", 0.6, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("Q", COMP_WIDTH - 0.6, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("~Q", COMP_WIDTH - 0.6, 1, { horizontal: "right", vertical: "middle" });
-
-    ctx.setColor("COMPONENT");
-    ctx.drawLine(0, 0.5, 0.5, 1);
-    ctx.drawLine(0.5, 1, 0, 1.5);
-
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 1.0 });
-      ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
+    drawGenericShape(ctx, {
+      inputLabels: ["J", "C", "K"],
+      outputLabels: ["Q", "~Q"],
+      clockInputIndices: [1],
+      componentName: "JK",
+      width: 3,
+      label: this._properties.getOrDefault<string>("label", ""),
+    });
   }
 
   getHelpText(): string {

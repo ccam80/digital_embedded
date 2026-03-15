@@ -59,6 +59,9 @@ export class ElementRenderer {
     selection: ReadonlySet<CircuitElement>,
     viewport: Rect,
   ): void {
+    // Build set of elements that overlap another element at the same position
+    const overlapSet = this._findOverlaps(circuit.elements);
+
     for (const element of circuit.elements) {
       if (!isVisible(element, viewport)) {
         continue;
@@ -73,8 +76,7 @@ export class ElementRenderer {
         ctx.rotate(-(element.rotation * Math.PI) / 2);
       }
       if (element.mirror) {
-        // Java Digital mirrors Y: TransformMatrix(1,0,0,-1,0,0).
-        // pinWorldPosition also mirrors Y: {x: p.x, y: -p.y}.
+        // Mirror negates Y in local space, matching Java Digital's convention.
         ctx.scale(1, -1);
       }
 
@@ -86,6 +88,9 @@ export class ElementRenderer {
 
       if (selection.has(element)) {
         this._renderSelectionHighlight(ctx, element);
+      }
+      if (overlapSet.has(element)) {
+        this._renderOverlapWarning(ctx, element);
       }
     }
   }
@@ -153,5 +158,46 @@ export class ElementRenderer {
     ctx.setColor("SELECTION");
     ctx.setLineWidth(1);
     ctx.drawRect(bb.x, bb.y, bb.width, bb.height, false);
+  }
+
+  /**
+   * Find all elements that share a position with at least one other element.
+   * Uses a position key to group elements, then collects any group with 2+.
+   */
+  private _findOverlaps(elements: readonly CircuitElement[]): Set<CircuitElement> {
+    const byPos = new Map<string, CircuitElement[]>();
+    for (const el of elements) {
+      const key = `${el.position.x},${el.position.y}`;
+      const arr = byPos.get(key);
+      if (arr) arr.push(el);
+      else byPos.set(key, [el]);
+    }
+    const result = new Set<CircuitElement>();
+    for (const group of byPos.values()) {
+      if (group.length > 1) {
+        for (const el of group) result.add(el);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Draw an overlap warning: a small filled triangle in the top-right corner
+   * of the element's bounding box, using the error color.
+   */
+  private _renderOverlapWarning(ctx: RenderContext, element: CircuitElement): void {
+    const bb = worldBoundingBox(element);
+    const s = 0.6; // triangle size in grid units
+    const rx = bb.x + bb.width;
+    const ty = bb.y;
+    ctx.setColor("WIRE_ERROR");
+    ctx.drawPolygon(
+      [
+        { x: rx - s, y: ty },
+        { x: rx, y: ty },
+        { x: rx, y: ty + s },
+      ],
+      true,
+    );
   }
 }

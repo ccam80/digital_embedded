@@ -76,11 +76,15 @@ export class NotElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const wide = this._properties.getOrDefault<boolean>("wideShape", false);
+    // Triangle starts at x=0.05; bubble extends to bubbleCX + BUBBLE_RADIUS.
+    // Narrow: bubbleCX=1.5, r=0.45 → maxX=1.95. Wide: bubbleCX=2.5, r=0.45 → maxX=2.95.
+    // triY: narrow=0.6, wide=1.1.
+    const triY = wide ? 1.1 : 0.6;
     return {
-      x: this.position.x,
-      y: this.position.y - (wide ? 1.1 : 0.6),
-      width: wide ? 3 : 2,
-      height: wide ? 2.2 : 1.2,
+      x: this.position.x + 0.05,
+      y: this.position.y - triY,
+      width: wide ? 2.9 : 1.9,
+      height: triY * 2,
     };
   }
 

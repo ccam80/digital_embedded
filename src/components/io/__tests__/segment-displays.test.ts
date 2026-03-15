@@ -369,17 +369,14 @@ describe("SevenSegHex", () => {
   });
 
   describe("pinLayout", () => {
-    it("SevenSegHex has 1 input pin with bitWidth=4", () => {
+    it("SevenSegHex has 2 input pins: d (4-bit) and dp (1-bit)", () => {
       const el = makeSevenSegHex();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(1);
+      expect(inputs).toHaveLength(2);
+      expect(inputs[0].label).toBe("d");
       expect(inputs[0].bitWidth).toBe(4);
-    });
-
-    it("input pin is labeled 'in'", () => {
-      const el = makeSevenSegHex();
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs[0].label).toBe("in");
+      expect(inputs[1].label).toBe("dp");
+      expect(inputs[1].bitWidth).toBe(1);
     });
   });
 
@@ -478,72 +475,65 @@ describe("SevenSegHex", () => {
 
 describe("SixteenSeg", () => {
   describe("segmentPacking", () => {
-    it("all segments off → output=0", () => {
-      const layout = makeLayout(16, 1);
-      const state = makeState(new Array(16).fill(0), 1);
+    it("is a no-op (display-only sink: no outputs to write)", () => {
+      // SixteenSeg now has 2 inputs: led (16-bit packed) and dp (1-bit)
+      // executeSixteenSeg does nothing — display panel reads inputs directly
+      const layout = makeLayout(2, 0);
+      const state = makeState([0xFFFF, 1], 0);
       const highZs = new Uint32Array(state.length);
+      const before = Array.from(state);
       executeSixteenSeg(0, state, highZs, layout);
-      expect(state[16]).toBe(0);
+      expect(Array.from(state)).toEqual(before);
     });
 
-    it("segment a1 (index 0) on → bit 0 set", () => {
-      const layout = makeLayout(16, 1);
-      const inputs = new Array(16).fill(0);
-      inputs[0] = 1; // a1
-      const state = makeState(inputs, 1);
+    it("led input (16-bit packed segments) is preserved in state", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([0xABCD, 0], 0);
       const highZs = new Uint32Array(state.length);
       executeSixteenSeg(0, state, highZs, layout);
-      expect(state[16] & 1).toBe(1);
+      expect(state[0]).toBe(0xABCD);
     });
 
-    it("segment dp (index 15) on → bit 15 set", () => {
-      const layout = makeLayout(16, 1);
-      const inputs = new Array(16).fill(0);
-      inputs[15] = 1; // dp
-      const state = makeState(inputs, 1);
+    it("dp input (1-bit) is preserved in state", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([0, 1], 0);
       const highZs = new Uint32Array(state.length);
       executeSixteenSeg(0, state, highZs, layout);
-      expect((state[16] >> 15) & 1).toBe(1);
+      expect(state[1]).toBe(1);
     });
 
-    it("all segments on → output has all 16 bits set", () => {
-      const layout = makeLayout(16, 1);
-      const state = makeState(new Array(16).fill(1), 1);
+    it("can be called 1000 times without error", () => {
+      const layout = makeLayout(2, 0);
+      const state = makeState([0xFFFF, 1], 0);
       const highZs = new Uint32Array(state.length);
-      executeSixteenSeg(0, state, highZs, layout);
-      expect(state[16]).toBe(0xFFFF);
-    });
-
-    it("non-zero inputs treated as on", () => {
-      const layout = makeLayout(16, 1);
-      const inputs = new Array(16).fill(0);
-      inputs[0] = 0xFF; // non-zero but not 1
-      const state = makeState(inputs, 1);
-      const highZs = new Uint32Array(state.length);
-      executeSixteenSeg(0, state, highZs, layout);
-      expect(state[16] & 1).toBe(1);
+      for (let i = 0; i < 1000; i++) {
+        executeSixteenSeg(0, state, highZs, layout);
+      }
+      expect(state[0]).toBe(0xFFFF);
     });
   });
 
   describe("pinLayout", () => {
-    it("SixteenSeg has 16 input pins", () => {
+    it("SixteenSeg has 2 input pins", () => {
       const el = makeSixteenSeg();
       const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(16);
+      expect(inputs).toHaveLength(2);
     });
 
-    it("SixteenSeg input pins include 'a1', 'dp', 'g1', 'g2'", () => {
+    it("SixteenSeg input pins are 'led' (16-bit) and 'dp' (1-bit)", () => {
       const el = makeSixteenSeg();
-      const labels = el.getPins().map((p) => p.label);
-      expect(labels).toContain("a1");
-      expect(labels).toContain("dp");
-      expect(labels).toContain("g1");
-      expect(labels).toContain("g2");
+      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
+      const ledPin = inputs.find((p) => p.label === "led");
+      const dpPin = inputs.find((p) => p.label === "dp");
+      expect(ledPin).toBeDefined();
+      expect(ledPin!.bitWidth).toBe(16);
+      expect(dpPin).toBeDefined();
+      expect(dpPin!.bitWidth).toBe(1);
     });
 
-    it("SixteenSegDefinition.pinLayout has 16 input pins", () => {
+    it("SixteenSegDefinition.pinLayout has 2 input pins", () => {
       const inputs = SixteenSegDefinition.pinLayout.filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(16);
+      expect(inputs).toHaveLength(2);
     });
   });
 

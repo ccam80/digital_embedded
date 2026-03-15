@@ -247,17 +247,16 @@ describe("VGA", () => {
   // ---------------------------------------------------------------------------
 
   describe("executeVga", () => {
-    it("packs R, G, B, H, V, C inputs into output slot", () => {
+    it("is a no-op (display-only sink: no outputs to write)", () => {
       const layout = makeLayout();
       const state = makeState(0xF, 0xA, 0x5, 1, 0, 1);
       const highZs = new Uint32Array(state.length);
+      const before = Array.from(state);
       executeVga(0, state, highZs, layout);
-      expect(typeof state[6]).toBe("number");
-      // Output should be non-zero given non-zero inputs
-      expect(state[6]).not.toBe(0);
+      expect(Array.from(state)).toEqual(before);
     });
 
-    it("all-zero inputs produce output=0", () => {
+    it("all-zero inputs: state unchanged", () => {
       const layout = makeLayout();
       const state = makeState(0, 0, 0, 0, 0, 0);
       const highZs = new Uint32Array(state.length);
@@ -274,26 +273,20 @@ describe("VGA", () => {
         state[5] = i & 1;
         executeVga(0, state, highZs, layout);
       }
-      expect(typeof state[6]).toBe("number");
+      expect(typeof state[0]).toBe("number");
     });
 
-    it("H and V flags are encoded in output slot", () => {
+    it("H and V inputs are preserved in state (no-op execute)", () => {
       const layout = makeLayout();
       const stateH = makeState(0, 0, 0, 1, 0, 0);
       executeVga(0, stateH, new Uint32Array(stateH.length), layout);
-      const withH = stateH[6];
+      // H input at index 3 is preserved
+      expect(stateH[3]).toBe(1);
 
       const stateV = makeState(0, 0, 0, 0, 1, 0);
       executeVga(0, stateV, new Uint32Array(stateV.length), layout);
-      const withV = stateV[6];
-
-      const stateNone = makeState(0, 0, 0, 0, 0, 0);
-      executeVga(0, stateNone, new Uint32Array(stateNone.length), layout);
-      const withNone = stateNone[6];
-
-      expect(withH).not.toBe(withNone);
-      expect(withV).not.toBe(withNone);
-      expect(withH).not.toBe(withV);
+      // V input at index 4 is preserved
+      expect(stateV[4]).toBe(1);
     });
   });
 
@@ -415,7 +408,8 @@ describe("VGA", () => {
       const el = new VGAElement("inst", { x: 3, y: 5 }, 0, false, props);
       const box = el.getBoundingBox();
       expect(box.x).toBe(3);
-      expect(box.y).toBe(5);
+      // GenericShape body starts 0.5 grid above origin
+      expect(box.y).toBe(5 - 0.5);
     });
 
     it("bounding box has positive dimensions", () => {

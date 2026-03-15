@@ -83,10 +83,11 @@ export class NAndElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
+    // Body polygon starts at x=0.05; bubble adds 1 to right extent.
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - topBorder,
-      width: compWidth(wideShape) + 1,
+      width: compWidth(wideShape) + 1 - 0.05,
       height: bodyHeight,
     };
   }

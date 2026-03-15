@@ -55,15 +55,15 @@ export function parseAddress(address: string): { component: string; pin: string 
 
 /**
  * Build a label → element index map for efficient repeated lookups.
- * Keys are user labels (from getAttribute("label")), values are element indices.
+ * Keys are user labels (via getComponentLabel), values are element indices.
  * Falls back to instanceId for unlabeled components.
  */
 export function buildLabelIndex(circuit: Circuit): Map<string, number> {
   const index = new Map<string, number>();
   for (let i = 0; i < circuit.elements.length; i++) {
     const el = circuit.elements[i];
-    const label = el.getAttribute('label');
-    if (typeof label === 'string' && label.length > 0) {
+    const label = getComponentLabel(el);
+    if (label !== undefined) {
       index.set(label, i);
     } else {
       index.set(el.instanceId, i);
@@ -77,21 +77,34 @@ export function buildLabelIndex(circuit: Circuit): Map<string, number> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Get the effective label for a component: checks "label" first, then
+ * "NetName" for Tunnel components (which store their label as NetName
+ * in .dig XML).
+ */
+export function getComponentLabel(el: CircuitElement): string | undefined {
+  const labelAttr = el.getAttribute('label');
+  if (typeof labelAttr === 'string' && labelAttr.length > 0) return labelAttr;
+  if (el.typeId === 'Tunnel') {
+    const netName = el.getAttribute('NetName');
+    if (typeof netName === 'string' && netName.length > 0) return netName;
+  }
+  return undefined;
+}
+
+/**
  * Find a component by label or instanceId in a circuit.
- * Searches element labels first (getAttribute("label")), falls back to instanceId.
+ *
+ * Resolution order:
+ * 1. Exact instanceId match (always unambiguous — takes priority)
+ * 2. User label (getAttribute("label"), or NetName for Tunnels)
+ *
+ * When multiple components share a label (e.g. many Tunnels named "C"),
+ * the first match wins. Use instanceId for disambiguation.
+ *
  * Throws FacadeError with available labels if not found.
  */
 export function resolveComponent(circuit: Circuit, label: string): ResolvedComponent {
-  // First pass: search by user label
-  for (let i = 0; i < circuit.elements.length; i++) {
-    const el = circuit.elements[i];
-    const attrLabel = el.getAttribute('label');
-    if (attrLabel === label) {
-      return { element: el, index: i };
-    }
-  }
-
-  // Second pass: search by instanceId
+  // First pass: search by instanceId (always unique, enables disambiguation)
   for (let i = 0; i < circuit.elements.length; i++) {
     const el = circuit.elements[i];
     if (el.instanceId === label) {
@@ -99,12 +112,18 @@ export function resolveComponent(circuit: Circuit, label: string): ResolvedCompo
     }
   }
 
+  // Second pass: search by user label (including NetName for Tunnels)
+  for (let i = 0; i < circuit.elements.length; i++) {
+    const el = circuit.elements[i];
+    const effectiveLabel = getComponentLabel(el);
+    if (effectiveLabel === label) {
+      return { element: el, index: i };
+    }
+  }
+
   // Build helpful error message listing available labels
   const available = circuit.elements.map((el) => {
-    const attrLabel = el.getAttribute('label');
-    return typeof attrLabel === 'string' && attrLabel.length > 0
-      ? attrLabel
-      : el.instanceId;
+    return getComponentLabel(el) ?? el.instanceId;
   });
 
   throw new FacadeError(

@@ -40,7 +40,7 @@ export interface InitializableEngine {
   /** Pre-allocated snapshot buffer, same length as state. */
   readonly snapshotBuffer: Uint32Array;
   /** Type ID per component index. */
-  readonly typeIds: Uint8Array;
+  readonly typeIds: Uint16Array;
   /** Function table indexed by type ID. */
   readonly executeFns: ExecuteFunction[];
   /** Wiring descriptor. */
@@ -106,7 +106,7 @@ function runNoisePropagation(
   state: Uint32Array,
   highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   executeFns: ExecuteFunction[],
   layout: ComponentLayout,
   evaluationOrder: EvaluationGroup[],
@@ -146,7 +146,7 @@ function runDeterministicSettle(
   state: Uint32Array,
   highZs: Uint32Array,
   snapshotBuffer: Uint32Array,
-  typeIds: Uint8Array,
+  typeIds: Uint16Array,
   executeFns: ExecuteFunction[],
   layout: ComponentLayout,
   evaluationOrder: EvaluationGroup[],

@@ -67,6 +67,7 @@ export class DataTablePanel implements MeasurementObserver {
   private _rows: SignalRow[];
   private _sortByName = false;
   private _tableBody: HTMLTableSectionElement | null = null;
+  private _lastUpdateTime = 0;
 
   constructor(
     container: HTMLElement,
@@ -88,10 +89,15 @@ export class DataTablePanel implements MeasurementObserver {
   // -------------------------------------------------------------------------
 
   onStep(_stepCount: number): void {
+    // Read values eagerly, throttle DOM updates to at most every 50ms.
     for (const row of this._rows) {
       row.value = this._engine.getSignalValue(row.descriptor.netId);
     }
-    this._updateDom();
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - this._lastUpdateTime >= 50) {
+      this._lastUpdateTime = now;
+      this._updateDom();
+    }
   }
 
   onReset(): void {
@@ -298,7 +304,7 @@ export class DataTablePanel implements MeasurementObserver {
       // Right-click context menu for radix switching
       tr.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        this._showRadixMenu(e as MouseEvent, row);
+        this._showRadixMenu(e as PointerEvent, row);
       });
 
       tr.appendChild(tdName);
@@ -307,7 +313,7 @@ export class DataTablePanel implements MeasurementObserver {
     }
   }
 
-  private _showRadixMenu(e: MouseEvent, row: SignalRow): void {
+  private _showRadixMenu(e: PointerEvent, row: SignalRow): void {
     const existing = document.getElementById("data-table-radix-menu");
     if (existing !== null) {
       existing.remove();

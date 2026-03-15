@@ -74,10 +74,10 @@ export class PullUpElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: COMP_HEIGHT,
+      x: this.position.x - 0.5,
+      y: this.position.y - 2.45,
+      width: 1,
+      height: 2.45,
     };
   }
 
@@ -87,21 +87,24 @@ export class PullUpElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // VDD rail (top horizontal bar)
-    ctx.drawLine(-0.4, 0, 0.4, 0);
+    // Pin at (0,0). Everything above is negative y.
+    // Java PullUpShape:
+    //   Resistor body rectangle: (-0.35,-0.05) -> (-0.35,-1.3) -> (0.35,-1.3) -> (0.35,-0.05)
+    //   Lead line: (0,-1.3) to (0,-2.3)
+    //   VDD triangle (open, upward): (-0.5,-1.8) -> (0,-2.45) -> (0.5,-1.8)
 
-    // Resistor body (zigzag from y=0 to y=1.4)
+    // Resistor body (closed rectangle)
+    ctx.drawRect(-0.35, -1.3, 0.7, 1.25, false);
+
+    // Lead from top of resistor body up to VDD triangle base
+    ctx.drawLine(0, -1.3, 0, -2.3);
+
+    // VDD triangle (open polygon, upward pointing)
     ctx.drawPath({
       operations: [
-        { op: "moveTo", x: 0, y: 0 },
-        { op: "lineTo", x: 0, y: 0.2 },
-        { op: "lineTo", x: 0.3, y: 0.35 },
-        { op: "lineTo", x: -0.3, y: 0.55 },
-        { op: "lineTo", x: 0.3, y: 0.75 },
-        { op: "lineTo", x: -0.3, y: 0.95 },
-        { op: "lineTo", x: 0.3, y: 1.15 },
-        { op: "lineTo", x: 0, y: 1.3 },
-        { op: "lineTo", x: 0, y: COMP_HEIGHT },
+        { op: "moveTo",  x: -0.5, y: -1.8 },
+        { op: "lineTo",  x:  0,   y: -2.45 },
+        { op: "lineTo",  x:  0.5, y: -1.8 },
       ],
     });
 
@@ -109,7 +112,7 @@ export class PullUpElement extends AbstractCircuitElement {
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.6, COMP_HEIGHT / 2, { horizontal: "left", vertical: "middle" });
+      ctx.drawText(label, 0.6, -1.2, { horizontal: "left", vertical: "middle" });
     }
 
     ctx.restore();

@@ -26,7 +26,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -39,10 +38,9 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
+// Java StepperMotorShape: component body spans x=[-2..3], y=[-1..3]
+// Body width = 5 (from -2 to 3), height = 4 (from -1 to 3)
 // ---------------------------------------------------------------------------
-
-const COMP_WIDTH = 4;
-const COMP_HEIGHT = 5;
 
 // ---------------------------------------------------------------------------
 // Bipolar step sequence: [A+, A-, B+, B-]
@@ -56,7 +54,7 @@ export const BIPOLAR_STEP_SEQUENCE: readonly [number, number, number, number][] 
 ];
 
 // ---------------------------------------------------------------------------
-// Unipolar step sequence: [A, B, C, D]
+// Unipolar step sequence: [P0, P1, P2, P3, com]
 // ---------------------------------------------------------------------------
 
 export const UNIPOLAR_STEP_SEQUENCE: readonly [number, number, number, number][] = [
@@ -68,87 +66,57 @@ export const UNIPOLAR_STEP_SEQUENCE: readonly [number, number, number, number][]
 
 // ---------------------------------------------------------------------------
 // Pin layout helpers
+// Java StepperMotorShape pin positions (grid units, relative to component origin):
+//   Bipolar inputs:  A+@(-2,-1), A-@(-2,0), B+@(-2,1), B-@(-2,2)
+//   Bipolar outputs: S0@(3,-1), S1@(3,3)
+//   Unipolar inputs: P0@(-2,-1), P1@(-2,0), P2@(-2,1), P3@(-2,2), com@(-2,3)
+//   Unipolar outputs: S0@(3,-1), S1@(3,3)
 // ---------------------------------------------------------------------------
 
 function buildBipolarPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
-  const labels = ["A+", "A-", "B+", "B-"];
-  const inputs: PinDeclaration[] = labels.map((label, i) => ({
-    direction: PinDirection.INPUT,
-    label,
-    defaultBitWidth: 1,
-    position: inputPositions[i],
-    isNegatable: false,
-    isClockCapable: false,
-  }));
   return [
-    ...inputs,
-    {
-      direction: PinDirection.OUTPUT,
-      label: "step",
-      defaultBitWidth: 4,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT,  label: "A+",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "A-",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "B+",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "B-",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
 function buildUnipolarPinDeclarations(): PinDeclaration[] {
-  const inputPositions = layoutPinsOnFace("west", 4, COMP_WIDTH, COMP_HEIGHT);
-  const outputPositions = layoutPinsOnFace("east", 1, COMP_WIDTH, COMP_HEIGHT);
-  const labels = ["A", "B", "C", "D"];
-  const inputs: PinDeclaration[] = labels.map((label, i) => ({
-    direction: PinDirection.INPUT,
-    label,
-    defaultBitWidth: 1,
-    position: inputPositions[i],
-    isNegatable: false,
-    isClockCapable: false,
-  }));
   return [
-    ...inputs,
-    {
-      direction: PinDirection.OUTPUT,
-      label: "step",
-      defaultBitWidth: 4,
-      position: outputPositions[0],
-      isNegatable: false,
-      isClockCapable: false,
-    },
+    { direction: PinDirection.INPUT,  label: "P0",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "P1",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "P2",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "P3",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "com", defaultBitWidth: 1, position: { x: -2, y:  3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false },
   ];
 }
 
 // ---------------------------------------------------------------------------
 // Shared draw helper
+// Java fixture: outer rect (-2,-1.5)→(3,3.5) [5x5], circle cx=0.5,cy=1,r=2 THIN,
+// line (0.5,1)→(0.5,-1) NORMAL.
 // ---------------------------------------------------------------------------
 
-function drawMotorBody(ctx: RenderContext, label: string, typeLabel: string): void {
-  const cx = COMP_WIDTH / 2;
-  const cy = COMP_HEIGHT / 2;
-
+function drawMotorBody(ctx: RenderContext): void {
+  // Outer rectangle: (-2,-1.5) to (3,3.5), width=5, height=5, NORMAL/filled
   ctx.setColor("COMPONENT_FILL");
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
+  ctx.drawRect(-2, -1.5, 5, 5, true);
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
-  ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, false);
+  ctx.drawRect(-2, -1.5, 5, 5, false);
 
-  // Motor circle symbol
-  ctx.drawCircle(cx, cy, 1.2, false);
+  // Circle at cx=0.5, cy=1, r=2, THIN (thin line weight)
+  ctx.setLineWidth(0.5);
+  ctx.drawCircle(0.5, 1, 2, false);
 
-  // "M" label inside
-  ctx.setColor("TEXT");
-  ctx.setFont({ family: "sans-serif", size: 0.8, weight: "bold" });
-  ctx.drawText("M", cx, cy, { horizontal: "center", vertical: "middle" });
-
-  // Type label below
-  ctx.setFont({ family: "sans-serif", size: 0.5 });
-  ctx.drawText(typeLabel, cx, COMP_HEIGHT + 0.3, { horizontal: "center", vertical: "top" });
-
-  if (label.length > 0) {
-    ctx.drawText(label, cx, -0.3, { horizontal: "center", vertical: "bottom" });
-  }
+  // Pointer line: (0.5,1) to (0.5,-1), NORMAL
+  ctx.setLineWidth(1);
+  ctx.drawLine(0.5, 1, 0.5, -1);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,13 +139,13 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Java: rect (-2,-1.5) to (3,3.5) → width=5, height=5
+    return { x: this.position.x - 2, y: this.position.y - 1.5, width: 5, height: 5 };
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
     ctx.save();
-    drawMotorBody(ctx, label, "Bipolar");
+    drawMotorBody(ctx);
     ctx.restore();
   }
 
@@ -210,13 +178,13 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: COMP_WIDTH, height: COMP_HEIGHT };
+    // Java: rect (-2,-1.5) to (3,3.5) → width=5, height=5
+    return { x: this.position.x - 2, y: this.position.y - 1.5, width: 5, height: 5 };
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
     ctx.save();
-    drawMotorBody(ctx, label, "Unipolar");
+    drawMotorBody(ctx);
     ctx.restore();
   }
 
@@ -259,11 +227,14 @@ export function executeStepperMotorBipolar(
       break;
     }
   }
-  state[wt[layout.outputOffset(index)]] = stepIndex;
+  const outBase = layout.outputOffset(index);
+  state[wt[outBase]]     = stepIndex & 0x3;       // S0: lower 2 bits
+  state[wt[outBase + 1]] = (stepIndex >> 2) & 0x3; // S1: upper 2 bits
 }
 
 // ---------------------------------------------------------------------------
 // executeStepperMotorUnipolar — detect coil pattern, output step index
+// Inputs: P0, P1, P2, P3, com (5 inputs); Outputs: S0, S1
 // ---------------------------------------------------------------------------
 
 export function executeStepperMotorUnipolar(
@@ -274,25 +245,28 @@ export function executeStepperMotorUnipolar(
 ): void {
   const wt = layout.wiringTable;
   const inputStart = layout.inputOffset(index);
-  const a = state[wt[inputStart]];
-  const b = state[wt[inputStart + 1]];
-  const c = state[wt[inputStart + 2]];
-  const d = state[wt[inputStart + 3]];
+  const p0 = state[wt[inputStart]];
+  const p1 = state[wt[inputStart + 1]];
+  const p2 = state[wt[inputStart + 2]];
+  const p3 = state[wt[inputStart + 3]];
+  // com (inputStart+4) is the common line — not used in step detection
 
   let stepIndex = 0;
   for (let s = 0; s < UNIPOLAR_STEP_SEQUENCE.length; s++) {
     const [sa, sb, sc, sd] = UNIPOLAR_STEP_SEQUENCE[s];
     if (
-      (a !== 0) === (sa === 1) &&
-      (b !== 0) === (sb === 1) &&
-      (c !== 0) === (sc === 1) &&
-      (d !== 0) === (sd === 1)
+      (p0 !== 0) === (sa === 1) &&
+      (p1 !== 0) === (sb === 1) &&
+      (p2 !== 0) === (sc === 1) &&
+      (p3 !== 0) === (sd === 1)
     ) {
       stepIndex = s;
       break;
     }
   }
-  state[wt[layout.outputOffset(index)]] = stepIndex;
+  const outBase = layout.outputOffset(index);
+  state[wt[outBase]]     = stepIndex & 0x3;
+  state[wt[outBase + 1]] = (stepIndex >> 2) & 0x3;
 }
 
 // ---------------------------------------------------------------------------
