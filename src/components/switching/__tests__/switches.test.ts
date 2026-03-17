@@ -952,3 +952,232 @@ describe("SwitchDT", () => {
     });
   });
 });
+
+// ===========================================================================
+// Analog Switch tests (Task 2.5.3)
+// ===========================================================================
+
+import { vi } from "vitest";
+import type { SparseSolver } from "../../../analog/sparse-solver.js";
+import type { SpstAnalogElement } from "../plain-switch.js";
+import type { SpdtAnalogElement } from "../plain-switch-dt.js";
+import {
+  makeResistor,
+  makeVoltageSource,
+} from "../../../analog/test-elements.js";
+import { MNAEngine } from "../../../analog/analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../analog/analog-engine.js";
+
+function makeMockSolver() {
+  const stamps: Array<{ row: number; col: number; value: number }> = [];
+  const rhs: Record<number, number> = {};
+
+  const solver = {
+    stamp: vi.fn((row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    }),
+    stampRHS: vi.fn((row: number, value: number) => {
+      rhs[row] = (rhs[row] ?? 0) + value;
+    }),
+    _stamps: stamps,
+    _rhs: rhs,
+  };
+
+  return solver;
+}
+
+function makeSpstProps(overrides: {
+  closed?: boolean;
+  Ron?: number;
+  Roff?: number;
+} = {}): PropertyBag {
+  const props = new PropertyBag();
+  props.set("closed", overrides.closed ?? false);
+  props.set("Ron", overrides.Ron ?? 1);
+  props.set("Roff", overrides.Roff ?? 1e9);
+  return props;
+}
+
+describe("AnalogSwitch", () => {
+  it("definition_has_engine_type_both", () => {
+    expect(PlainSwitchDefinition.engineType).toBe("both");
+    expect(PlainSwitchDTDefinition.engineType).toBe("both");
+  });
+
+  it("closed_stamps_ron", () => {
+    const props = makeSpstProps({ closed: true, Ron: 1 });
+    const el = PlainSwitchDefinition.analogFactory!(
+      [1, 2],
+      -1,
+      props,
+      () => 0,
+    ) as SpstAnalogElement;
+    const solver = makeMockSolver();
+    el.stamp(solver as unknown as SparseSolver);
+
+    // G = 1/Ron = 1.0; should stamp 4 conductance entries
+    const expectedG = 1.0;
+    const gCalls = solver.stamp.mock.calls.map(([, , v]) => v as number);
+    expect(gCalls.some((v) => Math.abs(v - expectedG) < 1e-10)).toBe(true);
+    expect(gCalls.some((v) => Math.abs(v + expectedG) < 1e-10)).toBe(true);
+  });
+
+  it("open_stamps_roff", () => {
+    const props = makeSpstProps({ closed: false, Roff: 1e9 });
+    const el = PlainSwitchDefinition.analogFactory!(
+      [1, 2],
+      -1,
+      props,
+      () => 0,
+    ) as SpstAnalogElement;
+    const solver = makeMockSolver();
+    el.stamp(solver as unknown as SparseSolver);
+
+    // G = 1/Roff = 1e-9
+    const expectedG = 1e-9;
+    const gCalls = solver.stamp.mock.calls.map(([, , v]) => v as number);
+    expect(gCalls.some((v) => Math.abs(v - expectedG) < 1e-18)).toBe(true);
+  });
+
+  it("toggle_changes_conductance", () => {
+    const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
+    const el = PlainSwitchDefinition.analogFactory!(
+      [1, 2],
+      -1,
+      props,
+      () => 0,
+    ) as SpstAnalogElement;
+
+    const solver1 = makeMockSolver();
+    el.stamp(solver1 as unknown as SparseSolver);
+    const gClosed = solver1.stamp.mock.calls.map(([, , v]) => v as number).find((v) => v > 0)!;
+
+    el.setClosed(false);
+    const solver2 = makeMockSolver();
+    el.stamp(solver2 as unknown as SparseSolver);
+    const gOpen = solver2.stamp.mock.calls.map(([, , v]) => v as number).find((v) => v > 0)!;
+
+    // Closed G = 1/Ron = 1.0; Open G = 1/Roff = 1e-9
+    expect(gClosed).toBeGreaterThan(gOpen);
+    expect(gClosed).toBeCloseTo(1.0, 8);
+    expect(gOpen).toBeCloseTo(1e-9, 18);
+  });
+
+  it("digital_behavior_unchanged", () => {
+    const layout = makeLayout(0, 1);
+    const state = makeState(2);
+    const highZs = new Uint32Array(state.length);
+    state[0] = 42;
+    executePlainSwitch(0, state, highZs, layout);
+    expect(state[0]).toBe(42);
+  });
+});
+
+describe("AnalogSPDT", () => {
+  it("common_to_a_when_position_0", () => {
+    // closed=false → common-B has Roff, common-C has Ron
+    // position 0 = open = common connects to C (normally-open)
+    const props = new PropertyBag();
+    props.set("closed", false);
+    props.set("Ron", 1);
+    props.set("Roff", 1e9);
+
+    const el = PlainSwitchDTDefinition.analogFactory!(
+      [1, 2, 3],
+      -1,
+      props,
+      () => 0,
+    ) as SpdtAnalogElement;
+
+    const solver = makeMockSolver();
+    el.stamp(solver as unknown as SparseSolver);
+
+    // common(1)-B(2): Goff = 1e-9, common(1)-C(3): Gon = 1.0
+    const calls = solver.stamp.mock.calls as Array<[number, number, number]>;
+    const positiveValues = calls.filter(([, , v]) => v > 0).map(([, , v]) => v);
+    const smallG = positiveValues.filter((v) => v < 1e-6);
+    const largeG = positiveValues.filter((v) => v > 0.5);
+    expect(smallG.length).toBeGreaterThan(0);
+    expect(largeG.length).toBeGreaterThan(0);
+  });
+
+  it("common_to_b_when_position_1", () => {
+    // closed=true → common-B has Ron, common-C has Roff
+    const props = new PropertyBag();
+    props.set("closed", true);
+    props.set("Ron", 1);
+    props.set("Roff", 1e9);
+
+    const el = PlainSwitchDTDefinition.analogFactory!(
+      [1, 2, 3],
+      -1,
+      props,
+      () => 0,
+    ) as SpdtAnalogElement;
+
+    const solver = makeMockSolver();
+    el.stamp(solver as unknown as SparseSolver);
+
+    const calls = solver.stamp.mock.calls as Array<[number, number, number]>;
+    const positiveValues = calls.filter(([, , v]) => v > 0).map(([, , v]) => v);
+    const smallG = positiveValues.filter((v) => v < 1e-6);
+    const largeG = positiveValues.filter((v) => v > 0.5);
+    expect(smallG.length).toBeGreaterThan(0);
+    expect(largeG.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration test — switched resistor divider
+// ---------------------------------------------------------------------------
+
+describe("Integration", () => {
+  it("switched_resistor_divider", () => {
+    // 10V → SPST switch (closed, Ron=1Ω) → 1kΩ → ground
+    // DC OP: V across R = 10 * 1000/1001 ≈ 9.99V
+    // Open switch: V across R ≈ 0V
+
+    const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
+    const swEl = PlainSwitchDefinition.analogFactory!(
+      [1, 2],
+      -1,
+      switchProps,
+      () => 0,
+    ) as SpstAnalogElement;
+
+    // nodeCount=2 (node1, node2), branchCount=1, matrixSize=3
+    // Branch at absolute row 2 (= nodeCount + 0)
+    const vs = makeVoltageSource(1, 0, 2, 10);  // 10V: node1→gnd, branch at absolute row 2
+    const r = makeResistor(2, 0, 1000);          // 1kΩ: node2→gnd
+
+    const circuit: ConcreteCompiledAnalogCircuit = {
+      netCount: 2,
+      componentCount: 3,
+      nodeCount: 2,
+      branchCount: 1,
+      matrixSize: 3,
+      elements: [vs, swEl, r],
+      labelToNodeId: new Map(),
+      wireToNodeId: new Map(),
+    };
+
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    const result = engine.dcOperatingPoint();
+
+    expect(result.converged).toBe(true);
+    // node2 = voltages[1] = V across R
+    const vAcrossR = engine.getNodeVoltage(1);
+    expect(vAcrossR).toBeGreaterThan(9.98);
+    expect(vAcrossR).toBeLessThan(10.0);
+
+    // Now open the switch
+    swEl.setClosed(false);
+    engine.init(circuit);
+    const result2 = engine.dcOperatingPoint();
+    expect(result2.converged).toBe(true);
+    // With Roff=1e9Ω, V across 1kΩ ≈ 10 * 1000 / (1000 + 1e9) ≈ 1e-5V ≈ 0
+    const vOpen = engine.getNodeVoltage(1);
+    expect(vOpen).toBeCloseTo(0, 2);
+  });
+});

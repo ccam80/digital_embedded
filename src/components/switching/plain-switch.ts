@@ -24,6 +24,8 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -251,6 +253,22 @@ const PLAIN_SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Initial switch state (closed = connected)",
   },
   {
+    key: "Ron",
+    type: PropertyType.INT,
+    label: "Ron (Ω)",
+    defaultValue: 1,
+    min: 0,
+    description: "On-state resistance in ohms",
+  },
+  {
+    key: "Roff",
+    type: PropertyType.INT,
+    label: "Roff (Ω)",
+    defaultValue: 1e9,
+    min: 0,
+    description: "Off-state resistance in ohms",
+  },
+  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -273,6 +291,55 @@ function plainSwitchFactory(props: PropertyBag): PlainSwitchElement {
   );
 }
 
+// ---------------------------------------------------------------------------
+// analogFactory — SPST variable-resistance model
+// ---------------------------------------------------------------------------
+
+function stampConductance(
+  solver: SparseSolver,
+  nodeA: number,
+  nodeB: number,
+  G: number,
+): void {
+  if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
+  if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+  if (nodeA !== 0 && nodeB !== 0) {
+    solver.stamp(nodeA - 1, nodeB - 1, -G);
+    solver.stamp(nodeB - 1, nodeA - 1, -G);
+  }
+}
+
+export interface SpstAnalogElement extends AnalogElement {
+  setClosed(closed: boolean): void;
+}
+
+function createPlainSwitchAnalogElement(
+  nodeIds: number[],
+  props: PropertyBag,
+): SpstAnalogElement {
+  const nodeA = nodeIds[0];
+  const nodeB = nodeIds[1];
+  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
+  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
+  let closed = props.getOrDefault<boolean>("closed", false);
+
+  return {
+    nodeIndices: [nodeA, nodeB],
+    branchIndex: -1,
+    isNonlinear: false,
+    isReactive: false,
+
+    stamp(solver: SparseSolver): void {
+      const G = closed ? 1 / ron : 1 / roff;
+      stampConductance(solver, nodeA, nodeB, G);
+    },
+
+    setClosed(c: boolean): void {
+      closed = c;
+    },
+  };
+}
+
 export const PlainSwitchDefinition: ComponentDefinition = {
   name: "PlainSwitch",
   typeId: -1,
@@ -282,10 +349,19 @@ export const PlainSwitchDefinition: ComponentDefinition = {
   propertyDefs: PLAIN_SWITCH_PROPERTY_DEFS,
   attributeMap: PLAIN_SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  engineType: "both",
   helpText:
     "Plain Switch (SPST) — a simple single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
+
+  analogFactory(
+    nodeIds: number[],
+    _branchIdx: number,
+    props: PropertyBag,
+  ): AnalogElement {
+    return createPlainSwitchAnalogElement(nodeIds, props);
+  },
 };

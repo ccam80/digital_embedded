@@ -286,10 +286,11 @@ export function compileAnalogCircuit(
     }
 
     // Reject digital-only components
-    if ((def.engineType ?? "digital") !== "analog") {
+    const et = def.engineType ?? "digital";
+    if (et !== "analog" && et !== "both") {
       throw new Error(
         `compileAnalogCircuit: component "${el.typeId}" is a digital-only ` +
-          `component (engineType="${def.engineType ?? "digital"}"). ` +
+          `component (engineType="${et}"). ` +
           `Analog circuits may only contain analog components.`,
       );
     }

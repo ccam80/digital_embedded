@@ -29,12 +29,14 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
+import { parseExpression, evaluateExpression, ExprParseError } from "../../analog/expression.js";
+import type { ExprNode } from "../../analog/expression.js";
 
 // ---------------------------------------------------------------------------
 // Waveform computation
 // ---------------------------------------------------------------------------
 
-export type Waveform = "sine" | "square" | "triangle" | "sawtooth";
+export type Waveform = "sine" | "square" | "triangle" | "sawtooth" | "expression";
 
 /**
  * Compute instantaneous waveform value at time t.
@@ -97,10 +99,11 @@ export function squareWaveBreakpoints(
 
   // Transitions occur at t = n*halfPeriod - phaseShift for all integers n.
   // Find first n such that n*halfPeriod - phaseShift > tStart.
+  // Include transitions strictly inside (tStart, tEnd) — both endpoints excluded.
   const nMin = Math.ceil((tStart + phaseShift) / halfPeriod);
   for (let n = nMin; ; n++) {
     const t = n * halfPeriod - phaseShift;
-    if (t > tEnd) break;
+    if (t >= tEnd) break;
     if (t > tStart) {
       breakpoints.push(t);
     }
@@ -216,6 +219,13 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Waveform type: sine | square | triangle | sawtooth",
   },
   {
+    key: "expression",
+    type: PropertyType.STRING,
+    label: "Expression",
+    defaultValue: "sin(2 * pi * 1000 * t)",
+    description: "Waveform expression with t as time variable (used when waveform=expression)",
+  },
+  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -244,6 +254,13 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 export interface AcVoltageSourceAnalogElement extends AnalogElement {
   /** Returns transition times within [tStart, tEnd] for square waveforms. */
   getBreakpoints(tStart: number, tEnd: number): number[];
+  /**
+   * Parsed expression AST for expression waveform mode.
+   * Null if waveform is not "expression" or if parsing failed.
+   */
+  _parsedExpr: ExprNode | null;
+  /** Parse error message if expression parsing failed; null otherwise. */
+  _parseError: string | null;
 }
 
 function createAcVoltageSourceElement(
@@ -262,11 +279,26 @@ function createAcVoltageSourceElement(
 
   let scale = 1;
 
-  return {
+  // Parse expression once at creation for expression waveform mode.
+  let parsedExpr: ExprNode | null = null;
+  let parseError: string | null = null;
+  if (waveform === "expression") {
+    const exprText = props.getOrDefault<string>("expression", "sin(2 * pi * 1000 * t)");
+    try {
+      parsedExpr = parseExpression(exprText);
+    } catch (err) {
+      parseError = err instanceof ExprParseError ? err.message : String(err);
+    }
+  }
+
+  const element: AcVoltageSourceAnalogElement = {
     nodeIndices: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
+
+    _parsedExpr: parsedExpr,
+    _parseError: parseError,
 
     setSourceScale(factor: number): void {
       scale = factor;
@@ -275,7 +307,17 @@ function createAcVoltageSourceElement(
     stamp(solver: SparseSolver): void {
       const k = branchIdx;
       const t = getTime();
-      const v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t);
+
+      let v: number;
+      if (waveform === "expression") {
+        if (element._parsedExpr !== null) {
+          v = evaluateExpression(element._parsedExpr, { t }) * scale;
+        } else {
+          v = 0;
+        }
+      } else {
+        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t) * scale;
+      }
 
       // B sub-matrix: node rows, branch column k
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
@@ -285,8 +327,8 @@ function createAcVoltageSourceElement(
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
 
-      // RHS voltage constraint (scaled for source stepping)
-      solver.stampRHS(k, v * scale);
+      // RHS voltage constraint
+      solver.stampRHS(k, v);
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {
@@ -294,6 +336,8 @@ function createAcVoltageSourceElement(
       return squareWaveBreakpoints(frequency, phase, tStart, tEnd);
     },
   };
+
+  return element;
 }
 
 // ---------------------------------------------------------------------------

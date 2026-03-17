@@ -206,8 +206,8 @@
   "hotPaths": [
     {
       "path": "spec\\phase-2-tier-1-components.md",
-      "accessCount": 63,
-      "lastAccessed": 1773755873455,
+      "accessCount": 66,
+      "lastAccessed": 1773757187122,
       "type": "file"
     },
     {
@@ -230,14 +230,14 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 40,
-      "lastAccessed": 1773755733050,
+      "accessCount": 41,
+      "lastAccessed": 1773756466705,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 38,
-      "lastAccessed": 1773755707849,
+      "accessCount": 39,
+      "lastAccessed": 1773756405920,
       "type": "file"
     },
     {

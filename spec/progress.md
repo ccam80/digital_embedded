@@ -579,3 +579,19 @@
   - I-V computation methods (computeIds, computeGm, computeGds, computeGmbs, limitVoltages, computeCapacitances) isolated for future AbstractFetElement extraction (Task 5.4.1)
   - Integration test: common-source NMOS DC OP converges correctly (Vds≈1.84V, Id≈3.16mA with W=10µ, L=1µ, Vgs=3V, Rd=1kΩ, Vdd=5V)
   - The sparse-solver performance_50_node test failure in full suite is a pre-existing timing/flakiness issue unrelated to this task (passes when run in isolation)
+
+## Task 2.5.2: AC Voltage Source + Switches SPST/SPDT (shared)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sources/__tests__/ac-voltage-source.test.ts
+- **Files modified**: src/analog/compiler.ts, src/components/switching/plain-switch.ts, src/components/switching/plain-switch-dt.ts, src/components/switching/__tests__/switches.test.ts
+- **Tests**: 120/120 passing (15 AC source tests + 105 switch tests including 9 new analog tests)
+- **Notes**: AC source was already implemented. Compiler updated to accept engineType "both". SPST and SPDT plain switches got analogFactory (variable resistance Ron/Roff), engineType "both", and Ron/Roff property defs. The performance_50_node sparse-solver test fails intermittently under full-suite load (timing flakiness) but passes in isolation — not a regression from this task.
+
+## Task 2.6.2: Expression Integration with AC Source
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/components/sources/ac-voltage-source.ts, src/components/sources/__tests__/ac-voltage-source.test.ts
+- **Tests**: 19/19 passing (4 new ExprWaveform tests + 15 existing tests)
+- **Notes**: Added "expression" to Waveform type, added expression property def, added _parsedExpr/_parseError fields to AcVoltageSourceAnalogElement. Expression is parsed once at analogFactory call, evaluated via evaluateExpression at stamp time. Parse errors stored as _parseError (not thrown). The spec says t=0.0005 is "half period" for 500Hz but 500Hz half period is actually 0.001s; used t=0.001 to match the stated assertion (RHS ≈ 0V).
