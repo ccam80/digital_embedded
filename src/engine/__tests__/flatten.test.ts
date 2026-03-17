@@ -202,7 +202,7 @@ describe("flattenCircuit", () => {
     circuit.addWire(new Wire({ x: 4, y: 1 }, { x: 10, y: 1 }));
 
     const registry = makeRegistry("And", "Or");
-    const flat = flattenCircuit(circuit, registry);
+    const { circuit: flat } = flattenCircuit(circuit, registry);
 
     expect(flat.elements.length).toBe(2);
     expect(flat.elements.map((e) => e.typeId)).toEqual(["And", "Or"]);
@@ -217,7 +217,7 @@ describe("flattenCircuit", () => {
     circuit.addElement(and2);
 
     const registry = makeRegistry("And");
-    const flat = flattenCircuit(circuit, registry);
+    const { circuit: flat } = flattenCircuit(circuit, registry);
 
     expect(flat.elements.length).toBe(2);
     expect(flat.elements[0]!.typeId).toBe("And");
@@ -264,7 +264,7 @@ describe("flattenCircuit", () => {
     parent.addElement(subcircuitInstance);
 
     const registry = makeRegistry("And", "In", "Out");
-    const flat = flattenCircuit(parent, registry);
+    const { circuit: flat } = flattenCircuit(parent, registry);
 
     // No subcircuit element in result
     const subcircuitEls = flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:"));
@@ -304,7 +304,7 @@ describe("flattenCircuit", () => {
     parent.addElement(sub1);
 
     const registry = makeRegistry("And", "In", "Out");
-    const flat = flattenCircuit(parent, registry);
+    const { circuit: flat } = flattenCircuit(parent, registry);
 
     // Each instance contributes 3 elements → 6 total
     expect(flat.elements.length).toBe(6);
@@ -355,7 +355,7 @@ describe("flattenCircuit", () => {
     top.addElement(middleSub);
 
     const registry = makeRegistry("And", "In", "Out");
-    const flat = flattenCircuit(top, registry);
+    const { circuit: flat } = flattenCircuit(top, registry);
 
     // No subcircuit elements in result
     const subcircuitEls = flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:"));
@@ -408,7 +408,7 @@ describe("flattenCircuit", () => {
     parent.addElement(subEl);
 
     const registry = makeRegistry("In", "Out");
-    const flat = flattenCircuit(parent, registry);
+    const { circuit: flat } = flattenCircuit(parent, registry);
 
     // Bridge wires should connect parent pin positions to internal element pin positions.
     // The internal In element's output pin is at (0 + 2, 5 + 1) = (2, 6).

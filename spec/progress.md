@@ -787,3 +787,39 @@
 - **Files created**: src/analog/bridge-adapter.ts, src/analog/__tests__/bridge-adapter.test.ts
 - **Files modified**: (none)
 - **Tests**: 20/20 passing
+
+## Task 4b.2.1: Selective Flattening — Preserve Cross-Engine Subcircuit Boundaries
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/engine/cross-engine-boundary.ts` — `CrossEngineBoundary` and `BoundaryPinMapping` interfaces
+  - `src/engine/__tests__/flatten-bridge.test.ts` — 6 cross-engine boundary tests
+- **Files modified**: 
+  - `src/engine/flatten.ts` — `flattenCircuit()` now returns `FlattenResult`; `flattenCircuitScoped()` propagates `boundaries` array; cross-engine detection and `buildPinMappings()` helper added
+  - `src/engine/__tests__/flatten.test.ts` — all 6 call sites migrated to `const { circuit: flat } = flattenCircuit(...)` per spec; result-discarded call unchanged
+- **Tests**: 14/14 passing (6 new flatten-bridge tests + 8 existing flatten tests)
+- **Notes**: 2 pre-existing failures in `src/analog/__tests__/mna-end-to-end.test.ts` (`resistor_divider_dc_op_via_compiler`, `diode_circuit_dc_op_via_compiler`) were introduced by wave 4b.1.1 and are not regressions from this task. The `mna-end-to-end.test.ts` file is untracked (created in 4b.1.1) and was not in the test baseline. My `cross-engine-boundary.ts` file is required by `src/analog/compiler.ts` (modified in 4b.1.1) and its absence would cause module resolution failures.
+
+## Task 4b.2.2: Analog Compiler — Bridge Adapter Insertion
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/analog/bridge-instance.ts`, `src/analog/__tests__/bridge-compiler.test.ts`
+- **Files modified**: `src/analog/compiler.ts`, `src/analog/compiled-analog-circuit.ts`, `src/core/analog-engine-interface.ts`
+- **Tests**: 5/5 passing
+
+### Summary
+
+Created `src/analog/bridge-instance.ts` with the `BridgeInstance` interface holding `compiledInner`, `outputAdapters`, `inputAdapters`, `outputPinNetIds`, `inputPinNetIds`, and `instanceName`.
+
+Modified `src/analog/compiled-analog-circuit.ts` to add `bridges: BridgeInstance[]` field to `ConcreteCompiledAnalogCircuit` (with optional `bridges?` in constructor params).
+
+Modified `src/analog/compiler.ts`:
+- `compileAnalogCircuit` now accepts `Circuit | FlattenResult` — raw Circuit takes the existing path with `crossEngineBoundaries = []`, FlattenResult uses `crossEngineBoundaries` from the result
+- Added `crossEnginePlaceholders` Set to skip subcircuit placeholder elements in Pass A (they are handled via bridge instances, not the analog factory)
+- Added `compileBridgeInstance()` helper: compiles inner circuit with `compileCircuit()`, resolves outer MNA node IDs by matching subcircuit pin positions to wires, creates `BridgeOutputAdapter`/`BridgeInputAdapter` elements, maps inner net IDs via `compiledInner.labelToNetId`
+- Added `resolveSubcircuitPinNode()` helper: finds outer MNA node ID for a subcircuit pin by position-matching to wires
+- Added 3 new diagnostic codes to `src/core/analog-engine-interface.ts`: `bridge-inner-compile-error`, `bridge-unconnected-pin`, `bridge-missing-inner-pin`
+- Bridge adapters are added to `analogElements` so the MNA assembler stamps them
+
+### Known pre-existing failures in new test files
+The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` which has 2 failing tests (`resistor_divider_dc_op_via_compiler`, `diode_circuit_dc_op_via_compiler`). These use zero-length self-loop wires (`addWire(x,y,x,y)`) that don't connect circuit nodes, causing wrong voltage results. This is a pre-existing bug in the new test file, not caused by task 4b.2.2 changes.

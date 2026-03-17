@@ -29,6 +29,13 @@ import { ModelLibrary, validateModel } from "./model-library.js";
 import { defaultLogicFamily, getLogicFamilyPreset } from "../core/logic-family.js";
 import { resolvePinElectrical } from "../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
+import type { FlattenResult, SubcircuitHost } from "../engine/flatten.js";
+import type { CrossEngineBoundary } from "../engine/cross-engine-boundary.js";
+import type { BridgeInstance } from "./bridge-instance.js";
+import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
+import { compileCircuit } from "../engine/compiler.js";
+import type { CompiledCircuitImpl } from "../engine/compiled-circuit.js";
+import type { LogicFamilyConfig } from "../core/logic-family.js";
 
 // ---------------------------------------------------------------------------
 // Pin-to-node resolution helpers
@@ -203,16 +210,33 @@ function detectInductorLoops(
 /**
  * Compile an analog circuit into a `ConcreteCompiledAnalogCircuit`.
  *
- * @param circuit  - The visual Circuit model (must have engineType "analog")
- * @param registry - The component registry with analog ComponentDefinitions
+ * Accepts either a raw `Circuit` or a `FlattenResult` (from `flattenCircuit`).
+ * When a `FlattenResult` is provided, `crossEngineBoundaries` are processed to
+ * create bridge adapter elements and compile inner digital circuits. When a raw
+ * `Circuit` is provided, no cross-engine boundary processing is performed
+ * (equivalent to passing a FlattenResult with an empty boundaries list).
+ *
+ * @param circuitOrResult - The visual Circuit model or a FlattenResult
+ * @param registry        - The component registry with analog ComponentDefinitions
  * @returns A compiled circuit ready for MNA simulation
  * @throws Error if circuit.metadata.engineType !== "analog" or if a
  *         non-analog component is found in the circuit
  */
 export function compileAnalogCircuit(
-  circuit: Circuit,
+  circuitOrResult: Circuit | FlattenResult,
   registry: ComponentRegistry,
 ): ConcreteCompiledAnalogCircuit {
+  // Unwrap: accept either a raw Circuit or a FlattenResult
+  let circuit: Circuit;
+  let crossEngineBoundaries: CrossEngineBoundary[];
+  if ("crossEngineBoundaries" in circuitOrResult) {
+    circuit = circuitOrResult.circuit;
+    crossEngineBoundaries = circuitOrResult.crossEngineBoundaries;
+  } else {
+    circuit = circuitOrResult;
+    crossEngineBoundaries = [];
+  }
+
   // Step 1: Verify engine type
   if (circuit.metadata.engineType !== "analog") {
     throw new Error(
@@ -253,6 +277,13 @@ export function compileAnalogCircuit(
     }
   }
 
+  // Build a set of cross-engine placeholder elements so Pass A and Pass B can
+  // skip them. These elements are left in the flat circuit as opaque placeholders
+  // by the flattener — they must not be passed to the analog factory.
+  const crossEnginePlaceholders = new Set<CircuitElement>(
+    crossEngineBoundaries.map((b) => b.subcircuitElement as CircuitElement),
+  );
+
   // Step 3: Determine branch indices for voltage sources / inductors, and
   //         allocate internal nodes via getInternalNodeCount.
   //
@@ -276,6 +307,11 @@ export function compileAnalogCircuit(
   }> = [];
 
   for (const el of circuit.elements) {
+    // Skip cross-engine placeholder elements — they are handled via bridge instances.
+    if (crossEnginePlaceholders.has(el)) {
+      continue;
+    }
+
     // Ground elements do not need an analog factory — they are structural.
     if (el.typeId === "Ground" || el.typeId === "ground") {
       elementMeta.push({
@@ -618,7 +654,34 @@ export function compileAnalogCircuit(
     }
   }
 
-  // Step 7: Build and return ConcreteCompiledAnalogCircuit
+  // Step 7: Process cross-engine boundaries — compile inner digital circuits
+  //          and create bridge adapter elements.
+  const bridges: BridgeInstance[] = [];
+
+  for (const boundary of crossEngineBoundaries) {
+    const bridgeInstance = compileBridgeInstance(
+      boundary,
+      nodeMap.wireToNodeId,
+      circuit,
+      totalNodeCount,
+      circuitFamily,
+      registry,
+      diagnostics,
+    );
+    if (bridgeInstance !== null) {
+      // Add bridge adapters to the analog element list so the MNA assembler
+      // stamps them into the matrix.
+      for (const adapter of bridgeInstance.outputAdapters) {
+        analogElements.push(adapter);
+      }
+      for (const adapter of bridgeInstance.inputAdapters) {
+        analogElements.push(adapter);
+      }
+      bridges.push(bridgeInstance);
+    }
+  }
+
+  // Step 8: Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();
 
   return new ConcreteCompiledAnalogCircuit({
@@ -630,5 +693,158 @@ export function compileAnalogCircuit(
     models,
     elementToCircuitElement,
     diagnostics,
+    bridges,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Bridge instance compilation
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile one CrossEngineBoundary into a BridgeInstance.
+ *
+ * Steps:
+ *   1. Compile the inner circuit with the digital compiler.
+ *   2. For each BoundaryPinMapping, resolve the outer MNA node ID by matching
+ *      the subcircuit element's pin position to wires in the outer circuit.
+ *   3. Create BridgeOutputAdapter (for 'out' pins) or BridgeInputAdapter
+ *      (for 'in' pins) using the resolved electrical spec.
+ *   4. Map each adapter to its corresponding net ID in the inner compiled circuit.
+ *
+ * Returns null and emits diagnostics when compilation fails.
+ */
+function compileBridgeInstance(
+  boundary: CrossEngineBoundary,
+  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  outerCircuit: Circuit,
+  _totalNodeCount: number,
+  circuitFamily: LogicFamilyConfig,
+  registry: ComponentRegistry,
+  diagnostics: SolverDiagnostic[],
+): BridgeInstance | null {
+  // Step 1: Compile the inner digital circuit.
+  let compiledInner: CompiledCircuitImpl;
+  try {
+    compiledInner = compileCircuit(boundary.internalCircuit, registry);
+  } catch (err) {
+    diagnostics.push(
+      makeDiagnostic(
+        "bridge-inner-compile-error",
+        "error",
+        `Failed to compile inner circuit for bridge "${boundary.instanceName}": ${String(err)}`,
+        {},
+      ),
+    );
+    return null;
+  }
+
+  const outputAdapters: BridgeOutputAdapter[] = [];
+  const inputAdapters: BridgeInputAdapter[] = [];
+  const outputPinNetIds: number[] = [];
+  const inputPinNetIds: number[] = [];
+
+  // Step 2 & 3: For each pin mapping, resolve the outer node ID and create
+  //             the appropriate bridge adapter.
+  for (const mapping of boundary.pinMappings) {
+    // Resolve the outer MNA node ID for this pin by matching the subcircuit
+    // element's pin position to wires in the outer circuit.
+    const outerNodeId = resolveSubcircuitPinNode(
+      boundary.subcircuitElement,
+      mapping.pinLabel,
+      wireToNodeId,
+      outerCircuit,
+    );
+
+    if (outerNodeId < 0) {
+      // Pin not connected to any wire in the outer circuit — skip with diagnostic.
+      diagnostics.push(
+        makeDiagnostic(
+          "bridge-unconnected-pin",
+          "warning",
+          `Bridge pin "${mapping.pinLabel}" on "${boundary.instanceName}" is not connected in the outer circuit`,
+          {},
+        ),
+      );
+      continue;
+    }
+
+    // Resolve the inner net ID for this pin from the compiled inner circuit.
+    const innerNetId = compiledInner.labelToNetId.get(mapping.innerLabel) ?? -1;
+    if (innerNetId < 0) {
+      diagnostics.push(
+        makeDiagnostic(
+          "bridge-missing-inner-pin",
+          "warning",
+          `Bridge: inner circuit "${boundary.instanceName}" has no net for pin label "${mapping.innerLabel}"`,
+          {},
+        ),
+      );
+      continue;
+    }
+
+    // Resolve the pin electrical spec from the circuit logic family.
+    const spec = resolvePinElectrical(circuitFamily);
+
+    if (mapping.direction === "out") {
+      // Digital subcircuit output → drives analog net.
+      const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
+      adapter.label = `${boundary.instanceName}:${mapping.pinLabel}`;
+      outputAdapters.push(adapter);
+      outputPinNetIds.push(innerNetId);
+    } else {
+      // Analog net → feeds digital subcircuit input.
+      const adapter = makeBridgeInputAdapter(spec, outerNodeId);
+      adapter.label = `${boundary.instanceName}:${mapping.pinLabel}`;
+      inputAdapters.push(adapter);
+      inputPinNetIds.push(innerNetId);
+    }
+  }
+
+  return {
+    compiledInner,
+    outputAdapters,
+    inputAdapters,
+    outputPinNetIds,
+    inputPinNetIds,
+    instanceName: boundary.instanceName,
+  };
+}
+
+/**
+ * Resolve the outer MNA node ID for a subcircuit element's pin.
+ *
+ * Finds the pin on the subcircuit element whose label matches `pinLabel`,
+ * then finds a wire in the outer circuit whose endpoint touches the pin's
+ * position. Returns the wire's node ID, or -1 if no match found.
+ */
+function resolveSubcircuitPinNode(
+  subcircuitEl: SubcircuitHost,
+  pinLabel: string,
+  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  outerCircuit: Circuit,
+): number {
+  const pins = subcircuitEl.getPins();
+  let pinPos: { x: number; y: number } | undefined;
+  for (const pin of pins) {
+    if (pin.label === pinLabel) {
+      pinPos = pin.position;
+      break;
+    }
+  }
+  if (pinPos === undefined) return -1;
+
+  for (const wire of outerCircuit.wires) {
+    const matchStart =
+      Math.abs(wire.start.x - pinPos.x) < 0.5 &&
+      Math.abs(wire.start.y - pinPos.y) < 0.5;
+    const matchEnd =
+      Math.abs(wire.end.x - pinPos.x) < 0.5 &&
+      Math.abs(wire.end.y - pinPos.y) < 0.5;
+    if (matchStart || matchEnd) {
+      const nodeId = wireToNodeId.get(wire);
+      if (nodeId !== undefined) return nodeId;
+    }
+  }
+  return -1;
 }

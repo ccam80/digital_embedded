@@ -11,6 +11,7 @@ import type { CompiledAnalogCircuit, SolverDiagnostic } from "../core/analog-eng
 import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./element.js";
+import type { BridgeInstance } from "./bridge-instance.js";
 
 // ---------------------------------------------------------------------------
 // DeviceModel — placeholder for Phase 2 .MODEL support
@@ -79,6 +80,16 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
+  /**
+   * Bridge instances for cross-engine subcircuits found during compilation.
+   *
+   * Each entry corresponds to one CrossEngineBoundary in the FlattenResult.
+   * The MixedSignalCoordinator reads this list during MNAEngine.init() to
+   * create DigitalEngine instances and synchronize signal values at each
+   * analog timestep. Empty when no mixed-signal subcircuits are present.
+   */
+  readonly bridges: BridgeInstance[];
+
   constructor(params: {
     nodeCount: number;
     branchCount: number;
@@ -88,6 +99,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     models: Map<string, DeviceModel>;
     elementToCircuitElement: Map<number, CircuitElement>;
     diagnostics?: SolverDiagnostic[];
+    bridges?: BridgeInstance[];
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -98,6 +110,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.models = params.models;
     this.elementToCircuitElement = params.elementToCircuitElement;
     this.diagnostics = params.diagnostics ?? [];
+    this.bridges = params.bridges ?? [];
   }
 
   // CompiledCircuit base interface
