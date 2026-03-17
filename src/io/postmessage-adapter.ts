@@ -12,7 +12,7 @@
  * Parent → Simulator message types:
  *   digital-load-url      — fetch URL then loadDig
  *   digital-load-data     — base64-decode then loadDig
- *   digital-load-json     — deserializeDigb then load circuit + subcircuits
+ *   digital-load-json     — deserializeDts then load circuit + subcircuits
  *   digital-set-input     — set input signal by label
  *   digital-step          — single propagation step
  *   digital-run-tests     — run test vectors, optional testData override
@@ -35,7 +35,7 @@ import type { SimulatorFacade } from '../headless/facade.js';
 import type { EditorBinding } from '../integration/editor-binding.js';
 import type { FileResolver } from './file-resolver.js';
 import { CacheResolver, ChainResolver, HttpResolver } from './file-resolver.js';
-import { deserializeDigb } from './digb-deserializer.js';
+import { deserializeDts } from './dts-deserializer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
@@ -127,7 +127,7 @@ export interface PostMessageAdapterOptions {
   binding: EditorBinding;
   /** The FileResolver to use for subcircuit lookups. */
   resolver: FileResolver;
-  /** The ComponentRegistry for deserializing .digb documents. */
+  /** The ComponentRegistry for deserializing .dts documents. */
   registry: ComponentRegistry;
   /**
    * The postMessage target used for outgoing responses.
@@ -264,7 +264,7 @@ export class PostMessageAdapter {
   }
 
   private _handleLoadJson(msg: LoadJsonMessage): void {
-    const { circuit } = deserializeDigb(msg.data, this._registry);
+    const { circuit } = deserializeDts(msg.data, this._registry);
     this._circuit = circuit;
     this._engine = this._facade.compile(circuit);
     this._post({ type: 'digital-loaded' });

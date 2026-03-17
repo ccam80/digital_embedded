@@ -11,6 +11,7 @@ import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElement } from "../analog/element.js";
 import type { DeviceType } from "../analog/model-parser.js";
+import type { PinElectricalSpec } from "./pin-electrical.js";
 
 // ---------------------------------------------------------------------------
 // ComponentCategory
@@ -249,6 +250,36 @@ export interface ComponentDefinition {
    * Not set on non-semiconductor components (resistors, capacitors, etc.).
    */
   analogDeviceType?: DeviceType;
+  /**
+   * Component-level electrical override applied to all pins of this component type.
+   *
+   * Fields present here take priority over the circuit-level logic family defaults
+   * but yield to per-pin overrides in pinElectricalOverrides. Most digital
+   * components omit this entirely and inherit from the circuit logic family.
+   */
+  pinElectrical?: PinElectricalSpec;
+  /**
+   * Per-pin electrical overrides keyed by pin label (e.g. "Q", "out").
+   *
+   * Each entry overrides specific fields for that pin only, taking priority
+   * over both pinElectrical and the circuit-level logic family defaults.
+   * Used for pins with unusual drive characteristics (open-drain, Schmitt
+   * trigger inputs, high-current drivers).
+   */
+  pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+  /**
+   * Available simulation modes for this component.
+   *
+   * Gates and sequential components with analogFactory declare
+   * ['digital', 'behavioral']. Components with transistor-level models
+   * additionally include 'transistor'. Digital-only components omit this.
+   */
+  simulationModes?: ('digital' | 'behavioral' | 'transistor')[];
+  /**
+   * Name of a registered subcircuit for transistor-level expansion.
+   * Populated in Phase 4c; field added here for forward declaration.
+   */
+  transistorModel?: string;
 }
 
 // ---------------------------------------------------------------------------

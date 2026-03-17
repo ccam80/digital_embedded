@@ -1,12 +1,11 @@
 /**
  * Tests for .dts format schema, serializer, and deserializer.
- * Imports via the digb-* re-export shims to verify the re-export layer works.
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateDigbDocument } from '../digb-schema.js';
-import { serializeCircuit, serializeWithSubcircuits } from '../digb-serializer.js';
-import { deserializeDigb } from '../digb-deserializer.js';
+import { validateDtsDocument } from '../dts-schema.js';
+import { serializeCircuit, serializeWithSubcircuits } from '../dts-serializer.js';
+import { deserializeDts } from '../dts-deserializer.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
@@ -65,42 +64,51 @@ function makeRegistry(...typeNames: string[]): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// validate::validDocument
+// Validation
 // ---------------------------------------------------------------------------
 
-describe('validate', () => {
-  it('validDocument', () => {
+describe('Validation', () => {
+  it('accepts_format_dts', () => {
     const doc = {
       format: 'dts',
       version: 1,
-      circuit: {
-        name: 'Test',
-        elements: [],
-        wires: [],
-      },
+      circuit: { name: 'Test', elements: [], wires: [] },
     };
-    expect(() => validateDigbDocument(doc)).not.toThrow();
-    const result = validateDigbDocument(doc);
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
     expect(result.format).toBe('dts');
     expect(result.version).toBe(1);
     expect(result.circuit.name).toBe('Test');
   });
 
-  // -------------------------------------------------------------------------
-  // validate::missingFormat
-  // -------------------------------------------------------------------------
+  it('accepts_legacy_format_digb', () => {
+    const doc = {
+      format: 'digb',
+      version: 1,
+      circuit: { name: 'Legacy', elements: [], wires: [] },
+    };
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
+    // Normalized to 'dts'
+    expect(result.format).toBe('dts');
+  });
+
+  it('rejects_unknown_format', () => {
+    const doc = {
+      format: 'foo',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/"format" must be "dts"/);
+  });
 
   it('missingFormat', () => {
     const doc = {
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
     };
-    expect(() => validateDigbDocument(doc)).toThrow(/missing.*"format"/i);
+    expect(() => validateDtsDocument(doc)).toThrow(/missing.*"format"/i);
   });
-
-  // -------------------------------------------------------------------------
-  // validate::wrongVersion
-  // -------------------------------------------------------------------------
 
   it('wrongVersion', () => {
     const doc = {
@@ -108,28 +116,24 @@ describe('validate', () => {
       version: 99,
       circuit: { name: 'Test', elements: [], wires: [] },
     };
-    expect(() => validateDigbDocument(doc)).toThrow(/unsupported version/i);
+    expect(() => validateDtsDocument(doc)).toThrow(/unsupported version/i);
   });
-
-  // -------------------------------------------------------------------------
-  // validate::missingCircuit
-  // -------------------------------------------------------------------------
 
   it('missingCircuit', () => {
     const doc = {
       format: 'dts',
       version: 1,
     };
-    expect(() => validateDigbDocument(doc)).toThrow(/missing.*"circuit"/i);
+    expect(() => validateDtsDocument(doc)).toThrow(/missing.*"circuit"/i);
   });
 });
 
 // ---------------------------------------------------------------------------
-// serialize::roundTrip
+// Serialization
 // ---------------------------------------------------------------------------
 
-describe('serialize', () => {
-  it('roundTrip', () => {
+describe('Serialization', () => {
+  it('round_trip_dts', () => {
     const registry = makeRegistry('In', 'Out');
 
     const circuit = new Circuit({ name: 'RoundTrip' });
@@ -137,16 +141,18 @@ describe('serialize', () => {
     circuit.addElement(makeElement('Out', 'id-2', 300, 200));
     circuit.addWire(new Wire({ x: 120, y: 200 }, { x: 280, y: 200 }));
 
-    const json1 = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDigb(json1, registry);
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+
+    // New documents must have format: 'dts'
+    expect(parsed['format']).toBe('dts');
+
+    const { circuit: restored } = deserializeDts(json, registry);
     const json2 = serializeCircuit(restored);
 
-    expect(json1).toBe(json2);
+    expect(json).toBe(json2);
+    expect(restored.metadata.name).toBe('RoundTrip');
   });
-
-  // -------------------------------------------------------------------------
-  // serialize::withSubcircuits
-  // -------------------------------------------------------------------------
 
   it('withSubcircuits', () => {
     const registry = makeRegistry('And', 'In', 'Out');
@@ -166,7 +172,7 @@ describe('serialize', () => {
     ]);
 
     const json = serializeWithSubcircuits(main, subcircuits);
-    const { circuit: restoredMain, subcircuits: restoredSubs } = deserializeDigb(json, registry);
+    const { circuit: restoredMain, subcircuits: restoredSubs } = deserializeDts(json, registry);
 
     expect(restoredMain.metadata.name).toBe('Main');
     expect(restoredSubs.size).toBe(2);
@@ -176,10 +182,6 @@ describe('serialize', () => {
     expect(restoredSubs.get('Sub2')!.metadata.name).toBe('Sub2');
   });
 
-  // -------------------------------------------------------------------------
-  // serialize::noSubcircuits
-  // -------------------------------------------------------------------------
-
   it('noSubcircuits', () => {
     const circuit = new Circuit({ name: 'Standalone' });
     const json = serializeCircuit(circuit);
@@ -187,10 +189,6 @@ describe('serialize', () => {
 
     expect('subcircuitDefinitions' in parsed).toBe(false);
   });
-
-  // -------------------------------------------------------------------------
-  // serialize::preservesAllFields
-  // -------------------------------------------------------------------------
 
   it('preservesAllFields', () => {
     const registry = makeRegistry('ROM');
@@ -211,7 +209,7 @@ describe('serialize', () => {
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 10 }));
 
     const json = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDigb(json, registry);
+    const { circuit: restored } = deserializeDts(json, registry);
 
     expect(restored.metadata.name).toBe('Full');
     expect(restored.metadata.description).toBe('A circuit with all fields');

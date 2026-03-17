@@ -1,5 +1,5 @@
 /**
- * FSM serialization for embedding in .digb documents.
+ * FSM serialization for embedding in .dts documents.
  *
  * `serializeFSM` converts an FSM model to a plain JSON-compatible object.
  * `deserializeFSM` reconstructs an FSM from that object.
@@ -11,7 +11,7 @@ import type { FSM, FSMState, FSMTransition } from './model';
 // Serialization
 // ---------------------------------------------------------------------------
 
-/** Serialize an FSM to a plain JSON-compatible object for .digb embedding. */
+/** Serialize an FSM to a plain JSON-compatible object for .dts embedding. */
 export function serializeFSM(fsm: FSM): object {
   return {
     name: fsm.name,
@@ -50,7 +50,7 @@ function serializeTransition(t: FSMTransition): object {
 // Deserialization
 // ---------------------------------------------------------------------------
 
-/** Deserialize an FSM from a plain object (as stored in .digb). */
+/** Deserialize an FSM from a plain object (as stored in .dts). */
 export function deserializeFSM(data: unknown): FSM {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
     throw new Error('Invalid FSM data: expected an object');

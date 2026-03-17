@@ -4,11 +4,18 @@
  * Consumes the engine-agnostic RenderContext and the optional WireSignalAccess
  * bridge. When no engine is connected every wire is drawn in the neutral WIRE
  * colour. When an engine is connected colours reflect the live signal state.
+ *
+ * Analog wires with voltage data use a continuous gradient (red → gray → green)
+ * computed from a VoltageRangeTracker. The gradient path calls setRawColor()
+ * instead of setColor(), bypassing the ThemeColor lookup entirely.
  */
 
-import type { RenderContext } from "@/core/renderer-interface";
+import type { RenderContext, ColorScheme } from "@/core/renderer-interface";
+import { defaultColorScheme } from "@/core/renderer-interface";
 import type { Wire } from "@/core/circuit";
 import type { WireSignalAccess } from "./wire-signal-access";
+import type { VoltageRangeTracker } from "./voltage-range";
+import { interpolateColor } from "./color-interpolation";
 
 /** Radius (in grid units) of a junction dot. */
 const JUNCTION_RADIUS = 0.15;
@@ -16,15 +23,41 @@ const JUNCTION_RADIUS = 0.15;
 /** Line width for single-bit wires. */
 const WIRE_WIDTH_SINGLE = 1;
 
+/** Line width for analog wires — thicker than digital to make gradient visible. */
+const WIRE_WIDTH_ANALOG = 2;
+
 /** Line width for bus wires (width > 1). */
 const WIRE_WIDTH_BUS = 3;
 
 export class WireRenderer {
+  private _colorScheme: ColorScheme = defaultColorScheme;
+  private _voltageTracker: VoltageRangeTracker | null = null;
+
+  /**
+   * Set the active color scheme. Used to resolve voltage gradient endpoint colors.
+   *
+   * @param scheme - The color scheme to use for theme color resolution.
+   */
+  setColorScheme(scheme: ColorScheme): void {
+    this._colorScheme = scheme;
+  }
+
+  /**
+   * Set the voltage range tracker used for analog gradient coloring.
+   * When null (default), analog wires fall back to the WIRE_ANALOG theme color.
+   *
+   * @param tracker - Active VoltageRangeTracker, or null to disable gradient.
+   */
+  setVoltageTracker(tracker: VoltageRangeTracker | null): void {
+    this._voltageTracker = tracker;
+  }
+
   /**
    * Draw all wire segments.
    *
    * For each wire the colour is determined from the signal state when a
    * WireSignalAccess is provided. Bus wires (width > 1) are drawn thicker.
+   * Analog wires with a voltage tracker use a continuous gradient via setRawColor().
    * Selected wires receive a SELECTION colour overlay drawn after the signal
    * colour so they remain visible.
    */
@@ -38,13 +71,24 @@ export class WireRenderer {
       const value = signalAccess?.getWireValue(wire);
       const isAnalog = value !== undefined && "voltage" in value;
       const isBus = !isAnalog && ((value !== undefined && "width" in value && value.width > 1) || wire.bitWidth > 1);
-      const lineWidth = isBus ? WIRE_WIDTH_BUS : WIRE_WIDTH_SINGLE;
+
+      let lineWidth: number;
+      if (isAnalog) {
+        lineWidth = WIRE_WIDTH_ANALOG;
+      } else if (isBus) {
+        lineWidth = WIRE_WIDTH_BUS;
+      } else {
+        lineWidth = WIRE_WIDTH_SINGLE;
+      }
 
       ctx.save();
       ctx.setLineWidth(lineWidth);
 
       if (selection.has(wire)) {
         ctx.setColor("SELECTION");
+      } else if (isAnalog && this._voltageTracker !== null && ctx.setRawColor !== undefined) {
+        const cssColor = this._analogVoltageColor((value as { voltage: number }).voltage);
+        ctx.setRawColor(cssColor);
       } else {
         ctx.setColor(this._colorForValue(value));
       }
@@ -156,6 +200,34 @@ export class WireRenderer {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Compute a CSS color string for an analog wire based on its voltage.
+   *
+   * Queries the VoltageRangeTracker for the normalized voltage (0–1), then
+   * interpolates between the theme's endpoint colors:
+   *   normalized < 0.5: WIRE_VOLTAGE_NEG → WIRE_VOLTAGE_GND
+   *   normalized > 0.5: WIRE_VOLTAGE_GND → WIRE_VOLTAGE_POS
+   *   normalized === 0.5: WIRE_VOLTAGE_GND
+   */
+  private _analogVoltageColor(voltage: number): string {
+    const tracker = this._voltageTracker!;
+    const normalized = tracker.normalize(voltage);
+
+    const posColor = this._colorScheme.resolve("WIRE_VOLTAGE_POS");
+    const negColor = this._colorScheme.resolve("WIRE_VOLTAGE_NEG");
+    const gndColor = this._colorScheme.resolve("WIRE_VOLTAGE_GND");
+
+    if (normalized < 0.5) {
+      const t = normalized / 0.5;
+      return interpolateColor(negColor, gndColor, t);
+    } else if (normalized > 0.5) {
+      const t = (normalized - 0.5) / 0.5;
+      return interpolateColor(gndColor, posColor, t);
+    } else {
+      return interpolateColor(gndColor, gndColor, 0);
+    }
+  }
 
   private _colorForValue(
     value: { raw: number; width: number } | { voltage: number } | undefined,

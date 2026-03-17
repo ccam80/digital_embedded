@@ -8,7 +8,7 @@
  * relativeTo path, and returns the .dig XML string content.
  *
  * Implementations:
- *   EmbeddedResolver — checks subcircuitDefinitions from a .digb document
+ *   EmbeddedResolver — checks subcircuitDefinitions from a .dts document
  *   CacheResolver    — checks already-loaded definitions (in-memory Map)
  *   HttpResolver     — fetches ${basePath}/${name}.dig via HTTP
  *   NodeResolver     — reads from filesystem (Node.js only)
@@ -55,7 +55,7 @@ export class ResolverNotFoundError extends Error {
 /**
  * Resolves subcircuit names from a pre-loaded embedded map.
  *
- * Used for .digb documents that bundle all subcircuit definitions inline.
+ * Used for .dts documents that bundle all subcircuit definitions inline.
  * The map key is the circuit name, the value is the .dig XML string.
  */
 export class EmbeddedResolver implements FileResolver {

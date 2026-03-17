@@ -9,6 +9,7 @@
 import type { Point } from "./renderer-interface.js";
 import type { Pin } from "./pin.js";
 import type { CircuitElement } from "./element.js";
+import type { LogicFamilyConfig } from "./logic-family.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -121,6 +122,11 @@ export interface CircuitMetadata {
   customShape?: CustomShapeData;
   /** Simulation engine type. Defaults to "digital" for backward compatibility. */
   engineType: EngineType;
+  /**
+   * Logic family configuration for this circuit.
+   * When absent, defaultLogicFamily() (CMOS 3.3V) is used by the analog engine.
+   */
+  logicFamily?: LogicFamilyConfig;
 }
 
 export function defaultCircuitMetadata(): CircuitMetadata {

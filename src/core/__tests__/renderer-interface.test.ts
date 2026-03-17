@@ -45,6 +45,9 @@ describe("THEME_COLORS", () => {
       "WIRE_ERROR",
       "WIRE_UNDEFINED",
       "WIRE_ANALOG",
+      "WIRE_VOLTAGE_POS",
+      "WIRE_VOLTAGE_NEG",
+      "WIRE_VOLTAGE_GND",
       "COMPONENT",
       "COMPONENT_FILL",
       "PIN",
@@ -58,8 +61,8 @@ describe("THEME_COLORS", () => {
     }
   });
 
-  it("has exactly 14 entries", () => {
-    expect(THEME_COLORS).toHaveLength(14);
+  it("has exactly 17 entries", () => {
+    expect(THEME_COLORS).toHaveLength(17);
   });
 
   it("contains no duplicates", () => {

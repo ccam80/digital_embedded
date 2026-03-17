@@ -46,7 +46,7 @@ import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolv
 import { deserializeCircuit } from '../io/load.js';
 import { serializeCircuit } from '../io/save.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
-import { deserializeDigb } from '../io/digb-deserializer.js';
+import { deserializeDts } from '../io/dts-deserializer.js';
 import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
 import { compileCircuit } from '../engine/compiler.js';
@@ -1994,10 +1994,10 @@ export function initApp(search?: string): void {
         let loaded: Circuit;
         const firstChar = text.replace(/^\s+/, '').charAt(0);
         if (firstChar === '{' || firstChar === '[') {
-          // JSON — distinguish .digb format from legacy .digj
+          // JSON — distinguish .dts format from legacy .digj
           const parsed = JSON.parse(text);
-          if (parsed.format === 'digb') {
-            const result = deserializeDigb(text, registry);
+          if (parsed.format === 'dts' || parsed.format === 'digb') {
+            const result = deserializeDts(text, registry);
             loaded = result.circuit;
           } else {
             loaded = deserializeCircuit(text, registry);

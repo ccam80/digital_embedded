@@ -211,16 +211,22 @@
       "type": "file"
     },
     {
+      "path": "",
+      "accessCount": 63,
+      "lastAccessed": 1773773704599,
+      "type": "directory"
+    },
+    {
       "path": "spec\\phase-1-mna-engine-core.md",
       "accessCount": 60,
       "lastAccessed": 1773752317732,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 55,
-      "lastAccessed": 1773755771875,
-      "type": "directory"
+      "path": "src\\core\\registry.ts",
+      "accessCount": 45,
+      "lastAccessed": 1773774374717,
+      "type": "file"
     },
     {
       "path": "spec\\phase-5-tier-2-components.md",
@@ -229,15 +235,15 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 41,
-      "lastAccessed": 1773756466705,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 43,
+      "lastAccessed": 1773773578626,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 39,
-      "lastAccessed": 1773756405920,
+      "path": "spec\\phase-3-analog-ui-features.md",
+      "accessCount": 34,
+      "lastAccessed": 1773773579003,
       "type": "file"
     },
     {
@@ -247,27 +253,21 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-3-analog-ui-features.md",
+      "path": "src\\app\\app-init.ts",
       "accessCount": 30,
-      "lastAccessed": 1773744669502,
+      "lastAccessed": 1773773956377,
       "type": "file"
     },
     {
       "path": "spec\\phase-4a-digital-analog-interface.md",
-      "accessCount": 26,
-      "lastAccessed": 1773744682496,
-      "type": "file"
-    },
-    {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 24,
-      "lastAccessed": 1773752412143,
+      "accessCount": 28,
+      "lastAccessed": 1773773583975,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 21,
-      "lastAccessed": 1773753302345,
+      "accessCount": 24,
+      "lastAccessed": 1773773576187,
       "type": "file"
     },
     {
@@ -290,8 +290,20 @@
     },
     {
       "path": "src",
-      "accessCount": 14,
-      "lastAccessed": 1773748872504,
+      "accessCount": 15,
+      "lastAccessed": 1773773617992,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\engine-interface.ts",
+      "accessCount": 15,
+      "lastAccessed": 1773773750169,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 15,
+      "lastAccessed": 1773774252089,
       "type": "directory"
     },
     {
@@ -301,27 +313,21 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\engine-interface.ts",
-      "accessCount": 12,
-      "lastAccessed": 1773751543520,
-      "type": "file"
-    },
-    {
       "path": "spec\\author_instructions.md",
       "accessCount": 11,
       "lastAccessed": 1773746718732,
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 11,
-      "lastAccessed": 1773751515692,
-      "type": "directory"
-    },
-    {
       "path": "spec\\.context\\review-spec.md",
       "accessCount": 9,
       "lastAccessed": 1773740990489,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773773776572,
       "type": "file"
     },
     {
@@ -331,21 +337,45 @@
       "type": "file"
     },
     {
+      "path": "simulator.html",
+      "accessCount": 7,
+      "lastAccessed": 1773773916891,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\postmessage-adapter.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773773811873,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fsm\\fsm-serializer.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773773955333,
+      "type": "directory"
+    },
+    {
       "path": "spec\\reviews\\spec-review-combined.md",
       "accessCount": 5,
       "lastAccessed": 1773741747966,
       "type": "file"
     },
     {
-      "path": "simulator.html",
+      "path": "src\\editor\\wire-renderer.ts",
       "accessCount": 5,
-      "lastAccessed": 1773747694103,
-      "type": "directory"
+      "lastAccessed": 1773773880441,
+      "type": "file"
     },
     {
       "path": "spec",
       "accessCount": 4,
       "lastAccessed": 1773744551246,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\file-resolver.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773773814158,
       "type": "directory"
     },
     {
@@ -362,8 +392,14 @@
     },
     {
       "path": "src\\editor\\wire-signal-access.ts",
-      "accessCount": 2,
-      "lastAccessed": 1773741051814,
+      "accessCount": 3,
+      "lastAccessed": 1773773582923,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\digb-schema.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773773836744,
       "type": "file"
     },
     {
@@ -409,12 +445,6 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 2,
-      "lastAccessed": 1773746881465,
-      "type": "file"
-    },
-    {
       "path": "src\\editor\\palette.ts",
       "accessCount": 2,
       "lastAccessed": 1773747296375,
@@ -430,18 +460,6 @@
       "path": "src\\components\\gates\\and.ts",
       "accessCount": 2,
       "lastAccessed": 1773752440530,
-      "type": "file"
-    },
-    {
-      "path": "src\\io\\digb-schema.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741022057,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\wire-renderer.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741022401,
       "type": "file"
     },
     {
@@ -472,24 +490,6 @@
       "path": "src\\io",
       "accessCount": 1,
       "lastAccessed": 1773741074629,
-      "type": "directory"
-    },
-    {
-      "path": "src\\io\\file-resolver.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741099965,
-      "type": "directory"
-    },
-    {
-      "path": "src\\fsm\\fsm-serializer.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741119893,
-      "type": "directory"
-    },
-    {
-      "path": "src\\io\\postmessage-adapter.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741123567,
       "type": "directory"
     },
     {
