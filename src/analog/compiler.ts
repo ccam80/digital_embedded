@@ -25,6 +25,7 @@ import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
 } from "./compiled-analog-circuit.js";
+import { ModelLibrary, validateModel } from "./model-library.js";
 
 // ---------------------------------------------------------------------------
 // Pin-to-node resolution helpers
@@ -223,6 +224,25 @@ export function compileAnalogCircuit(
   // Collect all diagnostics from compilation
   const diagnostics: SolverDiagnostic[] = [...nodeMap.diagnostics];
 
+  // Model library: starts empty; populated from circuit.metadata.models when present
+  const modelLibrary = new ModelLibrary();
+  if ((circuit.metadata as Record<string, unknown>)["models"] instanceof Map) {
+    const circuitModels = (circuit.metadata as Record<string, unknown>)["models"] as Map<string, DeviceModel>;
+    for (const model of circuitModels.values()) {
+      // Convert DeviceModel (which uses Map<string,number>) to the model-library format
+      const params: Record<string, number> =
+        model.params instanceof Map
+          ? Object.fromEntries(model.params.entries())
+          : (model.params as unknown as Record<string, number>);
+      modelLibrary.add({
+        name: model.name,
+        type: model.type as import("./model-parser.js").DeviceType,
+        level: 1,
+        params,
+      });
+    }
+  }
+
   // Step 3: Determine branch indices for voltage sources / inductors, and
   //         allocate internal nodes via getInternalNodeCount.
   //
@@ -358,8 +378,24 @@ export function compileAnalogCircuit(
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
+    // Model binding: semiconductor components get resolved model parameters
+    // injected into the props bag under '_modelParams' before factory call.
+    let resolvedProps = props;
+    if (def.analogDeviceType !== undefined) {
+      const modelName = typeof props["model"] === "string" ? props["model"] as string : "";
+      const resolvedModel =
+        (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
+        modelLibrary.getDefault(def.analogDeviceType);
+
+      // Emit diagnostics for any issues with the resolved model
+      const modelDiags = validateModel(resolvedModel);
+      diagnostics.push(...modelDiags);
+
+      resolvedProps = { ...props, _modelParams: resolvedModel.params };
+    }
+
     // Call the analog factory
-    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, props, getTime);
+    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, resolvedProps, getTime);
 
     const elementIndex = analogElements.length;
     analogElements.push(element);

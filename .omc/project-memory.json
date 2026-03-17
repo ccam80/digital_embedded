@@ -212,8 +212,8 @@
     },
     {
       "path": "spec\\phase-2-tier-1-components.md",
-      "accessCount": 47,
-      "lastAccessed": 1773752930362,
+      "accessCount": 51,
+      "lastAccessed": 1773754109803,
       "type": "file"
     },
     {
@@ -224,9 +224,15 @@
     },
     {
       "path": "",
-      "accessCount": 35,
-      "lastAccessed": 1773752426883,
+      "accessCount": 36,
+      "lastAccessed": 1773753311590,
       "type": "directory"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 33,
+      "lastAccessed": 1773753294071,
+      "type": "file"
     },
     {
       "path": "spec\\phase-6-tier-3-and-polish.md",
@@ -235,9 +241,9 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 32,
-      "lastAccessed": 1773752385551,
+      "path": "src\\core\\registry.ts",
+      "accessCount": 31,
+      "lastAccessed": 1773753961092,
       "type": "file"
     },
     {
@@ -253,12 +259,6 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 26,
-      "lastAccessed": 1773752631556,
-      "type": "file"
-    },
-    {
       "path": "src\\app\\app-init.ts",
       "accessCount": 24,
       "lastAccessed": 1773752412143,
@@ -266,8 +266,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 20,
-      "lastAccessed": 1773752385635,
+      "accessCount": 21,
+      "lastAccessed": 1773753302345,
       "type": "file"
     },
     {

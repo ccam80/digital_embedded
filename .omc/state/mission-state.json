@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-17T13:09:30.814Z",
+  "updatedAt": "2026-03-17T13:29:12.041Z",
   "missions": [
     {
       "id": "session:21c4cbb9-908b-4260-be26-2718be466e7d:none",
@@ -2041,15 +2041,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-03-17T11:25:12.781Z",
-      "updatedAt": "2026-03-17T13:09:30.814Z",
+      "updatedAt": "2026-03-17T13:29:12.041Z",
       "status": "running",
-      "workerCount": 25,
+      "workerCount": 26,
       "taskCounts": {
-        "total": 25,
+        "total": 26,
         "pending": 0,
         "blocked": 0,
         "inProgress": 1,
-        "completed": 24,
+        "completed": 25,
         "failed": 0
       },
       "agents": [
@@ -2302,49 +2302,19 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-03-17T13:09:30.814Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a6b42e6",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a6b42e61dc915a7c2",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-17T13:29:12.041Z"
         }
       ],
       "timeline": [
-        {
-          "id": "session-start:aee91784be7304c9d:2026-03-17T12:59:26.914Z",
-          "at": "2026-03-17T12:59:26.914Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:aee9178",
-          "detail": "started claude-orchestrator:implementer:aee9178",
-          "sourceKey": "session-start:aee91784be7304c9d"
-        },
-        {
-          "id": "session-start:a8c6a9317a233b4c9:2026-03-17T12:59:37.484Z",
-          "at": "2026-03-17T12:59:37.484Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:a8c6a93",
-          "detail": "started claude-orchestrator:implementer:a8c6a93",
-          "sourceKey": "session-start:a8c6a9317a233b4c9"
-        },
-        {
-          "id": "session-start:a1a9652b42b6610ee:2026-03-17T12:59:40.300Z",
-          "at": "2026-03-17T12:59:40.300Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:a1a9652",
-          "detail": "started claude-orchestrator:implementer:a1a9652",
-          "sourceKey": "session-start:a1a9652b42b6610ee"
-        },
-        {
-          "id": "session-stop:a83e64c7cb72e9eb3:2026-03-17T13:02:20.009Z",
-          "at": "2026-03-17T13:02:20.009Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:reviewer:a83e64c",
-          "detail": "completed",
-          "sourceKey": "session-stop:a83e64c7cb72e9eb3"
-        },
-        {
-          "id": "session-stop:ae739caa46eb4fdae:2026-03-17T13:02:30.059Z",
-          "at": "2026-03-17T13:02:30.059Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:ae739ca",
-          "detail": "completed",
-          "sourceKey": "session-stop:ae739caa46eb4fdae"
-        },
         {
           "id": "session-stop:aee91784be7304c9d:2026-03-17T13:08:49.287Z",
           "at": "2026-03-17T13:08:49.287Z",
@@ -2360,6 +2330,22 @@
           "agent": "claude-orchestrator:implementer:a1a9652",
           "detail": "completed",
           "sourceKey": "session-stop:a1a9652b42b6610ee"
+        },
+        {
+          "id": "session-start:a6b42e61dc915a7c2:2026-03-17T13:14:46.881Z",
+          "at": "2026-03-17T13:14:46.881Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:implementer:a6b42e6",
+          "detail": "started claude-orchestrator:implementer:a6b42e6",
+          "sourceKey": "session-start:a6b42e61dc915a7c2"
+        },
+        {
+          "id": "session-stop:a6b42e61dc915a7c2:2026-03-17T13:29:12.041Z",
+          "at": "2026-03-17T13:29:12.041Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a6b42e6",
+          "detail": "completed",
+          "sourceKey": "session-stop:a6b42e61dc915a7c2"
         }
       ]
     }

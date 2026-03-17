@@ -88,7 +88,9 @@ export type SolverDiagnosticCode =
   | "label-collision"
   | "combinational-loop"
   | "missing-property"
-  | "unknown-component";
+  | "unknown-component"
+  | "model-param-ignored"
+  | "model-level-unsupported";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

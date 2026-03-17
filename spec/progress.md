@@ -498,3 +498,24 @@
   - `src/components/passives/__tests__/resistor.test.ts` — added Integration::voltage_divider_dc_op test (10V source → 1kΩ → 2kΩ → ground; verifies V(junction)=6.667V ±1e-4, V(source)=10V, I=3.333mA ±1e-6). Linter also merged in 5 resistor unit tests from Task 2.1.2.
 - **Tests**: 17/17 passing (8 voltage source + 8 current source + 1 integration)
 - **Notes**: Full test suite shows no regressions. fixture-audit failures (5) are pre-existing. sparse-solver performance_50_node flakes under full-suite load (passes in isolation) — pre-existing flakiness unrelated to these changes.
+
+## Task 2.3.1: .MODEL Text Parser
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/model-parser.ts, src/analog/__tests__/model-parser.test.ts
+- **Files modified**: none
+- **Tests**: 13/13 passing
+
+## Task 2.3.2: Model Library + Built-in Defaults
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/model-defaults.ts, src/analog/model-library.ts, src/analog/__tests__/model-library.test.ts
+- **Files modified**: src/core/analog-engine-interface.ts (added model-param-ignored and model-level-unsupported to SolverDiagnosticCode union)
+- **Tests**: 17/17 passing
+
+## Task 2.3.3: Component ↔ Model Binding + Diagnostics
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/model-binding.test.ts
+- **Files modified**: src/analog/compiler.ts (model library instantiation + model binding in analogFactory call), src/core/registry.ts (added analogDeviceType field to ComponentDefinition + DeviceType import)
+- **Tests**: 8/8 passing

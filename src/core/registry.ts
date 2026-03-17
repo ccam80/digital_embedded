@@ -10,6 +10,7 @@ import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElement } from "../analog/element.js";
+import type { DeviceType } from "../analog/model-parser.js";
 
 // ---------------------------------------------------------------------------
 // ComponentCategory
@@ -236,6 +237,18 @@ export interface ComponentDefinition {
    * Defaults to 0 when not implemented.
    */
   getInternalNodeCount?: (props: PropertyBag) => number;
+
+  /**
+   * SPICE device type for semiconductor components.
+   *
+   * When set, the analog compiler performs model binding: it looks up the
+   * model name from the component's `model` property (or falls back to the
+   * built-in default for this device type) and passes the resolved parameters
+   * to `analogFactory` in `props._modelParams`.
+   *
+   * Not set on non-semiconductor components (resistors, capacitors, etc.).
+   */
+  analogDeviceType?: DeviceType;
 }
 
 // ---------------------------------------------------------------------------
