@@ -189,8 +189,9 @@ export class SimulationRunner {
           `Label "${label}" not found in compiled analog circuit. Available labels: ${available || "(none)"}`,
         );
       }
-      record.engine.getNodeVoltage(nodeId);
-      return;
+      throw new FacadeError(
+        "Setting analog node voltages is not yet supported",
+      );
     }
 
     const netId = this._resolveLabel(engine, label);
