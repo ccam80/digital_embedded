@@ -211,15 +211,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-2-tier-1-components.md",
-      "accessCount": 37,
-      "lastAccessed": 1773744624834,
+      "path": "spec\\phase-1-mna-engine-core.md",
+      "accessCount": 39,
+      "lastAccessed": 1773748657857,
       "type": "file"
     },
     {
-      "path": "spec\\phase-1-mna-engine-core.md",
-      "accessCount": 35,
-      "lastAccessed": 1773747733275,
+      "path": "spec\\phase-2-tier-1-components.md",
+      "accessCount": 37,
+      "lastAccessed": 1773744624834,
       "type": "file"
     },
     {
@@ -253,6 +253,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 19,
+      "lastAccessed": 1773748647118,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-4c-transistor-level-models.md",
       "accessCount": 17,
       "lastAccessed": 1773744752384,
@@ -265,33 +271,27 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 16,
-      "lastAccessed": 1773747708867,
-      "type": "file"
-    },
-    {
       "path": "src\\headless\\runner.ts",
       "accessCount": 16,
       "lastAccessed": 1773747864074,
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-interface-abstraction.md",
-      "accessCount": 13,
-      "lastAccessed": 1773747627915,
+      "path": "CLAUDE.md",
+      "accessCount": 14,
+      "lastAccessed": 1773748657945,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 12,
-      "lastAccessed": 1773744551508,
+      "accessCount": 14,
+      "lastAccessed": 1773748872504,
       "type": "directory"
     },
     {
-      "path": "CLAUDE.md",
-      "accessCount": 12,
-      "lastAccessed": 1773747716814,
+      "path": "spec\\phase-0-interface-abstraction.md",
+      "accessCount": 13,
+      "lastAccessed": 1773747627915,
       "type": "file"
     },
     {
@@ -313,16 +313,16 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773748658683,
+      "type": "directory"
+    },
+    {
       "path": "spec\\.context\\review-spec.md",
       "accessCount": 9,
       "lastAccessed": 1773740990489,
       "type": "file"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 9,
-      "lastAccessed": 1773747358578,
-      "type": "directory"
     },
     {
       "path": "spec\\phase-4b-two-engine-bridge.md",

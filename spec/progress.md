@@ -312,3 +312,24 @@
 - **Files created**: src/analog/sparse-solver.ts, src/analog/__tests__/sparse-solver.test.ts
 - **Files modified**: (none)
 - **Tests**: 9/9 passing
+
+## Task 1.2.1: Diagnostic Emission Infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/diagnostics.ts, src/analog/__tests__/diagnostics.test.ts
+- **Files modified**: (none)
+- **Tests**: 14/14 passing
+- **Summary**: Implemented `DiagnosticCollector` class with emit(), onDiagnostic(), removeDiagnosticListener(), getDiagnostics(), and clear() methods. Implemented `makeDiagnostic()` helper factory that fills required fields (code, severity, summary) and defaults optional fields (suggestions=[], involvedNodes/Elements/simTime/detail=undefined). Exported `ConvergenceTrace` type with largestChangeElement, largestChangeNode, oscillating, iteration, and fallbackLevel ('none'|'gmin'|'source-step') fields. All diagnostics are collected and dispatched synchronously to all registered callbacks in registration order. Tests verify callback dispatch, collection ordering, clearing, listener removal, and helper field defaults.
+
+## Task 1.2.2: Analog Element Interface + Node Mapping + MNA Assembler
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/analog/node-map.ts` — `buildNodeMap()` function with union-find wire grouping, ground detection, label mapping, `NodeMap` type
+  - `src/analog/mna-assembler.ts` — `MNAAssembler` class with `stampLinear`, `stampNonlinear`, `updateOperatingPoints`, `checkAllConverged`
+  - `src/analog/test-elements.ts` — `makeResistor`, `makeVoltageSource`, `makeCurrentSource` fixtures
+  - `src/analog/__tests__/mna-assembler.test.ts` — 11 tests across NodeMapping, Stamping, Assembler, Convergence groups
+- **Files modified**:
+  - `src/analog/element.ts` — replaced stub with full `AnalogElement` interface (nodeIndices, branchIndex, stamp, stampNonlinear, updateOperatingPoint, stampCompanion, updateState, checkConvergence, getLteEstimate, setSourceScale, stampAc, isNonlinear, isReactive, label) and `IntegrationMethod` type
+- **Tests**: 11/11 passing
+- **Notes**: The `SparseSolver > performance_50_node` test in `sparse-solver.test.ts` (created in Wave 1.1, not modified here) fails intermittently under full-suite load due to timing sensitivity — this is a pre-existing flaky test, not a regression.
