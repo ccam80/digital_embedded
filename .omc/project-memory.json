@@ -212,8 +212,8 @@
     },
     {
       "path": "spec\\phase-2-tier-1-components.md",
-      "accessCount": 51,
-      "lastAccessed": 1773754109803,
+      "accessCount": 56,
+      "lastAccessed": 1773754254084,
       "type": "file"
     },
     {
@@ -224,26 +224,26 @@
     },
     {
       "path": "",
-      "accessCount": 36,
-      "lastAccessed": 1773753311590,
+      "accessCount": 44,
+      "lastAccessed": 1773754307758,
       "type": "directory"
     },
     {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 36,
+      "lastAccessed": 1773754316301,
+      "type": "file"
+    },
+    {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 33,
-      "lastAccessed": 1773753294071,
+      "accessCount": 35,
+      "lastAccessed": 1773754209716,
       "type": "file"
     },
     {
       "path": "spec\\phase-6-tier-3-and-polish.md",
       "accessCount": 32,
       "lastAccessed": 1773745006883,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 31,
-      "lastAccessed": 1773753961092,
       "type": "file"
     },
     {

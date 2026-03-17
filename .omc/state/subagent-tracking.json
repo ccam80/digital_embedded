@@ -395,10 +395,24 @@
       "status": "completed",
       "completed_at": "2026-03-17T13:29:12.041Z",
       "duration_ms": 865160
+    },
+    {
+      "agent_id": "a4dfd073ab849d5c6",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-17T13:29:55.094Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "a7704ea2e5d63f982",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-17T13:30:00.495Z",
+      "parent_mode": "none",
+      "status": "running"
     }
   ],
-  "total_spawned": 44,
+  "total_spawned": 46,
   "total_completed": 44,
   "total_failed": 0,
-  "last_updated": "2026-03-17T13:29:12.151Z"
+  "last_updated": "2026-03-17T13:30:00.603Z"
 }

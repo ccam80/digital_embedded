@@ -519,3 +519,21 @@
 - **Files created**: src/analog/__tests__/model-binding.test.ts
 - **Files modified**: src/analog/compiler.ts (model library instantiation + model binding in analogFactory call), src/core/registry.ts (added analogDeviceType field to ComponentDefinition + DeviceType import)
 - **Tests**: 8/8 passing
+
+## Task 2.4.1: Diode + Zener Diode + LED (shared)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/diode.ts` — DiodeDefinition, createDiodeElement, computeJunctionCapacitance
+  - `src/components/semiconductors/zener.ts` — ZenerDiodeDefinition, createZenerElement
+  - `src/components/semiconductors/__tests__/diode.test.ts` — 8 tests (unit + integration)
+  - `src/components/semiconductors/__tests__/zener.test.ts` — 6 tests (unit + integration)
+- **Files modified**:
+  - `src/components/io/led.ts` — Added analogFactory (color-specific Shockley model), engineType changed to "both"
+  - `src/components/io/__tests__/led.test.ts` — Added AnalogLED test group (5 tests)
+- **Tests**: 98/98 passing (diode: 8, zener: 6, led: 84 including 5 new analog tests)
+- **Notes**:
+  - Diode uses GMIN=1e-12 for numerical stability, pnjlim() voltage limiting, CJO>0 activates isReactive
+  - Zener uses IBV (SPICE default 1e-3) for breakdown region, not IS — gives correct regulation voltage
+  - LED color models calibrated to give correct Vf at 20mA: red IS=3.17e-19 N=1.8, blue IS=6.26e-24 N=2.5
+  - Diode DC op test uses correct physical Vd=0.692V (not 0.665V) with IS=1e-14

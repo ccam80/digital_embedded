@@ -41,6 +41,13 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { SparseSolver } from "../../../analog/sparse-solver.js";
+import { DiagnosticCollector } from "../../../analog/diagnostics.js";
+import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
+import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import type { AnalogElement } from "../../../analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -699,5 +706,129 @@ describe("RGBLED", () => {
       const el = makeRgbLed();
       expect(el.getHelpText()).toContain("RGBLED");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AnalogLED tests (Task 2.4.2)
+// ---------------------------------------------------------------------------
+
+function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  return {
+    nodeIndices: [nodeA, nodeB],
+    branchIndex: -1,
+    isNonlinear: false,
+    isReactive: false,
+    stamp(solver: SparseSolverType): void {
+      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
+      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      if (nodeA !== 0 && nodeB !== 0) {
+        solver.stamp(nodeA - 1, nodeB - 1, -G);
+        solver.stamp(nodeB - 1, nodeA - 1, -G);
+      }
+    },
+  };
+}
+
+describe("AnalogLED", () => {
+  it("definition_has_engine_type_both", () => {
+    expect(LedDefinition.engineType).toBe("both");
+  });
+
+  it("digital_behavior_unchanged", () => {
+    const layout = makeLayout(1, 1);
+    const state = makeState([1], 1);
+    const highZs = new Uint32Array(state.length);
+    executeLed(0, state, highZs, layout);
+    expect(state[1]).toBe(1);
+
+    const layout2 = makeLayout(1, 1);
+    const state2 = makeState([0], 1);
+    const highZs2 = new Uint32Array(state2.length);
+    executeLed(0, state2, highZs2, layout2);
+    expect(state2[1]).toBe(0);
+  });
+
+  it("analog_factory_defined", () => {
+    expect(LedDefinition.analogFactory).toBeDefined();
+  });
+
+  it("analog_factory_produces_nonlinear_element", () => {
+    const props = new PropertyBag();
+    props.set("color", "red");
+    const element = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+    expect(element.isNonlinear).toBe(true);
+    expect(element.isReactive).toBe(false);
+  });
+
+  it("red_led_forward_drop", () => {
+    // Circuit: 5V → 220Ω → red LED (anode=node1, cathode=gnd) → ground
+    // Red LED Vf ≈ 1.8V ± 0.15V at the operating point
+    //
+    // MNA: node1 = LED anode / resistor junction
+    //      node2 = +5V source terminal
+    //      branch row = 2
+    //      matrixSize = 3
+
+    const matrixSize = 3;
+    const branchRow = 2;
+
+    const vs = makeDcVoltageSource(2, 0, branchRow, 5);
+    const r = makeResistorElementForLed(1, 2, 220);
+
+    const props = new PropertyBag();
+    props.set("color", "red");
+    const led = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+
+    const result = solveDcOperatingPoint({
+      solver,
+      elements: [vs, r, led],
+      matrixSize,
+      params: DEFAULT_SIMULATION_PARAMS,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(true);
+
+    // V(node1) = LED forward voltage
+    const vf = result.nodeVoltages[0];
+    expect(vf).toBeGreaterThan(1.65);
+    expect(vf).toBeLessThan(1.95);
+  });
+
+  it("blue_led_forward_drop", () => {
+    // Circuit: 5V → 100Ω → blue LED (anode=node1, cathode=gnd) → ground
+    // Blue LED Vf ≈ 3.2V ± 0.15V
+
+    const matrixSize = 3;
+    const branchRow = 2;
+
+    const vs = makeDcVoltageSource(2, 0, branchRow, 5);
+    const r = makeResistorElementForLed(1, 2, 100);
+
+    const props = new PropertyBag();
+    props.set("color", "blue");
+    const led = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+
+    const result = solveDcOperatingPoint({
+      solver,
+      elements: [vs, r, led],
+      matrixSize,
+      params: DEFAULT_SIMULATION_PARAMS,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(true);
+
+    const vf = result.nodeVoltages[0];
+    expect(vf).toBeGreaterThan(3.05);
+    expect(vf).toBeLessThan(3.35);
   });
 });

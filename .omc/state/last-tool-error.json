@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/analog/__tests__/model-library.test.ts\\\" 2>&1\",\"timeout\":60000,\"description\":\"Run model-library tests\"}",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/analog/__tests__/model-library.test.ts \u001b[2m(\u001b[22m\u001b[2m17 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 14\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m ModelLibrary\u001b[2m > \u001b[22mget_default_mosfet\u001b[90m 7\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → expected 24 to be 25 // Object.is equality\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[1m\u001b[7m Failed Tests 1 \u001b[27m\u001b[22m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m FAIL \u001b...",
-  "timestamp": "2026-03-17T13:21:02.430Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/components/active/__tests__/opamp.test.ts\\\" --reporter=verbose 2>&1\",\"timeout\":60000,\"description\":\"Run opamp te...",
+  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mlinear_region\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mpositive_saturation\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mnegative_saturation\n \u001b[31m×\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > ...",
+  "timestamp": "2026-03-17T13:41:25.970Z",
   "retry_count": 1
 }

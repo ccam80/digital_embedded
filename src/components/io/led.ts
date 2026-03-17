@@ -20,6 +20,9 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
+import { pnjlim } from "../../analog/newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -130,6 +133,118 @@ export function executeLed(
 }
 
 // ---------------------------------------------------------------------------
+// LED color model parameters
+// Color-specific IS/N values produce correct forward voltages at 20mA:
+//   Red:   Vf ≈ 1.8V at 20mA → IS=1e-20, N=1.8
+//   Green: Vf ≈ 2.1V at 20mA → IS=1e-22, N=2.0
+//   Blue:  Vf ≈ 3.2V at 20mA → IS=1e-26, N=2.5
+// ---------------------------------------------------------------------------
+
+const LED_COLOR_MODELS: Record<string, { IS: number; N: number }> = {
+  red:    { IS: 3.17e-19, N: 1.8 },
+  green:  { IS: 1e-21,   N: 2.0 },
+  blue:   { IS: 6.26e-24, N: 2.5 },
+  yellow: { IS: 1e-20,   N: 1.9 },
+  white:  { IS: 6.26e-24, N: 2.5 },
+};
+
+const LED_DEFAULT_MODEL = { IS: 3.17e-19, N: 1.8 };
+
+/** Thermal voltage at 300 K (kT/q). */
+const LED_VT = 0.02585;
+/** Minimum conductance for numerical stability. */
+const LED_GMIN = 1e-12;
+
+// ---------------------------------------------------------------------------
+// createLedAnalogElement — AnalogElement factory
+// ---------------------------------------------------------------------------
+
+function createLedAnalogElement(
+  nodeIds: number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElement {
+  const nodeAnode = nodeIds[0];
+  // Single-pin LED: cathode is implicitly ground (node 0)
+  const nodeCathode = nodeIds[1] ?? 0;
+
+  const color = props.getOrDefault<string>("color", "red").toLowerCase();
+  const colorModel = LED_COLOR_MODELS[color] ?? LED_DEFAULT_MODEL;
+  const IS = colorModel.IS;
+  const N = colorModel.N;
+  const nVt = N * LED_VT;
+  const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
+
+  let vd = 0;
+  let geq = LED_GMIN;
+  let ieq = 0;
+
+  return {
+    nodeIndices: [nodeAnode, nodeCathode],
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: false,
+
+    stamp(_solver: SparseSolver): void {
+      // No linear topology-constant contributions.
+    },
+
+    stampNonlinear(solver: SparseSolver): void {
+      _ledStampG(solver, nodeAnode, nodeAnode, geq);
+      _ledStampG(solver, nodeAnode, nodeCathode, -geq);
+      _ledStampG(solver, nodeCathode, nodeAnode, -geq);
+      _ledStampG(solver, nodeCathode, nodeCathode, geq);
+      _ledStampRHS(solver, nodeAnode, -ieq);
+      _ledStampRHS(solver, nodeCathode, ieq);
+    },
+
+    updateOperatingPoint(voltages: Float64Array): void {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vdRaw = va - vc;
+
+      const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
+
+      if (nodeAnode > 0) {
+        voltages[nodeAnode - 1] = vc + vdLimited;
+      }
+
+      vd = vdLimited;
+
+      const expArg = Math.min(vd / nVt, 700);
+      const expVal = Math.exp(expArg);
+      const id = IS * (expVal - 1);
+      geq = (IS * expVal) / nVt + LED_GMIN;
+      ieq = id - geq * vd;
+    },
+
+    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vdNew = va - vc;
+
+      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
+      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
+      const vdPrevVal = vaPrev - vcPrev;
+
+      return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
+    },
+  };
+}
+
+function _ledStampG(solver: SparseSolver, row: number, col: number, val: number): void {
+  if (row !== 0 && col !== 0) {
+    solver.stamp(row - 1, col - 1, val);
+  }
+}
+
+function _ledStampRHS(solver: SparseSolver, row: number, val: number): void {
+  if (row !== 0) {
+    solver.stampRHS(row - 1, val);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // LED_ATTRIBUTE_MAPPINGS
 // ---------------------------------------------------------------------------
 
@@ -178,6 +293,7 @@ function ledFactory(props: PropertyBag): LedElement {
 export const LedDefinition: ComponentDefinition = {
   name: "LED",
   typeId: -1,
+  engineType: "both",
   factory: ledFactory,
   executeFn: executeLed,
   pinLayout: buildLedPinDeclarations(),
@@ -188,4 +304,5 @@ export const LedDefinition: ComponentDefinition = {
     "LED — single-color light-emitting diode indicator.\n" +
     "Lights up (filled circle) when the input is non-zero.\n" +
     "Color is configurable. Label is shown above the component.",
+  analogFactory: createLedAnalogElement,
 };
