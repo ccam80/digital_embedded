@@ -1,27 +1,27 @@
 # Test Baseline
 
-- **Timestamp**: 2026-03-18T07:50:37Z
-- **Phase**: Phase 2 + Phase 3 + Phase 4a (Analog Engine + Components)
+- **Timestamp**: 2026-03-18T09:48:09Z
+- **Phase**: 4b, 4c, 5 (about to start)
 - **Command**: `npm test` (vitest run)
-- **Result**: 5914/5920 passing, 6 failing, 0 errors
-- **Test Files**: 234 passed / 236 total
-- **Duration**: 26.58s (total including setup and collection)
+- **Result**: 6096/6102 passing, 6 failing, 0 errors
+- **Test Files**: 255 passed / 257 total
+- **Duration**: 42.18s (total including setup, collection, and tests)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total Tests | 5920 |
-| Passed | 5914 (99.9%) |
+| Total Tests | 6102 |
+| Passed | 6096 (99.9%) |
 | Failed | 6 (0.1%) |
-| Test Files | 234 passed, 2 failed |
-| Duration | 26.58s |
+| Test Files | 255 passed, 2 failed |
+| Duration | 42.18s |
 
 ## Failing Tests (pre-existing)
 
 | Test | Status | Summary |
 |------|--------|---------|
-| src/analog/__tests__/sparse-solver.test.ts > SparseSolver > performance_50_node | FAIL | Performance: factorization took 2.96ms, threshold 2.5ms (0.5ms × 5 CI relaxation) |
+| src/analog/__tests__/sparse-solver.test.ts > SparseSolver > performance_50_node | FAIL | Performance: factorization took 2.83ms, threshold 2.5ms (0.5ms × 5 CI relaxation) |
 | src/fixtures/__tests__/fixture-audit.test.ts > 'Sim/all-components.dig' > tunnel pins connected | FAIL | 1 disconnected tunnel at (0, 64) — fixture wiring issue |
 | src/fixtures/__tests__/fixture-audit.test.ts > 'Sim/Processor/cpu_final.dig' > wire endpoints meet pins or junctions | FAIL | 3 orphan wire endpoints at (-38, 48), (-38, 36), (-38, 44) — fixture geometry |
 | src/fixtures/__tests__/fixture-audit.test.ts > 'Sim/TC.dig' > wire endpoints meet pins or junctions | FAIL | 1 orphan wire endpoint at (135, 18) — fixture geometry |

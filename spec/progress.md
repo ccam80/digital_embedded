@@ -780,3 +780,10 @@
   - Added WELL_KNOWN_PROPERTY_KEYS set to registry.ts with 'simulationMode' as first entry
   - Added showSimulationModeDropdown() method to PropertyPanel that shows a <select> dropdown when circuit is analog and component has simulationModes.length > 1; default value is 'behavioral'; fires onChange callback for undo integration
   - Compiler handling of simulationMode property was implemented in 4a.5.1
+
+## Task 4b.1.1: BridgeOutputAdapter — Digital Engine Output → MNA
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/bridge-adapter.ts, src/analog/__tests__/bridge-adapter.test.ts
+- **Files modified**: (none)
+- **Tests**: 20/20 passing
