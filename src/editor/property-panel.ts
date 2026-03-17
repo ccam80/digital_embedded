@@ -9,6 +9,7 @@ import type { CircuitElement } from "@/core/element";
 import type { PropertyDefinition, PropertyValue } from "@/core/properties";
 import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
+import type { ComponentDefinition } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // Change callback type
@@ -123,6 +124,69 @@ export class PropertyPanel {
    */
   isCollapsed(): boolean {
     return this._collapsed;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Simulation mode dropdown (analog mode only)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Show the simulation mode dropdown for a component that supports multiple
+   * simulation modes in an analog circuit.
+   *
+   * Called after showProperties() when the circuit engineType is "analog" and
+   * the selected component has simulationModes with more than one entry. The
+   * dropdown is appended after the regular property rows.
+   *
+   * Default is "behavioral" (read at call time, never persisted on the element
+   * until the user changes it).
+   *
+   * @param element   The selected circuit element.
+   * @param def       The component definition declaring simulationModes.
+   */
+  showSimulationModeDropdown(
+    element: CircuitElement,
+    def: ComponentDefinition,
+  ): void {
+    const modes = def.simulationModes;
+    if (!modes || modes.length <= 1) return;
+
+    const bag = element.getProperties();
+    const current = bag.has("simulationMode")
+      ? (bag.get("simulationMode") as string)
+      : "behavioral";
+
+    const select = document.createElement("select") as unknown as HTMLSelectElement & { value: string };
+    for (const mode of modes) {
+      const option = document.createElement("option");
+      option.value = mode;
+      option.textContent = mode;
+      if (mode === current) {
+        (option as unknown as { selected: boolean }).selected = true;
+      }
+      (select as unknown as { appendChild(c: unknown): void }).appendChild(option);
+    }
+    select.value = current;
+
+    (select as unknown as { addEventListener(e: string, cb: () => void): void }).addEventListener("change", () => {
+      const newMode = select.value;
+      const oldValue = bag.has("simulationMode")
+        ? bag.get("simulationMode")
+        : "behavioral";
+      bag.set("simulationMode", newMode);
+      for (const cb of this._changeCallbacks) {
+        cb("simulationMode", oldValue, newMode);
+      }
+    });
+
+    const row = this._buildRow("Simulation Mode", select as unknown as HTMLElement);
+    this._container.appendChild(row);
+    this._inputs.set("simulationMode", {
+      element: select as unknown as HTMLElement,
+      onChange: (_cb: (v: PropertyValue) => void) => { /* managed internally via select change event */ },
+      setValue: (v: PropertyValue) => { select.value = v as string; },
+      getValue: () => select.value,
+    });
   }
 
   // ---------------------------------------------------------------------------

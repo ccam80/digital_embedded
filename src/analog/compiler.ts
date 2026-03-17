@@ -26,6 +26,9 @@ import {
   type DeviceModel,
 } from "./compiled-analog-circuit.js";
 import { ModelLibrary, validateModel } from "./model-library.js";
+import { defaultLogicFamily, getLogicFamilyPreset } from "../core/logic-family.js";
+import { resolvePinElectrical } from "../core/pin-electrical.js";
+import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 
 // ---------------------------------------------------------------------------
 // Pin-to-node resolution helpers
@@ -221,6 +224,13 @@ export function compileAnalogCircuit(
   // Step 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
   const nodeMap = buildNodeMap(circuit);
 
+  // Resolve the circuit's logic family (used for _pinElectrical injection)
+  const circuitFamily = circuit.metadata.logicFamily
+    ? circuit.metadata.logicFamily
+    : (circuit.metadata as Record<string, unknown>)["logicFamilyKey"] !== undefined
+      ? (getLogicFamilyPreset((circuit.metadata as Record<string, unknown>)["logicFamilyKey"] as string) ?? defaultLogicFamily())
+      : defaultLogicFamily();
+
   // Collect all diagnostics from compilation
   const diagnostics: SolverDiagnostic[] = [...nodeMap.diagnostics];
 
@@ -285,14 +295,35 @@ export function compileAnalogCircuit(
       );
     }
 
-    // Reject digital-only components
+    // Reject digital-only components — emit diagnostic instead of throwing
     const et = def.engineType ?? "digital";
     if (et !== "analog" && et !== "both") {
-      throw new Error(
-        `compileAnalogCircuit: component "${el.typeId}" is a digital-only ` +
-          `component (engineType="${et}"). ` +
-          `Analog circuits may only contain analog components.`,
+      diagnostics.push(
+        makeDiagnostic(
+          "unsupported-component-in-analog",
+          "error",
+          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+          {
+            explanation:
+              `Component "${el.typeId}" has engineType="${et}" with no analogFactory. ` +
+              `Only components with engineType "analog" or "both" (with analogFactory) ` +
+              `can be placed in analog circuits.`,
+            suggestions: [
+              {
+                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                automatable: false,
+              },
+            ],
+          },
+        ),
       );
+      elementMeta.push({
+        el,
+        branchIdx: -1,
+        internalNodeOffset: -1,
+        internalNodeCount: 0,
+      });
+      continue;
     }
 
     // Assign branch index
@@ -355,6 +386,53 @@ export function compileAnalogCircuit(
     const def = registry.get(el.typeId)!;
     const props = el.getProperties();
 
+    // Skip digital-only components (diagnostic already emitted in Pass A)
+    const elEngineType = def.engineType ?? "digital";
+    if (elEngineType !== "analog" && elEngineType !== "both") {
+      continue;
+    }
+
+    // Handle simulationMode property for "both" components
+    if (elEngineType === "both" && def.analogFactory !== undefined) {
+      const simulationMode = props.has("simulationMode")
+        ? (props.get("simulationMode") as string)
+        : "behavioral";
+
+      if (simulationMode === "digital") {
+        diagnostics.push(
+          makeDiagnostic(
+            "digital-bridge-not-yet-implemented",
+            "info",
+            `Component "${el.typeId}" is set to simulationMode 'digital' — bridge not yet available`,
+            {
+              explanation:
+                `The digital bridge (Phase 4b) is not yet implemented. ` +
+                `Component "${el.typeId}" will be skipped in analog compilation. ` +
+                `Set simulationMode to 'behavioral' to simulate this component.`,
+            },
+          ),
+        );
+        continue;
+      }
+
+      if (simulationMode === "transistor") {
+        diagnostics.push(
+          makeDiagnostic(
+            "transistor-model-not-yet-implemented",
+            "info",
+            `Component "${el.typeId}" is set to simulationMode 'transistor' — transistor expansion not yet available`,
+            {
+              explanation:
+                `Transistor-level expansion (Phase 4c) is not yet implemented. ` +
+                `Component "${el.typeId}" will be skipped in analog compilation. ` +
+                `Set simulationMode to 'behavioral' to simulate this component.`,
+            },
+          ),
+        );
+        continue;
+      }
+    }
+
     // Resolve pin → node ID bindings
     const pinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit);
 
@@ -378,6 +456,25 @@ export function compileAnalogCircuit(
     // how makeVoltageSource uses it (as an absolute row index).
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
+
+    // Pin electrical injection for "both" components with analogFactory.
+    // Resolve per-pin electrical specs from the circuit logic family, component
+    // override, and per-pin overrides, then inject via _pinElectrical into the
+    // props bag before calling analogFactory.
+    if (elEngineType === "both" && def.analogFactory !== undefined) {
+      const pinLabels = def.pinLayout.map((pd) => pd.label);
+      const pinElectricalMap: Record<string, ResolvedPinElectrical> = {};
+      for (const pinLabel of pinLabels) {
+        const pinOverride = def.pinElectricalOverrides?.[pinLabel];
+        const componentOverride = def.pinElectrical;
+        pinElectricalMap[pinLabel] = resolvePinElectrical(
+          circuitFamily,
+          pinOverride,
+          componentOverride,
+        );
+      }
+      props.set("_pinElectrical", pinElectricalMap as unknown as import("../core/properties.js").PropertyValue);
+    }
 
     // Model binding: semiconductor components get resolved model parameters
     // injected into the props bag under '_modelParams' before factory call.
@@ -532,5 +629,6 @@ export function compileAnalogCircuit(
     wireToNodeId: nodeMap.wireToNodeId,
     models,
     elementToCircuitElement,
+    diagnostics,
   });
 }

@@ -483,9 +483,14 @@ describe("AnalogDispatch", () => {
     const circuit = buildHalfAdder(registry);
     circuit.metadata.engineType = "analog";
 
-    // The half-adder contains digital-only components (And, XOr).
-    // The analog compiler must reject them with a clear error.
-    expect(() => runner.compile(circuit)).toThrow(/digital-only/);
+    // The half-adder contains digital-only components (AND, XOR — no analogFactory).
+    // The analog compiler now emits unsupported-component-in-analog diagnostics
+    // instead of throwing, and returns the compiled circuit.
+    const engine = runner.compile(circuit);
+    // The compiled result is the ConcreteCompiledAnalogCircuit (runner casts it as engine).
+    const compiled = engine as unknown as { diagnostics: Array<{ code: string }> };
+    const codes = compiled.diagnostics.map((d) => d.code);
+    expect(codes).toContain("unsupported-component-in-analog");
   });
 
   it("dc_operating_point_throws_for_digital_engine — dcOperatingPoint on digital engine throws TypeError", () => {

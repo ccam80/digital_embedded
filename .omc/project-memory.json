@@ -224,14 +224,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 49,
-      "lastAccessed": 1773778791198,
+      "accessCount": 51,
+      "lastAccessed": 1773779286669,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 46,
-      "lastAccessed": 1773775929604,
+      "accessCount": 49,
+      "lastAccessed": 1773780008475,
       "type": "file"
     },
     {
@@ -253,22 +253,28 @@
       "type": "file"
     },
     {
+      "path": "spec\\phase-4a-digital-analog-interface.md",
+      "accessCount": 33,
+      "lastAccessed": 1773779291205,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-6-tier-3-and-polish.md",
       "accessCount": 32,
       "lastAccessed": 1773745006883,
       "type": "file"
     },
     {
-      "path": "spec\\phase-4a-digital-analog-interface.md",
-      "accessCount": 31,
-      "lastAccessed": 1773778795490,
+      "path": "CLAUDE.md",
+      "accessCount": 26,
+      "lastAccessed": 1773779281907,
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
-      "accessCount": 25,
-      "lastAccessed": 1773774537988,
-      "type": "file"
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 19,
+      "lastAccessed": 1773779313069,
+      "type": "directory"
     },
     {
       "path": "src\\core\\renderer-interface.ts",
@@ -277,10 +283,10 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
+      "path": "src\\headless\\runner.ts",
       "accessCount": 18,
-      "lastAccessed": 1773776159586,
-      "type": "directory"
+      "lastAccessed": 1773779772841,
+      "type": "file"
     },
     {
       "path": "spec\\phase-4c-transistor-level-models.md",
@@ -292,12 +298,6 @@
       "path": "spec\\circuits-engine-spec.md",
       "accessCount": 17,
       "lastAccessed": 1773750520626,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\runner.ts",
-      "accessCount": 16,
-      "lastAccessed": 1773747864074,
       "type": "file"
     },
     {
@@ -398,8 +398,8 @@
     },
     {
       "path": "src\\core",
-      "accessCount": 3,
-      "lastAccessed": 1773747331537,
+      "accessCount": 4,
+      "lastAccessed": 1773779980076,
       "type": "directory"
     },
     {

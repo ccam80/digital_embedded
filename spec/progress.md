@@ -749,3 +749,34 @@
 - **Files created**: src/analog/behavioral-flipflop.ts, src/analog/__tests__/behavioral-flipflop.test.ts
 - **Files modified**: src/components/flipflops/d.ts
 - **Tests**: 10/10 passing
+
+## Task 4a.5.3: End-to-End Integration Test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/analog/__tests__/behavioral-integration.test.ts`
+- **Files modified**: `src/headless/__tests__/runner.test.ts` (updated stale test expecting throw to check diagnostic instead — regression introduced by Task 4a.5.1 changing compiler to emit diagnostics rather than throw)
+- **Tests**: 8/8 passing
+
+## Task 4a.5.1: Analog Compiler Support for Behavioral Digital Components
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/analog-compiler.test.ts
+- **Files modified**: src/analog/compiler.ts, src/core/analog-engine-interface.ts, src/analog/compiled-analog-circuit.ts, src/analog/__tests__/compiler.test.ts, src/headless/__tests__/runner.test.ts
+- **Tests**: 9/9 passing (new tests in analog-compiler.test.ts), plus all 23 existing compiler.test.ts tests pass
+- **Summary**:
+  - Added 3 new diagnostic codes to analog-engine-interface.ts: unsupported-component-in-analog, digital-bridge-not-yet-implemented, transistor-model-not-yet-implemented
+  - Extended compileAnalogCircuit() in compiler.ts to: (a) emit unsupported-component-in-analog diagnostic for digital-only components instead of throwing; (b) resolve circuit logic family and inject _pinElectrical into props for "both" engineType components with analogFactory; (c) handle simulationMode property — 'digital' emits digital-bridge-not-yet-implemented (info), 'transistor' emits transistor-model-not-yet-implemented (info), 'behavioral' (default) proceeds normally
+  - Added diagnostics field to ConcreteCompiledAnalogCircuit so callers can inspect compilation diagnostics
+  - Updated compiler.test.ts rejects_digital_only_component to check diagnostic instead of throw (behavior change)
+  - Updated runner.test.ts test that also expected a throw (same behavior change)
+
+## Task 4a.5.2: Simulation Mode Property on Component Instances
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/core/registry.ts, src/editor/property-panel.ts
+- **Tests**: 4/4 SimulationMode tests passing (in analog-compiler.test.ts written during 4a.5.1); 6/6 property-panel tests passing
+- **Summary**:
+  - Added WELL_KNOWN_PROPERTY_KEYS set to registry.ts with 'simulationMode' as first entry
+  - Added showSimulationModeDropdown() method to PropertyPanel that shows a <select> dropdown when circuit is analog and component has simulationModes.length > 1; default value is 'behavioral'; fires onChange callback for undo integration
+  - Compiler handling of simulationMode property was implemented in 4a.5.1

@@ -90,7 +90,10 @@ export type SolverDiagnosticCode =
   | "missing-property"
   | "unknown-component"
   | "model-param-ignored"
-  | "model-level-unsupported";
+  | "model-level-unsupported"
+  | "unsupported-component-in-analog"
+  | "digital-bridge-not-yet-implemented"
+  | "transistor-model-not-yet-implemented";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

@@ -7,7 +7,7 @@
  * across engine types.
  */
 
-import type { CompiledAnalogCircuit } from "../core/analog-engine-interface.js";
+import type { CompiledAnalogCircuit, SolverDiagnostic } from "../core/analog-engine-interface.js";
 import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./element.js";
@@ -76,6 +76,9 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Maps element index to the originating CircuitElement for diagnostics. */
   readonly elementToCircuitElement: Map<number, CircuitElement>;
 
+  /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
+  readonly diagnostics: SolverDiagnostic[];
+
   constructor(params: {
     nodeCount: number;
     branchCount: number;
@@ -84,6 +87,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     wireToNodeId: Map<Wire, number>;
     models: Map<string, DeviceModel>;
     elementToCircuitElement: Map<number, CircuitElement>;
+    diagnostics?: SolverDiagnostic[];
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -93,6 +97,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.wireToNodeId = params.wireToNodeId;
     this.models = params.models;
     this.elementToCircuitElement = params.elementToCircuitElement;
+    this.diagnostics = params.diagnostics ?? [];
   }
 
   // CompiledCircuit base interface

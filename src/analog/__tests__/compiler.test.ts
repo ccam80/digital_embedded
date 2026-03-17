@@ -369,7 +369,10 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    expect(() => compileAnalogCircuit(circuit, registry)).toThrow(/digital-only/);
+    // Digital-only components emit an error diagnostic instead of throwing
+    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
+    const compiled = compileAnalogCircuit(circuit, registry);
+    expect(compiled.diagnostics.some((d) => d.code === "unsupported-component-in-analog")).toBe(true);
   });
 
   it("calls_analog_factory_with_correct_args", () => {

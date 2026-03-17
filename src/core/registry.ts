@@ -14,6 +14,21 @@ import type { DeviceType } from "../analog/model-parser.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
 // ---------------------------------------------------------------------------
+// Well-known property keys
+// ---------------------------------------------------------------------------
+
+/**
+ * Property keys with special handling by the editor, compiler, or engine.
+ *
+ * These keys are recognized by the property panel and simulation pipeline
+ * and receive dedicated UI treatment beyond the generic property editor.
+ */
+export const WELL_KNOWN_PROPERTY_KEYS = new Set<string>([
+  /** Simulation mode for components that support multiple backends. */
+  "simulationMode",
+]);
+
+// ---------------------------------------------------------------------------
 // ComponentCategory
 // ---------------------------------------------------------------------------
 
