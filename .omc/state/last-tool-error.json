@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/components/active/__tests__/opamp.test.ts\\\" --reporter=verbose 2>&1\",\"timeout\":60000,\"description\":\"Run opamp te...",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mlinear_region\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mpositive_saturation\n \u001b[32m✓\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > \u001b[22mOpAmp\u001b[2m > \u001b[22mnegative_saturation\n \u001b[31m×\u001b[39m src/components/active/__tests__/opamp.test.ts\u001b[2m > ...",
-  "timestamp": "2026-03-17T13:41:25.970Z",
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:/tmp/vitest-results.json\",\"limit\":5}",
+  "error": "File content (471899 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-17T14:00:56.383Z",
   "retry_count": 1
 }

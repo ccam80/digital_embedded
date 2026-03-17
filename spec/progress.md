@@ -537,3 +537,45 @@
   - Zener uses IBV (SPICE default 1e-3) for breakdown region, not IS — gives correct regulation voltage
   - LED color models calibrated to give correct Vf at 20mA: red IS=3.17e-19 N=1.8, blue IS=6.26e-24 N=2.5
   - Diode DC op test uses correct physical Vd=0.692V (not 0.665V) with IS=1e-14
+
+## Task 2.5.1: Ideal Op-Amp
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/opamp.ts, src/components/active/__tests__/opamp.test.ts
+- **Files modified**: (none)
+- **Tests**: 6/6 passing
+- **Notes**: Used linear MNA VCVS stamp (G[out,in+] -= gain*G_out, G[out,in-] += gain*G_out) in stamp() for unsaturated region. Saturation detected by comparing current output voltage to supply rails (not ideal open-loop voltage), which prevents NR Jacobian oscillation. Norton current source in stampNonlinear() drives output to rail when saturated. Source-stepping scale support via setSourceScale(). The flaky performance_50_node sparse solver test appeared once in the full suite run but passes in isolation — pre-existing timing issue unrelated to this task.
+
+## Task 2.6.1: Arithmetic Expression Parser
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/expression.ts, src/analog/__tests__/expression.test.ts
+- **Files modified**: none
+- **Tests**: 50/50 passing
+
+## Task 2.4.2: NPN + PNP BJT
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/semiconductors/__tests__/bjt.test.ts
+- **Files modified**: none (bjt.ts was already complete from previous agent)
+- **Tests**: 21/21 passing
+- **Notes**: The existing bjt.ts was fully implemented. The test file was missing. Wrote 21 tests covering: active region stamp (Ic/Ib magnitudes, Ic/Ib ratio ≈ BF=100), cutoff region (near-zero currents), saturation region (both junctions forward biased, Ic < BF*Ib), voltage limiting via pnjlim, checkConvergence behavior, PNP polarity reversal (negated RHS stamps), component definition fields (NpnBjtDefinition, PnpBjtDefinition), pin layout, analogFactory, and two integration tests (common-emitter amplifier DC operating point, cutoff with zero base drive). Corrected expected Ic/Ib values: spec stated 2.2mA/22µA at Vbe=0.7V but IS=1e-16 requires Vbe≈0.794V for those currents — tests use the physically correct Vbe derived from IS. The `SparseSolver > performance_50_node` failure observed in full-suite run is a pre-existing flaky timing test that passes in isolation; unrelated to this task.
+
+## Task 2.4.4: N-MOSFET + P-MOSFET
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/semiconductors/mosfet.ts`
+  - `src/components/semiconductors/__tests__/mosfet.test.ts`
+- **Files modified**: none
+- **Tests**: 22/22 passing
+- **Notes**: 
+  - Implemented Level 2 SPICE MOSFET model with cutoff/linear/saturation regions
+  - Body effect via GAMMA/PHI, channel-length modulation via LAMBDA
+  - fetlim() voltage limiting in updateOperatingPoint (internal state only, not written back to solution vector)
+  - Source/drain swap detection for symmetric device
+  - Junction capacitances (CBD, CBS) and overlap capacitances (CGDO, CGSO) via stampCompanion
+  - NmosfetDefinition and PmosfetDefinition registered with NMOS/PMOS analogDeviceType
+  - I-V computation methods (computeIds, computeGm, computeGds, computeGmbs, limitVoltages, computeCapacitances) isolated for future AbstractFetElement extraction (Task 5.4.1)
+  - Integration test: common-source NMOS DC OP converges correctly (Vds≈1.84V, Id≈3.16mA with W=10µ, L=1µ, Vgs=3V, Rd=1kΩ, Vdd=5V)
+  - The sparse-solver performance_50_node test failure in full suite is a pre-existing timing/flakiness issue unrelated to this task (passes when run in isolation)
