@@ -74,18 +74,20 @@ function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
-/** Layout where inputs and outputs don't overlap — for driver 2-output layout */
+/** Layout for driver — 2 inputs (data + sel), 1 output (value). High-Z is written to the highZs array. */
 function makeDriverLayout(): ComponentLayout {
   return {
     wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => 2,        // data + sel
     inputOffset: () => 0,
-    outputCount: () => 2,       // value + highZ
+    outputCount: () => 1,       // value only (highZ goes to highZs array)
     outputOffset: () => 2,
-    stateOffset: () => 4,
+    stateOffset: () => 3,
+    getProperty: () => undefined,
   };
 }
 
@@ -161,7 +163,7 @@ function makeSplitter(outputSplitting = "4,4"): SplitterElement {
 
 function makeBusSplitter(bits = 8, spreading = 1): BusSplitterElement {
   const props = new PropertyBag();
-  props.set("bits", bits);
+  props.set("bitWidth", bits);
   props.set("spreading", spreading);
   return new BusSplitterElement("test-bspl-001", { x: 0, y: 0 }, 0, false, props);
 }
@@ -181,49 +183,48 @@ describe("Driver", () => {
   describe("enableHigh", () => {
     it("sel=1, input=0xFF → output=0xFF, highZ=0", () => {
       const layout = makeDriverLayout();
-      // state: [data=0xFF, sel=1, outValue=0, outHighZ=0]
-      const state = makeState(0xFF, 1, 0, 0);
+      const state = makeState(0xFF, 1, 0);
       const highZs = new Uint32Array(state.length);
       executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
-      expect(state[3]).toBe(0);
+      expect(highZs[2]).toBe(0);
     });
 
     it("sel=1, input=0xABCD → output=0xABCD, highZ=0", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0xABCD, 1, 0, 0);
+      const state = makeState(0xABCD, 1, 0);
       const highZs = new Uint32Array(state.length);
       executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0xABCD);
-      expect(state[3]).toBe(0);
+      expect(highZs[2]).toBe(0);
     });
 
     it("sel=1, input=0 → output=0, highZ=0 (driven low)", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0, 1, 0xFFFFFFFF, 0xFFFFFFFF);
-      const highZs = new Uint32Array(state.length);
+      const state = makeState(0, 1, 0xFFFFFFFF);
+      const highZs = new Uint32Array(state.length).fill(0xFFFFFFFF);
       executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0);
-      expect(state[3]).toBe(0);
+      expect(highZs[2]).toBe(0);
     });
   });
 
   describe("enableLow", () => {
     it("sel=0, any input → output=0 (high-Z), highZ=0xFFFFFFFF", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0xFF, 0, 0, 0);
+      const state = makeState(0xFF, 0, 0);
       const highZs = new Uint32Array(state.length);
       executeDriver(0, state, highZs, layout);
       expect(state[2]).toBe(0);
-      expect(state[3]).toBe(0xFFFFFFFF);
+      expect(highZs[2]).toBe(0xFFFFFFFF);
     });
 
     it("sel=0 with large input → highZ is set regardless of input", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0xDEADBEEF, 0, 0, 0);
+      const state = makeState(0xDEADBEEF >>> 0, 0, 0);
       const highZs = new Uint32Array(state.length);
       executeDriver(0, state, highZs, layout);
-      expect(state[3]).toBe(0xFFFFFFFF);
+      expect(highZs[2]).toBe(0xFFFFFFFF);
     });
   });
 
@@ -292,22 +293,22 @@ describe("DriverInvSel", () => {
   describe("enableLow (active-low: sel=0 → output = input)", () => {
     it("sel=0, input=0xFF → output=0xFF, highZ=0", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0xFF, 0, 0, 0);
+      const state = makeState(0xFF, 0, 0);
       const highZs = new Uint32Array(state.length);
       executeDriverInvSel(0, state, highZs, layout);
       expect(state[2]).toBe(0xFF);
-      expect(state[3]).toBe(0);
+      expect(highZs[2]).toBe(0);
     });
   });
 
   describe("enableHigh (sel=1 → high-Z)", () => {
     it("sel=1 → output=0, highZ=0xFFFFFFFF", () => {
       const layout = makeDriverLayout();
-      const state = makeState(0xFF, 1, 0, 0);
+      const state = makeState(0xFF, 1, 0);
       const highZs = new Uint32Array(state.length);
       executeDriverInvSel(0, state, highZs, layout);
       expect(state[2]).toBe(0);
-      expect(state[3]).toBe(0xFFFFFFFF);
+      expect(highZs[2]).toBe(0xFFFFFFFF);
     });
   });
 
@@ -664,10 +665,10 @@ describe("BusSplitter", () => {
   });
 
   describe("attributeMapping", () => {
-    it("Bits maps to bits with integer conversion", () => {
+    it("Bits maps to bitWidth with integer conversion", () => {
       const m = BUS_SPLITTER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
       expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("bits");
+      expect(m!.propertyKey).toBe("bitWidth");
       expect(m!.convert("8")).toBe(8);
     });
 

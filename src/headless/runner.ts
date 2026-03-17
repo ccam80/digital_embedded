@@ -10,7 +10,7 @@
  */
 
 import type { Circuit } from "@/core/circuit";
-import type { SimulationEngine } from "@/core/engine-interface";
+import type { SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
 import { BitVector } from "@/core/signal";
 import { OscillationError } from "@/core/errors";
@@ -19,12 +19,18 @@ import { DigitalEngine } from "@/engine/digital-engine";
 import type { ConcreteCompiledCircuit } from "@/engine/digital-engine";
 import { FacadeError } from "./types.js";
 
+/**
+ * Factory function that creates and initialises a SimulationEngine from a
+ * compiled circuit. The default factory creates a DigitalEngine in level mode.
+ */
+export type EngineFactory = (compiled: CompiledCircuit) => SimulationEngine;
+
 // ---------------------------------------------------------------------------
 // EngineRecord — compiled circuit paired with engine for label resolution
 // ---------------------------------------------------------------------------
 
 interface EngineRecord {
-  readonly engine: DigitalEngine;
+  readonly engine: SimulationEngine;
   readonly compiled: ConcreteCompiledCircuit;
 }
 
@@ -58,17 +64,27 @@ export class SimulationRunner {
   /**
    * Compile a circuit into an initialized SimulationEngine.
    *
-   * Runs the compiler (topological sort + net assignment), creates a
-   * DigitalEngine in level-by-level mode, and calls init() on it.
+   * Runs the compiler (topological sort + net assignment), creates an engine
+   * via the provided factory (defaults to DigitalEngine in level mode), and
+   * calls init() on it.
    *
-   * @param circuit  The visual circuit model to compile.
-   * @returns        A SimulationEngine ready for stepping.
+   * @param circuit        The visual circuit model to compile.
+   * @param engineFactory  Optional factory to create a non-default engine.
+   * @returns              A SimulationEngine ready for stepping.
    */
-  compile(circuit: Circuit): SimulationEngine {
+  compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationEngine {
     const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
+    const engine = engineFactory
+      ? engineFactory(compiled)
+      : SimulationRunner._defaultEngineFactory(compiled);
+    this._records.set(engine, { engine, compiled });
+    return engine;
+  }
+
+  /** Default factory: creates a DigitalEngine in level-by-level mode. */
+  private static _defaultEngineFactory(compiled: CompiledCircuit): SimulationEngine {
     const engine = new DigitalEngine("level");
     engine.init(compiled);
-    this._records.set(engine, { engine, compiled });
     return engine;
   }
 
@@ -142,7 +158,9 @@ export class SimulationRunner {
    */
   setInput(engine: SimulationEngine, label: string, value: number): void {
     const netId = this._resolveLabel(engine, label);
-    engine.setSignalValue(netId, BitVector.fromNumber(value, 1));
+    const record = this._records.get(engine)!;
+    const width = record.compiled.netWidths[netId] ?? 1;
+    engine.setSignalValue(netId, BitVector.fromNumber(value, width));
   }
 
   /**

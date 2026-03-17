@@ -350,11 +350,16 @@ export function executeSplitter(
 
   const wideValue = state[wt[inBase]];
 
+  // Read output splitting pattern from component properties for correct port widths
+  const outputProp = layout.getProperty(index, "output");
+  const outputStr = typeof outputProp === "string" ? outputProp : undefined;
+  const ports = outputStr ? parsePorts(outputStr) : undefined;
+
   let startBit = 0;
   for (let i = 0; i < outCount; i++) {
-    const portValue = extractBits(wideValue, startBit, 1);
-    state[wt[outBase + i]] = portValue;
-    startBit += 1;
+    const width = ports && i < ports.length ? ports[i].bits : 1;
+    state[wt[outBase + i]] = extractBits(wideValue, startBit, width);
+    startBit += width;
   }
 }
 

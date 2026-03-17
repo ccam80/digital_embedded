@@ -9,6 +9,7 @@
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
+import type { AnalogElement } from "../analog/element.js";
 
 // ---------------------------------------------------------------------------
 // ComponentCategory
@@ -82,10 +83,12 @@ export interface ComponentLayout {
   stateOffset(componentIndex: number): number;
   /**
    * Read a per-instance property value for a component at the given index.
-   * Returns undefined when the layout has no property data (e.g. test stubs).
+   * Returns undefined when the property is not set.
    * ExecuteFunctions use this to read bitWidth, signed, etc. at runtime.
+   * Required by all engines — analog engines use it for live slider updates,
+   * digital engines populate it at compile time.
    */
-  getProperty?(componentIndex: number, key: string): PropertyValue | undefined;
+  getProperty(componentIndex: number, key: string): PropertyValue | undefined;
   /**
    * Returns the switch classification for a component: 0=not a switch,
    * 1=unidirectional, 2=bidirectional. Used by switch executeFns to choose
@@ -140,6 +143,8 @@ export type ExecuteFunction = (
 export interface ComponentDefinition {
   /** Type name matching the .dig elementName, e.g. "And", "FlipflopD". */
   name: string;
+  /** Engine type this component targets. Defaults to "digital" when omitted. */
+  engineType?: "digital" | "analog";
   /**
    * Numeric type ID auto-assigned by ComponentRegistry.register().
    * Not serialized. Used only at runtime for function-table dispatch.
@@ -185,6 +190,42 @@ export interface ComponentDefinition {
    * Only switch components set this field.
    */
   switchPins?: [number, number];
+  /**
+   * Factory for creating analog element instances during MNA compilation.
+   *
+   * Called by the analog compiler (Phase 1) for each component instance.
+   * `nodeIds` is the ordered list of MNA node IDs connected to this component's
+   * pins. `branchIdx` is the MNA branch-current row index (-1 if
+   * `requiresBranchRow` is false). `getTime` returns the current simulation
+   * time in seconds and is used by time-dependent sources.
+   *
+   * Not set on digital-only components. Does not affect existing registrations.
+   */
+  analogFactory?: (
+    nodeIds: number[],
+    branchIdx: number,
+    props: PropertyBag,
+    getTime: () => number,
+  ) => AnalogElement;
+  /**
+   * When `true`, the analog compiler assigns an MNA branch-current row index
+   * to this component before calling `analogFactory`. Used by voltage sources
+   * and inductors which require an extra row in the MNA matrix.
+   *
+   * Defaults to `false` when not set.
+   */
+  requiresBranchRow?: boolean;
+  /**
+   * Returns the number of internal MNA nodes this component requires.
+   *
+   * Called by the analog compiler before matrix allocation so the total node
+   * count (and therefore matrix size) is known before any stamps are applied.
+   * Used by components with variable internal topology, such as transmission
+   * lines with configurable segment counts.
+   *
+   * Defaults to 0 when not implemented.
+   */
+  getInternalNodeCount?: (props: PropertyBag) => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -296,6 +337,13 @@ export class ComponentRegistry {
   /** Return all definitions in the given category, in registration order. */
   getByCategory(category: ComponentCategory): ComponentDefinition[] {
     return this._byCategory.get(category) ?? [];
+  }
+
+  /** Return all definitions matching the given engine type, in registration order. */
+  getByEngineType(engineType: "digital" | "analog"): ComponentDefinition[] {
+    return Array.from(this._byName.values()).filter(
+      (d) => (d.engineType ?? "digital") === engineType,
+    );
   }
 
   /** Total number of registered component types. */

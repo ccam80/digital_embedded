@@ -36,6 +36,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -165,12 +166,13 @@ describe("Button", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw calls drawRect at least once (component body)", () => {
+    it("draw calls drawPolygon at least once (component body)", () => {
       const el = makeButton();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      // Button body is a 6-point polygon, not a rect
+      const polygons = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygons.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw calls save and restore", () => {

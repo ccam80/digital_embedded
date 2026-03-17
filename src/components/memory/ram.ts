@@ -264,6 +264,7 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
       componentName: "RAM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -391,6 +392,7 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
       componentName: "RAM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -508,6 +510,7 @@ export class RAMDualPortElement extends AbstractCircuitElement {
       componentName: "RAM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -640,6 +643,7 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
       componentName: "RAM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -763,6 +767,7 @@ export class RAMAsyncElement extends AbstractCircuitElement {
       componentName: "RAM, async.",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -869,6 +874,7 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
       componentName: "RAM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

@@ -16,6 +16,7 @@ import {
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
+import { drawTextUpright } from "../generic-shape.js";
 import {
   ComponentCategory,
   type AttributeMapping,
@@ -40,7 +41,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   get bits(): number {
-    return this._properties.getOrDefault<number>("bits", 1);
+    return this._properties.getOrDefault<number>("bitWidth", 1);
   }
 
   get spreading(): number {
@@ -48,7 +49,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bits = this._properties.getOrDefault<number>("bits", 1);
+    const bits = this._properties.getOrDefault<number>("bitWidth", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     const decls: PinDeclaration[] = [
       {
@@ -88,7 +89,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const bits = this._properties.getOrDefault<number>("bits", 1);
+    const bits = this._properties.getOrDefault<number>("bitWidth", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     // Original height formula covers OE pin at y=1 and all bit pins
     const h = Math.max(2, (bits - 1) * spreading + 1);
@@ -103,9 +104,10 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const bits = this._properties.getOrDefault<number>("bits", 1);
+    const bits = this._properties.getOrDefault<number>("bitWidth", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     const lastBitY = (bits - 1) * spreading;
+    const flip = this.rotation === 2;
 
     ctx.save();
 
@@ -121,8 +123,8 @@ export class BusSplitterElement extends AbstractCircuitElement {
     // Text labels for D and OE on the left (RIGHTBOTTOM anchor → right,bottom)
     ctx.setFont(labelFont);
     ctx.setColor("TEXT");
-    ctx.drawText("D",  -0.1, -0.15, { horizontal: "right", vertical: "bottom" });
-    ctx.drawText("OE", -0.1,  0.85, { horizontal: "right", vertical: "bottom" });
+    drawTextUpright(ctx, "D",  -0.1, -0.15, { horizontal: "right", vertical: "bottom" }, flip);
+    drawTextUpright(ctx, "OE", -0.1,  0.85, { horizontal: "right", vertical: "bottom" }, flip);
 
     // Right side: lead lines from (1,y)→(0.5,y) and labels for each bit
     ctx.setColor("COMPONENT");
@@ -132,7 +134,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
       ctx.setFont(labelFont);
       ctx.setColor("TEXT");
       // LEFTBOTTOM anchor → left,bottom; label offset mirrors Java: x=1.1, y=bitY-0.15
-      ctx.drawText(`D${i}`, 1.1, y - 0.15, { horizontal: "left", vertical: "bottom" });
+      drawTextUpright(ctx, `D${i}`, 1.1, y - 0.15, { horizontal: "left", vertical: "bottom" }, flip);
       ctx.setColor("COMPONENT");
     }
 
@@ -152,7 +154,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    const bits = this._properties.getOrDefault<number>("bits", 1);
+    const bits = this._properties.getOrDefault<number>("bitWidth", 1);
     const spreading = this._properties.getOrDefault<number>("spreading", 1);
     return (
       `BusSplitter — bidirectional bus splitter with OE control.\n` +
@@ -201,7 +203,7 @@ export function executeBusSplitter(
 export const BUS_SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "Bits",
-    propertyKey: "bits",
+    propertyKey: "bitWidth",
     convert: (v) => parseInt(v, 10),
   },
   {
@@ -217,8 +219,8 @@ export const BUS_SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 
 const BUS_SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "bits",
-    type: PropertyType.INT,
+    key: "bitWidth",
+    type: PropertyType.BIT_WIDTH,
     label: "Bits",
     defaultValue: 1,
     description: "Number of bits in the common bus",

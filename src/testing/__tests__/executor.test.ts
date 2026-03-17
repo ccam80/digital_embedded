@@ -230,8 +230,9 @@ describe("executeTests", () => {
     expect(clockCalls[0]).toEqual(["CLK", 1]);
     expect(clockCalls[1]).toEqual(["CLK", 0]);
 
-    // runToStable called twice: once after rising edge, once after falling edge
-    expect(calls.runToStable).toBe(2);
+    // runToStable called three times: once to propagate regular inputs before
+    // clock toggle, once after rising edge, once after falling edge
+    expect(calls.runToStable).toBe(3);
   });
 
   // -------------------------------------------------------------------------

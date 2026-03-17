@@ -91,11 +91,12 @@ export class PlainSwitchElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
+    // Lever and grip extend up to y=-1.25 above origin (matching Switch.ts)
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 1.25,
       width: COMP_WIDTH,
-      height: h,
+      height: h + 1.25,
     };
   }
 
@@ -116,26 +117,31 @@ export class PlainSwitchElement extends AbstractCircuitElement {
         ctx.drawLine(0, yPos, COMP_WIDTH, yPos);
       }
     } else {
-      // Open: angled line — mechanical open contact symbol
+      // Open: angled arm from A toward B (Java: (0,0)→(SIZE*2-4, -yOffs*2) = (1.8,-0.5))
       for (let p = 0; p < poles; p++) {
         const yPos = p * POLE_HEIGHT;
-        ctx.drawLine(0, yPos, COMP_WIDTH - 0.2, yPos - 0.5);
+        ctx.drawLine(0, yPos, 1.8, yPos - 0.5);
       }
     }
 
-    // Lever indicator: dashed vertical line above the contact
-    const yOffs = closed ? 0 : 0.5;
+    // Dashed lever: Java drawLine(SIZE, -yOffs+(poles-1)*2*SIZE, SIZE, -yOffs-SIZE)
+    // Open: yOffs = SIZE2/2 = 0.25 grid → dash from (1, -0.25+(poles-1)*2) to (1, -0.25-1)
+    // Closed: yOffs=0 → dash from (1, (poles-1)*2) to (1, -1)
+    const yOffs = closed ? 0 : 0.25;
     ctx.setLineDash([0.2, 0.2]);
     ctx.drawLine(
-      COMP_WIDTH / 2,
+      1,
       -yOffs + (poles - 1) * POLE_HEIGHT,
-      COMP_WIDTH / 2,
+      1,
       -yOffs - 1,
     );
     ctx.setLineDash([]);
 
-    // Grip: short horizontal bar at top of lever
-    ctx.drawLine(COMP_WIDTH / 4, -yOffs - 1, (COMP_WIDTH * 3) / 4, -yOffs - 1);
+    // Thin grip bar: Java drawLine(SIZE2, -yOffs-SIZE, SIZE+SIZE2, -yOffs-SIZE)
+    // = (0.5, -yOffs-1) to (1.5, -yOffs-1)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.5, -yOffs - 1, 1.5, -yOffs - 1);
+    ctx.setLineWidth(1);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");

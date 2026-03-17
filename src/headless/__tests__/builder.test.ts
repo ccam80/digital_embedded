@@ -173,8 +173,8 @@ describe('CircuitBuilder', () => {
       const el3 = builder.addComponent(circuit, 'Mock');
 
       expect(el1.position).toEqual({ x: 0, y: 0 });
-      expect(el2.position).toEqual({ x: 0, y: 4 });
-      expect(el3.position).toEqual({ x: 0, y: 8 });
+      expect(el2.position).toEqual({ x: 0, y: 8 });
+      expect(el3.position).toEqual({ x: 0, y: 16 });
     });
   });
 
@@ -189,7 +189,7 @@ describe('CircuitBuilder', () => {
       expect(circuit.wires).toHaveLength(1);
       expect(wire).toBeDefined();
       expect(wire.start).toEqual({ x: 2, y: 0 });
-      expect(wire.end).toEqual({ x: -2, y: 4 });
+      expect(wire.end).toEqual({ x: -2, y: 8 });
     });
   });
 

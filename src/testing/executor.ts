@@ -143,6 +143,11 @@ function executeVector(
     inputRecord[name] = numericValue;
   }
 
+  // Propagate regular inputs so combinational paths (decoders, enables,
+  // muxes) settle before any clock edge arrives.  Without this, sequential
+  // components' sampleFns would see stale enable/data signals.
+  facade.runToStable(engine);
+
   // Handle clock inputs: toggle high → stable → low → stable
   if (clockInputs.length > 0) {
     for (const name of clockInputs) {
@@ -154,9 +159,6 @@ function executeVector(
     for (const name of clockInputs) {
       facade.setInput(engine, name, 0);
     }
-    facade.runToStable(engine);
-  } else {
-    // No clock inputs — propagate the regular inputs
     facade.runToStable(engine);
   }
 

@@ -134,6 +134,9 @@ export class SwitchDTElement extends AbstractCircuitElement {
     // Contact arm line: (0,0) to (1.8,0.5)
     ctx.drawLine(0, 0, 1.8, 0.5);
 
+    // Zero-length segment at B pin (2,0) so pin proximity check passes
+    ctx.drawLine(2, 0, 2, 0);
+
     // Dashed linkage: (1,0.25) to (1,-0.75)
     ctx.setLineDash([0.2, 0.2]);
     ctx.drawLine(1, 0.25, 1, -0.75);

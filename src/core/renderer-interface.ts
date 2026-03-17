@@ -34,6 +34,7 @@ export type ThemeColor =
   | "WIRE_Z"
   | "WIRE_ERROR"
   | "WIRE_UNDEFINED"
+  | "WIRE_ANALOG"
   | "COMPONENT"
   | "COMPONENT_FILL"
   | "PIN"
@@ -107,11 +108,12 @@ const LIGHT_COLORS: ColorMap = {
   WIRE_Z: "#aaaaaa",
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff4444",
+  WIRE_ANALOG: "#2266cc",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
   PIN: "#0000cc",
   TEXT: "#000000",
-  GRID: "#dddddd",
+  GRID: "#eeeeee",
   BACKGROUND: "#f8f8f8",
   SELECTION: "#0066cc",
 };
@@ -123,11 +125,12 @@ const DARK_COLORS: ColorMap = {
   WIRE_Z: "#4444ff",
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff8800",
+  WIRE_ANALOG: "#4488ff",
   COMPONENT: "#cccccc",
   COMPONENT_FILL: "#333333",
   PIN: "#4444ff",
   TEXT: "#ffffff",
-  GRID: "#222222",
+  GRID: "#2d2d2d",
   BACKGROUND: "#000000",
   SELECTION: "#ffff00",
 };
@@ -139,6 +142,7 @@ const HIGH_CONTRAST_COLORS: ColorMap = {
   WIRE_Z: "#cccccc",
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff4444",
+  WIRE_ANALOG: "#66aaff",
   COMPONENT: "#ffffff",
   COMPONENT_FILL: "#000000",
   PIN: "#4488ff",
@@ -155,6 +159,7 @@ const MONOCHROME_COLORS: ColorMap = {
   WIRE_Z: "#888888",
   WIRE_ERROR: "#444444",
   WIRE_UNDEFINED: "#444444",
+  WIRE_ANALOG: "#000000",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
   PIN: "#000000",
@@ -188,6 +193,7 @@ export const THEME_COLORS: readonly ThemeColor[] = [
   "WIRE_Z",
   "WIRE_ERROR",
   "WIRE_UNDEFINED",
+  "WIRE_ANALOG",
   "COMPONENT",
   "COMPONENT_FILL",
   "PIN",

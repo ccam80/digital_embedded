@@ -55,6 +55,7 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
     outputCount: (_i: number) => outputCount,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount + outputCount,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -311,7 +312,7 @@ describe("EEPROM", () => {
       setFont: () => {},
       drawRect: () => calls.push("drawRect"),
       drawText: (text: string) => texts.push(text),
-      drawPolygon: () => {},
+      drawPolygon: () => calls.push("drawPolygon"),
       drawLine: () => {},
       drawCircle: () => {},
       drawArc: () => {},
@@ -323,7 +324,7 @@ describe("EEPROM", () => {
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    expect(calls).toContain("drawRect");
+    expect(calls).toContain("drawPolygon");
     expect(texts.some(t => t.includes("EEPROM"))).toBe(true);
   });
 

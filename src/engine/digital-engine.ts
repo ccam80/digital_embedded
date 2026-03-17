@@ -33,6 +33,7 @@ import type { Wire } from "@/core/circuit";
 import type { EvaluationMode } from "./evaluation-mode.js";
 import { initializeCircuit } from "./init-sequence.js";
 import type { InitializableEngine } from "./init-sequence.js";
+import { DataField, registerBackingStore, clearBackingStores } from "@/components/memory/ram.js";
 import type { BusResolver } from "./bus-resolution.js";
 import { OscillationError } from "@/core/errors.js";
 import { OscillationDetector, COLLECTION_STEPS } from "./oscillation.js";
@@ -264,6 +265,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       outputCount: () => 0,
       outputOffset: () => 0,
       stateOffset: () => 0,
+      getProperty: () => undefined,
     };
   }
 
@@ -307,6 +309,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._pendingTimedEvents = [];
     this._initSnapshotBuffer = new Uint32Array(arraySize);
     this._switchPrevStates = new Uint32Array(circuit.switchComponentIndices?.length ?? 0);
+    initializeBackingStores(circuit);
     initializeCircuit(this);
   }
 
@@ -319,6 +322,10 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._currentTime = 0n;
     this._pendingTimedEvents = [];
     this._setState(EngineState.STOPPED);
+    clearBackingStores();
+    if (this._compiled !== null) {
+      initializeBackingStores(this._compiled);
+    }
   }
 
   dispose(): void {
@@ -329,6 +336,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._changeListeners.clear();
     this._measurementObservers.clear();
     this._setState(EngineState.STOPPED);
+    clearBackingStores();
   }
 
   // -------------------------------------------------------------------------
@@ -997,5 +1005,70 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     for (const observer of this._measurementObservers) {
       observer.onStep(this._stepCount);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Backing store initialization for memory components
+// ---------------------------------------------------------------------------
+
+/**
+ * Component type names that require DataField backing stores.
+ * These components use `getBackingStore(index)` in their executeFn
+ * to read/write memory contents.
+ */
+const MEMORY_COMPONENT_TYPES = new Set([
+  "RAMSinglePort",
+  "RAMSinglePortSel",
+  "RAMDualPort",
+  "RAMDualAccess",
+  "RAMAsync",
+  "BlockRAMDualPort",
+  "ROM",
+  "ROMDualPort",
+  "EEPROM",
+  "EEPROMDualPort",
+  "LookUpTable",
+  "ProgramMemory",
+]);
+
+/**
+ * Create and register DataField backing stores for all memory components
+ * in the compiled circuit. Must be called after compilation (so component
+ * indices are assigned) and before initializeCircuit() (so the init
+ * sequence's evaluation passes can read memory).
+ */
+function initializeBackingStores(circuit: ConcreteCompiledCircuit): void {
+  clearBackingStores();
+
+  const { layout, typeIds, typeNames } = circuit;
+  if (!typeNames || typeNames.length === 0) return;
+
+  for (let i = 0; i < circuit.componentCount; i++) {
+    const typeId = typeIds[i];
+    if (typeId === undefined) continue;
+    const typeName = typeNames[typeId];
+    if (typeName === undefined || !MEMORY_COMPONENT_TYPES.has(typeName)) continue;
+
+    // Determine memory size: addrBits for most types, inputCount for LookUpTable
+    let addrBits: number;
+    if (typeName === "LookUpTable") {
+      const inputCount = layout.getProperty(i, "inputCount");
+      addrBits = typeof inputCount === "number" ? inputCount : 2;
+    } else {
+      const ab = layout.getProperty(i, "addrBits");
+      addrBits = typeof ab === "number" ? ab : 4;
+    }
+
+    const size = 1 << addrBits;
+    const field = new DataField(size);
+
+    // Initialize from the data property if present
+    const data = layout.getProperty(i, "data");
+    if (Array.isArray(data) && data.length > 0) {
+      field.initFrom(data as number[]);
+    }
+
+    registerBackingStore(i, field);
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import { Circuit, Wire } from '../core/circuit.js';
-import type { ComponentRegistry, ComponentDefinition } from '../core/registry.js';
+import type { ComponentRegistry, ComponentDefinition, AttributeMapping } from '../core/registry.js';
 import type { PropertyValue } from '../core/properties.js';
 import { PropertyBag } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
@@ -23,7 +23,7 @@ import { resolveNets } from './netlist.js';
 import { autoLayout } from './auto-layout.js';
 import type { LayoutConstraint } from './auto-layout.js';
 
-const AUTO_POSITION_Y_STEP = 4;
+const AUTO_POSITION_Y_STEP = 8;
 
 /**
  * String similarity for suggesting corrections (Levenshtein-like heuristic)
@@ -113,6 +113,60 @@ export class CircuitBuilder {
   }
 
   /**
+   * Translate user-supplied property keys using the component's attributeMap.
+   *
+   * Accepts both XML-convention keys (e.g. "Bits") and internal keys
+   * (e.g. "bitWidth"). XML keys are translated to internal keys via the
+   * attributeMap. Unknown keys that don't match any propertyDef or
+   * attributeMap entry are passed through with a console warning.
+   */
+  private translateProps(
+    definition: ComponentDefinition,
+    props: Record<string, PropertyValue>,
+  ): Record<string, PropertyValue> {
+    if (!props || Object.keys(props).length === 0) return props;
+
+    const xmlToInternal = new Map<string, AttributeMapping>();
+    for (const mapping of definition.attributeMap) {
+      xmlToInternal.set(mapping.xmlName, mapping);
+    }
+
+    const knownKeys = new Set<string>();
+    for (const pd of definition.propertyDefs) {
+      knownKeys.add(pd.key);
+    }
+    // 'position' and 'label' are universal implicit keys
+    knownKeys.add('position');
+    knownKeys.add('label');
+
+    const translated: Record<string, PropertyValue> = {};
+
+    for (const [key, value] of Object.entries(props)) {
+      // Already an internal key?
+      if (knownKeys.has(key)) {
+        translated[key] = value;
+        continue;
+      }
+
+      // XML-convention key? Translate to internal.
+      const mapping = xmlToInternal.get(key);
+      if (mapping) {
+        // Don't overwrite if the caller also supplied the internal key
+        if (!(mapping.propertyKey in translated) && !(mapping.propertyKey in props)) {
+          translated[mapping.propertyKey] = value;
+        }
+        continue;
+      }
+
+      // Unknown key — pass through (may be a component-specific key we
+      // don't have a propertyDef for, e.g. dynamic subcircuit props)
+      translated[key] = value;
+    }
+
+    return translated;
+  }
+
+  /**
    * Add a component to the circuit by type name
    * Auto-positions sequentially unless caller specifies position in props
    */
@@ -133,9 +187,12 @@ export class CircuitBuilder {
       );
     }
 
+    // Translate XML-convention keys (e.g. "Bits") to internal keys (e.g. "bitWidth")
+    const resolvedProps = this.translateProps(definition, props || {});
+
     // Build property bag from defaults and caller props
     const bag = new PropertyBag();
-    for (const [key, value] of Object.entries(props || {})) {
+    for (const [key, value] of Object.entries(resolvedProps)) {
       bag.set(key, value);
     }
 
@@ -396,7 +453,7 @@ export class CircuitBuilder {
           const { element } = resolveComponent(targetCircuit, op.target);
 
           // Re-instantiate the element so pin widths reflect the new
-          // properties (e.g. changing Bits must rebuild pins).
+          // properties (e.g. changing bitWidth must rebuild pins).
           const oldPosition = element.position;
           const oldRotation = element.rotation;
           const oldMirror = element.mirror;

@@ -87,6 +87,7 @@ class StubLayout implements ComponentLayout {
   outputCount(_i: number): number { return 1; }
   outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
   stateOffset(_i: number): number { return 0; }
+  getProperty(): undefined { return undefined; }
 }
 
 // ---------------------------------------------------------------------------

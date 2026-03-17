@@ -25,3 +25,10 @@
 - [ ] State diagram editor scope — Phase 8.2 mentions a graphical state diagram as a stretch goal. Should this be committed to or explicitly deferred to a separate plan? The state transition table (non-graphical) is the minimum deliverable.
 - [ ] View menu placement — Phase 8.3 proposes a new top-level "View" menu. Currently the menubar has File, Edit, Insert, Simulation. Adding both "View" and "Analysis" menus brings the count to 6. At 600px with the hamburger menu this is fine, but at 768px-1024px the menubar may feel crowded. Need to validate layout.
 - [ ] FILE property type: what file formats should the picker accept? — Phase 6.4 proposes `.hex,.bin,.dat` for the file input accept attribute. Need to confirm against what formats RAM/ROM components actually support for data loading.
+
+## tutorial-index-and-editor - 2026-03-16
+
+- [ ] Should the editor embed a simulator iframe for live circuit preview? — Currently scoped as NO (export JSON, use tutorial_create). But a future enhancement could embed simulator.html for real-time test-vector execution. Impacts editor complexity significantly.
+- [ ] Should tutorials/index.json include a thumbnail/preview image path? — Cards would look better with a circuit screenshot. But generating thumbnails automatically requires headless rendering, which does not exist yet. Defer or plan separately.
+- [ ] What is the right behavior when tutorial_create is called with an outputDir outside tutorials/? — The index.json upsert assumes tutorials live under tutorials/. If someone writes to a different path, manifestPath will still point there but tutorials.html resolves relative to its own location. Need to decide: warn, error, or allow.
+- [ ] Should locked mode field restrictions be defined in the manifest itself or only via URL params? — Plan says URL params (`?mode=locked&editable=testData,instructions`). An alternative is a `lockedFields` array in the manifest. URL params are simpler and do not pollute the manifest schema.

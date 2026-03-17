@@ -34,7 +34,6 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 interface LayoutWithState extends ComponentLayout {
   stateOffset(componentIndex: number): number;
-  getProperty?(componentIndex: number, key: string): number;
 }
 
 /**
@@ -332,13 +331,13 @@ describe("Monoflop", () => {
   });
 
   describe("rendering", () => {
-    it("draw() calls drawRect for body", () => {
+    it("draw() calls drawPolygon for body", () => {
       const props = new PropertyBag();
       props.set("timerDelay", 1);
       const el = new MonoflopElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 

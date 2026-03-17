@@ -190,6 +190,7 @@ export class ROMElement extends AbstractCircuitElement {
       componentName: "ROM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -323,6 +324,7 @@ export class ROMDualPortElement extends AbstractCircuitElement {
       componentName: "ROM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

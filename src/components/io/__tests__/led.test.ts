@@ -55,6 +55,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -185,12 +186,15 @@ describe("LED", () => {
       expect(textCalls.some((c) => c.args[0] === "D1")).toBe(true);
     });
 
-    it("draw does not render text when label is empty", () => {
+    it("draw does not render label text when label is empty (drawText not called with label)", () => {
+      // LED.draw always calls drawText for the label position, but only with non-empty label.
+      // When label is empty no drawText is emitted.
       const el = makeLed({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls).toHaveLength(0);
+      // LED draw() omits drawText entirely when label is empty
+      expect(textCalls.filter((c) => c.args[0] !== "")).toHaveLength(0);
     });
 
     it("color property is accessible", () => {
@@ -310,21 +314,22 @@ describe("PolarityAwareLED", () => {
   });
 
   describe("colorRendering", () => {
-    it("draw calls drawCircle", () => {
+    it("draw calls drawPolygon (diode triangle body)", () => {
       const el = makePolarityLed();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const circles = calls.filter((c) => c.method === "drawCircle");
-      expect(circles.length).toBeGreaterThanOrEqual(1);
+      // PolarityLed draws a diode triangle via drawPolygon, not a circle
+      const polygons = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygons.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders A and K polarity markers", () => {
+    it("draw renders diode symbol lines (cathode bar and leads)", () => {
       const el = makePolarityLed();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "A")).toBe(true);
-      expect(textCalls.some((c) => c.args[0] === "K")).toBe(true);
+      // PolarityLed draws cathode bar, stem, leads via drawLine
+      const lines = calls.filter((c) => c.method === "drawLine");
+      expect(lines.length).toBeGreaterThanOrEqual(3);
     });
 
     it("draw renders label when set", () => {
@@ -597,22 +602,22 @@ describe("RGBLED", () => {
       expect(circles.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw calls drawArc (sector markers)", () => {
+    it("draw calls drawCircle (LED body circles)", () => {
       const el = makeRgbLed();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const arcs = calls.filter((c) => c.method === "drawArc");
-      expect(arcs.length).toBeGreaterThanOrEqual(3);
+      // RGBLED draws outer filled circle, outer outline, and inner circle
+      const circles = calls.filter((c) => c.method === "drawCircle");
+      expect(circles.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("draw renders R, G, B channel labels", () => {
+    it("draw calls drawLine for lead wires to R, G, B pins", () => {
       const el = makeRgbLed();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "R")).toBe(true);
-      expect(textCalls.some((c) => c.args[0] === "G")).toBe(true);
-      expect(textCalls.some((c) => c.args[0] === "B")).toBe(true);
+      // RGBLED draws lead lines from R pin and B pin to LED center
+      const lines = calls.filter((c) => c.method === "drawLine");
+      expect(lines.length).toBeGreaterThanOrEqual(2);
     });
 
     it("draw renders label when set", () => {

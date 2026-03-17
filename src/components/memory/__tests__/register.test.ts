@@ -51,7 +51,7 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 interface LayoutWithState extends ComponentLayout {
   stateOffset(componentIndex: number): number;
-  getProperty?(componentIndex: number, key: string): number;
+  getProperty(componentIndex: number, key: string): number;
 }
 
 /**
@@ -305,13 +305,13 @@ describe("Register", () => {
   });
 
   describe("rendering", () => {
-    it("draw() calls drawRect for body", () => {
+    it("draw() calls drawPolygon for body", () => {
       const props = new PropertyBag();
       props.set("bitWidth", 8);
       const el = new RegisterElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter(c => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter(c => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() renders D, C, en, Q labels", () => {
@@ -584,14 +584,14 @@ describe("RegisterFile", () => {
   });
 
   describe("rendering", () => {
-    it("draw() calls drawRect for body", () => {
+    it("draw() calls drawPolygon for body", () => {
       const props = new PropertyBag();
       props.set("bitWidth", 8);
       props.set("addrBits", 2);
       const el = new RegisterFileElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter(c => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter(c => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() renders Din, we, Rw, C, Ra, Rb, Da, Db labels", () => {

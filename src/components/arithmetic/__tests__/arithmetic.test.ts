@@ -61,6 +61,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -326,20 +327,20 @@ describe("Add", () => {
   });
 
   describe("rendering", () => {
-    it("draw calls drawRect for the body", () => {
+    it("draw calls drawPolygon for the body", () => {
       const el = makeAddElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw calls drawText with '+' symbol", () => {
+    it("draw calls drawText with 'Add' name", () => {
       const el = makeAddElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "+")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "Add")).toBe(true);
     });
 
     it("draw calls save and restore", () => {
@@ -554,18 +555,18 @@ describe("Sub", () => {
   });
 
   describe("rendering", () => {
-    it("draw calls drawRect for the body", () => {
+    it("draw calls drawPolygon for the body", () => {
       const el = makeSubElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
     });
 
-    it("draw calls drawText with '-' symbol", () => {
+    it("draw calls drawText with 'Sub' name", () => {
       const el = makeSubElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "-")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Sub")).toBe(true);
     });
   });
 
@@ -779,25 +780,25 @@ describe("Mul", () => {
   });
 
   describe("rendering", () => {
-    it("unsigned mul draws '*' symbol", () => {
+    it("unsigned mul draws 'Mul' name", () => {
       const el = makeMulElement({ signed: false });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "*")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Mul")).toBe(true);
     });
 
-    it("signed mul draws 'A*B' symbol", () => {
+    it("signed mul draws 'Mul' name", () => {
       const el = makeMulElement({ signed: true });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "A*B")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Mul")).toBe(true);
     });
 
-    it("draw calls drawRect for the body", () => {
+    it("draw calls drawPolygon for the body", () => {
       const el = makeMulElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
     });
   });
 
@@ -1051,25 +1052,25 @@ describe("Div", () => {
   });
 
   describe("rendering", () => {
-    it("unsigned div draws '/' symbol", () => {
+    it("unsigned div draws 'Div' name", () => {
       const el = makeDivElement({ signed: false });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "/")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Div")).toBe(true);
     });
 
-    it("signed div draws 'A/B' symbol", () => {
+    it("signed div draws 'Div' name", () => {
       const el = makeDivElement({ signed: true });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "A/B")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Div")).toBe(true);
     });
 
-    it("draw calls drawRect for the body", () => {
+    it("draw calls drawPolygon for the body", () => {
       const el = makeDivElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
     });
 
     it("draws label when set", () => {

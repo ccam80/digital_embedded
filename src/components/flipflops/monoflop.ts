@@ -123,6 +123,7 @@ export class MonoflopElement extends AbstractCircuitElement {
       componentName: "Mono",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -158,7 +159,7 @@ export function sampleMonoflop(index: number, state: Uint32Array, _highZs: Uint3
   const inBase = layout.inputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
+    getProperty(i: number, key: string): number;
   };
   const stBase = extLayout.stateOffset(index);
 

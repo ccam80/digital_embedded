@@ -55,6 +55,7 @@ function makeLayoutSingle(inputOffset: number, outputOffset: number): ComponentL
     outputCount: () => 1,
     outputOffset: () => outputOffset,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -190,6 +191,7 @@ describe("Diode", () => {
         outputCount: () => 5,
         outputOffset: () => 2,
         stateOffset: () => 7,
+        getProperty: () => undefined,
       };
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
@@ -215,6 +217,7 @@ describe("Diode", () => {
         outputCount: () => 5,
         outputOffset: () => 2,
         stateOffset: () => 7,
+        getProperty: () => undefined,
       };
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
@@ -235,6 +238,7 @@ describe("Diode", () => {
         outputCount: () => 5,
         outputOffset: () => 2,
         stateOffset: () => 7,
+        getProperty: () => undefined,
       };
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
@@ -256,6 +260,7 @@ describe("Diode", () => {
         outputCount: () => 5,
         outputOffset: () => 2,
         stateOffset: () => 7,
+        getProperty: () => undefined,
       };
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
@@ -276,6 +281,7 @@ describe("Diode", () => {
         outputCount: () => 5,
         outputOffset: () => 2,
         stateOffset: () => 7,
+        getProperty: () => undefined,
       };
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
@@ -302,11 +308,12 @@ describe("Diode", () => {
       expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawLine for lead wires and cathode bar", () => {
+    it("draw() calls drawPath for triangle and drawLine for cathode bar", () => {
       const d = makeDiode();
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(3);
+      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() with label calls drawText", () => {
@@ -376,10 +383,10 @@ describe("Diode", () => {
     it("getBoundingBox returns correct dimensions", () => {
       const d = makeDiode();
       const bb = d.getBoundingBox();
-      expect(bb.x).toBe(0);
-      expect(bb.y).toBe(0);
-      expect(bb.width).toBeGreaterThanOrEqual(2);
-      expect(bb.height).toBeGreaterThanOrEqual(2);
+      expect(bb.x).toBe(-0.5);
+      expect(bb.y).toBe(-0.95);
+      expect(bb.width).toBeGreaterThanOrEqual(0.5);
+      expect(bb.height).toBeGreaterThanOrEqual(0.5);
     });
   });
 
@@ -524,6 +531,7 @@ describe("DiodeForward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -544,6 +552,7 @@ describe("DiodeForward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -563,6 +572,7 @@ describe("DiodeForward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -587,11 +597,12 @@ describe("DiodeForward", () => {
       expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawLine for lead wires and cathode bar", () => {
+    it("draw() calls drawLine for the cathode bar", () => {
       const d = makeDiodeForward();
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(3);
+      // drawDiodeBodyForward draws: drawPath (triangle) + drawLine (cathode bar at y=0.95)
+      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() with label calls drawText", () => {
@@ -708,6 +719,7 @@ describe("DiodeBackward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -728,6 +740,7 @@ describe("DiodeBackward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -748,6 +761,7 @@ describe("DiodeBackward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const state = makeState(6);
       const highZs = new Uint32Array(state.length);
@@ -767,6 +781,7 @@ describe("DiodeBackward", () => {
         outputCount: () => 3,
         outputOffset: () => 1,
         stateOffset: () => 4,
+        getProperty: () => undefined,
       };
       const stateBackward = makeState(6);
       stateBackward[0] = 0;
@@ -797,11 +812,12 @@ describe("DiodeBackward", () => {
       expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawLine for the cathode bar and lead wires", () => {
+    it("draw() calls drawLine for the cathode bar", () => {
       const d = makeDiodeBackward();
       const { ctx, calls } = makeStubCtx();
       d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(3);
+      // drawDiodeBodyBackward draws: drawPath (triangle) + drawLine (cathode bar at y=-0.05)
+      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() with label calls drawText", () => {
@@ -1166,11 +1182,12 @@ describe("PullDown", () => {
       expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawPath for the resistor zigzag body", () => {
+    it("draw() calls drawRect for the resistor body", () => {
       const pd = makePullDown();
       const { ctx, calls } = makeStubCtx();
       pd.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
+      // PullDown draws resistor body with drawRect, not drawPath
+      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() with label calls drawText", () => {

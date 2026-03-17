@@ -41,6 +41,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -247,20 +248,20 @@ describe("Terminal", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component body rect", () => {
+    it("draw renders component body polygon", () => {
       const el = makeTerminal();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders screen symbol rect inside body", () => {
+    it("draw renders component shape via drawPolygon", () => {
       const el = makeTerminal();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(2);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(2);
     });
 
     it("draw renders Terminal label text", () => {
@@ -533,12 +534,12 @@ describe("Keyboard", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component body rect", () => {
+    it("draw renders component body polygon", () => {
       const el = makeKeyboard();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw renders component name 'Keyboard'", () => {

@@ -688,7 +688,7 @@ export function getJavaPinPositions(
 
     // --- BusSplitter ---
     case "BusSplitter": {
-      const busBits = (props["bits"] as number) ?? 8;
+      const busBits = (props["bitWidth"] as number) ?? (props["bits"] as number) ?? 1;
       const busSpreading = (props["spreading"] as number) ?? 1;
       const pins: JavaPinRef[] = [];
       pins.push({ label: "D", x: 0, y: 0 });

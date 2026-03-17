@@ -22,7 +22,6 @@ import type { ComponentLayout } from "../../../core/registry.js";
 
 interface LayoutWithState extends ComponentLayout {
   stateOffset(componentIndex: number): number;
-  getProperty?(componentIndex: number, key: string): number;
 }
 
 function makeLayout(
@@ -73,7 +72,7 @@ describe("DFlipFlop", () => {
     expect(state[4]).toBe(1);
     executeD(0, state, highZs, layout);
     expect(state[2]).toBe(1);
-    expect(state[3]).toBe((~1) >>> 0);
+    expect(state[3]).toBe(0);
   });
 
   it("sampleD_ignores_falling_edge", () => {

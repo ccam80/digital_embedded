@@ -36,7 +36,7 @@ export type TouchDropHandler = (def: ComponentDefinition, worldPt: Point) => voi
 export class PaletteUI {
   private readonly _palette: ComponentPalette;
   private readonly _container: HTMLElement;
-  private readonly _colorScheme: ColorScheme | null;
+  private _colorScheme: ColorScheme | null;
   private _placementHandler: PlacementHandler | null = null;
   private _allowlistChangeHandler: AllowlistChangeHandler | null = null;
   private _touchDropHandler: TouchDropHandler | null = null;
@@ -57,6 +57,14 @@ export class PaletteUI {
   setCanvas(canvas: HTMLCanvasElement, viewport: Viewport): void {
     this._canvas = canvas;
     this._viewport = viewport;
+  }
+
+  /**
+   * Update the color scheme used for palette icons and re-render.
+   */
+  setColorScheme(scheme: ColorScheme): void {
+    this._colorScheme = scheme;
+    this.render();
   }
 
   /**
@@ -352,12 +360,16 @@ export class PaletteUI {
         }
       }
 
-      if (dragging && this._canvas) {
-        const rect = this._canvas.getBoundingClientRect();
-        const overCanvas =
-          e.clientX >= rect.left && e.clientX <= rect.right &&
-          e.clientY >= rect.top && e.clientY <= rect.bottom;
-        this._dragController.move(e.clientX, e.clientY, overCanvas);
+      if (dragging) {
+        // Prevent browser back/forward gesture while dragging
+        e.preventDefault();
+        if (this._canvas) {
+          const rect = this._canvas.getBoundingClientRect();
+          const overCanvas =
+            e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom;
+          this._dragController.move(e.clientX, e.clientY, overCanvas);
+        }
       }
     });
 
@@ -410,7 +422,7 @@ export class PaletteUI {
 
     const canvas = document.createElement("canvas");
     canvas.className = "palette-component-icon";
-    const size = 24;
+    const size = 32;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size * dpr;
     canvas.height = size * dpr;
@@ -436,7 +448,9 @@ export class PaletteUI {
       ctx2d.scale(scale, scale);
 
       const renderer = new CanvasRenderer(ctx2d, this._colorScheme);
-      renderer.setGridScale(scale);
+      // Ensure lines are at least 1.5 device pixels wide even at small icon scale
+      const minLineScale = (1.5 * dpr) / scale;
+      renderer.setGridScale(Math.min(scale, 1 / minLineScale));
       element.draw(renderer);
     } catch {
       // If rendering fails, just return empty canvas

@@ -920,8 +920,12 @@ function pointToSegmentDistance(
 export function checkPinProximity(
   pins: ReadonlyArray<{ label: string; x: number; y: number }>,
   segments: readonly LineSegment[],
-  threshold = 0.1,
+  threshold = 0.6,
 ): PinProximityResult {
+  // Text-only components produce no segments — nothing to be "detached from".
+  // Skip proximity check when the drawn shape has no geometric content.
+  if (segments.length === 0) return { detached: [] };
+
   const detached: PinProximityResult["detached"] = [];
 
   for (const pin of pins) {

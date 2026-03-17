@@ -182,21 +182,20 @@ export type EngineResponse =
 export type SnapshotId = number;
 
 // ---------------------------------------------------------------------------
-// SimulationEngine — pluggable simulation contract
+// Engine — base simulation contract (Phase 0, Task 0.1.1)
 // ---------------------------------------------------------------------------
 
 /**
- * The simulation engine interface. All editor, renderer, and tool code
- * interacts with the engine exclusively through this interface.
+ * Base engine interface shared by all simulation backend implementations.
  *
- * Implementations:
- *  - Main-thread engine: runs synchronously; signal array is a plain Uint32Array.
- *  - Web Worker engine: runs in a Worker; signal array is backed by SharedArrayBuffer;
- *    UI reads signals through Atomics.load() via getSignalRaw().
+ * This interface defines the core lifecycle and execution methods that any
+ * simulation engine must provide. Concrete implementations (digital, analog, etc.)
+ * extend this base with backend-specific methods.
  *
- * The rendering code is identical in both modes — it always calls getSignalRaw().
+ * Implementations must be pluggable and engine-agnostic to the editor and
+ * renderer — no simulation logic in the UI layer.
  */
-export interface SimulationEngine {
+export interface Engine {
   // -------------------------------------------------------------------------
   // Lifecycle
   // -------------------------------------------------------------------------
@@ -220,26 +219,11 @@ export interface SimulationEngine {
    */
   dispose(): void;
 
-  // -------------------------------------------------------------------------
-  // Execution
-  // -------------------------------------------------------------------------
-
   /**
    * Advance one full propagation cycle: evaluate all combinational logic
-   * until a stable state is reached.
+   * until a stable state is reached. Backend-specific interpretation.
    */
   step(): void;
-
-  /**
-   * Advance by a single gate evaluation (event-driven micro-step mode).
-   * Used for educational step-through debugging.
-   */
-  microStep(): void;
-
-  /**
-   * Run the simulation until a Break component fires or an error occurs.
-   */
-  runToBreak(): void;
 
   // -------------------------------------------------------------------------
   // Continuous run
@@ -263,6 +247,57 @@ export interface SimulationEngine {
 
   /** Return the current execution state of the engine. */
   getState(): EngineState;
+
+  // -------------------------------------------------------------------------
+  // Observation
+  // -------------------------------------------------------------------------
+
+  /**
+   * Register a listener to be called on every engine state transition.
+   * Safe to call multiple times with different listeners.
+   */
+  addChangeListener(listener: EngineChangeListener): void;
+
+  /**
+   * Remove a previously registered listener. No-op if the listener was not
+   * registered.
+   */
+  removeChangeListener(listener: EngineChangeListener): void;
+}
+
+// ---------------------------------------------------------------------------
+// SimulationEngine — digital-specific simulation contract
+// ---------------------------------------------------------------------------
+
+/**
+ * The digital simulation engine interface. All editor, renderer, and tool code
+ * interacts with the engine exclusively through this interface.
+ *
+ * Extends Engine with digital-specific methods for event-driven execution,
+ * signal access, measurement, and time-travel snapshots.
+ *
+ * Implementations:
+ *  - Main-thread engine: runs synchronously; signal array is a plain Uint32Array.
+ *  - Web Worker engine: runs in a Worker; signal array is backed by SharedArrayBuffer;
+ *    UI reads signals through Atomics.load() via getSignalRaw().
+ *
+ * The rendering code is identical in both modes — it always calls getSignalRaw().
+ */
+export interface SimulationEngine extends Engine {
+  // -------------------------------------------------------------------------
+  // Execution (digital-specific)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Advance by a single gate evaluation (event-driven micro-step mode).
+   * Used for educational step-through debugging.
+   */
+  microStep(): void;
+
+  /**
+   * Run the simulation until a Break component fires or an error occurs.
+   */
+  runToBreak(): void;
 
   // -------------------------------------------------------------------------
   // Signal access (Decision 2: engine owns the Uint32Array)
@@ -297,22 +332,6 @@ export interface SimulationEngine {
    * The engine propagates the new value on the next step or tick.
    */
   setSignalValue(netId: number, value: BitVector): void;
-
-  // -------------------------------------------------------------------------
-  // Observation
-  // -------------------------------------------------------------------------
-
-  /**
-   * Register a listener to be called on every engine state transition.
-   * Safe to call multiple times with different listeners.
-   */
-  addChangeListener(listener: EngineChangeListener): void;
-
-  /**
-   * Remove a previously registered listener. No-op if the listener was not
-   * registered.
-   */
-  removeChangeListener(listener: EngineChangeListener): void;
 
   // -------------------------------------------------------------------------
   // Measurement

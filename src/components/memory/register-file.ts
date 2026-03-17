@@ -129,7 +129,20 @@ export class RegisterFileElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(REGISTER_FILE_PIN_DECLARATIONS, ["C"]);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const addrBits = this._properties.getOrDefault<number>("addrBits", 2);
+    const scaled: PinDeclaration[] = REGISTER_FILE_PIN_DECLARATIONS.map((decl) => {
+      // Data pins scale with bitWidth
+      if (decl.label === "Din" || decl.label === "Da" || decl.label === "Db") {
+        return { ...decl, defaultBitWidth: bitWidth };
+      }
+      // Address pins scale with addrBits
+      if (decl.label === "Rw" || decl.label === "Ra" || decl.label === "Rb") {
+        return { ...decl, defaultBitWidth: addrBits };
+      }
+      return decl;
+    });
+    return this.derivePins(scaled, ["C"]);
   }
 
   getBoundingBox(): Rect {
@@ -149,6 +162,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
       componentName: "Register",
       width: 4,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -176,11 +190,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
 export function sampleRegisterFile(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
-  };
-  const stBase = extLayout.stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const din = state[wt[inBase]];
   const we = state[wt[inBase + 1]];
@@ -188,7 +198,8 @@ export function sampleRegisterFile(index: number, state: Uint32Array, _highZs: U
   const clock = state[wt[inBase + 3]];
   const prevClock = state[stBase];
 
-  const addrBits = extLayout.getProperty ? extLayout.getProperty(index, "addrBits") : 2;
+  const ab = layout.getProperty(index, "addrBits");
+  const addrBits = typeof ab === "number" ? ab : 2;
   const numRegs = 1 << addrBits;
   const addrMask = numRegs - 1;
 
@@ -205,11 +216,7 @@ export function executeRegisterFile(index: number, state: Uint32Array, _highZs: 
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
-  };
-  const stBase = extLayout.stateOffset(index);
+  const stBase = layout.stateOffset(index);
 
   const din = state[wt[inBase]];
   const we = state[wt[inBase + 1]];
@@ -219,7 +226,8 @@ export function executeRegisterFile(index: number, state: Uint32Array, _highZs: 
   const rb = state[wt[inBase + 5]];
   const prevClock = state[stBase];
 
-  const addrBits = extLayout.getProperty ? extLayout.getProperty(index, "addrBits") : 2;
+  const ab = layout.getProperty(index, "addrBits");
+  const addrBits = typeof ab === "number" ? ab : 2;
   const numRegs = 1 << addrBits;
   const addrMask = numRegs - 1;
 

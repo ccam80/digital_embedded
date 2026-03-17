@@ -49,6 +49,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 

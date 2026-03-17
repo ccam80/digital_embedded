@@ -151,7 +151,7 @@ export function executeNot(index: number, state: Uint32Array, _highZs: Uint32Arr
   const wt = layout.wiringTable;
   const inputIdx = layout.inputOffset(index);
   const outputIdx = layout.outputOffset(index);
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
   state[wt[outputIdx]] = ((~state[wt[inputIdx]]) & mask) >>> 0;
 }

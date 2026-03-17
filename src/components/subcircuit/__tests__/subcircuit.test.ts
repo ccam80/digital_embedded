@@ -272,6 +272,7 @@ describe("executeFnNoOp", () => {
       outputCount: () => 1,
       outputOffset: () => 1,
       stateOffset: () => 0,
+      getProperty: () => undefined,
     };
 
     executeSubcircuit(0, state, highZs, mockLayout);

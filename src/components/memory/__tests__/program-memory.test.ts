@@ -50,6 +50,7 @@ function makeLayout(): {
     outputCount: (_i: number) => 1,
     outputOffset: (_i: number) => 3,
     stateOffset: (_i: number) => 4,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }

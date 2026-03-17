@@ -21,6 +21,8 @@ export interface SavedMetadata {
   measurementOrdering: string[];
   /** Whether this is a generic (parameterised) circuit. */
   isGeneric: boolean;
+  /** Simulation engine type. Absent in older files; defaults to "digital". */
+  engineType?: string;
 }
 
 /**

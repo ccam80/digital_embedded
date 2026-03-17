@@ -42,6 +42,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     outputCount: () => 2,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + 2,
+    getProperty: () => undefined,
   };
 }
 
@@ -269,20 +270,20 @@ describe("PriorityEncoder", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw() calls drawRect for the body", () => {
+    it("draw() calls drawPolygon for the body", () => {
       const el = makePrioEnc();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'PRIO' text", () => {
+    it("draw() renders 'Priority' component name text", () => {
       const el = makePrioEnc();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "PRIO")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "Priority")).toBe(true);
     });
   });
 

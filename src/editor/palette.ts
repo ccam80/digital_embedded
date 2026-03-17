@@ -42,13 +42,13 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
 
 /** All ComponentCategory values in display order. Used instead of Object.values() which doesn't work with const enums. */
 const ALL_CATEGORIES: readonly ComponentCategory[] = [
-  ComponentCategory.WIRING,
   ComponentCategory.IO,
+  ComponentCategory.WIRING,
   ComponentCategory.LOGIC,
-  ComponentCategory.FLIP_FLOPS,
-  ComponentCategory.ARITHMETIC,
   ComponentCategory.SWITCHING,
+  ComponentCategory.FLIP_FLOPS,
   ComponentCategory.MEMORY,
+  ComponentCategory.ARITHMETIC,
   ComponentCategory.PLD,
   ComponentCategory.MISC,
   ComponentCategory.GRAPHICS,
@@ -56,6 +56,20 @@ const ALL_CATEGORIES: readonly ComponentCategory[] = [
   ComponentCategory.SEVENTY_FOUR_XX,
   ComponentCategory.SUBCIRCUIT,
 ];
+
+/**
+ * Default palette inclusion set per category. When no allowlist is active,
+ * only these components are shown, in the order listed here. Categories
+ * not listed fall through to PALETTE_HIDDEN_CATEGORIES for visibility.
+ */
+const PALETTE_DEFAULT_COMPONENTS: ReadonlyMap<ComponentCategory, readonly string[]> = new Map([
+  [ComponentCategory.IO, ["In", "Out", "Clock", "Const", "Ground", "VDD"]],
+  [ComponentCategory.WIRING, ["Tunnel", "Driver", "Splitter", "Multiplexer", "Demultiplexer"]],
+  [ComponentCategory.LOGIC, ["And", "Or", "Not", "NAnd", "NOr", "XOr", "XNOr"]],
+  [ComponentCategory.SWITCHING, ["NFET", "PFET", "Switch", "SwitchDT"]],
+  [ComponentCategory.FLIP_FLOPS, ["D_FF", "JK_FF", "RS_FF", "T_FF", "D_FF_AS", "JK_FF_AS", "RS_FF_AS"]],
+  [ComponentCategory.MEMORY, ["Counter", "CounterPreset", "Register", "RegisterFile", "ROM", "EEPROM", "LookUpTable", "RAMSinglePort"]],
+]);
 
 const MAX_RECENT_HISTORY = 10;
 
@@ -69,6 +83,7 @@ const MAX_RECENT_HISTORY = 10;
  */
 /** Categories hidden from the sidebar palette (available via Insert menu). */
 const PALETTE_HIDDEN_CATEGORIES: ReadonlySet<ComponentCategory> = new Set([
+  ComponentCategory.ARITHMETIC,
   ComponentCategory.GRAPHICS,
   ComponentCategory.TERMINAL,
   ComponentCategory.PLD,
@@ -89,6 +104,11 @@ export class ComponentPalette {
    * in the palette. Null means show everything (default behavior).
    */
   private _allowlist: Set<string> | null = null;
+  /**
+   * Engine type filter. When set, only components targeting this engine type
+   * appear in the palette. Null means show all (backward-compatible default).
+   */
+  private _engineTypeFilter: "digital" | "analog" | null = null;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -124,10 +144,33 @@ export class ComponentPalette {
     return this._allowlist !== null ? Array.from(this._allowlist) : null;
   }
 
+  // ---------------------------------------------------------------------------
+  // Engine type filter
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Set engine type filter. When set, only components matching this engine
+   * type are shown. Pass null to show all components (default).
+   */
+  setEngineTypeFilter(engineType: "digital" | "analog" | null): void {
+    this._engineTypeFilter = engineType;
+  }
+
+  /** Returns the current engine type filter, or null if not active. */
+  getEngineTypeFilter(): "digital" | "analog" | null {
+    return this._engineTypeFilter;
+  }
+
   /** Apply the allowlist filter to a list of component definitions. */
   private _applyAllowlist(defs: ComponentDefinition[]): ComponentDefinition[] {
     if (this._allowlist === null) return defs;
     return defs.filter((d) => this._allowlist!.has(d.name));
+  }
+
+  /** Apply the engine type filter to a list of component definitions. */
+  private _applyEngineTypeFilter(defs: ComponentDefinition[]): ComponentDefinition[] {
+    if (this._engineTypeFilter === null) return defs;
+    return defs.filter((d) => (d.engineType ?? "digital") === this._engineTypeFilter);
   }
 
   // ---------------------------------------------------------------------------
@@ -147,15 +190,31 @@ export class ComponentPalette {
       // components — don't hide the default-hidden categories since the
       // allowlist is the explicit override.
       if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
-      const all = this._registry.getByCategory(category);
-      const children = this._applyAllowlist(all);
+      const all = this._applyEngineTypeFilter(this._registry.getByCategory(category));
+      let children: ComponentDefinition[];
+      if (this._allowlist !== null) {
+        children = this._applyAllowlist(all);
+      } else {
+        // Apply default inclusion set with ordering
+        const defaults = PALETTE_DEFAULT_COMPONENTS.get(category);
+        if (defaults !== undefined) {
+          const byName = new Map(all.map(d => [d.name, d]));
+          children = [];
+          for (const name of defaults) {
+            const def = byName.get(name);
+            if (def) children.push(def);
+          }
+        } else {
+          children = [...all];
+        }
+      }
       if (children.length === 0) {
         continue;
       }
       nodes.push({
         category,
         label: CATEGORY_LABELS[category] ?? category,
-        children: [...children],
+        children,
         expanded: this._expandedCategories.get(category) ?? true,
       });
     }
@@ -180,7 +239,7 @@ export class ComponentPalette {
 
     for (const category of ALL_CATEGORIES) {
       const cat = category as ComponentCategory;
-      const all = this._applyAllowlist(this._registry.getByCategory(cat));
+      const all = this._applyAllowlist(this._applyEngineTypeFilter(this._registry.getByCategory(cat)));
       const matched = all.filter((def) =>
         def.name.toLowerCase().includes(lowerQuery),
       );

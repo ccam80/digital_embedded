@@ -191,6 +191,7 @@ export class EEPROMElement extends AbstractCircuitElement {
       componentName: "EEPROM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -347,6 +348,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
       componentName: "EEPROM",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

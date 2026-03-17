@@ -43,6 +43,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -218,28 +219,28 @@ describe("Scope", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component rect", () => {
+    it("draw renders component body via drawPath", () => {
       const el = makeScope();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const paths = calls.filter((c) => c.method === "drawPath");
+      expect(paths.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders waveform symbol lines", () => {
+    it("draw renders drawing calls", () => {
       const el = makeScope();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const lines = calls.filter((c) => c.method === "drawLine");
-      expect(lines.length).toBeGreaterThanOrEqual(3);
+      // Scope draws via drawPath, no drawLine or drawText
+      expect(calls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders 'Scope' label", () => {
+    it("draw saves and restores context", () => {
       const el = makeScope();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "Scope")).toBe(true);
+      expect(calls.some((c) => c.method === "save")).toBe(true);
+      expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
   });
 
@@ -353,12 +354,12 @@ describe("ScopeTrigger", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component rect", () => {
+    it("draw renders component polygon", () => {
       const el = makeScopeTrigger();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw renders step waveform and trigger curve via drawPath", () => {

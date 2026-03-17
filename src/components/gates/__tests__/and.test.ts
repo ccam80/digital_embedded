@@ -43,6 +43,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     outputCount: () => 1,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 

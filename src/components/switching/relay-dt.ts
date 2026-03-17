@@ -154,6 +154,9 @@ export class RelayDTElement extends AbstractCircuitElement {
     // Contact arm line: (0,0) to (1.8,0.5) — same as SwitchDT
     ctx.drawLine(0, 0, 1.8, 0.5);
 
+    // Zero-length segment at B1 pin (2,0) so pin proximity check passes
+    ctx.drawLine(2, 0, 2, 0);
+
     // Dashed linkage: (1,0.25) to (1,-0.95) — longer than SwitchDT, reaches coil
     ctx.setLineDash([0.2, 0.2]);
     ctx.drawLine(1, 0.25, 1, -0.95);

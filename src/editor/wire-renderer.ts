@@ -36,7 +36,8 @@ export class WireRenderer {
   ): void {
     for (const wire of wires) {
       const value = signalAccess?.getWireValue(wire);
-      const isBus = (value !== undefined && value.width > 1) || wire.bitWidth > 1;
+      const isAnalog = value !== undefined && "voltage" in value;
+      const isBus = !isAnalog && ((value !== undefined && "width" in value && value.width > 1) || wire.bitWidth > 1);
       const lineWidth = isBus ? WIRE_WIDTH_BUS : WIRE_WIDTH_SINGLE;
 
       ctx.save();
@@ -141,7 +142,7 @@ export class WireRenderer {
 
     for (const wire of wires) {
       const value = signalAccess.getWireValue(wire);
-      if (value === undefined || value.width <= 1) continue;
+      if (value === undefined || "voltage" in value || value.width <= 1) continue;
 
       const midX = (wire.start.x + wire.end.x) / 2;
       const midY = (wire.start.y + wire.end.y) / 2;
@@ -157,9 +158,11 @@ export class WireRenderer {
   // ---------------------------------------------------------------------------
 
   private _colorForValue(
-    value: { raw: number; width: number } | undefined,
-  ): "WIRE" | "WIRE_HIGH" | "WIRE_LOW" | "WIRE_Z" | "WIRE_UNDEFINED" {
+    value: { raw: number; width: number } | { voltage: number } | undefined,
+  ): "WIRE" | "WIRE_HIGH" | "WIRE_LOW" | "WIRE_Z" | "WIRE_UNDEFINED" | "WIRE_ANALOG" {
     if (value === undefined) return "WIRE";
+    // Analog wires use a single color (gradient rendering is a future enhancement)
+    if ("voltage" in value) return "WIRE_ANALOG";
     // Mask raw value to the signal's bit width — execute functions may store
     // full 32-bit results (e.g. ~0 >>> 0 = 0xFFFFFFFF for a 1-bit NOT output).
     const mask = value.width >= 32 ? 0xFFFFFFFF : (1 << value.width) - 1;

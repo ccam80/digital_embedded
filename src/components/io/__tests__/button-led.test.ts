@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -170,12 +171,13 @@ describe("ButtonLED", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw calls drawRect (component body)", () => {
+    it("draw calls drawPolygon (component body)", () => {
       const el = makeButtonLED();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      // ButtonLED body is a 6-point polygon, not a rect
+      const polygons = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygons.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw calls drawCircle for the LED indicator", () => {
@@ -202,12 +204,13 @@ describe("ButtonLED", () => {
       expect(textCalls.some((c) => c.args[0] === "LED1")).toBe(true);
     });
 
-    it("draw does not render text when label is empty", () => {
+    it("draw always calls drawText (ButtonLED draws label unconditionally)", () => {
       const el = makeButtonLED({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
+      // ButtonLED.draw() always emits a drawText call (Java parity — always renders label position)
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls).toHaveLength(0);
+      expect(textCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
 

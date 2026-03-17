@@ -88,6 +88,7 @@ function makeRAMLayout(inputCount: number, outputCount: number): RAMLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -99,6 +100,7 @@ function makeEEPROMLayout(inputCount: number, outputCount: number): EEPROMLayout
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -110,6 +112,7 @@ function makePRNGLayout(inputCount: number, outputCount: number): PRNGLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -118,7 +121,7 @@ function makePRNGLayout(inputCount: number, outputCount: number): PRNGLayout {
 // ---------------------------------------------------------------------------
 
 function makeCounterLayout(): {
-  layout: ComponentLayout & { stateOffset(i: number): number; getProperty?(i: number, key: string): number };
+  layout: ComponentLayout & { stateOffset(i: number): number; getProperty(i: number, key: string): number };
   state: Uint32Array;
   highZs: Uint32Array;
 } {
@@ -141,7 +144,7 @@ function makeCounterLayout(): {
 }
 
 function makeCounterPresetLayout(): {
-  layout: ComponentLayout & { stateOffset(i: number): number; getProperty?(i: number, key: string): number };
+  layout: ComponentLayout & { stateOffset(i: number): number; getProperty(i: number, key: string): number };
   state: Uint32Array;
   highZs: Uint32Array;
 } {
@@ -179,6 +182,7 @@ function makeProgramCounterLayout(): {
     outputCount: () => 2,
     outputOffset: () => 4,
     stateOffset: () => 6,
+    getProperty: () => undefined,
   };
   return { layout, state, highZs };
 }
@@ -198,12 +202,13 @@ function makeRegisterLayout(): {
     outputCount: () => 1,
     outputOffset: () => 3,
     stateOffset: () => 4,
+    getProperty: () => undefined,
   };
   return { layout, state, highZs };
 }
 
 function makeRegisterFileLayout(): {
-  layout: ComponentLayout & { stateOffset(i: number): number; getProperty?(i: number, key: string): number };
+  layout: ComponentLayout & { stateOffset(i: number): number; getProperty(i: number, key: string): number };
   state: Uint32Array;
   highZs: Uint32Array;
 } {
@@ -240,6 +245,7 @@ function makeProgramMemoryLayout(): {
     outputCount: () => 1,
     outputOffset: () => 3,
     stateOffset: () => 4,
+    getProperty: () => undefined,
   };
   return { layout, state, highZs };
 }

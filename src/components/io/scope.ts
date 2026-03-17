@@ -38,12 +38,26 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
+// Java ScopeShape constants (SIZE=20px = 1 grid unit, SIZE2=10px = 0.5 grid):
+//   BORDER = SIZE/3 = 7px ≈ 0.35 grid
+//   OUTER polygon: (2,SIZE2) → (2,-SIZE*2) → (SIZE*4,-SIZE*2) → (SIZE*4,SIZE2)
+//     = (0.1, 0.5) → (0.1,-2) → (4,-2) → (4,0.5)
+//   INNER polygon (rounded): (2+BORDER, SIZE2-BORDER) = (0.45, 0.15) approx
+//     inner corners: (0.45,0.15)→(0.45,-1.65)→(2.65,-1.65)→(2.65,0.15)
+//     rounded by BORDER*2 = 14px = 0.7 grid
+//   TRACE polyline:
+//     (3+BORDER,-BORDER) = (0.5,-0.35) approx, then step up
+//   Pin: clk at (0,0)
+const COMP_WIDTH = 4;   // outer rect right edge at x=4
 const MAX_CHANNELS = 8;
 const MAX_SAMPLES = 1024;
 
-function componentHeight(channelCount: number): number {
-  return Math.max(channelCount * 2, 4);
+// Java ScopeShape has a fixed single-pin layout (clock at 0,0) and fixed shape.
+// componentHeight is not variable for the default 1-channel scope.
+function componentHeight(_channelCount: number): number {
+  // Java outer: y from -2 to +0.5 = height 2.5; but pin is at y=0 which is inside.
+  // We keep this for compatibility but the shape is fixed.
+  return 2.5;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,49 +155,57 @@ export class ScopeElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
-    const h = componentHeight(channelCount);
+    // Java outer polygon spans x: 0.1..4, y: -2..0.5
+    // Bbox must tightly enclose drawn content (outer rect left edge at x=0.1)
     return {
-      x: this.position.x,
-      y: this.position.y,
-      width: COMP_WIDTH,
-      height: h,
+      x: this.position.x + 0.1,
+      y: this.position.y - 2,
+      width: COMP_WIDTH - 0.1,
+      height: 2.5,
     };
   }
 
   draw(ctx: RenderContext): void {
-    const channelCount = this._properties.getOrDefault<number>("channelCount", 1);
-    const h = componentHeight(channelCount);
-
     ctx.save();
 
-    // Component body
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, 0, COMP_WIDTH, h, true);
+    // Outer rectangle: (0.1, 0.5) → (4, -2) — NORMAL style
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, 0, COMP_WIDTH, h, false);
-
-    // Waveform symbol: small sawtooth/square wave icon
-    const midY = h / 2;
-    ctx.setLineWidth(1);
-    ctx.drawLine(0.5, midY, 1.0, midY);
-    ctx.drawLine(1.0, midY, 1.0, midY - 0.6);
-    ctx.drawLine(1.0, midY - 0.6, 1.5, midY - 0.6);
-    ctx.drawLine(1.5, midY - 0.6, 1.5, midY);
-    ctx.drawLine(1.5, midY, 2.0, midY);
-    ctx.drawLine(2.0, midY, 2.0, midY - 0.6);
-    ctx.drawLine(2.0, midY - 0.6, 2.5, midY - 0.6);
-    ctx.drawLine(2.5, midY - 0.6, 2.5, midY);
-    ctx.drawLine(2.5, midY, COMP_WIDTH - 0.5, midY);
-
-    // Label
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("Scope", COMP_WIDTH / 2, h + 0.3, {
-      horizontal: "center",
-      vertical: "top",
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.1, y:  0.5 },
+        { op: "lineTo", x: 0.1, y: -2   },
+        { op: "lineTo", x: 4,   y: -2   },
+        { op: "lineTo", x: 4,   y:  0.5 },
+        { op: "closePath" },
+      ],
     });
+
+    // Trace waveform (THIN): matches java-shapes.json points exactly
+    // (0.45,-0.3)→(1.3,-0.3)→(1.3,-1.3)→(2.3,-1.3)→(2.3,-0.3)→(2.65,-0.3)
+    ctx.setLineWidth(0.5);
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.45, y: -0.3  },
+        { op: "lineTo", x: 1.3,  y: -0.3  },
+        { op: "lineTo", x: 1.3,  y: -1.3  },
+        { op: "lineTo", x: 2.3,  y: -1.3  },
+        { op: "lineTo", x: 2.3,  y: -0.3  },
+        { op: "lineTo", x: 2.65, y: -0.3  },
+      ],
+    });
+
+    // Inner rounded rect (THIN): (0.4,0.2)→(0.4,-1.7)→(2.7,-1.7)→(2.7,0.2) closed
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.4, y:  0.2  },
+        { op: "lineTo", x: 0.4, y: -1.7  },
+        { op: "lineTo", x: 2.7, y: -1.7  },
+        { op: "lineTo", x: 2.7, y:  0.2  },
+        { op: "closePath" },
+      ],
+    });
+    ctx.setLineWidth(1);
 
     ctx.restore();
   }

@@ -46,6 +46,7 @@ function makeLayout(
     outputCount: (i: number) => outputCounts[i],
     outputOffset: (i: number) => outputOffsets[i],
     stateOffset: (_i: number) => 0,
+    getProperty: () => undefined,
   };
 }
 

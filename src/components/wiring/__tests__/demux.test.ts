@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -252,12 +253,12 @@ describe("Demultiplexer", () => {
       expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'DEMUX' text", () => {
+    it("draw() renders '0' text label", () => {
       const el = makeDemux();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "DEMUX")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "0")).toBe(true);
     });
   });
 

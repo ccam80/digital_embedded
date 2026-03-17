@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -279,12 +280,12 @@ describe("Multiplexer", () => {
       expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'MUX' text", () => {
+    it("draw() renders '0' text label", () => {
       const el = makeMux();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "MUX")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "0")).toBe(true);
     });
   });
 

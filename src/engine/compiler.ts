@@ -896,10 +896,20 @@ export function compileCircuit(
  */
 function isSequentialComponent(typeId: string): boolean {
   return (
+    // Java naming conventions (legacy .dig compat)
     typeId.startsWith("Flipflop") ||
-    typeId.startsWith("Register") ||
-    typeId.startsWith("Counter") ||
     typeId === "DFF" ||
-    typeId === "DFFSR"
+    typeId === "DFFSR" ||
+    // TS component names
+    typeId === "D_FF" ||
+    typeId === "JK_FF" ||
+    typeId === "RS_FF" ||
+    typeId === "T_FF" ||
+    typeId === "D_FF_AS" ||
+    typeId === "JK_FF_AS" ||
+    typeId === "RS_FF_AS" ||
+    typeId === "Monoflop" ||
+    typeId.startsWith("Register") ||
+    typeId.startsWith("Counter")
   );
 }

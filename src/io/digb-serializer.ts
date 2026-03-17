@@ -1,5 +1,5 @@
 /**
- * Serializer for the .digb (Digital-in-Browser) native JSON format.
+ * Serializer for the .digb (digiTS) native JSON format.
  *
  * Converts Circuit objects to .digb JSON strings. bigint property values are
  * encoded as "_bigint:<n>" strings for JSON compatibility.

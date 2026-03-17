@@ -45,6 +45,7 @@ function makeLayout(
     outputCount: () => outputCount,
     outputOffset: () => outputOffset,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -325,18 +326,18 @@ describe("BooleanFunctionElement", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPath for the component body", () => {
       const fn = makeFunction();
       const { ctx, calls } = makeStubCtx();
       fn.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() calls drawText with 'f(x)'", () => {
+    it("draw() renders no text when label is empty", () => {
       const fn = makeFunction();
       const { ctx, calls } = makeStubCtx();
       fn.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "f(x)")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").length).toBe(0);
     });
 
     it("draw() with label calls drawText for the label", () => {

@@ -64,6 +64,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -186,14 +187,14 @@ describe("Delay", () => {
   });
 
   describe("draw", () => {
-    it("draw() calls drawRect", () => {
+    it("draw() calls drawPolygon for body", () => {
       const props = new PropertyBag();
       props.set("bitWidth", 1);
       props.set("delayTime", 3);
       const el = new DelayElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -293,12 +294,12 @@ describe("Break", () => {
   });
 
   describe("draw", () => {
-    it("draw() calls drawRect", () => {
+    it("draw() calls drawCircle for body", () => {
       const props = new PropertyBag();
       const el = new BreakElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawCircle").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -457,18 +458,18 @@ describe("Reset", () => {
   });
 
   describe("draw", () => {
-    it("draw() renders 'RST' text", () => {
+    it("draw() renders 'R' text centered in body", () => {
       const props = new PropertyBag();
       const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "RST")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "R")).toBe(true);
     });
 
-    it("invertOutput=true draws inversion bubble (drawCircle)", () => {
+    it("always draws inversion bubble (drawCircle) regardless of invertOutput", () => {
       const props = new PropertyBag();
-      props.set("invertOutput", true);
+      props.set("invertOutput", false);
       const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
@@ -476,14 +477,13 @@ describe("Reset", () => {
       expect(circleCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("invertOutput=false does not draw inversion bubble", () => {
+    it("draw() uses drawRect for the body rectangle", () => {
       const props = new PropertyBag();
-      props.set("invertOutput", false);
       const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls).toHaveLength(0);
+      const rectCalls = calls.filter((c) => c.method === "drawRect");
+      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -591,21 +591,21 @@ describe("AsyncSeq", () => {
   });
 
   describe("draw", () => {
-    it("draw() calls drawRect for the body", () => {
+    it("draw() calls drawPolygon for the body", () => {
       const props = new PropertyBag();
       const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'AS' text", () => {
+    it("draw() renders 'Async' text", () => {
       const props = new PropertyBag();
       const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "AS")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "Async")).toBe(true);
     });
   });
 

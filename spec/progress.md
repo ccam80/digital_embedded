@@ -264,3 +264,18 @@
 - **Files created**: none
 - **Files modified**: src/components/wiring/driver.ts
 - **Tests**: 280/282 passing (2 BusSplitter failures are pre-existing per test-baseline.md)
+
+## Task 0.1.1: Engine Base Interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/core/engine-interface.ts
+- **Tests**: 41/41 passing (engine-interface.test.ts)
+- **Changes summary**: Extracted `Engine` base interface from `SimulationEngine`. `SimulationEngine` now extends `Engine`. All existing import sites compile unchanged. `DigitalEngine` satisfies both `Engine` and `SimulationEngine`.
+
+## Task 0.1.2: AnalogEngine Interface + Associated Types + Registry Extension
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/core/analog-engine-interface.ts, src/core/__tests__/analog-engine-interface.test.ts
+- **Files modified**: src/core/registry.ts
+- **Tests**: 9/9 passing

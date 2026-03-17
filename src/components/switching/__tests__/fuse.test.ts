@@ -41,6 +41,7 @@ function makeFuseLayout(stateCount: number): {
     outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => 0,
     stateOffset: (_i: number) => 0,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -157,7 +158,7 @@ describe("Fuse — attribute mappings", () => {
 // ---------------------------------------------------------------------------
 
 describe("Fuse — rendering", () => {
-  it("draw_intact — renders rectangle body and wire through centre", () => {
+  it("draw_intact — renders bezier wavy path (drawPath)", () => {
     const props = new PropertyBag();
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -168,30 +169,34 @@ describe("Fuse — rendering", () => {
       setColor: () => {},
       setLineWidth: () => {},
       setFont: () => {},
-      drawRect: () => calls.push("drawRect"),
-      drawLine: () => calls.push("drawLine"),
+      drawPath: () => calls.push("drawPath"),
       drawText: () => {},
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    expect(calls).toContain("drawRect");
-    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
+    // Fuse draws a wavy S-curve using drawPath (bezier), not drawRect/drawLine
+    expect(calls).toContain("drawPath");
   });
 
-  it("draw_blown — uses ERROR color for blown indicator", () => {
+  it("draw_blown — blown fuse draws same wavy path (no special blown color)", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const colors: string[] = [];
+    const calls: string[] = [];
     const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: (c: string) => colors.push(c),
-      setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawLine: () => {}, drawText: () => {},
+      save: () => calls.push("save"),
+      restore: () => calls.push("restore"),
+      translate: () => {},
+      setColor: () => {},
+      setLineWidth: () => {},
+      setFont: () => {},
+      drawPath: () => calls.push("drawPath"),
+      drawText: () => {},
     };
     el.draw(ctx as never);
-    expect(colors).toContain("WIRE_ERROR");
+    // blown state is reflected in simulation state, not via a different draw color
+    expect(calls).toContain("drawPath");
   });
 
   it("draw_notBlown — no WIRE_ERROR color when intact", () => {
@@ -202,10 +207,10 @@ describe("Fuse — rendering", () => {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: (c: string) => colors.push(c),
       setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawLine: () => {}, drawText: () => {},
+      drawPath: () => {}, drawText: () => {},
     };
     el.draw(ctx as never);
-    expect(colors).not.toContain("ERROR");
+    expect(colors).not.toContain("WIRE_ERROR");
   });
 
   it("draw_withLabel — renders label text when set", () => {
@@ -216,7 +221,7 @@ describe("Fuse — rendering", () => {
     const ctx = {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawLine: () => {}, drawText: (t: string) => texts.push(t),
+      drawPath: () => {}, drawText: (t: string) => texts.push(t),
     };
     el.draw(ctx as never);
     expect(texts).toContain("F1");
@@ -229,7 +234,7 @@ describe("Fuse — rendering", () => {
     const ctx = {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawLine: () => {}, drawText: (t: string) => texts.push(t),
+      drawPath: () => {}, drawText: (t: string) => texts.push(t),
     };
     el.draw(ctx as never);
     expect(texts.length).toBe(0);
@@ -269,9 +274,10 @@ describe("Fuse — ComponentDefinition", () => {
     const el = new FuseElement(crypto.randomUUID(), { x: 4, y: 6 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(4);
-    expect(bb.y).toBe(6);
+    // getBoundingBox offsets y by -0.25 (wavy path extends above pin centre)
+    expect(bb.y).toBeCloseTo(5.75);
     expect(bb.width).toBeGreaterThanOrEqual(1);
-    expect(bb.height).toBeGreaterThanOrEqual(1);
+    expect(bb.height).toBeGreaterThanOrEqual(0.4);
   });
 
   it("defaultDelay — is zero (combinational)", () => {

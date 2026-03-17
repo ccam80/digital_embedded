@@ -1,4 +1,4 @@
-# Digital-in-Browser
+# digiTS
 
 ## Project Overview
 
@@ -205,7 +205,7 @@ Everything uses the same string addresses — read format equals write format.
 | Pin | `"label:pinLabel"` | `"gate:A"`, `"sysreg:ADD"` |
 | Subcircuit scope | `"parent/child"` prefix | `"cpu/alu:A"` |
 
-If `netlist()` reports `sysreg:ADD [1-bit]`, the patch target is `{ op: 'set', target: 'ADD', props: { Bits: 16 } }`.
+If `netlist()` reports `sysreg:ADD [1-bit]`, the patch target is `{ op: 'set', target: 'ADD', props: { bitWidth: 16 } }`.
 
 ### Introspection Methods
 
@@ -222,7 +222,7 @@ If `netlist()` reports `sysreg:ADD [1-bit]`, the patch target is `{ op: 'set', t
 
 | Op | Target | Purpose | Example |
 |----|--------|---------|---------|
-| `set` | component label | Change properties | `{"op":"set","target":"ADD","props":{"Bits":16}}` |
+| `set` | component label | Change properties | `{"op":"set","target":"ADD","props":{"bitWidth":16}}` |
 | `add` | — | Add component + wire it | `{"op":"add","spec":{"id":"U1","type":"And"},"connect":{"A":"in1:out"}}` |
 | `remove` | component label | Remove component + wires | `{"op":"remove","target":"old_gate"}` |
 | `connect` | `from`, `to` pins | Wire two pins | `{"op":"connect","from":"gate:out","to":"output:in"}` |
@@ -258,15 +258,17 @@ Pass a `CircuitSpec` to `circuit_build`. No coordinates — pure topology.
 2. `circuit_list({ category: "LOGIC" })` → filter to one category
 3. `circuit_describe({ typeName: "NAnd" })` → get pin labels, property keys with types/defaults/min/max/descriptions
 
-**Property keys** use internal names from `circuit_describe`, not XML attribute names. Common ones:
+**Property keys** use internal names from `circuit_describe`. XML-convention keys (e.g. `Bits`) are also accepted and auto-translated via each component's `attributeMap`. Common internal keys:
 
 | Property | Type | Used by | Purpose |
 |----------|------|---------|---------|
 | `label` | STRING | most types | Display label |
-| `bitWidth` | BIT_WIDTH | gates, arithmetic | Signal width (1–32) |
+| `bitWidth` | BIT_WIDTH | gates, arithmetic, In, Out | Signal width (1–32). XML name: `Bits` |
+| `dataBits` | BIT_WIDTH | ROM, RAM, EEPROM, LookupTable | Data width. XML name: `Bits` |
+| `addrBits` | BIT_WIDTH | ROM, RAM, EEPROM | Address width. XML name: `AddrBits` |
+| `selectorBits` | BIT_WIDTH | Mux, Demux, Decoder | Selector width. XML name: `Selector Bits` |
 | `inputCount` | INT | gates | Number of inputs (2–5) |
 | `_inverterLabels` | STRING | gates | Invert specific inputs: `"1,3"` or `"In_1,In_3"` |
-| `Bits` | BIT_WIDTH | In, Out, memory | Signal width |
 | `defaultValue` | INT | In, Const | Initial value |
 
 **Connections** are pairs of `"id:pinLabel"` strings. Pin labels must match the component type's declared pins exactly. Use `circuit_describe({ typeName: "..." })` to look up pin labels before connecting.
@@ -276,8 +278,8 @@ Pass a `CircuitSpec` to `circuit_build`. No coordinates — pure topology.
 ~~~json
 {
   "components": [
-    { "id": "A",    "type": "In",  "props": { "label": "A", "Bits": 1 } },
-    { "id": "B",    "type": "In",  "props": { "label": "B", "Bits": 1 } },
+    { "id": "A",    "type": "In",  "props": { "label": "A", "bitWidth": 1 } },
+    { "id": "B",    "type": "In",  "props": { "label": "B", "bitWidth": 1 } },
     { "id": "gate", "type": "And" },
     { "id": "Y",    "type": "Out", "props": { "label": "Y" } }
   ],

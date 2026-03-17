@@ -156,6 +156,7 @@ export class TElement extends AbstractCircuitElement {
         componentName: "T",
         width: 3,
         label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
       });
     } else {
       drawGenericShape(ctx, {
@@ -165,6 +166,7 @@ export class TElement extends AbstractCircuitElement {
         componentName: "T",
         width: 3,
         label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
       });
     }
   }

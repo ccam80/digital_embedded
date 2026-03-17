@@ -41,6 +41,7 @@ const SavedMetadataSchema = z.object({
   description: z.string(),
   measurementOrdering: z.array(z.string()),
   isGeneric: z.boolean(),
+  engineType: z.string().optional(),
 });
 
 const SavedElementSchema = z.object({
@@ -147,6 +148,7 @@ export function deserializeCircuit(
     description: migrated.metadata.description,
     measurementOrdering: migrated.metadata.measurementOrdering,
     isGeneric: migrated.metadata.isGeneric,
+    engineType: (migrated.metadata.engineType as "digital" | "analog") ?? "digital",
   };
 
   const circuit = new Circuit(metadata);

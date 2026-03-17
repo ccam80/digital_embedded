@@ -1,4 +1,4 @@
-# UI Modernization Plan — Digital-in-Browser
+# UI Modernization Plan — digiTS
 
 **Created:** 2026-03-15
 **Revised:** 2026-03-15 (iteration 3 — adds Phases 6-8: surface hidden engine features)

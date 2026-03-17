@@ -149,7 +149,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 export function executeDriverInvSel(
   index: number,
   state: Uint32Array,
-  _highZs: Uint32Array,
+  highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
   const wt = layout.wiringTable;
@@ -158,13 +158,14 @@ export function executeDriverInvSel(
 
   const dataIn = state[wt[inBase]];
   const sel = state[wt[inBase + 1]];
+  const outNet = wt[outBase];
 
   if (sel === 0) {
-    state[wt[outBase]] = dataIn;
-    state[wt[outBase + 1]] = 0;
+    state[outNet] = dataIn;
+    highZs[outNet] = 0;
   } else {
-    state[wt[outBase]] = 0;
-    state[wt[outBase + 1]] = 0xFFFFFFFF;
+    state[outNet] = 0;
+    highZs[outNet] = 0xFFFFFFFF;
   }
 }
 

@@ -77,6 +77,7 @@ export class BitCountElement extends AbstractCircuitElement {
       componentName: "Bit count",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

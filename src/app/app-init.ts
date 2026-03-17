@@ -175,7 +175,7 @@ export function initApp(search?: string): void {
 
   /** Current save format: 'dig' (Digital XML) or 'digj' (native JSON). */
   let saveFormat: 'dig' | 'digj' = 'dig';
-  const colorScheme = params.dark ? darkColorScheme : lightColorScheme;
+  const colorScheme = useDark ? darkColorScheme : lightColorScheme;
 
   const canvas = document.getElementById('sim-canvas') as HTMLCanvasElement;
   const ctx2d = canvas.getContext('2d')!;
@@ -191,8 +191,13 @@ export function initApp(search?: string): void {
   const gridRenderer = new GridRenderer();
   const undoStack = new UndoRedoStack();
   const lockedModeGuard = new LockedModeGuard();
-  const colorSchemeManager = new ColorSchemeManager(params.dark ? 'dark' : 'default');
+  const colorSchemeManager = new ColorSchemeManager(useDark ? 'default' : 'light');
   const speedControl = new SpeedControl();
+
+  // Sync: any colorSchemeManager change updates the canvas renderer automatically
+  colorSchemeManager.onChange(() => {
+    canvasRenderer.setColorScheme(colorSchemeManager.getActive());
+  });
 
   // -------------------------------------------------------------------------
   // Status bar
@@ -1318,22 +1323,12 @@ export function initApp(search?: string): void {
     if (speedInput) speedInput.value = String(speedControl.speed);
   }
 
-  document.getElementById('btn-speed-div10')?.addEventListener('click', () => {
+  document.getElementById('btn-speed-down')?.addEventListener('click', () => {
     speedControl.divideBy10();
     updateSpeedDisplay();
   });
 
-  document.getElementById('btn-speed-div2')?.addEventListener('click', () => {
-    speedControl.divideBy2();
-    updateSpeedDisplay();
-  });
-
-  document.getElementById('btn-speed-mul2')?.addEventListener('click', () => {
-    speedControl.multiplyBy2();
-    updateSpeedDisplay();
-  });
-
-  document.getElementById('btn-speed-mul10')?.addEventListener('click', () => {
+  document.getElementById('btn-speed-up')?.addEventListener('click', () => {
     speedControl.multiplyBy10();
     updateSpeedDisplay();
   });
@@ -1460,12 +1455,6 @@ export function initApp(search?: string): void {
     document.getElementById('btn-stop')?.click();
   });
 
-  document.getElementById('btn-tb-micro-step')?.addEventListener('click', () => {
-    document.getElementById('btn-micro-step')?.click();
-  });
-  document.getElementById('btn-tb-run-to-break')?.addEventListener('click', () => {
-    document.getElementById('btn-run-to-break')?.click();
-  });
 
   // -------------------------------------------------------------------------
   // Viewer panels (Timing Diagram + Values Table)
@@ -1784,7 +1773,7 @@ export function initApp(search?: string): void {
     const label = String(props.has('label') ? props.get('label') : '');
     const typeId = element.typeId;
     const size = dataField.size;
-    const width = Number(props.has('Bits') ? props.get('Bits') : props.has('bitWidth') ? props.get('bitWidth') : 8);
+    const width = Number(props.has('bitWidth') ? props.get('bitWidth') : props.has('dataBits') ? props.get('dataBits') : 8);
     const title = label
       ? `${label}: ${typeId} (${size} words × ${width} bits)`
       : `${typeId} (${size} words × ${width} bits)`;
@@ -2482,6 +2471,7 @@ export function initApp(search?: string): void {
     appSettings.set(SettingKey.COLOR_SCHEME, newScheme);
     appSettings.save();
     applyColorScheme(!goingLight);
+    colorSchemeManager.setActive(goingLight ? 'light' : 'default');
     if (goingLight) {
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
@@ -2490,6 +2480,7 @@ export function initApp(search?: string): void {
       document.documentElement.classList.add('dark');
     }
     updateDarkModeIcon();
+    paletteUI.setColorScheme(goingLight ? lightColorScheme : darkColorScheme);
     scheduleRender();
   });
 
@@ -2549,15 +2540,13 @@ export function initApp(search?: string): void {
   // Lock toggle (Task 7.6)
   // -------------------------------------------------------------------------
 
-  const lockBtn = document.getElementById('btn-lock');
   const lockBanner = document.getElementById('lock-banner');
+  const lockCheck = document.getElementById('lock-check');
 
   function updateLockUI(): void {
     const locked = lockedModeGuard.isLocked();
-    if (lockBtn) {
-      lockBtn.textContent = locked ? '🔒' : '🔓';
-      lockBtn.classList.toggle('locked', locked);
-      lockBtn.title = locked ? 'Unlock editing' : 'Lock editing';
+    if (lockCheck) {
+      lockCheck.textContent = locked ? '\u2713' : '';
     }
     if (lockBanner) {
       lockBanner.classList.toggle('visible', locked);
@@ -2566,7 +2555,7 @@ export function initApp(search?: string): void {
 
   updateLockUI();
 
-  lockBtn?.addEventListener('click', () => {
+  document.getElementById('btn-menu-lock')?.addEventListener('click', () => {
     lockedModeGuard.setLocked(!lockedModeGuard.isLocked());
     updateLockUI();
   });
@@ -2798,7 +2787,6 @@ export function initApp(search?: string): void {
     }
   }
 
-  document.getElementById('btn-tb-presentation')?.addEventListener('click', togglePresentation);
   document.getElementById('btn-presentation-mode')?.addEventListener('click', togglePresentation);
   exitPresentationBtn?.addEventListener('click', exitPresentation);
 
@@ -2814,6 +2802,25 @@ export function initApp(search?: string): void {
       exitPresentation();
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Tablet mode toggle (View menu)
+  // -------------------------------------------------------------------------
+
+  let tabletMode = false;
+  const tabletModeCheck = document.getElementById('tablet-mode-check');
+
+  function updateTabletModeUI(): void {
+    if (tabletModeCheck) tabletModeCheck.textContent = tabletMode ? '\u2713' : '';
+    appEl?.classList.toggle('tablet-mode', tabletMode);
+    resizeCanvas();
+  }
+
+  document.getElementById('btn-tablet-mode')?.addEventListener('click', () => {
+    tabletMode = !tabletMode;
+    updateTabletModeUI();
+  });
+
   // -------------------------------------------------------------------------
   // Settings dialog (Task 8.4-8.5)
   // -------------------------------------------------------------------------
@@ -2858,6 +2865,7 @@ export function initApp(search?: string): void {
   }
 
   document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
+  document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
   document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
   document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
 
@@ -3304,6 +3312,16 @@ export function initApp(search?: string): void {
   document.getElementById('btn-synthesise-circuit')?.addEventListener('click', openAnalysisDialog);
 
   // -------------------------------------------------------------------------
+  // Tutorials menu
+  // -------------------------------------------------------------------------
+  document.getElementById('btn-browse-tutorials')?.addEventListener('click', () => {
+    window.open('tutorials.html', '_blank');
+  });
+  document.getElementById('btn-edit-tutorial')?.addEventListener('click', () => {
+    window.open('tutorial-editor.html', '_blank');
+  });
+
+  // -------------------------------------------------------------------------
   // Analysis menu: Critical Path
   // -------------------------------------------------------------------------
 
@@ -3400,7 +3418,7 @@ export function initApp(search?: string): void {
     for (const el of circuit.elements) {
       const props = el.getProperties();
       const label = props.has('label') ? String(props.get('label')) : '';
-      const bits = props.has('Bits') ? Number(props.get('Bits')) : 1;
+      const bits = props.has('bitWidth') ? Number(props.get('bitWidth')) : 1;
 
       if (flipFlopNames.has(el.typeId)) {
         // Use label or typeId+instanceId as state variable name
@@ -3911,9 +3929,11 @@ export function initApp(search?: string): void {
       case 'digital-set-instructions': {
         const markdown = data['markdown'];
         let instructionsPanel = document.getElementById('tutorial-instructions');
+        let toggleBtn = document.getElementById('tutorial-toggle-btn');
         if (markdown === null || markdown === undefined) {
-          // Hide/remove instructions panel
+          // Hide/remove instructions panel and toggle
           if (instructionsPanel) instructionsPanel.style.display = 'none';
+          if (toggleBtn) toggleBtn.style.display = 'none';
         } else {
           if (!instructionsPanel) {
             instructionsPanel = document.createElement('div');
@@ -3922,7 +3942,22 @@ export function initApp(search?: string): void {
             const workspace = document.getElementById('workspace');
             if (workspace) workspace.insertBefore(instructionsPanel, workspace.firstChild);
           }
+          if (!toggleBtn) {
+            toggleBtn = document.createElement('button');
+            toggleBtn.id = 'tutorial-toggle-btn';
+            toggleBtn.className = 'tutorial-toggle-btn';
+            toggleBtn.textContent = 'Instructions';
+            const canvasContainer = document.getElementById('canvas-container');
+            if (canvasContainer) canvasContainer.appendChild(toggleBtn);
+            toggleBtn.addEventListener('click', () => {
+              const panel = document.getElementById('tutorial-instructions');
+              if (!panel) return;
+              const collapsed = panel.classList.toggle('collapsed');
+              toggleBtn!.textContent = collapsed ? 'Instructions' : 'Hide';
+            });
+          }
           instructionsPanel.style.display = '';
+          toggleBtn.style.display = '';
           // Simple markdown rendering (headers, bold, code, lists)
           const escaped = String(markdown)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

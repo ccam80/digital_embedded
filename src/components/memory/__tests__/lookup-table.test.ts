@@ -39,6 +39,7 @@ function makeLayout(inputCount: number, outputCount: number): {
     outputCount: (_i: number) => outputCount,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount + outputCount,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -198,12 +199,20 @@ describe("LookUpTable", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawRect: () => calls.push("drawRect"),
+      drawPolygon: () => calls.push("drawPolygon"),
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
       drawText: (text: string) => texts.push(text),
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    expect(calls).toContain("drawRect");
+    expect(calls).toContain("drawPolygon");
     expect(texts).toContain("LUT");
   });
 
@@ -216,7 +225,10 @@ describe("LookUpTable", () => {
     const ctx = {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawText: (t: string) => texts.push(t),
+      drawRect: () => {}, drawPolygon: () => {}, drawLine: () => {},
+      drawCircle: () => {}, drawArc: () => {}, drawPath: () => {},
+      rotate: () => {}, scale: () => {}, setLineDash: () => {},
+      drawText: (t: string) => texts.push(t),
     };
     el.draw(ctx as never);
     expect(texts).toContain("MyLUT");
@@ -249,7 +261,7 @@ describe("LookUpTable", () => {
     const props = new PropertyBag();
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
-    expect(bb.x).toBe(2);
+    expect(bb.x).toBe(2.05);
     expect(bb.y).toBe(3 - 0.5);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);

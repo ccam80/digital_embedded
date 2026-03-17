@@ -38,6 +38,7 @@ function makeLayout(inputCount: number = 0, outputCount: number = 0): ComponentL
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 

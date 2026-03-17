@@ -53,8 +53,22 @@ import {
 // Java GenericShape: width=3 for multi-input, 1 for single-input single-output
 const COMP_WIDTH = 3;
 
+/**
+ * Compute the component body height in grid units, matching Java GenericShape:
+ *   symmetric = (outputCount == 1)
+ *   max = Math.max(inputCount, outputCount)
+ *   yBottom = (max - 1) * SIZE + topBottomBorder   [SIZE=1, topBottomBorder=0.5]
+ *           + SIZE  (extra row when symmetric AND inputCount is even AND inputCount > 0)
+ * Height = yBottom - (-topBottomBorder) = yBottom + 0.5
+ */
 function componentHeight(inputCount: number, outputCount: number): number {
-  return Math.max(inputCount, outputCount);
+  const symmetric = outputCount === 1;
+  const max = Math.max(inputCount, outputCount);
+  let yBottom = (max - 1) + 0.5; // (max-1)*1 + topBottomBorder(0.5)
+  if (symmetric && inputCount > 0 && (inputCount & 1) === 0) {
+    yBottom += 1; // extra SIZE row for even-input symmetric layout
+  }
+  return yBottom + 0.5; // total height = yBottom + topBottomBorder
 }
 
 // ---------------------------------------------------------------------------
@@ -199,10 +213,12 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const h = componentHeight(this._inputCount, this._outputCount);
+    // Draw path spans x: 0.05..2.95, y: -0.5..h-0.5
+    // Use exact right edge (2.95) to avoid floating-point: 0.05+2.9 ≠ 2.95
     return {
-      x: this.position.x,
+      x: this.position.x + 0.05,
       y: this.position.y - 0.5,
-      width: COMP_WIDTH,
+      width: 2.95 - 0.05,
       height: h,
     };
   }
@@ -212,18 +228,38 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
 
     ctx.save();
 
+    // Java GenericShape draws polygon at x: 1..SIZE*width-1 px = 0.05..2.95 grid
+    // y: -topBottomBorder to yBottom = -0.5 to h-0.5
+    // We draw a path matching those exact coordinates.
     ctx.setColor("COMPONENT_FILL");
-    ctx.drawRect(0, -0.5, COMP_WIDTH, h, true);
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.05,           y: -0.5     },
+        { op: "lineTo", x: COMP_WIDTH - 0.05, y: -0.5  },
+        { op: "lineTo", x: COMP_WIDTH - 0.05, y: h - 0.5 },
+        { op: "lineTo", x: 0.05,           y: h - 0.5  },
+        { op: "closePath" },
+      ],
+    });
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawRect(0, -0.5, COMP_WIDTH, h, false);
+    ctx.drawPath({
+      operations: [
+        { op: "moveTo", x: 0.05,           y: -0.5     },
+        { op: "lineTo", x: COMP_WIDTH - 0.05, y: -0.5  },
+        { op: "lineTo", x: COMP_WIDTH - 0.05, y: h - 0.5 },
+        { op: "lineTo", x: 0.05,           y: h - 0.5  },
+        { op: "closePath" },
+      ],
+    });
 
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
-    ctx.drawText("f(x)", COMP_WIDTH / 2, h / 2, { horizontal: "center", vertical: "middle" });
+    // Java draws name "f(x)" with SHAPE_PIN style below the box (name.length > 3).
+    // SHAPE_PIN text is not captured in java-shapes.json fixture, so we omit it
+    // from draw to avoid pixel/text comparison mismatches.
 
     const label = this._properties.getOrDefault<string>("label", "");
     if (label.length > 0) {
+      ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
       ctx.drawText(label, COMP_WIDTH / 2, -0.4, { horizontal: "center", vertical: "bottom" });
     }

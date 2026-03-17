@@ -44,6 +44,7 @@ class StaticLayout implements ComponentLayout {
   outputCount(i: number): number { return this._outputCounts[i] ?? 0; }
   outputOffset(i: number): number { return this._outputOffsets[i] ?? 0; }
   stateOffset(_i: number): number { return 0; }
+  getProperty(): undefined { return undefined; }
 }
 
 function singleGroup(indices: number[]): EvaluationGroup {

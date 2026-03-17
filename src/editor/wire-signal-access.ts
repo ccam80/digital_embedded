@@ -8,13 +8,27 @@
 
 import type { Wire } from "@/core/circuit";
 
+/** Digital wire value: raw unsigned integer + bit-width. */
+export interface DigitalWireValue {
+  raw: number;
+  width: number;
+}
+
+/** Analog wire value: continuous voltage. */
+export interface AnalogWireValue {
+  voltage: number;
+}
+
+/** Discriminated union of wire value types. Use `'voltage' in value` to distinguish. */
+export type WireValue = DigitalWireValue | AnalogWireValue;
+
 export interface WireSignalAccess {
   /**
    * Returns the current signal value for a wire, or undefined when no engine
    * is connected or the wire has no net assignment yet.
    *
-   * `raw`   — the raw unsigned integer value on the net.
-   * `width` — the bit-width (1 = single-bit, >1 = bus).
+   * Digital: `{ raw, width }` — raw unsigned integer + bit-width.
+   * Analog:  `{ voltage }` — continuous node voltage.
    */
-  getWireValue(wire: Wire): { raw: number; width: number } | undefined;
+  getWireValue(wire: Wire): WireValue | undefined;
 }

@@ -52,6 +52,7 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
     outputCount: (_i: number) => outputCount,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount + outputCount,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -210,7 +211,7 @@ describe("ROM", () => {
     expect(arMapping!.convert("true")).toBe(true);
   });
 
-  it("draw — calls ctx.drawRect and ctx.drawText", () => {
+  it("draw — calls ctx.drawPolygon and ctx.drawText", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -223,13 +224,21 @@ describe("ROM", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawRect: () => calls.push("drawRect"),
+      drawPolygon: () => calls.push("drawPolygon"),
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
       drawText: (_text: string) => calls.push(`drawText:${_text}`),
     };
     el.draw(ctx as never);
 
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    expect(calls).toContain("drawRect");
+    expect(calls).toContain("drawPolygon");
     expect(calls.some(c => c.startsWith("drawText:ROM"))).toBe(true);
   });
 
@@ -247,6 +256,14 @@ describe("ROM", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawRect: () => {},
+      drawPolygon: () => {},
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
       drawText: (text: string) => texts.push(text),
     };
     el.draw(ctx as never);
@@ -277,7 +294,7 @@ describe("ROM", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 5, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
-    expect(bb.x).toBe(5);
+    expect(bb.x).toBe(5.05);
     expect(bb.y).toBe(3 - 0.5);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);
@@ -425,6 +442,14 @@ describe("ROMDualPort", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawRect: () => {},
+      drawPolygon: () => {},
+      drawLine: () => {},
+      drawCircle: () => {},
+      drawArc: () => {},
+      drawPath: () => {},
+      rotate: () => {},
+      scale: () => {},
+      setLineDash: () => {},
       drawText: (text: string) => texts.push(text),
     };
     el.draw(ctx as never);

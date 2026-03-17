@@ -70,6 +70,10 @@ class StaticLayout implements ComponentLayout {
   stateOffset(_idx: number): number {
     return 0;
   }
+
+  getProperty(): undefined {
+    return undefined;
+  }
 }
 
 /**

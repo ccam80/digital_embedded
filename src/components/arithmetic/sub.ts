@@ -127,6 +127,7 @@ export class SubElement extends AbstractCircuitElement {
       componentName: "Sub",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -180,7 +181,7 @@ export function makeExecuteSub(bitWidth: number): (index: number, state: Uint32A
 
 export function executeSub(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);

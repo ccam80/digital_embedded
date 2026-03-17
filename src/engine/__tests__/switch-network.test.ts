@@ -49,6 +49,7 @@ function makeLayout(opts: {
     outputOffset: () => opts.outputOffset,
     stateOffset: () => opts.stateOffset,
     getSwitchClassification: () => opts.switchClassification ?? 1,
+    getProperty: () => undefined,
   };
 }
 
@@ -67,6 +68,7 @@ function makeTransGateLayout(opts: {
     outputOffset: () => opts.outputOffset,
     stateOffset: () => opts.stateOffset,
     getSwitchClassification: () => opts.switchClassification ?? 1,
+    getProperty: () => undefined,
   };
 }
 

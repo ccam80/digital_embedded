@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -183,16 +184,18 @@ describe("DipSwitch", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("4-bit DipSwitch renders more drawRect calls than 1-bit (more switch slots)", () => {
+    it("4-bit DipSwitch renders same drawRect calls as 1-bit (one slider slot drawn)", () => {
       const el1 = makeDipSwitch({ bitCount: 1 });
       const el4 = makeDipSwitch({ bitCount: 4 });
       const { ctx: ctx1, calls: calls1 } = makeStubCtx();
       const { ctx: ctx4, calls: calls4 } = makeStubCtx();
       el1.draw(ctx1);
       el4.draw(ctx4);
+      // Body is drawn via drawPolygon; slider (filled + outline) is 2 drawRect calls each
       const rects1 = calls1.filter((c) => c.method === "drawRect").length;
       const rects4 = calls4.filter((c) => c.method === "drawRect").length;
-      expect(rects4).toBeGreaterThan(rects1);
+      expect(rects1).toBe(2);
+      expect(rects4).toBe(2);
     });
 
     it("draw renders label when set", () => {

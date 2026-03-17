@@ -52,6 +52,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -210,20 +211,20 @@ describe("SevenSeg", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw calls drawLine (segment outlines)", () => {
+    it("draw calls drawPolygon for segment outlines", () => {
       const el = makeSevenSeg();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const lines = calls.filter((c) => c.method === "drawLine");
-      expect(lines.length).toBeGreaterThanOrEqual(7);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(7);
     });
 
-    it("draw renders component background rect", () => {
+    it("draw renders component background polygon", () => {
       const el = makeSevenSeg();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -389,20 +390,21 @@ describe("SevenSegHex", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component rect", () => {
+    it("draw renders component polygon", () => {
       const el = makeSevenSegHex();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw renders 'hex' label text", () => {
+    it("draw renders segment shapes via drawPolygon (reuses SevenSeg shape)", () => {
       const el = makeSevenSegHex();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "hex")).toBe(true);
+      // SevenSegHex reuses drawSevenSegShape which draws segment outlines as polygons
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(7);
     });
   });
 
@@ -546,20 +548,20 @@ describe("SixteenSeg", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders component rect", () => {
+    it("draw renders component polygon", () => {
       const el = makeSixteenSeg();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw calls drawLine for segment outlines", () => {
+    it("draw calls drawPolygon for segment outlines", () => {
       const el = makeSixteenSeg();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const lines = calls.filter((c) => c.method === "drawLine");
-      expect(lines.length).toBeGreaterThanOrEqual(10);
+      const polys = calls.filter((c) => c.method === "drawPolygon");
+      expect(polys.length).toBeGreaterThanOrEqual(10);
     });
   });
 

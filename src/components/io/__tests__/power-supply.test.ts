@@ -38,6 +38,7 @@ function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayou
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -173,12 +174,13 @@ describe("PowerSupply", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw calls drawRect (component body)", () => {
+    it("draw calls drawPolygon (component body)", () => {
       const el = makePowerSupply();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
+      // PowerSupply body is a 4-point polygon, not a rect
+      const polygons = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygons.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw renders 'VDD' text", () => {
@@ -205,12 +207,14 @@ describe("PowerSupply", () => {
       expect(calls.some((c) => c.method === "restore")).toBe(true);
     });
 
-    it("draw renders label when set", () => {
+    it("draw renders 'Power' component name text", () => {
       const el = makePowerSupply({ label: "PSU1" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
+      // PowerSupply.draw() renders fixed pin labels and component name "Power",
+      // but does not render the instance label property
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "PSU1")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "Power")).toBe(true);
     });
   });
 

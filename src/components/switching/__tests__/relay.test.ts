@@ -49,6 +49,7 @@ function makeRelayLayout(inputCount: number, stateCount: number): {
     outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -65,6 +66,7 @@ function makeRelayDTLayout(inputCount: number, stateCount: number): {
     outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }
@@ -172,12 +174,11 @@ describe("Relay", () => {
     expect(ncMap!.convert("false")).toBe(false);
   });
 
-  it("draw — renders coil rectangle and NO label", () => {
+  it("draw — renders coil rectangle and contact arm lines", () => {
     const props = new PropertyBag();
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
     const calls: string[] = [];
-    const texts: string[] = [];
     const ctx = {
       save: () => calls.push("save"),
       restore: () => calls.push("restore"),
@@ -186,29 +187,34 @@ describe("Relay", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawRect: () => calls.push("drawRect"),
-      drawText: (t: string) => texts.push(t),
+      drawText: () => {},
       drawLine: () => calls.push("drawLine"),
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
     expect(calls).toContain("drawRect"); // coil rectangle
-    expect(texts).toContain("NO");      // normally-open label
+    // Contact arm and coil leads use drawLine
+    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
-  it("drawNormallyClosed — NC label rendered", () => {
+  it("drawNormallyClosed — extra straight line drawn for NC contacts", () => {
     const props = new PropertyBag();
     props.set("normallyClosed", true);
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
-    const texts: string[] = [];
-    const ctx = {
+    const normallyOpenEl = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, new PropertyBag());
+    const callsNO: string[] = [];
+    const callsNC: string[] = [];
+    const makeCtx = (calls: string[]) => ({
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawText: (t: string) => texts.push(t), drawLine: () => {},
-    };
-    el.draw(ctx as never);
-    expect(texts).toContain("NC");
+      drawRect: () => {}, drawText: () => {}, drawLine: () => calls.push("drawLine"),
+    });
+    normallyOpenEl.draw(makeCtx(callsNO) as never);
+    el.draw(makeCtx(callsNC) as never);
+    // NC draws an extra straight-line across contacts compared to NO
+    expect(callsNC.length).toBeGreaterThan(callsNO.length);
   });
 
   it("definitionComplete — RelayDefinition has all required fields", () => {
@@ -239,7 +245,8 @@ describe("Relay", () => {
     const el = new RelayElement(crypto.randomUUID(), { x: 1, y: 2 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(1);
-    expect(bb.y).toBe(2);
+    // Coil sits above origin: y offset by -3 from position
+    expect(bb.y).toBe(-1);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });
@@ -330,12 +337,11 @@ describe("RelayDT", () => {
     expect(polesMap!.convert("2")).toBe(2);
   });
 
-  it("draw — renders coil rectangle and DT label", () => {
+  it("draw — renders coil polygon, contact arm and pole stub", () => {
     const props = new PropertyBag();
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
     const calls: string[] = [];
-    const texts: string[] = [];
     const ctx = {
       save: () => calls.push("save"),
       restore: () => calls.push("restore"),
@@ -343,14 +349,19 @@ describe("RelayDT", () => {
       setColor: () => {},
       setLineWidth: () => {},
       setFont: () => {},
-      drawRect: () => calls.push("drawRect"),
-      drawText: (t: string) => texts.push(t),
+      drawPath: () => calls.push("drawPath"),
       drawLine: () => calls.push("drawLine"),
+      drawPolygon: () => calls.push("drawPolygon"),
+      setLineDash: () => {},
+      drawText: () => {},
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
-    expect(calls).toContain("drawRect");
-    expect(texts).toContain("DT");
+    expect(calls).toContain("restore");
+    // Coil outline is drawn as polygon, pole stub as drawPath, contact arm as drawLine
+    expect(calls).toContain("drawPolygon");
+    expect(calls).toContain("drawPath");
+    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
   it("definitionComplete — RelayDTDefinition has all required fields", () => {

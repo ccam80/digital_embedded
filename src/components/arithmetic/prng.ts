@@ -132,6 +132,7 @@ export class PRNGElement extends AbstractCircuitElement {
       componentName: "PRNG",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

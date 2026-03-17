@@ -25,6 +25,11 @@ export interface GenericShapeConfig {
   width: number;
   /** Optional user-assigned label drawn above the body. */
   label?: string;
+  /**
+   * Element rotation in quarter-turns (0–3). When 2 (180°), text is
+   * counter-rotated so it renders right-side-up instead of upside-down.
+   */
+  rotation?: 0 | 1 | 2 | 3;
 }
 
 /**
@@ -67,6 +72,33 @@ export function inputPinY(index: number, inputCount: number, symmetric: boolean,
 }
 
 /**
+ * Draw text with automatic counter-rotation when the element is at 180°.
+ *
+ * Java Digital corrects text orientation at the Graphic level by detecting
+ * the direction vector of the text position. We replicate that by rotating
+ * π around the text anchor point so the net canvas rotation for the text
+ * glyphs becomes 0° (readable) instead of 180° (upside-down).
+ */
+export function drawTextUpright(
+  ctx: RenderContext,
+  text: string,
+  x: number,
+  y: number,
+  anchor: import("../core/renderer-interface.js").TextAnchor,
+  flipForRot2: boolean,
+): void {
+  if (!flipForRot2) {
+    ctx.drawText(text, x, y, anchor);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-Math.PI);
+  ctx.drawText(text, 0, 0, anchor);
+  ctx.restore();
+}
+
+/**
  * Draw a component using the Java Digital GenericShape convention.
  *
  * This produces output that pixel-matches the Java reference shapes fixture.
@@ -79,7 +111,10 @@ export function drawGenericShape(ctx: RenderContext, config: GenericShapeConfig)
     componentName,
     width,
     label,
+    rotation = 0,
   } = config;
+
+  const flip = rotation === 2;
 
   const inCount = inputLabels.length;
   const outCount = outputLabels.length;
@@ -130,24 +165,24 @@ export function drawGenericShape(ctx: RenderContext, config: GenericShapeConfig)
     const y = inputPinY(i, inCount, symmetric, even);
     const isClock = clockSet.has(i);
     const labelX = isClock ? 0.55 : 0.2;
-    ctx.drawText(inputLabels[i], labelX, y, { horizontal: "left", vertical: "middle" });
+    drawTextUpright(ctx, inputLabels[i], labelX, y, { horizontal: "left", vertical: "middle" }, flip);
   }
 
   for (let i = 0; i < outCount; i++) {
     const y = i + offs;
-    ctx.drawText(outputLabels[i], width - 0.2, y, { horizontal: "right", vertical: "middle" });
+    drawTextUpright(ctx, outputLabels[i], width - 0.2, y, { horizontal: "right", vertical: "middle" }, flip);
   }
 
   // Component name
   if (componentName != null && componentName.length > 0) {
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText(componentName, width / 2, maxY - 0.3, { horizontal: "center", vertical: "top" });
+    drawTextUpright(ctx, componentName, width / 2, maxY - 0.3, { horizontal: "center", vertical: "top" }, flip);
   }
 
   // User label above body
   if (label != null && label.length > 0) {
     ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, width / 2, bodyTop, { horizontal: "center", vertical: "bottom" });
+    drawTextUpright(ctx, label, width / 2, bodyTop, { horizontal: "center", vertical: "bottom" }, flip);
   }
 
   ctx.restore();

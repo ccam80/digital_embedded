@@ -39,6 +39,7 @@ function makeLayout(inputCount: number, inputOffset: number, outputOffset: numbe
     outputOffset: () => outputOffset,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -238,11 +239,11 @@ describe("MidiElement", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPolygon for the component body", () => {
       const midi = makeMidi();
       const { ctx, calls } = makeStubCtx();
       midi.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
+      expect(calls.filter((c) => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() calls drawText with 'MIDI'", () => {

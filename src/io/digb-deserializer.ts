@@ -1,5 +1,5 @@
 /**
- * Deserializer for the .digb (Digital-in-Browser) native JSON format.
+ * Deserializer for the .digb (digiTS) native JSON format.
  *
  * Parses .digb JSON strings back to Circuit objects. bigint values encoded as
  * "_bigint:<n>" strings are restored to native bigint.

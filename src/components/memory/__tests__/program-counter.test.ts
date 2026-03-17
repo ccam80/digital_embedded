@@ -47,6 +47,7 @@ function makeLayout(): {
     outputCount: (_i: number) => 2,
     outputOffset: (_i: number) => 4,
     stateOffset: (_i: number) => 6,
+    getProperty: () => undefined,
   };
   return { layout, state };
 }

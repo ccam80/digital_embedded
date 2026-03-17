@@ -141,6 +141,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
       componentName: "JK-AS",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

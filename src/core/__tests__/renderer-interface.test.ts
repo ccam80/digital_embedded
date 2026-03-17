@@ -44,6 +44,7 @@ describe("THEME_COLORS", () => {
       "WIRE_Z",
       "WIRE_ERROR",
       "WIRE_UNDEFINED",
+      "WIRE_ANALOG",
       "COMPONENT",
       "COMPONENT_FILL",
       "PIN",
@@ -57,8 +58,8 @@ describe("THEME_COLORS", () => {
     }
   });
 
-  it("has exactly 13 entries", () => {
-    expect(THEME_COLORS).toHaveLength(13);
+  it("has exactly 14 entries", () => {
+    expect(THEME_COLORS).toHaveLength(14);
   });
 
   it("contains no duplicates", () => {

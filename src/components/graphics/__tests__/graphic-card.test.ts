@@ -40,6 +40,7 @@ function makeLayout(): ComponentLayout {
     outputCount: () => 1,
     outputOffset: () => 5,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -448,13 +449,13 @@ describe("GraphicCard", () => {
   // ---------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPolygon for the component body", () => {
       const el = makeCard();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polyCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polyCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() calls drawText containing 'Gr-RAM'", () => {
@@ -505,7 +506,8 @@ describe("GraphicCard", () => {
       props.set("graphicHeight", 4);
       const el = new GraphicCardElement("inst", { x: 2, y: 7 }, 0, false, props);
       const box = el.getBoundingBox();
-      expect(box.x).toBe(2);
+      // GenericShape body insets 0.05 from left edge, starts 0.5 grid above origin
+      expect(box.x).toBeCloseTo(2 + 0.05, 5);
       expect(box.y).toBe(7 - 0.5);
     });
 

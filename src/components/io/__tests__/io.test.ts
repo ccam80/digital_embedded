@@ -79,6 +79,7 @@ function makeLayout(inputCount: number): ComponentLayout {
     outputOffset: () => inputCount,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -91,6 +92,7 @@ function makeLayoutNoInputs(): ComponentLayout {
     outputOffset: () => 0,
     stateOffset: () => 0,
     wiringTable: wt,
+    getProperty: () => undefined,
   };
 }
 
@@ -251,12 +253,12 @@ describe("InComponent", () => {
   });
 
   describe("draw", () => {
-    it("draw calls drawRect for the component body", () => {
+    it("draw calls drawPolygon for the component body", () => {
       const el = makeIn();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polyCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polyCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw shows label when label is set", () => {
@@ -267,13 +269,13 @@ describe("InComponent", () => {
       expect(textCalls.some((c) => c.args[0] === "A")).toBe(true);
     });
 
-    it("draw shows type name when label is empty", () => {
+    it("draw calls drawText once (empty label draws empty string)", () => {
       const el = makeIn({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
       expect(textCalls.length).toBe(1);
-      expect(textCalls[0].args[0]).toBe("In");
+      expect(textCalls[0].args[0]).toBe("");
     });
   });
 
@@ -420,12 +422,12 @@ describe("OutComponent", () => {
   });
 
   describe("draw", () => {
-    it("draw calls drawRect for component body", () => {
+    it("draw calls drawCircle for component body (two concentric circles)", () => {
       const el = makeOut();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const circleCalls = calls.filter((c) => c.method === "drawCircle");
+      expect(circleCalls.length).toBeGreaterThanOrEqual(2);
     });
 
     it("draw shows label when set", () => {
@@ -540,12 +542,13 @@ describe("ClockComponent", () => {
       expect(textCalls.some((c) => c.args[0] === "CLK")).toBe(true);
     });
 
-    it("draw shows no text when label is empty", () => {
+    it("draw calls drawText with empty string when label is empty", () => {
       const el = makeClock({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.length).toBe(0);
+      expect(textCalls.length).toBe(1);
+      expect(textCalls[0].args[0]).toBe("");
     });
   });
 
@@ -753,7 +756,7 @@ describe("GroundComponent", () => {
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const lineCalls = calls.filter((c) => c.method === "drawLine");
-      expect(lineCalls.length).toBeGreaterThanOrEqual(4);
+      expect(lineCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -820,14 +823,14 @@ describe("VddComponent", () => {
   });
 
   describe("draw", () => {
-    it("draw renders VDD symbol with lines and text", () => {
+    it("draw renders VDD symbol with triangle path and stem line", () => {
       const el = makeVdd();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const lineCalls = calls.filter((c) => c.method === "drawLine");
-      expect(lineCalls.length).toBeGreaterThanOrEqual(2);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => (c.args[0] as string).includes("VDD"))).toBe(true);
+      expect(lineCalls.length).toBeGreaterThanOrEqual(1);
+      const pathCalls = calls.filter((c) => c.method === "drawPath");
+      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
 

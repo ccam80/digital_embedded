@@ -31,6 +31,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -197,12 +198,12 @@ describe("Neg", () => {
   });
 
   describe("rendering", () => {
-    it("draws a rect and '-A' text", () => {
+    it("draws a polygon body and 'Neg' name", () => {
       const el = makeNegElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "-A")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Neg")).toBe(true);
     });
   });
 
@@ -357,12 +358,15 @@ describe("Comparator", () => {
   });
 
   describe("rendering", () => {
-    it("draws a rect and 'A=B' text", () => {
+    it("draws a polygon body and output labels '>', '=', '<'", () => {
       const el = makeComparatorElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "A=B")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
+      const textArgs = calls.filter((c) => c.method === "drawText").map((c) => c.args[0]);
+      expect(textArgs).toContain(">");
+      expect(textArgs).toContain("=");
+      expect(textArgs).toContain("<");
     });
   });
 
@@ -562,18 +566,18 @@ describe("BarrelShifter", () => {
   });
 
   describe("rendering", () => {
-    it("left shifter draws '<<' symbol", () => {
+    it("left shifter draws 'Shift' name", () => {
       const el = makeBarrelShifterElement(8, false, "logical", "left");
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "<<")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Shift")).toBe(true);
     });
 
-    it("right shifter draws '>>' symbol", () => {
+    it("right shifter draws 'Shift' name", () => {
       const el = makeBarrelShifterElement(8, false, "logical", "right");
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === ">>")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Shift")).toBe(true);
     });
   });
 
@@ -669,12 +673,12 @@ describe("BitCount", () => {
   });
 
   describe("rendering", () => {
-    it("draws rect and '#1' text", () => {
+    it("draws polygon body and 'Bit count' name", () => {
       const el = makeBitCountElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "#1")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "Bit count")).toBe(true);
     });
   });
 
@@ -794,12 +798,12 @@ describe("BitExtender", () => {
   });
 
   describe("rendering", () => {
-    it("draws rect and 'ext' text", () => {
+    it("draws polygon body and 'SignEx' name", () => {
       const el = makeBitExtenderElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "ext")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
+      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "SignEx")).toBe(true);
     });
   });
 
@@ -848,6 +852,7 @@ describe("PRNG", () => {
       outputCount: () => 1,
       outputOffset: () => 4,
       stateOffset: () => STATE_BASE,
+      getProperty: () => undefined,
     };
   }
 
@@ -961,11 +966,11 @@ describe("PRNG", () => {
   });
 
   describe("rendering", () => {
-    it("draws rect and 'PRNG' text", () => {
+    it("draws polygon body and 'PRNG' name", () => {
       const el = makePRNGElement();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some((c) => c.method === "drawRect")).toBe(true);
+      expect(calls.some((c) => c.method === "drawPolygon")).toBe(true);
       expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "PRNG")).toBe(true);
     });
   });

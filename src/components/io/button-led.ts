@@ -79,13 +79,13 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Drawn geometry: outer polygon x:[-1.9,-0.05], y:[-1.1,0.75]
-    // Circle at cx=-1.15,r=0.5 → x:[-1.65,-0.65] (inside outer polygon)
-    // Line (-0.4,0.4)→(-0.1,0.7): maxX=-0.05 (outer polygon is rightmost)
+    // Line (-0.4,0.4)→(-0.1,0.7): inside polygon bounds
+    // Circle at cx=-1.15,r=0.5 → x:[-1.65,-0.65], y:[-0.85,0.15]: inside polygon
     return {
       x: this.position.x - 1.9,
       y: this.position.y - 1.1,
-      width: 1.85,
-      height: 1.85,
+      width: 1.85,  // x: -1.9 to -0.05
+      height: 1.85, // y: -1.1 to 0.75
     };
   }
 

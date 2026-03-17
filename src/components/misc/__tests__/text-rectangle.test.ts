@@ -80,6 +80,7 @@ function makeNoOpLayout(): ComponentLayout {
     outputCount: () => 0,
     outputOffset: () => 0,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 

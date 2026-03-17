@@ -184,20 +184,21 @@ export class DriverElement extends AbstractCircuitElement {
 //   outputOffset(index) + 1 = highZ flag (0=driven, 0xFFFFFFFF=high-Z)
 // ---------------------------------------------------------------------------
 
-export function executeDriver(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeDriver(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
 
   const dataIn = state[wt[inBase]];
   const sel = state[wt[inBase + 1]];
+  const outNet = wt[outBase];
 
   if (sel !== 0) {
-    state[wt[outBase]] = dataIn;
-    state[wt[outBase + 1]] = 0;
+    state[outNet] = dataIn;
+    highZs[outNet] = 0;
   } else {
-    state[wt[outBase]] = 0;
-    state[wt[outBase + 1]] = 0xFFFFFFFF;
+    state[outNet] = 0;
+    highZs[outNet] = 0xFFFFFFFF;
   }
 }
 

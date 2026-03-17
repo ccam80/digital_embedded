@@ -67,6 +67,7 @@ function makeFETLayout(inputCount: number, stateCount: number): {
     outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => inputCount,
     stateOffset: (_i: number) => inputCount,
+    getProperty: () => undefined,
   };
   return { layout, state, highZs };
 }
@@ -139,6 +140,7 @@ describe("NFET", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawLine: () => calls.push("drawLine"),
+      drawPolygon: () => calls.push("drawPolygon"),
       drawText: () => {},
     };
     el.draw(ctx as never);
@@ -155,7 +157,7 @@ describe("NFET", () => {
     const ctx = {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: (t: string) => texts.push(t),
+      drawLine: () => {}, drawPolygon: () => {}, drawText: (t: string) => texts.push(t),
     };
     el.draw(ctx as never);
     expect(texts).toContain("Q1");
@@ -188,9 +190,10 @@ describe("NFET", () => {
     const props = new PropertyBag();
     const el = new NFETElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
-    expect(bb.x).toBe(2);
+    // oxide bar at x+0.05 offset
+    expect(bb.x).toBeCloseTo(2.05);
     expect(bb.y).toBe(3);
-    expect(bb.width).toBeGreaterThanOrEqual(1);
+    expect(bb.width).toBeGreaterThanOrEqual(0.9);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });
 });
@@ -247,7 +250,7 @@ describe("PFET", () => {
     expect(labelMap!.convert("P1")).toBe("P1");
   });
 
-  it("draw — renders gate inversion bubble (drawCircle)", () => {
+  it("draw — renders P-channel arrow (drawPolygon) and lead lines", () => {
     const props = new PropertyBag();
     const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -259,11 +262,16 @@ describe("PFET", () => {
       setLineWidth: () => {},
       setFont: () => {},
       drawLine: () => calls.push("drawLine"),
-      drawCircle: () => calls.push("drawCircle"),
+      drawPath: () => calls.push("drawPath"),
+      drawPolygon: () => calls.push("drawPolygon"),
       drawText: () => {},
     };
     el.draw(ctx as never);
-    expect(calls).toContain("drawCircle");
+    expect(calls).toContain("save");
+    expect(calls).toContain("restore");
+    // PFET uses drawPath for drain/source L-shapes and drawPolygon for arrow
+    expect(calls).toContain("drawPath");
+    expect(calls).toContain("drawPolygon");
   });
 
   it("definitionComplete — PFETDefinition has all required fields", () => {
@@ -302,6 +310,7 @@ describe("FGNFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // G high
     state[2] = 0;  // blownFlag=0
@@ -321,6 +330,7 @@ describe("FGNFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // G
     state[1] = 0;  // closedFlag (will be written)
@@ -339,6 +349,7 @@ describe("FGNFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // G
     state[2] = 0;  // blownFlag=0
@@ -356,6 +367,7 @@ describe("FGNFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // G high
     state[2] = 1;  // blownFlag=1
@@ -373,6 +385,7 @@ describe("FGNFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // G low
     state[2] = 1;  // blownFlag=1
@@ -402,7 +415,7 @@ describe("FGNFET", () => {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: (c: string) => colors.push(c),
       setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawCircle: () => {},
+      drawLine: () => {}, drawText: () => {}, drawPolygon: () => {},
     };
     el.draw(ctx as never);
     expect(colors).toContain("WIRE_ERROR");
@@ -416,7 +429,7 @@ describe("FGNFET", () => {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: (c: string) => colors.push(c),
       setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawCircle: () => {},
+      drawLine: () => {}, drawText: () => {}, drawPolygon: () => {},
     };
     el.draw(ctx as never);
     expect(colors).not.toContain("ERROR");
@@ -465,6 +478,7 @@ describe("FGPFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // G low
     state[2] = 0;  // blownFlag=0
@@ -482,6 +496,7 @@ describe("FGPFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // G high
     state[2] = 0;  // blownFlag=0
@@ -499,6 +514,7 @@ describe("FGPFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // G low (would normally close)
     state[2] = 1;  // blownFlag=1
@@ -516,6 +532,7 @@ describe("FGPFET", () => {
       outputCount: () => 0,
       outputOffset: () => 1,
       stateOffset: () => 1,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // G high
     state[2] = 1;  // blownFlag=1
@@ -539,7 +556,7 @@ describe("FGPFET", () => {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: (c: string) => colors.push(c),
       setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawCircle: () => {},
+      drawLine: () => {}, drawText: () => {}, drawPath: () => {}, drawPolygon: () => {},
     };
     el.draw(ctx as never);
     expect(colors).toContain("WIRE_ERROR");
@@ -586,6 +603,7 @@ describe("TransGate", () => {
       outputCount: () => 0,
       outputOffset: () => 2,
       stateOffset: () => 2,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // S
     state[1] = 0;  // ~S
@@ -603,6 +621,7 @@ describe("TransGate", () => {
       outputCount: () => 0,
       outputOffset: () => 2,
       stateOffset: () => 2,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // S
     state[1] = 1;  // ~S
@@ -620,6 +639,7 @@ describe("TransGate", () => {
       outputCount: () => 0,
       outputOffset: () => 2,
       stateOffset: () => 2,
+      getProperty: () => undefined,
     };
     state[0] = 0;  // S
     state[1] = 0;  // ~S
@@ -637,6 +657,7 @@ describe("TransGate", () => {
       outputCount: () => 0,
       outputOffset: () => 2,
       stateOffset: () => 2,
+      getProperty: () => undefined,
     };
     state[0] = 1;  // S
     state[1] = 1;  // ~S
@@ -654,6 +675,7 @@ describe("TransGate", () => {
       outputCount: () => 0,
       outputOffset: () => 2,
       stateOffset: () => 2,
+      getProperty: () => undefined,
     };
 
     state[0] = 1; state[1] = 0;
@@ -687,7 +709,7 @@ describe("TransGate", () => {
     expect(labelMap!.convert("TG1")).toBe("TG1");
   });
 
-  it("draw — renders gate lines and inversion bubble", () => {
+  it("draw — renders bowtie polygons and inversion bubble", () => {
     const props = new PropertyBag();
     const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -700,12 +722,15 @@ describe("TransGate", () => {
       setFont: () => {},
       drawLine: () => calls.push("drawLine"),
       drawCircle: () => calls.push("drawCircle"),
+      drawPolygon: () => calls.push("drawPolygon"),
       drawText: () => {},
     };
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    expect(calls).toContain("drawCircle"); // ~S inversion bubble
+    // TransGate uses drawPolygon for bowtie shapes and drawCircle for inversion bubble
+    expect(calls).toContain("drawPolygon");
+    expect(calls).toContain("drawCircle");
     expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
@@ -717,7 +742,7 @@ describe("TransGate", () => {
     const ctx = {
       save: () => {}, restore: () => {}, translate: () => {},
       setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawCircle: () => {}, drawText: (t: string) => texts.push(t),
+      drawLine: () => {}, drawCircle: () => {}, drawPolygon: () => {}, drawText: (t: string) => texts.push(t),
     };
     el.draw(ctx as never);
     expect(texts).toContain("TG1");
@@ -751,7 +776,8 @@ describe("TransGate", () => {
     const el = new TransGateElement(crypto.randomUUID(), { x: 5, y: 7 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(5);
-    expect(bb.y).toBe(7);
+    // getBoundingBox offsets y by -1 (pin p1 at y=-1 relative to position)
+    expect(bb.y).toBe(6);
     expect(bb.width).toBeGreaterThanOrEqual(2);
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });

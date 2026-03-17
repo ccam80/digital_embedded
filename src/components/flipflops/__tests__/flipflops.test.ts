@@ -54,6 +54,7 @@ function makeLayout(inputCount: number, outputCount: number, _stateCount: number
     outputOffset: () => outputStart,
     stateOffset: () => stateStart,
     wiringTable,
+    getProperty: () => undefined,
   };
 }
 
@@ -111,22 +112,22 @@ describe("FlipflopD", () => {
   // Slots: [D=0, C=1, Q=2, ~Q=3, storedQ=4, prevClock=5]
 
   describe("truth table on clock edge", () => {
-    it("D=1 captured on rising clock edge → Q=1, ~Q=0xFFFFFFFE", () => {
+    it("D=1 captured on rising clock edge → Q=1, ~Q=0", () => {
       const state = makeState(6, { 0: 1, 1: 0, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
       sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
-      expect(state[3]).toBe((~1) >>> 0);
+      expect(state[3]).toBe(0);
     });
 
-    it("D=0 captured on rising clock edge → Q=0, ~Q=0xFFFFFFFF", () => {
+    it("D=0 captured on rising clock edge → Q=0, ~Q=1", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 1, 5: 0 });
       const highZs = new Uint32Array(state.length);
       state[1] = 1;
       sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
-      expect(state[3]).toBe((~0) >>> 0);
+      expect(state[3]).toBe(1);
     });
 
     it("D=1 but no clock edge (clock stays high) → Q unchanged", () => {
@@ -164,7 +165,7 @@ describe("FlipflopD", () => {
       state[1] = 1;
       sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(1);
-      expect(state[3]).toBe((~1) >>> 0);
+      expect(state[3]).toBe(0);
 
       state[0] = 0;
       state[5] = 0;
@@ -172,7 +173,7 @@ describe("FlipflopD", () => {
       state[1] = 1;
       sampleD(0, state, highZs, layout); executeD(0, state, highZs, layout);
       expect(state[2]).toBe(0);
-      expect(state[3]).toBe((~0) >>> 0);
+      expect(state[3]).toBe(1);
     });
   });
 
@@ -232,13 +233,13 @@ describe("FlipflopD", () => {
   });
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPolygon for the component body", () => {
       const props = new PropertyBag();
       props.set("bitWidth", 1);
       const el = new DElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -313,8 +314,9 @@ describe("FlipflopDAsync", () => {
       const state = makeState(8, { 0: 1, 1: 0, 2: 0, 3: 0, 6: 0, 7: 0 });
       const highZs = new Uint32Array(state.length);
       executeDAsync(0, state, highZs, layout);
-      expect(state[4]).toBe(0xFFFFFFFF >>> 0);
-      expect(state[5]).toBe((~0xFFFFFFFF) >>> 0);
+      // bitWidth defaults to 1 (no getProperty), so Set=1 → Q=1, ~Q=0
+      expect(state[4]).toBe(1);
+      expect(state[5]).toBe(0);
     });
 
     it("Set=1 overrides D=0 on clock edge", () => {
@@ -322,7 +324,7 @@ describe("FlipflopDAsync", () => {
       const highZs = new Uint32Array(state.length);
       state[2] = 1;
       executeDAsync(0, state, highZs, layout);
-      expect(state[4]).toBe(0xFFFFFFFF >>> 0);
+      expect(state[4]).toBe(1);
     });
   });
 
@@ -332,7 +334,7 @@ describe("FlipflopDAsync", () => {
       const highZs = new Uint32Array(state.length);
       executeDAsync(0, state, highZs, layout);
       expect(state[4]).toBe(0);
-      expect(state[5]).toBe(0xFFFFFFFF >>> 0);
+      expect(state[5]).toBe(1);
     });
   });
 
@@ -370,13 +372,13 @@ describe("FlipflopDAsync", () => {
   });
 
   describe("rendering", () => {
-    it("draw() calls drawRect and contains label texts", () => {
+    it("draw() calls drawPolygon and contains label texts", () => {
       const props = new PropertyBag();
       props.set("bitWidth", 1);
       const el = new DAsyncElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
       const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
       expect(texts).toContain("Set");
@@ -514,11 +516,11 @@ describe("FlipflopJK", () => {
   });
 
   describe("rendering", () => {
-    it("draw() renders rect body and J/K/C labels", () => {
+    it("draw() renders polygon body and J/K/C labels", () => {
       const el = new JKElement("id", { x: 0, y: 0 }, 0, false, new PropertyBag());
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
       const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
       expect(texts).toContain("J");
@@ -722,11 +724,11 @@ describe("FlipflopRS", () => {
   });
 
   describe("rendering", () => {
-    it("draw() renders rect and S/R/C labels", () => {
+    it("draw() renders polygon and S/R/C labels", () => {
       const el = new RSElement("id", { x: 0, y: 0 }, 0, false, new PropertyBag());
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
       const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
       expect(texts).toContain("S");
@@ -833,11 +835,11 @@ describe("FlipflopRSAsync", () => {
   });
 
   describe("rendering", () => {
-    it("draw() renders rect and S/R labels", () => {
+    it("draw() renders polygon and S/R labels", () => {
       const el = new RSAsyncElement("id", { x: 0, y: 0 }, 0, false, new PropertyBag());
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
       const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
       expect(texts).toContain("S");
@@ -1009,13 +1011,13 @@ describe("FlipflopT", () => {
   });
 
   describe("rendering", () => {
-    it("draw() renders rect body", () => {
+    it("draw() renders polygon body", () => {
       const props = new PropertyBag();
       props.set("withEnable", false);
       const el = new TElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawRect");
+      const rects = calls.filter(c => c.method === "drawPolygon");
       expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 

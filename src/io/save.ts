@@ -132,12 +132,17 @@ function serializeWire(wire: Wire): SavedWire {
 // ---------------------------------------------------------------------------
 
 function serializeMetadata(circuit: Circuit): SavedMetadata {
-  return {
+  const meta: SavedMetadata = {
     name: circuit.metadata.name,
     description: circuit.metadata.description,
     measurementOrdering: [...circuit.metadata.measurementOrdering],
     isGeneric: circuit.metadata.isGeneric,
   };
+  // Only write engineType when non-default to keep digital files clean
+  if (circuit.metadata.engineType !== "digital") {
+    meta.engineType = circuit.metadata.engineType;
+  }
+  return meta;
 }
 
 // ---------------------------------------------------------------------------

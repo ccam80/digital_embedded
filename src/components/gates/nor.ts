@@ -201,7 +201,7 @@ export function executeNOr(index: number, state: Uint32Array, _highZs: Uint32Arr
   const inputStart = layout.inputOffset(index);
   const inputCount = layout.inputCount(index);
   const outputIdx = layout.outputOffset(index);
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
 
   let result = 0;

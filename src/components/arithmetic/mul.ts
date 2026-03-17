@@ -110,6 +110,7 @@ export class MulElement extends AbstractCircuitElement {
       componentName: "Mul",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -186,8 +187,8 @@ export function makeExecuteMul(
 
 export function executeMul(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   makeExecuteMul(
-    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
-    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
+    (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty(index, "signed") as boolean | undefined) ?? false,
   )(index, state, _highZs, layout);
 }
 

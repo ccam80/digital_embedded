@@ -11,8 +11,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { readFile, writeFile, readdir } from "fs/promises";
-import { dirname } from "path";
+import { readFile, writeFile, readdir, mkdir } from "fs/promises";
+import { dirname, resolve as resolvePath } from "path";
 import { createDefaultRegistry } from "../src/components/register-all.js";
 import { CircuitBuilder } from "../src/headless/builder.js";
 import { SimulationLoader } from "../src/headless/loader.js";
@@ -570,7 +570,7 @@ server.registerTool(
           "Array of patch operations. Each op must have an 'op' field: " +
             "'set' | 'add' | 'remove' | 'connect' | 'disconnect' | 'replace'. " +
             "Examples: " +
-            "{op:'set', target:'gate1', props:{Bits:16}} | " +
+            "{op:'set', target:'gate1', props:{bitWidth:16}} | " +
             "{op:'add', spec:{id:'g2',type:'And'}, connect:{A:'in1:out'}} | " +
             "{op:'remove', target:'gate1'} | " +
             "{op:'connect', from:'in1:out', to:'gate:A'} | " +
@@ -678,7 +678,7 @@ server.registerTool(
                 props: z
                   .record(z.unknown())
                   .optional()
-                  .describe("Optional properties (Bits, label, Inputs, etc.)"),
+                  .describe("Optional properties — use internal keys from circuit_describe (e.g. bitWidth, label, inputCount). XML-convention keys (e.g. Bits, Inputs) are also accepted and auto-translated."),
                 layout: z
                   .object({
                     col: z.number().int().min(0).optional().describe("Pin to column (0 = leftmost)"),
@@ -967,8 +967,6 @@ import { isTutorialManifest } from "../src/tutorial/types.js";
 import type { TutorialManifest, TutorialStep, TutorialCircuitSpec } from "../src/tutorial/types.js";
 import { validateManifest } from "../src/tutorial/validate.js";
 import { listPresets, resolvePaletteSpec } from "../src/tutorial/presets.js";
-import { mkdir } from "fs/promises";
-
 // ---- tutorial_list_presets ----
 
 server.registerTool(
@@ -1207,6 +1205,44 @@ server.registerTool(
     await writeFile(manifestPath, JSON.stringify(m, null, 2), "utf-8");
     lines.push(`\nManifest saved: ${manifestPath}`);
 
+    // Step 5: Upsert tutorials/index.json
+    try {
+      const indexPath = resolvePath("tutorials/index.json");
+      let indexData: { tutorials: Array<Record<string, unknown>> } = { tutorials: [] };
+      try {
+        const raw = await readFile(indexPath, "utf-8");
+        indexData = JSON.parse(raw);
+        if (!Array.isArray(indexData.tutorials)) indexData.tutorials = [];
+      } catch {
+        // File doesn't exist or is invalid — start fresh
+      }
+
+      const entry = {
+        id: m.id,
+        title: m.title,
+        description: m.description,
+        difficulty: m.difficulty,
+        estimatedMinutes: m.estimatedMinutes ?? null,
+        stepCount: m.steps.length,
+        tags: m.tags ?? [],
+        author: m.author ?? null,
+        manifestPath: `${outputDir}/manifest.json`,
+      };
+
+      const existingIdx = indexData.tutorials.findIndex((t) => t.id === m.id);
+      if (existingIdx >= 0) {
+        indexData.tutorials[existingIdx] = entry;
+        lines.push(`\nUpdated existing entry in tutorials/index.json`);
+      } else {
+        indexData.tutorials.push(entry);
+        lines.push(`\nAdded new entry to tutorials/index.json`);
+      }
+
+      await writeFile(indexPath, JSON.stringify(indexData, null, 2), "utf-8");
+    } catch (err) {
+      lines.push(`\nWARNING: Failed to update tutorials/index.json: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     // Warnings
     const warnings = diagnostics.filter((d) => d.severity === "warning");
     if (warnings.length > 0) {
@@ -1218,8 +1254,8 @@ server.registerTool(
     }
 
     lines.push(`\nTutorial created successfully.`);
-    lines.push(`To use: load manifest.json from the tutorial host, or embed with:`);
-    lines.push(`  simulator.html?palette=And,Or,Not&file=${outputDir}/step-1-goal.dig`);
+    lines.push(`To use: open tutorials.html or load directly with:`);
+    lines.push(`  tutorial-viewer.html?manifest=${outputDir}/manifest.json`);
 
     return {
       content: [{ type: "text" as const, text: lines.join("\n") }],
@@ -1259,10 +1295,10 @@ server.registerTool(
       for (const el of circuitA.elements) {
         const def = registry.get(el.typeId);
         if (!def) continue;
-        const label = el.getProperty("label") as string;
+        const label = el.getAttribute("label") as string;
         if (!label) continue;
         if (def.name === "In" || def.name === "Clock") {
-          const bits = (el.getProperty("Bits") as number) || 1;
+          const bits = (el.getAttribute("bitWidth") as number) || 1;
           inputLabels.push(label);
           inputWidths.push(bits);
         } else if (def.name === "Out") {

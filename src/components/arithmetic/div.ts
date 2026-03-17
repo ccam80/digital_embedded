@@ -110,6 +110,7 @@ export class DivElement extends AbstractCircuitElement {
       componentName: "Div",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -190,9 +191,9 @@ export function makeExecuteDiv(
 
 export function executeDiv(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   makeExecuteDiv(
-    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
-    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
-    (layout.getProperty?.(index, "remainderPositive") as boolean | undefined) ?? false,
+    (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty(index, "signed") as boolean | undefined) ?? false,
+    (layout.getProperty(index, "remainderPositive") as boolean | undefined) ?? false,
   )(index, state, _highZs, layout);
 }
 

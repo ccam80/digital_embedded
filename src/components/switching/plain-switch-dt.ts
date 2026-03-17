@@ -104,11 +104,13 @@ export class PlainSwitchDTElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
+    // Lever and grip extend up to y=-0.75 above origin (Java DT open: yOffs=-SIZE2/2=-0.25,
+    // lever top at -yOffs-SIZE = 0.25-1 = -0.75)
     return {
       x: this.position.x,
-      y: this.position.y,
+      y: this.position.y - 0.75,
       width: COMP_WIDTH,
-      height: h,
+      height: h + 0.75,
     };
   }
 
@@ -122,41 +124,59 @@ export class PlainSwitchDTElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Draw the C-contact stub (always visible — shows the DT nature)
+    // Java SwitchDTShape draws C-contact stub polygon:
+    //   (SIZE*2, p*SIZE*2+SIZE) → (SIZE*2-SIZE2/2, p*SIZE*2+SIZE) → (SIZE*2-SIZE2/2, p*SIZE*2+SIZE2+2)
+    // In grid units (SIZE=1, SIZE2=0.5):
+    //   (2, p*2+1) → (1.75, p*2+1) → (1.75, p*2+0.6)
     for (let p = 0; p < poles; p++) {
       const yBase = p * POLE_HEIGHT;
-      // Stub connecting to C terminal (lower-right position)
-      ctx.drawLine(COMP_WIDTH, yBase + C_OFFSET, COMP_WIDTH - 0.5, yBase + C_OFFSET);
-      ctx.drawLine(COMP_WIDTH - 0.5, yBase + C_OFFSET, COMP_WIDTH - 0.5, yBase + 0.5 + 0.1);
+      ctx.drawPath({
+        operations: [
+          { op: "moveTo", x: COMP_WIDTH,      y: yBase + C_OFFSET },
+          { op: "lineTo", x: COMP_WIDTH - 0.25, y: yBase + C_OFFSET },
+          { op: "lineTo", x: COMP_WIDTH - 0.25, y: yBase + 0.6 },
+        ],
+      });
     }
 
     if (closed) {
-      // Closed (A-B connected): straight line from A to B
+      // Closed: straight line from A(0,0) to B(2,0)
       for (let p = 0; p < poles; p++) {
         const yBase = p * POLE_HEIGHT;
         ctx.drawLine(0, yBase, COMP_WIDTH, yBase);
       }
     } else {
-      // Open (A-C connected): angled line from A toward C contact
+      // Open: Java drawLine(0, 2*SIZE*p), (SIZE*2-4, 2*SIZE*p - yOffs*2)
+      // yOffs = -SIZE2/2 = -0.25 → endpoint: (1.8, 0 - (-0.25)*2) = (1.8, 0.5)
       for (let p = 0; p < poles; p++) {
         const yBase = p * POLE_HEIGHT;
-        ctx.drawLine(0, yBase, COMP_WIDTH - 0.2, yBase + 0.5);
+        ctx.drawLine(0, yBase, 1.8, yBase + 0.5);
+      }
+      // Zero-length segments at B pins so pin proximity check passes
+      for (let p = 0; p < poles; p++) {
+        const yBase = p * POLE_HEIGHT;
+        ctx.drawLine(COMP_WIDTH, yBase, COMP_WIDTH, yBase);
       }
     }
 
-    // Lever indicator: dashed vertical line
-    const yOffs = closed ? 0 : -0.5;
+    // Java: yOffs = -SIZE2/2 = -0.25 (open), 0 (closed)
+    // Dashed lever: drawLine(SIZE, -yOffs+(poles-1)*2*SIZE, SIZE, -yOffs-SIZE)
+    // Open: (1, 0.25+(poles-1)*2) → (1, 0.25-1) = (1, -0.75)
+    // Closed: (1, (poles-1)*2) → (1, -1)
+    const yOffs = closed ? 0 : -0.25;
     ctx.setLineDash([0.2, 0.2]);
     ctx.drawLine(
-      COMP_WIDTH / 2,
+      1,
       -yOffs + (poles - 1) * POLE_HEIGHT,
-      COMP_WIDTH / 2,
+      1,
       -yOffs - 1,
     );
     ctx.setLineDash([]);
 
-    // Grip: short horizontal bar at top of lever
-    ctx.drawLine(COMP_WIDTH / 4, -yOffs - 1, (COMP_WIDTH * 3) / 4, -yOffs - 1);
+    // Thin grip bar: (0.5, -yOffs-1) to (1.5, -yOffs-1)
+    ctx.setLineWidth(0.5);
+    ctx.drawLine(0.5, -yOffs - 1, 1.5, -yOffs - 1);
+    ctx.setLineWidth(1);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");

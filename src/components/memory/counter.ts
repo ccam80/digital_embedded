@@ -127,6 +127,7 @@ export class CounterElement extends AbstractCircuitElement {
       componentName: "Counter",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -154,7 +155,7 @@ export function sampleCounter(index: number, state: Uint32Array, _highZs: Uint32
   const inBase = layout.inputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
+    getProperty(i: number, key: string): number;
   };
   const stBase = extLayout.stateOffset(index);
 
@@ -163,7 +164,7 @@ export function sampleCounter(index: number, state: Uint32Array, _highZs: Uint32
   const clr = state[wt[inBase + 2]];
   const prevClock = state[stBase + 1];
 
-  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 4;
   const maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
 
   if (clock !== 0 && prevClock === 0) {
@@ -187,7 +188,7 @@ export function executeCounter(index: number, state: Uint32Array, _highZs: Uint3
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
+    getProperty(i: number, key: string): number;
   };
   const stBase = extLayout.stateOffset(index);
 
@@ -196,7 +197,7 @@ export function executeCounter(index: number, state: Uint32Array, _highZs: Uint3
   const clr = state[wt[inBase + 2]];
   const prevClock = state[stBase + 1];
 
-  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 4;
   const maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
 
   if (clock !== 0 && prevClock === 0) {

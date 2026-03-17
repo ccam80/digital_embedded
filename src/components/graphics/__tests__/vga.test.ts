@@ -39,6 +39,7 @@ function makeLayout(): ComponentLayout {
     outputCount: () => 1,
     outputOffset: () => 6,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -354,13 +355,13 @@ describe("VGA", () => {
   // ---------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPolygon for the component body", () => {
       const el = makeVga();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polyCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polyCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() calls drawText for the VGA label", () => {
@@ -407,8 +408,8 @@ describe("VGA", () => {
       props.set("frameHeight", 8);
       const el = new VGAElement("inst", { x: 3, y: 5 }, 0, false, props);
       const box = el.getBoundingBox();
-      expect(box.x).toBe(3);
-      // GenericShape body starts 0.5 grid above origin
+      // GenericShape body insets 0.05 from left edge, starts 0.5 grid above origin
+      expect(box.x).toBeCloseTo(3 + 0.05, 5);
       expect(box.y).toBe(5 - 0.5);
     });
 

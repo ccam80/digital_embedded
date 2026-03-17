@@ -126,6 +126,7 @@ export class RSElement extends AbstractCircuitElement {
       componentName: "RS",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

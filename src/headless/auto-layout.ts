@@ -128,12 +128,20 @@ interface Graph {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function buildGraph(circuit: Circuit): Graph {
-  // Index: world-position key → (element, pin)
-  const posMap = new Map<string, { el: CircuitElement; pin: Pin }>();
+  // Index: world-position key → list of (element, pin) at that position.
+  // Multiple pins from different components can share coordinates (e.g. when
+  // auto-positioned components have tall pin spans), so we store an array.
+  const posMap = new Map<string, Array<{ el: CircuitElement; pin: Pin }>>();
   for (const el of circuit.elements) {
     for (const pin of el.getPins()) {
       const wp = pinWorldPosition(el, pin);
-      posMap.set(`${wp.x},${wp.y}`, { el, pin });
+      const key = `${wp.x},${wp.y}`;
+      let arr = posMap.get(key);
+      if (arr === undefined) {
+        arr = [];
+        posMap.set(key, arr);
+      }
+      arr.push({ el, pin });
     }
   }
 
@@ -162,9 +170,24 @@ function buildGraph(circuit: Circuit): Graph {
   const seen = new Set<string>();
 
   for (const wire of circuit.wires) {
-    const a = posMap.get(`${wire.start.x},${wire.start.y}`);
-    const b = posMap.get(`${wire.end.x},${wire.end.y}`);
-    if (!a || !b || a.el === b.el) continue;
+    const aList = posMap.get(`${wire.start.x},${wire.start.y}`);
+    const bList = posMap.get(`${wire.end.x},${wire.end.y}`);
+    if (!aList || !bList) continue;
+
+    // Find a pair (a, b) from different elements.
+    let a: { el: CircuitElement; pin: Pin } | undefined;
+    let b: { el: CircuitElement; pin: Pin } | undefined;
+    for (const ai of aList) {
+      for (const bi of bList) {
+        if (ai.el !== bi.el) {
+          a = ai;
+          b = bi;
+          break;
+        }
+      }
+      if (a) break;
+    }
+    if (!a || !b) continue;
 
     // Orient: output → input
     let src = a;

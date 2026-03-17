@@ -46,8 +46,13 @@ import {
 // Diode:         out1(0,0), out2(0,-1)  [cathode at y=0, anode at y=-1]
 // DiodeBackward: in(0,0),   out(0,-1)
 // DiodeForeward: in(0,0),   out(0,1)
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
+//
+// Java draws:
+//   Polygon: (-0.5,-0.95) → (0.5,-0.95) → (0,-0.05), closed
+//   Line:    (-0.5,-0.05) → (0.5,-0.05)
+// Pins: out1 at (0,0), out2 at (0,-1)
+const COMP_WIDTH = 1;  // fits the ±0.5 x extent
+const COMP_HEIGHT = 1; // fits the -1..0 y extent
 
 // ---------------------------------------------------------------------------
 // Shared pin layout helpers
@@ -121,44 +126,35 @@ function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Draw the diode triangle symbol body (cathode on left, anode on right).
- * Used by the bidirectional Diode — kept horizontal for that component.
+ * Draw the Diode symbol body.
+ * Matches Java DiodeShape exactly:
+ *   Polygon (closed): (-0.5,-0.95) → (0.5,-0.95) → (0,-0.05)
+ *   Line: (-0.5,-0.05) → (0.5,-0.05)   [cathode bar]
+ * Pins: out1 at (0,0), out2 at (0,-1).
+ * The polygon tip touches pin out1 at (0,-0.05≈0), cathode bar at -0.05.
+ * The base spans ±0.5 at y=-0.95, touching pin out2 at (0,-1) from below.
  */
 function drawDiodeBody(ctx: RenderContext, label: string): void {
-  ctx.setColor("COMPONENT_FILL");
-  ctx.drawPath({
-    operations: [
-      { op: "moveTo", x: 0.3, y: 0.2 },
-      { op: "lineTo", x: 1.7, y: 1 },
-      { op: "lineTo", x: 0.3, y: 1.8 },
-      { op: "closePath" },
-    ],
-  });
-
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
 
-  // Triangle outline
+  // Triangle: base at top (y=-0.95), tip pointing down toward (0,-0.05)
   ctx.drawPath({
     operations: [
-      { op: "moveTo", x: 0.3, y: 0.2 },
-      { op: "lineTo", x: 1.7, y: 1 },
-      { op: "lineTo", x: 0.3, y: 1.8 },
+      { op: "moveTo", x: -0.5, y: -0.95 },
+      { op: "lineTo", x: 0.5,  y: -0.95 },
+      { op: "lineTo", x: 0,    y: -0.05 },
       { op: "closePath" },
     ],
   });
 
-  // Cathode bar (vertical line at right/anode tip)
-  ctx.drawLine(1.7, 0.2, 1.7, 1.8);
-
-  // Lead lines from pins to body
-  ctx.drawLine(0, 1, 0.3, 1);
-  ctx.drawLine(1.7, 1, COMP_WIDTH, 1);
+  // Cathode bar at the tip
+  ctx.drawLine(-0.5, -0.05, 0.5, -0.05);
 
   if (label.length > 0) {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText(label, COMP_WIDTH / 2, -0.3, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText(label, 0, -1.1, { horizontal: "center", vertical: "bottom" });
   }
 }
 
@@ -274,9 +270,10 @@ export class DiodeElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Draw extents: x in [-0.5, 0.5], y in [-0.95, -0.05]
     return {
-      x: this.position.x,
-      y: this.position.y,
+      x: this.position.x - 0.5,
+      y: this.position.y - 0.95,
       width: COMP_WIDTH,
       height: COMP_HEIGHT,
     };
@@ -292,7 +289,7 @@ export class DiodeElement extends AbstractCircuitElement {
     if (blown) {
       ctx.setColor("WIRE_ERROR");
       ctx.setLineWidth(1);
-      ctx.drawLine(0.8, 0.4, 1.2, 1.6);
+      ctx.drawLine(-0.2, -0.8, 0.2, -0.2);
     }
 
     ctx.restore();

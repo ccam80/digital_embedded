@@ -117,6 +117,7 @@ export class DElement extends AbstractCircuitElement {
       componentName: "D",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -160,9 +161,13 @@ export function executeD(index: number, state: Uint32Array, _highZs: Uint32Array
   const outBase = layout.outputOffset(index);
   const stBase = layout.stateOffset(index);
 
+  const bw = layout.getProperty(index, "bitWidth");
+  const bitWidth = typeof bw === "number" ? bw : 1;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
+
   const q = state[stBase];
   state[wt[outBase]] = q;
-  state[wt[outBase + 1]] = (~q) >>> 0;
+  state[wt[outBase + 1]] = (~q & mask) >>> 0;
 }
 
 // ---------------------------------------------------------------------------

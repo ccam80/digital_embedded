@@ -43,6 +43,7 @@ class StaticLayout implements ComponentLayout {
   outputCount(idx: number): number { return this._outputCounts[idx] ?? 0; }
   outputOffset(idx: number): number { return this._outputOffsets[idx] ?? 0; }
   stateOffset(_idx: number): number { return 0; }
+  getProperty(): undefined { return undefined; }
 }
 
 function buildCircuit(

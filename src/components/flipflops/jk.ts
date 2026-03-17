@@ -126,6 +126,7 @@ export class JKElement extends AbstractCircuitElement {
       componentName: "JK",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 

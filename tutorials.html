@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>digiTS Tutorials</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e; color: #e0e0e0;
+    }
+
+    .header {
+      padding: 24px 32px 16px; border-bottom: 1px solid #3a3a3a; background: #2a2a2a;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+    .header-actions { display: flex; gap: 8px; }
+    .header-actions a {
+      padding: 6px 14px; background: #3a3a3a; color: #ccc; border: 1px solid #4a4a4a;
+      border-radius: 4px; text-decoration: none; font-size: 13px;
+    }
+    .header-actions a:hover { background: #4a4a4a; color: #fff; }
+
+    .filters {
+      display: flex; gap: 8px; padding: 16px 32px; flex-wrap: wrap; align-items: center;
+    }
+    .filter-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+    .filter-btn {
+      padding: 5px 14px; background: #333; color: #aaa; border: 1px solid #444;
+      border-radius: 16px; cursor: pointer; font-size: 12px; transition: all 0.15s;
+    }
+    .filter-btn:hover { background: #3a3a3a; color: #ccc; }
+    .filter-btn.active { background: #0066cc; border-color: #0066cc; color: #fff; }
+
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px; padding: 16px 32px 32px; max-width: 1200px;
+    }
+
+    .card {
+      background: #252525; border: 1px solid #3a3a3a; border-radius: 8px;
+      padding: 20px; cursor: pointer; transition: all 0.15s;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .card:hover { border-color: #0066cc; background: #2a2a2a; transform: translateY(-1px); }
+    .card-title { font-size: 15px; font-weight: 600; color: #fff; }
+    .card-desc { font-size: 13px; color: #aaa; line-height: 1.5; flex: 1; }
+    .card-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .badge {
+      padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;
+      text-transform: capitalize;
+    }
+    .badge-beginner { background: #1a3a1a; color: #6c6; border: 1px solid #2a4a2a; }
+    .badge-intermediate { background: #3a3a1a; color: #cc6; border: 1px solid #4a4a2a; }
+    .badge-advanced { background: #3a1a1a; color: #c66; border: 1px solid #4a2a2a; }
+
+    .meta-item { font-size: 11px; color: #777; }
+    .tag { padding: 1px 6px; background: #2a2a3a; color: #99a; border-radius: 3px; font-size: 10px; }
+    .card-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .card-link {
+      font-size: 11px; color: #68a; text-decoration: none; padding: 2px 0;
+    }
+    .card-link:hover { color: #8bf; text-decoration: underline; }
+
+    .empty-state {
+      padding: 60px 32px; text-align: center; color: #666; font-size: 14px;
+    }
+    .error-state {
+      padding: 60px 32px; text-align: center; color: #c44; font-size: 14px;
+    }
+    .error-state code { display: block; margin-top: 8px; color: #888; font-size: 12px; }
+
+    @media (max-width: 600px) {
+      .header, .filters, .grid { padding-left: 16px; padding-right: 16px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>digiTS Tutorials</h1>
+    <div class="header-actions">
+      <a href="tutorial-editor.html">New Tutorial</a>
+      <a href="simulator.html">Simulator</a>
+    </div>
+  </div>
+  <div class="filters" id="filters">
+    <span class="filter-label">Difficulty</span>
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="beginner">Beginner</button>
+    <button class="filter-btn" data-filter="intermediate">Intermediate</button>
+    <button class="filter-btn" data-filter="advanced">Advanced</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="empty-state" id="empty" style="display:none">No tutorials match this filter.</div>
+  <div class="error-state" id="error" style="display:none"></div>
+
+  <script>
+    // --- State ---
+    let tutorials = [];
+    let activeFilter = 'all';
+
+    // --- Locked mode: single tutorial redirect ---
+    const params = new URLSearchParams(window.location.search);
+    const lockedManifest = params.get('tutorial');
+    if (lockedManifest) {
+      // Locked mode — skip the index, go straight to the viewer
+      window.location.href = 'tutorial-viewer.html?manifest=' + encodeURIComponent(lockedManifest);
+    }
+
+    // --- Load index ---
+    const indexUrl = params.get('index') || 'tutorials/index.json';
+
+    async function init() {
+      try {
+        const res = await fetch(indexUrl);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const data = await res.json();
+        tutorials = data.tutorials || [];
+        render();
+      } catch (err) {
+        document.getElementById('error').style.display = '';
+        document.getElementById('error').innerHTML =
+          `Failed to load tutorial index.<code>${err.message}</code>` +
+          `<br><br><span style="color:#888">Make sure you're serving over HTTP, not file://</span>`;
+      }
+    }
+
+    // --- Render ---
+    function render() {
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      grid.innerHTML = '';
+
+      const filtered = activeFilter === 'all'
+        ? tutorials
+        : tutorials.filter(t => t.difficulty === activeFilter);
+
+      if (filtered.length === 0) {
+        empty.style.display = '';
+        return;
+      }
+      empty.style.display = 'none';
+
+      for (const t of filtered) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const desc = t.description.length > 160
+          ? t.description.substring(0, 157) + '...'
+          : t.description;
+
+        const timePart = t.estimatedMinutes
+          ? `<span class="meta-item">${t.estimatedMinutes} min</span>`
+          : '';
+
+        const tags = (t.tags || [])
+          .map(tag => `<span class="tag">${esc(tag)}</span>`)
+          .join('');
+
+        const viewerUrl = 'tutorial-viewer.html?manifest=' + encodeURIComponent(t.manifestPath);
+        const editorUrl = 'tutorial-editor.html?manifest=' + encodeURIComponent(t.manifestPath);
+
+        card.innerHTML = `
+          <div class="card-title">${esc(t.title)}</div>
+          <div class="card-desc">${esc(desc)}</div>
+          <div class="card-meta">
+            <span class="badge badge-${t.difficulty}">${t.difficulty}</span>
+            <span class="meta-item">${t.stepCount} step${t.stepCount !== 1 ? 's' : ''}</span>
+            ${timePart}
+            ${tags}
+          </div>
+          <div class="card-actions">
+            <a class="card-link" href="${viewerUrl}">Start Tutorial</a>
+            <a class="card-link" href="${editorUrl}">Edit</a>
+          </div>
+        `;
+        card.onclick = (e) => {
+          if (e.target.tagName === 'A') return; // let links handle themselves
+          window.location.href = viewerUrl;
+        };
+        grid.appendChild(card);
+      }
+    }
+
+    function esc(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // --- Filter buttons ---
+    document.getElementById('filters').addEventListener('click', (e) => {
+      if (!e.target.classList.contains('filter-btn')) return;
+      activeFilter = e.target.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === activeFilter));
+      render();
+    });
+
+    init();
+  </script>
+</body>
+</html>

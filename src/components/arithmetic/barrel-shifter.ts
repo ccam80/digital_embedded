@@ -92,6 +92,7 @@ export class BarrelShifterElement extends AbstractCircuitElement {
       componentName: "Shift",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -193,7 +194,15 @@ export function makeExecuteBarrelShifter(
 }
 
 export function executeBarrelShifter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteBarrelShifter(8, false, "logical", "left")(index, state, _highZs, layout);
+  const bw = layout.getProperty(index, "bitWidth");
+  const bitWidth = typeof bw === "number" ? bw : 8;
+  const sg = layout.getProperty(index, "signed");
+  const signed = typeof sg === "boolean" ? sg : false;
+  const md = layout.getProperty(index, "mode");
+  const mode: BarrelShifterMode = typeof md === "string" ? md as BarrelShifterMode : "logical";
+  const dr = layout.getProperty(index, "direction");
+  const direction: ShiftDirection = typeof dr === "string" ? dr as ShiftDirection : "left";
+  makeExecuteBarrelShifter(bitWidth, signed, mode, direction)(index, state, _highZs, layout);
 }
 
 export const BARREL_SHIFTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

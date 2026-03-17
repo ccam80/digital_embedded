@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Digital Simulator</title>
+  <title>digiTS</title>
   <style>
     :root {
       --bg: #1e1e1e;
@@ -136,14 +136,18 @@
       border: 1px solid var(--panel-border);
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       min-width: 160px;
+      max-height: 60vh;
+      overflow-y: auto;
       z-index: 201;
       padding: 4px 0;
     }
-    .menu-submenu.open > .menu-dropdown {
+    .menu-submenu.open > .menu-dropdown,
+    .menu-submenu:hover > .menu-dropdown {
       display: block;
+      opacity: 1;
+      transform: none;
     }
     #circuit-name {
-      margin-left: 12px;
       padding: 2px 6px;
       background: transparent;
       border: 1px solid transparent;
@@ -151,6 +155,7 @@
       font-size: 12px;
       border-radius: 3px;
       width: 150px;
+      text-align: center;
       opacity: 0.8;
     }
     #circuit-name:hover {
@@ -184,15 +189,6 @@
       cursor: default;
     }
     .menubar-speed button:disabled:hover { background: transparent; }
-    /* ---- Lock button ---- */
-    #btn-lock {
-      font-size: 14px;
-      padding: 1px 6px;
-    }
-    #btn-lock.locked {
-      color: #e8a23a;
-      border-color: #e8a23a;
-    }
     /* ---- Lock banner ---- */
     #lock-banner {
       display: none;
@@ -381,6 +377,8 @@
       overflow-y: auto;
       flex-shrink: 0;
       transition: width 0.2s ease, transform 0.2s ease;
+      overscroll-behavior-x: none;
+      touch-action: pan-y;
     }
     #palette-panel .panel-header {
       padding: 6px 8px;
@@ -875,6 +873,43 @@
     }
     .tutorial-instructions-panel ul { padding-left: 18px; margin: 4px 0; }
     .tutorial-instructions-panel li { margin: 2px 0; }
+    .tutorial-toggle-btn {
+      display: none;
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      z-index: 160;
+      padding: 6px 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .tutorial-toggle-btn:hover { opacity: 0.9; }
+    @media (max-width: 768px) {
+      .tutorial-instructions-panel {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 50vh;
+        border-right: none;
+        border-top: 2px solid var(--accent);
+        z-index: 155;
+        transform: translateY(0);
+        transition: transform 0.2s ease;
+      }
+      .tutorial-instructions-panel.collapsed {
+        transform: translateY(100%);
+      }
+      .tutorial-toggle-btn {
+        display: block;
+      }
+    }
     /* ---- Memory editor modal ---- */
     .memory-dialog-overlay {
       position: fixed;
@@ -1181,6 +1216,7 @@
       font-size: 12px;
       cursor: pointer;
       user-select: none;
+      touch-action: pan-y;
     }
     .palette-component-item:hover {
       background: var(--accent);
@@ -1188,14 +1224,14 @@
     }
     .palette-component-icon {
       display: block;
-      width: 24px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
       flex-shrink: 0;
       border-radius: 2px;
     }
     .palette-component-icon--placeholder {
-      width: 24px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
       border: 1px solid var(--panel-border);
       border-radius: 2px;
       background: transparent;
@@ -1231,6 +1267,20 @@
       border-radius: 3px;
       font-size: 12px;
     }
+    /* ---- Menu hamburger button (shown only at <=600px) ---- */
+    .menu-hamburger-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--fg);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 8px;
+      height: 100%;
+    }
+    .menu-hamburger-btn:hover { background: var(--panel-border); }
     /* ---- Palette toggle button (shown only at <=768px) ---- */
     .palette-toggle-btn {
       display: none;
@@ -1260,18 +1310,35 @@
       }
       #menubar {
         height: 44px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
       }
+      #menubar::-webkit-scrollbar { display: none; }
       .menu-item {
         min-height: 44px;
         padding: 0 10px;
         display: flex;
         align-items: center;
+        flex-shrink: 0;
       }
       .menu-action {
         min-height: 44px;
         padding: 0 16px;
         display: flex;
         align-items: center;
+      }
+      .menubar-speed {
+        flex-shrink: 0;
+      }
+      /* Hide speed display on tablets */
+      .menubar-speed #speed-input,
+      .menubar-speed .speed-unit {
+        display: none;
+      }
+      #circuit-name {
+        display: none;
       }
       #status-bar {
         height: 32px;
@@ -1280,6 +1347,123 @@
       #viewer-panel {
         height: 180px;
       }
+    }
+    /* ---- Tablet mode (manual toggle mirrors <=768px responsive) ---- */
+    .tablet-mode #palette-panel {
+      width: 0;
+      overflow: hidden;
+    }
+    .tablet-mode #palette-panel.palette-visible {
+      width: 200px;
+      overflow-y: auto;
+    }
+    .tablet-mode .palette-toggle-btn {
+      display: flex;
+    }
+    .tablet-mode #menubar {
+      height: 44px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .tablet-mode #menubar::-webkit-scrollbar { display: none; }
+    .tablet-mode .menu-item {
+      min-height: 44px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .tablet-mode .menu-action {
+      min-height: 44px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+    }
+    .tablet-mode .menubar-speed {
+      flex-shrink: 0;
+    }
+    .tablet-mode .menubar-speed #speed-input,
+    .tablet-mode .menubar-speed .speed-unit {
+      display: none;
+    }
+    .tablet-mode #circuit-name {
+      display: none;
+    }
+    .tablet-mode #status-bar {
+      height: 32px;
+      line-height: 32px;
+    }
+    .tablet-mode #viewer-panel {
+      height: 180px;
+    }
+    .tablet-mode .palette-component-item {
+      min-height: 44px;
+      padding: 10px 8px;
+    }
+    .tablet-mode #menubar button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    .tablet-mode .menu-item {
+      display: none;
+    }
+    .tablet-mode .menu-hamburger-btn {
+      display: flex;
+    }
+    .tablet-mode .menubar-speed > span[style*="width:1px"] {
+      display: none;
+    }
+    .tablet-mode .menu-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      height: 100vh;
+      z-index: 300;
+      background: var(--panel-bg);
+      transform: translateX(-100%);
+      transition: transform 0.2s;
+      overflow-y: auto;
+      border-right: 1px solid var(--panel-border);
+      padding: 8px 0;
+    }
+    .tablet-mode .menu-drawer.open {
+      transform: translateX(0);
+    }
+    .tablet-mode .menu-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 299;
+    }
+    .tablet-mode .menu-drawer-backdrop.open {
+      display: block;
+    }
+    .tablet-mode .menu-drawer .drawer-section {
+      border-bottom: 1px solid var(--panel-border);
+      padding: 4px 0;
+    }
+    .tablet-mode .menu-drawer .drawer-section-title {
+      padding: 8px 16px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.6;
+    }
+    .tablet-mode .menu-drawer .drawer-action {
+      display: block;
+      padding: 10px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--fg);
+    }
+    .tablet-mode .menu-drawer .drawer-action:hover,
+    .tablet-mode .menu-drawer .drawer-action:active {
+      background: var(--accent);
+      color: #fff;
     }
     /* ---- Responsive: mobile (<=600px) ---- */
     @media (max-width: 600px) {
@@ -1300,6 +1484,21 @@
       .palette-toggle-btn {
         display: flex;
       }
+      .menu-hamburger-btn {
+        display: flex;
+      }
+      /* Hide circuit name and non-essential toolbar items on mobile */
+      #circuit-name {
+        display: none;
+      }
+      /* Hide separators and speed +/- on mobile */
+      .menubar-speed > span[style*="width:1px"],
+      .menubar-speed #btn-speed-down,
+      .menubar-speed #btn-speed-up,
+      .menubar-speed #speed-input,
+      .menubar-speed .speed-unit {
+        display: none;
+      }
       .menu-drawer {
         position: fixed;
         top: 0;
@@ -1312,6 +1511,7 @@
         transition: transform 0.2s;
         overflow-y: auto;
         border-right: 1px solid var(--panel-border);
+        padding: 8px 0;
       }
       .menu-drawer.open {
         transform: translateX(0);
@@ -1321,6 +1521,33 @@
         inset: 0;
         background: rgba(0,0,0,0.5);
         z-index: 299;
+      }
+      .menu-drawer-backdrop.open {
+        display: block;
+      }
+      .menu-drawer .drawer-section {
+        border-bottom: 1px solid var(--panel-border);
+        padding: 4px 0;
+      }
+      .menu-drawer .drawer-section-title {
+        padding: 8px 16px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        opacity: 0.6;
+      }
+      .menu-drawer .drawer-action {
+        display: block;
+        padding: 10px 16px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--fg);
+      }
+      .menu-drawer .drawer-action:hover,
+      .menu-drawer .drawer-action:active {
+        background: var(--accent);
+        color: #fff;
       }
     }
     /* ---- Touch targets (coarse pointer / touch devices) ---- */
@@ -1531,6 +1758,7 @@
   <div id="app">
     <div id="menubar" role="menubar">
       <button class="palette-toggle-btn" id="btn-palette-toggle" title="Toggle palette">&#9776;</button>
+      <button class="menu-hamburger-btn" id="btn-menu-hamburger" title="Menu">&#8942;</button>
       <div class="menu-item" data-menu="file" role="menuitem" aria-haspopup="true">File
         <div class="menu-dropdown" role="menu">
           <div class="menu-action" id="btn-new">New<span class="menu-shortcut"></span></div>
@@ -1555,8 +1783,10 @@
             </div>
           </div>
           <div class="menu-separator"></div>
-          <div class="menu-action" id="btn-format-dig"><span class="format-check">&check;</span> Save as .dig (Digital XML)</div>
+          <div class="menu-action" id="btn-format-dig"><span class="format-check">&check;</span> Save as .dig (digiTS XML)</div>
           <div class="menu-action" id="btn-format-digj"><span class="format-check"></span> Save as .digj (JSON)</div>
+          <div class="menu-separator"></div>
+          <div class="menu-action" id="btn-menu-lock">Lock Editing<span class="menu-shortcut" id="lock-check"></span></div>
         </div>
       </div>
       <div class="menu-item" data-menu="edit" role="menuitem" aria-haspopup="true">Edit
@@ -1573,6 +1803,8 @@
           <div class="menu-action" id="btn-find">Find...<span class="menu-shortcut">Ctrl+F</span></div>
           <div class="menu-separator"></div>
           <div class="menu-action" id="btn-fit-content">Fit to Content<span class="menu-shortcut">Ctrl+Shift+F</span></div>
+          <div class="menu-separator"></div>
+          <div class="menu-action" id="btn-menu-settings">Settings...</div>
         </div>
       </div>
       <div class="menu-item" data-menu="view">View
@@ -1582,6 +1814,7 @@
           <div class="menu-action" id="btn-menu-gate-style">IEEE / IEC Gate Style<span class="menu-shortcut" id="gate-style-check"></span></div>
           <div class="menu-separator"></div>
           <div class="menu-action" id="btn-presentation-mode">Presentation Mode</div>
+          <div class="menu-action" id="btn-tablet-mode">Tablet Mode<span class="menu-shortcut" id="tablet-mode-check"></span></div>
         </div>
       </div>
             <div class="menu-item" data-menu="insert" role="menuitem" aria-haspopup="true">Insert
@@ -1609,33 +1842,34 @@
           <div class="menu-action" id="btn-state-transition">State Transition Table...</div>
         </div>
       </div>
+      <div class="menu-item" data-menu="tutorials">Tutorials
+        <div class="menu-dropdown">
+          <div class="menu-action" id="btn-browse-tutorials">Browse Tutorials...</div>
+          <div class="menu-action" id="btn-edit-tutorial">Tutorial Editor...</div>
+        </div>
+      </div>
+      <div class="menubar-spacer"></div>
       <input id="circuit-name" type="text" value="Untitled" title="Circuit name" />
       <div class="menubar-spacer"></div>
       <div class="menubar-speed">
         <button id="btn-tb-undo" title="Undo (Ctrl+Z)" disabled>&#8630;</button>
         <button id="btn-tb-redo" title="Redo (Ctrl+Y)" disabled>&#8631;</button>
         <button id="btn-tb-fit" title="Fit to content (Ctrl+Shift+F)">&#10697;</button>
-        <button id="btn-lock" title="Lock/unlock editing">&#128275;</button>
-        <button id="btn-tb-presentation" title="Presentation mode (F4)">&#9654;&#9646;&#9646;</button>
         <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
         <button id="btn-tb-run" title="Start simulation">&#9654;</button>
         <button id="btn-tb-step" title="Single step">&#9205;</button>
-        <button id="btn-tb-micro-step" title="Micro step (single event)">&#187;&#9205;</button>
-        <button id="btn-tb-run-to-break" title="Run to breakpoint">&#9654;&#9646;</button>
         <button id="btn-tb-stop" title="Stop simulation">&#9632;</button>
-        <button id="btn-speed-div10" title="Speed / 10">/10</button>
-        <button id="btn-speed-div2" title="Speed / 2">/2</button>
-        <input id="speed-input" type="text" value="1000" title="Steps per second" /><span class="speed-unit">steps/s</span>
-        <button id="btn-speed-mul2" title="Speed x 2">x2</button>
-        <button id="btn-speed-mul10" title="Speed x 10">x10</button>
-        <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
-        <button id="btn-tb-timing" title="Timing diagram">&#9776;</button>
-        <button id="btn-tb-values" title="Values table">&#9638;</button>
+        <button id="btn-speed-down" title="Speed / 10">&#8722;</button>
+        <input id="speed-input" type="text" value="1000" title="Steps per second" />
+        <button id="btn-speed-up" title="Speed x 10">+</button><span class="speed-unit">steps/s</span>
         <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
         <button id="btn-dark-mode" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">&#9790;</button>
-        <button id="btn-settings" title="Settings" aria-label="Settings">&#9881;</button>
       </div>
     </div>
+
+    <!-- Mobile menu drawer -->
+    <div id="menu-drawer-backdrop" class="menu-drawer-backdrop" style="display:none"></div>
+    <div id="menu-drawer" class="menu-drawer"></div>
 
     <!-- Settings dialog -->
     <div id="settings-overlay" class="test-dialog-overlay" style="display:none">
@@ -1735,41 +1969,162 @@
         }
       });
     });
-    document.querySelectorAll('.menu-action').forEach(action => {
-      action.addEventListener('click', () => {
-        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
-      });
-    });
+    // Close menus when a leaf menu-action is clicked (not submenu triggers)
     document.addEventListener('click', (e) => {
       const el = e.target instanceof Element ? e.target : null;
-      if (!el || !el.closest('.menu-item')) {
+      if (!el) return;
+      // If clicking a submenu trigger, toggle it instead of closing
+      const subTrigger = el.closest('.menu-submenu > .menu-action');
+      if (subTrigger) {
+        const sub = subTrigger.parentElement;
+        if (sub) {
+          e.stopPropagation();
+          const wasOpen = sub.classList.contains('open');
+          const parent = sub.parentElement;
+          if (parent) {
+            parent.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
+          }
+          if (!wasOpen) sub.classList.add('open');
+        }
+        return;
+      }
+      // If clicking a leaf action inside a dropdown, close all menus
+      if (el.closest('.menu-dropdown .menu-action')) {
         document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        document.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
+        return;
+      }
+      // If clicking outside any menu-item, close all
+      if (!el.closest('.menu-item')) {
+        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        document.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
       }
     });
-    // Submenu hover management: only one submenu open at a time
-    document.addEventListener('pointerenter', (e) => {
-      const el = e.target instanceof Element ? e.target : null;
-      if (!el) return;
-      const sub = el.closest('.menu-submenu');
-      if (!sub) return;
-      const parent = sub.parentElement;
-      if (parent) {
-        parent.querySelectorAll('.menu-submenu.open').forEach(s => s.classList.remove('open'));
+    // Note: submenu hover on desktop is handled purely by CSS :hover rule
+  </script>
+  <script>
+    // Mobile menu drawer: populate from menubar items and toggle
+    (function() {
+      const hamburger = document.getElementById('btn-menu-hamburger');
+      const drawer = document.getElementById('menu-drawer');
+      const backdrop = document.getElementById('menu-drawer-backdrop');
+      if (!hamburger || !drawer || !backdrop) return;
+
+      function populateDrawer() {
+        drawer.innerHTML = '';
+        // Close button at top
+        const closeRow = document.createElement('div');
+        closeRow.className = 'drawer-action';
+        closeRow.style.cssText = 'text-align:right;font-size:18px;padding:8px 16px;';
+        closeRow.textContent = '\u2715';
+        closeRow.addEventListener('click', closeDrawer);
+        drawer.appendChild(closeRow);
+
+        document.querySelectorAll('#menubar > .menu-item[data-menu]').forEach(menuItem => {
+          const section = document.createElement('div');
+          section.className = 'drawer-section';
+
+          const title = document.createElement('div');
+          title.className = 'drawer-section-title';
+          title.style.cursor = 'pointer';
+          const arrow = document.createElement('span');
+          arrow.textContent = '\u25B6 ';
+          arrow.style.fontSize = '9px';
+          title.appendChild(arrow);
+          title.appendChild(document.createTextNode(menuItem.childNodes[0].textContent.trim()));
+          section.appendChild(title);
+
+          const content = document.createElement('div');
+          content.style.display = 'none'; // collapsed by default
+
+          const dropdown = menuItem.querySelector('.menu-dropdown');
+          if (dropdown) {
+            Array.from(dropdown.children).forEach(item => {
+              if (!(item instanceof HTMLElement)) return;
+              if (item.classList.contains('menu-separator')) return;
+              if (item.style.display === 'none') return;
+              if (item.classList.contains('menu-submenu')) {
+                // Submenu: get trigger label and nested items
+                const subLabel = item.children[0]; // first child is the trigger .menu-action
+                const subDropdown = item.querySelector('.menu-dropdown');
+                if (!subLabel) return;
+                const subTitle = document.createElement('div');
+                subTitle.className = 'drawer-action';
+                subTitle.style.cssText = 'padding-left:24px;cursor:pointer;font-weight:600;';
+                const subArrow = document.createElement('span');
+                subArrow.textContent = '\u25B6 ';
+                subArrow.style.fontSize = '9px';
+                subTitle.appendChild(subArrow);
+                subTitle.appendChild(document.createTextNode(subLabel.textContent.replace(/\u25B6/g,'').trim()));
+                content.appendChild(subTitle);
+
+                const subContent = document.createElement('div');
+                subContent.style.display = 'none'; // collapsed
+                if (subDropdown) {
+                  Array.from(subDropdown.children).forEach(subChild => {
+                    if (!(subChild instanceof HTMLElement)) return;
+                    if (subChild.classList.contains('menu-separator')) return;
+                    const action = document.createElement('div');
+                    action.className = 'drawer-action';
+                    action.style.paddingLeft = '40px';
+                    action.textContent = subChild.textContent.trim();
+                    action.addEventListener('click', () => { closeDrawer(); subChild.click(); });
+                    subContent.appendChild(action);
+                  });
+                }
+                content.appendChild(subContent);
+                subTitle.addEventListener('click', (ev) => {
+                  ev.stopPropagation();
+                  const open = subContent.style.display !== 'none';
+                  subContent.style.display = open ? 'none' : '';
+                  subArrow.textContent = open ? '\u25BC ' : '\u25B6 ';
+                });
+              } else if (item.classList.contains('menu-action')) {
+                const action = document.createElement('div');
+                action.className = 'drawer-action';
+                // Get text content but strip shortcut hints and format-check marks
+                let label = '';
+                item.childNodes.forEach(n => {
+                  if (n instanceof HTMLElement && (n.classList.contains('menu-shortcut') || n.classList.contains('format-check'))) return;
+                  label += n.textContent || '';
+                });
+                action.textContent = label.trim();
+                action.addEventListener('click', () => { closeDrawer(); item.click(); });
+                content.appendChild(action);
+              }
+            });
+          }
+
+          section.appendChild(content);
+          title.addEventListener('click', () => {
+            const open = content.style.display !== 'none';
+            content.style.display = open ? 'none' : '';
+            arrow.textContent = open ? '\u25B6 ' : '\u25BC ';
+          });
+
+          drawer.appendChild(section);
+        });
       }
-      sub.classList.add('open');
-    }, true);
-    document.addEventListener('pointerleave', (e) => {
-      const el = e.target instanceof Element ? e.target : null;
-      if (!el) return;
-      const sub = el.closest('.menu-submenu');
-      if (!sub) return;
-      // Delay removal so pointer can move into the dropdown
-      setTimeout(() => {
-        if (!sub.matches(':hover')) {
-          sub.classList.remove('open');
-        }
-      }, 100);
-    }, true);
+
+      function openDrawer() {
+        populateDrawer();
+        backdrop.style.display = '';
+        backdrop.classList.add('open');
+        drawer.classList.add('open');
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('open');
+        backdrop.classList.remove('open');
+        setTimeout(() => { backdrop.style.display = 'none'; }, 200);
+      }
+
+      hamburger.addEventListener('click', () => {
+        if (drawer.classList.contains('open')) closeDrawer();
+        else openDrawer();
+      });
+      backdrop.addEventListener('click', closeDrawer);
+    })();
   </script>
   <button id="btn-exit-presentation" title="Exit presentation (Esc / F4)">&#10005; Exit</button>
 </body>

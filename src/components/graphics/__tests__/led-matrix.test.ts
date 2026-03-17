@@ -40,6 +40,7 @@ function makeLayout(): ComponentLayout {
     outputCount: () => 1,
     outputOffset: () => 2,
     stateOffset: () => 0,
+    getProperty: () => undefined,
   };
 }
 
@@ -264,13 +265,13 @@ describe("LedMatrix", () => {
   // ---------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("draw() calls drawRect for the component body", () => {
+    it("draw() calls drawPolygon for the component body", () => {
       const el = makeLedMatrix();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
 
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polyCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polyCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     it("draw() calls drawText with 'LED-Matrix' component name", () => {
@@ -326,7 +327,8 @@ describe("LedMatrix", () => {
       props.set("colAddrBits", 3);
       const el = new LedMatrixElement("inst", { x: 4, y: 6 }, 0, false, props);
       const box = el.getBoundingBox();
-      expect(box.x).toBe(4);
+      // GenericShape body insets 0.05 from left edge, starts 0.5 grid above origin
+      expect(box.x).toBeCloseTo(4 + 0.05, 5);
       expect(box.y).toBe(6 - 0.5);
     });
 

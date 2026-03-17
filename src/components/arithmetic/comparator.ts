@@ -74,6 +74,7 @@ export class ComparatorElement extends AbstractCircuitElement {
       componentName: null,
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -126,8 +127,8 @@ export function makeExecuteComparator(
 
 export function executeComparator(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   makeExecuteComparator(
-    (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1,
-    (layout.getProperty?.(index, "signed") as boolean | undefined) ?? false,
+    (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1,
+    (layout.getProperty(index, "signed") as boolean | undefined) ?? false,
   )(index, state, _highZs, layout);
 }
 

@@ -123,6 +123,7 @@ export class AddElement extends AbstractCircuitElement {
       componentName: "Add",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -180,7 +181,7 @@ export function makeExecuteAdd(bitWidth: number): (index: number, state: Uint32A
 
 export function executeAdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  const bitWidth = (layout.getProperty?.(index, "bitWidth") as number | undefined) ?? 1;
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
   const carryMask = bitWidth >= 32 ? 0 : (1 << bitWidth);
   const inBase = layout.inputOffset(index);

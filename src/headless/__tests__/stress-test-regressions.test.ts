@@ -46,8 +46,8 @@ function makeLayout(
     stateOffset: () => inputCount + outputCount,
     getProperty: opts?.props
       ? (_index: number, key: string) => (opts.props as Record<string, unknown>)[key]
-      : undefined,
-  } as ComponentLayout;
+      : () => undefined,
+  };
 }
 
 /** Build a real, fully-populated registry for integration-level checks. */
@@ -68,7 +68,7 @@ describe("BUG-2: Splitter executeFn ignores port widths", () => {
   it("executeSplitter should split 16-bit value into two 8-bit halves", () => {
     // Splitter configured as input=16, output="8,8"
     // Layout: 1 input (the 16-bit bus), 2 outputs (8-bit halves)
-    const layout = makeLayout(1, 2);
+    const layout = makeLayout(1, 2, { props: { output: "8,8" } });
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(3);
 
@@ -77,9 +77,6 @@ describe("BUG-2: Splitter executeFn ignores port widths", () => {
 
     executeSplitter(0, state, highZs, layout);
 
-    // BUG: Currently returns extractBits(0xABCD, 0, 1) = 1 and
-    //      extractBits(0xABCD, 1, 1) = 0 — both 1-bit
-    // EXPECTED: output[0] = 0xCD, output[1] = 0xAB
     expect(state[layout.wiringTable[layout.outputOffset(0)]]).toBe(0xCD);
     expect(state[layout.wiringTable[layout.outputOffset(0) + 1]]).toBe(0xAB);
   });
@@ -278,10 +275,9 @@ describe("BUG-5b: Sequential component classification", () => {
 // operates at 8-bit width.
 
 describe("BUG-7: BarrelShifter executeBarrelShifter ignores bitWidth", () => {
-  it("default executeBarrelShifter operates at 8 bits (documents the bug)", () => {
-    // This test documents the current broken behavior.
-    // When the bug is fixed, update expectations to match 32-bit.
-    const layout = makeLayout(2, 1);
+  it("executeBarrelShifter reads bitWidth from getProperty", () => {
+    // With getProperty providing bitWidth=32, the shifter should operate at full width
+    const layout = makeLayout(2, 1, { props: { bitWidth: 32 } });
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(3);
 
@@ -293,11 +289,8 @@ describe("BUG-7: BarrelShifter executeBarrelShifter ignores bitWidth", () => {
 
     const result = state[layout.wiringTable[layout.outputOffset(0)]];
 
-    // BUG: With hardcoded 8-bit width, 0xFF << 4 = 0xF0 (masked to 8 bits)
-    // EXPECTED for 32-bit: 0xFF0
-    // When this test fails (result === 0xFF0), the bug is fixed!
-    expect(result).not.toBe(0xF0); // Should NOT be 8-bit truncated
-    expect(result).toBe(0xFF0);    // Should be full-width shift
+    // With bitWidth=32: 0xFF << 4 = 0xFF0 (not truncated to 8 bits)
+    expect(result).toBe(0xFF0);
   });
 
   it("makeExecuteBarrelShifter(32, ...) correctly handles 32-bit shifts", () => {

@@ -73,6 +73,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -88,6 +89,7 @@ function makeRAMLayout(inputCount: number, outputCount: number): RAMLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -355,7 +357,7 @@ describe("RAMSinglePort", () => {
       const el = new RAMSinglePortElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some(c => c.method === "drawRect")).toBe(true);
+      expect(calls.some(c => c.method === "drawPolygon")).toBe(true);
     });
 
     it("draw calls drawText with RAM symbol", () => {
@@ -1033,7 +1035,7 @@ describe("RAMAsync", () => {
       const el = new RAMAsyncElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some(c => c.method === "drawRect")).toBe(true);
+      expect(calls.some(c => c.method === "drawPolygon")).toBe(true);
     });
 
     it("draw calls drawText with RAM symbol", () => {
@@ -1226,7 +1228,7 @@ describe("BlockRAMDualPort", () => {
       const el = new BlockRAMDualPortElement("id", { x: 0, y: 0 }, 0, false, props);
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      expect(calls.some(c => c.method === "drawRect")).toBe(true);
+      expect(calls.some(c => c.method === "drawPolygon")).toBe(true);
     });
   });
 

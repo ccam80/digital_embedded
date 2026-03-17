@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -270,20 +271,20 @@ describe("Decoder", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw() calls drawRect for the body", () => {
+    it("draw() calls drawPolygon for trapezoid body", () => {
       const el = makeDecoder();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'DEC' text", () => {
+    it("draw() renders '0' text label", () => {
       const el = makeDecoder();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "DEC")).toBe(true);
+      expect(textCalls.some((c) => c.args[0] === "0")).toBe(true);
     });
   });
 

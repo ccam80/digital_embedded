@@ -155,6 +155,7 @@ export class CounterPresetElement extends AbstractCircuitElement {
       componentName: "Counter",
       width: 3,
       label: this._properties.getOrDefault<string>("label", ""),
+      rotation: this.rotation,
     });
   }
 
@@ -187,7 +188,7 @@ export function sampleCounterPreset(
   const inBase = layout.inputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
+    getProperty(i: number, key: string): number;
   };
   const stBase = extLayout.stateOffset(index);
 
@@ -199,9 +200,9 @@ export function sampleCounterPreset(
   const clr = state[wt[inBase + 5]];
   const prevClock = state[stBase + 1];
 
-  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 4;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
-  let maxValue = extLayout.getProperty ? extLayout.getProperty(index, "maxValue") : 0;
+  let maxValue = extLayout.getProperty(index, "maxValue") ?? 0;
   if (maxValue === 0) maxValue = mask;
   maxValue = maxValue & mask;
 
@@ -242,7 +243,7 @@ export function executeCounterPreset(
   const outBase = layout.outputOffset(index);
   const extLayout = layout as unknown as {
     stateOffset(i: number): number;
-    getProperty?(i: number, key: string): number;
+    getProperty(i: number, key: string): number;
   };
   const stBase = extLayout.stateOffset(index);
 
@@ -254,9 +255,9 @@ export function executeCounterPreset(
   const clr = state[wt[inBase + 5]];
   const prevClock = state[stBase + 1];
 
-  const bitWidth = extLayout.getProperty ? extLayout.getProperty(index, "bitWidth") : 4;
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 4;
   const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
-  let maxValue = extLayout.getProperty ? extLayout.getProperty(index, "maxValue") : 0;
+  let maxValue = extLayout.getProperty(index, "maxValue") ?? 0;
   if (maxValue === 0) maxValue = mask;
   maxValue = maxValue & mask;
 

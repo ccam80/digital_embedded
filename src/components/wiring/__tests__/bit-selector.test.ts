@@ -37,6 +37,7 @@ function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
+    getProperty: () => undefined,
   };
 }
 
@@ -249,20 +250,20 @@ describe("BitSelector", () => {
   // ---------------------------------------------------------------------------
 
   describe("draw", () => {
-    it("draw() calls drawRect for the body", () => {
+    it("draw() calls drawPolygon for trapezoid body", () => {
       const el = makeBitSelector();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
+      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
+      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("draw() renders 'BSel' text", () => {
+    it("draw() does not draw any text (BitSelector has no label)", () => {
       const el = makeBitSelector();
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
       const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "BSel")).toBe(true);
+      expect(textCalls).toHaveLength(0);
     });
   });
 

@@ -1,0 +1,26 @@
+{
+  "tutorials": [
+    {
+      "id": "sr-to-flipflop",
+      "title": "From SR Latch to D Flip-Flop",
+      "description": "Build sequential logic from first principles. Start with a simple SR latch from NAND gates, add gating for level-sensitive control, then chain two gated latches to create an edge-triggered D flip-flop.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 30,
+      "stepCount": 3,
+      "tags": ["sequential", "latches", "flip-flops", "nand"],
+      "author": null,
+      "manifestPath": "tutorials/sr-to-flipflop/manifest.json"
+    },
+    {
+      "id": "mcu-build",
+      "title": "Building a Microcontroller",
+      "description": "Construct an MCU from first principles \u2014 starting with an adder and ending with a program counter reading instructions from memory.",
+      "difficulty": "advanced",
+      "estimatedMinutes": null,
+      "stepCount": 8,
+      "tags": [],
+      "author": null,
+      "manifestPath": "tutorials/mcu-build/manifest.json"
+    }
+  ]
+}

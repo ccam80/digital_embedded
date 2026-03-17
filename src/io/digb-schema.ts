@@ -1,5 +1,5 @@
 /**
- * TypeScript interfaces and validation for the .digb (Digital-in-Browser)
+ * TypeScript interfaces and validation for the .digb (digiTS)
  * native JSON format.
  *
  * .digb is the native save format for this project. .dig XML is the import
