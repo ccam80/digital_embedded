@@ -29,6 +29,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeDFlipflopAnalogFactory } from "../../analog/behavioral-flipflop.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -227,4 +228,7 @@ export const DDefinition: ComponentDefinition = {
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeDFlipflopAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

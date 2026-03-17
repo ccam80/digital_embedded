@@ -742,3 +742,10 @@
 - **Files created**: src/components/gates/__tests__/analog-gates.test.ts
 - **Files modified**: src/components/gates/and.ts, src/components/gates/nand.ts, src/components/gates/or.ts, src/components/gates/nor.ts, src/components/gates/xor.ts, src/components/gates/xnor.ts, src/components/gates/not.ts, src/analog/behavioral-gate.ts (inputCount=0 dynamic fallback)
 - **Tests**: 8/8 passing
+
+## Task 4a.4.1: BehavioralFlipflopElement — Edge Detection in MNA
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/behavioral-flipflop.ts, src/analog/__tests__/behavioral-flipflop.test.ts
+- **Files modified**: src/components/flipflops/d.ts
+- **Tests**: 10/10 passing
