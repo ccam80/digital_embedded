@@ -188,10 +188,37 @@
       "status": "completed",
       "completed_at": "2026-03-17T11:33:08.295Z",
       "duration_ms": 326480
+    },
+    {
+      "agent_id": "aeb433cb697631587",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-17T11:34:33.206Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-17T11:39:18.489Z",
+      "duration_ms": 285283
+    },
+    {
+      "agent_id": "a2e759103cc3c5c45",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-17T11:34:37.048Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-17T11:39:35.702Z",
+      "duration_ms": 298654
+    },
+    {
+      "agent_id": "a9bded4289af7d133",
+      "agent_type": "claude-orchestrator:reviewer",
+      "started_at": "2026-03-17T11:34:45.339Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-17T11:38:23.983Z",
+      "duration_ms": 218644
     }
   ],
-  "total_spawned": 21,
-  "total_completed": 21,
+  "total_spawned": 24,
+  "total_completed": 24,
   "total_failed": 0,
-  "last_updated": "2026-03-17T11:33:08.402Z"
+  "last_updated": "2026-03-17T11:39:35.806Z"
 }

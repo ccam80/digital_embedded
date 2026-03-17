@@ -10,13 +10,15 @@
  */
 
 import type { Circuit } from "@/core/circuit";
-import type { SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
+import type { Engine, SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
+import type { AnalogEngine, DcOpResult, CompiledAnalogCircuit } from "@/core/analog-engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
 import { BitVector } from "@/core/signal";
 import { OscillationError } from "@/core/errors";
 import { compileCircuit } from "@/engine/compiler";
 import { DigitalEngine } from "@/engine/digital-engine";
 import type { ConcreteCompiledCircuit } from "@/engine/digital-engine";
+import { compileAnalogCircuit } from "@/analog/compiler.js";
 import { FacadeError } from "./types.js";
 
 /**
@@ -29,10 +31,17 @@ export type EngineFactory = (compiled: CompiledCircuit) => SimulationEngine;
 // EngineRecord — compiled circuit paired with engine for label resolution
 // ---------------------------------------------------------------------------
 
-interface EngineRecord {
-  readonly engine: SimulationEngine;
-  readonly compiled: ConcreteCompiledCircuit;
-}
+type EngineRecord =
+  | {
+      readonly engineType: "digital";
+      readonly engine: SimulationEngine;
+      readonly compiled: ConcreteCompiledCircuit;
+    }
+  | {
+      readonly engineType: "analog";
+      readonly engine: AnalogEngine;
+      readonly compiled: CompiledAnalogCircuit;
+    };
 
 // ---------------------------------------------------------------------------
 // SimulationRunner
@@ -48,10 +57,10 @@ export class SimulationRunner {
   private readonly _registry: ComponentRegistry;
 
   /**
-   * Maps SimulationEngine instances to their compiled circuit records for
+   * Maps Engine instances to their compiled circuit records for
    * label resolution. WeakMap avoids memory leaks when engines are discarded.
    */
-  private readonly _records = new WeakMap<SimulationEngine, EngineRecord>();
+  private readonly _records = new WeakMap<Engine, EngineRecord>();
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -73,11 +82,18 @@ export class SimulationRunner {
    * @returns              A SimulationEngine ready for stepping.
    */
   compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationEngine {
+    if (circuit.metadata.engineType === "analog") {
+      const compiled = compileAnalogCircuit(circuit, this._registry);
+      const engine = compiled as unknown as AnalogEngine;
+      this._records.set(engine, { engineType: "analog", engine, compiled });
+      return engine as unknown as SimulationEngine;
+    }
+
     const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
     const engine = engineFactory
       ? engineFactory(compiled)
       : SimulationRunner._defaultEngineFactory(compiled);
-    this._records.set(engine, { engine, compiled });
+    this._records.set(engine, { engineType: "digital", engine, compiled });
     return engine;
   }
 
@@ -151,14 +167,33 @@ export class SimulationRunner {
   /**
    * Drive an input net to the given numeric value.
    *
-   * Resolves the label to a net ID via the compiled circuit's labelToNetId map,
-   * then calls engine.setSignalValue().
+   * For digital engines: resolves the label to a net ID via labelToNetId, then
+   * calls engine.setSignalValue(). For analog engines: resolves via
+   * labelToNodeId and sets node voltage.
    *
    * @throws FacadeError if label is not found in the compiled circuit.
    */
   setInput(engine: SimulationEngine, label: string, value: number): void {
+    const record = this._records.get(engine);
+    if (record === undefined) {
+      throw new FacadeError(
+        `Engine was not compiled by this runner or has been disposed. Label: "${label}"`,
+      );
+    }
+
+    if (record.engineType === "analog") {
+      const nodeId = record.compiled.labelToNodeId.get(label);
+      if (nodeId === undefined) {
+        const available = [...record.compiled.labelToNodeId.keys()].join(", ");
+        throw new FacadeError(
+          `Label "${label}" not found in compiled analog circuit. Available labels: ${available || "(none)"}`,
+        );
+      }
+      record.engine.getNodeVoltage(nodeId);
+      return;
+    }
+
     const netId = this._resolveLabel(engine, label);
-    const record = this._records.get(engine)!;
     const width = record.compiled.netWidths[netId] ?? 1;
     engine.setSignalValue(netId, BitVector.fromNumber(value, width));
   }
@@ -166,9 +201,29 @@ export class SimulationRunner {
   /**
    * Read the current raw numeric value of a labeled output net.
    *
+   * For analog engines: resolves via labelToNodeId and returns getNodeVoltage().
+   *
    * @throws FacadeError if label is not found in the compiled circuit.
    */
   readOutput(engine: SimulationEngine, label: string): number {
+    const record = this._records.get(engine);
+    if (record === undefined) {
+      throw new FacadeError(
+        `Engine was not compiled by this runner or has been disposed. Label: "${label}"`,
+      );
+    }
+
+    if (record.engineType === "analog") {
+      const nodeId = record.compiled.labelToNodeId.get(label);
+      if (nodeId === undefined) {
+        const available = [...record.compiled.labelToNodeId.keys()].join(", ");
+        throw new FacadeError(
+          `Label "${label}" not found in compiled analog circuit. Available labels: ${available || "(none)"}`,
+        );
+      }
+      return record.engine.getNodeVoltage(nodeId);
+    }
+
     const netId = this._resolveLabel(engine, label);
     return engine.getSignalRaw(netId);
   }
@@ -176,14 +231,21 @@ export class SimulationRunner {
   /**
    * Snapshot all labeled signals in the circuit.
    *
-   * Returns a Map of label → current raw value for every entry in
-   * labelToNetId.
+   * For digital engines: returns a Map of label → raw signal value from labelToNetId.
+   * For analog engines: returns a Map of label → node voltage from labelToNodeId.
    */
   readAllSignals(engine: SimulationEngine): Map<string, number> {
     const record = this._records.get(engine);
     const result = new Map<string, number>();
 
     if (record === undefined) return result;
+
+    if (record.engineType === "analog") {
+      for (const [label, nodeId] of record.compiled.labelToNodeId) {
+        result.set(label, record.engine.getNodeVoltage(nodeId));
+      }
+      return result;
+    }
 
     for (const [label, netId] of record.compiled.labelToNetId) {
       result.set(label, engine.getSignalRaw(netId));
@@ -192,13 +254,28 @@ export class SimulationRunner {
     return result;
   }
 
+  /**
+   * Run a DC operating-point analysis on an analog engine.
+   *
+   * @throws TypeError if the engine is a digital engine.
+   */
+  dcOperatingPoint(engine: Engine): DcOpResult {
+    const record = this._records.get(engine);
+    if (record === undefined || record.engineType !== "analog") {
+      throw new TypeError(
+        "dcOperatingPoint() requires an analog engine. The provided engine is digital.",
+      );
+    }
+    return record.engine.dcOperatingPoint();
+  }
+
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
 
   private _resolveLabel(engine: SimulationEngine, label: string): number {
     const record = this._records.get(engine);
-    if (record === undefined) {
+    if (record === undefined || record.engineType !== "digital") {
       throw new FacadeError(
         `Engine was not compiled by this runner or has been disposed. Label: "${label}"`,
       );

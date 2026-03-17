@@ -279,3 +279,17 @@
 - **Files created**: src/core/analog-engine-interface.ts, src/core/__tests__/analog-engine-interface.test.ts
 - **Files modified**: src/core/registry.ts
 - **Tests**: 9/9 passing
+
+## Task 0.2.1: SimulationRunner Analog Dispatch
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/compiler.ts
+- **Files modified**: src/headless/runner.ts, src/headless/__tests__/runner.test.ts
+- **Tests**: 10/10 passing (runner.test.ts); full suite 5540/5545 passing (5 pre-existing fixture-audit failures unchanged)
+
+## Task 0.2.2: Edit Menu Mode Toggle
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/app/__tests__/mode-toggle.test.ts
+- **Files modified**: src/app/app-init.ts, simulator.html
+- **Tests**: 4/4 passing

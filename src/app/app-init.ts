@@ -324,6 +324,10 @@ export function initApp(search?: string): void {
   let clockManager: ClockManager | null = null;
 
   function compileAndBind(): boolean {
+    if (circuit.metadata.engineType === 'analog') {
+      showStatus('Analog simulation not yet available', true);
+      return false;
+    }
     if (binding.isBound) {
       engine.stop();
       binding.unbind();
@@ -1968,6 +1972,9 @@ export function initApp(search?: string): void {
     for (const el of loaded.elements) circuit.addElement(el);
     for (const w of loaded.wires) circuit.addWire(w);
     circuit.metadata = loaded.metadata;
+    palette.setEngineTypeFilter(loaded.metadata.engineType === 'analog' ? 'analog' : null);
+    paletteUI.render();
+    updateCircuitModeLabel();
     selection.clear();
     viewport.fitToContent(circuit.elements, {
       width: canvas.clientWidth,
@@ -2980,6 +2987,23 @@ export function initApp(search?: string): void {
   // -------------------------------------------------------------------------
   // Edit menu: Auto-Connect Power Supplies
   // -------------------------------------------------------------------------
+
+  function updateCircuitModeLabel(): void {
+    const label = document.getElementById('circuit-mode-label');
+    if (label) {
+      label.textContent = circuit.metadata.engineType === 'analog' ? 'Analog' : 'Digital';
+    }
+  }
+
+  document.getElementById('btn-circuit-mode')?.addEventListener('click', () => {
+    const current = circuit.metadata.engineType;
+    const next = current === 'digital' ? 'analog' : 'digital';
+    circuit.metadata = { ...circuit.metadata, engineType: next };
+    palette.setEngineTypeFilter(next === 'digital' ? null : 'analog');
+    paletteUI.render();
+    updateCircuitModeLabel();
+    invalidateCompiled();
+  });
 
   document.getElementById('btn-auto-power')?.addEventListener('click', () => {
     if (params.locked) return;

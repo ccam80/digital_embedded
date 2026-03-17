@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"/c/local_working_projects/digital_in_browser\\\" && npm test 2>&1\",\"timeout\":120000}",
-  "error": "Exit code 1\n\n> digits-sim@0.1.0 test\n> vitest run\n\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/basic/__tests__/function.test.ts \u001b[2m(\u001b[22m\u001b[2m73 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 29\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/graphics/__tests__/graphic-card.test.ts \u001b[2m(\u001b[22m\u001b[2m57 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 28\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/memory/__tests__/ram.test.ts \u001b[2m(\u001b[22m\u001b[2m105 tests\u001b[22m\u001b[2...",
-  "timestamp": "2026-03-17T11:25:54.638Z",
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:/local_working_projects/digital_in_browser/src/app/app-init.ts\"}",
+  "error": "File content (44562 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-17T11:34:55.675Z",
   "retry_count": 1
 }

@@ -18,6 +18,7 @@
 
 import { describe, it, expect } from "vitest";
 import { SimulationRunner } from "../runner.js";
+import type { Engine } from "@/core/engine-interface";
 import { ComponentRegistry } from "@/core/registry";
 import { PropertyBag, PropertyType } from "@/core/properties";
 import { AbstractCircuitElement } from "@/core/element";
@@ -448,5 +449,51 @@ describe("Runner", () => {
     const engine = runner.compile(circuit);
 
     expect(() => runner.setInput(engine, "NONEXISTENT", 1)).toThrow(FacadeError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AnalogDispatch tests
+// ---------------------------------------------------------------------------
+
+describe("AnalogDispatch", () => {
+  it("compile_digital_circuit_returns_digital_engine — existing digital behavior unchanged", () => {
+    const registry = buildRegistry();
+    const runner = new SimulationRunner(registry);
+    const circuit = buildHalfAdder(registry);
+
+    // Default engineType is "digital"
+    expect(circuit.metadata.engineType).toBe("digital");
+
+    const engine = runner.compile(circuit);
+
+    // Digital engine can step and produce correct results
+    runner.setInput(engine, "A", 1);
+    runner.setInput(engine, "B", 1);
+    runner.step(engine);
+
+    expect(runner.readOutput(engine, "S")).toBe(0);
+    expect(runner.readOutput(engine, "C")).toBe(1);
+  });
+
+  it("compile_analog_circuit_throws_not_implemented — analog engineType throws stub error", () => {
+    const registry = buildRegistry();
+    const runner = new SimulationRunner(registry);
+
+    const circuit = buildHalfAdder(registry);
+    circuit.metadata.engineType = "analog";
+
+    expect(() => runner.compile(circuit)).toThrow(/not yet implemented/);
+  });
+
+  it("dc_operating_point_throws_for_digital_engine — dcOperatingPoint on digital engine throws TypeError", () => {
+    const registry = buildRegistry();
+    const runner = new SimulationRunner(registry);
+    const circuit = buildHalfAdder(registry);
+
+    const engine = runner.compile(circuit);
+
+    // dcOperatingPoint accepts Engine (base type), so cast to satisfy TS
+    expect(() => runner.dcOperatingPoint(engine as unknown as Engine)).toThrow(TypeError);
   });
 });
