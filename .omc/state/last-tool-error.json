@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/core/__tests__/renderer-interface.test.ts\\\" --reporter=verbose 2>&1\",\"timeout\":60000,\"description\":\"Run renderer...",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[32m✓\u001b[39m src/core/__tests__/renderer-interface.test.ts\u001b[2m > \u001b[22mTHEME_COLORS\u001b[2m > \u001b[22mcontains all required semantic color names\n \u001b[31m×\u001b[39m src/core/__tests__/renderer-interface.test.ts\u001b[2m > \u001b[22mTHEME_COLORS\u001b[2m > \u001b[22mhas exactly 14 entries\n\u001b[31m   → expected [ 'WIRE', 'WIRE_HIGH', …(15) ] to have a length of 14 but got 17\u001b[39m\n \u001b[32m✓\u001b[39m src/core/__tests__/rende...",
-  "timestamp": "2026-03-17T19:01:29.916Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run --reporter=json 2>/dev/null | \\\"./.venv/Scripts/python.exe\\\" -c \\\"import sys,json; d=json.load(sys.stdin); print('File...",
+  "error": "Exit code 127\n/usr/bin/bash: line 1: ./.venv/Scripts/python.exe: No such file or directory",
+  "timestamp": "2026-03-17T19:29:23.803Z",
+  "retry_count": 2
 }

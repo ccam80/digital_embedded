@@ -61,8 +61,8 @@ describe("THEME_COLORS", () => {
     }
   });
 
-  it("has exactly 17 entries", () => {
-    expect(THEME_COLORS).toHaveLength(17);
+  it("has exactly 18 entries", () => {
+    expect(THEME_COLORS).toHaveLength(18);
   });
 
   it("contains no duplicates", () => {

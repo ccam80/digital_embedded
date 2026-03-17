@@ -38,6 +38,7 @@ export type ThemeColor =
   | "WIRE_VOLTAGE_POS"
   | "WIRE_VOLTAGE_NEG"
   | "WIRE_VOLTAGE_GND"
+  | "CURRENT_DOT"
   | "COMPONENT"
   | "COMPONENT_FILL"
   | "PIN"
@@ -115,6 +116,7 @@ const LIGHT_COLORS: ColorMap = {
   WIRE_VOLTAGE_POS: "#cc0000",
   WIRE_VOLTAGE_NEG: "#008800",
   WIRE_VOLTAGE_GND: "#666666",
+  CURRENT_DOT: "#cc9900",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
   PIN: "#0000cc",
@@ -135,6 +137,7 @@ const DARK_COLORS: ColorMap = {
   WIRE_VOLTAGE_POS: "#ff4444",
   WIRE_VOLTAGE_NEG: "#44cc44",
   WIRE_VOLTAGE_GND: "#888888",
+  CURRENT_DOT: "#ffcc00",
   COMPONENT: "#cccccc",
   COMPONENT_FILL: "#333333",
   PIN: "#4444ff",
@@ -155,6 +158,7 @@ const HIGH_CONTRAST_COLORS: ColorMap = {
   WIRE_VOLTAGE_POS: "#ff0000",
   WIRE_VOLTAGE_NEG: "#00ff00",
   WIRE_VOLTAGE_GND: "#ffffff",
+  CURRENT_DOT: "#ffff00",
   COMPONENT: "#ffffff",
   COMPONENT_FILL: "#000000",
   PIN: "#4488ff",
@@ -175,6 +179,7 @@ const MONOCHROME_COLORS: ColorMap = {
   WIRE_VOLTAGE_POS: "#ffffff",
   WIRE_VOLTAGE_NEG: "#aaaaaa",
   WIRE_VOLTAGE_GND: "#666666",
+  CURRENT_DOT: "#888888",
   COMPONENT: "#000000",
   COMPONENT_FILL: "#ffffff",
   PIN: "#000000",
@@ -212,6 +217,7 @@ export const THEME_COLORS: readonly ThemeColor[] = [
   "WIRE_VOLTAGE_POS",
   "WIRE_VOLTAGE_NEG",
   "WIRE_VOLTAGE_GND",
+  "CURRENT_DOT",
   "COMPONENT",
   "COMPONENT_FILL",
   "PIN",

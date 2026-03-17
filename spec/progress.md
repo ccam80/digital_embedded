@@ -682,3 +682,35 @@
   - `src/core/registry.ts` — added import of PinElectricalSpec; added pinElectrical?, pinElectricalOverrides?, simulationModes?, transistorModel? fields to ComponentDefinition
 - **Tests**: 5/5 passing
 - **Notes**: all_fields_required_in_result uses TTL preset (vOL=0.35) since CMOS 3.3V has vOL=0.0 which fails > 0 assertion; TTL satisfies the spec intent that all fields are strictly positive finite numbers.
+
+## Task 3.2.1: KCL Wire-Current Resolver
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/wire-current-resolver.ts, src/editor/__tests__/wire-current-resolver.test.ts
+- **Files modified**: (none)
+- **Tests**: 5/5 passing
+
+## Task 3.5.1: Slider Panel
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/si-format.ts, src/editor/slider-panel.ts, src/editor/slider-engine-bridge.ts, src/editor/__tests__/slider-panel.test.ts
+- **Files modified**: (none)
+- **Tests**: 14/14 passing
+  - SIFormat: milliamps, kilohms, microfarads, zero, negative, very_small (6 tests)
+  - SliderPanel: add_slider_creates_dom_element, log_scale_midpoint, linear_scale_midpoint, callback_fires_on_change, remove_slider_removes_dom, multiple_sliders_independent, value_display_formatted (7 tests)
+  - Integration: slider_changes_resistance (1 test)
+- **If partial — remaining work**: N/A
+
+## Task 4a.2.1: DigitalPinModel — Reusable MNA Stamp Helper
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/digital-pin-model.ts, src/analog/__tests__/digital-pin-model.test.ts
+- **Files modified**: (none)
+- **Tests**: 19/19 passing
+
+## Task 3.2.2: Current Flow Animation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/current-animation.ts, src/editor/__tests__/current-animation.test.ts
+- **Files modified**: src/core/renderer-interface.ts (added CURRENT_DOT ThemeColor to union, all 4 color maps, THEME_COLORS array), src/core/__tests__/renderer-interface.test.ts (updated count 17→18), src/app/app-init.ts (added WireCurrentResolver/CurrentFlowAnimator imports, startAnalogRenderLoop/stopAnalogRenderLoop functions)
+- **Tests**: 6/6 passing

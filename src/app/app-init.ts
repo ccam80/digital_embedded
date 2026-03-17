@@ -67,6 +67,8 @@ import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import { TimingDiagramPanel } from '../runtime/timing-diagram.js';
 import { SimulationRunner } from '../headless/runner.js';
 import { parseTestData } from '../testing/parser.js';
+import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
+import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { executeTests } from '../testing/executor.js';
 import { analyseCircuit } from '../analysis/model-analyser.js';
 import { TruthTableTab } from '../analysis/truth-table-ui.js';
@@ -1386,6 +1388,48 @@ export function initApp(search?: string): void {
     }
     engine.stop();
     scheduleRender();
+  }
+
+  // -------------------------------------------------------------------------
+  // Analog render loop — steps analog engine and animates current-flow dots
+  // -------------------------------------------------------------------------
+
+  let analogRafHandle = -1;
+  let currentFlowAnimator: CurrentFlowAnimator | null = null;
+
+  function startAnalogRenderLoop(
+    analogEngine: import('../core/analog-engine-interface.js').AnalogEngine,
+    analogCircuit: import('../core/circuit.js').Circuit,
+    analogCompiled: import('../core/analog-engine-interface.js').CompiledAnalogCircuit,
+  ): void {
+    const resolver = new WireCurrentResolver();
+    currentFlowAnimator = new CurrentFlowAnimator(resolver);
+    currentFlowAnimator.setEnabled(true);
+
+    let lastTime = performance.now();
+
+    const tick = (now: number): void => {
+      const dtSeconds = (now - lastTime) / 1000;
+      lastTime = now;
+
+      resolver.resolve(analogEngine, analogCircuit, analogCompiled);
+      currentFlowAnimator!.update(dtSeconds);
+
+      scheduleRender();
+      analogRafHandle = requestAnimationFrame(tick);
+    };
+    analogRafHandle = requestAnimationFrame(tick);
+  }
+
+  function stopAnalogRenderLoop(): void {
+    if (analogRafHandle !== -1) {
+      cancelAnimationFrame(analogRafHandle);
+      analogRafHandle = -1;
+    }
+    if (currentFlowAnimator !== null) {
+      currentFlowAnimator.setEnabled(false);
+      currentFlowAnimator = null;
+    }
   }
 
   // -------------------------------------------------------------------------
