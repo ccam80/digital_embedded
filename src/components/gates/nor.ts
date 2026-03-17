@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeNorAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -306,8 +307,11 @@ function norFactory(props: PropertyBag): NOrElement {
 export const NOrDefinition: ComponentDefinition = {
   name: "NOr",
   typeId: -1,
+  engineType: "both",
   factory: norFactory,
   executeFn: executeNOr,
+  analogFactory: makeNorAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NOR_PROPERTY_DEFS,
   attributeMap: NOR_ATTRIBUTE_MAPPINGS,

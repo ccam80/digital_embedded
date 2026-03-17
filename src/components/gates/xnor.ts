@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeXnorAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -314,8 +315,11 @@ function xnorFactory(props: PropertyBag): XNOrElement {
 export const XNOrDefinition: ComponentDefinition = {
   name: "XNOr",
   typeId: -1,
+  engineType: "both",
   factory: xnorFactory,
   executeFn: executeXNOr,
+  analogFactory: makeXnorAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XNOR_PROPERTY_DEFS,
   attributeMap: XNOR_ATTRIBUTE_MAPPINGS,

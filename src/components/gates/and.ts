@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeAndAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -285,8 +286,11 @@ function andFactory(props: PropertyBag): AndElement {
 export const AndDefinition: ComponentDefinition = {
   name: "And",
   typeId: -1,
+  engineType: "both",
   factory: andFactory,
   executeFn: executeAnd,
+  analogFactory: makeAndAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: AND_PROPERTY_DEFS,
   attributeMap: AND_ATTRIBUTE_MAPPINGS,

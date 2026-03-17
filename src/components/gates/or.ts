@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeOrAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -298,8 +299,11 @@ function orFactory(props: PropertyBag): OrElement {
 export const OrDefinition: ComponentDefinition = {
   name: "Or",
   typeId: -1,
+  engineType: "both",
   factory: orFactory,
   executeFn: executeOr,
+  analogFactory: makeOrAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: OR_PROPERTY_DEFS,
   attributeMap: OR_ATTRIBUTE_MAPPINGS,

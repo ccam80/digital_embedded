@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeXorAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -306,8 +307,11 @@ function xorFactory(props: PropertyBag): XOrElement {
 export const XOrDefinition: ComponentDefinition = {
   name: "XOr",
   typeId: -1,
+  engineType: "both",
   factory: xorFactory,
   executeFn: executeXOr,
+  analogFactory: makeXorAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XOR_PROPERTY_DEFS,
   attributeMap: XOR_ATTRIBUTE_MAPPINGS,

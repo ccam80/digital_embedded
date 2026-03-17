@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeNotAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -225,8 +226,11 @@ function notFactory(props: PropertyBag): NotElement {
 export const NotDefinition: ComponentDefinition = {
   name: "Not",
   typeId: -1,
+  engineType: "both",
   factory: notFactory,
   executeFn: executeNot,
+  analogFactory: makeNotAnalogFactory(),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(1, false),
   propertyDefs: NOT_PROPERTY_DEFS,
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,

@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeNandAnalogFactory } from "../../analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -284,8 +285,11 @@ function nandFactory(props: PropertyBag): NAndElement {
 export const NAndDefinition: ComponentDefinition = {
   name: "NAnd",
   typeId: -1,
+  engineType: "both",
   factory: nandFactory,
   executeFn: executeNAnd,
+  analogFactory: makeNandAnalogFactory(0),
+  simulationModes: ["digital", "behavioral"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NAND_PROPERTY_DEFS,
   attributeMap: NAND_ATTRIBUTE_MAPPINGS,

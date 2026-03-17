@@ -714,3 +714,31 @@
 - **Files created**: src/editor/current-animation.ts, src/editor/__tests__/current-animation.test.ts
 - **Files modified**: src/core/renderer-interface.ts (added CURRENT_DOT ThemeColor to union, all 4 color maps, THEME_COLORS array), src/core/__tests__/renderer-interface.test.ts (updated count 17→18), src/app/app-init.ts (added WireCurrentResolver/CurrentFlowAnimator imports, startAnalogRenderLoop/stopAnalogRenderLoop functions)
 - **Tests**: 6/6 passing
+
+## Task 3.4.1: Probe Tooltip
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/analog-tooltip.ts, src/editor/__tests__/si-format.test.ts, src/editor/__tests__/analog-tooltip.test.ts
+- **Files modified**: (none — si-format.ts already existed from Task 3.5.1)
+- **Tests**: 10/10 passing
+
+## Task 3.4.2: Power Dissipation Display
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/power-overlay.ts, src/editor/__tests__/power-overlay.test.ts
+- **Files modified**: (none)
+- **Tests**: 5/5 passing
+
+## Task 4a.3.1: BehavioralGateElement — Parameterized Factory
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/behavioral-gate.ts, src/analog/__tests__/behavioral-gate.test.ts
+- **Files modified**: (none)
+- **Tests**: 14/14 passing
+
+## Task 4a.3.2: Register Behavioral analogFactory on Gate ComponentDefinitions
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/gates/__tests__/analog-gates.test.ts
+- **Files modified**: src/components/gates/and.ts, src/components/gates/nand.ts, src/components/gates/or.ts, src/components/gates/nor.ts, src/components/gates/xor.ts, src/components/gates/xnor.ts, src/components/gates/not.ts, src/analog/behavioral-gate.ts (inputCount=0 dynamic fallback)
+- **Tests**: 8/8 passing
