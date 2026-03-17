@@ -206,8 +206,8 @@
   "hotPaths": [
     {
       "path": "spec\\phase-1-mna-engine-core.md",
-      "accessCount": 51,
-      "lastAccessed": 1773750569530,
+      "accessCount": 59,
+      "lastAccessed": 1773751612379,
       "type": "file"
     },
     {
@@ -230,8 +230,8 @@
     },
     {
       "path": "",
-      "accessCount": 31,
-      "lastAccessed": 1773750538576,
+      "accessCount": 32,
+      "lastAccessed": 1773751607482,
       "type": "directory"
     },
     {
@@ -241,15 +241,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-4a-digital-analog-interface.md",
-      "accessCount": 26,
-      "lastAccessed": 1773744682496,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 27,
+      "lastAccessed": 1773751516612,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 24,
-      "lastAccessed": 1773750505813,
+      "path": "spec\\phase-4a-digital-analog-interface.md",
+      "accessCount": 26,
+      "lastAccessed": 1773744682496,
       "type": "file"
     },
     {
@@ -259,15 +259,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-4c-transistor-level-models.md",
-      "accessCount": 17,
-      "lastAccessed": 1773744752384,
+      "path": "CLAUDE.md",
+      "accessCount": 19,
+      "lastAccessed": 1773751517653,
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
+      "path": "spec\\phase-4c-transistor-level-models.md",
       "accessCount": 17,
-      "lastAccessed": 1773750507010,
+      "lastAccessed": 1773744752384,
       "type": "file"
     },
     {
@@ -295,27 +295,27 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\engine-interface.ts",
+      "accessCount": 12,
+      "lastAccessed": 1773751543520,
+      "type": "file"
+    },
+    {
       "path": "spec\\author_instructions.md",
       "accessCount": 11,
       "lastAccessed": 1773746718732,
       "type": "file"
     },
     {
-      "path": "src\\core\\engine-interface.ts",
-      "accessCount": 10,
-      "lastAccessed": 1773747301061,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\registry.ts",
-      "accessCount": 10,
-      "lastAccessed": 1773747518058,
+      "accessCount": 11,
+      "lastAccessed": 1773751514453,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 10,
-      "lastAccessed": 1773748658683,
+      "accessCount": 11,
+      "lastAccessed": 1773751515692,
       "type": "directory"
     },
     {

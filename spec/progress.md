@@ -383,3 +383,25 @@
   - Inductor uses short-circuit stamp (`companionActive=false`) before first `stampCompanion` call; switches to companion model after that
   - `stampCompanion` only updates `geq`/`ieq` internal state; actual MNA stamping is done by `stamp(solver)` per the `AnalogElement` interface contract
   - Sparse solver `performance_50_node` test fails under full-suite load (timing-sensitive) but passes in isolation — pre-existing flaky test, not a regression
+
+## Task 1.5.2: MNAEngine Class
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/analog/analog-engine.ts` — `MNAEngine` class implementing `AnalogEngine`
+  - `src/analog/__tests__/analog-engine.test.ts` — 17 tests
+- **Files modified**: none
+- **Tests**: 17/17 passing
+- **Notes**: The `compile_analog_circuit_throws_not_implemented` failure in `src/headless/__tests__/runner.test.ts` is a pre-existing regression from Task 1.5.1 (compiler stub replaced by real implementation), not caused by Task 1.5.2. The `SparseSolver > performance_50_node` failure is a timing flake (passes in isolation). Neither was introduced by this task.
+
+## Task 1.5.1: Analog Compiler
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/analog/compiled-analog-circuit.ts` — `ConcreteCompiledAnalogCircuit` class implementing `CompiledAnalogCircuit`
+  - `src/analog/__tests__/compiler.test.ts` — 14 tests for the analog compiler
+- **Files modified**: 
+  - `src/analog/compiler.ts` — replaced stub with working compiler
+  - `src/headless/__tests__/runner.test.ts` — updated stub-era test to match real compiler behavior (test was explicitly testing the Phase 0 stub error; updated to assert `digital-only` error)
+- **Tests**: 14/14 passing
+- **Notes**: The `performance_50_node` sparse-solver test is a pre-existing flaky timing test (passes alone, occasionally fails under full-suite load). The 5 fixture-audit failures are pre-existing per spec/test-baseline.md.

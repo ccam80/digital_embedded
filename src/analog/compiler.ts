@@ -1,11 +1,499 @@
-import type { Circuit } from "@/core/circuit";
-import type { ComponentRegistry } from "@/core/registry";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+/**
+ * Analog circuit compiler.
+ *
+ * Transforms a visual `Circuit` with `engineType: "analog"` into a
+ * `ConcreteCompiledAnalogCircuit` that the MNA engine can simulate.
+ *
+ * Steps:
+ *  1. Verify circuit.metadata.engineType === "analog"
+ *  2. Build node map (wire groups → MNA node IDs, ground = 0)
+ *  3. Assign sequential branch indices to components with requiresBranchRow
+ *  4. Allocate internal nodes via getInternalNodeCount
+ *  5. Resolve pin→node bindings for each element
+ *  6. Call analogFactory for each element
+ *  7. Topology validation (floating nodes, voltage-source loops, inductor loops)
+ *  8. Return ConcreteCompiledAnalogCircuit
+ */
 
-/** Compile an analog circuit into a `CompiledAnalogCircuit`. */
+import type { Circuit } from "../core/circuit.js";
+import type { CircuitElement } from "../core/element.js";
+import type { ComponentRegistry } from "../core/registry.js";
+import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
+import { buildNodeMap } from "./node-map.js";
+import { makeDiagnostic } from "./diagnostics.js";
+import {
+  ConcreteCompiledAnalogCircuit,
+  type DeviceModel,
+} from "./compiled-analog-circuit.js";
+
+// ---------------------------------------------------------------------------
+// Pin-to-node resolution helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Given a CircuitElement, look up the MNA node IDs for each of its pins by
+ * matching pin world positions to wire endpoints in the node map.
+ *
+ * Returns an array of node IDs in pin order. Pins not connected to any wire
+ * receive node ID -1 (unconnected).
+ */
+function resolveElementNodes(
+  el: CircuitElement,
+  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  circuit: Circuit,
+): number[] {
+  const pins = el.getPins();
+  const result: number[] = new Array(pins.length).fill(-1);
+
+  for (let i = 0; i < pins.length; i++) {
+    const pinPos = pins[i].position;
+    for (const wire of circuit.wires) {
+      const matchStart =
+        Math.abs(wire.start.x - pinPos.x) < 0.5 &&
+        Math.abs(wire.start.y - pinPos.y) < 0.5;
+      const matchEnd =
+        Math.abs(wire.end.x - pinPos.x) < 0.5 &&
+        Math.abs(wire.end.y - pinPos.y) < 0.5;
+      if (matchStart || matchEnd) {
+        const nodeId = wireToNodeId.get(wire);
+        if (nodeId !== undefined) {
+          result[i] = nodeId;
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Topology validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect floating nodes: nodes that appear as terminals of only one element.
+ *
+ * A floating node has no current path (only one element connected to it).
+ * This makes the MNA system unsolvable or ill-conditioned.
+ */
+function detectFloatingNodes(
+  elements: Array<{ nodeIds: number[] }>,
+  nodeCount: number,
+): number[] {
+  // Count how many element terminals touch each node (excluding ground = 0).
+  const terminalCount = new Array<number>(nodeCount + 1).fill(0);
+  for (const el of elements) {
+    for (const n of el.nodeIds) {
+      if (n >= 0 && n <= nodeCount) {
+        terminalCount[n]++;
+      }
+    }
+  }
+  const floating: number[] = [];
+  for (let n = 1; n <= nodeCount; n++) {
+    if (terminalCount[n] <= 1) {
+      floating.push(n);
+    }
+  }
+  return floating;
+}
+
+/**
+ * Detect voltage-source loops: cycles consisting only of voltage sources.
+ *
+ * A loop of ideal voltage sources (with no resistors in between) creates a
+ * contradictory constraint system that makes the MNA matrix singular. We
+ * detect this by building a graph of voltage-source connections and looking
+ * for cycles within that graph.
+ */
+function detectVoltageSourceLoops(
+  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
+): boolean {
+  // Build adjacency for voltage-source-only graph
+  const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
+  if (vSources.length < 2) return false;
+
+  // Build adjacency list: node → set of reachable nodes through voltage sources
+  const adj = new Map<number, Set<number>>();
+  for (const vs of vSources) {
+    const [a, b] = vs.nodeIds;
+    if (a < 0 || b < 0) continue;
+    if (!adj.has(a)) adj.set(a, new Set());
+    if (!adj.has(b)) adj.set(b, new Set());
+    adj.get(a)!.add(b);
+    adj.get(b)!.add(a);
+  }
+
+  // DFS cycle detection
+  const visited = new Set<number>();
+  function hasCycle(node: number, parent: number): boolean {
+    visited.add(node);
+    const neighbors = adj.get(node) ?? new Set<number>();
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        if (hasCycle(neighbor, node)) return true;
+      } else if (neighbor !== parent) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (const node of adj.keys()) {
+    if (!visited.has(node)) {
+      if (hasCycle(node, -1)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Detect inductor loops: cycles consisting only of inductors.
+ *
+ * A loop of ideal inductors creates a singular MNA system (degenerate branch
+ * equations) at DC and during transient initialization.
+ */
+function detectInductorLoops(
+  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
+): boolean {
+  const inductors = elements.filter((e) => e.isBranch && e.typeHint === "inductor");
+  if (inductors.length < 2) return false;
+
+  const adj = new Map<number, Set<number>>();
+  for (const ind of inductors) {
+    const [a, b] = ind.nodeIds;
+    if (a < 0 || b < 0) continue;
+    if (!adj.has(a)) adj.set(a, new Set());
+    if (!adj.has(b)) adj.set(b, new Set());
+    adj.get(a)!.add(b);
+    adj.get(b)!.add(a);
+  }
+
+  const visited = new Set<number>();
+  function hasCycle(node: number, parent: number): boolean {
+    visited.add(node);
+    const neighbors = adj.get(node) ?? new Set<number>();
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        if (hasCycle(neighbor, node)) return true;
+      } else if (neighbor !== parent) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (const node of adj.keys()) {
+    if (!visited.has(node)) {
+      if (hasCycle(node, -1)) return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Main compiler entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile an analog circuit into a `ConcreteCompiledAnalogCircuit`.
+ *
+ * @param circuit  - The visual Circuit model (must have engineType "analog")
+ * @param registry - The component registry with analog ComponentDefinitions
+ * @returns A compiled circuit ready for MNA simulation
+ * @throws Error if circuit.metadata.engineType !== "analog" or if a
+ *         non-analog component is found in the circuit
+ */
 export function compileAnalogCircuit(
-  _circuit: Circuit,
-  _registry: ComponentRegistry,
-): CompiledAnalogCircuit {
-  throw new Error("Analog compiler not yet implemented — Phase 1 delivers this");
+  circuit: Circuit,
+  registry: ComponentRegistry,
+): ConcreteCompiledAnalogCircuit {
+  // Step 1: Verify engine type
+  if (circuit.metadata.engineType !== "analog") {
+    throw new Error(
+      `compileAnalogCircuit: circuit engineType must be "analog", ` +
+        `got "${circuit.metadata.engineType}"`,
+    );
+  }
+
+  // Step 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
+  const nodeMap = buildNodeMap(circuit);
+
+  // Collect all diagnostics from compilation
+  const diagnostics: SolverDiagnostic[] = [...nodeMap.diagnostics];
+
+  // Step 3: Determine branch indices for voltage sources / inductors, and
+  //         allocate internal nodes via getInternalNodeCount.
+  //
+  // We need two passes:
+  //   Pass A: collect branch counts and internal node counts
+  //   Pass B: build elements with correct absolute branch row indices
+
+  // The branch row block starts immediately after the external nodes.
+  // nodeMap.nodeCount = number of external (wire group) non-ground nodes.
+  // Internal nodes (from getInternalNodeCount) are appended after external nodes.
+
+  let nextInternalNode = nodeMap.nodeCount + 1; // 1-based, after external nodes
+  let branchCount = 0;
+
+  // Per-element metadata collected in Pass A, consumed in Pass B
+  const elementMeta: Array<{
+    el: CircuitElement;
+    branchIdx: number;         // -1 or absolute 0-based branch index
+    internalNodeOffset: number; // first internal node ID for this element
+    internalNodeCount: number;
+  }> = [];
+
+  for (const el of circuit.elements) {
+    // Ground elements do not need an analog factory — they are structural.
+    if (el.typeId === "Ground" || el.typeId === "ground") {
+      elementMeta.push({
+        el,
+        branchIdx: -1,
+        internalNodeOffset: -1,
+        internalNodeCount: 0,
+      });
+      continue;
+    }
+
+    const def = registry.get(el.typeId);
+    if (!def) {
+      throw new Error(
+        `compileAnalogCircuit: unknown component type "${el.typeId}" — ` +
+          `not registered in the provided registry`,
+      );
+    }
+
+    // Reject digital-only components
+    if ((def.engineType ?? "digital") !== "analog") {
+      throw new Error(
+        `compileAnalogCircuit: component "${el.typeId}" is a digital-only ` +
+          `component (engineType="${def.engineType ?? "digital"}"). ` +
+          `Analog circuits may only contain analog components.`,
+      );
+    }
+
+    // Assign branch index
+    let branchIdx = -1;
+    if (def.requiresBranchRow) {
+      // The actual matrix row = nodeCount + branchIdx (0-based within branch block)
+      // We store the absolute branch index here; the matrix row is computed
+      // as nodeCount_total + branchIdx when building the matrix.
+      branchIdx = branchCount++;
+    }
+
+    // Allocate internal nodes
+    const props = el.getProperties();
+    const internalCount = def.getInternalNodeCount?.(props) ?? 0;
+    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
+    nextInternalNode += internalCount;
+
+    elementMeta.push({
+      el,
+      branchIdx,
+      internalNodeOffset,
+      internalNodeCount: internalCount,
+    });
+  }
+
+  // Total node count including internal nodes
+  const totalNodeCount = nextInternalNode - 1;
+
+  // The MNA matrix dimension: totalNodeCount + branchCount
+  // Branch rows are indexed as: nodeCount + branchIdx (0-based)
+  // For consistency with test-elements.ts, the absolute branch row index
+  // passed to analogFactory is: totalNodeCount + branchIdx
+  // However, the spec says branchIdx is 0-based within the branch block,
+  // and the MNA matrix size = nodeCount + branchCount. We keep branchIdx
+  // as 0-based — the assembler adds nodeCount to get the absolute row.
+
+  // Step 5 & 6: Resolve pin nodes and call analogFactory for each element
+  const analogElements: import("./element.js").AnalogElement[] = [];
+  const elementToCircuitElement = new Map<number, CircuitElement>();
+
+  // Metadata for topology validation
+  type ElementTopologyInfo = {
+    nodeIds: number[];
+    isBranch: boolean;
+    typeHint: string;
+  };
+  const topologyInfo: ElementTopologyInfo[] = [];
+
+  // getTime placeholder — replaced by MNAEngine at runtime
+  const getTime = (): number => 0;
+
+  for (const meta of elementMeta) {
+    const { el } = meta;
+
+    // Ground elements: skip factory, just record for topology
+    if (el.typeId === "Ground" || el.typeId === "ground") {
+      continue;
+    }
+
+    const def = registry.get(el.typeId)!;
+    const props = el.getProperties();
+
+    // Resolve pin → node ID bindings
+    const pinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit);
+
+    // Build the full nodeIds array: external pin nodes + internal nodes
+    const nodeIds = [...pinNodeIds];
+    if (meta.internalNodeCount > 0) {
+      for (let i = 0; i < meta.internalNodeCount; i++) {
+        nodeIds.push(meta.internalNodeOffset + i);
+      }
+    }
+
+    // Compute the absolute branch row index for this element.
+    // The branch block starts at totalNodeCount in the full matrix, but
+    // analogFactory receives a 0-based branchIdx. The concrete value passed
+    // here matches the convention in test-elements.ts makeVoltageSource where
+    // branchIdx is the absolute 0-based solver row (including nodeCount offset).
+    // The MNA assembler sets up beginAssembly(matrixSize) where
+    // matrixSize = totalNodeCount + branchCount, so branch rows are
+    // absolute indices totalNodeCount, totalNodeCount+1, …
+    // We pass branchIdx as totalNodeCount + meta.branchIdx to match
+    // how makeVoltageSource uses it (as an absolute row index).
+    const absoluteBranchIdx =
+      meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
+
+    // Call the analog factory
+    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, props, getTime);
+
+    const elementIndex = analogElements.length;
+    analogElements.push(element);
+    elementToCircuitElement.set(elementIndex, el);
+
+    // Record topology info for validation
+    topologyInfo.push({
+      nodeIds: pinNodeIds,
+      isBranch: meta.branchIdx >= 0,
+      // Infer typeHint from branchIdx being present; inductors also use branches
+      // We distinguish by checking if the element is reactive with a branch
+      typeHint: meta.branchIdx >= 0
+        ? element.isReactive
+          ? "inductor"
+          : "voltage"
+        : "other",
+    });
+  }
+
+  // Step 6: Topology validation
+
+  // Check for floating nodes (only meaningful if we have external nodes)
+  if (totalNodeCount > 0) {
+    const floatingNodes = detectFloatingNodes(topologyInfo, totalNodeCount);
+    for (const nodeId of floatingNodes) {
+      diagnostics.push(
+        makeDiagnostic(
+          "floating-node",
+          "warning",
+          `Node ${nodeId} is floating (connected to only one element terminal)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has only one element terminal connected to it. ` +
+              `A floating node has no complete current path, which makes the ` +
+              `MNA system ill-conditioned or unsolvable.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+  }
+
+  // Check for voltage-source loops
+  if (detectVoltageSourceLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "voltage-source-loop",
+        "error",
+        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal voltage sources with no resistive elements creates " +
+            "contradictory KVL constraints. The MNA matrix will be singular and " +
+            "cannot be solved. Add a series resistance to break the loop.",
+          suggestions: [
+            {
+              text: "Add a small series resistance (e.g. 1 mΩ) to one of the voltage source branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  // Check for inductor loops
+  if (detectInductorLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "inductor-loop",
+        "error",
+        "Inductor loop detected — inductors form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal inductors with no resistive elements creates a " +
+            "degenerate branch equation system. The MNA matrix will be singular " +
+            "at DC and during transient initialization. Add series resistance.",
+          suggestions: [
+            {
+              text: "Add a small series resistance (e.g. 1 mΩ) to one of the inductor branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  // Re-check missing ground (buildNodeMap already handles this, but the spec
+  // says the compiler re-checks). If nodeMap already emitted a no-ground
+  // diagnostic we don't duplicate it.
+  const hasGroundDiag = nodeMap.diagnostics.some((d) => d.code === "no-ground");
+  if (!hasGroundDiag) {
+    const hasGround = circuit.elements.some(
+      (el) => el.typeId === "Ground" || el.typeId === "ground",
+    );
+    if (!hasGround) {
+      diagnostics.push(
+        makeDiagnostic(
+          "no-ground",
+          "warning",
+          "No Ground element found in circuit",
+          {
+            explanation:
+              "MNA simulation requires a ground reference node (node 0). " +
+              "Without a Ground element the simulator cannot establish a voltage reference.",
+            suggestions: [
+              {
+                text: "Add a Ground element connected to the reference node.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+  }
+
+  // Step 7: Build and return ConcreteCompiledAnalogCircuit
+  const models = new Map<string, DeviceModel>();
+
+  return new ConcreteCompiledAnalogCircuit({
+    nodeCount: totalNodeCount,
+    branchCount,
+    elements: analogElements,
+    labelToNodeId: nodeMap.labelToNodeId,
+    wireToNodeId: nodeMap.wireToNodeId,
+    models,
+    elementToCircuitElement,
+  });
 }

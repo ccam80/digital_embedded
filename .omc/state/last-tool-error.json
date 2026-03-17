@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/analog/__tests__/integration.test.ts\\\" 2>&1\",\"timeout\":60000,\"description\":\"Run integration tests to confirm all...",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/analog/__tests__/integration.test.ts \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 26\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m RCCircuit\u001b[2m > \u001b[22mexponential_decay_bdf2\u001b[90m 8\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → expected 0.5010010017947684 to be less than 0.05\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[1m\u001b[7m Failed Tests 1 \u001b[27m\u001b[22m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m F...",
-  "timestamp": "2026-03-17T12:40:42.970Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/analog/__tests__/compiler.test.ts\\\" 2>&1\",\"timeout\":120000,\"description\":\"Run the compiler tests\"}",
+  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/analog/__tests__/compiler.test.ts \u001b[2m(\u001b[22m\u001b[2m0 test\u001b[22m\u001b[2m)\u001b[22m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯\u001b[1m\u001b[7m Failed Suites 1 \u001b[27m\u001b[22m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m FAIL \u001b[27m\u001b[22m\u001b[39m src/analog/__tests__/compiler.test.ts\u001b[2m [ src/analog/__tests__/compiler.test.ts ]\u001b[22m\n\u001b[31m\u001b[1mError\u001b[22m: Transform failed with 1 error:\nC:/local_working_projects/digital_in_browser/src/analog/...",
+  "timestamp": "2026-03-17T12:49:22.312Z",
   "retry_count": 1
 }

@@ -476,14 +476,16 @@ describe("AnalogDispatch", () => {
     expect(runner.readOutput(engine, "C")).toBe(1);
   });
 
-  it("compile_analog_circuit_throws_not_implemented — analog engineType throws stub error", () => {
+  it("compile_analog_circuit_rejects_digital_components — digital components in analog circuit throw", () => {
     const registry = buildRegistry();
     const runner = new SimulationRunner(registry);
 
     const circuit = buildHalfAdder(registry);
     circuit.metadata.engineType = "analog";
 
-    expect(() => runner.compile(circuit)).toThrow(/not yet implemented/);
+    // The half-adder contains digital-only components (And, XOr).
+    // The analog compiler must reject them with a clear error.
+    expect(() => runner.compile(circuit)).toThrow(/digital-only/);
   });
 
   it("dc_operating_point_throws_for_digital_engine — dcOperatingPoint on digital engine throws TypeError", () => {

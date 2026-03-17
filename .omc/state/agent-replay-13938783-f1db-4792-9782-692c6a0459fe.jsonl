@@ -32,3 +32,9 @@
 {"t":0,"agent":"a78eb85","agent_type":"claude-orchestrator:reviewer","event":"agent_stop","success":true,"duration_ms":156724}
 {"t":0,"agent":"af8f34c","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":357535}
 {"t":0,"agent":"a75e7e4","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":964623}
+{"t":0,"agent":"a811039","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a868c8e","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a0347be","agent_type":"claude-orchestrator:reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a0347be","agent_type":"claude-orchestrator:reviewer","event":"agent_stop","success":true,"duration_ms":219629}
+{"t":0,"agent":"a868c8e","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":455852}
+{"t":0,"agent":"a811039","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":784282}
