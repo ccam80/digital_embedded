@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/analog/__tests__/compiler.test.ts\\\" 2>&1\",\"timeout\":120000,\"description\":\"Run the compiler tests\"}",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/analog/__tests__/compiler.test.ts \u001b[2m(\u001b[22m\u001b[2m0 test\u001b[22m\u001b[2m)\u001b[22m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯\u001b[1m\u001b[7m Failed Suites 1 \u001b[27m\u001b[22m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m FAIL \u001b[27m\u001b[22m\u001b[39m src/analog/__tests__/compiler.test.ts\u001b[2m [ src/analog/__tests__/compiler.test.ts ]\u001b[22m\n\u001b[31m\u001b[1mError\u001b[22m: Transform failed with 1 error:\nC:/local_working_projects/digital_in_browser/src/analog/...",
-  "timestamp": "2026-03-17T12:49:22.312Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"node -e \\\"const r=JSON.parse(require('fs').readFileSync('C:/Users/cca79/AppData/Local/Temp/vitest-results.json','utf8')); console.log('passed:',r.numPassedTests,'failed:',r.numFailedTests)...",
+  "error": "Exit code 1\npassed: 5730 failed: 6\n[eval]:1\r\nconst r=JSON.parse(require('fs').readFileSync('C:/Users/cca79/AppData/Local/Temp/vitest-results.json','utf8')); console.log('passed:',r.numPassedTests,'failed:',r.numFailedTests); r.testResults.filter(x=>x.status==='failed').forEach(x=>console.log('FAIL:',x.testFilePath.split('/').slice(-4).join('/')))\r\n                                                                                                                                                      ...",
+  "timestamp": "2026-03-17T13:11:15.964Z",
+  "retry_count": 3
 }

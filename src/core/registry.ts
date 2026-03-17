@@ -29,6 +29,10 @@ export const enum ComponentCategory {
   TERMINAL = "TERMINAL",
   SEVENTY_FOUR_XX = "74XX",
   SUBCIRCUIT = "SUBCIRCUIT",
+  PASSIVES = "PASSIVES",
+  SEMICONDUCTORS = "SEMICONDUCTORS",
+  SOURCES = "SOURCES",
+  ACTIVE = "ACTIVE",
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +134,12 @@ export type ExecuteFunction = (
   layout: ComponentLayout,
 ) => void;
 
+/**
+ * No-op ExecuteFunction for pure-analog components.
+ * Pure analog components have no digital simulation behavior.
+ */
+export const noOpAnalogExecuteFn: ExecuteFunction = () => {};
+
 // ---------------------------------------------------------------------------
 // ComponentDefinition
 // ---------------------------------------------------------------------------
@@ -144,7 +154,7 @@ export interface ComponentDefinition {
   /** Type name matching the .dig elementName, e.g. "And", "FlipflopD". */
   name: string;
   /** Engine type this component targets. Defaults to "digital" when omitted. */
-  engineType?: "digital" | "analog";
+  engineType?: "digital" | "analog" | "both";
   /**
    * Numeric type ID auto-assigned by ComponentRegistry.register().
    * Not serialized. Used only at runtime for function-table dispatch.
@@ -341,9 +351,10 @@ export class ComponentRegistry {
 
   /** Return all definitions matching the given engine type, in registration order. */
   getByEngineType(engineType: "digital" | "analog"): ComponentDefinition[] {
-    return Array.from(this._byName.values()).filter(
-      (d) => (d.engineType ?? "digital") === engineType,
-    );
+    return Array.from(this._byName.values()).filter((d) => {
+      const et = d.engineType ?? "digital";
+      return et === engineType || et === "both";
+    });
   }
 
   /** Total number of registered component types. */

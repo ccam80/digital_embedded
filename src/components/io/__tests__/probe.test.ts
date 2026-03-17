@@ -23,6 +23,7 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
+import type { SparseSolver } from "../../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -346,6 +347,85 @@ describe("Probe", () => {
     it("ProbeElement.getHelpText() contains 'Probe'", () => {
       const el = makeProbe();
       expect(el.getHelpText()).toContain("Probe");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AnalogProbe tests
+  // ---------------------------------------------------------------------------
+
+  describe("AnalogProbe", () => {
+    it("stamp_is_noop calls no solver methods", () => {
+      const props = new PropertyBag();
+      const stampCalls: string[] = [];
+
+      const mockSolver: SparseSolver = {
+        stamp: () => stampCalls.push("stamp"),
+        stampRHS: () => stampCalls.push("stampRHS"),
+        beginAssembly: () => {},
+        finalize: () => {},
+        solve: () => new Float64Array([]),
+      };
+
+      const analogElement = ProbeDefinition.analogFactory!(
+        [3],
+        -1,
+        props,
+        () => 0,
+      );
+
+      analogElement.stamp(mockSolver);
+
+      expect(stampCalls).toHaveLength(0);
+    });
+
+    it("reads_node_voltage returns voltage at node index", () => {
+      const props = new PropertyBag();
+      const analogElement = ProbeDefinition.analogFactory!(
+        [3],
+        -1,
+        props,
+        () => 0,
+      );
+
+      const voltages = new Float64Array(5);
+      voltages[3] = 4.72;
+
+      const voltage = (analogElement as any).getVoltage(voltages);
+      expect(voltage).toBe(4.72);
+    });
+
+    it("definition_has_engine_type_both", () => {
+      expect(ProbeDefinition.engineType).toBe("both");
+    });
+
+    it("appears_in_both_palettes", () => {
+      const registry = new ComponentRegistry();
+      registry.register(ProbeDefinition);
+
+      const digitalComponents = registry.getByEngineType("digital");
+      const analogComponents = registry.getByEngineType("analog");
+
+      const probeInDigital = digitalComponents.some((c) => c.name === "Probe");
+      const probeInAnalog = analogComponents.some((c) => c.name === "Probe");
+
+      expect(probeInDigital).toBe(true);
+      expect(probeInAnalog).toBe(true);
+    });
+
+    it("analogFactory returns AnalogElement with correct properties", () => {
+      const props = new PropertyBag();
+      const analogElement = ProbeDefinition.analogFactory!(
+        [5],
+        -1,
+        props,
+        () => 0,
+      );
+
+      expect(analogElement.nodeIndices).toEqual([5]);
+      expect(analogElement.branchIndex).toBe(-1);
+      expect(analogElement.isNonlinear).toBe(false);
+      expect(analogElement.isReactive).toBe(false);
     });
   });
 });

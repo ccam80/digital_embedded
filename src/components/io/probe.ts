@@ -24,6 +24,8 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // ProbeMode
@@ -217,6 +219,37 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Analog probe factory and element
+// ---------------------------------------------------------------------------
+
+class AnalogProbeElement implements AnalogElement {
+  readonly nodeIndices: readonly number[];
+  readonly branchIndex: number = -1;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+
+  constructor(nodeIndices: number[]) {
+    this.nodeIndices = nodeIndices;
+  }
+
+  stamp(_solver: SparseSolver): void {
+  }
+
+  getVoltage(voltages: Float64Array): number {
+    return voltages[this.nodeIndices[0]];
+  }
+}
+
+function probeAnalogFactory(
+  nodeIds: number[],
+  _branchIdx: number,
+  _props: PropertyBag,
+  _getTime: () => number,
+): AnalogElement {
+  return new AnalogProbeElement(nodeIds);
+}
+
+// ---------------------------------------------------------------------------
 // ProbeDefinition
 // ---------------------------------------------------------------------------
 
@@ -227,8 +260,10 @@ function probeFactory(props: PropertyBag): ProbeElement {
 export const ProbeDefinition: ComponentDefinition = {
   name: "Probe",
   typeId: -1,
+  engineType: "both",
   factory: probeFactory,
   executeFn: executeProbe,
+  analogFactory: probeAnalogFactory,
   pinLayout: buildProbePinDeclarations(1),
   propertyDefs: PROBE_PROPERTY_DEFS,
   attributeMap: PROBE_ATTRIBUTE_MAPPINGS,

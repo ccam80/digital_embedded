@@ -405,3 +405,96 @@
   - `src/headless/__tests__/runner.test.ts` — updated stub-era test to match real compiler behavior (test was explicitly testing the Phase 0 stub error; updated to assert `digital-only` error)
 - **Tests**: 14/14 passing
 - **Notes**: The `performance_50_node` sparse-solver test is a pre-existing flaky timing test (passes alone, occasionally fails under full-suite load). The 5 fixture-audit failures are pre-existing per spec/test-baseline.md.
+
+## Task 2.1.1: Analog Component Infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/core/registry.ts, src/core/__tests__/registry.test.ts
+- **Tests**: 4/4 passing
+  - `AnalogInfrastructure::new_categories_accepted` — register definition with PASSIVES category, verify it appears in getByCategory(PASSIVES)
+  - `AnalogInfrastructure::engine_type_both_appears_in_digital_and_analog` — register definition with engineType "both", verify it appears in both getByEngineType("digital") and getByEngineType("analog")
+  - `AnalogInfrastructure::pure_analog_excluded_from_digital` — register definition with engineType "analog", verify it appears only in getByEngineType("analog") and not in getByEngineType("digital")
+  - `AnalogInfrastructure::no_op_execute_fn_is_callable` — call noOpAnalogExecuteFn with stub layout, verify no throw and no state mutation
+- **Changes**:
+  - Added ComponentCategory enum values: PASSIVES, SEMICONDUCTORS, SOURCES, ACTIVE
+  - Changed ComponentDefinition.engineType from `"digital" | "analog"` to `"digital" | "analog" | "both"`
+  - Updated ComponentRegistry.getByEngineType() to include components with engineType "both" in both digital and analog results
+  - Exported noOpAnalogExecuteFn: ExecuteFunction sentinel for pure-analog components
+- **All existing registry tests pass unchanged**: 25/25 in registry.test.ts
+
+## Task 2.1.4: Probe (Shared Component)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: 
+  - `src/components/io/probe.ts` — added `AnalogProbeElement` class, `probeAnalogFactory()`, set `engineType: "both"`, added `analogFactory` to `ProbeDefinition`
+  - `src/components/io/__tests__/probe.test.ts` — added 5 new analog probe tests
+- **Tests**: 37/37 passing (32 existing + 5 new analog tests)
+- **Details**: 
+  - Probe now appears in both digital and analog palettes
+  - Digital behavior completely unchanged
+  - Analog probe stamps nothing (no-op) and reads node voltage correctly via `getVoltage()`
+  - All existing probe tests pass unchanged
+  - New analog tests verify: stamp is no-op, reads node voltage, has engineType "both", appears in both palettes, returns correct AnalogElement properties
+
+## Task 2.2.1: Capacitor + Inductor
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/passives/capacitor.ts` — CapacitorElement class, AnalogCapacitorElement with companion model, CapacitorDefinition
+  - `src/components/passives/inductor.ts` — InductorElement class, AnalogInductorElement with branch variable and companion model, InductorDefinition
+  - `src/components/passives/__tests__/capacitor.test.ts` — 12 tests for capacitor
+  - `src/components/passives/__tests__/inductor.test.ts` — 13 tests for inductor
+- **Files modified**: none
+- **Tests**: 25/25 passing (12 capacitor + 13 inductor)
+- **Details**:
+  - Both capacitors and inductors are reactive elements with isReactive: true
+  - Capacitor stampCompanion() computes geq and ieq using integration.ts helpers
+  - Inductor has requiresBranchRow: true and stamps branch incidence equations
+  - All three integration methods (BDF-1, trapezoidal, BDF-2) supported
+  - History state tracking (vPrev, vPrevPrev for capacitor; iPrev, iPrevPrev for inductor)
+  - Pin layouts: capacitor (pos/neg), inductor (A/B)
+  - All existing tests still pass (5713/5719 = 99.9%, 6 pre-existing fixture audit failures unchanged)
+
+## Task 2.1.2: Resistor + Ground
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/passives/resistor.ts` — ResistorDefinition with conductance stamp (G=1/R at 4 positions), analogFactory, IEEE zigzag draw(), min resistance clamp 1e-9
+  - `src/components/sources/ground.ts` — AnalogGroundDefinition with no-op stamp, single input pin (gnd), 3-bar ground draw()
+  - `src/components/sources/__tests__/ground.test.ts` — 7 ground tests
+- **Files modified**: 
+  - `src/components/passives/__tests__/resistor.test.ts` — prepended 5 unit tests (stamp_places_four_conductance_entries, resistance_from_props, minimum_resistance_clamped, is_not_nonlinear_and_not_reactive, branch_index_is_minus_one) before integration test added by 2.1.3
+  - `src/components/register-all.ts` — added imports and registrations for ResistorDefinition and AnalogGroundDefinition
+- **Tests**: 13/13 passing (6 resistor + 7 ground)
+- **Notes**: registry.ts was modified by task 2.1.1 (PASSIVES/SOURCES/ACTIVE/SEMICONDUCTORS categories, noOpAnalogExecuteFn, engineType "both"). Used noOpAnalogExecuteFn from registry in both component definitions. File lock conflicts with 2.1.3 (resistor.test.ts) and 2.1.1 (registry.ts) required waiting; resolved by polling.
+
+## Task 2.2.2: Potentiometer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/passives/potentiometer.ts` — PotentiometerElement, AnalogPotentiometerElement, PotentiometerDefinition
+  - `src/components/passives/__tests__/potentiometer.test.ts` — 12 tests
+- **Files modified**: none
+- **Tests**: 12/12 passing
+- **Details**:
+  - Three-terminal linear element (A, wiper W, B)
+  - Modeled as two series resistors split at wiper position
+  - R_top = R × position, R_bottom = R × (1 - position)
+  - Both resistances clamped to minimum 1e-9Ω to prevent division by zero
+  - Stamps 8 conductance entries: 4 for top resistor, 4 for bottom
+  - Position edge cases (0 and 1) handled with clamping
+  - All tests pass, no regressions
+
+## Task 2.1.3: DC Voltage Source + Current Source
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/sources/dc-voltage-source.ts` — DcVoltageSourceElement, makeDcVoltageSource factory, DcVoltageSourceDefinition (engineType: "analog", requiresBranchRow: true). Stamps 4 incidence matrix entries + 1 RHS entry. Supports setSourceScale for source-stepping.
+  - `src/components/sources/current-source.ts` — CurrentSourceElement, makeCurrentSource factory, CurrentSourceDefinition (engineType: "analog", branchIndex: -1). Stamps RHS-only (2 entries). Supports setSourceScale.
+  - `src/components/sources/__tests__/dc-voltage-source.test.ts` — 8 tests: stamp_incidence_and_rhs, set_scale_modifies_rhs, ground_node_stamps_suppressed, branch_index_stored, is_not_nonlinear_or_reactive, definition_has_requires_branch_row, definition_engine_type_analog, default_voltage_from_analog_factory
+  - `src/components/sources/__tests__/current-source.test.ts` — 8 tests: stamp_rhs_only, set_scale_modifies_current, ground_node_rhs_suppressed, branch_index_is_minus_one, is_not_nonlinear_or_reactive, definition_engine_type_analog, definition_does_not_require_branch_row, default_current_from_analog_factory
+- **Files modified**: 
+  - `src/components/passives/__tests__/resistor.test.ts` — added Integration::voltage_divider_dc_op test (10V source → 1kΩ → 2kΩ → ground; verifies V(junction)=6.667V ±1e-4, V(source)=10V, I=3.333mA ±1e-6). Linter also merged in 5 resistor unit tests from Task 2.1.2.
+- **Tests**: 17/17 passing (8 voltage source + 8 current source + 1 integration)
+- **Notes**: Full test suite shows no regressions. fixture-audit failures (5) are pre-existing. sparse-solver performance_50_node flakes under full-suite load (passes in isolation) — pre-existing flakiness unrelated to these changes.

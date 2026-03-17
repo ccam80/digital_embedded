@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   ComponentRegistry,
   ComponentCategory,
+  noOpAnalogExecuteFn,
 } from "../registry.js";
 import type {
   ComponentDefinition,
@@ -279,6 +280,61 @@ describe("ComponentRegistry", () => {
       expect(ComponentCategory.GRAPHICS).toBe("GRAPHICS");
       expect(ComponentCategory.TERMINAL).toBe("TERMINAL");
       expect(ComponentCategory.SEVENTY_FOUR_XX).toBe("74XX");
+    });
+  });
+
+  describe("AnalogInfrastructure", () => {
+    it("new_categories_accepted", () => {
+      const def = makeDefinition("TestPassive", ComponentCategory.PASSIVES);
+      registry.register(def);
+      const result = registry.getByCategory(ComponentCategory.PASSIVES);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("TestPassive");
+    });
+
+    it("engine_type_both_appears_in_digital_and_analog", () => {
+      const def = makeDefinition("SharedComponent");
+      def.engineType = "both";
+      registry.register(def);
+
+      const digital = registry.getByEngineType("digital");
+      const analog = registry.getByEngineType("analog");
+
+      expect(digital.map((d) => d.name)).toContain("SharedComponent");
+      expect(analog.map((d) => d.name)).toContain("SharedComponent");
+    });
+
+    it("pure_analog_excluded_from_digital", () => {
+      const def = makeDefinition("PureAnalog");
+      def.engineType = "analog";
+      registry.register(def);
+
+      const digital = registry.getByEngineType("digital");
+      const analog = registry.getByEngineType("analog");
+
+      expect(digital.map((d) => d.name)).not.toContain("PureAnalog");
+      expect(analog.map((d) => d.name)).toContain("PureAnalog");
+    });
+
+    it("no_op_execute_fn_is_callable", () => {
+      const stubLayout: ComponentLayout = {
+        wiringTable: new Int32Array([]),
+        inputCount: () => 0,
+        inputOffset: () => 0,
+        outputCount: () => 0,
+        outputOffset: () => 0,
+        stateOffset: () => 0,
+        getProperty: () => undefined,
+      };
+
+      const state = new Uint32Array(4);
+      const highZs = new Uint32Array(4);
+      const initialState = Array.from(state);
+
+      noOpAnalogExecuteFn(0, state, highZs, stubLayout);
+
+      const finalState = Array.from(state);
+      expect(initialState).toEqual(finalState);
     });
   });
 });

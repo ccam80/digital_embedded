@@ -206,8 +206,14 @@
   "hotPaths": [
     {
       "path": "spec\\phase-1-mna-engine-core.md",
-      "accessCount": 59,
-      "lastAccessed": 1773751612379,
+      "accessCount": 60,
+      "lastAccessed": 1773752317732,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-2-tier-1-components.md",
+      "accessCount": 47,
+      "lastAccessed": 1773752930362,
       "type": "file"
     },
     {
@@ -217,10 +223,10 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-2-tier-1-components.md",
-      "accessCount": 37,
-      "lastAccessed": 1773744624834,
-      "type": "file"
+      "path": "",
+      "accessCount": 35,
+      "lastAccessed": 1773752426883,
+      "type": "directory"
     },
     {
       "path": "spec\\phase-6-tier-3-and-polish.md",
@@ -229,21 +235,15 @@
       "type": "file"
     },
     {
-      "path": "",
+      "path": "spec\\.context\\rules.md",
       "accessCount": 32,
-      "lastAccessed": 1773751607482,
-      "type": "directory"
+      "lastAccessed": 1773752385551,
+      "type": "file"
     },
     {
       "path": "spec\\phase-3-analog-ui-features.md",
       "accessCount": 30,
       "lastAccessed": 1773744669502,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 27,
-      "lastAccessed": 1773751516612,
       "type": "file"
     },
     {
@@ -253,15 +253,21 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 26,
+      "lastAccessed": 1773752631556,
+      "type": "file"
+    },
+    {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 23,
-      "lastAccessed": 1773747697669,
+      "accessCount": 24,
+      "lastAccessed": 1773752412143,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 19,
-      "lastAccessed": 1773751517653,
+      "accessCount": 20,
+      "lastAccessed": 1773752385635,
       "type": "file"
     },
     {
@@ -304,12 +310,6 @@
       "path": "spec\\author_instructions.md",
       "accessCount": 11,
       "lastAccessed": 1773746718732,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 11,
-      "lastAccessed": 1773751514453,
       "type": "file"
     },
     {
@@ -427,6 +427,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\gates\\and.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773752440530,
+      "type": "file"
+    },
+    {
       "path": "src\\io\\digb-schema.ts",
       "accessCount": 1,
       "lastAccessed": 1773741022057,
@@ -442,12 +448,6 @@
       "path": "src\\engine\\flatten.ts",
       "accessCount": 1,
       "lastAccessed": 1773741026649,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\and.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741026715,
       "type": "file"
     },
     {

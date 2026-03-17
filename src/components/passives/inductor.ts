@@ -1,0 +1,246 @@
+/**
+ * Inductor analog component.
+ *
+ * Reactive two-terminal element that requires a branch variable (extra MNA row)
+ * to track branch current. Uses companion model (equivalent conductance + history
+ * current source) recomputed at each timestep with one of three integration methods:
+ * BDF-1, trapezoidal, or BDF-2.
+ */
+
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext } from "../../core/renderer-interface.js";
+import type { Rect } from "../../core/renderer-interface.js";
+import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
+import type { PropertyDefinition } from "../../core/properties.js";
+import {
+  ComponentCategory,
+  type AttributeMapping,
+  type ComponentDefinition,
+} from "../../core/registry.js";
+import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
+import {
+  inductorConductance,
+  inductorHistoryCurrent,
+} from "../../analog/integration.js";
+
+// ---------------------------------------------------------------------------
+// Pin layout
+// ---------------------------------------------------------------------------
+
+function buildInductorPinDeclarations(): PinDeclaration[] {
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "A",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "B",
+      defaultBitWidth: 1,
+      position: { x: 2, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// InductorElement — CircuitElement implementation
+// ---------------------------------------------------------------------------
+
+export class InductorElement extends AbstractCircuitElement {
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("AnalogInductor", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(buildInductorPinDeclarations(), []);
+  }
+
+  getBoundingBox(): Rect {
+    return {
+      x: this.position.x,
+      y: this.position.y - 0.5,
+      width: 2,
+      height: 1,
+    };
+  }
+
+  draw(ctx: RenderContext): void {
+    const inductance = this._properties.getOrDefault<number>("inductance", 1e-3);
+    const label = this._properties.getOrDefault<string>("label", "");
+
+    ctx.save();
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+
+    // Lead lines
+    ctx.drawLine(0, 0, 0.4, 0);
+    ctx.drawLine(1.6, 0, 2, 0);
+
+    // Four semicircular arcs (coil symbol)
+    const arcRadius = 0.25;
+    const spacing = 0.35;
+    for (let i = 0; i < 4; i++) {
+      const cx = 0.4 + i * spacing;
+      ctx.drawArc(cx, 0, arcRadius, Math.PI, 2 * Math.PI);
+    }
+
+    // Value label below body
+    const displayLabel = label.length > 0 ? label : `${inductance * 1e3}mH`;
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(displayLabel, 1, 0.65, { horizontal: "center", vertical: "top" });
+
+    ctx.restore();
+  }
+
+  getHelpText(): string {
+    return (
+      "Inductor — reactive element with companion model and branch current.\n" +
+      "Stamps equivalent conductance, history current, and branch incidence entries."
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AnalogInductorElement — MNA implementation
+// ---------------------------------------------------------------------------
+
+class AnalogInductorElement implements AnalogElement {
+  readonly nodeIndices: readonly number[];
+  readonly branchIndex: number;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = true;
+
+  private readonly L: number;
+  private geq: number = 0;
+  private ieq: number = 0;
+  private iPrev: number = 0;
+  private iPrevPrev: number = 0;
+  private vPrev: number = 0;
+
+  constructor(nodeIndices: number[], branchIdx: number, inductance: number) {
+    this.nodeIndices = nodeIndices;
+    this.branchIndex = branchIdx;
+    this.L = inductance;
+  }
+
+  stamp(solver: SparseSolver): void {
+    const n0 = this.nodeIndices[0];
+    const n1 = this.nodeIndices[1];
+    const b = this.branchIndex;
+
+    // Conductance stamps (companion model)
+    solver.stamp(n0, n0, this.geq);
+    solver.stamp(n1, n1, this.geq);
+    solver.stamp(n0, n1, -this.geq);
+    solver.stamp(n1, n0, -this.geq);
+
+    // Branch incidence row entries: V_branch = V_n0 - V_n1 - (geq * I_branch + ieq)
+    solver.stamp(b, n0, 1);
+    solver.stamp(b, n1, -1);
+    solver.stamp(b, b, -this.geq);
+
+    // RHS: branch equation source
+    solver.stampRHS(b, this.ieq);
+  }
+
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+    const iNow = voltages[this.branchIndex + voltages.length - this.nodeIndices.length];
+    const vNow = voltages[this.nodeIndices[0]] - voltages[this.nodeIndices[1]];
+
+    this.geq = inductorConductance(this.L, dt, method);
+    this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);
+
+    this.iPrevPrev = this.iPrev;
+    this.iPrev = iNow;
+    this.vPrev = vNow;
+  }
+}
+
+function createInductorElement(
+  nodeIds: number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElement {
+  const L = props.getOrDefault<number>("inductance", 1e-3);
+  return new AnalogInductorElement(nodeIds, branchIdx, L);
+}
+
+// ---------------------------------------------------------------------------
+// Property definitions
+// ---------------------------------------------------------------------------
+
+const INDUCTOR_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "inductance",
+    type: PropertyType.FLOAT,
+    label: "Inductance (H)",
+    defaultValue: 1e-3,
+    min: 1e-12,
+    description: "Inductance in henries",
+  },
+  {
+    key: "label",
+    type: PropertyType.STRING,
+    label: "Label",
+    defaultValue: "",
+    description: "Optional label shown below the component",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Attribute mappings
+// ---------------------------------------------------------------------------
+
+export const INDUCTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  {
+    xmlName: "inductance",
+    propertyKey: "inductance",
+    convert: (v) => parseFloat(v),
+  },
+  {
+    xmlName: "Label",
+    propertyKey: "label",
+    convert: (v) => v,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// InductorDefinition
+// ---------------------------------------------------------------------------
+
+function inductorCircuitFactory(props: PropertyBag): InductorElement {
+  return new InductorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+}
+
+export const InductorDefinition: ComponentDefinition = {
+  name: "AnalogInductor",
+  typeId: -1,
+  engineType: "analog",
+  factory: inductorCircuitFactory,
+  executeFn: () => {},
+  pinLayout: buildInductorPinDeclarations(),
+  propertyDefs: INDUCTOR_PROPERTY_DEFS,
+  attributeMap: INDUCTOR_ATTRIBUTE_MAPPINGS,
+  category: ComponentCategory.PASSIVES,
+  helpText:
+    "Inductor — reactive element with companion model and branch current.\n" +
+    "Stamps equivalent conductance, history current, and branch incidence entries.",
+  analogFactory: createInductorElement,
+  requiresBranchRow: true,
+};

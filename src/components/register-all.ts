@@ -133,6 +133,12 @@ import { GraphicCardDefinition } from "./graphics/graphic-card.js";
 import { TerminalDefinition } from "./terminal/terminal.js";
 import { KeyboardDefinition } from "./terminal/keyboard.js";
 
+// Analog passives
+import { ResistorDefinition } from "./passives/resistor.js";
+
+// Analog sources
+import { AnalogGroundDefinition } from "./sources/ground.js";
+
 // Basic
 import { BooleanFunctionDefinition } from "./basic/function.js";
 
@@ -280,6 +286,12 @@ export function createDefaultRegistry(
   // Terminal
   registry.register(TerminalDefinition);
   registry.register(KeyboardDefinition);
+
+  // Analog passives
+  registry.register(ResistorDefinition);
+
+  // Analog sources
+  registry.register(AnalogGroundDefinition);
 
   // Basic
   registry.register(BooleanFunctionDefinition);
