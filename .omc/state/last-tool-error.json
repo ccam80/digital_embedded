@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && cat > /tmp/debug-solver.mts << 'EOF'\\nimport { SparseSolver } from \\\"./src/analog/sparse-solver.js\\\";\\n\\n// Simple 2x2: [[4,1],[1,3]]...",
-  "error": "Exit code 1\n\r\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\nError [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\Users\\cca79\\AppData\\Local\\Temp\\src\\analog\\sparse-solver.js' imported from C:\\Users\\cca79\\AppData\\Local\\Temp\\debug-solver.mts\r\n    at finalizeResolution (node:internal/modules/esm/resolve:274:11)\r\n    at moduleResolve (node:internal/modules/esm/resolve:864:10)\r\n    at defaultResolve (node:internal/modules/esm/resolve:990:11)\r\n    at nextResolve (node:interna...",
-  "timestamp": "2026-03-17T11:49:02.446Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/analog/__tests__/dc-operating-point.test.ts\\\" \\\"src/analog/__tests__/sparse-solver.test.ts\\\" 2>&1\",\"timeout\":600...",
+  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[32m✓\u001b[39m src/analog/__tests__/sparse-solver.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 10\u001b[2mms\u001b[22m\u001b[39m\n \u001b[31m❯\u001b[39m src/analog/__tests__/dc-operating-point.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 14\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m DcOP\u001b[2m > \u001b[22mgmin_stepping_fallback\u001b[90m 8\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → expected fal...",
+  "timestamp": "2026-03-17T12:20:04.976Z",
   "retry_count": 1
 }
