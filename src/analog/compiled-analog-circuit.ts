@@ -90,6 +90,10 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    */
   readonly bridges: BridgeInstance[];
 
+  /** Mutable time reference shared with element closures. The engine updates
+   *  `timeRef.value` each timestep so elements see the current simulation time. */
+  readonly timeRef: { value: number };
+
   constructor(params: {
     nodeCount: number;
     branchCount: number;
@@ -100,6 +104,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementToCircuitElement: Map<number, CircuitElement>;
     diagnostics?: SolverDiagnostic[];
     bridges?: BridgeInstance[];
+    timeRef?: { value: number };
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -111,6 +116,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.elementToCircuitElement = params.elementToCircuitElement;
     this.diagnostics = params.diagnostics ?? [];
     this.bridges = params.bridges ?? [];
+    this.timeRef = params.timeRef ?? { value: 0 };
   }
 
   // CompiledCircuit base interface

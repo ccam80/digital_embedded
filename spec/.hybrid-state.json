@@ -1,6 +1,15 @@
 {
-  "phase": "phase-3-analog-ui-features",
-  "completed_phases": ["phase-0-interface-abstraction", "phase-1-mna-engine-core", "phase-2-tier-1-components"],
+  "phase": "4b",
+  "wave": "4b.4",
+  "completed_waves": ["4b.1", "4b.2", "4b.3", "4b.4"],
+  "completed_phases": ["4b"],
+  "pending_phases": ["4c", "5"],
   "status": "in_progress",
-  "last_updated": "2026-03-17T05:00:00Z"
+  "notes": {
+    "4b_review": "Wave 4b.2 review has 1 critical finding: historical-provenance comment in src/analog/compiler.ts line ~411 ('replaced by MNAEngine at runtime'). Fix at phase completion.",
+    "4b_review_file": "spec/reviews/wave-4b.2.md",
+    "mna_end_to_end": "src/analog/__tests__/mna-end-to-end.test.ts has 2 failing tests (untracked file from 4b.2.1 agent with zero-length self-loop wires). Not a regression — test bug.",
+    "stale_agents": "4b.4.1 agent (a84870a173e1fa2f5) was still spinning on full suite regression check when session ended. Its implementation is complete and tests pass."
+  },
+  "last_updated": "2026-03-18T10:58:00Z"
 }

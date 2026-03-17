@@ -11,7 +11,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -31,12 +31,12 @@ const COMP_HEIGHT = 2;
 // Pin layout
 // ---------------------------------------------------------------------------
 
-function buildGroundPinDeclarations(): PinDeclaration[] {
+function buildGroundPinDeclarations(bitWidth: number): PinDeclaration[] {
   return [
     {
       direction: PinDirection.OUTPUT,
       label: "out",
-      defaultBitWidth: 1,
+      defaultBitWidth: bitWidth,
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
@@ -60,7 +60,8 @@ export class GroundElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(buildGroundPinDeclarations(), []);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    return this.derivePins(buildGroundPinDeclarations(bitWidth), []);
   }
 
   getBoundingBox(): Rect {
@@ -104,16 +105,32 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 }
 
 // ---------------------------------------------------------------------------
-// GROUND_ATTRIBUTE_MAPPINGS — Ground has no configurable attributes
+// GROUND_ATTRIBUTE_MAPPINGS
 // ---------------------------------------------------------------------------
 
-export const GROUND_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [];
+export const GROUND_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  {
+    xmlName: "Bits",
+    propertyKey: "bitWidth",
+    convert: (v) => parseInt(v, 10),
+  },
+];
 
 // ---------------------------------------------------------------------------
-// Property definitions — none
+// Property definitions
 // ---------------------------------------------------------------------------
 
-const GROUND_PROPERTY_DEFS: PropertyDefinition[] = [];
+const GROUND_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "bitWidth",
+    type: PropertyType.BIT_WIDTH,
+    label: "Bits",
+    defaultValue: 1,
+    min: 1,
+    max: 32,
+    description: "Bit width of the output signal",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // GroundDefinition
@@ -128,7 +145,7 @@ export const GroundDefinition: ComponentDefinition = {
   typeId: -1,
   factory: groundFactory,
   executeFn: executeGround,
-  pinLayout: buildGroundPinDeclarations(),
+  pinLayout: buildGroundPinDeclarations(1),
   propertyDefs: GROUND_PROPERTY_DEFS,
   attributeMap: GROUND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,

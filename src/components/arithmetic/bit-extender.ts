@@ -102,8 +102,20 @@ export function makeExecuteBitExtender(
   };
 }
 
+const _bitExtenderCache = new Map<string, (index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => void>();
+
 export function executeBitExtender(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  makeExecuteBitExtender(4, 8)(index, state, _highZs, layout);
+  const inProp = layout.getProperty(index, "inputBits");
+  const outProp = layout.getProperty(index, "outputBits");
+  const inputBits = typeof inProp === "number" ? inProp : 4;
+  const outputBits = typeof outProp === "number" ? outProp : 8;
+  const key = `${inputBits},${outputBits}`;
+  let fn = _bitExtenderCache.get(key);
+  if (fn === undefined) {
+    fn = makeExecuteBitExtender(inputBits, outputBits);
+    _bitExtenderCache.set(key, fn);
+  }
+  fn(index, state, _highZs, layout);
 }
 
 export const BIT_EXTENDER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

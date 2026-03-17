@@ -206,8 +206,8 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 71,
-      "lastAccessed": 1773776553288,
+      "accessCount": 85,
+      "lastAccessed": 1773786750832,
       "type": "directory"
     },
     {
@@ -218,32 +218,32 @@
     },
     {
       "path": "spec\\phase-1-mna-engine-core.md",
-      "accessCount": 60,
-      "lastAccessed": 1773752317732,
+      "accessCount": 61,
+      "lastAccessed": 1773784705397,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 51,
-      "lastAccessed": 1773779286669,
+      "accessCount": 59,
+      "lastAccessed": 1773786725844,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 49,
-      "lastAccessed": 1773780008475,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-5-tier-2-components.md",
-      "accessCount": 44,
-      "lastAccessed": 1773744943457,
+      "accessCount": 54,
+      "lastAccessed": 1773786740443,
       "type": "file"
     },
     {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 37,
-      "lastAccessed": 1773775435900,
+      "accessCount": 52,
+      "lastAccessed": 1773785387344,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-5-tier-2-components.md",
+      "accessCount": 49,
+      "lastAccessed": 1773780378744,
       "type": "file"
     },
     {
@@ -259,6 +259,12 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 33,
+      "lastAccessed": 1773786334724,
+      "type": "directory"
+    },
+    {
       "path": "spec\\phase-6-tier-3-and-polish.md",
       "accessCount": 32,
       "lastAccessed": 1773745006883,
@@ -266,15 +272,39 @@
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 26,
-      "lastAccessed": 1773779281907,
+      "accessCount": 28,
+      "lastAccessed": 1773786511162,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\digital-engine.ts",
+      "accessCount": 27,
+      "lastAccessed": 1773786739328,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 19,
-      "lastAccessed": 1773779313069,
+      "accessCount": 26,
+      "lastAccessed": 1773786741259,
       "type": "directory"
+    },
+    {
+      "path": "src\\headless\\runner.ts",
+      "accessCount": 21,
+      "lastAccessed": 1773786765201,
+      "type": "file"
+    },
+    {
+      "path": "spec\\circuits-engine-spec.md",
+      "accessCount": 20,
+      "lastAccessed": 1773784718916,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-4c-transistor-level-models.md",
+      "accessCount": 20,
+      "lastAccessed": 1773786729882,
+      "type": "file"
     },
     {
       "path": "src\\core\\renderer-interface.ts",
@@ -283,33 +313,27 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\runner.ts",
-      "accessCount": 18,
-      "lastAccessed": 1773779772841,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-4c-transistor-level-models.md",
-      "accessCount": 17,
-      "lastAccessed": 1773744752384,
-      "type": "file"
-    },
-    {
-      "path": "spec\\circuits-engine-spec.md",
-      "accessCount": 17,
-      "lastAccessed": 1773750520626,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 16,
-      "lastAccessed": 1773775940064,
-      "type": "directory"
-    },
-    {
       "path": "src\\core\\engine-interface.ts",
       "accessCount": 15,
       "lastAccessed": 1773773750169,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-4b-two-engine-bridge.md",
+      "accessCount": 15,
+      "lastAccessed": 1773783922338,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\flatten.ts",
+      "accessCount": 15,
+      "lastAccessed": 1773783945723,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 14,
+      "lastAccessed": 1773786695063,
       "type": "file"
     },
     {
@@ -319,21 +343,21 @@
       "type": "file"
     },
     {
+      "path": "src\\engine\\__tests__\\flatten.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1773783189198,
+      "type": "file"
+    },
+    {
       "path": "spec\\author_instructions.md",
-      "accessCount": 11,
-      "lastAccessed": 1773746718732,
+      "accessCount": 12,
+      "lastAccessed": 1773784693662,
       "type": "file"
     },
     {
       "path": "spec\\.context\\review-spec.md",
       "accessCount": 9,
       "lastAccessed": 1773740990489,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-4b-two-engine-bridge.md",
-      "accessCount": 7,
-      "lastAccessed": 1773744578767,
       "type": "file"
     },
     {
@@ -367,6 +391,12 @@
       "type": "file"
     },
     {
+      "path": "src\\editor\\hit-test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773783636932,
+      "type": "file"
+    },
+    {
       "path": "spec\\reviews\\spec-review-combined.md",
       "accessCount": 5,
       "lastAccessed": 1773741747966,
@@ -385,9 +415,15 @@
       "type": "file"
     },
     {
+      "path": "src\\engine",
+      "accessCount": 5,
+      "lastAccessed": 1773785782861,
+      "type": "directory"
+    },
+    {
       "path": "spec",
-      "accessCount": 4,
-      "lastAccessed": 1773744551246,
+      "accessCount": 5,
+      "lastAccessed": 1773786456746,
       "type": "directory"
     },
     {
@@ -401,12 +437,6 @@
       "accessCount": 4,
       "lastAccessed": 1773779980076,
       "type": "directory"
-    },
-    {
-      "path": "src\\engine\\digital-engine.ts",
-      "accessCount": 3,
-      "lastAccessed": 1773747348387,
-      "type": "file"
     },
     {
       "path": "src\\io\\digb-schema.ts",
@@ -469,40 +499,10 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\hit-test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1773775948109,
-      "type": "file"
-    },
-    {
-      "path": "src\\engine\\flatten.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741026649,
-      "type": "file"
-    },
-    {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773741052634,
-      "type": "file"
-    },
-    {
       "path": "src\\io",
       "accessCount": 1,
       "lastAccessed": 1773741074629,
       "type": "directory"
-    },
-    {
-      "path": "src\\engine",
-      "accessCount": 1,
-      "lastAccessed": 1773744535776,
-      "type": "directory"
-    },
-    {
-      "path": "src\\engine\\__tests__\\flatten.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773744542702,
-      "type": "file"
     }
   ],
   "userDirectives": []

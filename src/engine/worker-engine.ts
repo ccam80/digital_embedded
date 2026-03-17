@@ -55,6 +55,7 @@ interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly resetComponentIndices: Uint32Array;
   readonly switchComponentIndices: Uint32Array;
   readonly switchClassification: Uint8Array;
+  readonly shadowNetCount: number;
 }
 
 function isConcreteCompiled(c: CompiledCircuit): c is ConcreteCompiledCircuit {

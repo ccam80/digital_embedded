@@ -109,6 +109,9 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly switchComponentIndices: Uint32Array;
   /** Per-component switch classification: 0=not switch, 1=unidirectional, 2=bidirectional. */
   readonly switchClassification: Uint8Array;
+  /** Number of shadow driver nets for multi-driver bus resolution.
+   *  Shadow nets occupy [netCount, netCount + shadowNetCount) and must start as high-Z. */
+  readonly shadowNetCount: number;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -311,6 +314,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._switchPrevStates = new Uint32Array(circuit.switchComponentIndices?.length ?? 0);
     initializeBackingStores(circuit);
     initializeCircuit(this);
+    this._initBusResolver(circuit);
   }
 
   reset(): void {
@@ -611,7 +615,9 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     // Net portion: UNDEFINED (value=0, highZ=0xFFFFFFFF)
     this._values.fill(0, 0, netCount);
     this._highZs.fill(0xffffffff, 0, netCount);
-    // State portion: initialized to 0
+    // State + shadow portion: initialized to 0.
+    // Shadow nets for bidirectional switches are set to high-Z later
+    // in _initBusResolver, after we know which components are switches.
     if (totalSize > netCount) {
       this._values.fill(0, netCount, totalSize);
       this._highZs.fill(0, netCount, totalSize);
@@ -791,6 +797,71 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     return nets;
   }
 
+  /**
+   * After initializeCircuit() runs, shadow nets have values from executeFns
+   * but the bus resolver has never combined them into shared output nets.
+   * This method performs the initial bus resolution pass:
+   *   1. Recalculate all bus nets from their shadow driver values.
+   *   2. Process switch state changes (FET closed flags set during init).
+   *   3. Recalculate bus nets again after switch cross-links are added.
+   *   4. Re-evaluate all components so downstream components see resolved values.
+   */
+  private _initBusResolver(compiled: ConcreteCompiledCircuit): void {
+    const { busResolver, switchComponentIndices, switchClassification } = compiled;
+    if (busResolver === null) return;
+
+    const state = this._values;
+    const highZs = this._highZs;
+    const layout = compiled.layout;
+    const shadowEnd = compiled.netCount + compiled.shadowNetCount;
+
+    // Step 0: Set shadow nets for bidirectional switch outputs to high-Z.
+    // These components' executeFns skip propagation (classification=2),
+    // so their shadow nets must not appear as "actively driving 0".
+    for (let s = 0; s < switchComponentIndices.length; s++) {
+      const compIdx = switchComponentIndices[s]!;
+      if (switchClassification[compIdx] !== 2) continue;
+      const outBase = layout.outputOffset(compIdx);
+      const outCount = layout.outputCount(compIdx);
+      const wt = layout.wiringTable;
+      for (let o = 0; o < outCount; o++) {
+        const shadowNetId = wt[outBase + o]!;
+        if (shadowNetId >= compiled.netCount && shadowNetId < shadowEnd) {
+          highZs[shadowNetId] = 0xffffffff;
+        }
+      }
+    }
+
+    // Notify all nets (shadows + actual) so bus resolver recalculates everything.
+    const recalcAllBusNets = () => {
+      for (let netId = 0; netId < shadowEnd; netId++) {
+        busResolver.onNetChanged(netId, state, highZs);
+      }
+    };
+
+    // Step 1: Recalculate all bus nets from current shadow values.
+    recalcAllBusNets();
+
+    // Step 2: Process switch state changes from init (FETs may have closed).
+    // This adds cross-links between nets (e.g. VDD↔output when PFET closes).
+    if (switchComponentIndices !== undefined && switchComponentIndices.length > 0) {
+      this._checkSwitchStateChanges(compiled, state);
+      // Step 3: Recalculate again — cross-linked actual net IDs are now
+      // registered as drivers, so the resolved values flow through switches.
+      recalcAllBusNets();
+      // Step 4: Re-evaluate all components so downstream see resolved values.
+      const { executeFns, typeIds, evaluationOrder } = compiled;
+      for (let g = 0; g < evaluationOrder.length; g++) {
+        const group = evaluationOrder[g]!;
+        if (group.isFeedback) {
+          this._evaluateFeedbackGroup(group, executeFns, typeIds, layout, state);
+        } else {
+          this._evaluateGroupOnce(group, executeFns, typeIds, layout, state);
+        }
+      }
+    }
+  }
+
   private _checkSwitchStateChanges(
     compiled: ConcreteCompiledCircuit,
     state: Uint32Array,
@@ -814,6 +885,15 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     }
 
     if (anyChanged) {
+      // After switch reconfiguration, cross-linked actual net IDs are now
+      // registered as drivers in other bus nets. Notify them so the bus
+      // resolver picks up the cross-linked values (e.g. VDD flowing through
+      // a closed PFET to the output net).
+      const shadowEnd = compiled.netCount + compiled.shadowNetCount;
+      for (let netId = 0; netId < shadowEnd; netId++) {
+        busResolver.onNetChanged(netId, state, this._highZs);
+      }
+      // Re-evaluate all components so downstream components see resolved values.
       const { executeFns, typeIds, evaluationOrder } = compiled;
       for (let g = 0; g < evaluationOrder.length; g++) {
         const group = evaluationOrder[g]!;

@@ -65,18 +65,20 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.set("capacitance", 1e-6);
 
+      // Node IDs are 1-based (ground=0). Use [1, 2] so both are non-ground.
+      // Solver indices: node1→idx0, node2→idx1
       const analogElement = CapacitorDefinition.analogFactory!(
-        [0, 1],
+        [1, 2],
         -1,
         props,
         () => 0,
       );
 
+      // voltages[0] = V(node1) = 5V, voltages[1] = V(node2) = 0V
       const voltages = new Float64Array([5, 0]);
       analogElement.stampCompanion!(1e-6, "trapezoidal", voltages);
 
       // For trapezoidal: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
-      // ieq = -geq * vNow - iNow = -2.0 * 5 - 0 = -10.0
       const { solver, stamps, rhsStamps } = makeStubSolver();
       analogElement.stamp(solver);
 
@@ -92,7 +94,7 @@ describe("Capacitor", () => {
       props.set("capacitance", 1e-6);
 
       const analogElement = CapacitorDefinition.analogFactory!(
-        [0, 1],
+        [1, 2],
         -1,
         props,
         () => 0,
@@ -116,7 +118,7 @@ describe("Capacitor", () => {
       props.set("capacitance", 1e-6);
 
       const analogElement = CapacitorDefinition.analogFactory!(
-        [0, 1],
+        [1, 2],
         -1,
         props,
         () => 0,
@@ -138,7 +140,7 @@ describe("Capacitor", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
       const analogElement = CapacitorDefinition.analogFactory!(
-        [0, 1],
+        [1, 2],
         -1,
         props,
         () => 0,

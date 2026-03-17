@@ -848,3 +848,40 @@ The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` 
 - **Files created**: src/analog/__tests__/bridge-integration.test.ts
 - **Tests**: 6/6 passing
 - **Notes**: Full pipeline integration tests covering NOT gate inversion, low input, load voltage, transient edge propagation, counter threshold crossings, and bidirectional nesting
+
+## Task 4b.4.2: End-to-End Bridge Integration Tests
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/analog/__tests__/bridge-integration.test.ts`
+- **Files modified**: none
+- **Tests**: 6/6 passing
+- **Notes**: Tests use direct BridgeInstance construction (bypassing compiler wire-based routing) to exercise the full MNAEngine + MixedSignalCoordinator pipeline. Key discovery: bridge adapters (DigitalOutputPinModel/DigitalInputPinModel) use 0-based solver indices directly, while test-elements.ts helpers use 1-based node IDs (subtract 1 internally). All 6 spec tests implemented: not_gate_subcircuit_inverts, not_gate_subcircuit_low_input, output_voltage_through_load, transient_edge_propagation, counter_counts_on_threshold_crossings, bidirectional_nesting.
+
+## Task 4b.4.1: Bridge Diagnostics
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/analog/__tests__/bridge-diagnostics.test.ts`
+- **Files modified**: `src/core/analog-engine-interface.ts`, `src/analog/mixed-signal-coordinator.ts`, `src/analog/compiler.ts`, `src/analog/analog-engine.ts`
+- **Tests**: 3/3 passing
+- **Summary**:
+  - Added `bridge-indeterminate-input`, `bridge-oscillating-input`, `bridge-impedance-mismatch` to `SolverDiagnosticCode` union
+  - Added `setDiagnosticCollector(collector)` to `MixedSignalCoordinator` — called by `MNAEngine.init()` to share the engine's collector
+  - Added per-input `indeterminateCount[]` and `oscillatingCount[]` counters to `BridgeState`
+  - `syncBeforeAnalogStep()` emits `bridge-indeterminate-input` warning after N=10 consecutive indeterminate timesteps per input pin
+  - `syncAfterAnalogStep()` emits `bridge-oscillating-input` warning after M=20 consecutive threshold crossings per input pin
+  - `detectHighSourceImpedance()` helper in `compiler.ts` scans outer circuit elements at bridge input nodes for high resistance values; emits `bridge-impedance-mismatch` info when R_source > 100 × R_in
+  - All counters reset in `reset()`; counters initialized in `init()`
+
+## Task 4c.1.1: Transistor Model Expansion in Analog Compiler
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/analog/transistor-model-registry.ts` — TransistorModelRegistry class storing Circuit objects by name
+  - `src/analog/transistor-expansion.ts` — expandTransistorModel() function + registerAnalogFactory()/getAnalogFactory() infrastructure
+  - `src/analog/__tests__/transistor-expansion.test.ts` — 6 tests for expansion logic
+- **Files modified**:
+  - `src/core/analog-engine-interface.ts` — added `missing-transistor-model` and `invalid-transistor-model` to SolverDiagnosticCode union
+  - `src/analog/compiler.ts` — replaced transistor placeholder stub with real expansion logic: VDD injection, Pass A skip for transistor-mode, Pass B inline expansion, makeVddSource helper, post-loop totalNodeCount recompute
+  - `src/analog/__tests__/analog-compiler.test.ts` — updated `transistor_mode_emits_stub_diagnostic` test to assert new `missing-transistor-model` error behavior
+- **Tests**: 6/6 passing (transistor-expansion.test.ts); 9/9 passing (analog-compiler.test.ts); 15/15 total
+- **Notes**: Other test failures in full suite (sparse-solver, analog-engine, resistor, diode, etc.) are pre-existing — all affected files were already modified before this task started (confirmed via git diff --name-only HEAD)

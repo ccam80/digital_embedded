@@ -5,7 +5,7 @@
 import { Circuit, Wire } from '../core/circuit.js';
 import type { ComponentRegistry, ComponentDefinition, AttributeMapping } from '../core/registry.js';
 import type { PropertyValue } from '../core/properties.js';
-import { PropertyBag } from '../core/properties.js';
+import { PropertyBag, PropertyType } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
 import { pinWorldPosition } from '../core/pin.js';
 import type { CircuitElement } from '../core/element.js';
@@ -144,7 +144,7 @@ export class CircuitBuilder {
     for (const [key, value] of Object.entries(props)) {
       // Already an internal key?
       if (knownKeys.has(key)) {
-        translated[key] = value;
+        translated[key] = this.coercePropertyValue(definition, key, value);
         continue;
       }
 
@@ -349,6 +349,11 @@ export class CircuitBuilder {
     for (const comp of spec.components) {
       const element = this.addComponent(circuit, comp.type, comp.props);
       idMap.set(comp.id, element);
+      // Use spec id as label fallback so netlist shows readable names instead of UUIDs
+      const bag = element.getProperties();
+      if (!bag.has('label') || !bag.get('label')) {
+        bag.set('label', comp.id);
+      }
     }
 
     for (const [fromAddr, toAddr] of spec.connections) {
@@ -790,6 +795,28 @@ export class CircuitBuilder {
       x: element.position.x + pin.position.x,
       y: element.position.y + pin.position.y,
     };
+  }
+
+  /**
+   * Coerce a property value to its canonical type based on the propertyDef.
+   * Handles HEX_DATA strings → number arrays so downstream consumers
+   * (e.g. initializeBackingStores) always see the canonical type.
+   */
+  private coercePropertyValue(
+    definition: ComponentDefinition,
+    key: string,
+    value: PropertyValue,
+  ): PropertyValue {
+    const propDef = definition.propertyDefs.find((pd) => pd.key === key);
+    if (propDef === undefined) return value;
+
+    if (propDef.type === PropertyType.HEX_DATA && typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) return [];
+      return trimmed.split(/[\s,]+/).map((s) => parseInt(s, 16));
+    }
+
+    return value;
   }
 
 }

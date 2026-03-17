@@ -385,19 +385,19 @@ describe("SimulationMode", () => {
     expect(stubDiags[0]!.severity).toBe("info");
   });
 
-  it("transistor_mode_emits_stub_diagnostic", () => {
+  it("transistor_mode_without_registry_emits_diagnostic", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "transistor"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileAnalogCircuit(circuit, registry);
 
-    // Factory should NOT be called (component is skipped)
+    // Factory should NOT be called (component is skipped — no registry supplied)
     expect(factorySpy).not.toHaveBeenCalled();
 
-    // Should emit info diagnostic
-    const stubDiags = compiled.diagnostics.filter(
-      (d) => d.code === "transistor-model-not-yet-implemented",
+    // Should emit missing-transistor-model error when no TransistorModelRegistry is passed
+    const errorDiags = compiled.diagnostics.filter(
+      (d) => d.code === "missing-transistor-model",
     );
-    expect(stubDiags).toHaveLength(1);
-    expect(stubDiags[0]!.severity).toBe("info");
+    expect(errorDiags).toHaveLength(1);
+    expect(errorDiags[0]!.severity).toBe("error");
   });
 });

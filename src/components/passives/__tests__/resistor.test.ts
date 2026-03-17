@@ -40,11 +40,11 @@ describe("Resistor", () => {
     expect(calls).toHaveLength(4);
 
     const G = 1e-3;
-    // Check that all 4 positions are stamped with correct G values
+    // Node IDs are 1-based; factory converts to 0-based solver indices (nodeId - 1)
+    expect(calls).toContainEqual([0, 0, G]);
     expect(calls).toContainEqual([1, 1, G]);
-    expect(calls).toContainEqual([2, 2, G]);
-    expect(calls).toContainEqual([1, 2, -G]);
-    expect(calls).toContainEqual([2, 1, -G]);
+    expect(calls).toContainEqual([0, 1, -G]);
+    expect(calls).toContainEqual([1, 0, -G]);
   });
 
   it("resistance_from_props", () => {
@@ -56,10 +56,10 @@ describe("Resistor", () => {
 
     const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
     const G = 1 / 470;
+    expect(calls).toContainEqual([0, 0, G]);
     expect(calls).toContainEqual([1, 1, G]);
-    expect(calls).toContainEqual([2, 2, G]);
-    expect(calls).toContainEqual([1, 2, -G]);
-    expect(calls).toContainEqual([2, 1, -G]);
+    expect(calls).toContainEqual([0, 1, -G]);
+    expect(calls).toContainEqual([1, 0, -G]);
   });
 
   it("minimum_resistance_clamped", () => {
@@ -71,10 +71,10 @@ describe("Resistor", () => {
 
     const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
     const G = 1 / 1e-9;
+    expect(calls).toContainEqual([0, 0, G]);
     expect(calls).toContainEqual([1, 1, G]);
-    expect(calls).toContainEqual([2, 2, G]);
-    expect(calls).toContainEqual([1, 2, -G]);
-    expect(calls).toContainEqual([2, 1, -G]);
+    expect(calls).toContainEqual([0, 1, -G]);
+    expect(calls).toContainEqual([1, 0, -G]);
   });
 
   it("is_not_nonlinear_and_not_reactive", () => {

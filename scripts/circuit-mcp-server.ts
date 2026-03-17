@@ -64,6 +64,7 @@ function getCircuit(handle: string): Circuit {
 function detectInputCount(circuit: Circuit, headerLine: string): number | undefined {
   // Collect circuit input labels (In, Clock components)
   const inputLabels = new Set<string>();
+  const outputLabels = new Set<string>();
   for (const el of circuit.elements) {
     const def = registry.get(el.typeId);
     if (!def) continue;
@@ -71,8 +72,14 @@ function detectInputCount(circuit: Circuit, headerLine: string): number | undefi
       const label = el.getProperties().get("label") as string | undefined;
       if (label) inputLabels.add(label);
     }
+    if (def.name === "Out") {
+      const label = el.getProperties().get("label") as string | undefined;
+      if (label) outputLabels.add(label);
+    }
   }
-  if (inputLabels.size === 0) return undefined;
+
+  // If we can't identify any labeled components, fall back
+  if (inputLabels.size === 0 && outputLabels.size === 0) return undefined;
 
   // Parse signal names from header (whitespace-separated, skip comments)
   const names = headerLine.trim().split(/\s+/).filter((n) => n.length > 0 && n !== "#");
@@ -86,7 +93,9 @@ function detectInputCount(circuit: Circuit, headerLine: string): number | undefi
       break; // First non-input name marks the boundary
     }
   }
-  return count > 0 ? count : undefined;
+
+  // If no inputs found but we have outputs, all columns are outputs
+  return count > 0 ? count : (outputLabels.size > 0 ? 0 : undefined);
 }
 
 // ---------------------------------------------------------------------------

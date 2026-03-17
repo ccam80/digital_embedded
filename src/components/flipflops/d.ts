@@ -96,7 +96,42 @@ export class DElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(D_FF_PIN_DECLARATIONS, ["C"]);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls: PinDeclaration[] = [
+      {
+        direction: PinDirection.INPUT,
+        label: "D",
+        defaultBitWidth: bitWidth,
+        position: { x: 0, y: 0 },
+        isNegatable: true,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "C",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 1 },
+        isNegatable: true,
+        isClockCapable: true,
+      },
+      {
+        direction: PinDirection.OUTPUT,
+        label: "Q",
+        defaultBitWidth: bitWidth,
+        position: { x: COMP_WIDTH, y: 0 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.OUTPUT,
+        label: "~Q",
+        defaultBitWidth: bitWidth,
+        position: { x: COMP_WIDTH, y: 1 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+    ];
+    return this.derivePins(decls, ["C"]);
   }
 
   getBoundingBox(): Rect {

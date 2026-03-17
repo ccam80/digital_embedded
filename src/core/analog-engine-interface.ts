@@ -93,7 +93,15 @@ export type SolverDiagnosticCode =
   | "model-level-unsupported"
   | "unsupported-component-in-analog"
   | "digital-bridge-not-yet-implemented"
-  | "transistor-model-not-yet-implemented";
+  | "transistor-model-not-yet-implemented"
+  | "bridge-inner-compile-error"
+  | "bridge-unconnected-pin"
+  | "bridge-missing-inner-pin"
+  | "bridge-indeterminate-input"
+  | "bridge-oscillating-input"
+  | "bridge-impedance-mismatch"
+  | "missing-transistor-model"
+  | "invalid-transistor-model";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

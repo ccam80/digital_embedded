@@ -104,6 +104,8 @@ export function createDefaultShortcuts(callbacks: {
   search?: () => void;
   presentation?: () => void;
   panMode?: () => void;
+  placeVDD?: () => void;
+  placeGND?: () => void;
 } = {}): ShortcutManager {
   const mgr = new ShortcutManager();
 
@@ -123,6 +125,8 @@ export function createDefaultShortcuts(callbacks: {
   mgr.register("f", ["ctrl"], callbacks.search ?? noop, "Find / search");
   mgr.register("F4", [], callbacks.presentation ?? noop, "Presentation mode");
   mgr.register(" ", [], callbacks.panMode ?? noop, "Pan mode (hold)");
+  mgr.register("v", [], callbacks.placeVDD ?? noop, "Place VDD");
+  mgr.register("g", [], callbacks.placeGND ?? noop, "Place GND");
 
   return mgr;
 }

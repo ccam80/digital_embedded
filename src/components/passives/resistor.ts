@@ -120,6 +120,13 @@ export class ResistorElement extends AbstractCircuitElement {
 // createResistorElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
+// Stamp helper — node 0 is ground (skipped), 1-based → 0-based solver index
+function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
+  if (row !== 0 && col !== 0) {
+    solver.stamp(row - 1, col - 1, val);
+  }
+}
+
 function createResistorElement(
   nodeIds: number[],
   _branchIdx: number,
@@ -138,10 +145,10 @@ function createResistorElement(
     isReactive: false,
 
     stamp(solver: SparseSolver): void {
-      solver.stamp(n0, n0, G);
-      solver.stamp(n1, n1, G);
-      solver.stamp(n0, n1, -G);
-      solver.stamp(n1, n0, -G);
+      stampG(solver, n0, n0, G);
+      stampG(solver, n0, n1, -G);
+      stampG(solver, n1, n0, -G);
+      stampG(solver, n1, n1, G);
     },
   };
 }

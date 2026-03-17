@@ -338,6 +338,29 @@ export function pasteFromClipboard(
 }
 
 // ---------------------------------------------------------------------------
+// placeComponent
+// ---------------------------------------------------------------------------
+
+/**
+ * Place a new component in the circuit.
+ * Returns a reversible EditCommand.
+ */
+export function placeComponent(
+  circuit: Circuit,
+  element: CircuitElement,
+): EditCommand {
+  return {
+    description: "Place component",
+    execute(): void {
+      circuit.addElement(element);
+    },
+    undo(): void {
+      circuit.removeElement(element);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // duplicate
 // ---------------------------------------------------------------------------
 

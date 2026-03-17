@@ -116,6 +116,19 @@ export class CapacitorElement extends AbstractCircuitElement {
 // AnalogCapacitorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
+// Stamp helpers — node 0 is ground (skipped), 1-based → 0-based solver index
+function capStampG(solver: SparseSolver, row: number, col: number, val: number): void {
+  if (row !== 0 && col !== 0) {
+    solver.stamp(row - 1, col - 1, val);
+  }
+}
+
+function capStampRHS(solver: SparseSolver, row: number, val: number): void {
+  if (row !== 0) {
+    solver.stampRHS(row - 1, val);
+  }
+}
+
 class AnalogCapacitorElement implements AnalogElement {
   readonly nodeIndices: readonly number[];
   readonly branchIndex: number = -1;
@@ -137,18 +150,22 @@ class AnalogCapacitorElement implements AnalogElement {
     const n0 = this.nodeIndices[0];
     const n1 = this.nodeIndices[1];
 
-    solver.stamp(n0, n0, this.geq);
-    solver.stamp(n1, n1, this.geq);
-    solver.stamp(n0, n1, -this.geq);
-    solver.stamp(n1, n0, -this.geq);
+    capStampG(solver, n0, n0, this.geq);
+    capStampG(solver, n0, n1, -this.geq);
+    capStampG(solver, n1, n0, -this.geq);
+    capStampG(solver, n1, n1, this.geq);
 
-    solver.stampRHS(n0, this.ieq);
-    solver.stampRHS(n1, -this.ieq);
+    capStampRHS(solver, n0, this.ieq);
+    capStampRHS(solver, n1, -this.ieq);
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const vNow = voltages[this.nodeIndices[0]] - voltages[this.nodeIndices[1]];
-    const iNow = this.geq > 0 ? (voltages[this.nodeIndices[0]] - voltages[this.nodeIndices[1]]) * this.geq : 0;
+    const n0 = this.nodeIndices[0];
+    const n1 = this.nodeIndices[1];
+    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const vNow = v0 - v1;
+    const iNow = this.geq > 0 ? vNow * this.geq : 0;
 
     this.geq = capacitorConductance(this.C, dt, method);
     this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);

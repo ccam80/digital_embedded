@@ -66,9 +66,11 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.set("inductance", 0.01);
 
+      // Use non-ground nodes [1, 2] with branchIdx=2 (absolute solver row)
+      // Node 1 → solver idx 0, Node 2 → solver idx 1, branch → solver row 2
       const analogElement = InductorDefinition.analogFactory!(
-        [0, 1],
-        0,
+        [1, 2],
+        2,
         props,
         () => 0,
       );
@@ -76,13 +78,13 @@ describe("Inductor", () => {
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      // Should have: 4 conductance stamps + 3 branch incidence stamps
-      // Conductance: (0,0), (1,1), (0,1), (1,0)
-      // Branch: (0, 0), (0, 1), (0, 2)
+      // Should have: 4 conductance stamps + 3 branch incidence stamps = 7
+      // Conductance: (0,0), (1,1), (0,1), (1,0) — geq=0 initially
+      // Branch: (2,0)=+1, (2,1)=-1, (2,2)=-geq
       expect(stamps.length).toBe(7);
 
-      // Check for branch incidence entries
-      const branchEntries = stamps.filter((s) => s.row === 0 && (s.col === 0 || s.col === 1));
+      // Check for branch incidence entries at branch row 2
+      const branchEntries = stamps.filter((s) => s.row === 2);
       expect(branchEntries.some((s) => s.col === 0 && s.value === 1)).toBe(true);
       expect(branchEntries.some((s) => s.col === 1 && s.value === -1)).toBe(true);
     });
@@ -93,21 +95,24 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.set("inductance", 0.01);
 
+      // [1, 2] with branchIdx=2. Solver: node1→idx0, node2→idx1, branch→idx2
       const analogElement = InductorDefinition.analogFactory!(
-        [0, 1],
-        0,
+        [1, 2],
+        2,
         props,
         () => 0,
       );
 
-      const voltages = new Float64Array([5, 0]);
+      // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0A
+      const voltages = new Float64Array([5, 0, 0]);
       analogElement.stampCompanion!(1e-4, "trapezoidal", voltages);
 
       // For trapezoidal: geq = 2L/h = 2 * 0.01 / 1e-4 = 200
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      const geqStamps = stamps.filter((s) => s.value > 0 && s.row !== 0 && s.col !== 0);
+      // Filter for diagonal conductance stamps (positive values, not branch row)
+      const geqStamps = stamps.filter((s) => s.value > 0 && s.row < 2 && s.col < 2);
       expect(geqStamps.length).toBeGreaterThan(0);
       expect(geqStamps[0].value).toBeCloseTo(200, 3);
     });
@@ -119,20 +124,20 @@ describe("Inductor", () => {
       props.set("inductance", 0.01);
 
       const analogElement = InductorDefinition.analogFactory!(
-        [0, 1],
-        0,
+        [1, 2],
+        2,
         props,
         () => 0,
       );
 
-      const voltages = new Float64Array([5, 0]);
+      const voltages = new Float64Array([5, 0, 0]);
       analogElement.stampCompanion!(1e-4, "bdf1", voltages);
 
       // For BDF-1: geq = L/h = 0.01 / 1e-4 = 100
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      const geqStamps = stamps.filter((s) => s.value > 0 && s.row !== 0 && s.col !== 0);
+      const geqStamps = stamps.filter((s) => s.value > 0 && s.row < 2 && s.col < 2);
       expect(geqStamps[0].value).toBeCloseTo(100, 3);
     });
   });
@@ -141,8 +146,8 @@ describe("Inductor", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
       const analogElement = InductorDefinition.analogFactory!(
-        [0, 1],
-        0,
+        [1, 2],
+        2,
         props,
         () => 0,
       );

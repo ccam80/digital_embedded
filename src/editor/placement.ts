@@ -43,6 +43,7 @@ export class PlacementMode {
   private _rotation: Rotation = 0;
   private _mirror: boolean = false;
   private _ghost: CircuitElement | undefined = undefined;
+  private _lastPlaced: CircuitElement | undefined = undefined;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -57,6 +58,7 @@ export class PlacementMode {
     this._position = { x: 0, y: 0 };
     this._rotation = 0;
     this._mirror = false;
+    this._lastPlaced = undefined;
     this._ghost = this._buildGhost();
     this._active = true;
   }
@@ -95,10 +97,12 @@ export class PlacementMode {
   }
 
   /**
-   * Instantiate a real element at the current ghost position, add it to the
-   * circuit, and return it. The mode stays active for placing further copies.
+   * Instantiate a real element at the current ghost position and return it.
+   * The element is NOT added to the circuit — the caller is responsible for
+   * pushing a `placeComponent` EditCommand so placement is undoable.
+   * The mode stays active for placing further copies.
    */
-  place(circuit: Circuit): CircuitElement {
+  place(_circuit?: Circuit): CircuitElement {
     if (!this._active || this._definition === undefined) {
       throw new Error("PlacementMode: cannot place when not active");
     }
@@ -109,12 +113,23 @@ export class PlacementMode {
     element.rotation = this._rotation;
     element.mirror = this._mirror;
 
-    circuit.addElement(element);
+    this._lastPlaced = element;
 
     // Rebuild ghost so the overlay remains ready for the next placement
     this._ghost = this._buildGhost();
 
     return element;
+  }
+
+  /**
+   * Returns the most recently placed element, or undefined if nothing has
+   * been placed yet in this placement session.
+   *
+   * Used by the editor to detect clicks on the just-placed component
+   * (which should exit placement mode and select/connect instead).
+   */
+  getLastPlaced(): CircuitElement | undefined {
+    return this._lastPlaced;
   }
 
   /**
@@ -124,6 +139,7 @@ export class PlacementMode {
     this._active = false;
     this._definition = undefined;
     this._ghost = undefined;
+    this._lastPlaced = undefined;
   }
 
   /**

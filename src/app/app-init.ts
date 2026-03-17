@@ -38,7 +38,7 @@ import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.j
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
 import { TouchGestureTracker } from '../editor/touch-gestures.js';
 import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
-import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard, pasteFromClipboard } from '../editor/edit-operations.js';
+import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard, pasteFromClipboard, placeComponent } from '../editor/edit-operations.js';
 import type { ClipboardData } from '../editor/edit-operations.js';
 import { loadDig } from '../io/dig-loader.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
@@ -679,8 +679,29 @@ export function initApp(search?: string): void {
     }
 
     if (placement.isActive()) {
+      // If the click lands on the just-placed component (its body or a pin),
+      // exit placement mode and select/start-wire instead of placing another copy.
+      const lastPlaced = placement.getLastPlaced();
+      if (lastPlaced) {
+        const pinHit = hitTestPins(worldPt, [lastPlaced], hitThreshold);
+        const elemHit = !pinHit && hitTestElements(worldPt, [lastPlaced]);
+        if (pinHit || elemHit) {
+          placement.cancel();
+          scheduleRender();
+          // Re-dispatch as a normal click: select element or start wire from pin
+          if (pinHit) {
+            wireDrawing.startFromPin(pinHit.element, pinHit.pin);
+          } else {
+            selection.clear();
+            selection.select(lastPlaced);
+          }
+          scheduleRender();
+          return;
+        }
+      }
       placement.updateCursor(worldPt);
-      placement.place(circuit);
+      const placed = placement.place(circuit);
+      undoStack.push(placeComponent(circuit, placed));
       invalidateCompiled();
       return;
     }
@@ -1196,6 +1217,18 @@ export function initApp(search?: string): void {
 
       if (e.key === 'c' || e.key === 'C') {
         const def = registry.get('Const');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === 'v' || e.key === 'V') {
+        const def = registry.get('VDD');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === 'g' || e.key === 'G') {
+        const def = registry.get('Ground');
         if (def) { placement.start(def); scheduleRender(); }
         return;
       }

@@ -144,15 +144,15 @@ class AnalogInductorElement implements AnalogElement {
     const n1 = this.nodeIndices[1];
     const b = this.branchIndex;
 
-    // Conductance stamps (companion model)
-    solver.stamp(n0, n0, this.geq);
-    solver.stamp(n1, n1, this.geq);
-    solver.stamp(n0, n1, -this.geq);
-    solver.stamp(n1, n0, -this.geq);
+    // Conductance stamps (companion model) — 1-based node IDs, skip ground
+    if (n0 !== 0 && n0 !== 0) solver.stamp(n0 - 1, n0 - 1, this.geq);
+    if (n1 !== 0 && n1 !== 0) solver.stamp(n1 - 1, n1 - 1, this.geq);
+    if (n0 !== 0 && n1 !== 0) solver.stamp(n0 - 1, n1 - 1, -this.geq);
+    if (n1 !== 0 && n0 !== 0) solver.stamp(n1 - 1, n0 - 1, -this.geq);
 
     // Branch incidence row entries: V_branch = V_n0 - V_n1 - (geq * I_branch + ieq)
-    solver.stamp(b, n0, 1);
-    solver.stamp(b, n1, -1);
+    if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
+    if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
     solver.stamp(b, b, -this.geq);
 
     // RHS: branch equation source
@@ -160,8 +160,10 @@ class AnalogInductorElement implements AnalogElement {
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const iNow = voltages[this.branchIndex + voltages.length - this.nodeIndices.length];
-    const vNow = voltages[this.nodeIndices[0]] - voltages[this.nodeIndices[1]];
+    const iNow = voltages[this.branchIndex];
+    const v0 = this.nodeIndices[0] > 0 ? voltages[this.nodeIndices[0] - 1] : 0;
+    const v1 = this.nodeIndices[1] > 0 ? voltages[this.nodeIndices[1] - 1] : 0;
+    const vNow = v0 - v1;
 
     this.geq = inductorConductance(this.L, dt, method);
     this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);

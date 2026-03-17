@@ -163,17 +163,22 @@ class AnalogPotentiometerElement implements AnalogElement {
     const n_W = this.nodeIndices[1]; // wiper
     const n_B = this.nodeIndices[2]; // bottom
 
+    // Stamp helper: 1-based node IDs, skip ground (node 0), -1 for solver index
+    const s = (r: number, c: number, v: number): void => {
+      if (r !== 0 && c !== 0) solver.stamp(r - 1, c - 1, v);
+    };
+
     // Top resistor (R_top) stamps: G_top at (A,A), (W,W), (A,W), (W,A)
-    solver.stamp(n_A, n_A, this.G_top);
-    solver.stamp(n_W, n_W, this.G_top);
-    solver.stamp(n_A, n_W, -this.G_top);
-    solver.stamp(n_W, n_A, -this.G_top);
+    s(n_A, n_A, this.G_top);
+    s(n_W, n_W, this.G_top);
+    s(n_A, n_W, -this.G_top);
+    s(n_W, n_A, -this.G_top);
 
     // Bottom resistor (R_bottom) stamps: G_bottom at (W,W), (B,B), (W,B), (B,W)
-    solver.stamp(n_W, n_W, this.G_bottom);
-    solver.stamp(n_B, n_B, this.G_bottom);
-    solver.stamp(n_W, n_B, -this.G_bottom);
-    solver.stamp(n_B, n_W, -this.G_bottom);
+    s(n_W, n_W, this.G_bottom);
+    s(n_B, n_B, this.G_bottom);
+    s(n_W, n_B, -this.G_bottom);
+    s(n_B, n_W, -this.G_bottom);
   }
 }
 

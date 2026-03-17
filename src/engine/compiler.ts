@@ -882,6 +882,7 @@ export function compileCircuit(
     multiDriverNets,
     switchComponentIndices,
     switchClassification,
+    shadowNetCount,
     typeNames,
   });
 }

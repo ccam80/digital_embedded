@@ -28,8 +28,19 @@ export type HitResult =
 // ---------------------------------------------------------------------------
 
 /**
+ * Minimum bounding-box dimension (in grid units) for hit-testing.
+ * Small components like VDD (1×0.65) and GND (1×0.5) are hard to click;
+ * this ensures every component has at least a 1.5×1.5 click target.
+ */
+const MIN_HIT_SIZE = 1.5;
+
+/**
  * Returns the topmost element whose bounding box contains the point.
  * Front-to-back order: last element in the array is considered on top.
+ *
+ * Small components are inflated to a minimum hit-test size so they remain
+ * easy to click. The margin parameter provides additional inflation on top
+ * of the minimum-size guarantee.
  *
  * @param margin  Optional bounding-box inflation in grid units (for touch targets).
  */
@@ -41,11 +52,14 @@ export function hitTestElements(
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     const bb = worldBoundingBox(el);
+    // Ensure minimum hit-test size for small components, then add margin
+    const padW = Math.max(margin, (MIN_HIT_SIZE - bb.width) / 2, 0);
+    const padH = Math.max(margin, (MIN_HIT_SIZE - bb.height) / 2, 0);
     const inflated: Rect = {
-      x: bb.x - margin,
-      y: bb.y - margin,
-      width: bb.width + margin * 2,
-      height: bb.height + margin * 2,
+      x: bb.x - padW,
+      y: bb.y - padH,
+      width: bb.width + padW * 2,
+      height: bb.height + padH * 2,
     };
     if (pointInRect(point, inflated)) {
       return el;

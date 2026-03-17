@@ -770,8 +770,10 @@ describe("GroundComponent", () => {
   });
 
   describe("attributeMapping", () => {
-    it("Ground has no attribute mappings", () => {
-      expect(GROUND_ATTRIBUTE_MAPPINGS).toHaveLength(0);
+    it("Ground maps Bits to bitWidth", () => {
+      expect(GROUND_ATTRIBUTE_MAPPINGS).toHaveLength(1);
+      expect(GROUND_ATTRIBUTE_MAPPINGS[0]!.xmlName).toBe("Bits");
+      expect(GROUND_ATTRIBUTE_MAPPINGS[0]!.propertyKey).toBe("bitWidth");
     });
   });
 

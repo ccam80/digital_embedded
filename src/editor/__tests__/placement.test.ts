@@ -107,7 +107,7 @@ describe("PlacementMode", () => {
     expect(mode.getGhost()!.mirror).toBe(false);
   });
 
-  it("placeAddsToCircuit", () => {
+  it("placeReturnsElement", () => {
     const mode = new PlacementMode();
     const def = makeMockDefinition();
     const circuit = new Circuit();
@@ -117,11 +117,13 @@ describe("PlacementMode", () => {
 
     const placed = mode.place(circuit);
 
-    expect(circuit.elements).toHaveLength(1);
-    expect(circuit.elements[0]).toBe(placed);
+    // place() no longer adds to circuit directly — caller uses placeComponent EditCommand
+    expect(circuit.elements).toHaveLength(0);
     // Element position should match the ghost position (snapped cursor)
     expect(placed.position.x).toBe(5);
     expect(placed.position.y).toBe(3);
+    // Last placed element is tracked
+    expect(mode.getLastPlaced()).toBe(placed);
   });
 
   it("staysActiveAfterPlace", () => {

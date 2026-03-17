@@ -21,6 +21,8 @@ import type { ComponentRegistry } from "../core/registry.js";
 import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
 import { buildNodeMap } from "./node-map.js";
 import { makeDiagnostic } from "./diagnostics.js";
+import { TransistorModelRegistry } from "./transistor-model-registry.js";
+import { expandTransistorModel } from "./transistor-expansion.js";
 import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
@@ -36,6 +38,39 @@ import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, B
 import { compileCircuit } from "../engine/compiler.js";
 import type { CompiledCircuitImpl } from "../engine/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../core/logic-family.js";
+
+// ---------------------------------------------------------------------------
+// VDD voltage source factory for transistor expansion
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a minimal ideal DC voltage source AnalogElement for the shared VDD
+ * rail injected when transistor-level components are present in the circuit.
+ *
+ * Uses the same MNA stamp convention as makeVoltageSource in test-elements.ts:
+ * the branch row `branchIdx` is an absolute 0-based solver row index.
+ */
+function makeVddSource(
+  nodePos: number,
+  nodeNeg: number,
+  branchIdx: number,
+  voltage: number,
+): import("./element.js").AnalogElement {
+  return {
+    nodeIndices: [nodePos, nodeNeg],
+    branchIndex: branchIdx,
+    isNonlinear: false,
+    isReactive: false,
+    stamp(solver: import("./sparse-solver.js").SparseSolver): void {
+      const k = branchIdx;
+      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
+      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
+      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
+      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      solver.stampRHS(k, voltage);
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Pin-to-node resolution helpers
@@ -225,6 +260,7 @@ function detectInductorLoops(
 export function compileAnalogCircuit(
   circuitOrResult: Circuit | FlattenResult,
   registry: ComponentRegistry,
+  transistorModels?: TransistorModelRegistry,
 ): ConcreteCompiledAnalogCircuit {
   // Unwrap: accept either a raw Circuit or a FlattenResult
   let circuit: Circuit;
@@ -298,6 +334,12 @@ export function compileAnalogCircuit(
   let nextInternalNode = nodeMap.nodeCount + 1; // 1-based, after external nodes
   let branchCount = 0;
 
+  // VDD node and branch tracking for transistor expansion (Phase 4c).
+  // vddNodeId is -1 until the first transistor-mode component is encountered;
+  // the compiler allocates a single shared VDD node and voltage source for the circuit.
+  let vddNodeId = -1;
+  let vddBranchIdx = -1;
+
   // Per-element metadata collected in Pass A, consumed in Pass B
   const elementMeta: Array<{
     el: CircuitElement;
@@ -362,6 +404,23 @@ export function compileAnalogCircuit(
       continue;
     }
 
+    // Transistor-mode components are expanded in Pass B — skip branch/node allocation here.
+    if (et === "both") {
+      const passAProps = el.getProperties();
+      const passAMode = passAProps.has("simulationMode")
+        ? (passAProps.get("simulationMode") as string)
+        : "behavioral";
+      if (passAMode === "transistor") {
+        elementMeta.push({
+          el,
+          branchIdx: -1,
+          internalNodeOffset: -1,
+          internalNodeCount: 0,
+        });
+        continue;
+      }
+    }
+
     // Assign branch index
     let branchIdx = -1;
     if (def.requiresBranchRow) {
@@ -385,8 +444,9 @@ export function compileAnalogCircuit(
     });
   }
 
-  // Total node count including internal nodes
-  const totalNodeCount = nextInternalNode - 1;
+  // Total node count including internal nodes from Pass A.
+  // Updated again after Pass B completes (transistor expansion allocates more nodes).
+  let totalNodeCount = nextInternalNode - 1;
 
   // The MNA matrix dimension: totalNodeCount + branchCount
   // Branch rows are indexed as: nodeCount + branchIdx (0-based)
@@ -408,8 +468,8 @@ export function compileAnalogCircuit(
   };
   const topologyInfo: ElementTopologyInfo[] = [];
 
-  // getTime placeholder — replaced by MNAEngine at runtime
-  const getTime = (): number => 0;
+  const timeRef = { value: 0 };
+  const getTime = (): number => timeRef.value;
 
   for (const meta of elementMeta) {
     const { el } = meta;
@@ -452,19 +512,56 @@ export function compileAnalogCircuit(
       }
 
       if (simulationMode === "transistor") {
-        diagnostics.push(
-          makeDiagnostic(
-            "transistor-model-not-yet-implemented",
-            "info",
-            `Component "${el.typeId}" is set to simulationMode 'transistor' — transistor expansion not yet available`,
-            {
-              explanation:
-                `Transistor-level expansion (Phase 4c) is not yet implemented. ` +
-                `Component "${el.typeId}" will be skipped in analog compilation. ` +
-                `Set simulationMode to 'behavioral' to simulate this component.`,
-            },
-          ),
+        if (!transistorModels) {
+          diagnostics.push(
+            makeDiagnostic(
+              "missing-transistor-model",
+              "error",
+              `Component "${el.typeId}" is set to simulationMode 'transistor' but no TransistorModelRegistry was provided`,
+              {
+                explanation:
+                  `Pass a TransistorModelRegistry as the third argument to compileAnalogCircuit() ` +
+                  `when compiling circuits with transistor-level components.`,
+              },
+            ),
+          );
+          continue;
+        }
+
+        // Resolve outer pin node IDs for this component
+        const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit);
+
+        // Ensure the shared VDD node and VDD voltage source are created once
+        if (vddNodeId < 0) {
+          vddNodeId = nextInternalNode++;
+          // Allocate a branch row for the VDD voltage source
+          vddBranchIdx = branchCount++;
+        }
+
+        // Expand the transistor model
+        const expResult = expandTransistorModel(
+          def,
+          outerPinNodeIds,
+          transistorModels,
+          vddNodeId,
+          0, // gndNodeId is always 0
+          () => nextInternalNode++,
         );
+
+        diagnostics.push(...expResult.diagnostics);
+
+        for (const expEl of expResult.elements) {
+          const expElIdx = analogElements.length;
+          analogElements.push(expEl);
+          elementToCircuitElement.set(expElIdx, el);
+          topologyInfo.push({
+            nodeIds: Array.from(expEl.nodeIndices),
+            isBranch: expEl.branchIndex >= 0,
+            typeHint: expEl.branchIndex >= 0
+              ? expEl.isReactive ? "inductor" : "voltage"
+              : "other",
+          });
+        }
         continue;
       }
     }
@@ -546,6 +643,23 @@ export function compileAnalogCircuit(
           ? "inductor"
           : "voltage"
         : "other",
+    });
+  }
+
+  // After Pass B: recompute totalNodeCount to include all transistor-expansion nodes.
+  totalNodeCount = nextInternalNode - 1;
+
+  // If any transistor-mode component was expanded, inject the shared VDD voltage source.
+  // This single DC source supplies all expanded transistor models in the circuit.
+  if (vddNodeId >= 0 && vddBranchIdx >= 0) {
+    const vdd = circuitFamily.vdd;
+    const absoluteVddBranch = totalNodeCount + vddBranchIdx;
+    const vddSource = makeVddSource(vddNodeId, 0, absoluteVddBranch, vdd);
+    analogElements.push(vddSource);
+    topologyInfo.push({
+      nodeIds: [vddNodeId, 0],
+      isBranch: true,
+      typeHint: "voltage",
     });
   }
 
@@ -694,7 +808,61 @@ export function compileAnalogCircuit(
     elementToCircuitElement,
     diagnostics,
     bridges,
+    timeRef,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Bridge instance compilation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan the outer circuit for elements connected to `targetNodeId` and return
+ * the highest resistance property found among driving elements.
+ *
+ * Checks each CircuitElement in the outer circuit: if any of its pins are
+ * wired to `targetNodeId`, the element's "resistance" property (or "R") is
+ * read. Returns the maximum resistance found, or null if no resistive element
+ * is found on the node.
+ *
+ * This is a heuristic check — it only detects simple resistor elements with
+ * a "resistance" or "R" property. More complex impedances (e.g., op-amps,
+ * current sources) are not detected.
+ */
+function detectHighSourceImpedance(
+  targetNodeId: number,
+  outerCircuit: Circuit,
+  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  registry: ComponentRegistry,
+): number | null {
+  let maxResistance: number | null = null;
+
+  for (const el of outerCircuit.elements) {
+    const def = registry.get(el.typeId);
+    if (!def) continue;
+
+    // Only inspect analog or both elements
+    const et = def.engineType ?? "digital";
+    if (et !== "analog" && et !== "both") continue;
+
+    // Check if any pin of this element is connected to targetNodeId
+    const nodeIds = resolveElementNodes(el, wireToNodeId, outerCircuit);
+    if (!nodeIds.includes(targetNodeId)) continue;
+
+    // Try to read a resistance property from the element using safe access
+    const props = el.getProperties();
+    let rRaw = 0;
+    if (props.has("resistance")) rRaw = props.getOrDefault<number>("resistance", 0);
+    else if (props.has("R")) rRaw = props.getOrDefault<number>("R", 0);
+    else if (props.has("Resistance")) rRaw = props.getOrDefault<number>("Resistance", 0);
+    if (typeof rRaw === "number" && rRaw > 0) {
+      if (maxResistance === null || rRaw > maxResistance) {
+        maxResistance = rRaw;
+      }
+    }
+  }
+
+  return maxResistance;
 }
 
 // ---------------------------------------------------------------------------
@@ -798,6 +966,41 @@ function compileBridgeInstance(
       adapter.label = `${boundary.instanceName}:${mapping.pinLabel}`;
       inputAdapters.push(adapter);
       inputPinNetIds.push(innerNetId);
+
+      // Check for impedance mismatch: if any element driving this node has a
+      // source resistance much greater than rIn (threshold: R_source > 100 × rIn),
+      // emit an info diagnostic.
+      const rIn = spec.rIn;
+      const rSourceMismatch = detectHighSourceImpedance(
+        outerNodeId,
+        outerCircuit,
+        wireToNodeId,
+        registry,
+      );
+      if (rSourceMismatch !== null && rSourceMismatch > 100 * rIn) {
+        diagnostics.push(
+          makeDiagnostic(
+            "bridge-impedance-mismatch",
+            "info",
+            `Bridge input pin "${adapter.label}" source impedance ${rSourceMismatch.toExponential(2)}Ω >> R_in ${rIn.toExponential(2)}Ω — may not reliably drive the digital input`,
+            {
+              explanation:
+                `The analog source driving bridge input "${adapter.label}" has an estimated ` +
+                `source resistance of ${rSourceMismatch.toExponential(2)}Ω, which is more than ` +
+                `100× the bridge input resistance R_in = ${rIn.toExponential(2)}Ω. ` +
+                `The voltage at the bridge pin will be attenuated by the resistor divider ` +
+                `formed by R_source and R_in, potentially preventing the signal from ` +
+                `reaching valid logic levels. Add a buffer or lower the source impedance.`,
+              suggestions: [
+                {
+                  text: "Add a unity-gain buffer (voltage follower) between the high-impedance source and the bridge input.",
+                  automatable: false,
+                },
+              ],
+            },
+          ),
+        );
+      }
     }
   }
 

@@ -173,6 +173,12 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Per-component switch classification: 0=not a switch, 1=unidirectional, 2=bidirectional. */
   readonly switchClassification: Uint8Array;
 
+  /** Number of shadow driver nets allocated for multi-driver bus resolution.
+   *  Shadow nets occupy signal array slots [netCount, netCount + shadowNetCount).
+   *  Must be initialized to high-Z so the bus resolver ignores them until
+   *  their owning component's executeFn writes a real value. */
+  readonly shadowNetCount: number;
+
   /** Type name per type ID slot, for serialization to the Web Worker. */
   readonly typeNames: string[];
 
@@ -199,6 +205,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     multiDriverNets?: Set<number>;
     switchComponentIndices?: Uint32Array;
     switchClassification?: Uint8Array;
+    shadowNetCount?: number;
     typeNames?: string[];
   }) {
     this.netCount = fields.netCount;
@@ -224,6 +231,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.multiDriverNets = fields.multiDriverNets ?? new Set();
     this.switchComponentIndices = fields.switchComponentIndices ?? new Uint32Array(0);
     this.switchClassification = fields.switchClassification ?? new Uint8Array(fields.componentCount);
+    this.shadowNetCount = fields.shadowNetCount ?? 0;
     this.typeNames = fields.typeNames ?? [];
     if (this.switchClassification.length > 0) {
       this.layout.setSwitchClassification(this.switchClassification);

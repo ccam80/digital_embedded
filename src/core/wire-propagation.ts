@@ -69,12 +69,15 @@ export function propagateWireBitWidths(circuit: Circuit): void {
 
   // Flood-fill from each seed through connected wires
   const visited = new Set<Wire>();
+  // Track the resolved bit width for each net endpoint position
+  const resolvedWidths = new Map<string, number>();
 
   for (const [seedKey, bw] of seeds) {
     const startWires = pointToWires.get(seedKey);
     if (!startWires) continue;
 
     const queue: Wire[] = [];
+    const netKeys: string[] = [seedKey];
     for (const w of startWires) {
       if (!visited.has(w)) {
         visited.add(w);
@@ -88,6 +91,7 @@ export function propagateWireBitWidths(circuit: Circuit): void {
 
       const [sk, ek] = wireKeys.get(wire)!;
       for (const neighborKey of [sk, ek]) {
+        netKeys.push(neighborKey);
         const neighbors = pointToWires.get(neighborKey);
         if (!neighbors) continue;
         for (const nw of neighbors) {
@@ -96,6 +100,32 @@ export function propagateWireBitWidths(circuit: Circuit): void {
             queue.push(nw);
           }
         }
+      }
+    }
+
+    // Record resolved width for all positions in this net
+    for (const key of netKeys) {
+      const existing = resolvedWidths.get(key) ?? 1;
+      if (bw > existing) resolvedWidths.set(key, bw);
+    }
+  }
+
+  // Auto-match: update VDD and Ground components to match their net's bit width.
+  // These are constant-value sources that should transparently adopt the width
+  // of the net they're connected to, avoiding manual width configuration.
+  const AUTO_WIDTH_TYPES = new Set(["VDD", "Ground"]);
+  for (const element of circuit.elements) {
+    if (!AUTO_WIDTH_TYPES.has(element.typeId)) continue;
+    const pins = element.getPins();
+    if (pins.length === 0) continue;
+    const wp = pinWorldPosition(element, pins[0]!);
+    const key = ptKey(wp.x, wp.y);
+    const netWidth = resolvedWidths.get(key);
+    if (netWidth !== undefined && netWidth > 1) {
+      const props = element.getProperties();
+      const current = props.getOrDefault<number>("bitWidth", 1);
+      if (current !== netWidth) {
+        props.set("bitWidth", netWidth);
       }
     }
   }

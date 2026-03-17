@@ -345,21 +345,35 @@ export function executeSplitter(
 ): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
+  const inCount = layout.inputCount(index);
   const outBase = layout.outputOffset(index);
   const outCount = layout.outputCount(index);
 
-  const wideValue = state[wt[inBase]];
-
-  // Read output splitting pattern from component properties for correct port widths
-  const outputProp = layout.getProperty(index, "output");
-  const outputStr = typeof outputProp === "string" ? outputProp : undefined;
-  const ports = outputStr ? parsePorts(outputStr) : undefined;
-
-  let startBit = 0;
-  for (let i = 0; i < outCount; i++) {
-    const width = ports && i < ports.length ? ports[i].bits : 1;
-    state[wt[outBase + i]] = extractBits(wideValue, startBit, width);
-    startBit += width;
+  if (inCount === 1 && outCount >= 1) {
+    // SPLIT mode: 1 wide input → N narrow outputs
+    const outputProp = layout.getProperty(index, "output splitting");
+    const outputStr = typeof outputProp === "string" ? outputProp : undefined;
+    const ports = outputStr ? parsePorts(outputStr) : undefined;
+    const wideValue = state[wt[inBase]];
+    let startBit = 0;
+    for (let i = 0; i < outCount; i++) {
+      const width = ports && i < ports.length ? ports[i].bits : 1;
+      state[wt[outBase + i]] = extractBits(wideValue, startBit, width);
+      startBit += width;
+    }
+  } else if (outCount === 1 && inCount >= 1) {
+    // MERGE mode: N narrow inputs → 1 wide output
+    const inputProp = layout.getProperty(index, "input splitting");
+    const inputStr = typeof inputProp === "string" ? inputProp : undefined;
+    const ports = inputStr ? parsePorts(inputStr) : undefined;
+    let wideValue = 0;
+    let startBit = 0;
+    for (let i = 0; i < inCount; i++) {
+      const width = ports && i < ports.length ? ports[i].bits : 1;
+      wideValue = insertBits(wideValue, state[wt[inBase + i]], startBit, width);
+      startBit += width;
+    }
+    state[wt[outBase]] = wideValue;
   }
 }
 
