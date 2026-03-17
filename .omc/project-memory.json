@@ -217,6 +217,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\phase-1-mna-engine-core.md",
+      "accessCount": 35,
+      "lastAccessed": 1773747733275,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-6-tier-3-and-polish.md",
       "accessCount": 32,
       "lastAccessed": 1773745006883,
@@ -226,12 +232,6 @@
       "path": "spec\\phase-3-analog-ui-features.md",
       "accessCount": 30,
       "lastAccessed": 1773744669502,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-1-mna-engine-core.md",
-      "accessCount": 29,
-      "lastAccessed": 1773744542467,
       "type": "file"
     },
     {
@@ -247,6 +247,12 @@
       "type": "file"
     },
     {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 23,
+      "lastAccessed": 1773747697669,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-4c-transistor-level-models.md",
       "accessCount": 17,
       "lastAccessed": 1773744752384,
@@ -259,15 +265,21 @@
       "type": "file"
     },
     {
-      "path": "src\\app\\app-init.ts",
+      "path": "spec\\.context\\rules.md",
       "accessCount": 16,
-      "lastAccessed": 1773747465626,
+      "lastAccessed": 1773747708867,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 14,
-      "lastAccessed": 1773747290590,
+      "path": "src\\headless\\runner.ts",
+      "accessCount": 16,
+      "lastAccessed": 1773747864074,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-0-interface-abstraction.md",
+      "accessCount": 13,
+      "lastAccessed": 1773747627915,
       "type": "file"
     },
     {
@@ -277,21 +289,15 @@
       "type": "directory"
     },
     {
-      "path": "spec\\phase-0-interface-abstraction.md",
+      "path": "CLAUDE.md",
       "accessCount": 12,
-      "lastAccessed": 1773747295456,
+      "lastAccessed": 1773747716814,
       "type": "file"
     },
     {
       "path": "spec\\author_instructions.md",
       "accessCount": 11,
       "lastAccessed": 1773746718732,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 10,
-      "lastAccessed": 1773746866721,
       "type": "file"
     },
     {
@@ -319,12 +325,6 @@
       "type": "directory"
     },
     {
-      "path": "src\\headless\\runner.ts",
-      "accessCount": 9,
-      "lastAccessed": 1773747430994,
-      "type": "file"
-    },
-    {
       "path": "spec\\phase-4b-two-engine-bridge.md",
       "accessCount": 7,
       "lastAccessed": 1773744578767,
@@ -337,15 +337,15 @@
       "type": "file"
     },
     {
-      "path": "spec",
-      "accessCount": 4,
-      "lastAccessed": 1773744551246,
+      "path": "simulator.html",
+      "accessCount": 5,
+      "lastAccessed": 1773747694103,
       "type": "directory"
     },
     {
-      "path": "simulator.html",
+      "path": "spec",
       "accessCount": 4,
-      "lastAccessed": 1773747422545,
+      "lastAccessed": 1773744551246,
       "type": "directory"
     },
     {

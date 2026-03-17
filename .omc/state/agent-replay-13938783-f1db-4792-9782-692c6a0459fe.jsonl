@@ -10,3 +10,7 @@
 {"t":0,"agent":"a9bded4","agent_type":"claude-orchestrator:reviewer","event":"agent_stop","success":true,"duration_ms":218644}
 {"t":0,"agent":"aeb433c","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":285283}
 {"t":0,"agent":"a2e7591","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":298654}
+{"t":0,"agent":"a940f31","agent_type":"claude-orchestrator:reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a714d31","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a940f31","agent_type":"claude-orchestrator:reviewer","event":"agent_stop","success":true,"duration_ms":187161}
+{"t":0,"agent":"a714d31","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":891352}

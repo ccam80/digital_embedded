@@ -293,3 +293,22 @@
 - **Files created**: src/app/__tests__/mode-toggle.test.ts
 - **Files modified**: src/app/app-init.ts, simulator.html
 - **Tests**: 4/4 passing
+
+---
+## Wave 0.1 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+---
+## Wave 0.2 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+## Task 1.1.1: Sparse Linear Solver
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/sparse-solver.ts, src/analog/__tests__/sparse-solver.test.ts
+- **Files modified**: (none)
+- **Tests**: 9/9 passing
