@@ -834,3 +834,17 @@ The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` 
   - `src/analog/analog-engine.ts` (added coordinator import, field, and lifecycle calls in init/step/reset/dispose)
 - **Tests**: 8/8 passing
 - **Notes**: Full test suite shows 14 failures (vs 6 in baseline). The 8 extra failures are pre-existing from parallel wave work modifying `src/components/io/const.ts`, `ground.ts`, `src/components/passives/*.ts`, and `src/components/passives/__tests__/*.ts` — confirmed by `git diff` showing those files changed by other agents. My changes are limited to analog engine integration files.
+
+## Task 4b.4.1: Bridge Diagnostics
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/bridge-diagnostics.test.ts
+- **Files modified**: src/analog/mixed-signal-coordinator.ts (indeterminate + oscillation diagnostics)
+- **Tests**: 3/3 passing
+
+## Task 4b.4.2: End-to-End Bridge Integration Tests
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/bridge-integration.test.ts
+- **Tests**: 6/6 passing
+- **Notes**: Full pipeline integration tests covering NOT gate inversion, low input, load voltage, transient edge propagation, counter threshold crossings, and bidirectional nesting

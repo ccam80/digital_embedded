@@ -20,6 +20,8 @@ import { DigitalEngine } from "../engine/digital-engine.js";
 import { BitVector } from "../core/signal.js";
 import type { MNAEngine } from "./analog-engine.js";
 import type { BridgeInstance } from "./bridge-instance.js";
+import type { DiagnosticCollector } from "./diagnostics.js";
+import { makeDiagnostic } from "./diagnostics.js";
 
 // ---------------------------------------------------------------------------
 // Per-bridge internal state
@@ -30,6 +32,9 @@ interface BridgeState {
   prevInputBits: boolean[];
   prevOutputBits: boolean[];
   prevInputVoltages: number[];
+  // Per-input-adapter counters for diagnostic detection
+  indeterminateCount: number[];   // consecutive timesteps each input has been indeterminate
+  oscillatingCount: number[];     // consecutive timesteps each input has crossed a threshold
 }
 
 // ---------------------------------------------------------------------------
@@ -43,6 +48,7 @@ interface BridgeState {
 export class MixedSignalCoordinator {
   private readonly _analogEngine: MNAEngine;
   private readonly _bridgeStates: BridgeState[];
+  private _diagnostics: DiagnosticCollector | null = null;
 
   readonly bridges: BridgeInstance[];
 
@@ -54,7 +60,19 @@ export class MixedSignalCoordinator {
       prevInputBits: [],
       prevOutputBits: [],
       prevInputVoltages: [],
+      indeterminateCount: [],
+      oscillatingCount: [],
     }));
+  }
+
+  /**
+   * Attach a DiagnosticCollector so the coordinator can emit runtime
+   * diagnostics (indeterminate input, oscillating input, etc.).
+   *
+   * Called by MNAEngine after init() so the engine's collector is shared.
+   */
+  setDiagnosticCollector(collector: DiagnosticCollector): void {
+    this._diagnostics = collector;
   }
 
   /**
@@ -72,6 +90,8 @@ export class MixedSignalCoordinator {
       state.prevInputBits = bridge.inputAdapters.map(() => false);
       state.prevOutputBits = bridge.outputAdapters.map(() => false);
       state.prevInputVoltages = bridge.inputAdapters.map(() => 0);
+      state.indeterminateCount = bridge.inputAdapters.map(() => 0);
+      state.oscillatingCount = bridge.inputAdapters.map(() => 0);
     }
   }
 
@@ -94,6 +114,29 @@ export class MixedSignalCoordinator {
         const nodeId = adapter.inputNodeId;
         const voltage = nodeId < voltages.length ? voltages[nodeId] : 0;
         const level = adapter.readLogicLevel(voltage);
+
+        // Track consecutive indeterminate timesteps and emit diagnostic after N=10
+        if (level === undefined) {
+          state.indeterminateCount[i] = (state.indeterminateCount[i] ?? 0) + 1;
+          if (state.indeterminateCount[i] === 10) {
+            this._diagnostics?.emit(
+              makeDiagnostic(
+                "bridge-indeterminate-input",
+                "warning",
+                `Bridge input pin "${adapter.label ?? String(i)}" voltage ${voltage.toFixed(3)}V is in the indeterminate band for 10+ consecutive timesteps`,
+                {
+                  explanation:
+                    `The analog voltage at bridge input "${adapter.label ?? String(i)}" ` +
+                    `(${voltage.toFixed(3)}V) has been between V_IL and V_IH for more than ` +
+                    `10 consecutive timesteps. The digital interpretation is ambiguous. ` +
+                    `Ensure the analog driver can fully swing to a valid logic level.`,
+                },
+              ),
+            );
+          }
+        } else {
+          state.indeterminateCount[i] = 0;
+        }
 
         // Treat indeterminate as previous value (hold last known state)
         const bit = level !== undefined ? level : state.prevInputBits[i] ?? false;
@@ -166,6 +209,25 @@ export class MixedSignalCoordinator {
         // direct low→high or high→low transitions.
         if (prevLevel !== currLevel) {
           crossingDetected = true;
+          state.oscillatingCount[i] = (state.oscillatingCount[i] ?? 0) + 1;
+          if (state.oscillatingCount[i] === 20) {
+            this._diagnostics?.emit(
+              makeDiagnostic(
+                "bridge-oscillating-input",
+                "warning",
+                `Bridge input pin "${adapter.label ?? String(i)}" is oscillating across a threshold for 20+ consecutive timesteps`,
+                {
+                  explanation:
+                    `The analog voltage at bridge input "${adapter.label ?? String(i)}" ` +
+                    `has crossed a logic threshold on every timestep for 20 consecutive steps. ` +
+                    `This may indicate an oscillating signal or simulation instability near a threshold. ` +
+                    `Consider adding hysteresis or a Schmitt trigger at the boundary.`,
+                },
+              ),
+            );
+          }
+        } else {
+          state.oscillatingCount[i] = 0;
         }
 
         state.prevInputVoltages[i] = currVoltage;
@@ -214,6 +276,8 @@ export class MixedSignalCoordinator {
       state.prevInputBits.fill(false);
       state.prevOutputBits.fill(false);
       state.prevInputVoltages.fill(0);
+      state.indeterminateCount.fill(0);
+      state.oscillatingCount.fill(0);
     }
   }
 
