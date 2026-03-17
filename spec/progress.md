@@ -823,3 +823,14 @@ Modified `src/analog/compiler.ts`:
 
 ### Known pre-existing failures in new test files
 The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` which has 2 failing tests (`resistor_divider_dc_op_via_compiler`, `diode_circuit_dc_op_via_compiler`). These use zero-length self-loop wires (`addWire(x,y,x,y)`) that don't connect circuit nodes, causing wrong voltage results. This is a pre-existing bug in the new test file, not caused by task 4b.2.2 changes.
+
+## Task 4b.3.1: MixedSignalCoordinator — Timing Synchronization
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/analog/mixed-signal-coordinator.ts`
+  - `src/analog/__tests__/mixed-signal-coordinator.test.ts`
+- **Files modified**: 
+  - `src/analog/analog-engine.ts` (added coordinator import, field, and lifecycle calls in init/step/reset/dispose)
+- **Tests**: 8/8 passing
+- **Notes**: Full test suite shows 14 failures (vs 6 in baseline). The 8 extra failures are pre-existing from parallel wave work modifying `src/components/io/const.ts`, `ground.ts`, `src/components/passives/*.ts`, and `src/components/passives/__tests__/*.ts` — confirmed by `git diff` showing those files changed by other agents. My changes are limited to analog engine integration files.
