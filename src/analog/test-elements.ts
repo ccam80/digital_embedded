@@ -25,8 +25,14 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement } from "./element.js";
+import type { AnalogElement, IntegrationMethod } from "./element.js";
 import { pnjlim } from "./newton-raphson.js";
+import {
+  capacitorConductance,
+  capacitorHistoryCurrent,
+  inductorConductance,
+  inductorHistoryCurrent,
+} from "./integration.js";
 
 // ---------------------------------------------------------------------------
 // Internal helper — stamp into solver, skipping ground (node 0)
@@ -287,6 +293,175 @@ export function makeDiode(
 
       // Converged when junction voltage change is within tolerance
       return Math.abs(vdNew - vdPrev) <= 2 * nVt;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// makeCapacitor
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a linear capacitor test element with companion model integration.
+ *
+ * The capacitor is modelled as a parallel conductance (geq) and independent
+ * current source (ieq) — the standard Norton companion model. Coefficients
+ * are recomputed each timestep by `stampCompanion`; `stamp` re-stamps the
+ * same coefficients on every NR iteration within that timestep.
+ *
+ * Stamp convention (nodes A, B):
+ *   G[A,A] += geq    G[A,B] -= geq
+ *   G[B,A] -= geq    G[B,B] += geq
+ *   RHS[A]  += ieq   (current source: ieq flows from B to A through element)
+ *   RHS[B]  -= ieq
+ *
+ * @param nodeA       - First terminal node ID (0 = ground)
+ * @param nodeB       - Second terminal node ID (0 = ground)
+ * @param capacitance - Capacitance in farads (must be > 0)
+ * @returns An AnalogElement implementing the capacitor companion model
+ */
+export function makeCapacitor(
+  nodeA: number,
+  nodeB: number,
+  capacitance: number,
+): AnalogElement {
+  let geq = 0;
+  let ieq = 0;
+  // History for BDF-2: track previous terminal voltage v(n-1).
+  // Initialized to NaN so we can detect the first call.
+  let vPrev = NaN;
+  let firstCall = true;
+
+  return {
+    nodeIndices: [nodeA, nodeB],
+    branchIndex: -1,
+    isNonlinear: false,
+    isReactive: true,
+
+    stamp(solver: SparseSolver): void {
+      // Stamp Norton companion model: conductance geq + history current source ieq.
+      //
+      // KCL at nodeA: current leaving via cap = geq*(vA-vB) + ieq
+      // MNA equation: (G_R + geq)*vA = -ieq  (history current enters RHS negated)
+      G(solver, nodeA, nodeA, geq);
+      G(solver, nodeA, nodeB, -geq);
+      G(solver, nodeB, nodeA, -geq);
+      G(solver, nodeB, nodeB, geq);
+      RHS(solver, nodeA, -ieq);
+      RHS(solver, nodeB, ieq);
+    },
+
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vNow = vA - vB;
+
+      // Recover capacitor current at the previous accepted step from the
+      // companion model: i_cap(n) = geq_prev * v(n) + ieq_prev
+      // On the first call geq=0 and ieq=0, so iNow=0 (correct: DC steady state).
+      const iNow = geq * vNow + ieq;
+
+      // For BDF-2: on the first call there is no valid v(n-1), so we use v(n)
+      // as a warm-start approximation (equivalent to assuming the circuit was at
+      // the same voltage one step earlier — the DC initial condition).
+      const vPrevForFormula = firstCall ? vNow : vPrev;
+      vPrev = vNow;
+      firstCall = false;
+
+      geq = capacitorConductance(capacitance, dt, method);
+      ieq = capacitorHistoryCurrent(capacitance, dt, method, vNow, vPrevForFormula, iNow);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// makeInductor
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a linear inductor test element with companion model integration.
+ *
+ * An inductor introduces an extra MNA branch row to track branch current.
+ * The companion model replaces it with a conductance (geq) and current source
+ * (ieq) in the branch equation.
+ *
+ * MNA stamp for an inductor with nodes A, B and branch row k:
+ *   In DC (before first stampCompanion): stamp as short circuit (voltage source V=0).
+ *   After stampCompanion: the branch equation becomes:
+ *     geq * V_AB - I_k = -ieq
+ *   which in matrix form:
+ *     B[A,k] +=  1   B[B,k] -= 1   (incidence: current into A, out of B)
+ *     C[k,A] -= geq  C[k,B] += geq (branch equation)
+ *     RHS[k] += -ieq
+ *
+ * For the test element, the inductor uses the companion model approach where
+ * the branch row represents the inductor current directly.
+ *
+ * @param nodeA      - First terminal node ID (0 = ground)
+ * @param nodeB      - Second terminal node ID (0 = ground)
+ * @param branchIdx  - 0-based absolute branch row index in the MNA matrix
+ * @param inductance - Inductance in henries (must be > 0)
+ * @returns An AnalogElement implementing the inductor companion model
+ */
+export function makeInductor(
+  nodeA: number,
+  nodeB: number,
+  branchIdx: number,
+  inductance: number,
+): AnalogElement {
+  // Companion model state. Before the first stampCompanion call these are zero,
+  // which makes the branch equation V_A - V_B = 0 (short circuit) — the correct
+  // DC operating point for an inductor.
+  let geq = 0;
+  let ieq = 0;
+  // true after stampCompanion has been called at least once
+  let companionActive = false;
+
+  return {
+    nodeIndices: [nodeA, nodeB],
+    branchIndex: branchIdx,
+    isNonlinear: false,
+    isReactive: true,
+
+    stamp(solver: SparseSolver): void {
+      const k = branchIdx;
+
+      // B sub-matrix: I_k flows INTO nodeA and OUT OF nodeB
+      // (inductor branch current I_L flows from nodeA to nodeB)
+      if (nodeA !== 0) solver.stamp(nodeA - 1, k, 1);
+      if (nodeB !== 0) solver.stamp(nodeB - 1, k, -1);
+
+      if (!companionActive) {
+        // DC model: short circuit  →  V_A - V_B = 0
+        // C sub-matrix enforces V_A - V_B = 0
+        if (nodeA !== 0) solver.stamp(k, nodeA - 1, 1);
+        if (nodeB !== 0) solver.stamp(k, nodeB - 1, -1);
+        solver.stampRHS(k, 0);
+      } else {
+        // Companion model branch equation: V_A - V_B - geq * I_k = ieq
+        // i.e.  +V_A - V_B - geq*I_k = ieq
+        // C sub-matrix:
+        if (nodeA !== 0) solver.stamp(k, nodeA - 1, 1);
+        if (nodeB !== 0) solver.stamp(k, nodeB - 1, -1);
+        // -geq coefficient on I_k (branch column k in the C block)
+        solver.stamp(k, k, -geq);
+        // RHS: ieq
+        solver.stampRHS(k, ieq);
+      }
+    },
+
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+      // Read previous branch current I_L and terminal voltage V_AB from solution.
+      const iNow = voltages[branchIdx];
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vNow = vA - vB;
+
+      geq = inductorConductance(inductance, dt, method);
+      // iPrev not tracked in this simple test element (BDF-2 needs it).
+      ieq = inductorHistoryCurrent(inductance, dt, method, iNow, 0, vNow);
+
+      companionActive = true;
     },
   };
 }

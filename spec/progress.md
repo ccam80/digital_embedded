@@ -361,3 +361,25 @@
   - Reverse-bias pnjlim: removed aggressive step limiting for reverse bias (exp(vneg) ≈ 0, no runaway risk); only forward bias is limited
   - Diode updateOperatingPoint writes limited junction voltage back into voltages[] array so global convergence check operates on physically reasonable values
   - Full suite: 5 pre-existing fixture-audit failures, 1 flaky timing test (performance_50_node passes in isolation)
+
+## Task 1.4.2: LTE Timestep Control + Auto-Switching
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/timestep.ts, src/analog/__tests__/timestep.test.ts
+- **Files modified**: (none)
+- **Tests**: 16/16 passing
+
+## Task 1.4.1: Companion Models for Reactive Elements
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/analog/integration.ts` — `capacitorConductance`, `capacitorHistoryCurrent`, `inductorConductance`, `inductorHistoryCurrent` coefficient functions for BDF-1, trapezoidal, BDF-2; `HistoryStore` class with per-element pointer-swap rotation (zero copy per push)
+  - `src/analog/__tests__/integration.test.ts` — 16 tests covering coefficient values, HistoryStore semantics, RC decay (trapezoidal and BDF-2), RL current rise
+- **Files modified**:
+  - `src/analog/test-elements.ts` — added `makeCapacitor` and `makeInductor` with correct Norton companion model stamping; added import of integration functions and `IntegrationMethod`
+- **Tests**: 16/16 passing
+- **Notes**:
+  - BDF-2 capacitor initializes `vPrev = vNow` on first call (DC warm-start) so it degenerates to BDF-1 for step 0 — prevents instability
+  - Inductor uses short-circuit stamp (`companionActive=false`) before first `stampCompanion` call; switches to companion model after that
+  - `stampCompanion` only updates `geq`/`ieq` internal state; actual MNA stamping is done by `stamp(solver)` per the `AnalogElement` interface contract
+  - Sparse solver `performance_50_node` test fails under full-suite load (timing-sensitive) but passes in isolation — pre-existing flaky test, not a regression

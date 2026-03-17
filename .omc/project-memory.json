@@ -205,15 +205,15 @@
   },
   "hotPaths": [
     {
-      "path": "spec\\phase-5-tier-2-components.md",
-      "accessCount": 44,
-      "lastAccessed": 1773744943457,
+      "path": "spec\\phase-1-mna-engine-core.md",
+      "accessCount": 51,
+      "lastAccessed": 1773750569530,
       "type": "file"
     },
     {
-      "path": "spec\\phase-1-mna-engine-core.md",
+      "path": "spec\\phase-5-tier-2-components.md",
       "accessCount": 44,
-      "lastAccessed": 1773749349644,
+      "lastAccessed": 1773744943457,
       "type": "file"
     },
     {
@@ -229,21 +229,27 @@
       "type": "file"
     },
     {
+      "path": "",
+      "accessCount": 31,
+      "lastAccessed": 1773750538576,
+      "type": "directory"
+    },
+    {
       "path": "spec\\phase-3-analog-ui-features.md",
       "accessCount": 30,
       "lastAccessed": 1773744669502,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 30,
-      "lastAccessed": 1773749277121,
-      "type": "directory"
-    },
-    {
       "path": "spec\\phase-4a-digital-analog-interface.md",
       "accessCount": 26,
       "lastAccessed": 1773744682496,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 24,
+      "lastAccessed": 1773750505813,
       "type": "file"
     },
     {
@@ -253,33 +259,27 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 22,
-      "lastAccessed": 1773749255886,
-      "type": "file"
-    },
-    {
       "path": "spec\\phase-4c-transistor-level-models.md",
       "accessCount": 17,
       "lastAccessed": 1773744752384,
       "type": "file"
     },
     {
+      "path": "CLAUDE.md",
+      "accessCount": 17,
+      "lastAccessed": 1773750507010,
+      "type": "file"
+    },
+    {
       "path": "spec\\circuits-engine-spec.md",
-      "accessCount": 16,
-      "lastAccessed": 1773746903129,
+      "accessCount": 17,
+      "lastAccessed": 1773750520626,
       "type": "file"
     },
     {
       "path": "src\\headless\\runner.ts",
       "accessCount": 16,
       "lastAccessed": 1773747864074,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 16,
-      "lastAccessed": 1773749256653,
       "type": "file"
     },
     {
