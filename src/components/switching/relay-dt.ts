@@ -35,6 +35,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createRelayDTAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -280,6 +281,7 @@ function relayDTFactory(props: PropertyBag): RelayDTElement {
 export const RelayDTDefinition: ComponentDefinition = {
   name: "RelayDT",
   typeId: -1,
+  engineType: "both",
   factory: relayDTFactory,
   executeFn: executeRelayDT,
   pinLayout: buildRelayDTPins(1, 1),
@@ -290,4 +292,6 @@ export const RelayDTDefinition: ComponentDefinition = {
   stateSlotCount: 1,
   defaultDelay: 0,
   switchPins: [2, 3],
+  analogFactory: createRelayDTAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

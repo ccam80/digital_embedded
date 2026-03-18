@@ -39,6 +39,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createRelayAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -294,6 +295,7 @@ function relayFactory(props: PropertyBag): RelayElement {
 export const RelayDefinition: ComponentDefinition = {
   name: "Relay",
   typeId: -1,
+  engineType: "both",
   factory: relayFactory,
   executeFn: executeRelay,
   pinLayout: buildRelayPins(1, 1),
@@ -304,4 +306,6 @@ export const RelayDefinition: ComponentDefinition = {
   stateSlotCount: 1,
   defaultDelay: 0,
   switchPins: [2, 3],
+  analogFactory: createRelayAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

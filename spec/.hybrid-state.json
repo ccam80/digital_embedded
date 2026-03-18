@@ -1,9 +1,8 @@
 {
-  "phase": "4c",
-  "wave": "4c.3",
-  "completed_waves": ["4c.1", "4c.2", "4c.3"],
-  "completed_phases": ["4b", "4c"],
-  "pending_phases": ["5"],
-  "status": "complete",
-  "last_updated": "2026-03-18T13:37:00Z"
+  "phase": "6",
+  "wave": null,
+  "completed_waves": [],
+  "completed_phases": ["4b", "4c", "5"],
+  "status": "in_progress",
+  "last_updated": "2026-03-18T16:00:00Z"
 }

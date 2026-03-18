@@ -105,7 +105,8 @@ export type SolverDiagnosticCode =
   | "transmission-line-low-segments"
   | "reverse-biased-cap"
   | "fuse-blown"
-  | "ndr-convergence-assist";
+  | "ndr-convergence-assist"
+  | "rs-flipflop-both-set";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

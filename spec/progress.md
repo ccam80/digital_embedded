@@ -906,3 +906,110 @@ The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` 
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 1
+
+## Task 6.2.3: OTA (Operational Transconductance Amplifier)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/ota.ts, src/components/active/__tests__/ota.test.ts
+- **Files modified**: (none)
+- **Tests**: 4/4 passing
+
+## Task 6.2.4: Comparator
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/comparator.ts, src/components/active/__tests__/comparator.test.ts
+- **Files modified**: src/components/register-all.ts
+- **Tests**: 5/5 passing
+
+## Task 6.1.2: Behavioral Factories for Counters and Registers
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/behavioral-sequential.ts, src/analog/__tests__/behavioral-sequential.test.ts
+- **Files modified**: src/components/memory/counter.ts, src/components/memory/counter-preset.ts, src/components/memory/register.ts
+- **Tests**: 16/16 passing
+
+## Task 6.3.1: DAC (Digital-to-Analog Converter)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/dac.ts, src/components/active/__tests__/dac.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+- **Notes**: 555 timer test failures (4 tests in timer-555.test.ts) are pre-existing from Task 6.2.x implementation, unrelated to DAC. All 8 baseline failures unchanged.
+
+## Task 6.2.1: 555 Timer IC
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/components/active/timer-555.ts` — Timer555Element, Timer555Definition, createTimer555Element analog factory
+  - `src/components/active/__tests__/timer-555.test.ts` — 8 tests covering all spec requirements
+- **Files modified**: none
+- **Tests**: 8/8 passing
+- **Implementation notes**:
+  - Behavioral model with SR flip-flop, two comparators, discharge transistor, output stage
+  - Internal voltage divider (5kΩ + 10kΩ) sets CTRL = 2/3 VCC when pin is floating
+  - Key design: flip-flop state changes ONLY in updateState() (after accepted timestep), never in updateOperatingPoint(). This allows NR convergence within each timestep while correctly advancing state each step.
+  - DC operating point converges for astable circuits (Q=0 RESET state as stable DC point)
+  - Astable tests skip first period (initial transient) and use 0.2% timestep for accurate measurements
+  - Monostable tests use 0.5% of pulse width as maxTimeStep for sub-1% timing accuracy
+
+## Task 6.1.3: Behavioral Factories for Mux, Demux, Decoder
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/behavioral-combinational.ts, src/analog/__tests__/behavioral-combinational.test.ts
+- **Files modified**: src/components/wiring/mux.ts, src/components/wiring/demux.ts, src/components/wiring/decoder.ts
+- **Tests**: 14/14 passing
+
+## Task 6.2.5: Optocoupler
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/optocoupler.ts, src/components/active/__tests__/optocoupler.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 6.1.1: Behavioral Factories for Remaining Flip-Flops (TESTS ONLY)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/behavioral-flipflop-variants.test.ts
+- **Files modified**: none
+- **Tests**: 8/8 passing
+
+## Task 6.3.2: ADC (Analog-to-Digital Converter) — Tests Only
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/__tests__/adc.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 6.1.4: Behavioral Factories for Remaining Digital Components (TESTS ONLY)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/behavioral-remaining.test.ts
+- **Files modified**: src/analog/behavioral-remaining.ts (fixed bug: stampCompanion used undefined `s` variable in relay/relayDT; added cachedSolver pattern), src/components/switching/relay.ts (added engineType:"both", analogFactory, simulationModes), src/components/switching/relay-dt.ts (same), src/components/switching/switch.ts (same), src/components/switching/switch-dt.ts (same), src/components/io/button-led.ts (same)
+- **Tests**: 6/6 passing
+- **Notes**: Two flaky tests (SparseSolver performance_50_node and Integration common_source_nmos) failed under full suite load but pass in isolation — confirmed pre-existing flakiness, not regressions
+
+## Task 6.2.2: Real Op-Amp (Composite Model)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/real-opamp.ts, src/components/active/__tests__/real-opamp.test.ts
+- **Files modified**: none
+- **Tests**: 11/11 passing
+- **Notes**: BDF-1 companion model for bandwidth-limited gain stage with slew rate limiting. Current limiting modeled passively via R_out (75Ω), not as explicit nonlinear clamp. .MODEL support for 741, LM358, TL072, OPA2134.
+
+---
+## Wave 6.1 Summary
+- **Status**: complete
+- **Tasks completed**: 4/4
+- **Rounds**: 2
+
+---
+## Wave 6.2 Summary
+- **Status**: complete
+- **Tasks completed**: 5/5
+- **Rounds**: 2
+
+---
+## Wave 6.3 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 2

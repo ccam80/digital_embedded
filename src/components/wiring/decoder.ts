@@ -26,6 +26,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeBehavioralDecoderAnalogFactory } from "../../analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -238,4 +239,7 @@ export const DecoderDefinition: ComponentDefinition = {
   helpText:
     "Decoder — N-bit input produces 2^N one-hot outputs.\n" +
     "Only output[input_value] is 1; all others are 0.",
+  engineType: "both",
+  analogFactory: makeBehavioralDecoderAnalogFactory(1),
+  simulationModes: ['digital', 'behavioral'],
 };

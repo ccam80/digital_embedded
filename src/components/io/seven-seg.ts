@@ -31,6 +31,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSevenSegAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -288,6 +289,7 @@ function sevenSegFactory(props: PropertyBag): SevenSegElement {
 export const SevenSegDefinition: ComponentDefinition = {
   name: "SevenSeg",
   typeId: -1,
+  engineType: "both",
   factory: sevenSegFactory,
   executeFn: executeSevenSeg,
   pinLayout: buildSevenSegPinDeclarations(),
@@ -298,4 +300,6 @@ export const SevenSegDefinition: ComponentDefinition = {
     "SevenSeg — direct-drive 7-segment display.\n" +
     "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
+  analogFactory: createSevenSegAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

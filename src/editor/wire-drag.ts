@@ -236,6 +236,8 @@ export class WireDragMode {
     for (const dw of this._doglegs) {
       circuit.addWire(dw);
     }
+    // Split wires at any T-junctions created by the drag.
+    circuit.splitWiresAtJunctions();
     this._active = false;
     this._doglegs = [];
   }

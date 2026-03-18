@@ -206,26 +206,32 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 130,
-      "lastAccessed": 1773798509816,
+      "accessCount": 165,
+      "lastAccessed": 1773807312890,
       "type": "directory"
     },
     {
-      "path": "spec\\phase-5-tier-2-components.md",
-      "accessCount": 89,
-      "lastAccessed": 1773798983580,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 79,
-      "lastAccessed": 1773798813781,
+      "accessCount": 94,
+      "lastAccessed": 1773807295134,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 78,
-      "lastAccessed": 1773799010623,
+      "accessCount": 94,
+      "lastAccessed": 1773807334508,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-5-tier-2-components.md",
+      "accessCount": 91,
+      "lastAccessed": 1773800911965,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-6-tier-3-and-polish.md",
+      "accessCount": 69,
+      "lastAccessed": 1773807310435,
       "type": "file"
     },
     {
@@ -235,22 +241,22 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 63,
+      "lastAccessed": 1773805507207,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 62,
+      "lastAccessed": 1773803298969,
+      "type": "file"
+    },
+    {
       "path": "spec\\phase-1-mna-engine-core.md",
       "accessCount": 61,
       "lastAccessed": 1773784705397,
       "type": "file"
-    },
-    {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 58,
-      "lastAccessed": 1773792663664,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 43,
-      "lastAccessed": 1773797456347,
-      "type": "directory"
     },
     {
       "path": "src\\engine\\digital-engine.ts",
@@ -271,22 +277,16 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-6-tier-3-and-polish.md",
-      "accessCount": 32,
-      "lastAccessed": 1773745006883,
-      "type": "file"
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 33,
+      "lastAccessed": 1773802752899,
+      "type": "directory"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 32,
-      "lastAccessed": 1773795616867,
+      "accessCount": 33,
+      "lastAccessed": 1773803807464,
       "type": "file"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 32,
-      "lastAccessed": 1773798665667,
-      "type": "directory"
     },
     {
       "path": "src\\headless\\runner.ts",
@@ -308,14 +308,14 @@
     },
     {
       "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 18,
-      "lastAccessed": 1773776143301,
+      "accessCount": 20,
+      "lastAccessed": 1773805523444,
       "type": "file"
     },
     {
       "path": "src\\engine\\compiler.ts",
-      "accessCount": 18,
-      "lastAccessed": 1773798588395,
+      "accessCount": 19,
+      "lastAccessed": 1773800997838,
       "type": "file"
     },
     {
@@ -385,6 +385,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\core",
+      "accessCount": 7,
+      "lastAccessed": 1773807324380,
+      "type": "directory"
+    },
+    {
       "path": "src\\io\\postmessage-adapter.ts",
       "accessCount": 6,
       "lastAccessed": 1773773811873,
@@ -424,12 +430,6 @@
       "path": "spec",
       "accessCount": 5,
       "lastAccessed": 1773786456746,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core",
-      "accessCount": 5,
-      "lastAccessed": 1773795959100,
       "type": "directory"
     },
     {

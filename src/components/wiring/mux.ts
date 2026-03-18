@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeBehavioralMuxAnalogFactory } from "../../analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -297,4 +298,7 @@ export const MuxDefinition: ComponentDefinition = {
   helpText:
     "Multiplexer — selects one of N inputs based on selector bits.\n" +
     "Output = input[selector]. N = 2^selectorBits.",
+  engineType: "both",
+  analogFactory: makeBehavioralMuxAnalogFactory(1),
+  simulationModes: ['digital', 'behavioral'],
 };

@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSevenSegAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -198,6 +199,7 @@ function sevenSegHexFactory(props: PropertyBag): SevenSegHexElement {
 export const SevenSegHexDefinition: ComponentDefinition = {
   name: "SevenSegHex",
   typeId: -1,
+  engineType: "both",
   factory: sevenSegHexFactory,
   executeFn: executeSevenSegHex,
   pinLayout: buildSevenSegHexPinDeclarations(),
@@ -208,4 +210,6 @@ export const SevenSegHexDefinition: ComponentDefinition = {
     "SevenSegHex — 7-segment display with internal hex decoder.\n" +
     "4-bit input selects which hex digit (0–F) to display.\n" +
     "commonCathode=true: common cathode configuration (active high).",
+  analogFactory: createSevenSegAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

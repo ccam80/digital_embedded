@@ -139,6 +139,9 @@ import { ResistorDefinition } from "./passives/resistor.js";
 // Analog sources
 import { AnalogGroundDefinition } from "./sources/ground.js";
 
+// Analog active
+import { AnalogComparatorDefinition } from "./active/comparator.js";
+
 // Basic
 import { BooleanFunctionDefinition } from "./basic/function.js";
 
@@ -292,6 +295,9 @@ export function createDefaultRegistry(
 
   // Analog sources
   registry.register(AnalogGroundDefinition);
+
+  // Analog active
+  registry.register(AnalogComparatorDefinition);
 
   // Basic
   registry.register(BooleanFunctionDefinition);

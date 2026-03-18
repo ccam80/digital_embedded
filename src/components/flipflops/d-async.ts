@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeDAsyncFlipflopAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -293,4 +294,7 @@ export const DAsyncDefinition: ComponentDefinition = {
     "When Set and Clr are both inactive, stores D on rising clock edge.",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeDAsyncFlipflopAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

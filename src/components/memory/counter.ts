@@ -29,6 +29,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeBehavioralCounterAnalogFactory } from "../../analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -262,9 +263,12 @@ function counterFactory(props: PropertyBag): CounterElement {
 export const CounterDefinition: ComponentDefinition = {
   name: "Counter",
   typeId: -1,
+  engineType: "both",
   factory: counterFactory,
   executeFn: executeCounter,
   sampleFn: sampleCounter,
+  analogFactory: makeBehavioralCounterAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
   pinLayout: COUNTER_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PROPERTY_DEFS,
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,

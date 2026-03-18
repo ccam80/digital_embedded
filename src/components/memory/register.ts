@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeBehavioralRegisterAnalogFactory } from "../../analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -224,9 +225,12 @@ function registerFactory(props: PropertyBag): RegisterElement {
 export const RegisterDefinition: ComponentDefinition = {
   name: "Register",
   typeId: -1,
+  engineType: "both",
   factory: registerFactory,
   executeFn: executeRegister,
   sampleFn: sampleRegister,
+  analogFactory: makeBehavioralRegisterAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
   pinLayout: REGISTER_PIN_DECLARATIONS,
   propertyDefs: REGISTER_PROPERTY_DEFS,
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,

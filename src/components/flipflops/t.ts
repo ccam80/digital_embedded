@@ -32,6 +32,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeTFlipflopAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -286,4 +287,7 @@ export const TDefinition: ComponentDefinition = {
     "Q and ~Q are always complementary.",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeTFlipflopAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

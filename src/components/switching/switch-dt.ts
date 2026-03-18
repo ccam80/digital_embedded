@@ -25,6 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSwitchDTAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -267,6 +268,7 @@ function switchDTFactory(props: PropertyBag): SwitchDTElement {
 export const SwitchDTDefinition: ComponentDefinition = {
   name: "SwitchDT",
   typeId: -1,
+  engineType: "both",
   factory: switchDTFactory,
   executeFn: executeSwitchDT,
   pinLayout: buildPinDeclarations(1, 1),
@@ -279,4 +281,6 @@ export const SwitchDTDefinition: ComponentDefinition = {
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
+  analogFactory: createSwitchDTAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

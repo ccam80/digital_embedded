@@ -187,6 +187,11 @@ export class WireDrawingMode {
       circuit.addWire(wire);
     }
 
+    // Split wires at T-junctions created by the new wire segments.
+    // A new wire may cross through an existing wire endpoint or pin, or
+    // an existing wire may pass through one of the new wire's endpoints.
+    circuit.splitWiresAtJunctions();
+
     this._active = false;
     return merged;
   }
@@ -216,6 +221,9 @@ export class WireDrawingMode {
     for (const wire of merged) {
       circuit.addWire(wire);
     }
+
+    // Split wires at T-junctions created by the new wire segments.
+    circuit.splitWiresAtJunctions();
 
     this._active = false;
     return merged;

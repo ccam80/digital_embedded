@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeRSAsyncLatchAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -214,4 +215,7 @@ export const RSAsyncDefinition: ComponentDefinition = {
     "Changes propagate immediately without a clock edge.",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeRSAsyncLatchAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

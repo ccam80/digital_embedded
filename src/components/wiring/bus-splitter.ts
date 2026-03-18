@@ -23,6 +23,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSplitterAnalogElement } from "../../analog/behavioral-remaining.js";
 import { extractBits } from "./splitter.js";
 
 // ---------------------------------------------------------------------------
@@ -277,6 +278,7 @@ function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[
 export const BusSplitterDefinition: ComponentDefinition = {
   name: "BusSplitter",
   typeId: -1,
+  engineType: "both",
   factory: busSplitterFactory,
   executeFn: executeBusSplitter,
   pinLayout: buildDefaultPinLayout(1, 1),
@@ -286,4 +288,6 @@ export const BusSplitterDefinition: ComponentDefinition = {
   helpText:
     "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
     "Splits a common bus into individual bit lines gated by OE.",
+  analogFactory: createSplitterAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

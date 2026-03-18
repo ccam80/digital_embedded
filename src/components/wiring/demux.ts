@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeBehavioralDemuxAnalogFactory } from "../../analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -296,4 +297,7 @@ export const DemuxDefinition: ComponentDefinition = {
   helpText:
     "Demultiplexer — routes one input to one of N outputs based on selector.\n" +
     "Selected output = input, all others = 0. N = 2^selectorBits.",
+  engineType: "both",
+  analogFactory: makeBehavioralDemuxAnalogFactory(1),
+  simulationModes: ['digital', 'behavioral'],
 };

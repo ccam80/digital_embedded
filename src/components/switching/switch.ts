@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSwitchAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -257,6 +258,7 @@ function switchFactory(props: PropertyBag): SwitchElement {
 export const SwitchDefinition: ComponentDefinition = {
   name: "Switch",
   typeId: -1,
+  engineType: "both",
   factory: switchFactory,
   executeFn: executeSwitch,
   pinLayout: buildPinDeclarations(1, 1),
@@ -269,4 +271,6 @@ export const SwitchDefinition: ComponentDefinition = {
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
+  analogFactory: createSwitchAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

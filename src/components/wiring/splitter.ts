@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createSplitterAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Port type
@@ -490,6 +491,7 @@ const _defaultOutputPorts = parsePorts("8");
 export const SplitterDefinition: ComponentDefinition = {
   name: "Splitter",
   typeId: -1,
+  engineType: "both",
   factory: splitterFactory,
   executeFn: executeSplitter,
   pinLayout: buildSplitterPinDeclarations(_defaultInputPorts, _defaultOutputPorts, 1),
@@ -500,4 +502,6 @@ export const SplitterDefinition: ComponentDefinition = {
     "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
     "Configure Input Splitting for the left pins and Output Splitting for the right pins.\n" +
     "Supports patterns like '4,4', '1*8', or '0-3'.",
+  analogFactory: createSplitterAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

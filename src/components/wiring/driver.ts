@@ -23,6 +23,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createDriverAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -265,6 +266,7 @@ function driverFactory(props: PropertyBag): DriverElement {
 export const DriverDefinition: ComponentDefinition = {
   name: "Driver",
   typeId: -1,
+  engineType: "both",
   factory: driverFactory,
   executeFn: executeDriver,
   pinLayout: buildDriverPinDeclarations(1),
@@ -275,4 +277,6 @@ export const DriverDefinition: ComponentDefinition = {
     "Driver — tri-state buffer.\n" +
     "When sel=1: output = input.\n" +
     "When sel=0: output is high-impedance (disconnected).",
+  analogFactory: createDriverAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

@@ -22,6 +22,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createButtonLEDAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -233,6 +234,7 @@ function buttonLEDFactory(props: PropertyBag): ButtonLEDElement {
 export const ButtonLEDDefinition: ComponentDefinition = {
   name: "ButtonLED",
   typeId: -1,
+  engineType: "both",
   factory: buttonLEDFactory,
   executeFn: executeButtonLED,
   pinLayout: buildButtonLEDPinDeclarations(),
@@ -244,4 +246,6 @@ export const ButtonLEDDefinition: ComponentDefinition = {
     "The 'in' pin drives the LED; the 'out' pin is the button output.\n" +
     "Button behavior: output high while held, low when released (inverted if activeLow).\n" +
     "Interactive: the engine sets the output value on mouse-down/up events.",
+  analogFactory: createButtonLEDAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

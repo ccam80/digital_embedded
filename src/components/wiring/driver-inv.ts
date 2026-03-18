@@ -24,6 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createDriverInvAnalogElement } from "../../analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants — same as Driver (origin-centred)
@@ -220,6 +221,7 @@ function driverInvFactory(props: PropertyBag): DriverInvSelElement {
 export const DriverInvSelDefinition: ComponentDefinition = {
   name: "DriverInvSel",
   typeId: -1,
+  engineType: "both",
   factory: driverInvFactory,
   executeFn: executeDriverInvSel,
   pinLayout: buildDriverInvPinDeclarations(1),
@@ -230,4 +232,6 @@ export const DriverInvSelDefinition: ComponentDefinition = {
     "DriverInvSel — tri-state buffer with active-low enable.\n" +
     "When sel=0 (active-low): output = input.\n" +
     "When sel=1: output is high-impedance (disconnected).",
+  analogFactory: createDriverInvAnalogElement,
+  simulationModes: ["digital", "behavioral"],
 };

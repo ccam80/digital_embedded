@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeJKFlipflopAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -230,4 +231,7 @@ export const JKDefinition: ComponentDefinition = {
     "Q and ~Q outputs are always complementary.",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeJKFlipflopAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

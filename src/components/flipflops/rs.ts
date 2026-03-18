@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeRSFlipflopAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -230,4 +231,7 @@ export const RSDefinition: ComponentDefinition = {
     "Q and ~Q outputs are always complementary (except on S=R=1).",
   stateSlotCount: 2,
   defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeRSFlipflopAnalogFactory(),
+  simulationModes: ['digital', 'behavioral'],
 };

@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/components/passives/__tests__/tapped-transformer.test.ts\\\" --reporter=verbose 2>&1\",\"timeout\":120000,\"descriptio...",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m×\u001b[39m src/components/passives/__tests__/tapped-transformer.test.ts\u001b[2m > \u001b[22mTappedTransformer\u001b[2m > \u001b[22mcenter_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint\n\u001b[31m   → expected 4.663774161555921 to be greater than 7\u001b[39m\n \u001b[32m✓\u001b[39m src/components/passives/__tests__/tapped-transformer.test.ts\u001b[2m > \u001b[22mTappedTransformer\u001b[2m > \u001b[22msymmetric_ha...",
-  "timestamp": "2026-03-18T02:02:23.751Z",
+  "tool_input_preview": "{\"command\":\"node -e \\\"\\nconst r = require('C:/Users/cca79/AppData/Local/Temp/vitest-results.json');\\nconst total = r.numFailedTests;\\nconst files = r.testResults.filter(f => f.status === 'failed').len...",
+  "error": "Exit code 1\n[eval]:8\r\n  console.log('FILE:', f.name.replace(/.*digital_in_browser.slash/,'').replace(/\\/g,'/').split('digital_in_browser/').pop());\r\n                                                                               ^^^^^^^\r\nExpected ',', got 'string literal ().split(, ').split(')'\r\n\r\nSyntaxError: missing ) after argument list\r\n    at makeContextifyScript (node:internal/vm:194:14)\r\n    at compileScript (node:internal/process/execution:388:10)\r\n    at evalTypeScript (node:internal/pro...",
+  "timestamp": "2026-03-18T04:39:06.685Z",
   "retry_count": 1
 }
