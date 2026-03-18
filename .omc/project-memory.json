@@ -206,20 +206,20 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 165,
-      "lastAccessed": 1773807312890,
+      "accessCount": 169,
+      "lastAccessed": 1773809385579,
       "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 94,
-      "lastAccessed": 1773807295134,
+      "accessCount": 97,
+      "lastAccessed": 1773809225706,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 94,
-      "lastAccessed": 1773807334508,
+      "accessCount": 95,
+      "lastAccessed": 1773809270170,
       "type": "file"
     },
     {
@@ -230,8 +230,14 @@
     },
     {
       "path": "spec\\phase-6-tier-3-and-polish.md",
-      "accessCount": 69,
-      "lastAccessed": 1773807310435,
+      "accessCount": 77,
+      "lastAccessed": 1773809246252,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 71,
+      "lastAccessed": 1773809769539,
       "type": "file"
     },
     {
@@ -242,15 +248,9 @@
     },
     {
       "path": "src",
-      "accessCount": 63,
-      "lastAccessed": 1773805507207,
+      "accessCount": 65,
+      "lastAccessed": 1773809288048,
       "type": "directory"
-    },
-    {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 62,
-      "lastAccessed": 1773803298969,
-      "type": "file"
     },
     {
       "path": "spec\\phase-1-mna-engine-core.md",
@@ -271,16 +271,16 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 36,
+      "lastAccessed": 1773809412325,
+      "type": "directory"
+    },
+    {
       "path": "spec\\phase-4a-digital-analog-interface.md",
       "accessCount": 33,
       "lastAccessed": 1773779291205,
       "type": "file"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 33,
-      "lastAccessed": 1773802752899,
-      "type": "directory"
     },
     {
       "path": "CLAUDE.md",
@@ -301,15 +301,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\circuits-engine-spec.md",
-      "accessCount": 20,
-      "lastAccessed": 1773784718916,
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 22,
+      "lastAccessed": 1773809597293,
       "type": "file"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
+      "path": "spec\\circuits-engine-spec.md",
       "accessCount": 20,
-      "lastAccessed": 1773805523444,
+      "lastAccessed": 1773784718916,
       "type": "file"
     },
     {
@@ -320,8 +320,8 @@
     },
     {
       "path": "src\\core\\engine-interface.ts",
-      "accessCount": 15,
-      "lastAccessed": 1773773750169,
+      "accessCount": 16,
+      "lastAccessed": 1773809390744,
       "type": "file"
     },
     {
@@ -355,6 +355,12 @@
       "type": "file"
     },
     {
+      "path": "simulator.html",
+      "accessCount": 11,
+      "lastAccessed": 1773809757312,
+      "type": "directory"
+    },
+    {
       "path": "spec\\.context\\review-spec.md",
       "accessCount": 9,
       "lastAccessed": 1773740990489,
@@ -377,12 +383,6 @@
       "accessCount": 8,
       "lastAccessed": 1773793005882,
       "type": "file"
-    },
-    {
-      "path": "simulator.html",
-      "accessCount": 7,
-      "lastAccessed": 1773773916891,
-      "type": "directory"
     },
     {
       "path": "src\\core",

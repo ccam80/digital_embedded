@@ -44,6 +44,7 @@ import { loadDig } from '../io/dig-loader.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
 import { deserializeCircuit } from '../io/load.js';
+import { parseCtzCircuitFromText } from '../io/ctz-parser.js';
 import { serializeCircuit } from '../io/save.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { deserializeDts } from '../io/dts-deserializer.js';
@@ -2039,6 +2040,16 @@ export function initApp(search?: string): void {
     fileInput?.click();
   });
 
+  document.getElementById('btn-import-ctz')?.addEventListener('click', () => {
+    if (fileInput) {
+      fileInput.accept = '.ctz';
+      fileInput.click();
+      fileInput.addEventListener('change', () => {
+        fileInput.accept = '.dig,.dts,.json,.digj,.ctz';
+      }, { once: true });
+    }
+  });
+
   /** HTTP resolver for subcircuit .dig file resolution. */
   const httpResolver = new HttpResolver(params.base || './');
 
@@ -2069,23 +2080,28 @@ export function initApp(search?: string): void {
       try {
         const text = reader.result as string;
         let loaded: Circuit;
-        const firstChar = text.replace(/^\s+/, '').charAt(0);
-        if (firstChar === '{' || firstChar === '[') {
-          // JSON — distinguish .dts format from legacy .digj
-          const parsed = JSON.parse(text);
-          if (parsed.format === 'dts' || parsed.format === 'digb') {
-            const result = deserializeDts(text, registry);
-            loaded = result.circuit;
-          } else {
-            loaded = deserializeCircuit(text, registry);
-          }
+        if (file.name.endsWith('.ctz')) {
+          // CircuitJS CTZ format — decompressed text parsed directly
+          loaded = parseCtzCircuitFromText(text, registry);
         } else {
-          // Use async subcircuit-aware loader to handle embedded subcircuit references
-          try {
-            loaded = await loadWithSubcircuits(text, httpResolver, registry);
-          } catch {
-            // Fall back to simple loader if async loading fails
-            loaded = loadDig(text, registry);
+          const firstChar = text.replace(/^\s+/, '').charAt(0);
+          if (firstChar === '{' || firstChar === '[') {
+            // JSON — distinguish .dts format from legacy .digj
+            const parsed = JSON.parse(text);
+            if (parsed.format === 'dts' || parsed.format === 'digb') {
+              const result = deserializeDts(text, registry);
+              loaded = result.circuit;
+            } else {
+              loaded = deserializeCircuit(text, registry);
+            }
+          } else {
+            // Use async subcircuit-aware loader to handle embedded subcircuit references
+            try {
+              loaded = await loadWithSubcircuits(text, httpResolver, registry);
+            } catch {
+              // Fall back to simple loader if async loading fails
+              loaded = loadDig(text, registry);
+            }
           }
         }
         applyLoadedCircuit(loaded);

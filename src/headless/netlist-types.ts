@@ -118,7 +118,8 @@ export type DiagnosticCode =
   | 'label-collision'
   | 'combinational-loop'
   | 'missing-property'
-  | 'unknown-component';
+  | 'unknown-component'
+  | 'unsupported-ctz-component';
 
 /**
  * A single diagnostic: an error, warning, or informational note about

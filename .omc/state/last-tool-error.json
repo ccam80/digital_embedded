@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node -e \\\"\\nconst r = require('C:/Users/cca79/AppData/Local/Temp/vitest-results.json');\\nconst total = r.numFailedTests;\\nconst files = r.testResults.filter(f => f.status === 'failed').len...",
-  "error": "Exit code 1\n[eval]:8\r\n  console.log('FILE:', f.name.replace(/.*digital_in_browser.slash/,'').replace(/\\/g,'/').split('digital_in_browser/').pop());\r\n                                                                               ^^^^^^^\r\nExpected ',', got 'string literal ().split(, ').split(')'\r\n\r\nSyntaxError: missing ) after argument list\r\n    at makeContextifyScript (node:internal/vm:194:14)\r\n    at compileScript (node:internal/process/execution:388:10)\r\n    at evalTypeScript (node:internal/pro...",
-  "timestamp": "2026-03-18T04:39:06.685Z",
+  "tool_input_preview": "{\"command\":\"ls \\\"C:\\\\Users\\\\cca79\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--local-working-projects-digital-in-browser\\\\727257b3-032e-4a98-88bf-da233a7e5a57\\\\tasks\\\\\\\" 2>/dev/null\",\"description\":\"List backgrou...",
+  "error": "Exit code 2\n/usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `\"'",
+  "timestamp": "2026-03-18T04:55:35.292Z",
   "retry_count": 1
 }

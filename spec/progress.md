@@ -1013,3 +1013,72 @@ The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` 
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 2
+
+## Task 6.6.1: Parameter Variation Engine (Monte Carlo + Parameter Sweep)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/analog/monte-carlo.ts` — MonteCarloRunner, MonteCarloConfig, ParameterVariation, OutputSpec, MonteCarloResult, OutputStatistics, TrialResult, CircuitFactory, SeededRng, computeOutputStatistics, TransientParams, AcParams
+  - `src/analog/parameter-sweep.ts` — ParameterSweepRunner, SweepConfig, SweepResult, SweepCircuitFactory, generateSweepValues
+  - `src/analog/__tests__/monte-carlo.test.ts` — 16 tests covering all spec cases
+- **Files modified**:
+  - `src/core/analog-engine-interface.ts` — added `monte-carlo-trial-failed`, `ac-linearization-failed`, `unsupported-ctz-component` to SolverDiagnosticCode union
+- **Tests**: 16/16 passing
+
+## Task 6.4.1: AC Analysis Engine
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/analog/complex-sparse-solver.ts` — ComplexSparseSolver using 2N×2N real block expansion
+  - `src/analog/ac-analysis.ts` — AcAnalysis class, AcParams/AcResult interfaces, buildFrequencyArray
+  - `src/analog/__tests__/ac-analysis.test.ts` — 8 tests all passing
+- **Files modified**: 
+  - `src/core/analog-engine-interface.ts` — added `ac-no-source` to SolverDiagnosticCode union
+- **Tests**: 8/8 passing
+
+## Task 6.4.2: Bode Plot Renderer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/runtime/bode-plot.ts` — BodePlotRenderer class with magnitude/phase plot, grid, cursor, marker detection
+  - `src/runtime/__tests__/bode-plot.test.ts` — 4 tests all passing
+- **Files modified**: none
+- **Tests**: 4/4 passing
+
+## Task 6.5.1: CTZ URL Parser
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/io/ctz-format.ts` — `CtzComponent` interface, `CTZ_TYPE_MAP` (~40 type mappings), `parseCtzText()`, `mapCtzToCircuit()`, `CtzPlaceholderElement`, `applySemanticAliases()`
+  - `src/io/ctz-parser.ts` — `parseCtzUrl()` (async URL→Circuit), `parseCtzCircuitFromText()` (sync text→Circuit), `decompressRawDeflate()`, `base64ToUint8Array()`
+  - `src/test-utils/decompress-polyfill.ts` — Node.js `DecompressionStream` polyfill using `node:zlib.inflateRawSync`
+  - `src/io/__tests__/ctz-parser.test.ts` — 5 tests covering all spec requirements
+- **Files modified**:
+  - `src/headless/netlist-types.ts` — added `'unsupported-ctz-component'` to `DiagnosticCode` union
+  - `src/io/load.ts` — added `isCtzUrl()` helper + `CTZ_URL_PATTERNS` for CircuitJS URL detection
+  - `src/app/app-init.ts` — added `parseCtzCircuitFromText` import, `.ctz` file routing in fileInput change handler, `btn-import-ctz` click handler
+  - `simulator.html` — added `.ctz` to file input accept list, added "Import from CircuitJS (.ctz)..." menu item
+- **Tests**: 5/5 passing
+  - `CTZ::parses_simple_rc_circuit` — RC circuit parses to 4 elements (resistor, capacitor, voltage source, ground)
+  - `CTZ::maps_component_types` — r→AnalogResistor, c→AnalogCapacitor, l→AnalogInductor, d→AnalogDiode
+  - `CTZ::handles_unknown_type` — unknown type emits info diagnostic with code `unsupported-ctz-component` and creates placeholder
+  - `CTZ::decompresses_url` — real CTZ URL decompresses to valid circuit
+  - `CTZ::preserves_component_values` — resistor value 4700 preserved as `resistance` property
+
+---
+## Wave 6.4 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+---
+## Wave 6.5 Summary
+- **Status**: complete
+- **Tasks completed**: 1/1
+- **Rounds**: 1
+
+---
+## Wave 6.6 Summary
+- **Status**: complete
+- **Tasks completed**: 1/1
+- **Rounds**: 1

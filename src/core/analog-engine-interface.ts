@@ -106,7 +106,11 @@ export type SolverDiagnosticCode =
   | "reverse-biased-cap"
   | "fuse-blown"
   | "ndr-convergence-assist"
-  | "rs-flipflop-both-set";
+  | "rs-flipflop-both-set"
+  | "ac-no-source"
+  | "ac-linearization-failed"
+  | "unsupported-ctz-component"
+  | "monte-carlo-trial-failed";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint
