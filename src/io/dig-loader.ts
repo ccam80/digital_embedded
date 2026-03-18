@@ -98,6 +98,11 @@ export function loadDigCircuit(
     circuit.addWire(createWireFromDig(dw));
   }
 
+  // Split wires at T-junctions so endpoint-based net resolution sees the
+  // connection.  Digital's Java editor always splits wires at junctions,
+  // but hand-edited or externally-generated .dig files may not.
+  circuit.splitWiresAtJunctions();
+
   propagateWireBitWidths(circuit);
 
   return circuit;

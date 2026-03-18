@@ -633,3 +633,276 @@ The parallel agent (4b.2.1) added `src/analog/__tests__/mna-end-to-end.test.ts` 
   - clock_to_q_delay measures from ramp start to Q crossing VDD/2 (not CLK-to-Q differential) because the MOSFETs have zero default capacitance — no true delay without charge storage
   - setup_time_violation uses DC with D=CLK=VDD/2 to demonstrate metastable equilibrium; Q settles to mid-supply (~1.65V) confirming neither valid HIGH nor LOW
   - All pre-existing baseline failures (11) are unchanged; no regressions introduced
+
+## Task 5.6.1: Coupled Inductor Infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/coupled-inductor.ts, src/analog/__tests__/coupled-inductor.test.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 5.8.1: Analog Switch (SPST + SPDT)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/analog-switch.ts, src/components/active/__tests__/analog-switch.test.ts
+- **Files modified**: none
+- **Tests**: 7/7 passing
+
+## Task 5.2.1: Expression Parser Enhancements
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/expression-differentiate.ts, src/analog/expression-evaluate.ts, src/analog/__tests__/expression-differentiate.test.ts, src/analog/__tests__/expression-evaluate.test.ts
+- **Files modified**: src/analog/expression.ts
+- **Tests**: 40/40 passing (24 differentiate + 16 evaluate; original 50 expression tests unchanged)
+- **Notes**: Additional failures in full suite (cmos-flipflop, cmos-gates, mosfet, scr, fet-base, mna-end-to-end) are pre-existing from prior wave agents' work, unrelated to expression parser changes. My changes to expression.ts are purely additive (new AST node types, constructors, parser cases for V(), I(), random(), time, freq).
+
+## Task 5.5.1: SCR (Silicon Controlled Rectifier)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/scr.ts` — SCRElement, createScrElement, ScrDefinition
+  - `src/components/semiconductors/__tests__/scr.test.ts` — 7 tests
+- **Files modified**: none
+- **Tests**: 7/7 passing
+
+## Task 5.8.2: Schmitt Trigger (Inverting + Non-Inverting)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/schmitt-trigger.ts, src/components/active/__tests__/schmitt-trigger.test.ts
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 5.2.2: Additional Waveform Modes
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sources/__tests__/ac-voltage-extended.test.ts
+- **Files modified**: src/components/sources/ac-voltage-source.ts
+- **Tests**: 9/9 passing (new); 19/19 original ac-voltage-source tests still passing
+- **Notes**: Added sweep (linear+log), AM, FM, and noise waveforms. Added ExtendedWaveformParams interface. Added 7 new property definitions. getBreakpoints extended for noise mode.
+
+## Task 5.5.2: Triac
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/triac.ts` — TriacElement, createTriacElement, TriacDefinition
+  - `src/components/semiconductors/__tests__/triac.test.ts` — 5 tests
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 5.4.1: AbstractFetElement Base Class
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/fet-base.ts, src/analog/__tests__/fet-base.test.ts
+- **Files modified**: src/components/semiconductors/mosfet.ts
+- **Tests**: 9/9 passing (fet-base.test.ts), 24/24 passing (mosfet.test.ts)
+- **Summary**: Created AbstractFetElement abstract base class in src/analog/fet-base.ts. Refactored createMosfetElement() to return MosfetAnalogElement (extends AbstractFetElement) instead of an anonymous object. All existing MOSFET behaviors preserved. All new refactor tests pass.
+
+## Task 5.1.1: Polarized Capacitor
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/passives/polarized-cap.ts, src/components/passives/__tests__/polarized-cap.test.ts
+- **Files modified**: none
+- **Tests**: 12/12 passing
+- **Notes**: SolverDiagnosticCode union in src/core/analog-engine-interface.ts needs `reverse-biased-cap` added (file was locked by task 5.7.1). The element uses `as SolverDiagnosticCode` type assertion at runtime — functionally correct. When the file lock releases, the type should be added to the union.
+
+## Task 5.5.3: Diac
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/diac.ts` — DiacElement, createDiacElement, DiacDefinition
+  - `src/components/semiconductors/__tests__/diac.test.ts` — 5 tests
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task 5.2.3: Variable Rail Source
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sources/variable-rail.ts, src/components/sources/__tests__/variable-rail.test.ts
+- **Files modified**: none
+- **Tests**: 8/8 passing
+- **Notes**: Implements VariableRailElement (CircuitElement), makeVariableRailElement (AnalogElement factory), VariableRailDefinition (ComponentDefinition). Uses ideal voltage source + internal series resistance via MNA internal node. setVoltage() updates live for re-solve.
+
+## Task 5.5.4: Varactor Diode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/varactor.ts` — VaractorElement, createVaractorElement, computeVaractorCapacitance, VaractorDefinition
+  - `src/components/semiconductors/__tests__/varactor.test.ts` — 6 tests
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 5.2.4: Analog Clock Factory
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/io/__tests__/analog-clock.test.ts
+- **Files modified**: src/components/io/clock.ts
+- **Tests**: 9/9 passing (new); io.test.ts 2 failures are pre-existing baseline failures (ConstComponent)
+- **Notes**: Added engineType: "both", simulationModes: ["digital", "behavioral"], vdd property, makeAnalogClockElement(), AnalogClockElement interface, analogFactory. Square-wave output via stampAtTime(). getBreakpoints() returns edge times for timestep controller. requiresBranchRow: true added.
+
+## Task 5.4.2: N-JFET + P-JFET
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/semiconductors/njfet.ts, src/components/semiconductors/pjfet.ts, src/components/semiconductors/__tests__/jfet.test.ts
+- **Files modified**: (none)
+- **Tests**: 11/11 passing (jfet.test.ts)
+- **Summary**: Implemented NJfetAnalogElement extending AbstractFetElement with Shichman-Hodges I-V model (cutoff/linear/saturation), gate junction Shockley diode, pnjlim voltage limiting, and CGS/CGD capacitances. PJfetAnalogElement extends NJfetAnalogElement with polaritySign=-1, inverting all junction voltages. Both registered as ComponentDefinitions with engineType "analog". All 12 SPICE JFET model parameters supported via JFET_N_DEFAULTS/JFET_P_DEFAULTS.
+
+## Task 5.5.5: Tunnel Diode
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/components/semiconductors/tunnel-diode.ts` — TunnelDiodeElement, createTunnelDiodeElement, tunnelDiodeIV, TunnelDiodeDefinition
+  - `src/components/semiconductors/__tests__/tunnel-diode.test.ts` — 6 tests
+- **Files modified**: none
+- **Tests**: 6/6 passing
+
+## Task 5.3.1: Controlled Source Infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/controlled-source-base.ts, src/analog/__tests__/controlled-source-base.test.ts
+- **Files modified**: (none)
+- **Tests**: 5/5 passing
+
+## Task 5.1.2: Quartz Crystal
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/passives/crystal.ts, src/components/passives/__tests__/crystal.test.ts
+- **Files modified**: (none)
+- **Tests**: 18/18 passing
+
+## Task 5.7.5: Memristor
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/passives/memristor.ts, src/components/passives/__tests__/memristor.test.ts
+- **Files modified**: none
+- **Tests**: 19/19 passing
+
+## Task 5.7.6: Triode (Vacuum Tube)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/semiconductors/triode.ts, src/components/semiconductors/__tests__/triode.test.ts
+- **Files modified**: none
+- **Tests**: 14/14 passing
+
+## Task 5.3.2: VCVS + VCCS
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/vcvs.ts, src/components/active/vccs.ts, src/components/active/__tests__/vcvs.test.ts, src/components/active/__tests__/vccs.test.ts
+- **Files modified**: src/analog/controlled-source-base.ts (added ctrlValue param to stampOutput, exported MutableExpressionContext)
+- **Tests**: 7/7 passing (4 VCVS + 3 VCCS)
+
+## Task 5.7.7: NPN/PNP Darlington (Subcircuit Expansion)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/transistor-models/darlington.ts, src/analog/__tests__/darlington.test.ts
+- **Files modified**: none
+- **Tests**: 16/16 passing
+
+## Task 5.1.3: Analog Fuse
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/passives/analog-fuse.ts, src/components/passives/__tests__/analog-fuse.test.ts
+- **Files modified**: src/components/switching/fuse.ts (added engineType: "both", analogFactory pointing to createAnalogFuseElement)
+- **Tests**: 20/20 passing
+- **Notes**: SolverDiagnosticCode does not include "fuse-blown" — used type cast (same pattern as polarized-cap's "reverse-biased-cap"). The analog-engine-interface.ts file lock was held by task 5.7.1 during implementation.
+
+## Task 5.3.3: CCVS + CCCS
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/active/ccvs.ts, src/components/active/cccs.ts, src/components/active/__tests__/ccvs.test.ts, src/components/active/__tests__/cccs.test.ts
+- **Files modified**: (none)
+- **Tests**: 6/6 passing (3 CCVS + 3 CCCS)
+- **Notes**: cmos-inverter.test.ts failure in full suite is not caused by this task — it relates to mosfet.ts modified by another parallel agent (5.4.1 wave). All 5.3.x tests pass cleanly.
+
+## Task 5.7.2: NTC Thermistor
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sensors/ntc-thermistor.ts, src/components/sensors/__tests__/ntc-thermistor.test.ts
+- **Files modified**: none
+- **Tests**: 16/16 passing
+
+## Task 5.7.3: LDR (Light Dependent Resistor)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sensors/ldr.ts, src/components/sensors/__tests__/ldr.test.ts
+- **Files modified**: none
+- **Tests**: 16/16 passing
+
+## Task 5.6.2: Transformer Component (FIX)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/components/passives/__tests__/transformer.test.ts
+- **Tests**: 15/15 passing
+- **Notes**: The power_conservation test was computing apparent power (Vrms * Irms) which includes reactive power from the primary inductance. With L=500mH at 1kHz, inductive reactance (~3142Ω) >> load impedance (10Ω), so apparent primary power >> secondary real power. Fixed by switching to instantaneous real power averaging (time-averaged v*i product) and correcting lastCycleStart from (numCycles-1)*200 to (numCycles-1)*400 to match the 400 steps/cycle parameter.
+
+## Task 5.7.4: Spark Gap
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/sensors/spark-gap.ts, src/components/sensors/__tests__/spark-gap.test.ts
+- **Files modified**: none
+- **Tests**: 20/20 passing
+
+## Task 5.6.3: Tapped Transformer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/passives/tapped-transformer.ts, src/components/passives/__tests__/tapped-transformer.test.ts
+- **Files modified**: (none)
+- **Tests**: 16/16 passing
+- **Notes**: Implemented 3-winding center-tapped transformer with full 3×3 coupled inductor companion model. Five external pins (P1, P2, S1, CT, S2), three branch rows (branchIndex, +1, +2). L2=L3=L1*(N/2)², M12=M13=k*sqrt(L1*L2), M23=k*sqrt(L2*L3). Supports trapezoidal, BDF1, and BDF2 integration. Tests verified: center-tap midpoint voltage, symmetric secondary halves, full-wave rectifier operation. CT needs a reference-to-ground to avoid floating node singularity in simulation.
+
+## Task 5.7.1: Lossy Transmission Line (Lumped RLCG)
+- **Status**: complete
+- **Agent**: implementer + coordinator fix
+- **Files created**: src/components/passives/transmission-line.ts, src/components/passives/__tests__/transmission-line.test.ts
+- **Files modified**: (none)
+- **Tests**: 26/26 passing
+- **Notes**: Lumped RLCG model with N cascaded segments. Per-segment sub-elements (SegmentResistorElement, SegmentInductorElement, SegmentCapacitorElement, SegmentShuntConductanceElement, CombinedRLElement). Internal node layout: rlMidNodes and junctionNodes. Proper B+C MNA inductor stamps with companion model. Test fix: more_segments_more_accurate steady-state check relaxed — ideal voltage source circuit has no source impedance so steady-state is 1V not 0.5V.
+
+---
+## Wave 5.1 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 2
+
+---
+## Wave 5.2 Summary
+- **Status**: complete
+- **Tasks completed**: 4/4
+- **Rounds**: 1
+
+---
+## Wave 5.3 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1
+
+---
+## Wave 5.4 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
+
+---
+## Wave 5.5 Summary
+- **Status**: complete
+- **Tasks completed**: 5/5
+- **Rounds**: 1
+
+---
+## Wave 5.6 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 2
+
+---
+## Wave 5.7 Summary
+- **Status**: complete
+- **Tasks completed**: 7/7
+- **Rounds**: 3
+
+---
+## Wave 5.8 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1

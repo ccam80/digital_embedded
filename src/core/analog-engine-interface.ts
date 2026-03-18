@@ -101,7 +101,8 @@ export type SolverDiagnosticCode =
   | "bridge-oscillating-input"
   | "bridge-impedance-mismatch"
   | "missing-transistor-model"
-  | "invalid-transistor-model";
+  | "invalid-transistor-model"
+  | "transmission-line-low-segments";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

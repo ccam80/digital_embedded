@@ -21,12 +21,6 @@
  * MNA stamp convention (3-terminal: D, G, S):
  *   The linearized MOSFET produces conductances between terminals plus
  *   Norton current sources at D and S.
- *
- * Architectural note: The I-V computation, voltage limiting, and capacitance
- * calculation are in dedicated methods (computeIds, computeGm, computeGds,
- * computeGmbs, limitVoltages, computeCapacitances) rather than inlined in
- * stampNonlinear. This design supports future extraction into an
- * AbstractFetElement base class shared with JFETs (Task 5.4.1).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -42,7 +36,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { fetlim } from "../../analog/newton-raphson.js";
 import { MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../analog/model-defaults.js";
@@ -50,6 +44,8 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../analog/integration.js";
+import { AbstractFetElement } from "../../analog/fet-base.js";
+import type { FetCapacitances } from "../../analog/fet-base.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -317,6 +313,227 @@ export function computeCapacitances(
 }
 
 // ---------------------------------------------------------------------------
+// MosfetAnalogElement — AbstractFetElement subclass
+// ---------------------------------------------------------------------------
+
+/**
+ * Concrete FET analog element for MOSFET (N-channel or P-channel).
+ *
+ * Extends AbstractFetElement with the Level 2 SPICE MOSFET I-V model,
+ * body effect, junction/overlap capacitances, and source/drain swap detection.
+ */
+class MosfetAnalogElement extends AbstractFetElement {
+  readonly polaritySign: 1 | -1;
+
+  private readonly _p: MosfetParams;
+  private readonly _nodeB: number;
+
+  // Body-effect state
+  private _vsb: number = 0;
+  private _gmbs: number = 0;
+
+  // Junction capacitance companion model state (drain-bulk and source-bulk)
+  private _capGeqDB: number = 0;
+  private _capIeqDB: number = 0;
+  private _capGeqSB: number = 0;
+  private _capIeqSB: number = 0;
+  private _vdbPrev: number = NaN;
+  private _vsbCapPrev: number = NaN;
+  private _capJunctionFirstCall: boolean = true;
+
+  constructor(
+    polarity: 1 | -1,
+    nodeD: number,
+    nodeG: number,
+    nodeS: number,
+    nodeB: number,
+    p: MosfetParams,
+  ) {
+    // Pass nodeB as extra node so nodeIndices = [D, G, S, B] (bulk always included)
+    super(nodeG, nodeD, nodeS, [nodeB]);
+    this.polaritySign = polarity;
+    this._p = p;
+    this._nodeB = nodeB;
+
+    // For PMOS, VTO is stored as magnitude; polarity inversion applies sign during I-V evaluation
+    if (polarity === -1) {
+      this._p.VTO = Math.abs(this._p.VTO);
+    }
+
+    const caps = computeCapacitances(p);
+    const hasCaps = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0;
+    this._initReactive(hasCaps);
+  }
+
+  limitVoltages(
+    vgsOld: number,
+    _vdsOld: number,
+    vgsNew: number,
+    vdsNew: number,
+  ): { vgs: number; vds: number; swapped: boolean } {
+    return limitVoltages(vgsOld, vgsNew, _vdsOld, vdsNew, this._p.VTO);
+  }
+
+  computeIds(vgs: number, vds: number): number {
+    const { ids } = computeIds(vgs, vds, this._vsb, this._p);
+    return ids;
+  }
+
+  computeGm(vgs: number, vds: number): number {
+    return computeGm(vgs, vds, this._vsb, this._p);
+  }
+
+  computeGds(vgs: number, vds: number): number {
+    return computeGds(vgs, vds, this._vsb, this._p);
+  }
+
+  computeCapacitances(_vgs: number, _vds: number): FetCapacitances {
+    const caps = computeCapacitances(this._p);
+    return { cgs: caps.cgs, cgd: caps.cgd };
+  }
+
+  override updateOperatingPoint(voltages: Float64Array): void {
+    const nodeD = this.drainNode;
+    const nodeG = this.gateNode;
+    const nodeS = this.sourceNode;
+    const nodeB = this._nodeB;
+
+    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
+    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+    const vBulk = nodeB > 0 ? voltages[nodeB - 1] : 0;
+
+    // Apply polarity for PMOS (negate all voltages relative to device)
+    const vGraw = this.polaritySign * (vG - vS);
+    const vDraw = this.polaritySign * (vD - vS);
+    const vBraw = this.polaritySign * (vBulk - vS);
+
+    // Voltage limiting on Vgs via fetlim: (vgsOld, vgsNew, vdsOld, vdsNew, vto)
+    const limited = limitVoltages(this._vgs, vGraw, this._vds, vDraw, this._p.VTO);
+    this._vgs = limited.vgs;
+    this._vds = limited.vds;
+    this._swapped = limited.swapped;
+
+    // Source-bulk voltage (body effect): Vsb = Vs - Vb (always >= 0 for normal bias)
+    this._vsb = Math.max(-vBraw, 0);
+
+    // Recompute operating point at limited voltages
+    const result = computeIds(this._vgs, this._vds, this._vsb, this._p);
+    this._ids = result.ids;
+    this._gm = computeGm(this._vgs, this._vds, this._vsb, this._p);
+    this._gds = computeGds(this._vgs, this._vds, this._vsb, this._p);
+    this._gmbs = computeGmbs(this._vgs, this._vds, this._vsb, this._p);
+  }
+
+  override stampNonlinear(solver: SparseSolver): void {
+    const nodeG = this.gateNode;
+    const effectiveD = this._swapped ? this.sourceNode : this.drainNode;
+    const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
+    const nodeB = this._nodeB;
+
+    const gmS = this._gm * this._sourceScale;
+    const gdsS = this._gds * this._sourceScale;
+    const gmbsS = this._gmbs * this._sourceScale;
+
+    // Transconductance gm (Vgs): current from S to D
+    stampG(solver, effectiveD, nodeG, gmS);
+    stampG(solver, effectiveD, effectiveS, -gmS);
+    stampG(solver, effectiveS, nodeG, -gmS);
+    stampG(solver, effectiveS, effectiveS, gmS);
+
+    // Output conductance gds (Vds): current from S to D
+    stampG(solver, effectiveD, effectiveD, gdsS);
+    stampG(solver, effectiveD, effectiveS, -gdsS);
+    stampG(solver, effectiveS, effectiveD, -gdsS);
+    stampG(solver, effectiveS, effectiveS, gdsS);
+
+    // Body transconductance gmbs (Vbs = Vb - Vs): only when bulk ≠ source
+    if (nodeB !== effectiveS && gmbsS > 0) {
+      stampG(solver, effectiveD, nodeB, gmbsS);
+      stampG(solver, effectiveD, effectiveS, -gmbsS);
+      stampG(solver, effectiveS, nodeB, -gmbsS);
+      stampG(solver, effectiveS, effectiveS, gmbsS);
+    }
+
+    // Norton current sources (KCL at drain and source)
+    // Signed by polarity: positive Id flows from D to S in NMOS
+    const vbsOp = -this._vsb; // Vbs = -Vsb
+    const nortonId = this.polaritySign * (this._ids - this._gm * this._vgs - this._gds * this._vds - this._gmbs * vbsOp) * this._sourceScale;
+
+    stampRHS(solver, effectiveD, -nortonId);
+    stampRHS(solver, effectiveS, nortonId);
+  }
+
+  override stamp(solver: SparseSolver): void {
+    // Stamp base gate overlap capacitances (Cgs, Cgd)
+    super.stamp(solver);
+
+    const nodeD = this.drainNode;
+    const nodeS = this.sourceNode;
+    const nodeB = this._nodeB;
+
+    // Drain-bulk junction capacitance
+    if (this._capGeqDB !== 0 || this._capIeqDB !== 0) {
+      stampG(solver, nodeD, nodeD, this._capGeqDB);
+      stampG(solver, nodeD, nodeB, -this._capGeqDB);
+      stampG(solver, nodeB, nodeD, -this._capGeqDB);
+      stampG(solver, nodeB, nodeB, this._capGeqDB);
+      stampRHS(solver, nodeD, -this._capIeqDB);
+      stampRHS(solver, nodeB, this._capIeqDB);
+    }
+
+    // Source-bulk junction capacitance
+    if (this._capGeqSB !== 0 || this._capIeqSB !== 0) {
+      stampG(solver, nodeS, nodeS, this._capGeqSB);
+      stampG(solver, nodeS, nodeB, -this._capGeqSB);
+      stampG(solver, nodeB, nodeS, -this._capGeqSB);
+      stampG(solver, nodeB, nodeB, this._capGeqSB);
+      stampRHS(solver, nodeS, -this._capIeqSB);
+      stampRHS(solver, nodeB, this._capIeqSB);
+    }
+  }
+
+  override stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+    // Gate overlap capacitances (Cgs, Cgd) via base class
+    super.stampCompanion(dt, method, voltages);
+
+    const nodeD = this.drainNode;
+    const nodeS = this.sourceNode;
+    const nodeB = this._nodeB;
+
+    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
+    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+    const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
+
+    const vdb = vD - vBulkV;
+    const vsbCap = vS - vBulkV;
+
+    const prevVdb = this._capJunctionFirstCall ? vdb : this._vdbPrev;
+    const prevVsb = this._capJunctionFirstCall ? vsbCap : this._vsbCapPrev;
+
+    const iDB = this._capGeqDB * vdb + this._capIeqDB;
+    const iSB = this._capGeqSB * vsbCap + this._capIeqSB;
+
+    this._vdbPrev = vdb;
+    this._vsbCapPrev = vsbCap;
+    this._capJunctionFirstCall = false;
+
+    const caps = computeCapacitances(this._p);
+
+    if (caps.cbd > 0) {
+      this._capGeqDB = capacitorConductance(caps.cbd, dt, method);
+      this._capIeqDB = capacitorHistoryCurrent(caps.cbd, dt, method, vdb, prevVdb, iDB);
+    }
+
+    if (caps.cbs > 0) {
+      this._capGeqSB = capacitorConductance(caps.cbs, dt, method);
+      this._capIeqSB = capacitorHistoryCurrent(caps.cbs, dt, method, vsbCap, prevVsb, iSB);
+    }
+  }
+
+}
+
+// ---------------------------------------------------------------------------
 // createMosfetElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -325,7 +542,7 @@ export function createMosfetElement(
   nodeIds: number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): MosfetAnalogElement {
   const nodeD = nodeIds[0]; // drain
   const nodeG = nodeIds[1]; // gate
   const nodeS = nodeIds[2]; // source
@@ -346,263 +563,7 @@ export function createMosfetElement(
 
   const p = resolveParams(props, defaults, propsW, propsL);
 
-  // Polarity inversion: all junction voltages are sign-flipped for PMOS,
-  // so VTO must be used as magnitude. SPICE stores VTO < 0 for PMOS, but
-  // after polarity inversion the internal threshold should be |VTO|.
-  if (polarity === -1) {
-    p.VTO = Math.abs(p.VTO);
-  }
-
-  // Check if capacitances are active
-  const caps = computeCapacitances(p);
-  const hasCapacitance = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0;
-
-  // Source stepping scale factor (1.0 = fully active, 0.0 = device off)
-  let _sourceScale = 1.0;
-
-  // NR linearization state — initialize with device off
-  let vgs = 0;
-  let vds = 0;
-  let vsb = 0;
-  let gm = GMIN;
-  let gds = GMIN;
-  let gmbs = 0;
-  let ids = 0;
-  let swapped = false;
-
-  // Junction capacitance companion model state (drain-bulk and source-bulk)
-  let capGeqDB = 0;
-  let capIeqDB = 0;
-  let capGeqSB = 0;
-  let capIeqSB = 0;
-  let vdbPrev = NaN;
-  let vsbCapPrev = NaN;
-  let capFirstCall = true;
-
-  // Gate overlap capacitance companion model state
-  let capGeqGS = 0;
-  let capIeqGS = 0;
-  let capGeqGD = 0;
-  let capIeqGD = 0;
-  let vgsPrev = NaN;
-  let vgdPrev = NaN;
-  let capOverlapFirstCall = true;
-
-  const element: AnalogElement = {
-    nodeIndices: [nodeD, nodeG, nodeS, nodeB],
-    branchIndex: -1,
-    isNonlinear: true,
-    isReactive: hasCapacitance,
-
-    setSourceScale(factor: number): void {
-      _sourceScale = factor;
-    },
-
-    stamp(solver: SparseSolver): void {
-      // Stamp junction capacitance companion models (linear part, stamped once per timestep)
-      if (capGeqDB !== 0 || capIeqDB !== 0) {
-        // Drain-bulk capacitance
-        stampG(solver, nodeD, nodeD, capGeqDB);
-        stampG(solver, nodeD, nodeB, -capGeqDB);
-        stampG(solver, nodeB, nodeD, -capGeqDB);
-        stampG(solver, nodeB, nodeB, capGeqDB);
-        stampRHS(solver, nodeD, -capIeqDB);
-        stampRHS(solver, nodeB, capIeqDB);
-      }
-      if (capGeqSB !== 0 || capIeqSB !== 0) {
-        // Source-bulk capacitance
-        stampG(solver, nodeS, nodeS, capGeqSB);
-        stampG(solver, nodeS, nodeB, -capGeqSB);
-        stampG(solver, nodeB, nodeS, -capGeqSB);
-        stampG(solver, nodeB, nodeB, capGeqSB);
-        stampRHS(solver, nodeS, -capIeqSB);
-        stampRHS(solver, nodeB, capIeqSB);
-      }
-      if (capGeqGS !== 0 || capIeqGS !== 0) {
-        // Gate-source overlap capacitance
-        stampG(solver, nodeG, nodeG, capGeqGS);
-        stampG(solver, nodeG, nodeS, -capGeqGS);
-        stampG(solver, nodeS, nodeG, -capGeqGS);
-        stampG(solver, nodeS, nodeS, capGeqGS);
-        stampRHS(solver, nodeG, -capIeqGS);
-        stampRHS(solver, nodeS, capIeqGS);
-      }
-      if (capGeqGD !== 0 || capIeqGD !== 0) {
-        // Gate-drain overlap capacitance
-        stampG(solver, nodeG, nodeG, capGeqGD);
-        stampG(solver, nodeG, nodeD, -capGeqGD);
-        stampG(solver, nodeD, nodeG, -capGeqGD);
-        stampG(solver, nodeD, nodeD, capGeqGD);
-        stampRHS(solver, nodeG, -capIeqGD);
-        stampRHS(solver, nodeD, capIeqGD);
-      }
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      // The MOSFET linearized model (3-terminal D, G, S):
-      //
-      // Id = ids + gm*(Vgs - vgs_op) + gds*(Vds - vds_op) + gmbs*(Vbs - vbs_op)
-      //
-      // which stamps as:
-      //   G[D,G] += gm,  G[D,S] += -gm  (transconductance)
-      //   G[D,D] += gds, G[D,S] += -gds (output conductance)
-      //   G[D,B] += gmbs, G[D,S] += -gmbs (body transconductance, if bulk != source)
-      //   G[S,G] += -gm, G[S,S] += gm
-      //   G[S,D] += -gds, G[S,S] += gds
-      //   G[S,B] += -gmbs, G[S,S] += gmbs
-      //
-      // Norton current at D: ids - gm*vgs_op - gds*vds_op - gmbs*vsb_op
-      // Norton current at S: -(ids - gm*vgs_op - gds*vds_op - gmbs*vsb_op)
-      //
-      // For swapped source/drain, indices are exchanged in the stamp.
-
-      const effectiveD = swapped ? nodeS : nodeD;
-      const effectiveS = swapped ? nodeD : nodeS;
-
-      // Scale conductances and Norton current by source stepping factor
-      const gmS = gm * _sourceScale;
-      const gdsS = gds * _sourceScale;
-      const gmbsS = gmbs * _sourceScale;
-
-      // Transconductance gm (Vgs): current from S to D
-      stampG(solver, effectiveD, nodeG, gmS);
-      stampG(solver, effectiveD, effectiveS, -gmS);
-      stampG(solver, effectiveS, nodeG, -gmS);
-      stampG(solver, effectiveS, effectiveS, gmS);
-
-      // Output conductance gds (Vds): current from S to D
-      stampG(solver, effectiveD, effectiveD, gdsS);
-      stampG(solver, effectiveD, effectiveS, -gdsS);
-      stampG(solver, effectiveS, effectiveD, -gdsS);
-      stampG(solver, effectiveS, effectiveS, gdsS);
-
-      // Body transconductance gmbs (Vbs = Vb - Vs): only when bulk ≠ source
-      if (nodeB !== effectiveS && gmbsS > 0) {
-        stampG(solver, effectiveD, nodeB, gmbsS);
-        stampG(solver, effectiveD, effectiveS, -gmbsS);
-        stampG(solver, effectiveS, nodeB, -gmbsS);
-        stampG(solver, effectiveS, effectiveS, gmbsS);
-      }
-
-      // Norton current sources (KCL at drain and source)
-      // Signed by polarity: positive Id flows from D to S in NMOS
-      const vbsOp = -vsb; // Vbs = -Vsb
-      const nortonId = polarity * (ids - gm * vgs - gds * vds - gmbs * vbsOp) * _sourceScale;
-
-      stampRHS(solver, effectiveD, -nortonId);
-      stampRHS(solver, effectiveS, nortonId);
-    },
-
-    updateOperatingPoint(voltages: Float64Array): void {
-      const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-      const vBulk = nodeB > 0 ? voltages[nodeB - 1] : 0;
-
-      // Apply polarity for PMOS (negate all voltages relative to device)
-      const vGraw = polarity * (vG - vS);
-      const vDraw = polarity * (vD - vS);
-      const vBraw = polarity * (vBulk - vS);
-
-      // Voltage limiting on Vgs via fetlim
-      const limited = limitVoltages(vgs, vGraw, vds, vDraw, p.VTO);
-      vgs = limited.vgs;
-      vds = limited.vds;
-      swapped = limited.swapped;
-
-      // Source-bulk voltage (body effect): Vsb = Vs - Vb (always >= 0 for normal bias)
-      vsb = Math.max(-vBraw, 0);
-
-      // Recompute operating point at limited voltages
-      const result = computeIds(vgs, vds, vsb, p);
-      ids = result.ids;
-      gm = computeGm(vgs, vds, vsb, p);
-      gds = computeGds(vgs, vds, vsb, p);
-      gmbs = computeGmbs(vgs, vds, vsb, p);
-    },
-
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-
-      const vDp = nodeD > 0 ? prevVoltages[nodeD - 1] : 0;
-      const vGp = nodeG > 0 ? prevVoltages[nodeG - 1] : 0;
-      const vSp = nodeS > 0 ? prevVoltages[nodeS - 1] : 0;
-
-      const vgsNew = polarity * (vG - vS);
-      const vdsNew = polarity * (vD - vS);
-      const vgsPrev = polarity * (vGp - vSp);
-      const vdsPrev = polarity * (vDp - vSp);
-
-      // Convergence when both Vgs and Vds changes are within 10mV
-      const TOL = 0.01;
-      return Math.abs(vgsNew - vgsPrev) <= TOL && Math.abs(vdsNew - vdsPrev) <= TOL;
-    },
-  };
-
-  // Attach stampCompanion only when junction/overlap capacitances are present
-  if (hasCapacitance) {
-    element.stampCompanion = function (
-      dt: number,
-      method: IntegrationMethod,
-      voltages: Float64Array,
-    ): void {
-      const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-      const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
-
-      const vdb = vD - vBulkV;
-      const vsbCap = vS - vBulkV;
-      const vgsNow = vG - vS;
-      const vgdNow = vG - vD;
-
-      const prevVdb = capFirstCall ? vdb : vdbPrev;
-      const prevVsb = capFirstCall ? vsbCap : vsbCapPrev;
-      const prevVgs = capOverlapFirstCall ? vgsNow : vgsPrev;
-      const prevVgd = capOverlapFirstCall ? vgdNow : vgdPrev;
-
-      // Recover capacitor currents at previous accepted step
-      const iDB = capGeqDB * vdb + capIeqDB;
-      const iSB = capGeqSB * vsbCap + capIeqSB;
-      const iGS = capGeqGS * vgsNow + capIeqGS;
-      const iGD = capGeqGD * vgdNow + capIeqGD;
-
-      vdbPrev = vdb;
-      vsbCapPrev = vsbCap;
-      vgsPrev = vgsNow;
-      vgdPrev = vgdNow;
-      capFirstCall = false;
-      capOverlapFirstCall = false;
-
-      // Drain-bulk junction capacitance
-      if (caps.cbd > 0) {
-        capGeqDB = capacitorConductance(caps.cbd, dt, method);
-        capIeqDB = capacitorHistoryCurrent(caps.cbd, dt, method, vdb, prevVdb, iDB);
-      }
-
-      // Source-bulk junction capacitance
-      if (caps.cbs > 0) {
-        capGeqSB = capacitorConductance(caps.cbs, dt, method);
-        capIeqSB = capacitorHistoryCurrent(caps.cbs, dt, method, vsbCap, prevVsb, iSB);
-      }
-
-      // Gate-source overlap capacitance
-      if (caps.cgs > 0) {
-        capGeqGS = capacitorConductance(caps.cgs, dt, method);
-        capIeqGS = capacitorHistoryCurrent(caps.cgs, dt, method, vgsNow, prevVgs, iGS);
-      }
-
-      // Gate-drain overlap capacitance
-      if (caps.cgd > 0) {
-        capGeqGD = capacitorConductance(caps.cgd, dt, method);
-        capIeqGD = capacitorHistoryCurrent(caps.cgd, dt, method, vgdNow, prevVgd, iGD);
-      }
-    };
-  }
-
-  return element;
+  return new MosfetAnalogElement(polarity, nodeD, nodeG, nodeS, nodeB, p);
 }
 
 // ---------------------------------------------------------------------------

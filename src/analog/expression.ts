@@ -25,7 +25,11 @@ export type ExprNode =
   | { kind: "variable"; name: string }
   | { kind: "unary"; op: "-"; operand: ExprNode }
   | { kind: "binary"; op: "+" | "-" | "*" | "/" | "^"; left: ExprNode; right: ExprNode }
-  | { kind: "call"; fn: string; args: ExprNode[] };
+  | { kind: "call"; fn: string; args: ExprNode[] }
+  | { kind: "circuit-voltage"; label: string }
+  | { kind: "circuit-current"; label: string }
+  | { kind: "builtin-var"; name: "time" | "freq" }
+  | { kind: "builtin-func"; name: "random" };
 
 // ---------------------------------------------------------------------------
 // AST constructor helpers
@@ -53,6 +57,22 @@ export function unaryOp(op: "-", operand: ExprNode): ExprNode {
 
 export function callNode(fn: string, args: ExprNode[]): ExprNode {
   return { kind: "call", fn, args };
+}
+
+export function circuitVoltageNode(label: string): ExprNode {
+  return { kind: "circuit-voltage", label };
+}
+
+export function circuitCurrentNode(label: string): ExprNode {
+  return { kind: "circuit-current", label };
+}
+
+export function builtinVarNode(name: "time" | "freq"): ExprNode {
+  return { kind: "builtin-var", name };
+}
+
+export function builtinFuncNode(name: "random"): ExprNode {
+  return { kind: "builtin-func", name };
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +325,27 @@ class Parser {
       // Function call
       if (this._peek().kind === TokenKind.LParen) {
         this._advance(); // consume '('
+
+        // V(label) — circuit node voltage reference
+        if (name === "V") {
+          const labelTok = this._expect(TokenKind.Ident, "label identifier");
+          this._expect(TokenKind.RParen, "')'");
+          return circuitVoltageNode(labelTok.name!);
+        }
+
+        // I(label) — circuit branch current reference
+        if (name === "I") {
+          const labelTok = this._expect(TokenKind.Ident, "label identifier");
+          this._expect(TokenKind.RParen, "')'");
+          return circuitCurrentNode(labelTok.name!);
+        }
+
+        // random() — white noise
+        if (name === "random") {
+          this._expect(TokenKind.RParen, "')'");
+          return builtinFuncNode("random");
+        }
+
         const args: ExprNode[] = [];
         if (this._peek().kind !== TokenKind.RParen) {
           args.push(this._parseAdditive());
@@ -316,6 +357,10 @@ class Parser {
         this._expect(TokenKind.RParen, "')'");
         return callNode(name, args);
       }
+
+      // time and freq are builtin simulation variables
+      if (name === "time") return builtinVarNode("time");
+      if (name === "freq") return builtinVarNode("freq");
 
       // Variable or constant
       return varNode(name);

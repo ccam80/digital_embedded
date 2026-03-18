@@ -1,0 +1,455 @@
+/**
+ * Analog Switch components — SPST and SPDT.
+ *
+ * Voltage-controlled variable resistances. The control voltage smoothly
+ * transitions resistance from R_off to R_on using a tanh function, providing
+ * a continuous, differentiable R(V_ctrl) characteristic for reliable
+ * Newton-Raphson convergence.
+ *
+ * SPST (Single-Pole Single-Throw):
+ *   Pins: ctrl, in, out
+ *   R(V_ctrl) = R_off - (R_off - R_on) * 0.5 * (1 + tanh(k * (V_ctrl - V_th)))
+ *
+ * SPDT (Single-Pole Double-Throw):
+ *   Pins: ctrl, com, no, nc
+ *   COM-NO closes when V_ctrl > V_th (same tanh as SPST)
+ *   COM-NC opens  when V_ctrl > V_th (inverted tanh — complementary)
+ *
+ * MNA stamp: conductance 1/R between signal terminals, updated every NR
+ * iteration from the current V_ctrl operating point.
+ */
+
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
+import type { PropertyDefinition } from "../../core/properties.js";
+import {
+  ComponentCategory,
+  noOpAnalogExecuteFn,
+  type AttributeMapping,
+  type ComponentDefinition,
+} from "../../core/registry.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
+
+// ---------------------------------------------------------------------------
+// Shared resistance computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the switch resistance from the control voltage using a tanh
+ * transition centred on V_th.
+ *
+ * @param vCtrl      - Control voltage (V)
+ * @param vTh        - Threshold voltage (V)
+ * @param rOn        - On-state resistance (Ω)
+ * @param rOff       - Off-state resistance (Ω)
+ * @param k          - Transition sharpness (1/V); larger values → sharper switch
+ * @param invert     - When true, tanh argument is negated (complementary path)
+ * @returns Resistance in ohms
+ */
+function switchResistance(
+  vCtrl: number,
+  vTh: number,
+  rOn: number,
+  rOff: number,
+  k: number,
+  invert: boolean,
+): number {
+  const arg = invert ? -k * (vCtrl - vTh) : k * (vCtrl - vTh);
+  const tanhVal = Math.tanh(arg);
+  return rOff - (rOff - rOn) * 0.5 * (1 + tanhVal);
+}
+
+// ---------------------------------------------------------------------------
+// MNA stamp helpers (1-based node IDs, 0 = ground)
+// ---------------------------------------------------------------------------
+
+function stampConductance(
+  solver: SparseSolver,
+  nodeA: number,
+  nodeB: number,
+  g: number,
+): void {
+  if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, g);
+  if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, g);
+  if (nodeA > 0 && nodeB > 0) {
+    solver.stamp(nodeA - 1, nodeB - 1, -g);
+    solver.stamp(nodeB - 1, nodeA - 1, -g);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createAnalogSwitchSPSTElement — AnalogElement factory (SPST)
+// ---------------------------------------------------------------------------
+
+function createAnalogSwitchSPSTElement(
+  nodeIds: number[],
+  props: PropertyBag,
+): AnalogElement {
+  const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
+  const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
+  const vTh  = props.getOrDefault<number>("threshold", 1.65);
+  const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
+
+  const nCtrl = nodeIds[0]; // control terminal
+  const nIn   = nodeIds[1]; // signal in
+  const nOut  = nodeIds[2]; // signal out
+
+  // Current operating-point resistance
+  let currentR = rOff;
+
+  function readNode(voltages: Float64Array, n: number): number {
+    return n > 0 ? voltages[n - 1] : 0;
+  }
+
+  return {
+    nodeIndices: [nCtrl, nIn, nOut],
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: false,
+
+    stamp(_solver: SparseSolver): void {
+      // No linear (topology-constant) contributions — all in stampNonlinear.
+    },
+
+    stampNonlinear(solver: SparseSolver): void {
+      const g = 1 / currentR;
+      stampConductance(solver, nIn, nOut, g);
+    },
+
+    updateOperatingPoint(voltages: Float64Array): void {
+      const vCtrl = readNode(voltages, nCtrl);
+      currentR = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// createAnalogSwitchSPDTElement — AnalogElement factory (SPDT)
+// ---------------------------------------------------------------------------
+
+function createAnalogSwitchSPDTElement(
+  nodeIds: number[],
+  props: PropertyBag,
+): AnalogElement {
+  const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
+  const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
+  const vTh  = props.getOrDefault<number>("threshold", 1.65);
+  const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
+
+  const nCtrl = nodeIds[0]; // control terminal
+  const nCom  = nodeIds[1]; // common terminal
+  const nNO   = nodeIds[2]; // normally-open terminal
+  const nNC   = nodeIds[3]; // normally-closed terminal
+
+  let rNO = rOff; // COM-NO resistance (closes when V_ctrl > V_th)
+  let rNC = rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
+
+  function readNode(voltages: Float64Array, n: number): number {
+    return n > 0 ? voltages[n - 1] : 0;
+  }
+
+  return {
+    nodeIndices: [nCtrl, nCom, nNO, nNC],
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: false,
+
+    stamp(_solver: SparseSolver): void {
+      // No linear contributions — all in stampNonlinear.
+    },
+
+    stampNonlinear(solver: SparseSolver): void {
+      stampConductance(solver, nCom, nNO, 1 / rNO);
+      stampConductance(solver, nCom, nNC, 1 / rNC);
+    },
+
+    updateOperatingPoint(voltages: Float64Array): void {
+      const vCtrl = readNode(voltages, nCtrl);
+      rNO = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
+      rNC = switchResistance(vCtrl, vTh, rOn, rOff, k, true);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pin declarations
+// ---------------------------------------------------------------------------
+
+function buildSPSTPinDeclarations(): PinDeclaration[] {
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl",
+      defaultBitWidth: 1,
+      position: { x: 1, y: -2 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "in",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "out",
+      defaultBitWidth: 1,
+      position: { x: 4, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+function buildSPDTPinDeclarations(): PinDeclaration[] {
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl",
+      defaultBitWidth: 1,
+      position: { x: 2, y: -2 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "com",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "no",
+      defaultBitWidth: 1,
+      position: { x: 4, y: -1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "nc",
+      defaultBitWidth: 1,
+      position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// CircuitElement classes
+// ---------------------------------------------------------------------------
+
+export class AnalogSwitchSPSTElement extends AbstractCircuitElement {
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("AnalogSwitchSPST", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(buildSPSTPinDeclarations(), []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 4 };
+  }
+
+  draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
+    ctx.save();
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+
+    // Switch body: two terminals with a gap in the middle and control line
+    ctx.drawLine(0, 0, 1.5, 0);       // in stub
+    ctx.drawLine(2.5, 0, 4, 0);       // out stub
+    ctx.drawLine(1.5, 0, 2.0, -0.8);  // switch blade (open position indicator)
+    ctx.drawLine(1, -2, 1, -0.3);     // control line (dashed style approximation)
+
+    if (label.length > 0) {
+      ctx.setFont({ family: "sans-serif", size: 0.8 });
+      ctx.drawText(label, 2, -2.5, { horizontal: "center", vertical: "bottom" });
+    }
+    ctx.restore();
+  }
+
+  getHelpText(): string {
+    return "Analog Switch (SPST) — voltage-controlled variable resistance. " +
+      "Transitions smoothly from R_off to R_on as control voltage crosses threshold.";
+  }
+}
+
+export class AnalogSwitchSPDTElement extends AbstractCircuitElement {
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("AnalogSwitchSPDT", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(buildSPDTPinDeclarations(), []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 4 };
+  }
+
+  draw(ctx: RenderContext): void {
+    const label = this._properties.getOrDefault<string>("label", "");
+    ctx.save();
+    ctx.setColor("COMPONENT");
+    ctx.setLineWidth(1);
+
+    // COM on left, NO on top-right, NC on bottom-right
+    ctx.drawLine(0, 0, 1.5, 0);       // com stub
+    ctx.drawLine(2.5, -1, 4, -1);     // no stub
+    ctx.drawLine(2.5, 1, 4, 1);       // nc stub
+    ctx.drawLine(1.5, 0, 2.0, -0.7);  // blade toward NO
+
+    if (label.length > 0) {
+      ctx.setFont({ family: "sans-serif", size: 0.8 });
+      ctx.drawText(label, 2, -2.5, { horizontal: "center", vertical: "bottom" });
+    }
+    ctx.restore();
+  }
+
+  getHelpText(): string {
+    return "Analog Switch (SPDT) — voltage-controlled double-throw switch. " +
+      "COM-NO closes and COM-NC opens as control voltage crosses threshold.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Property definitions (shared)
+// ---------------------------------------------------------------------------
+
+const ANALOG_SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "rOn",
+    type: PropertyType.INT,
+    label: "On resistance (Ω)",
+    defaultValue: 10,
+    min: 1e-6,
+    description: "Resistance when fully on (V_ctrl >> V_th). Default 10 Ω.",
+  },
+  {
+    key: "rOff",
+    type: PropertyType.INT,
+    label: "Off resistance (Ω)",
+    defaultValue: 1e9,
+    min: 1,
+    description: "Resistance when fully off (V_ctrl << V_th). Default 1 GΩ.",
+  },
+  {
+    key: "threshold",
+    type: PropertyType.INT,
+    label: "Threshold voltage (V)",
+    defaultValue: 1.65,
+    description: "Control voltage at midpoint of transition. Default 1.65 V (VDD/2 for 3.3 V CMOS).",
+  },
+  {
+    key: "transitionSharpness",
+    type: PropertyType.INT,
+    label: "Transition sharpness (1/V)",
+    defaultValue: 20,
+    min: 1e-6,
+    description: "Controls how sharply resistance transitions. Default 20 V⁻¹ (~0.2 V transition range).",
+  },
+  {
+    key: "label",
+    type: PropertyType.STRING,
+    label: "Label",
+    defaultValue: "",
+    description: "Optional display label.",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Attribute mappings (shared)
+// ---------------------------------------------------------------------------
+
+const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  { xmlName: "rOn",                 propertyKey: "rOn",                 convert: (v) => parseFloat(v) },
+  { xmlName: "rOff",                propertyKey: "rOff",                convert: (v) => parseFloat(v) },
+  { xmlName: "threshold",           propertyKey: "threshold",           convert: (v) => parseFloat(v) },
+  { xmlName: "transitionSharpness", propertyKey: "transitionSharpness", convert: (v) => parseFloat(v) },
+  { xmlName: "Label",               propertyKey: "label",               convert: (v) => v },
+];
+
+// ---------------------------------------------------------------------------
+// ComponentDefinitions
+// ---------------------------------------------------------------------------
+
+export const AnalogSwitchSPSTDefinition: ComponentDefinition = {
+  name: "AnalogSwitchSPST",
+  typeId: -1,
+  engineType: "analog",
+  category: ComponentCategory.ACTIVE,
+  executeFn: noOpAnalogExecuteFn,
+
+  pinLayout: buildSPSTPinDeclarations(),
+  propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
+  attributeMap: ANALOG_SWITCH_ATTRIBUTE_MAPPINGS,
+
+  helpText:
+    "Analog Switch (SPST) — three-terminal (ctrl, in, out). " +
+    "Voltage-controlled resistance using tanh transition for NR-friendly behavior.",
+
+  factory(props: PropertyBag): AnalogSwitchSPSTElement {
+    return new AnalogSwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  },
+
+  analogFactory(
+    nodeIds: number[],
+    _branchIdx: number,
+    props: PropertyBag,
+  ): AnalogElement {
+    return createAnalogSwitchSPSTElement(nodeIds, props);
+  },
+};
+
+export const AnalogSwitchSPDTDefinition: ComponentDefinition = {
+  name: "AnalogSwitchSPDT",
+  typeId: -1,
+  engineType: "analog",
+  category: ComponentCategory.ACTIVE,
+  executeFn: noOpAnalogExecuteFn,
+
+  pinLayout: buildSPDTPinDeclarations(),
+  propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
+  attributeMap: ANALOG_SWITCH_ATTRIBUTE_MAPPINGS,
+
+  helpText:
+    "Analog Switch (SPDT) — four-terminal (ctrl, com, no, nc). " +
+    "COM-NO closes and COM-NC opens as control voltage rises through threshold.",
+
+  factory(props: PropertyBag): AnalogSwitchSPDTElement {
+    return new AnalogSwitchSPDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  },
+
+  analogFactory(
+    nodeIds: number[],
+    _branchIdx: number,
+    props: PropertyBag,
+  ): AnalogElement {
+    return createAnalogSwitchSPDTElement(nodeIds, props);
+  },
+};

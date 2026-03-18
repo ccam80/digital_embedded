@@ -299,6 +299,20 @@ describe("SparseSolver", () => {
     expect(tFactor).toBeLessThan(2.5);    // 0.5ms * 5
     expect(tSolve).toBeLessThan(1.0);     // 0.2ms * 5
 
+    // Warm run: re-stamp same pattern, re-factor (simulates NR iteration 2+)
+    solver.beginAssembly(n);
+    for (const [r, c, v] of entries) solver.stamp(r, c, v);
+    for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
+    solver.finalize(); // topology unchanged — skips symbolic
+
+    const tw1 = performance.now();
+    solver.factor();
+    const tWarmFactor = performance.now() - tw1;
+
+    const tw2 = performance.now();
+    solver.solve(x);
+    const tWarmSolve = performance.now() - tw2;
+
     // Verify solution is correct: A*x should equal b within tolerance
     // (residual check using original entries)
     const residual = new Float64Array(n);
@@ -306,5 +320,157 @@ describe("SparseSolver", () => {
     for (let i = 0; i < n; i++) {
       expect(Math.abs(residual[i] - rhs[i])).toBeLessThan(1e-8);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real MNA circuit benchmark — full engine pipeline
+// ---------------------------------------------------------------------------
+
+import {
+  makeResistor,
+  makeVoltageSource,
+  makeCapacitor,
+  makeDiode,
+  makeInductor,
+} from "../test-elements.js";
+import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+import { MNAEngine } from "../analog-engine.js";
+import { EngineState } from "../../core/engine-interface.js";
+
+describe("SparseSolver real MNA circuit", () => {
+  it("mna_50node_realistic_circuit_performance", () => {
+    // 50-node MNA circuit with realistic topology:
+    //
+    //   Vs=10V source: node 50 → GND (branch row 50)
+    //   Resistor chain: node 50 → 49 → 48 → ... → 1 → GND (50 resistors)
+    //   Shunt capacitors: every 5th node to GND (10 caps at nodes 5,10,...,50)
+    //   Shunt diodes: every 7th node to GND (7 diodes at nodes 7,14,...,49)
+    //   Inductor: node 25 → GND (branch row 51)
+    //   Cross-links: 5 feedback resistors spanning non-adjacent nodes
+    //
+    // Matrix: 50 nodes + 2 branches = 52×52
+    // ~70 elements, ~150 nonzeros, ~5.5% density (realistic MNA)
+
+    const nodeCount = 50;
+    const branchCount = 2;
+    const matrixSize = nodeCount + branchCount;
+    const elements: import("../element.js").AnalogElement[] = [];
+
+    // Voltage source: node 50 → GND, branch row = 50
+    elements.push(makeVoltageSource(50, 0, 50, 10.0));
+
+    // Resistor chain: node i → node i-1, with node 1 → GND
+    for (let i = 50; i >= 2; i--) {
+      elements.push(makeResistor(i, i - 1, 1000 + i * 10));
+    }
+    elements.push(makeResistor(1, 0, 1000)); // node 1 → GND
+
+    // Shunt capacitors: every 5th node to GND
+    for (let i = 5; i <= 50; i += 5) {
+      elements.push(makeCapacitor(i, 0, 100e-9));
+    }
+
+    // Shunt diodes: every 7th node to GND
+    for (let i = 7; i <= 49; i += 7) {
+      elements.push(makeDiode(i, 0, 1e-14, 1.0));
+    }
+
+    // Inductor: node 25 → GND, branch row = 51
+    elements.push(makeInductor(25, 0, 51, 1e-3));
+
+    // Cross-link resistors (feedback paths across the chain)
+    elements.push(makeResistor(10, 40, 10000));
+    elements.push(makeResistor(15, 35, 10000));
+    elements.push(makeResistor(20, 30, 10000));
+    elements.push(makeResistor(5, 45, 10000));
+    elements.push(makeResistor(12, 38, 10000));
+
+    const compiled = new ConcreteCompiledAnalogCircuit({
+      nodeCount,
+      branchCount,
+      elements,
+      labelToNodeId: new Map(),
+      wireToNodeId: new Map(),
+      models: new Map(),
+      elementToCircuitElement: new Map(),
+    });
+
+    const engine = new MNAEngine();
+    engine.init(compiled);
+
+    // --- DC operating point ---
+    const t0 = performance.now();
+    const dcResult = engine.dcOperatingPoint();
+    const tDcOp = performance.now() - t0;
+
+    expect(dcResult.converged).toBe(true);
+
+    // Voltage source enforces node 50 = 10V
+    const v50 = engine.getNodeVoltage(49); // 0-based
+    expect(v50).toBeCloseTo(10.0, 1);
+
+    // --- Transient simulation: 100 steps ---
+    engine.configure({ maxTimeStep: 1e-6 });
+    const t1 = performance.now();
+    let transientSteps = 0;
+    while (transientSteps < 100 && engine.getState() !== EngineState.ERROR) {
+      engine.step();
+      transientSteps++;
+    }
+    const tTransient = performance.now() - t1;
+    const tPerStep = tTransient / transientSteps;
+
+    expect(engine.getState()).not.toBe(EngineState.ERROR);
+    expect(transientSteps).toBe(100);
+
+    // --- Isolated solver timing (apples-to-apples with performance_50_node) ---
+    // Stamp the same circuit's linear elements into a raw SparseSolver
+    const rawSolver = new SparseSolver();
+    rawSolver.beginAssembly(matrixSize);
+    for (const el of elements) {
+      if (!el.isNonlinear) el.stamp(rawSolver);
+    }
+    // Also stamp diodes at their initial operating point (geq=GMIN, ieq=0)
+    // so the matrix has the same sparsity pattern as a real NR iteration
+    for (const el of elements) {
+      if (el.isNonlinear && el.stampNonlinear) el.stampNonlinear(rawSolver);
+    }
+
+    const ts0 = performance.now();
+    rawSolver.finalize();
+    const tRawSymbolic = performance.now() - ts0;
+
+    const ts1 = performance.now();
+    const fResult = rawSolver.factor();
+    const tRawFactor = performance.now() - ts1;
+    expect(fResult.success).toBe(true);
+
+    const ts2 = performance.now();
+    const xRaw = new Float64Array(matrixSize);
+    rawSolver.solve(xRaw);
+    const tRawSolve = performance.now() - ts2;
+
+    // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
+    rawSolver.beginAssembly(matrixSize);
+    for (const el of elements) {
+      if (!el.isNonlinear) el.stamp(rawSolver);
+      if (el.isNonlinear && el.stampNonlinear) el.stampNonlinear(rawSolver);
+    }
+    rawSolver.finalize(); // topology unchanged — skips symbolic
+
+    const tw1 = performance.now();
+    rawSolver.factor();
+    const tWarmFactor = performance.now() - tw1;
+
+    const tw2 = performance.now();
+    rawSolver.solve(xRaw);
+    const tWarmSolve = performance.now() - tw2;
+
+    // Performance targets for a 52×52 real MNA matrix:
+    // DC OP: < 20ms (multiple NR iterations with 7 nonlinear diodes)
+    // Per transient step: < 2ms
+    expect(tDcOp).toBeLessThan(20);
+    expect(tPerStep).toBeLessThan(2);
   });
 });

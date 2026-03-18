@@ -187,6 +187,88 @@ export class Circuit {
   }
 
   /**
+   * Split wires at T-junctions.
+   *
+   * In Digital's Java editor, when a wire endpoint lands on the interior of
+   * another wire, the editor splits the longer wire into two segments at that
+   * point. This ensures endpoint-based net resolution sees the connection.
+   *
+   * .dig files from the original editor always have split wires, but
+   * hand-edited or externally-generated files may not.  Call this after
+   * loading a .dig file to normalise the wire list.
+   */
+  splitWiresAtJunctions(): void {
+    // Collect all "interesting" points: wire endpoints + pin world positions
+    const points = new Set<string>();
+    for (const wire of this.wires) {
+      points.add(`${wire.start.x},${wire.start.y}`);
+      points.add(`${wire.end.x},${wire.end.y}`);
+    }
+    for (const el of this.elements) {
+      for (const pin of el.getPins()) {
+        const wx = el.position.x + pin.position.x;
+        const wy = el.position.y + pin.position.y;
+        points.add(`${wx},${wy}`);
+      }
+    }
+
+    // For each wire, check if any point lies strictly on its interior.
+    // If so, split the wire at that point into two segments.
+    // Repeat until no more splits are needed (a wire may need multiple splits).
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = this.wires.length - 1; i >= 0; i--) {
+        const wire = this.wires[i]!;
+        const sx = wire.start.x, sy = wire.start.y;
+        const ex = wire.end.x, ey = wire.end.y;
+        const dx = ex - sx, dy = ey - sy;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) continue;
+
+        // Find the split point closest to start (lowest t) so we split
+        // one segment at a time from the start end.
+        let bestT = 2; // > 1 means no split found
+        let bestPx = 0, bestPy = 0;
+
+        for (const key of points) {
+          const commaIdx = key.indexOf(',');
+          const px = +key.slice(0, commaIdx);
+          const py = +key.slice(commaIdx + 1);
+
+          if (px === sx && py === sy) continue;
+          if (px === ex && py === ey) continue;
+
+          // Collinearity (cross product == 0)
+          const cross = dx * (py - sy) - dy * (px - sx);
+          if (cross !== 0) continue;
+
+          // Parameterise: t = dot(P-S, E-S) / |E-S|²
+          const dot = (px - sx) * dx + (py - sy) * dy;
+          if (dot <= 0 || dot >= lenSq) continue;
+
+          const t = dot / lenSq;
+          if (t < bestT) {
+            bestT = t;
+            bestPx = px;
+            bestPy = py;
+          }
+        }
+
+        if (bestT < 1) {
+          // Split: replace wire with [start→splitPt] and [splitPt→end]
+          const splitPt = { x: bestPx, y: bestPy };
+          this.wires.splice(i, 1,
+            new Wire(wire.start, splitPt, wire.bitWidth),
+            new Wire(splitPt, wire.end, wire.bitWidth),
+          );
+          changed = true;
+        }
+      }
+    }
+  }
+
+  /**
    * Return all elements whose bounding box contains the given point.
    */
   getElementsAt(point: Point): CircuitElement[] {

@@ -206,9 +206,27 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 85,
-      "lastAccessed": 1773786750832,
+      "accessCount": 130,
+      "lastAccessed": 1773798509816,
       "type": "directory"
+    },
+    {
+      "path": "spec\\phase-5-tier-2-components.md",
+      "accessCount": 89,
+      "lastAccessed": 1773798983580,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 79,
+      "lastAccessed": 1773798813781,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 78,
+      "lastAccessed": 1773799010623,
+      "type": "file"
     },
     {
       "path": "spec\\phase-2-tier-1-components.md",
@@ -223,27 +241,21 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 59,
-      "lastAccessed": 1773786725844,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 54,
-      "lastAccessed": 1773786740443,
-      "type": "file"
-    },
-    {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 52,
-      "lastAccessed": 1773785387344,
+      "accessCount": 58,
+      "lastAccessed": 1773792663664,
       "type": "file"
     },
     {
-      "path": "spec\\phase-5-tier-2-components.md",
-      "accessCount": 49,
-      "lastAccessed": 1773780378744,
+      "path": "src",
+      "accessCount": 43,
+      "lastAccessed": 1773797456347,
+      "type": "directory"
+    },
+    {
+      "path": "src\\engine\\digital-engine.ts",
+      "accessCount": 40,
+      "lastAccessed": 1773793783963,
       "type": "file"
     },
     {
@@ -259,12 +271,6 @@
       "type": "file"
     },
     {
-      "path": "src",
-      "accessCount": 33,
-      "lastAccessed": 1773786334724,
-      "type": "directory"
-    },
-    {
       "path": "spec\\phase-6-tier-3-and-polish.md",
       "accessCount": 32,
       "lastAccessed": 1773745006883,
@@ -272,26 +278,26 @@
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 28,
-      "lastAccessed": 1773786511162,
-      "type": "file"
-    },
-    {
-      "path": "src\\engine\\digital-engine.ts",
-      "accessCount": 27,
-      "lastAccessed": 1773786739328,
+      "accessCount": 32,
+      "lastAccessed": 1773795616867,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 26,
-      "lastAccessed": 1773786741259,
+      "accessCount": 32,
+      "lastAccessed": 1773798665667,
       "type": "directory"
     },
     {
       "path": "src\\headless\\runner.ts",
-      "accessCount": 21,
-      "lastAccessed": 1773786765201,
+      "accessCount": 26,
+      "lastAccessed": 1773793808143,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-4c-transistor-level-models.md",
+      "accessCount": 24,
+      "lastAccessed": 1773792973917,
       "type": "file"
     },
     {
@@ -301,15 +307,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-4c-transistor-level-models.md",
-      "accessCount": 20,
-      "lastAccessed": 1773786729882,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\renderer-interface.ts",
       "accessCount": 18,
       "lastAccessed": 1773776143301,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 18,
+      "lastAccessed": 1773798588395,
       "type": "file"
     },
     {
@@ -331,15 +337,15 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 14,
-      "lastAccessed": 1773786695063,
-      "type": "file"
-    },
-    {
       "path": "spec\\phase-0-interface-abstraction.md",
       "accessCount": 13,
       "lastAccessed": 1773747627915,
+      "type": "file"
+    },
+    {
+      "path": "spec\\author_instructions.md",
+      "accessCount": 13,
+      "lastAccessed": 1773795346240,
       "type": "file"
     },
     {
@@ -349,15 +355,27 @@
       "type": "file"
     },
     {
-      "path": "spec\\author_instructions.md",
-      "accessCount": 12,
-      "lastAccessed": 1773784693662,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\review-spec.md",
       "accessCount": 9,
       "lastAccessed": 1773740990489,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\not.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773793005720,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-renderer.ts",
+      "accessCount": 8,
+      "lastAccessed": 1773792595895,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\and.ts",
+      "accessCount": 8,
+      "lastAccessed": 1773793005882,
       "type": "file"
     },
     {
@@ -365,12 +383,6 @@
       "accessCount": 7,
       "lastAccessed": 1773773916891,
       "type": "directory"
-    },
-    {
-      "path": "src\\editor\\wire-renderer.ts",
-      "accessCount": 7,
-      "lastAccessed": 1773774556765,
-      "type": "file"
     },
     {
       "path": "src\\io\\postmessage-adapter.ts",
@@ -385,33 +397,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\gates\\not.ts",
-      "accessCount": 6,
-      "lastAccessed": 1773776546448,
-      "type": "file"
-    },
-    {
       "path": "src\\editor\\hit-test.ts",
       "accessCount": 6,
       "lastAccessed": 1773783636932,
       "type": "file"
     },
     {
+      "path": "src\\editor\\wire-signal-access.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773792595222,
+      "type": "file"
+    },
+    {
       "path": "spec\\reviews\\spec-review-combined.md",
       "accessCount": 5,
       "lastAccessed": 1773741747966,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\wire-signal-access.ts",
-      "accessCount": 5,
-      "lastAccessed": 1773774571480,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\and.ts",
-      "accessCount": 5,
-      "lastAccessed": 1773776482092,
       "type": "file"
     },
     {
@@ -427,15 +427,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\io\\file-resolver.ts",
-      "accessCount": 4,
-      "lastAccessed": 1773773814158,
+      "path": "src\\core",
+      "accessCount": 5,
+      "lastAccessed": 1773795959100,
       "type": "directory"
     },
     {
-      "path": "src\\core",
+      "path": "src\\io\\file-resolver.ts",
       "accessCount": 4,
-      "lastAccessed": 1773779980076,
+      "lastAccessed": 1773773814158,
       "type": "directory"
     },
     {

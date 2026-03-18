@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:\\\\local_working_projects\\\\digital_in_browser\\\" && npx vitest run src/analog/__tests__/sparse-solver.test.ts 2>&1\",\"timeout\":30000,\"description\":\"Run sparse solver tests\"}",
-  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/analog/__tests__/sparse-solver.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 22\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m SparseSolver\u001b[2m > \u001b[22mperformance_50_node\u001b[90m 12\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → expected 0.01801708681416936 to be less than 1e-8\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[1m\u001b[7m Failed Tests 1 \u001b[27m\u001b[22m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7...",
-  "timestamp": "2026-03-17T22:56:01.987Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/components/passives/__tests__/tapped-transformer.test.ts\\\" --reporter=verbose 2>&1\",\"timeout\":120000,\"descriptio...",
+  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m×\u001b[39m src/components/passives/__tests__/tapped-transformer.test.ts\u001b[2m > \u001b[22mTappedTransformer\u001b[2m > \u001b[22mcenter_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint\n\u001b[31m   → expected 4.663774161555921 to be greater than 7\u001b[39m\n \u001b[32m✓\u001b[39m src/components/passives/__tests__/tapped-transformer.test.ts\u001b[2m > \u001b[22mTappedTransformer\u001b[2m > \u001b[22msymmetric_ha...",
+  "timestamp": "2026-03-18T02:02:23.751Z",
   "retry_count": 1
 }

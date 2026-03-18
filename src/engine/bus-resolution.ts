@@ -319,6 +319,14 @@ export class BusResolver {
     }
   }
 
+  /**
+   * Return all bus output net IDs. Used by the engine to reset stale values
+   * before recalculation after switch reconfiguration.
+   */
+  getOutputNetIds(): number[] {
+    return Array.from(this._busNets.keys());
+  }
+
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------

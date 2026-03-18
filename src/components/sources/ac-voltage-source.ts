@@ -36,17 +36,40 @@ import type { ExprNode } from "../../analog/expression.js";
 // Waveform computation
 // ---------------------------------------------------------------------------
 
-export type Waveform = "sine" | "square" | "triangle" | "sawtooth" | "expression";
+export type Waveform = "sine" | "square" | "triangle" | "sawtooth" | "expression" | "sweep" | "am" | "fm" | "noise";
+
+/**
+ * Box-Muller transform: produces a standard normal (mean=0, std=1) sample.
+ */
+function boxMuller(): number {
+  const u1 = Math.random();
+  const u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1 === 0 ? Number.EPSILON : u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/**
+ * Extended waveform parameters for sweep, AM, FM, and noise modes.
+ */
+export interface ExtendedWaveformParams {
+  freqStart?: number;
+  freqEnd?: number;
+  sweepDuration?: number;
+  sweepMode?: "linear" | "log";
+  modulationFreq?: number;
+  modulationDepth?: number;
+  modulationIndex?: number;
+}
 
 /**
  * Compute instantaneous waveform value at time t.
  *
  * @param waveform  - Waveform type
  * @param amplitude - Peak amplitude in volts
- * @param frequency - Frequency in Hz
+ * @param frequency - Carrier frequency in Hz (also used as center/base frequency)
  * @param phase     - Phase offset in radians
  * @param dcOffset  - DC offset added to waveform output
  * @param t         - Simulation time in seconds
+ * @param ext       - Extended parameters for sweep/AM/FM/noise modes
  */
 export function computeWaveformValue(
   waveform: Waveform,
@@ -55,6 +78,7 @@ export function computeWaveformValue(
   phase: number,
   dcOffset: number,
   t: number,
+  ext?: ExtendedWaveformParams,
 ): number {
   const arg = 2 * Math.PI * frequency * t + phase;
   switch (waveform) {
@@ -71,6 +95,38 @@ export function computeWaveformValue(
       const normalized = frequency * t + phase / (2 * Math.PI);
       return dcOffset + amplitude * 2 * (normalized - Math.floor(normalized + 0.5));
     }
+
+    case "sweep": {
+      const fStart = ext?.freqStart ?? frequency;
+      const fEnd = ext?.freqEnd ?? frequency;
+      const T = ext?.sweepDuration ?? 1;
+      const mode = ext?.sweepMode ?? "linear";
+      let ft: number;
+      if (mode === "log" && fStart > 0 && fEnd > 0) {
+        ft = fStart * Math.pow(fEnd / fStart, Math.min(t, T) / T);
+      } else {
+        ft = fStart + (fEnd - fStart) * Math.min(t, T) / T;
+      }
+      return dcOffset + amplitude * Math.sin(2 * Math.PI * ft * t + phase);
+    }
+
+    case "am": {
+      const modFreq = ext?.modulationFreq ?? 100;
+      const depth = ext?.modulationDepth ?? 1.0;
+      return dcOffset + (1 + depth * Math.sin(2 * Math.PI * modFreq * t)) * amplitude * Math.sin(arg);
+    }
+
+    case "fm": {
+      const modFreq = ext?.modulationFreq ?? 100;
+      const idx = ext?.modulationIndex ?? 1.0;
+      return dcOffset + amplitude * Math.sin(2 * Math.PI * frequency * t + idx * Math.sin(2 * Math.PI * modFreq * t) + phase);
+    }
+
+    case "noise":
+      return dcOffset + amplitude * boxMuller();
+
+    case "expression":
+      return dcOffset;
   }
 }
 
@@ -216,7 +272,56 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     type: PropertyType.STRING,
     label: "Waveform",
     defaultValue: "sine",
-    description: "Waveform type: sine | square | triangle | sawtooth",
+    description: "Waveform type: sine | square | triangle | sawtooth | sweep | am | fm | noise",
+  },
+  {
+    key: "freqStart",
+    type: PropertyType.INT,
+    label: "Sweep Start Freq (Hz)",
+    defaultValue: 100,
+    description: "Start frequency for sweep waveform (Hz)",
+  },
+  {
+    key: "freqEnd",
+    type: PropertyType.INT,
+    label: "Sweep End Freq (Hz)",
+    defaultValue: 10000,
+    description: "End frequency for sweep waveform (Hz)",
+  },
+  {
+    key: "sweepDuration",
+    type: PropertyType.INT,
+    label: "Sweep Duration (s)",
+    defaultValue: 1,
+    description: "Duration of the frequency sweep in seconds",
+  },
+  {
+    key: "sweepMode",
+    type: PropertyType.STRING,
+    label: "Sweep Mode",
+    defaultValue: "linear",
+    description: "Sweep interpolation: linear | log",
+  },
+  {
+    key: "modulationFreq",
+    type: PropertyType.INT,
+    label: "Modulation Freq (Hz)",
+    defaultValue: 100,
+    description: "Modulation frequency for AM and FM waveforms (Hz)",
+  },
+  {
+    key: "modulationDepth",
+    type: PropertyType.INT,
+    label: "Modulation Depth (0-1)",
+    defaultValue: 1,
+    description: "AM modulation depth (0 = no modulation, 1 = full AM)",
+  },
+  {
+    key: "modulationIndex",
+    type: PropertyType.INT,
+    label: "Modulation Index (rad)",
+    defaultValue: 1,
+    description: "FM modulation index (peak phase deviation in radians)",
   },
   {
     key: "expression",
@@ -276,6 +381,15 @@ function createAcVoltageSourceElement(
   const phase = props.getOrDefault<number>("phase", 0);
   const dcOffset = props.getOrDefault<number>("dcOffset", 0);
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
+  const ext: ExtendedWaveformParams = {
+    freqStart: props.getOrDefault<number>("freqStart", 100),
+    freqEnd: props.getOrDefault<number>("freqEnd", 10000),
+    sweepDuration: props.getOrDefault<number>("sweepDuration", 1),
+    sweepMode: props.getOrDefault<string>("sweepMode", "linear") as "linear" | "log",
+    modulationFreq: props.getOrDefault<number>("modulationFreq", 100),
+    modulationDepth: props.getOrDefault<number>("modulationDepth", 1),
+    modulationIndex: props.getOrDefault<number>("modulationIndex", 1),
+  };
 
   let scale = 1;
 
@@ -316,7 +430,7 @@ function createAcVoltageSourceElement(
           v = 0;
         }
       } else {
-        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t) * scale;
+        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * scale;
       }
 
       // B sub-matrix: node rows, branch column k
@@ -332,8 +446,20 @@ function createAcVoltageSourceElement(
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {
-      if (waveform !== "square") return [];
-      return squareWaveBreakpoints(frequency, phase, tStart, tEnd);
+      if (waveform === "square") {
+        return squareWaveBreakpoints(frequency, phase, tStart, tEnd);
+      }
+      if (waveform === "noise") {
+        // Force timestep controller to sample at each interval so noise is uncorrelated.
+        const dt = Math.min(1 / (20 * frequency), (tEnd - tStart));
+        if (dt <= 0) return [];
+        const pts: number[] = [];
+        for (let t = tStart + dt; t < tEnd; t += dt) {
+          pts.push(t);
+        }
+        return pts;
+      }
+      return [];
     },
   };
 

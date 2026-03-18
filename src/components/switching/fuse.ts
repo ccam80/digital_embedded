@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { createAnalogFuseElement } from "../passives/analog-fuse.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -197,6 +198,7 @@ function fuseFactory(props: PropertyBag): FuseElement {
 export const FuseDefinition: ComponentDefinition = {
   name: "Fuse",
   typeId: -1,
+  engineType: "both",
   factory: fuseFactory,
   executeFn: executeFuse,
   pinLayout: FUSE_PIN_DECLARATIONS,
@@ -205,4 +207,5 @@ export const FuseDefinition: ComponentDefinition = {
   category: ComponentCategory.SWITCHING,
   helpText: "Fuse — one-time irreversible switch. blown=false → closed; blown=true → permanently open.",
   defaultDelay: 0,
+  analogFactory: createAnalogFuseElement,
 };

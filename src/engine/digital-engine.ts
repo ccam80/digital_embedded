@@ -869,32 +869,55 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     const switchIndices = compiled.switchComponentIndices;
     const layout = compiled.layout;
     const busResolver = compiled.busResolver!;
-    let anyChanged = false;
+    const shadowEnd = compiled.netCount + compiled.shadowNetCount;
+    const { executeFns, typeIds, evaluationOrder } = compiled;
 
-    for (let s = 0; s < switchIndices.length; s++) {
-      const compIdx = switchIndices[s]!;
-      const stBase = layout.stateOffset(compIdx);
-      const closedFlag = state[stBase]!;
-      const prevFlag = this._switchPrevStates[s]!;
+    // Outer loop: after reconfiguring switches and re-evaluating components,
+    // downstream switch states may have changed (e.g. chained CMOS inverters
+    // where inverter 1's output change flips inverter 2's FETs). Repeat
+    // until no more switch states change, bounded to prevent infinite loops.
+    const MAX_SWITCH_SETTLE = 20;
+    for (let iter = 0; iter < MAX_SWITCH_SETTLE; iter++) {
+      let anyChanged = false;
 
-      if (closedFlag !== prevFlag) {
-        this._switchPrevStates[s] = closedFlag;
-        busResolver.reconfigureForSwitch(compIdx, closedFlag !== 0);
-        anyChanged = true;
+      for (let s = 0; s < switchIndices.length; s++) {
+        const compIdx = switchIndices[s]!;
+        const stBase = layout.stateOffset(compIdx);
+        const closedFlag = state[stBase]!;
+        const prevFlag = this._switchPrevStates[s]!;
+
+        if (closedFlag !== prevFlag) {
+          this._switchPrevStates[s] = closedFlag;
+          busResolver.reconfigureForSwitch(compIdx, closedFlag !== 0);
+          anyChanged = true;
+        }
       }
-    }
 
-    if (anyChanged) {
-      // After switch reconfiguration, cross-linked actual net IDs are now
-      // registered as drivers in other bus nets. Notify them so the bus
-      // resolver picks up the cross-linked values (e.g. VDD flowing through
-      // a closed PFET to the output net).
-      const shadowEnd = compiled.netCount + compiled.shadowNetCount;
-      for (let netId = 0; netId < shadowEnd; netId++) {
-        busResolver.onNetChanged(netId, state, this._highZs);
+      if (!anyChanged) break;
+
+      // Reset all bus output net values to high-Z so stale cross-driver
+      // values from the previous topology don't cause false burn detection.
+      // Critical for CMOS circuits where one switch opens (removing a VDD
+      // cross-link) while another closes (adding a GND cross-link) in the
+      // same iteration.
+      for (const busNet of this._getBusOutputNetIds(compiled)) {
+        state[busNet] = 0;
+        this._highZs[busNet] = 0xffffffff;
       }
-      // Re-evaluate all components so downstream components see resolved values.
-      const { executeFns, typeIds, evaluationOrder } = compiled;
+
+      // Recalculate iteratively until stable — bus nets can be circularly
+      // cross-linked through switches, requiring multiple passes.
+      const MAX_BUS_SETTLE = 10;
+      for (let pass = 0; pass < MAX_BUS_SETTLE; pass++) {
+        const before = this._snapshotBusNets(compiled);
+        for (let netId = 0; netId < shadowEnd; netId++) {
+          busResolver.onNetChanged(netId, state, this._highZs);
+        }
+        if (this._busNetsStable(compiled, before)) break;
+      }
+
+      // Re-evaluate all components so downstream components see resolved
+      // values — this may change switch closedFlags for the next iteration.
       for (let g = 0; g < evaluationOrder.length; g++) {
         const group = evaluationOrder[g]!;
         if (group.isFeedback) {
@@ -904,6 +927,33 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
         }
       }
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Private: bus net snapshot helpers for iterative recalculation
+  // -------------------------------------------------------------------------
+
+  private _getBusOutputNetIds(compiled: ConcreteCompiledCircuit): number[] {
+    return compiled.busResolver!.getOutputNetIds();
+  }
+
+  private _snapshotBusNets(compiled: ConcreteCompiledCircuit): Uint32Array {
+    const ids = this._getBusOutputNetIds(compiled);
+    const snap = new Uint32Array(ids.length * 2);
+    for (let i = 0; i < ids.length; i++) {
+      snap[i * 2] = this._values[ids[i]!]!;
+      snap[i * 2 + 1] = this._highZs[ids[i]!]!;
+    }
+    return snap;
+  }
+
+  private _busNetsStable(compiled: ConcreteCompiledCircuit, before: Uint32Array): boolean {
+    const ids = this._getBusOutputNetIds(compiled);
+    for (let i = 0; i < ids.length; i++) {
+      if (this._values[ids[i]!] !== before[i * 2]) return false;
+      if (this._highZs[ids[i]!] !== before[i * 2 + 1]) return false;
+    }
+    return true;
   }
 
   // -------------------------------------------------------------------------
