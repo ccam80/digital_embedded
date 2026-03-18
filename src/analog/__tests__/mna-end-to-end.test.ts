@@ -43,6 +43,7 @@ import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-s
 import { AnalogGroundDefinition } from "../../components/sources/ground.js";
 import { CapacitorDefinition } from "../../components/passives/capacitor.js";
 import { DiodeDefinition } from "../../components/semiconductors/diode.js";
+import { NmosfetDefinition, PmosfetDefinition } from "../../components/semiconductors/mosfet.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement factory — same pattern as analog-compiler.test.ts
@@ -568,5 +569,243 @@ describe("End-to-end: analytical verification", () => {
     expect(engine.getNodeVoltage(0)).toBeCloseTo(10.0, 6);
     expect(engine.getNodeVoltage(2)).toBeCloseTo(5.0, 6);
     expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 6);
+  });
+});
+
+// ===========================================================================
+// 5. MOSFET through compiler
+// ===========================================================================
+
+describe("MOSFET through compiler", () => {
+  // Shared registry builder that includes MOSFET definitions
+  function buildMosfetRegistry(): ComponentRegistry {
+    const registry = new ComponentRegistry();
+    registry.register(AnalogGroundDefinition);
+    registry.register(ResistorDefinition);
+    registry.register(DcVoltageSourceDefinition);
+    registry.register(NmosfetDefinition);
+    registry.register(PmosfetDefinition);
+    return registry;
+  }
+
+  it("nmos_common_source_dc_op", () => {
+    // VDD=5V → Rd=10kΩ → drain. Gate=2V (Vgs=2V). Source=GND.
+    // NMOS default W/L=1, KP=120e-6, VTO=0.7, LAMBDA=0.02
+    // Saturation: ids = KP/2*(W/L)*(Vgs-Vth)² = 60e-6*1*1.69 ≈ 0.1014mA
+    // Vdrain = 5 - 0.1014e-3 * 10000 ≈ 3.986V
+    // Confirm saturation: Vds(≈3.99V) > Vgs-Vth(1.3V) ✓
+    //
+    // Node layout (coordinate-based wiring):
+    //   x=10: VDD+ (vdd.pos), Rd.A
+    //   x=20: Rd.B, NMOS D
+    //   x=30: vdd.neg, GND, NMOS S
+    //   x=40: Vg+ (vg.pos), NMOS G
+    //   x=50: vg.neg, GND2
+
+    const circuit = new Circuit({ engineType: "analog" });
+    const registry = buildMosfetRegistry();
+
+    const vdd = makeElement("DcVoltageSource", "vdd1",
+      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 5]]),
+    );
+    const rd = makeElement("AnalogResistor", "rd1",
+      [{ x: 10, y: 0 }, { x: 20, y: 0 }],
+      new Map<string, PropertyValue>([["resistance", 10000]]),
+    );
+    // NMOS: D=x20, G=x40, S=x30 (uses default W/L=1e-6/1e-6 → W/L=1)
+    const nmos = makeElement("NMOS", "m1",
+      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>(),
+    );
+    const vg = makeElement("DcVoltageSource", "vg1",
+      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 2]]),
+    );
+    const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd2 = makeElement("Ground", "gnd2", [{ x: 50, y: 0 }]);
+
+    circuit.addElement(vdd);
+    circuit.addElement(rd);
+    circuit.addElement(nmos);
+    circuit.addElement(vg);
+    circuit.addElement(gnd1);
+    circuit.addElement(gnd2);
+
+    addWire(circuit, 10, 0, 10, 0);
+    addWire(circuit, 20, 0, 20, 0);
+    addWire(circuit, 30, 0, 30, 0);
+    addWire(circuit, 40, 0, 40, 0);
+    addWire(circuit, 50, 0, 50, 0);
+
+    const compiled = compileAnalogCircuit(circuit, registry);
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    const engine = new MNAEngine();
+    engine.init(compiled);
+    const result = engine.dcOperatingPoint();
+
+    expect(result.converged).toBe(true);
+
+    // Node voltages (non-ground): VDD top=5V, drain≈3.99V, gate=2V
+    // Sort descending: [5V, ≈3.99V, 2V]
+    // The drain node is the one between supply and gate voltage
+    const voltages = Array.from(result.nodeVoltages)
+      .slice(0, compiled.nodeCount)
+      .sort((a, b) => b - a);
+
+    // VDD node = 5V
+    expect(voltages[0]).toBeCloseTo(5.0, 1);
+    // Gate node = 2V (third highest when drain is ~3.99V)
+    // Drain node: pulled below VDD by ≈0.1014mA through 10kΩ
+    // Expected drain ≈ 3.99V, confirm saturation: Vdrain > Vgs-Vth = 1.3V
+    const vDrain = voltages[1]; // second-highest: drain between supply and gate
+    expect(vDrain).toBeGreaterThan(1.3);   // saturation condition
+    expect(vDrain).toBeLessThan(5.0);      // drain pulled below supply
+    expect(vDrain).toBeGreaterThan(3.0);   // significant voltage (not near ground)
+  });
+
+  it("nmos_triode_region_dc_op", () => {
+    // VDD=5V → Rd=100kΩ → drain. Gate=3V (Vgs=3V). Source=GND.
+    // NMOS default W/L=1, KP=120e-6, VTO=0.7 → Vgs-Vth=2.3V
+    // Saturation current: ids = 60e-6*1*2.3² ≈ 0.317mA
+    // If in saturation: Vdrain = 5 - 0.317e-3*100000 = 5 - 31.7 → clamps below 0 → triode
+    // Large Rd forces Vds small → triode (linear) region: Vds < Vgs-Vth = 2.3V
+    // In triode: ids = KP*W/L*((Vgs-Vth)*Vds - Vds²/2)
+    // KCL: (5-Vdrain)/100k = ids(Vdrain) → Vdrain ≈ small positive value
+
+    const circuit = new Circuit({ engineType: "analog" });
+    const registry = buildMosfetRegistry();
+
+    const vdd = makeElement("DcVoltageSource", "vdd1",
+      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 5]]),
+    );
+    const rd = makeElement("AnalogResistor", "rd1",
+      [{ x: 10, y: 0 }, { x: 20, y: 0 }],
+      new Map<string, PropertyValue>([["resistance", 100000]]),
+    );
+    // NMOS: D=x20, G=x40, S=x30 (default W/L=1)
+    const nmos = makeElement("NMOS", "m1",
+      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>(),
+    );
+    const vg = makeElement("DcVoltageSource", "vg1",
+      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 3]]),
+    );
+    const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd2 = makeElement("Ground", "gnd2", [{ x: 50, y: 0 }]);
+
+    circuit.addElement(vdd);
+    circuit.addElement(rd);
+    circuit.addElement(nmos);
+    circuit.addElement(vg);
+    circuit.addElement(gnd1);
+    circuit.addElement(gnd2);
+
+    addWire(circuit, 10, 0, 10, 0);
+    addWire(circuit, 20, 0, 20, 0);
+    addWire(circuit, 30, 0, 30, 0);
+    addWire(circuit, 40, 0, 40, 0);
+    addWire(circuit, 50, 0, 50, 0);
+
+    const compiled = compileAnalogCircuit(circuit, registry);
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    const engine = new MNAEngine();
+    engine.init(compiled);
+    const result = engine.dcOperatingPoint();
+
+    expect(result.converged).toBe(true);
+
+    // Sort node voltages descending: [5V(VDD), 3V(gate), drain(small)]
+    const voltages = Array.from(result.nodeVoltages)
+      .slice(0, compiled.nodeCount)
+      .sort((a, b) => b - a);
+
+    // VDD = 5V
+    expect(voltages[0]).toBeCloseTo(5.0, 1);
+    // Drain node (lowest non-ground voltage): must be in triode → Vds < Vgs-Vth = 2.3V
+    const vDrain = voltages[voltages.length - 1];
+    expect(vDrain).toBeLessThan(2.3);   // triode condition
+    expect(vDrain).toBeGreaterThan(0.0); // conducting (above ground)
+  });
+
+  it("pmos_common_source_dc_op", () => {
+    // PMOS source=VDD=5V, gate=3V (Vsg=2V), drain through Rd=10kΩ to GND.
+    // PMOS default W/L=1, KP=60e-6, VTO=-0.7, LAMBDA=0.02
+    // |Vsg|=2V, |Vtp|=0.7V → |Vsg|-|Vtp|=1.3V
+    // Saturation: |ids| = KP/2*(W/L)*1.3² = 30e-6*1.69 ≈ 50.7µA
+    // Vdrain = ids*Rd = 50.7e-6*10000 ≈ 0.507V
+    // Confirm saturation: |Vds|=5-0.507=4.493V > 1.3V ✓
+    //
+    // Node layout:
+    //   x=10: PMOS S (source=VDD), vs.pos
+    //   x=20: PMOS D (drain), Rd.A
+    //   x=30: vs.neg, Rd.B, GND
+    //   x=40: Vg.pos, PMOS G
+    //   x=50: Vg.neg, GND2
+
+    const circuit = new Circuit({ engineType: "analog" });
+    const registry = buildMosfetRegistry();
+
+    const vs = makeElement("DcVoltageSource", "vs1",
+      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 5]]),
+    );
+    const rd = makeElement("AnalogResistor", "rd1",
+      [{ x: 20, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["resistance", 10000]]),
+    );
+    // PMOS: D=x20, G=x40, S=x10 (default W/L=1)
+    const pmos = makeElement("PMOS", "m1",
+      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 10, y: 0 }],
+      new Map<string, PropertyValue>(),
+    );
+    const vg = makeElement("DcVoltageSource", "vg1",
+      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 3]]),
+    );
+    const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd2 = makeElement("Ground", "gnd2", [{ x: 50, y: 0 }]);
+
+    circuit.addElement(vs);
+    circuit.addElement(rd);
+    circuit.addElement(pmos);
+    circuit.addElement(vg);
+    circuit.addElement(gnd1);
+    circuit.addElement(gnd2);
+
+    addWire(circuit, 10, 0, 10, 0);
+    addWire(circuit, 20, 0, 20, 0);
+    addWire(circuit, 30, 0, 30, 0);
+    addWire(circuit, 40, 0, 40, 0);
+    addWire(circuit, 50, 0, 50, 0);
+
+    const compiled = compileAnalogCircuit(circuit, registry);
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    const engine = new MNAEngine();
+    engine.init(compiled);
+    const result = engine.dcOperatingPoint();
+
+    expect(result.converged).toBe(true);
+
+    // Sort node voltages descending: [5V(VDD/source), 3V(gate), drain(~0.5V)]
+    const voltages = Array.from(result.nodeVoltages)
+      .slice(0, compiled.nodeCount)
+      .sort((a, b) => b - a);
+
+    // VDD/source node = 5V
+    expect(voltages[0]).toBeCloseTo(5.0, 1);
+    // Drain node: pulled up from ground by PMOS current through Rd
+    // Expected ≈ 0.5V, must be above ground and confirm saturation: |Vds|>1.3V → Vdrain<3.7V
+    const vDrain = voltages[voltages.length - 1];
+    expect(vDrain).toBeGreaterThan(0.0);   // PMOS conducting (above ground)
+    expect(vDrain).toBeLessThan(3.7);      // saturation: |Vds|=5-Vdrain > 1.3V
   });
 });

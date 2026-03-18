@@ -98,8 +98,10 @@ function resolveParams(
   propsW: number | undefined,
   propsL: number | undefined,
 ): MosfetParams {
-  const modelParams =
-    (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const hasFn = typeof props.has === "function";
+  const modelParams = hasFn
+    ? (props.has("_modelParams") ? props.get<Record<string, number>>("_modelParams") : undefined)
+    : (props as unknown as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
   const mp = modelParams ?? defaults;
 
   return {
@@ -332,16 +334,31 @@ export function createMosfetElement(
 
   const defaults = polarity === 1 ? MOSFET_NMOS_DEFAULTS : MOSFET_PMOS_DEFAULTS;
 
-  // W and L can be set directly on the component instance
-  const propsRaw = props as Record<string, unknown>;
-  const propsW = typeof propsRaw["W"] === "number" ? (propsRaw["W"] as number) : undefined;
-  const propsL = typeof propsRaw["L"] === "number" ? (propsRaw["L"] as number) : undefined;
+  // W and L can be set directly on the component instance.
+  // Support both PropertyBag (has/get API) and plain objects (tests cast {} as PropertyBag).
+  const hasFn = typeof props.has === "function";
+  const propsW = hasFn
+    ? (props.has("W") ? props.get<number>("W") : undefined)
+    : (props as unknown as Record<string, unknown>)["W"] as number | undefined;
+  const propsL = hasFn
+    ? (props.has("L") ? props.get<number>("L") : undefined)
+    : (props as unknown as Record<string, unknown>)["L"] as number | undefined;
 
   const p = resolveParams(props, defaults, propsW, propsL);
+
+  // Polarity inversion: all junction voltages are sign-flipped for PMOS,
+  // so VTO must be used as magnitude. SPICE stores VTO < 0 for PMOS, but
+  // after polarity inversion the internal threshold should be |VTO|.
+  if (polarity === -1) {
+    p.VTO = Math.abs(p.VTO);
+  }
 
   // Check if capacitances are active
   const caps = computeCapacitances(p);
   const hasCapacitance = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0;
+
+  // Source stepping scale factor (1.0 = fully active, 0.0 = device off)
+  let _sourceScale = 1.0;
 
   // NR linearization state — initialize with device off
   let vgs = 0;
@@ -376,6 +393,10 @@ export function createMosfetElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
+
+    setSourceScale(factor: number): void {
+      _sourceScale = factor;
+    },
 
     stamp(solver: SparseSolver): void {
       // Stamp junction capacitance companion models (linear part, stamped once per timestep)
@@ -438,30 +459,35 @@ export function createMosfetElement(
       const effectiveD = swapped ? nodeS : nodeD;
       const effectiveS = swapped ? nodeD : nodeS;
 
+      // Scale conductances and Norton current by source stepping factor
+      const gmS = gm * _sourceScale;
+      const gdsS = gds * _sourceScale;
+      const gmbsS = gmbs * _sourceScale;
+
       // Transconductance gm (Vgs): current from S to D
-      stampG(solver, effectiveD, nodeG, gm);
-      stampG(solver, effectiveD, effectiveS, -gm);
-      stampG(solver, effectiveS, nodeG, -gm);
-      stampG(solver, effectiveS, effectiveS, gm);
+      stampG(solver, effectiveD, nodeG, gmS);
+      stampG(solver, effectiveD, effectiveS, -gmS);
+      stampG(solver, effectiveS, nodeG, -gmS);
+      stampG(solver, effectiveS, effectiveS, gmS);
 
       // Output conductance gds (Vds): current from S to D
-      stampG(solver, effectiveD, effectiveD, gds);
-      stampG(solver, effectiveD, effectiveS, -gds);
-      stampG(solver, effectiveS, effectiveD, -gds);
-      stampG(solver, effectiveS, effectiveS, gds);
+      stampG(solver, effectiveD, effectiveD, gdsS);
+      stampG(solver, effectiveD, effectiveS, -gdsS);
+      stampG(solver, effectiveS, effectiveD, -gdsS);
+      stampG(solver, effectiveS, effectiveS, gdsS);
 
       // Body transconductance gmbs (Vbs = Vb - Vs): only when bulk ≠ source
-      if (nodeB !== effectiveS && gmbs > 0) {
-        stampG(solver, effectiveD, nodeB, gmbs);
-        stampG(solver, effectiveD, effectiveS, -gmbs);
-        stampG(solver, effectiveS, nodeB, -gmbs);
-        stampG(solver, effectiveS, effectiveS, gmbs);
+      if (nodeB !== effectiveS && gmbsS > 0) {
+        stampG(solver, effectiveD, nodeB, gmbsS);
+        stampG(solver, effectiveD, effectiveS, -gmbsS);
+        stampG(solver, effectiveS, nodeB, -gmbsS);
+        stampG(solver, effectiveS, effectiveS, gmbsS);
       }
 
       // Norton current sources (KCL at drain and source)
       // Signed by polarity: positive Id flows from D to S in NMOS
       const vbsOp = -vsb; // Vbs = -Vsb
-      const nortonId = polarity * (ids - gm * vgs - gds * vds - gmbs * vbsOp);
+      const nortonId = polarity * (ids - gm * vgs - gds * vds - gmbs * vbsOp) * _sourceScale;
 
       stampRHS(solver, effectiveD, -nortonId);
       stampRHS(solver, effectiveS, nortonId);

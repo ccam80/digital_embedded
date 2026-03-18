@@ -611,9 +611,8 @@ export function compileAnalogCircuit(
 
     // Model binding: semiconductor components get resolved model parameters
     // injected into the props bag under '_modelParams' before factory call.
-    let resolvedProps = props;
     if (def.analogDeviceType !== undefined) {
-      const modelName = typeof props["model"] === "string" ? props["model"] as string : "";
+      const modelName = props.has("model") ? props.get<string>("model") : "";
       const resolvedModel =
         (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
         modelLibrary.getDefault(def.analogDeviceType);
@@ -622,11 +621,13 @@ export function compileAnalogCircuit(
       const modelDiags = validateModel(resolvedModel);
       diagnostics.push(...modelDiags);
 
-      resolvedProps = { ...props, _modelParams: resolvedModel.params };
+      // Inject resolved model params into the PropertyBag directly rather
+      // than spreading (spreading PropertyBag loses _map contents).
+      props.set("_modelParams", resolvedModel.params as unknown as import("../core/properties.js").PropertyValue);
     }
 
     // Call the analog factory
-    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, resolvedProps, getTime);
+    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, props, getTime);
 
     const elementIndex = analogElements.length;
     analogElements.push(element);

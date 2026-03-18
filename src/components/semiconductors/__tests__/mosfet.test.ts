@@ -283,6 +283,52 @@ describe("NMOS", () => {
     const nonzeroStamps = stampCalls.filter((call) => Math.abs(call[2] as number) > 1e-15);
     expect(nonzeroStamps.length).toBeGreaterThan(0);
   });
+
+  it("setSourceScale_zero_disables_current", () => {
+    // setSourceScale(0) should zero all RHS contributions from stampNonlinear
+    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    element.setSourceScale!(0);
+    const solver = makeMockSolver();
+
+    element.stampNonlinear!(solver);
+
+    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    for (const call of rhsCalls) {
+      expect(Math.abs(call[1] as number)).toBe(0);
+    }
+
+    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    for (const call of stampCalls) {
+      expect(Math.abs(call[2] as number)).toBe(0);
+    }
+  });
+
+  it("setSourceScale_one_is_default", () => {
+    // Without calling setSourceScale, behavior should match explicit setSourceScale(1)
+    const elementDefault = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const elementScaled = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    elementScaled.setSourceScale!(1);
+
+    const solverDefault = makeMockSolver();
+    const solverScaled = makeMockSolver();
+
+    elementDefault.stampNonlinear!(solverDefault);
+    elementScaled.stampNonlinear!(solverScaled);
+
+    const defaultStamp = (solverDefault.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const scaledStamp = (solverScaled.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const defaultRhs = (solverDefault.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    const scaledRhs = (solverScaled.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+
+    expect(defaultStamp.length).toBe(scaledStamp.length);
+    for (let i = 0; i < defaultStamp.length; i++) {
+      expect(defaultStamp[i][2]).toBeCloseTo(scaledStamp[i][2] as number, 15);
+    }
+    expect(defaultRhs.length).toBe(scaledRhs.length);
+    for (let i = 0; i < defaultRhs.length; i++) {
+      expect(defaultRhs[i][1]).toBeCloseTo(scaledRhs[i][1] as number, 15);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
