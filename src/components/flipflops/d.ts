@@ -265,5 +265,6 @@ export const DDefinition: ComponentDefinition = {
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeDFlipflopAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['digital', 'behavioral', 'transistor'],
+  transistorModel: 'CmosDFlipflop',
 };
