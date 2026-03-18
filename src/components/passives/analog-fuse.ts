@@ -173,7 +173,7 @@ export class AnalogFuseElement implements AnalogElement {
     if (this._blown && !this._blownDiagEmitted) {
       this._blownDiagEmitted = true;
       this._emitDiagnostic({
-        code: "fuse-blown" as SolverDiagnosticCode,
+        code: "fuse-blown",
         severity: "info",
         summary: "Fuse blown: accumulated I²t energy exceeded rating.",
         explanation:

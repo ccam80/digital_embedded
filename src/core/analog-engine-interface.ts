@@ -102,7 +102,10 @@ export type SolverDiagnosticCode =
   | "bridge-impedance-mismatch"
   | "missing-transistor-model"
   | "invalid-transistor-model"
-  | "transmission-line-low-segments";
+  | "transmission-line-low-segments"
+  | "reverse-biased-cap"
+  | "fuse-blown"
+  | "ndr-convergence-assist";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

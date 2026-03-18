@@ -250,7 +250,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
       if (!this._reverseBiasDiagEmitted) {
         this._reverseBiasDiagEmitted = true;
         this._emitDiagnostic({
-          code: "reverse-biased-cap" as import("../../core/analog-engine-interface.js").SolverDiagnosticCode,
+          code: "reverse-biased-cap",
           severity: "warning",
           summary: `Polarized capacitor reverse biased by ${(-vDiff).toFixed(2)} V (threshold: ${this.reverseMax} V)`,
           explanation:
