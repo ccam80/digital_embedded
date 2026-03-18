@@ -145,8 +145,8 @@ class AnalogInductorElement implements AnalogElement {
     const b = this.branchIndex;
 
     // Conductance stamps (companion model) — 1-based node IDs, skip ground
-    if (n0 !== 0 && n0 !== 0) solver.stamp(n0 - 1, n0 - 1, this.geq);
-    if (n1 !== 0 && n1 !== 0) solver.stamp(n1 - 1, n1 - 1, this.geq);
+    if (n0 !== 0) solver.stamp(n0 - 1, n0 - 1, this.geq);
+    if (n1 !== 0) solver.stamp(n1 - 1, n1 - 1, this.geq);
     if (n0 !== 0 && n1 !== 0) solver.stamp(n0 - 1, n1 - 1, -this.geq);
     if (n1 !== 0 && n0 !== 0) solver.stamp(n1 - 1, n0 - 1, -this.geq);
 

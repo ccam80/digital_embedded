@@ -193,13 +193,6 @@ export function expandTransistorModel(
     if (interfaceElementIds.has(el.instanceId)) continue;
     if (el.typeId === "Ground" || el.typeId === "ground") continue;
 
-    // Check if this is an analog component — we need an analog factory to stamp it
-    // We can't directly look up the ComponentRegistry here, but we can check by
-    // attempting to expand. The spec says we should emit invalid-transistor-model
-    // when the model contains non-analog components. We detect this by checking
-    // if the element has a known non-analog typeId pattern (digital flip-flops, etc.)
-    // The caller (compiler) validates this more thoroughly; here we rely on the
-    // analogFactory being present when getAnalogFactory is called.
     if (!getAnalogFactory(el.typeId)) {
       diagnostics.push(
         makeDiagnostic(

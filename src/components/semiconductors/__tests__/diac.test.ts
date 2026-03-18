@@ -34,7 +34,7 @@ const DIAC_DEFAULTS = {
 function makeDiac(overrides: Partial<typeof DIAC_DEFAULTS> = {}): AnalogElement {
   const params = { ...DIAC_DEFAULTS, ...overrides };
   // nodeA=1, nodeB=2
-  return createDiacElement([1, 2], -1, params as unknown as PropertyBag);
+  return createDiacElement([1, 2], -1, new PropertyBag(Object.entries(params)));
 }
 
 /**
@@ -151,7 +151,7 @@ describe("Diac", () => {
     const triac = createTriacElement(
       [1, 2, 3],
       -1,
-      { vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 } as unknown as PropertyBag,
+      new PropertyBag(Object.entries({ vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 })),
     );
 
     // Step 1: verify diac at V=40V (above V_BO=32V) produces current that can trigger triac

@@ -21,6 +21,20 @@ import {
   makeCapacitor,
   makeDiode,
 } from "../test-elements.js";
+import { Circuit, Wire } from "../../core/circuit.js";
+import { ComponentRegistry } from "../../core/registry.js";
+import { PropertyBag } from "../../core/properties.js";
+import type { PropertyValue } from "../../core/properties.js";
+import type { CircuitElement } from "../../core/element.js";
+import type { Pin } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
+import type { Rect, RenderContext } from "../../core/renderer-interface.js";
+import type { SerializedElement } from "../../core/element.js";
+import { compileAnalogCircuit } from "../compiler.js";
+import { ResistorDefinition } from "../../components/passives/resistor.js";
+import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
+import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { ProbeDefinition } from "../../components/io/probe.js";
 
 // ---------------------------------------------------------------------------
 // Fixture builders
@@ -414,5 +428,138 @@ describe("MNAEngine", () => {
 
     // Listener removed; states array should remain empty
     expect(states).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SimulationRunner integration test
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal CircuitElement factory for runner_integration test.
+ * Matches the pattern used in mna-end-to-end.test.ts.
+ */
+function makeAnalogPin(x: number, y: number, label: string = ""): Pin {
+  return {
+    position: { x, y },
+    label,
+    direction: PinDirection.BIDIRECTIONAL,
+    isInverted: false,
+    isClock: false,
+    bitWidth: 1,
+  };
+}
+
+function makeAnalogElement(
+  typeId: string,
+  instanceId: string,
+  pins: Array<{ x: number; y: number; label?: string }>,
+  propsMap: Map<string, PropertyValue> = new Map(),
+): CircuitElement {
+  const resolvedPins = pins.map((p) => makeAnalogPin(p.x, p.y, p.label ?? ""));
+  const propertyBag = new PropertyBag(propsMap.entries());
+
+  const serialized: SerializedElement = {
+    typeId,
+    instanceId,
+    position: { x: 0, y: 0 },
+    rotation: 0 as SerializedElement["rotation"],
+    mirror: false,
+    properties: {},
+  };
+
+  return {
+    typeId,
+    instanceId,
+    position: { x: 0, y: 0 },
+    rotation: 0 as CircuitElement["rotation"],
+    mirror: false,
+    getPins() { return resolvedPins; },
+    getProperties() { return propertyBag; },
+    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
+    draw(_ctx: RenderContext) { /* no-op */ },
+    serialize() { return serialized; },
+    getHelpText() { return ""; },
+    getAttribute(k: string) { return propsMap.get(k); },
+  };
+}
+
+describe("runner_integration", () => {
+  it("runner_integration", () => {
+    // Full pipeline: compileAnalogCircuit → MNAEngine.init → dcOperatingPoint → read by label.
+    //
+    // Circuit: Vs=5V → R1=1kΩ → midpoint (labeled "V_mid") → R2=1kΩ → GND
+    // Expected: V_mid = 2.5V
+    //
+    // Node layout:
+    //   node_top (x=10): Vs.pos, R1.A
+    //   node_mid (x=20): R1.B, R2.A  ← labeled "V_mid" via Probe element
+    //   node_gnd (x=30): R2.B, Vs.neg, GND
+
+    const registry = new ComponentRegistry();
+    registry.register(AnalogGroundDefinition);
+    registry.register(ResistorDefinition);
+    registry.register(DcVoltageSourceDefinition);
+    registry.register(ProbeDefinition);
+
+    const circuit = new Circuit({ engineType: "analog" });
+
+    // Voltage source: pos at (10,0), neg at (30,0)
+    const vs = makeAnalogElement("DcVoltageSource", "vs1",
+      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["voltage", 5]]),
+    );
+    // R1: 1kΩ from node_top (10,0) to node_mid (20,0)
+    const r1 = makeAnalogElement("AnalogResistor", "r1",
+      [{ x: 10, y: 0 }, { x: 20, y: 0 }],
+      new Map<string, PropertyValue>([["resistance", 1000]]),
+    );
+    // R2: 1kΩ from node_mid (20,0) to node_gnd (30,0)
+    const r2 = makeAnalogElement("AnalogResistor", "r2",
+      [{ x: 20, y: 0 }, { x: 30, y: 0 }],
+      new Map<string, PropertyValue>([["resistance", 1000]]),
+    );
+    // Ground at (30,0)
+    const gnd = makeAnalogElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    // Probe at node_mid (20,0) labeled "V_mid"
+    const probe = makeAnalogElement("Probe", "probe1",
+      [{ x: 20, y: 0 }],
+      new Map<string, PropertyValue>([["label", "V_mid"]]),
+    );
+
+    circuit.addElement(vs);
+    circuit.addElement(r1);
+    circuit.addElement(r2);
+    circuit.addElement(gnd);
+    circuit.addElement(probe);
+
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
+
+    // Compile via compileAnalogCircuit (the full pipeline under test)
+    const compiled = compileAnalogCircuit(circuit, registry);
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    // Create and initialise MNAEngine
+    const mnaEngine = new MNAEngine();
+    mnaEngine.init(compiled);
+
+    // Run DC operating point
+    const dcResult = mnaEngine.dcOperatingPoint();
+    expect(dcResult.converged).toBe(true);
+
+    // Read labeled output by label: the Probe element at (20,0) is labeled "V_mid".
+    // labelToNodeId maps "V_mid" to the 1-based MNA node ID for position (20,0).
+    // The DC result nodeVoltages array is the full MNA solution vector:
+    //   indices 0..nodeCount-1 hold node voltages (1-based node n is at index n-1).
+    //   indices nodeCount..matrixSize-1 hold branch currents.
+    const nodeId = compiled.labelToNodeId.get("V_mid");
+    expect(nodeId).toBeDefined();
+    // Convert 1-based node ID to 0-based solver index
+    const solverIdx = nodeId! - 1;
+    const vMid = dcResult.nodeVoltages[solverIdx];
+    expect(vMid).toBeCloseTo(2.5, 2);
   });
 });

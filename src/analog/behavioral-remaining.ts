@@ -814,8 +814,3 @@ export function createButtonLEDAnalogElement(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Re-export AnalogElementFactory type for consumers
-// ---------------------------------------------------------------------------
-
-export type { AnalogElementFactory } from "./behavioral-gate.js";

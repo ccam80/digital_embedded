@@ -102,15 +102,6 @@ export class BehavioralDFlipflopElement implements AnalogElement {
     this._resetPin = resetPin;
     this._resetActiveLevel = resetActiveLevel;
 
-    // vIH/vIL for edge and async detection — read from clock pin spec.
-    // All input pins share the same resolved electrical spec in typical usage,
-    // but the clock's threshold is the authoritative edge-detection value.
-    // Access via readLogicLevel internals is not available; re-use the spec
-    // fields we stored at pin construction. We retrieve them via a sentinel
-    // call: voltage well above any realistic supply → should return true.
-    // Instead, pass the spec through a local parameter to the constructor.
-    // The spec fields are private on DigitalInputPinModel, so we capture them
-    // here. The factory passes the spec to us directly (see makeDFlipflopAnalogFactory).
     this._vIH = 2.0; // overwritten by factory via _setThresholds
     this._vIL = 0.8;
 

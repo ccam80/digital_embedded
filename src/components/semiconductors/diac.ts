@@ -124,11 +124,10 @@ export function createDiacElement(
   const nodeA = nodeIds[0]; // terminal A
   const nodeB = nodeIds[1]; // terminal B
 
-  const propsMap = props as unknown as Record<string, unknown>;
-  const vBreakover: number = (propsMap["vBreakover"] as number) ?? 32;
-  const vHold: number      = (propsMap["vHold"] as number)      ?? 28;
-  const rOn: number        = (propsMap["rOn"] as number)        ?? 10;
-  const rOff: number       = (propsMap["rOff"] as number)       ?? 1e7;
+  const vBreakover: number = props.getOrDefault<number>("vBreakover", 32);
+  const vHold: number      = props.getOrDefault<number>("vHold",      28);
+  const rOn: number        = props.getOrDefault<number>("rOn",        10);
+  const rOff: number       = props.getOrDefault<number>("rOff",       1e7);
 
   // Sharpness of the tanh transition: smaller = sharper snap.
   // V_BO - V_hold gives the snap width; use ~0.5V for good NR convergence.

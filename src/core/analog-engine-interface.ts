@@ -10,8 +10,9 @@
  * `CompiledAnalogCircuit`) are defined and exported here.
  */
 
-import type { Engine, CompiledCircuit } from "./engine-interface.js";
+import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
+import type { AcParams, AcResult } from "../analog/ac-analysis.js";
 
 // ---------------------------------------------------------------------------
 // SimulationParams — transient solver configuration
@@ -92,8 +93,6 @@ export type SolverDiagnosticCode =
   | "model-param-ignored"
   | "model-level-unsupported"
   | "unsupported-component-in-analog"
-  | "digital-bridge-not-yet-implemented"
-  | "transistor-model-not-yet-implemented"
   | "bridge-inner-compile-error"
   | "bridge-unconnected-pin"
   | "bridge-missing-inner-pin"
@@ -229,6 +228,15 @@ export interface AnalogEngine extends Engine {
    */
   dcOperatingPoint(): DcOpResult;
 
+  /**
+   * Run an AC small-signal frequency sweep analysis.
+   *
+   * Solves the DC operating point to linearize nonlinear elements, then sweeps
+   * frequency and returns complex transfer function data at the requested output
+   * nodes. The engine must be initialised (`init()` called) before invoking this.
+   */
+  acAnalysis(params: AcParams): AcResult;
+
   // -------------------------------------------------------------------------
   // Simulation time
   // -------------------------------------------------------------------------
@@ -310,4 +318,20 @@ export interface AnalogEngine extends Engine {
    * when all registered source components have been removed.
    */
   clearBreakpoints(): void;
+
+  // -------------------------------------------------------------------------
+  // Measurement observers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Register an observer to receive step/reset notifications.
+   * The observer's `onStep()` is called after each accepted timestep.
+   * The observer's `onReset()` is called when the engine is reset.
+   */
+  addMeasurementObserver(observer: MeasurementObserver): void;
+
+  /**
+   * Remove a previously registered measurement observer.
+   */
+  removeMeasurementObserver(observer: MeasurementObserver): void;
 }

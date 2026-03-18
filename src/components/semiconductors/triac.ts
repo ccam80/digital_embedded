@@ -74,15 +74,14 @@ export function createTriacElement(
   const nodeMT2 = nodeIds[1]; // Main Terminal 2
   const nodeG   = nodeIds[2]; // Gate
 
-  const propsMap = props as unknown as Record<string, unknown>;
-  const vOn: number      = (propsMap["vOn"] as number)      ?? 1.5;
-  const iH: number       = (propsMap["iH"] as number)       ?? 10e-3;
-  const rOn: number      = (propsMap["rOn"] as number)      ?? 0.01;
-  const iS: number       = (propsMap["iS"] as number)       ?? 1e-12;
-  const alpha1: number   = (propsMap["alpha1"] as number)   ?? 0.5;
-  const alpha2_0: number = (propsMap["alpha2_0"] as number) ?? 0.3;
-  const iRef: number     = (propsMap["i_ref"] as number)    ?? 1e-3;
-  const n: number        = (propsMap["n"] as number)        ?? 1;
+  const vOn: number      = props.getOrDefault<number>("vOn",      1.5);
+  const iH: number       = props.getOrDefault<number>("iH",       10e-3);
+  const rOn: number      = props.getOrDefault<number>("rOn",      0.01);
+  const iS: number       = props.getOrDefault<number>("iS",       1e-12);
+  const alpha1: number   = props.getOrDefault<number>("alpha1",   0.5);
+  const alpha2_0: number = props.getOrDefault<number>("alpha2_0", 0.3);
+  const iRef: number     = props.getOrDefault<number>("i_ref",    1e-3);
+  const n: number        = props.getOrDefault<number>("n",        1);
 
   const nVt = n * VT;
   const vcritMain = nVt * Math.log(nVt / (iS * Math.SQRT2));

@@ -3,7 +3,7 @@
  */
 
 import type { ScopeCursors } from "./scope-cursors.js";
-import { formatSI } from "./scope-cursors.js";
+import { formatSI } from "../editor/si-format.js";
 import type { ScopeViewport } from "./analog-scope-renderer.js";
 
 // ---------------------------------------------------------------------------

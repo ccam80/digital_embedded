@@ -369,20 +369,19 @@ describe("SimulationMode", () => {
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 
-  it("digital_mode_emits_stub_diagnostic", () => {
+  it("digital_mode_falls_through_to_analog_factory", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "digital"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileAnalogCircuit(circuit, registry);
 
-    // Factory should NOT be called (component is skipped)
-    expect(factorySpy).not.toHaveBeenCalled();
+    // Factory SHOULD be called — digital mode falls through to behavioral (analogFactory)
+    expect(factorySpy).toHaveBeenCalled();
 
-    // Should emit info diagnostic
+    // No stub diagnostic should be emitted
     const stubDiags = compiled.diagnostics.filter(
-      (d) => d.code === "digital-bridge-not-yet-implemented",
+      (d) => d.code === ("digital-bridge-not-yet-implemented" as string),
     );
-    expect(stubDiags).toHaveLength(1);
-    expect(stubDiags[0]!.severity).toBe("info");
+    expect(stubDiags).toHaveLength(0);
   });
 
   it("transistor_mode_without_registry_emits_diagnostic", () => {

@@ -195,6 +195,9 @@ function createComparatorElement(
   // Effective conductance stamped on the output node (updated each NR iter)
   let _gEff = G_off;
 
+  // Solver reference cached during stamp() for use in stampCompanion()
+  let _solver: SparseSolver | null = null;
+
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
@@ -211,6 +214,8 @@ function createComparatorElement(
     isReactive: false,
 
     stamp(solver: SparseSolver): void {
+      // Cache solver for use in stampCompanion (interface does not pass it there)
+      _solver = solver;
       // Linear part: stamp the effective conductance between out and ground.
       // This is re-evaluated every NR iteration via stampNonlinear to track
       // the current output state.
@@ -256,12 +261,7 @@ function createComparatorElement(
       }
     },
 
-    stampCompanion(
-      solver: SparseSolver,
-      dt: number,
-      _method: IntegrationMethod,
-      _voltages: Float64Array,
-    ): void {
+    stampCompanion(dt: number, _method: IntegrationMethod, _voltages: Float64Array): void {
       // Update _outputWeight toward its target using first-order Euler step.
       // This models the propagation delay specified by responseTime.
       const target = _outputActive ? 1.0 : 0.0;
@@ -269,10 +269,10 @@ function createComparatorElement(
       const alpha = dt / (tau + dt); // first-order low-pass coefficient
       _outputWeight = _outputWeight + alpha * (target - _outputWeight);
 
-      // Re-stamp the (now possibly updated) conductance
+      // Re-stamp the (now possibly updated) conductance using cached solver
       const gNew = computeGeff();
-      if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
+      if (nOut > 0 && _solver !== null) {
+        _solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
       }
       _gEff = gNew;
     },

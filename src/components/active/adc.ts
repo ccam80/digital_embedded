@@ -24,7 +24,7 @@
  * Clock-edge detection:
  *   Rising edge: prev CLK voltage < vIH, current CLK voltage >= vIH.
  *   Comparison uses threshold vIH = 2.0V (standard CMOS 3.3V logic family).
- *   Edge detection happens in updateCompanion() (once per accepted timestep,
+ *   Edge detection happens in updateState() (once per accepted timestep,
  *   never mid-NR), guaranteeing output only latches on real clock edges.
  *
  * EOC:
@@ -270,6 +270,9 @@ function createADCElement(
     if (n > 0) digitalPins[i].init(n - 1, -1);
   }
 
+  // Solver cached from stamp() for use in stampCompanion()
+  let _solver: SparseSolver | null = null;
+
   // Clock edge detection state
   const VIH = INPUT_PIN_SPEC.vIH;
   let prevClkVoltage = 0;
@@ -323,6 +326,8 @@ function createADCElement(
     isReactive: true,
 
     stamp(solver: SparseSolver): void {
+      // Cache solver for use in stampCompanion (interface does not pass it there)
+      _solver = solver;
       // Input loading — VIN and CLK pins
       if (nVin > 0) vinPin.stamp(solver);
       if (nClk > 0) clkPin.stamp(solver);
@@ -342,17 +347,13 @@ function createADCElement(
       }
     },
 
-    stampCompanion(
-      solver: SparseSolver,
-      dt: number,
-      method: IntegrationMethod,
-      _voltages: Float64Array,
-    ): void {
-      if (nVin > 0) vinPin.stampCompanion(solver, dt, method);
-      if (nClk > 0) clkPin.stampCompanion(solver, dt, method);
-      if (nEoc > 0) eocPin.stampCompanion(solver, dt, method);
+    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
+      if (_solver === null) return;
+      if (nVin > 0) vinPin.stampCompanion(_solver, dt, method);
+      if (nClk > 0) clkPin.stampCompanion(_solver, dt, method);
+      if (nEoc > 0) eocPin.stampCompanion(_solver, dt, method);
       for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stampCompanion(solver, dt, method);
+        if (nDigital[i] > 0) digitalPins[i].stampCompanion(_solver, dt, method);
       }
     },
 

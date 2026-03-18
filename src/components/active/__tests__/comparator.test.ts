@@ -214,7 +214,7 @@ describe("Comparator", () => {
     const steps = 10;
     const voltages = makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 });
     for (let i = 0; i < steps; i++) {
-      cmp.stampCompanion!(makeMockSolver(), dt, "bdf1", voltages);
+      cmp.stampCompanion!(dt, "bdf1", voltages);
     }
 
     // After 5τ the weight should be > 99% active → conductance near G_sat

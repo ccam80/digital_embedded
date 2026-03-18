@@ -199,6 +199,7 @@ export const FuseDefinition: ComponentDefinition = {
   name: "Fuse",
   typeId: -1,
   engineType: "both",
+  simulationModes: ["digital", "behavioral"],
   factory: fuseFactory,
   executeFn: executeFuse,
   pinLayout: FUSE_PIN_DECLARATIONS,

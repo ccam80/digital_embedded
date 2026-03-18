@@ -11,7 +11,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import { PinDirection, type Pin, type PinDeclaration, type Rotation } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -81,8 +81,22 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
-  { name: "pos", direction: "input",  position: { x: 0, y: -2 }, description: "Positive terminal (+)" },
-  { name: "neg", direction: "output", position: { x: 0, y:  2 }, description: "Negative terminal (-)" },
+  {
+    label: "pos",
+    direction: PinDirection.INPUT,
+    position: { x: 0, y: -2 },
+    defaultBitWidth: 1,
+    isNegatable: false,
+    isClockCapable: false,
+  },
+  {
+    label: "neg",
+    direction: PinDirection.OUTPUT,
+    position: { x: 0, y: 2 },
+    defaultBitWidth: 1,
+    isNegatable: false,
+    isClockCapable: false,
+  },
 ];
 
 // ---------------------------------------------------------------------------

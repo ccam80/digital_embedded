@@ -6,7 +6,7 @@
  * analog simulator behind the AnalogEngine interface.
  */
 
-import type { CompiledCircuit, EngineChangeListener } from "../core/engine-interface.js";
+import type { CompiledCircuit, EngineChangeListener, MeasurementObserver } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
 import type {
   AnalogEngine,
@@ -15,6 +15,8 @@ import type {
   SimulationParams,
 } from "../core/analog-engine-interface.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../core/analog-engine-interface.js";
+import { AcAnalysis } from "./ac-analysis.js";
+import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { MNAAssembler } from "./mna-assembler.js";
 import { TimestepController } from "./timestep.js";
@@ -165,6 +167,10 @@ export class MNAEngine implements AnalogEngine {
     this._diagnostics.clear();
     if (this._coordinator !== null) {
       this._coordinator.reset();
+    }
+    this._stepCount = 0;
+    for (const obs of this._measurementObservers) {
+      obs.onReset();
     }
     this._transitionState(EngineState.STOPPED);
   }
@@ -359,6 +365,12 @@ export class MNAEngine implements AnalogEngine {
     if (this._coordinator !== null) {
       this._coordinator.syncAfterAnalogStep(this._voltages);
     }
+
+    // Notify measurement observers
+    this._stepCount++;
+    for (const obs of this._measurementObservers) {
+      obs.onStep(this._stepCount);
+    }
   }
 
   /** Transition to RUNNING state. */
@@ -386,6 +398,28 @@ export class MNAEngine implements AnalogEngine {
     const idx = this._changeListeners.indexOf(listener);
     if (idx >= 0) {
       this._changeListeners.splice(idx, 1);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Engine interface — Measurement observers
+  // -------------------------------------------------------------------------
+
+  private _measurementObservers: MeasurementObserver[] = [];
+  private _stepCount: number = 0;
+
+  /** Register an observer to receive step/reset notifications. */
+  addMeasurementObserver(observer: MeasurementObserver): void {
+    if (!this._measurementObservers.includes(observer)) {
+      this._measurementObservers.push(observer);
+    }
+  }
+
+  /** Remove a previously registered measurement observer. */
+  removeMeasurementObserver(observer: MeasurementObserver): void {
+    const idx = this._measurementObservers.indexOf(observer);
+    if (idx >= 0) {
+      this._measurementObservers.splice(idx, 1);
     }
   }
 
@@ -427,6 +461,34 @@ export class MNAEngine implements AnalogEngine {
     }
 
     return result;
+  }
+
+  /**
+   * Run an AC small-signal frequency sweep analysis.
+   *
+   * Creates an `AcAnalysis` instance using the engine's compiled circuit,
+   * runs the sweep with the given params, and returns the `AcResult`.
+   * The engine must be initialised before calling this method.
+   */
+  acAnalysis(params: AcParams): AcResult {
+    if (!this._compiled) {
+      const emptyFreqs = new Float64Array(0);
+      const empty = new Map<string, Float64Array>();
+      for (const label of params.outputNodes) {
+        empty.set(label, new Float64Array(0));
+      }
+      return {
+        frequencies: emptyFreqs,
+        magnitude: empty,
+        phase: new Map(params.outputNodes.map((l) => [l, new Float64Array(0)])),
+        real: new Map(params.outputNodes.map((l) => [l, new Float64Array(0)])),
+        imag: new Map(params.outputNodes.map((l) => [l, new Float64Array(0)])),
+        diagnostics: [],
+      };
+    }
+
+    const ac = new AcAnalysis(this._compiled, this._params);
+    return ac.run(params);
   }
 
   // -------------------------------------------------------------------------

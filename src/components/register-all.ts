@@ -138,9 +138,17 @@ import { ResistorDefinition } from "./passives/resistor.js";
 
 // Analog sources
 import { AnalogGroundDefinition } from "./sources/ground.js";
+import { DcVoltageSourceDefinition } from "./sources/dc-voltage-source.js";
+import { CurrentSourceDefinition } from "./sources/current-source.js";
 
 // Analog active
 import { AnalogComparatorDefinition } from "./active/comparator.js";
+import { Timer555Definition } from "./active/timer-555.js";
+import { RealOpAmpDefinition } from "./active/real-opamp.js";
+import { OTADefinition } from "./active/ota.js";
+import { OptocouplerDefinition } from "./active/optocoupler.js";
+import { DACDefinition } from "./active/dac.js";
+import { ADCDefinition } from "./active/adc.js";
 
 // Basic
 import { BooleanFunctionDefinition } from "./basic/function.js";
@@ -295,9 +303,17 @@ export function createDefaultRegistry(
 
   // Analog sources
   registry.register(AnalogGroundDefinition);
+  registry.register(DcVoltageSourceDefinition);
+  registry.register(CurrentSourceDefinition);
 
   // Analog active
   registry.register(AnalogComparatorDefinition);
+  registry.register(Timer555Definition);
+  registry.register(RealOpAmpDefinition);
+  registry.register(OTADefinition);
+  registry.register(OptocouplerDefinition);
+  registry.register(DACDefinition);
+  registry.register(ADCDefinition);
 
   // Basic
   registry.register(BooleanFunctionDefinition);

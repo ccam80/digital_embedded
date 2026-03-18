@@ -6,6 +6,7 @@
  *    timesteps (voltage between vIL and vIH)
  *  - bridge-indeterminate-input: NOT emitted when voltage stays at a valid level
  *  - bridge-oscillating-input: emitted after 20 consecutive threshold crossings
+ *  - bridge-impedance-mismatch: emitted when source R > 100 × R_in
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,6 +15,19 @@ import { makeBridgeInputAdapter } from "../bridge-adapter.js";
 import type { BridgeInstance } from "../bridge-instance.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { DiagnosticCollector } from "../diagnostics.js";
+import { compileAnalogCircuit } from "../compiler.js";
+import { Circuit, Wire } from "../../core/circuit.js";
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { Pin } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
+import { PropertyBag } from "../../core/properties.js";
+import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
+import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
+import type { Rect, RenderContext } from "../../core/renderer-interface.js";
+import type { CrossEngineBoundary } from "../../engine/cross-engine-boundary.js";
+import type { FlattenResult, SubcircuitHost } from "../../engine/flatten.js";
+import type { AnalogElement } from "../element.js";
+import type { SparseSolver } from "../sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Shared electrical spec — CMOS 3.3V with vIL=0.8, vIH=2.0
@@ -186,5 +200,256 @@ describe("Diagnostics", () => {
       expect(oscillatingDiags.length).toBeGreaterThanOrEqual(1);
       expect(oscillatingDiags[0]!.summary).toContain("sub:CLK");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bridge-impedance-mismatch — compiler diagnostic
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal leaf element for the outer analog circuit.
+ * Supports a "resistance" property so detectHighSourceImpedance can find it.
+ */
+class HighZResistorElement extends AbstractCircuitElement {
+  private readonly _pins: readonly Pin[];
+
+  constructor(
+    instanceId: string,
+    pos: { x: number; y: number },
+    pins: Pin[],
+    resistance: number,
+  ) {
+    const props = new PropertyBag([["resistance", resistance]]);
+    super("HighZResistor", instanceId, pos, 0, false, props);
+    this._pins = pins;
+  }
+
+  getPins(): readonly Pin[] { return this._pins; }
+  draw(_ctx: RenderContext): void {}
+  getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; }
+  getHelpText(): string { return ""; }
+}
+
+/** Ground placeholder element — gives MNA a ground reference node. */
+class GroundElement extends AbstractCircuitElement {
+  private readonly _pins: readonly Pin[];
+
+  constructor(instanceId: string, pos: { x: number; y: number }, pins: Pin[]) {
+    super("Ground", instanceId, pos, 0, false, new PropertyBag());
+    this._pins = pins;
+  }
+
+  getPins(): readonly Pin[] { return this._pins; }
+  draw(_ctx: RenderContext): void {}
+  getBoundingBox(): Rect { return { x: 0, y: 0, width: 2, height: 2 }; }
+  getHelpText(): string { return ""; }
+}
+
+/** SubcircuitHost placeholder for the bridge inner digital circuit. */
+class BridgeSubcircuitElement extends AbstractCircuitElement implements SubcircuitHost {
+  readonly internalCircuit: Circuit;
+  readonly subcircuitName: string;
+  private readonly _pins: readonly Pin[];
+
+  constructor(
+    name: string,
+    instanceId: string,
+    pos: { x: number; y: number },
+    internalCircuit: Circuit,
+    pins: Pin[],
+  ) {
+    super(`Subcircuit:${name}`, instanceId, pos, 0, false, new PropertyBag());
+    this.subcircuitName = name;
+    this.internalCircuit = internalCircuit;
+    this._pins = pins;
+  }
+
+  getPins(): readonly Pin[] { return this._pins; }
+  draw(_ctx: RenderContext): void {}
+  getBoundingBox(): Rect { return { x: 0, y: 0, width: 6, height: 6 }; }
+  getHelpText(): string { return "subcircuit"; }
+}
+
+function noopExec(): ExecuteFunction {
+  return (_idx, _state, _layout) => {};
+}
+
+function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinition {
+  return {
+    name: typeId,
+    typeId: -1,
+    factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
+    executeFn: noopExec(),
+    pinLayout: Array.from({ length: pinCount }, (_, i) => ({
+      label: `p${i}`,
+      direction: PinDirection.BIDIRECTIONAL,
+    })),
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: typeId,
+    engineType: "analog",
+    analogFactory: (nodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+      nodeIndices: nodeIds,
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp(_s: SparseSolver) {},
+    }),
+  };
+}
+
+function makeGroundDef(): ComponentDefinition {
+  return {
+    name: "Ground",
+    typeId: -1,
+    factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
+    executeFn: noopExec(),
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: "Ground",
+    engineType: "analog",
+  };
+}
+
+function makeDigitalInDef(): ComponentDefinition {
+  return {
+    name: "In",
+    typeId: -1,
+    factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
+    executeFn: noopExec(),
+    pinLayout: [{ label: "out", direction: PinDirection.OUTPUT }],
+    propertyDefs: [{ key: "label", defaultValue: "" }],
+    attributeMap: [],
+    category: ComponentCategory.IO,
+    helpText: "In",
+  };
+}
+
+describe("bridge-impedance-mismatch", () => {
+  it("emits_bridge_impedance_mismatch_when_source_resistance_too_high", () => {
+    // Build a circuit where a digital subcircuit's input pin (direction "in") is
+    // driven by a high-impedance analog resistor: R_source = 2e9 Ω.
+    // Default rIn from logic family = 1e7 Ω.
+    // Threshold: R_source > 100 * rIn = 1e9 Ω → 2e9 > 1e9 → diagnostic emitted.
+
+    // Inner digital circuit: a single In component labeled "A" with output pin at (2,1).
+    // The digital compiler uses labelToNetId to map "A" → net ID via In/Out elements.
+    const innerCircuit = new Circuit({ engineType: "digital" });
+
+    // PropertyBag with label="A" so compileCircuit can build labelToNetId["A"]
+    const innerInProps = new PropertyBag([["label", "A"]]);
+
+    // The In element needs an OUTPUT pin so the compiler assigns it a net.
+    // Position its output pin at (2,1); wire connects it to (4,1) to give a net.
+    class InnerInElement extends AbstractCircuitElement {
+      private readonly _p: readonly Pin[];
+      constructor() {
+        super("In", "innerIn_A", { x: 0, y: 0 }, 0, false, innerInProps);
+        this._p = [{
+          direction: PinDirection.OUTPUT,
+          position: { x: 2, y: 1 },
+          label: "out",
+          bitWidth: 1,
+          isNegated: false,
+          isClock: false,
+        }];
+      }
+      getPins(): readonly Pin[] { return this._p; }
+      draw(_ctx: RenderContext): void {}
+      getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 2 }; }
+      getHelpText(): string { return ""; }
+    }
+
+    const innerIn = new InnerInElement();
+    innerCircuit.addElement(innerIn);
+    // Wire from In's output pin to a net node — gives the compiler a net for "A"
+    innerCircuit.addWire(new Wire({ x: 2, y: 1 }, { x: 4, y: 1 }));
+
+    // Outer analog circuit layout:
+    //   Ground at (0, 0)
+    //   HighZResistor: p0 at (0,0) [ground], p1 at (10, 0) [bridge input node]
+    //   Subcircuit element: pin "SIG" at (10, 0) → connects to bridge input node
+    //
+    // Wire:
+    //   (10,0)-(10,0): self-loop connecting HighZResistor.p1 and subcircuit.SIG
+
+    const outerCircuit = new Circuit({ engineType: "analog" });
+
+    const gndPin: Pin = {
+      direction: PinDirection.BIDIRECTIONAL,
+      position: { x: 0, y: 0 },
+      label: "gnd",
+      bitWidth: 1,
+      isNegated: false,
+      isClock: false,
+    };
+    const gnd = new GroundElement("gnd", { x: 0, y: 0 }, [gndPin]);
+    outerCircuit.addElement(gnd);
+
+    // High-Z resistor: 2 GΩ — R_source > 100 * rIn triggers mismatch
+    const R_SOURCE = 2e9;
+    const rzp0: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false };
+    const rzp1: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 }, label: "p1", bitWidth: 1, isNegated: false, isClock: false };
+    const highZRes = new HighZResistorElement("hz1", { x: 0, y: 0 }, [rzp0, rzp1], R_SOURCE);
+    outerCircuit.addElement(highZRes);
+
+    // Subcircuit element: outer pin "SIG" at (10, 0)
+    const subcircuitPin: Pin = {
+      direction: PinDirection.INPUT,
+      position: { x: 10, y: 0 },
+      label: "SIG",
+      bitWidth: 1,
+      isNegated: false,
+      isClock: false,
+    };
+    const subcircuitEl = new BridgeSubcircuitElement(
+      "DigSub",
+      "digsub_0",
+      { x: 8, y: 0 },
+      innerCircuit,
+      [subcircuitPin],
+    );
+    outerCircuit.addElement(subcircuitEl);
+
+    // Wires: ground node at (0,0), bridge input node at (10,0)
+    outerCircuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    outerCircuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+
+    // Registry: Ground, HighZResistor (analog), In (digital)
+    const registry = new ComponentRegistry();
+    registry.register(makeGroundDef());
+    registry.register(makeAnalogStubDef("HighZResistor", 2));
+    registry.register(makeDigitalInDef());
+
+    // CrossEngineBoundary: subcircuit's "SIG" pin maps to inner "A" (direction "in")
+    const boundary: CrossEngineBoundary = {
+      subcircuitElement: subcircuitEl,
+      internalCircuit: innerCircuit,
+      internalEngineType: "digital",
+      outerEngineType: "analog",
+      pinMappings: [
+        { pinLabel: "SIG", direction: "in", innerLabel: "A", bitWidth: 1 },
+      ],
+      instanceName: "DigSub_0",
+    };
+
+    const flattenResult: FlattenResult = {
+      circuit: outerCircuit,
+      crossEngineBoundaries: [boundary],
+    };
+
+    const compiled = compileAnalogCircuit(flattenResult, registry);
+
+    const mismatchDiags = compiled.diagnostics.filter(
+      (d) => d.code === "bridge-impedance-mismatch",
+    );
+    expect(mismatchDiags.length).toBeGreaterThanOrEqual(1);
+    expect(mismatchDiags[0]!.severity).toBe("info");
+    // Diagnostic summary must mention the pin label
+    expect(mismatchDiags[0]!.summary).toContain("DigSub_0:SIG");
   });
 });

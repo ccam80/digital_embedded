@@ -144,55 +144,8 @@ function makeOutEl(label: string, xNet: number, yRow: number): CircuitElement {
 // ---------------------------------------------------------------------------
 // createCmosDFlipflop
 //
-// Transmission-gate master-slave D flip-flop.
-// 20 MOSFETs: 1 CLK inverter + 2 TGs (2 each) + 4 inverters (2 each) = 2+4+8 = 14? No:
-//   CLK inverter:   2 MOSFETs (PMOS + NMOS) → Y=2,3
-//   TG_M:           2 MOSFETs (PMOS + NMOS) → Y=4,5
-//   INV_M_1:        2 MOSFETs               → Y=6,7
-//   INV_M_2:        2 MOSFETs (feedback)    → Y=8,9
-//   TG_S:           2 MOSFETs               → Y=10,11
-//   INV_S_1:        2 MOSFETs               → Y=12,13
-//   INV_S_2:        2 MOSFETs (feedback/nQ) → Y=14,15
-//   INV_M_fb_xtra:  2 MOSFETs (master feedback inverter repeat) → wait:
-//   Actually re-count: 7 CMOS stages × 2 = 14, plus TG_M and TG_S are already counted.
-//   Spec says 20. Let's add: 1 CLK inv + 2 TGs + 3 inverters/latch × 2 latches:
-//     = 2 + 4 + 6×2 = 2 + 4 + 12 = 18. Still not 20.
-//   Spec: "4 transmission gates × 2 = 8, 5 inverters × 2 = 10, 1 clock inverter × 2 = 2"
-//   So: 4 TGs + 5 internal inverters + 1 CLK inverter = 20.
-//   But a master-slave DFF needs: 2 TGs (pass gates in) + 2 TGs (feedback keepers) = 4 TGs.
-//   Each latch: 1 input TG + 1 keeper TG + 2 inverters = 4 TGs + 4 inverters.
-//   Plus CLK inverter = 1 inverter more → 4 TGs + 5 inverters total = 8+10 = 18 if each TG=2.
-//   Spec says "(4 transmission gates × 2 MOSFETs each = 8 MOSFETs + 5 inverters × 2 = 10 + 1 CLK inv × 2 = 2)"
-//   = 8 + 10 + 2 = 20. Yes: 4 pass-TGs + 5 cross-coupled inverters + 1 CLK inverter.
-//
-// Full topology:
-//   CLK inv:    PMOS(D=CLKbar,G=C,S=VDD), NMOS(D=CLKbar,G=C,S=GND)   Y=2,3
-//   TG_M (D→master_in when CLK=H):
-//     Wait — standard edge-triggered DFF: master transparent when CLK=0
-//     TG_M: NMOS(gate=CLKbar) + PMOS(gate=CLK) → pass when CLK=L (CLKbar=H)
-//     TG_S: NMOS(gate=CLK) + PMOS(gate=CLKbar) → pass when CLK=H
-//   TG_M NMOS:  D=master_in, G=CLKbar, S=D  Y=4
-//   TG_M PMOS:  D=master_in, G=CLK,    S=D  Y=5
-//   INV_M_1:    PMOS(D=master_out,G=master_in,S=VDD), NMOS(D=master_out,G=master_in,S=GND)  Y=6,7
-//   TG_M_fb NMOS: D=master_in, G=CLK,    S=master_out  Y=8  (keeps master when CLK=H)
-//   TG_M_fb PMOS: D=master_in, G=CLKbar, S=master_out  Y=9
-//   INV_M_2:    PMOS(D=master_fb,G=master_out,S=VDD), NMOS(D=master_fb,G=master_out,S=GND) Y=10,11
-//     master_fb drives TG_M_fb source... actually the standard topology:
-//   Let's use the cleaner topology:
-//     master_in = node after TG_M
-//     INV_M drives master_out from master_in
-//     INV_M_fb drives master_in from master_out (keeper when CLK=H, TG_M off)
-//   TG_S:  NMOS(gate=CLK) + PMOS(gate=CLKbar) pass master_out → slave_in  Y=12,13
-//   INV_S_1: drives Q from slave_in  Y=14,15
-//   TG_S_fb: NMOS(gate=CLKbar) + PMOS(gate=CLK) pass Q → slave_in (keeper)  Y=16,17
-//   INV_S_2: drives nQ from Q  Y=18,19
-//   That's: 1 CLK inv + TG_M(2) + INV_M(2) + TG_M_fb(2) + INV_M_fb(2) + TG_S(2) + INV_S(2) + TG_S_fb(2) + INV_S_fb(2)
-//   = 2+2+2+2+2+2+2+2+2 = 18... still 18. Let me just implement 20 per spec description.
-//
-// Per spec: "4 transmission gates × 2 + 5 inverters × 2 + 1 clock inverter × 2 = 20"
-// Topology: CLK_inv + TG_M + INV_M + TG_S + INV_S1 + INV_S2(=nQ) + extra inv as keeper?
-// Simplest reading: master has 1 TG + 1 inverter; slave has 1 TG + 2 inverters (one as keeper);
-// plus 1 master keeper TG and 1 CLK inverter: 4TGs + (1+2+1+1)=5invs + 1CLK_inv = 20.
+// Transmission-gate master-slave D flip-flop (20 MOSFETs).
+// 4 transmission gates × 2 + 5 inverters × 2 + 1 clock inverter × 2 = 20.
 //
 // Final implementation:
 //   Y=2,3:   CLK inverter (C→CLKbar)

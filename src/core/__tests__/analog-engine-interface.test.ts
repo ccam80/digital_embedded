@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { Engine, CompiledCircuit, EngineState, EngineChangeListener } from "@/core/engine-interface";
+import type { Engine, CompiledCircuit, EngineState, EngineChangeListener, MeasurementObserver } from "@/core/engine-interface";
 import type {
   AnalogEngine,
   SimulationParams,
@@ -18,6 +18,7 @@ import type {
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
 } from "@/core/analog-engine-interface";
+import type { AcParams, AcResult } from "@/analog/ac-analysis";
 import { DEFAULT_SIMULATION_PARAMS } from "@/core/analog-engine-interface";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +182,18 @@ describe("AnalogEngineTypes", () => {
       onDiagnostic(_callback: (diag: SolverDiagnostic) => void): void {},
       addBreakpoint(_time: number): void {},
       clearBreakpoints(): void {},
+      acAnalysis(_params: AcParams): AcResult {
+        return {
+          frequencies: new Float64Array(0),
+          magnitude: new Map(),
+          phase: new Map(),
+          real: new Map(),
+          imag: new Map(),
+          diagnostics: [],
+        };
+      },
+      addMeasurementObserver(_observer: MeasurementObserver): void {},
+      removeMeasurementObserver(_observer: MeasurementObserver): void {},
     };
 
     // Assignment to Engine base must be valid

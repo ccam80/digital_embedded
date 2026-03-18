@@ -7,6 +7,8 @@
  */
 
 import type { AnalogScopeBuffer } from "./analog-scope-buffer.js";
+import { formatSI } from "../editor/si-format.js";
+export { formatSI };
 
 // ---------------------------------------------------------------------------
 // ScopeMeasurements — computed values between cursors A and B
@@ -25,71 +27,6 @@ export interface ScopeMeasurements {
   peakToPeak: number;
   /** Arithmetic mean of samples between A and B. */
   mean: number;
-}
-
-// ---------------------------------------------------------------------------
-// formatSI — local implementation (used until src/editor/si-format.ts exists)
-// ---------------------------------------------------------------------------
-
-/**
- * Formats a number with an appropriate SI prefix and 3 significant figures.
- *
- * Examples:
- *   formatSI(0.001, "A")   → "1.00 mA"
- *   formatSI(0.0047, "A")  → "4.70 mA"
- *   formatSI(2200, "Ω")    → "2.20 kΩ"
- *   formatSI(1e-6, "F")    → "1.00 µF"
- *   formatSI(1e-14, "A")   → "10.0 fA"
- */
-export function formatSI(value: number, unit: string, precision?: number): string {
-  if (value === 0) {
-    return `0.00 ${unit}`;
-  }
-
-  const sigFigs = precision ?? 3;
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-
-  // SI prefix table: [exponent, symbol]
-  const prefixes: [number, string][] = [
-    [-15, "f"],
-    [-12, "p"],
-    [-9, "n"],
-    [-6, "µ"],
-    [-3, "m"],
-    [0, ""],
-    [3, "k"],
-    [6, "M"],
-    [9, "G"],
-    [12, "T"],
-  ];
-
-  // Find the appropriate prefix
-  let chosenExp = 0;
-  let chosenSymbol = "";
-
-  for (let i = prefixes.length - 1; i >= 0; i--) {
-    const [exp, sym] = prefixes[i]!;
-    if (abs >= Math.pow(10, exp) * 0.9999999) {
-      chosenExp = exp;
-      chosenSymbol = sym;
-      break;
-    }
-  }
-
-  // If value is smaller than all prefixes (sub-femto), use femto
-  if (abs < Math.pow(10, -15) * 0.9999999) {
-    chosenExp = -15;
-    chosenSymbol = "f";
-  }
-
-  const scaled = abs / Math.pow(10, chosenExp);
-
-  // Format to `sigFigs` significant figures
-  const formatted = scaled.toPrecision(sigFigs);
-
-  const prefix = chosenSymbol ? `${chosenSymbol}${unit}` : unit;
-  return `${sign}${formatted} ${prefix}`;
 }
 
 // ---------------------------------------------------------------------------

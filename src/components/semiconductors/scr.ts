@@ -74,16 +74,15 @@ export function createScrElement(
   const nodeK = nodeIds[1]; // cathode
   const nodeG = nodeIds[2]; // gate
 
-  const propsMap = props as unknown as Record<string, unknown>;
-  const vOn: number = (propsMap["vOn"] as number) ?? 1.5;
-  const iH: number = (propsMap["iH"] as number) ?? 5e-3;
-  const rOn: number = (propsMap["rOn"] as number) ?? 0.01;
-  const vBreakover: number = (propsMap["vBreakover"] as number) ?? 100;
-  const iS: number = (propsMap["iS"] as number) ?? 1e-12;
-  const alpha1: number = (propsMap["alpha1"] as number) ?? 0.5;
-  const alpha2_0: number = (propsMap["alpha2_0"] as number) ?? 0.3;
-  const iRef: number = (propsMap["i_ref"] as number) ?? 1e-3;
-  const n: number = (propsMap["n"] as number) ?? 1;
+  const vOn: number       = props.getOrDefault<number>("vOn",        1.5);
+  const iH: number        = props.getOrDefault<number>("iH",         5e-3);
+  const rOn: number       = props.getOrDefault<number>("rOn",        0.01);
+  const vBreakover: number = props.getOrDefault<number>("vBreakover", 100);
+  const iS: number        = props.getOrDefault<number>("iS",         1e-12);
+  const alpha1: number    = props.getOrDefault<number>("alpha1",     0.5);
+  const alpha2_0: number  = props.getOrDefault<number>("alpha2_0",   0.3);
+  const iRef: number      = props.getOrDefault<number>("i_ref",      1e-3);
+  const n: number         = props.getOrDefault<number>("n",          1);
 
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (iS * Math.SQRT2));
@@ -245,7 +244,7 @@ export function createScrElement(
     },
 
     get label(): string | undefined {
-      return (propsMap["label"] as string | undefined);
+      return props.getOrDefault<string>("label", "");
     },
 
     // Expose latch state for testing

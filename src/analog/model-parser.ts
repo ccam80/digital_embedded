@@ -202,9 +202,6 @@ export function parseModelCard(
   // Extract LEVEL parameter (case-insensitive) — default is 1
   const level = params["LEVEL"] !== undefined ? params["LEVEL"] : 1;
 
-  // Remove LEVEL from params (it's a meta-parameter, not a device parameter)
-  // Keep it in for reference per spec — spec says "level extracted", implying
-  // it appears in both level field AND params. We omit from params to keep clean.
   delete params["LEVEL"];
 
   return { name, deviceType, level, params };

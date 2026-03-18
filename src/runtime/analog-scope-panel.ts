@@ -74,15 +74,15 @@ const ENVELOPE_THRESHOLD = 1000;
 /**
  * Analog oscilloscope panel.
  *
- * Registers itself as a `MeasurementObserver` on construction; caller must
- * call `engine.addMeasurementObserver(panel)` separately (or let the
- * constructor do it via `autoRegister` option, but the engine type in Phase 0
- * does not expose that).
+ * Auto-registers itself as a `MeasurementObserver` on construction by calling
+ * `engine.addMeasurementObserver(this)`. Call `dispose()` to deregister when
+ * the panel is no longer needed.
  *
  * Usage:
  *   const panel = new AnalogScopePanel(canvas, engine);
- *   engine.addMeasurementObserver(panel);
  *   panel.addVoltageChannel(1, "Vout", "#4488ff");
+ *   // ... later ...
+ *   panel.dispose();
  */
 export class AnalogScopePanel implements MeasurementObserver {
   private readonly _canvas: HTMLCanvasElement | null;
@@ -101,6 +101,12 @@ export class AnalogScopePanel implements MeasurementObserver {
   constructor(canvas: HTMLCanvasElement | null, engine: AnalogEngine) {
     this._canvas = canvas;
     this._engine = engine;
+    engine.addMeasurementObserver(this);
+  }
+
+  /** Deregister from the engine. Call when the panel is no longer needed. */
+  dispose(): void {
+    this._engine.removeMeasurementObserver(this);
   }
 
   // -------------------------------------------------------------------------

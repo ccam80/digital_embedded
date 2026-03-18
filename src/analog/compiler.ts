@@ -494,23 +494,6 @@ export function compileAnalogCircuit(
         ? (props.get("simulationMode") as string)
         : "behavioral";
 
-      if (simulationMode === "digital") {
-        diagnostics.push(
-          makeDiagnostic(
-            "digital-bridge-not-yet-implemented",
-            "info",
-            `Component "${el.typeId}" is set to simulationMode 'digital' — bridge not yet available`,
-            {
-              explanation:
-                `The digital bridge (Phase 4b) is not yet implemented. ` +
-                `Component "${el.typeId}" will be skipped in analog compilation. ` +
-                `Set simulationMode to 'behavioral' to simulate this component.`,
-            },
-          ),
-        );
-        continue;
-      }
-
       if (simulationMode === "transistor") {
         if (!transistorModels) {
           diagnostics.push(

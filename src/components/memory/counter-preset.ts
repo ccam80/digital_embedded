@@ -32,7 +32,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralCounterAnalogFactory } from "../../analog/behavioral-sequential.js";
+import { makeBehavioralCounterPresetAnalogFactory } from "../../analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -352,7 +352,7 @@ export const CounterPresetDefinition: ComponentDefinition = {
   factory: counterPresetFactory,
   executeFn: executeCounterPreset,
   sampleFn: sampleCounterPreset,
-  analogFactory: makeBehavioralCounterAnalogFactory(),
+  analogFactory: makeBehavioralCounterPresetAnalogFactory(),
   simulationModes: ['digital', 'behavioral'],
   pinLayout: COUNTER_PRESET_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PRESET_PROPERTY_DEFS,

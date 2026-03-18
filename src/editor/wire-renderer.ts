@@ -233,7 +233,6 @@ export class WireRenderer {
     value: { raw: number; width: number } | { voltage: number } | undefined,
   ): "WIRE" | "WIRE_HIGH" | "WIRE_LOW" | "WIRE_Z" | "WIRE_UNDEFINED" | "WIRE_ANALOG" {
     if (value === undefined) return "WIRE";
-    // Analog wires use a single color (gradient rendering is a future enhancement)
     if ("voltage" in value) return "WIRE_ANALOG";
     // Mask raw value to the signal's bit width — execute functions may store
     // full 32-bit results (e.g. ~0 >>> 0 = 0xFFFFFFFF for a 1-bit NOT output).

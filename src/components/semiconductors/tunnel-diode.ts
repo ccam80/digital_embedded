@@ -131,11 +131,10 @@ export function createTunnelDiodeElement(
   const nodeAnode   = nodeIds[0];
   const nodeCathode = nodeIds[1];
 
-  const propsMap = props as unknown as Record<string, unknown>;
-  const ip: number = (propsMap["ip"] as number) ?? 5e-3;
-  const vp: number = (propsMap["vp"] as number) ?? 0.08;
-  const iv: number = (propsMap["iv"] as number) ?? 0.5e-3;
-  const vv: number = (propsMap["vv"] as number) ?? 0.5;
+  const ip: number = props.getOrDefault<number>("ip", 5e-3);
+  const vp: number = props.getOrDefault<number>("vp", 0.08);
+  const iv: number = props.getOrDefault<number>("iv", 0.5e-3);
+  const vv: number = props.getOrDefault<number>("vv", 0.5);
 
   // NR linearization state
   let _vd = 0;

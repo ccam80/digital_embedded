@@ -40,7 +40,7 @@ const TD_DEFAULTS = {
 function makeTunnelDiode(overrides: Partial<typeof TD_DEFAULTS> = {}): AnalogElement {
   const params = { ...TD_DEFAULTS, ...overrides };
   // nodeAnode=1, nodeCathode=2
-  return createTunnelDiodeElement([1, 2], -1, params as unknown as PropertyBag);
+  return createTunnelDiodeElement([1, 2], -1, new PropertyBag(Object.entries(params)));
 }
 
 /**
@@ -233,7 +233,7 @@ describe("TunnelDiode", () => {
     const td = createTunnelDiodeElement(
       [2, 0],
       -1,
-      TD_DEFAULTS as unknown as PropertyBag,
+      new PropertyBag(Object.entries(TD_DEFAULTS)),
     );
 
     // Resistor element
