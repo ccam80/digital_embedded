@@ -28,7 +28,7 @@ import { findSCCs, hasSelfLoop } from "./tarjan.js";
 import { topologicalSort } from "./topological-sort.js";
 import { BusResolver } from "./bus-resolution.js";
 import type { PullResistor } from "./bus-resolution.js";
-import { UnionFind } from "./union-find.js";
+import { traceNets } from "./net-trace.js";
 
 // ---------------------------------------------------------------------------
 // CompilationWarning — non-fatal issue found during compilation
@@ -90,7 +90,7 @@ export function compileCircuit(
   }
 
   // -----------------------------------------------------------------------
-  // Step 2: Collect all pins with their world positions
+  // Step 2: Collect all pins (for wiring table construction in later steps)
   // -----------------------------------------------------------------------
 
   // Build a flat list of all pins across all components.
@@ -107,139 +107,17 @@ export function compileCircuit(
   }
 
   // -----------------------------------------------------------------------
-  // Step 3: Trace nets via wire endpoints and pin positions
+  // Step 3: Trace nets via wire endpoints and pin positions (F5, F6)
   // -----------------------------------------------------------------------
-
-  // Total number of "slots" = sum of all pins across all components.
-  // We assign each pin a unique slot index and then union-find merge them.
-  const slotCount = allPinRefs.reduce((sum, refs) => sum + refs.length, 0);
-
-  // Build slot index: element i, pin j → slot
-  const slotOf = (elemIdx: number, pinIdx: number): number => {
-    let base = 0;
-    for (let k = 0; k < elemIdx; k++) {
-      base += allPinRefs[k]!.length;
-    }
-    return base + pinIdx;
-  };
-
-  // Build a map from position key to list of pin slots at that position
-  const positionToSlots = new Map<string, number[]>();
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    const refs = allPinRefs[i]!;
-    for (let j = 0; j < refs.length; j++) {
-      const pin = refs[j]!.pin;
-      const wx = el.position.x + pin.position.x;
-      const wy = el.position.y + pin.position.y;
-      const key = `${wx},${wy}`;
-      let list = positionToSlots.get(key);
-      if (list === undefined) {
-        list = [];
-        positionToSlots.set(key, list);
-      }
-      list.push(slotOf(i, j));
-    }
-  }
-
-  // Process wires: build adjacency between endpoints
-  // Wire endpoints that land on pin positions merge those pins into one net.
-  // Wire endpoints that land on other wire endpoints merge those wires into one net.
-
-  // First, collect all endpoint positions including both wire ends.
-  // We create "wire endpoint slots" beyond the pin slots for wire-to-wire junctions.
-  // Simpler approach: treat wire endpoints as position points. For each wire,
-  // union together the slots at its start and end positions.
 
   const wires = circuit.wires;
 
-  // For each wire, find all pin slots at its endpoints and wire them together.
-  // Wire endpoints that don't land on a pin are "floating wire nodes" — we
-  // create virtual slots for them so wires can chain together through space.
+  // Delegate to shared traceNets() which uses pinWorldPosition() (F6 fix).
+  const traced = traceNets(elements, wires, registry);
+  const { uf: uf2, slotBase: tracedSlotBase, wireVirtualBase } = traced;
 
-  // Total virtual slots needed = 2 * wireCount (start + end of each wire)
-  const wireVirtualBase = slotCount;
-  const totalSlots = slotCount + wires.length * 2;
-  const uf2 = new UnionFind(totalSlots);
-
-  // Re-build position map including wire virtual nodes
-  const posToNodes = new Map<string, number[]>();
-
-  // Add pin slots
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    const refs = allPinRefs[i]!;
-    for (let j = 0; j < refs.length; j++) {
-      const pin = refs[j]!.pin;
-      const wx = el.position.x + pin.position.x;
-      const wy = el.position.y + pin.position.y;
-      const key = `${wx},${wy}`;
-      let list = posToNodes.get(key);
-      if (list === undefined) {
-        list = [];
-        posToNodes.set(key, list);
-      }
-      list.push(slotOf(i, j));
-    }
-  }
-
-  // Add wire virtual nodes (2 per wire: start=wireVirtualBase+2k, end=wireVirtualBase+2k+1)
-  for (let k = 0; k < wires.length; k++) {
-    const wire = wires[k]!;
-    const startKey = `${wire.start.x},${wire.start.y}`;
-    const endKey = `${wire.end.x},${wire.end.y}`;
-    const startNode = wireVirtualBase + k * 2;
-    const endNode = wireVirtualBase + k * 2 + 1;
-
-    let startList = posToNodes.get(startKey);
-    if (startList === undefined) {
-      startList = [];
-      posToNodes.set(startKey, startList);
-    }
-    startList.push(startNode);
-
-    let endList = posToNodes.get(endKey);
-    if (endList === undefined) {
-      endList = [];
-      posToNodes.set(endKey, endList);
-    }
-    endList.push(endNode);
-
-    // Merge start and end of this wire into one net
-    uf2.union(startNode, endNode);
-  }
-
-  // Now merge all nodes at the same position
-  for (const nodes of posToNodes.values()) {
-    if (nodes.length > 1) {
-      for (let m = 1; m < nodes.length; m++) {
-        uf2.union(nodes[0]!, nodes[m]!);
-      }
-    }
-  }
-
-  // Resolve Tunnel components: all Tunnels with the same label are merged
-  const tunnelsByLabel = new Map<string, number[]>(); // label → list of pin slots
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    if (el.typeId === "Tunnel") {
-      const label = el.getAttribute("label");
-      if (typeof label === "string" && label.length > 0) {
-        let slots = tunnelsByLabel.get(label);
-        if (slots === undefined) {
-          slots = [];
-          tunnelsByLabel.set(label, slots);
-        }
-        // Tunnel has one pin (index 0)
-        slots.push(slotOf(i, 0));
-      }
-    }
-  }
-  for (const tunnelSlots of tunnelsByLabel.values()) {
-    for (let m = 1; m < tunnelSlots.length; m++) {
-      uf2.union(tunnelSlots[0]!, tunnelSlots[m]!);
-    }
-  }
+  const slotOf = (elemIdx: number, pinIdx: number): number =>
+    tracedSlotBase[elemIdx]! + pinIdx;
 
   // -----------------------------------------------------------------------
   // Step 4: Assign net IDs
