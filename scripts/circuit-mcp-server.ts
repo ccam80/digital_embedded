@@ -14,9 +14,9 @@ import { z } from "zod";
 import { readFile, writeFile, readdir, mkdir } from "fs/promises";
 import { dirname, resolve as resolvePath } from "path";
 import { createDefaultRegistry } from "../src/components/register-all.js";
-import { CircuitBuilder } from "../src/headless/builder.js";
-import { SimulationLoader } from "../src/headless/loader.js";
+import { DefaultSimulatorFacade } from "../src/headless/default-facade.js";
 import { SimulationRunner } from "../src/headless/runner.js";
+import { detectInputCount } from "../src/testing/detect-input-count.js";
 import type { Circuit } from "../src/core/circuit.js";
 import type { Diagnostic, ComponentDescriptor, NetDescriptor, PinDescriptor, Netlist } from "../src/headless/netlist-types.js";
 import type { ComponentDefinition } from "../src/core/registry.js";
@@ -25,10 +25,7 @@ import type { CircuitSpec, PatchOp } from "../src/headless/netlist-types.js";
 import { executeTests } from "../src/testing/executor.js";
 import { parseTestData } from "../src/testing/parser.js";
 import { extractEmbeddedTestData } from "../src/headless/test-runner.js";
-import { serializeCircuit } from "../src/io/save.js";
 import { serializeCircuitToDig } from "../src/io/dig-serializer.js";
-import { parseDigXml } from "../src/io/dig-parser.js";
-import { loadDigCircuit } from "../src/io/dig-loader.js";
 import { loadWithSubcircuits } from "../src/io/subcircuit-loader.js";
 import { NodeResolver } from "../src/io/file-resolver.js";
 import { registerSubcircuit, createLiveDefinition } from "../src/components/subcircuit/subcircuit.js";
@@ -56,57 +53,14 @@ function getCircuit(handle: string): Circuit {
   return circuit;
 }
 
-/**
- * Determine inputCount for parseTestData by matching header signal names
- * against the circuit's In/Clock component labels (inputs) vs Out labels (outputs).
- * Returns the number of leading header names that are circuit inputs.
- */
-function detectInputCount(circuit: Circuit, headerLine: string): number | undefined {
-  // Collect circuit input labels (In, Clock components)
-  const inputLabels = new Set<string>();
-  const outputLabels = new Set<string>();
-  for (const el of circuit.elements) {
-    const def = registry.get(el.typeId);
-    if (!def) continue;
-    if (def.name === "In" || def.name === "Clock") {
-      const label = el.getProperties().get("label") as string | undefined;
-      if (label) inputLabels.add(label);
-    }
-    if (def.name === "Out") {
-      const label = el.getProperties().get("label") as string | undefined;
-      if (label) outputLabels.add(label);
-    }
-  }
-
-  // If we can't identify any labeled components, fall back
-  if (inputLabels.size === 0 && outputLabels.size === 0) return undefined;
-
-  // Parse signal names from header (whitespace-separated, skip comments)
-  const names = headerLine.trim().split(/\s+/).filter((n) => n.length > 0 && n !== "#");
-
-  // Count leading names that are circuit inputs
-  let count = 0;
-  for (const name of names) {
-    if (inputLabels.has(name)) {
-      count++;
-    } else {
-      break; // First non-input name marks the boundary
-    }
-  }
-
-  // If no inputs found but we have outputs, all columns are outputs
-  return count > 0 ? count : (outputLabels.size > 0 ? 0 : undefined);
-}
-
 // ---------------------------------------------------------------------------
-// Registry + builder + loader + runner (initialized once)
+// Registry + facade + runner (initialized once)
 // ---------------------------------------------------------------------------
 
 const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
 const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
 const registry = createDefaultRegistry(pinMap74xx);
-const builder = new CircuitBuilder(registry);
-const loader = new SimulationLoader(registry);
+const facade = new DefaultSimulatorFacade(registry);
 const runner = new SimulationRunner(registry);
 
 // ---------------------------------------------------------------------------
@@ -272,7 +226,7 @@ server.registerTool(
       circuits.set(handle, circuit);
       circuitSourceDirs.set(handle, baseDir);
 
-      const netlist = builder.netlist(circuit);
+      const netlist = facade.netlist(circuit);
       const wireCount = circuit.wires.length;
 
       return {
@@ -324,7 +278,7 @@ server.registerTool(
   ({ handle }) => {
     try {
       const circuit = getCircuit(handle);
-      const netlist = builder.netlist(circuit);
+      const netlist = facade.netlist(circuit);
       return {
         content: [{ type: "text" as const, text: formatNetlist(netlist) }],
       };
@@ -360,7 +314,7 @@ server.registerTool(
   ({ handle }) => {
     try {
       const circuit = getCircuit(handle);
-      const diagnostics = builder.validate(circuit);
+      const diagnostics = facade.validate(circuit);
       const text =
         diagnostics.length === 0
           ? "No issues found. Circuit is valid."
@@ -403,7 +357,7 @@ server.registerTool(
   },
   ({ typeName }) => {
     try {
-      const def = builder.describeComponent(typeName);
+      const def = facade.describeComponent(typeName);
       if (!def) {
         // List available types to help
         const allNames = registry.getAll().map((d: ComponentDefinition) => d.name);
@@ -625,7 +579,7 @@ server.registerTool(
         }
       }
 
-      const result = builder.patch(circuit, ops as unknown as PatchOp[], scope ? { scope } : undefined);
+      const result = facade.patch(circuit, ops as unknown as PatchOp[], scope ? { scope } : undefined);
       const lines: string[] = [];
 
       // Show added component ID mappings so the caller can address them
@@ -707,11 +661,11 @@ server.registerTool(
   },
   ({ spec }) => {
     try {
-      const circuit = builder.build(spec as CircuitSpec);
+      const circuit = facade.build(spec as CircuitSpec);
       const handle = nextHandle();
       circuits.set(handle, circuit);
 
-      const netlist = builder.netlist(circuit);
+      const netlist = facade.netlist(circuit);
       const text = [
         `Circuit built successfully.`,
         `Handle: ${handle}`,
@@ -758,13 +712,13 @@ server.registerTool(
   ({ handle }) => {
     try {
       const circuit = getCircuit(handle);
-      const engine = runner.compile(circuit);
+      const engine = facade.compile(circuit);
 
       // Read all labeled signals to confirm engine is alive
-      const signals = runner.readAllSignals(engine);
-      const signalCount = signals.size;
+      const signals = facade.readAllSignals(engine);
+      const signalCount = Object.keys(signals).length;
 
-      const netlist = builder.netlist(circuit);
+      const netlist = facade.netlist(circuit);
       return {
         content: [
           {
@@ -822,15 +776,14 @@ server.registerTool(
   ({ handle, testData }) => {
     try {
       const circuit = getCircuit(handle);
-      const engine = runner.compile(circuit);
       const resolvedData = testData ?? extractEmbeddedTestData(circuit);
       if (resolvedData === null || resolvedData.trim().length === 0) {
         throw new Error("No test data available: circuit contains no Testcase components and no external test data was provided.");
       }
-      const firstLine = resolvedData.split('\n').find((l) => l.trim().length > 0 && !l.trim().startsWith('#')) ?? '';
-      const inputCount = detectInputCount(circuit, firstLine);
+      const inputCount = detectInputCount(circuit, registry, resolvedData);
       const parsed = parseTestData(resolvedData, inputCount);
-      const results = executeTests(runner, engine, circuit, parsed);
+      const testEngine = runner.compile(circuit);
+      const results = executeTests(runner, testEngine, circuit, parsed);
 
       const lines: string[] = [
         `Test Results:`,
@@ -1146,7 +1099,7 @@ server.registerTool(
       // Build goal circuit if it's a CircuitSpec
       if (step.goalCircuit && typeof step.goalCircuit !== "string") {
         try {
-          const goalCircuit = builder.build(step.goalCircuit as import("../src/headless/netlist-types.js").CircuitSpec);
+          const goalCircuit = facade.build(step.goalCircuit as import("../src/headless/netlist-types.js").CircuitSpec);
           const goalHandle = nextHandle();
           circuits.set(goalHandle, goalCircuit);
 
@@ -1159,8 +1112,7 @@ server.registerTool(
           // Verify test vectors against goal circuit
           if (step.testData) {
             try {
-              const goalFirstLine = step.testData.split('\n').find((l: string) => l.trim().length > 0 && !l.trim().startsWith('#')) ?? '';
-              const goalInputCount = detectInputCount(goalCircuit, goalFirstLine);
+              const goalInputCount = detectInputCount(goalCircuit, registry, step.testData);
               const parsed = parseTestData(step.testData, goalInputCount);
               const testEngine = runner.compile(goalCircuit);
               const results = executeTests(runner, testEngine, goalCircuit, parsed);
@@ -1189,7 +1141,7 @@ server.registerTool(
       // Build start circuit if it's a CircuitSpec
       if (step.startCircuit && typeof step.startCircuit !== "string") {
         try {
-          const startCircuit = builder.build(step.startCircuit as import("../src/headless/netlist-types.js").CircuitSpec);
+          const startCircuit = facade.build(step.startCircuit as import("../src/headless/netlist-types.js").CircuitSpec);
           const startXml = serializeCircuitToDig(startCircuit, registry);
           const startPath = `${outputDir}/${step.id}-start.dig`;
           await writeFile(startPath, startXml, "utf-8");
@@ -1293,8 +1245,10 @@ server.registerTool(
       const circuitA = getCircuit(handleA);
       const circuitB = getCircuit(handleB);
 
-      const engineA = runner.compile(circuitA);
-      const engineB = runner.compile(circuitB);
+      const facadeA = new DefaultSimulatorFacade(registry);
+      const facadeB = new DefaultSimulatorFacade(registry);
+      const engineA = facadeA.compile(circuitA);
+      const engineB = facadeB.compile(circuitB);
 
       // Discover In/Out labels from circuit A
       const inputLabels: string[] = [];
@@ -1338,18 +1292,18 @@ server.registerTool(
         for (let i = 0; i < inputLabels.length; i++) {
           const mask = (1 << inputWidths[i]!) - 1;
           const value = (combo >> bitPos) & mask;
-          runner.setInput(engineA, inputLabels[i]!, value);
-          runner.setInput(engineB, inputLabels[i]!, value);
+          facadeA.setInput(engineA, inputLabels[i]!, value);
+          facadeB.setInput(engineB, inputLabels[i]!, value);
           bitPos += inputWidths[i]!;
         }
 
-        runner.runToStable(engineA);
-        runner.runToStable(engineB);
+        facadeA.runToStable(engineA);
+        facadeB.runToStable(engineB);
 
         // Compare outputs
         for (const label of outputLabels) {
-          const outA = runner.readOutput(engineA, label);
-          const outB = runner.readOutput(engineB, label);
+          const outA = facadeA.readOutput(engineA, label);
+          const outB = facadeB.readOutput(engineB, label);
           if (outA !== outB) {
             mismatches++;
             if (!firstMismatch) {

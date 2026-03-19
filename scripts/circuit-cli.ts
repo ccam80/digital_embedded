@@ -19,8 +19,7 @@ import { readFileSync, writeFileSync, readFile, readdir } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { createDefaultRegistry } from '@/components/register-all.js';
 import { scan74xxPinMap } from '@/io/dig-pin-scanner.js';
-import { CircuitBuilder } from '@/headless/builder.js';
-import { SimulationRunner } from '@/headless/runner.js';
+import { DefaultSimulatorFacade } from '@/headless/default-facade.js';
 import { FacadeError } from '@/headless/types.js';
 import { extractEmbeddedTestData } from '@/headless/test-runner.js';
 import { parseTestData } from '@/testing/parser.js';
@@ -47,8 +46,7 @@ import type { ComponentDefinition } from '@/core/registry.js';
 const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
 const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
 const registry = createDefaultRegistry(pinMap74xx);
-const builder = new CircuitBuilder(registry);
-const runner = new SimulationRunner(registry);
+const facade = new DefaultSimulatorFacade(registry);
 
 // ---------------------------------------------------------------------------
 // Helper: load a .dig file from disk and return a Circuit
@@ -176,13 +174,13 @@ function formatComponentDefinition(def: ComponentDefinition): string {
 
 async function cmdNetlist(filePath: string): Promise<void> {
   const circuit = await loadCircuit(filePath);
-  const netlist = builder.netlist(circuit);
+  const netlist = facade.netlist(circuit);
   console.log(formatNetlist(netlist));
 }
 
 async function cmdValidate(filePath: string): Promise<void> {
   const circuit = await loadCircuit(filePath);
-  const diagnostics = builder.validate(circuit);
+  const diagnostics = facade.validate(circuit);
   console.log(formatDiagnostics(diagnostics));
 }
 
@@ -203,7 +201,7 @@ function cmdList(): void {
 }
 
 function cmdDescribe(typeName: string): void {
-  const def = builder.describeComponent(typeName);
+  const def = facade.describeComponent(typeName);
   if (!def) {
     console.error(`Unknown component type: "${typeName}"`);
     console.error('Use `describe` with a registered type name (e.g. And, Or, FlipflopD).');
@@ -227,7 +225,7 @@ async function cmdPatch(
   }
 
   const patchOpts = opts.scope ? { scope: opts.scope } : undefined;
-  const { diagnostics } = builder.patch(circuit, ops, patchOpts);
+  const { diagnostics } = facade.patch(circuit, ops, patchOpts);
 
   if (opts.save) {
     // Serialize back: we don't have a .dig serializer, so warn the user.
@@ -269,8 +267,8 @@ function cmdBuild(specJson: string, outPath: string): void {
     process.exit(1);
   }
 
-  const circuit = builder.build(spec);
-  const diagnostics = builder.validate(circuit);
+  const circuit = facade.build(spec);
+  const diagnostics = facade.validate(circuit);
 
   if (diagnostics.some((d) => d.severity === 'error')) {
     console.log('Build produced errors:');
@@ -300,7 +298,7 @@ async function cmdCompile(filePath: string): Promise<void> {
   const circuit = await loadCircuit(filePath);
 
   // Pre-check via netlist
-  const diagnostics = builder.validate(circuit);
+  const diagnostics = facade.validate(circuit);
   const errors = diagnostics.filter((d) => d.severity === 'error');
   if (errors.length > 0) {
     console.log('Compilation blocked by pre-compile errors:');
@@ -309,7 +307,7 @@ async function cmdCompile(filePath: string): Promise<void> {
   }
 
   try {
-    runner.compile(circuit);
+    facade.compile(circuit);
     console.log('Compilation successful.');
     if (diagnostics.length > 0) {
       console.log('');
@@ -334,7 +332,7 @@ async function cmdTest(filePath: string): Promise<void> {
 
   let engine;
   try {
-    engine = runner.compile(circuit);
+    engine = facade.compile(circuit);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`Compile error: ${msg}`);
@@ -349,7 +347,7 @@ async function cmdTest(filePath: string): Promise<void> {
       process.exit(1);
     }
     const parsed = parseTestData(testData);
-    results = executeTests(runner, engine, circuit, parsed);
+    results = executeTests(facade, engine, circuit, parsed);
   } catch (err) {
     if (err instanceof FacadeError) {
       console.error(`Test error: ${err.message}`);
