@@ -49,9 +49,10 @@ import { serializeCircuit } from '../io/save.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { deserializeDts } from '../io/dts-deserializer.js';
 import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
-import { DigitalEngine } from '../engine/digital-engine.js';
-import { compileCircuit } from '../engine/compiler.js';
-import { ClockManager } from '../engine/clock.js';
+import { PostMessageAdapter } from '../io/postmessage-adapter.js';
+import { createTestBridge } from './test-bridge.js';
+import type { AnalogTestContext } from './test-bridge.js';
+import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
 import { EngineState } from '../core/engine-interface.js';
 import { BitVector } from '../core/signal.js';
@@ -62,15 +63,17 @@ import type { Diagnostic } from '../headless/netlist-types.js';
 import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
-import type { CompiledCircuitImpl } from '../engine/compiled-circuit.js';
+import type { ConcreteCompiledCircuit } from '../engine/digital-engine.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import { TimingDiagramPanel } from '../runtime/timing-diagram.js';
-import { SimulationRunner } from '../headless/runner.js';
-import { parseTestData } from '../testing/parser.js';
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
-import { executeTests } from '../testing/executor.js';
+import { AnalogScopePanel } from '../runtime/analog-scope-panel.js';
+import type { ConcreteCompiledAnalogCircuit } from '../analog/compiled-analog-circuit.js';
+import type { AcParams } from '../analog/ac-analysis.js';
+import { BodePlotRenderer } from '../runtime/bode-plot.js';
+import type { BodeViewport } from '../runtime/bode-plot.js';
 import { analyseCircuit } from '../analysis/model-analyser.js';
 import { TruthTableTab } from '../analysis/truth-table-ui.js';
 import { TruthTable } from '../analysis/truth-table.js';
@@ -257,30 +260,59 @@ export function initApp(search?: string): void {
   // Insert menu — full component set with hierarchical submenus
   // -------------------------------------------------------------------------
   const insertMenuDropdown = document.getElementById('insert-menu-dropdown');
-  if (insertMenuDropdown) {
-    const categoryLabels: Record<string, string> = {
-      LOGIC: "Logic",
-      IO: "I/O",
-      FLIP_FLOPS: "Flip-Flops",
-      MEMORY: "Memory",
-      ARITHMETIC: "Arithmetic",
-      WIRING: "Wiring",
-      SWITCHING: "Switching",
-      PLD: "PLD",
-      MISC: "Miscellaneous",
-      GRAPHICS: "Graphics",
-      TERMINAL: "Terminal",
-      "74XX": "74xx",
-    };
+
+  const INSERT_CATEGORY_LABELS: Record<string, string> = {
+    LOGIC: "Logic",
+    IO: "I/O",
+    FLIP_FLOPS: "Flip-Flops",
+    MEMORY: "Memory",
+    ARITHMETIC: "Arithmetic",
+    WIRING: "Wiring",
+    SWITCHING: "Switching",
+    PLD: "PLD",
+    MISC: "Miscellaneous",
+    GRAPHICS: "Graphics",
+    TERMINAL: "Terminal",
+    "74XX": "74xx",
+    PASSIVES: "Passives",
+    SEMICONDUCTORS: "Semiconductors",
+    SOURCES: "Sources",
+    ACTIVE: "Active",
+  };
+
+  /** Category keys in digital-first order. */
+  const INSERT_ORDER_DIGITAL = [
+    "IO", "WIRING", "LOGIC", "SWITCHING", "FLIP_FLOPS", "MEMORY",
+    "ARITHMETIC", "PLD", "MISC", "GRAPHICS", "TERMINAL", "74XX",
+    "PASSIVES", "SEMICONDUCTORS", "SOURCES", "ACTIVE",
+  ];
+  /** Category keys in analog-first order. */
+  const INSERT_ORDER_ANALOG = [
+    "PASSIVES", "SEMICONDUCTORS", "SOURCES", "ACTIVE",
+    "IO", "WIRING", "LOGIC", "SWITCHING", "FLIP_FLOPS", "MEMORY",
+    "ARITHMETIC", "PLD", "MISC", "GRAPHICS", "TERMINAL", "74XX",
+  ];
+
+  /** Rebuild the Insert menu, filtering by engine type. */
+  function rebuildInsertMenu(): void {
+    if (!insertMenuDropdown) return;
+    insertMenuDropdown.innerHTML = '';
     const reg = palette.getRegistry();
-    for (const catKey of Object.keys(categoryLabels)) {
-      const defs = reg.getByCategory(catKey as any);
+    const engineFilter = circuit.metadata.engineType;
+    const order = engineFilter === 'analog' ? INSERT_ORDER_ANALOG : INSERT_ORDER_DIGITAL;
+    for (const catKey of order) {
+      const allDefs = reg.getByCategory(catKey as any);
+      // Filter by engine type
+      const defs = allDefs.filter(d => {
+        const et = d.engineType ?? "digital";
+        return et === engineFilter || et === "both";
+      });
       if (defs.length === 0) continue;
       const sub = document.createElement("div");
       sub.className = "menu-submenu";
       const trigger = document.createElement("div");
       trigger.className = "menu-action";
-      trigger.textContent = categoryLabels[catKey] ?? catKey;
+      trigger.textContent = INSERT_CATEGORY_LABELS[catKey] ?? catKey;
       sub.appendChild(trigger);
 
       const subDropdown = document.createElement("div");
@@ -299,6 +331,7 @@ export function initApp(search?: string): void {
       insertMenuDropdown.appendChild(sub);
     }
   }
+  rebuildInsertMenu();
 
   const propertyContainer = document.getElementById('property-content')!;
   const propertyPanel = new PropertyPanel(propertyContainer);
@@ -320,22 +353,132 @@ export function initApp(search?: string): void {
   // Engine + binding
   // -------------------------------------------------------------------------
 
-  const engine = new DigitalEngine('level');
+  const facade = new DefaultSimulatorFacade(registry);
   const binding = createEditorBinding();
   let compiledDirty = true;
-  let compiled: CompiledCircuitImpl | null = null;
-  let clockManager: ClockManager | null = null;
+
+  /** True when a simulation (digital or analog) is active. */
+  function isSimActive(): boolean {
+    return binding.isBound || facade.getCompiledAnalog() !== null;
+  }
+
+  /**
+   * Translate raw JS error messages from the analog pipeline into
+   * plain-language descriptions that help the user locate the problem.
+   */
+  function _friendlyAnalogError(raw: string, circ: import("../core/circuit.js").Circuit): string {
+    // Pattern: "Cannot read properties of undefined (reading 'X')"
+    // This typically means a component's pin didn't connect to any wire,
+    // producing an invalid node index that cascaded into the solver.
+    if (raw.includes('Cannot read properties of undefined')) {
+      const componentNames = circ.elements
+        .map(el => {
+          const props = el.getProperties();
+          const label = props.has('label') ? props.get<string>('label') : '';
+          return label || el.typeId;
+        })
+        .filter(n => n.length > 0);
+      const list = componentNames.length > 0
+        ? ` Components in circuit: ${componentNames.join(', ')}.`
+        : '';
+      return `A component has an unconnected pin — check that every pin sits exactly ` +
+        `on a wire endpoint. Rotated or moved components often leave pins dangling.${list}`;
+    }
+
+    // Pattern: unknown component type
+    if (raw.includes('unknown component type')) {
+      const match = raw.match(/"([^"]+)"/);
+      const typeName = match ? match[1] : 'unknown';
+      return `Couldn't find the component type "${typeName}" — check that it's ` +
+        `registered and spelled correctly.`;
+    }
+
+    // Pattern: digital-only component in analog circuit
+    if (raw.includes('digital-only')) {
+      const match = raw.match(/"([^"]+)"/);
+      const typeName = match ? match[1] : 'unknown';
+      return `"${typeName}" is a digital-only component and can't be used in an analog circuit. ` +
+        `Replace it with an analog equivalent or switch to digital mode.`;
+    }
+
+    // Fallback: return the raw message
+    return raw;
+  }
+
+  /** Dispose the analog engine and clear analog state. */
+  function disposeAnalog(): void {
+    stopAnalogRenderLoop();
+    facade.invalidate();
+  }
 
   function compileAndBind(): boolean {
-    if (circuit.metadata.engineType === 'analog') {
-      showStatus('Analog simulation not yet available', true);
-      return false;
-    }
+    const isAnalog = circuit.metadata.engineType === 'analog';
+
+    // Clean up whichever engine was previously active
     if (binding.isBound) {
-      engine.stop();
+      facade.getEngine()?.stop?.();
       binding.unbind();
-      engine.dispose();
     }
+    disposeAnalog();
+
+    if (isAnalog) {
+      try {
+        const engine = facade.compile(circuit);
+        const ac = facade.getCompiledAnalog();
+
+        if (ac) {
+          const concreteAc = ac as unknown as ConcreteCompiledAnalogCircuit;
+          const compileErrors = concreteAc.diagnostics.filter(d => d.severity === 'error');
+          if (compileErrors.length > 0) {
+            const friendlyMessages = compileErrors.map(d => d.summary);
+            const combined = friendlyMessages.join(' | ');
+            console.error('Analog compilation diagnostics:', compileErrors);
+            showStatus(`Analog circuit problem: ${combined}`, true);
+            facade.invalidate();
+            return false;
+          }
+
+          const compileWarnings = concreteAc.diagnostics.filter(d => d.severity === 'warning');
+          if (compileWarnings.length > 0) {
+            console.warn('Analog compilation warnings:', compileWarnings.map(d => d.summary));
+          }
+        }
+
+        const dcResult = facade.getDcOpResult();
+        if (dcResult && !dcResult.converged) {
+          showStatus('Warning: DC operating point did not converge', true);
+        }
+
+        compiledDirty = false;
+        clearStatus();
+
+        if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
+          const analogCompiled = facade.getCompiledAnalog();
+          if (analogCompiled) {
+            for (const sig of watchedSignals) {
+              const nodeId = analogCompiled.labelToNodeId.get(sig.name);
+              if (nodeId !== undefined) {
+                sig.netId = nodeId;
+                sig.width = 1;
+              }
+            }
+          }
+          rebuildViewers();
+        }
+
+        void engine;
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Analog compilation failed:', msg, err);
+        const friendly = _friendlyAnalogError(msg, circuit);
+        showStatus(`Analog compilation error: ${friendly}`, true);
+        facade.invalidate();
+        return false;
+      }
+    }
+
+    // Pre-compilation diagnostics (digital only)
     const { diagnostics } = resolveNets(circuit, registry);
     const errors = diagnostics.filter(d => d.severity === 'error');
     if (errors.length > 0) {
@@ -344,21 +487,24 @@ export function initApp(search?: string): void {
       showStatus(`Compilation error: ${msg}`, true);
       return false;
     }
+
     try {
-      compiled = compileCircuit(circuit, registry);
-      engine.init(compiled);
-      binding.bind(circuit, engine, compiled.wireToNetId, compiled.pinNetMap);
-      clockManager = new ClockManager(compiled);
+      const engine = facade.compile(circuit);
+      const compiled = facade.getCompiled();
+      if (compiled) {
+        binding.bind(circuit, engine, compiled.wireToNetId, compiled.pinNetMap);
+      }
       compiledDirty = false;
       clearStatus();
-      // Recreate viewer panels if the viewer panel is open
       if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
-        // Re-resolve net IDs from signal names after recompilation
-        for (const sig of watchedSignals) {
-          const newNetId = compiled.labelToNetId.get(sig.name);
-          if (newNetId !== undefined) {
-            sig.netId = newNetId;
-            sig.width = compiled.netWidths[newNetId] ?? 1;
+        const compiledCircuit = facade.getCompiled();
+        if (compiledCircuit) {
+          for (const sig of watchedSignals) {
+            const newNetId = compiledCircuit.labelToNetId.get(sig.name);
+            if (newNetId !== undefined) {
+              sig.netId = newNetId;
+              sig.width = compiledCircuit.netWidths[newNetId] ?? 1;
+            }
           }
         }
         rebuildViewers();
@@ -374,8 +520,10 @@ export function initApp(search?: string): void {
 
   function invalidateCompiled(): void {
     compiledDirty = true;
-    if (engine.getState() === EngineState.RUNNING) engine.stop();
+    const eng = facade.getEngine();
+    if (eng?.getState?.() === EngineState.RUNNING) eng.stop?.();
     if (binding.isBound) binding.unbind();
+    disposeAnalog();
     // Dispose viewer panels — they hold stale net IDs
     disposeViewers();
     scheduleRender();
@@ -383,6 +531,19 @@ export function initApp(search?: string): void {
 
   const wireSignalAccessAdapter: WireSignalAccess = {
     getWireValue(wire: Wire): { raw: number; width: number } | undefined {
+      const analogCompiled = facade.getCompiledAnalog();
+      const analogEng = facade.getEngine();
+      if (analogEng && analogCompiled) {
+        const nodeId = analogCompiled.wireToNodeId.get(wire);
+        if (nodeId === undefined) return undefined;
+        try {
+          const voltage = (analogEng as unknown as { getNodeVoltage(id: number): number }).getNodeVoltage(nodeId);
+          return { raw: voltage, width: 0 };
+        } catch {
+          return undefined;
+        }
+      }
+      const compiled = facade.getCompiled();
       if (!binding.isBound || compiled === null) return undefined;
       const netId = compiled.wireToNetId.get(wire);
       if (netId === undefined) return undefined;
@@ -457,7 +618,7 @@ export function initApp(search?: string): void {
       canvasRenderer,
       circuit.wires,
       selection.getSelectedWires(),
-      binding.isBound ? wireSignalAccessAdapter : undefined,
+      isSimActive() ? wireSignalAccessAdapter : undefined,
     );
     wireRenderer.renderJunctionDots(canvasRenderer, circuit.wires);
     wireRenderer.renderBusWidthMarkers(canvasRenderer, circuit.wires);
@@ -647,7 +808,9 @@ export function initApp(search?: string): void {
     if (e.button !== 0 && e.pointerType !== 'touch') return;
 
     // During simulation, only allow toggling interactive components (In, Clock, etc.)
-    if (binding.isBound) {
+    if (isSimActive()) {
+      if (facade.getCompiledAnalog() !== null) { return; }
+
       const elementHit = hitTestElements(worldPt, circuit.elements, hitMargin);
       if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock')) {
         const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
@@ -657,19 +820,19 @@ export function initApp(search?: string): void {
             ? (current === 0 ? 1 : 0)
             : ((current + 1) & ((1 << bitWidth) - 1));
           binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          if (elementHit.typeId === 'Clock' && clockManager !== null && compiled !== null) {
-            // Sync ClockManager phase so it doesn't immediately revert
-            const netId = compiled.pinNetMap.get(`${elementHit.instanceId}:out`);
-            if (netId !== undefined) {
-              clockManager.setClockPhase(netId, newVal !== 0);
+          if (elementHit.typeId === 'Clock') {
+            const compiled = facade.getCompiled();
+            const clockManager = facade.getClockManager();
+            if (clockManager !== null && compiled !== null) {
+              const netId = compiled.pinNetMap.get(`${elementHit.instanceId}:out`);
+              if (netId !== undefined) {
+                clockManager.setClockPhase(netId, newVal !== 0);
+              }
             }
           }
-          if (engine.getState() !== EngineState.RUNNING) {
-            // Skip advanceClocks when manually toggling a Clock
-            if (elementHit.typeId !== 'Clock' && clockManager !== null) {
-              clockManager.advanceClocks(engine.getSignalArray());
-            }
-            engine.step();
+          const eng = facade.getEngine();
+          if (eng?.getState?.() !== EngineState.RUNNING) {
+            facade.step(eng!, { clockAdvance: elementHit.typeId !== 'Clock' });
           }
           scheduleRender();
         } catch {
@@ -1088,7 +1251,7 @@ export function initApp(search?: string): void {
     if (!elementHit) return;
 
     // During simulation, don't open properties for togglable components
-    if (binding.isBound && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
+    if (isSimActive() && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
 
     // Memory components: open hex editor
     if (MEMORY_TYPES.has(elementHit.typeId)) {
@@ -1182,17 +1345,27 @@ export function initApp(search?: string): void {
 
     if (e.key === ' ') {
       e.preventDefault();
-      if (binding.isBound && engine.getState() === EngineState.RUNNING) {
-        // Stop simulation and return to edit mode
-        stopContinuousRun();
-        binding.unbind();
-        engine.dispose();
+      if (isSimActive()) {
+        if (facade.getCompiledAnalog() !== null) {
+          disposeAnalog();
+        } else {
+          stopContinuousRun();
+          binding.unbind();
+          facade.getEngine()?.dispose?.();
+        }
         compiledDirty = true;
         scheduleRender();
       } else {
-        // Start simulation
         if (compiledDirty && !compileAndBind()) return;
-        if (engine.getState() !== EngineState.RUNNING) {
+        const analogEngine = facade.getEngine();
+        const analogCompiled = facade.getCompiledAnalog();
+        if (analogCompiled !== null && analogEngine) {
+          startAnalogRenderLoop(
+            analogEngine as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
+            circuit,
+            analogCompiled,
+          );
+        } else if (facade.getEngine()?.getState?.() !== EngineState.RUNNING) {
           startContinuousRun();
         }
       }
@@ -1200,7 +1373,7 @@ export function initApp(search?: string): void {
     }
 
     // Block all edit shortcuts during simulation
-    if (binding.isBound) return;
+    if (isSimActive()) return;
 
     // Single-letter placement/wire shortcuts — skip when Ctrl/Meta is held
     if (!e.ctrlKey && !e.metaKey) {
@@ -1386,22 +1559,23 @@ export function initApp(search?: string): void {
 
   function startContinuousRun(): void {
     selection.clear();
-    engine.start();
+    const eng = facade.getEngine();
+    eng?.start?.();
     let lastTime = performance.now();
 
     const tick = (now: number): void => {
-      if (engine.getState() !== EngineState.RUNNING) {
+      const currentEng = facade.getEngine();
+      if (currentEng?.getState?.() !== EngineState.RUNNING) {
         runRafHandle = -1;
         scheduleRender();
         return;
       }
-      const dt = (now - lastTime) / 1000; // seconds elapsed
+      const dt = (now - lastTime) / 1000;
       lastTime = now;
       const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
       for (let i = 0; i < stepsThisFrame; i++) {
-        if (clockManager !== null) clockManager.advanceClocks(engine.getSignalArray());
         try {
-          engine.step();
+          facade.step(currentEng);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           showStatus(`Simulation error: ${msg}`, true);
@@ -1420,7 +1594,7 @@ export function initApp(search?: string): void {
       cancelAnimationFrame(runRafHandle);
       runRafHandle = -1;
     }
-    engine.stop();
+    facade.getEngine()?.stop?.();
     scheduleRender();
   }
 
@@ -1472,52 +1646,92 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (engine.getState() === EngineState.RUNNING) engine.stop();
-    if (clockManager !== null) clockManager.advanceClocks(engine.getSignalArray());
-    try {
-      engine.step();
-      clearStatus();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showStatus(`Simulation error: ${msg}`, true);
+    const eng = facade.getEngine();
+    if (!eng) return;
+    if (facade.getCompiledAnalog() !== null) {
+      try {
+        eng.step();
+        clearStatus();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showStatus(`Simulation error: ${msg}`, true);
+      }
+    } else {
+      if (eng.getState?.() === EngineState.RUNNING) eng.stop?.();
+      try {
+        facade.step(eng);
+        clearStatus();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showStatus(`Simulation error: ${msg}`, true);
+      }
     }
     scheduleRender();
   });
 
   document.getElementById('btn-run')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (engine.getState() === EngineState.RUNNING) return;
+    const analogCompiled = facade.getCompiledAnalog();
+    const eng = facade.getEngine();
+    if (analogCompiled !== null && eng) {
+      if (analogRafHandle !== -1) return;
+      eng.start?.();
+      startAnalogRenderLoop(
+        eng as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
+        circuit,
+        analogCompiled,
+      );
+      return;
+    }
+    if (eng?.getState?.() === EngineState.RUNNING) return;
     startContinuousRun();
   });
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
-    if (!binding.isBound) return;
-    stopContinuousRun();
-    // Return to edit mode: unbind signals so wires go grey
-    binding.unbind();
-    engine.dispose();
+    if (!isSimActive()) return;
+    if (facade.getCompiledAnalog() !== null) {
+      disposeAnalog();
+    } else {
+      stopContinuousRun();
+      binding.unbind();
+      facade.getEngine()?.dispose?.();
+    }
     compiledDirty = true;
     scheduleRender();
   });
 
   document.getElementById('btn-micro-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (engine.getState() === EngineState.RUNNING) engine.stop();
-    try {
-      engine.microStep();
-      clearStatus();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showStatus(`Simulation error: ${msg}`, true);
+    const eng = facade.getEngine();
+    if (!eng) return;
+    if (facade.getCompiledAnalog() !== null) {
+      try { eng.step(); clearStatus(); } catch (err) {
+        showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
+      }
+    } else {
+      if (eng.getState?.() === EngineState.RUNNING) eng.stop?.();
+      try {
+        (eng as unknown as { microStep(): void }).microStep();
+        clearStatus();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showStatus(`Simulation error: ${msg}`, true);
+      }
     }
     scheduleRender();
   });
 
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (engine.getState() === EngineState.RUNNING) return;
+    if (facade.getCompiledAnalog() !== null) {
+      showStatus('Run-to-break is not available for analog circuits');
+      return;
+    }
+    const eng = facade.getEngine();
+    if (!eng) return;
+    if (eng.getState?.() === EngineState.RUNNING) return;
     try {
-      engine.runToBreak();
+      (eng as unknown as { runToBreak(): void }).runToBreak();
       clearStatus();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1550,6 +1764,7 @@ export function initApp(search?: string): void {
   const viewerTabs = viewerPanel?.querySelectorAll('.viewer-tab');
 
   let activeTimingPanel: TimingDiagramPanel | null = null;
+  let activeScopePanel: AnalogScopePanel | null = null;
   let activeDataTable: DataTablePanel | null = null;
 
   /** Watched signals — persisted across recompilations by name. */
@@ -1562,7 +1777,7 @@ export function initApp(search?: string): void {
   const watchedSignals: WatchedSignal[] = [];
 
   /** Build a human-readable name for a net ID from the pinNetMap. */
-  function netIdToName(cc: CompiledCircuitImpl, netId: number): string {
+  function netIdToName(cc: ConcreteCompiledCircuit, netId: number): string {
     // Try labelToNetId first (In/Out/Probe labels)
     for (const [label, nid] of cc.labelToNetId) {
       if (nid === netId) return label;
@@ -1586,7 +1801,7 @@ export function initApp(search?: string): void {
   }
 
   /** Determine signal group from its source element type. */
-  function netIdToGroup(cc: CompiledCircuitImpl, netId: number): 'input' | 'output' | 'probe' {
+  function netIdToGroup(cc: ConcreteCompiledCircuit, netId: number): 'input' | 'output' | 'probe' {
     for (const [pinKey, nid] of cc.pinNetMap) {
       if (nid === netId) {
         const instId = pinKey.split(':')[0];
@@ -1605,59 +1820,99 @@ export function initApp(search?: string): void {
 
   /** Tear down any active viewer panels and unregister observers. */
   function disposeViewers(): void {
+    const eng = facade.getEngine();
     if (activeTimingPanel) {
-      engine.removeMeasurementObserver(activeTimingPanel);
+      (eng as unknown as { removeMeasurementObserver(o: unknown): void } | null)?.removeMeasurementObserver(activeTimingPanel);
       activeTimingPanel.dispose();
       activeTimingPanel = null;
     }
+    if (activeScopePanel) {
+      activeScopePanel.dispose();
+      activeScopePanel = null;
+    }
     if (activeDataTable) {
-      engine.removeMeasurementObserver(activeDataTable);
+      (eng as unknown as { removeMeasurementObserver(o: unknown): void } | null)?.removeMeasurementObserver(activeDataTable);
       activeDataTable.dispose();
       activeDataTable = null;
     }
   }
 
+  /** Size a canvas to fill its container at device pixel ratio. */
+  function sizeCanvasToContainer(cvs: HTMLCanvasElement): void {
+    const container = cvs.parentElement;
+    if (!container) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    cvs.width = w * dpr;
+    cvs.height = h * dpr;
+    cvs.style.width = `${w}px`;
+    cvs.style.height = `${h}px`;
+  }
+
   /** Rebuild viewer panels from the current watchedSignals list. */
   function rebuildViewers(): void {
     disposeViewers();
-    if (!compiled || watchedSignals.length === 0) return;
+    const compiled = facade.getCompiled();
+    const analogCompiled = facade.getCompiledAnalog();
+    if ((!compiled && !analogCompiled) || watchedSignals.length === 0) return;
 
-    const channels = watchedSignals.map(s => ({ name: s.name, netId: s.netId, width: s.width }));
+    const eng = facade.getEngine();
+    const ae = analogCompiled !== null ? eng : null;
+    const isAnalog = circuit.metadata.engineType === 'analog' && ae !== null;
 
-    // Size timing canvas to its container
     if (viewerTimingCanvas) {
-      const container = viewerTimingCanvas.parentElement;
-      if (container) {
-        const dpr = window.devicePixelRatio || 1;
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        viewerTimingCanvas.width = w * dpr;
-        viewerTimingCanvas.height = h * dpr;
-        viewerTimingCanvas.style.width = `${w}px`;
-        viewerTimingCanvas.style.height = `${h}px`;
+      sizeCanvasToContainer(viewerTimingCanvas);
+
+      if (isAnalog && ae) {
+        activeScopePanel = new AnalogScopePanel(viewerTimingCanvas, ae as unknown as import('../core/analog-engine-interface.js').AnalogEngine);
+        for (const s of watchedSignals) {
+          activeScopePanel.addVoltageChannel(s.netId, s.name);
+        }
+      } else if (eng) {
+        const channels = watchedSignals.map(s => ({ name: s.name, netId: s.netId, width: s.width }));
+        activeTimingPanel = new TimingDiagramPanel(viewerTimingCanvas, eng, channels, {
+          snapshotInterval: 0,
+          stepsPerSecond: speedControl.speed,
+        });
+        (eng as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeTimingPanel);
       }
-      activeTimingPanel = new TimingDiagramPanel(viewerTimingCanvas, engine, channels, {
-        snapshotInterval: 0,  // no snapshots — just waveform recording
-        stepsPerSecond: speedControl.speed,
-      });
-      engine.addMeasurementObserver(activeTimingPanel);
     }
 
     if (viewerValuesContainer) {
       const signals: SignalDescriptor[] = watchedSignals.map(s => ({
         name: s.name, netId: s.netId, width: s.width, group: s.group,
       }));
-      activeDataTable = new DataTablePanel(viewerValuesContainer, engine, signals);
-      engine.addMeasurementObserver(activeDataTable);
+      if (isAnalog && ae) {
+        activeDataTable = new DataTablePanel(viewerValuesContainer, ae as any, signals);
+        (ae as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeDataTable);
+      } else if (eng) {
+        activeDataTable = new DataTablePanel(viewerValuesContainer, eng, signals);
+        (eng as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeDataTable);
+      }
     }
   }
 
   /** Add a wire's net to the watched signals and rebuild viewers. */
   function addWireToViewer(wire: Wire): void {
+    const analogCompiled = facade.getCompiledAnalog();
+    if (analogCompiled) {
+      const nodeId = analogCompiled.wireToNodeId.get(wire);
+      if (nodeId === undefined) return;
+      if (watchedSignals.some(s => s.netId === nodeId)) return;
+      let name = `node${nodeId}`;
+      for (const [label, nid] of analogCompiled.labelToNodeId) {
+        if (nid === nodeId) { name = label; break; }
+      }
+      watchedSignals.push({ name, netId: nodeId, width: 1, group: 'probe' });
+      viewerPanel?.classList.add('open');
+      rebuildViewers();
+      return;
+    }
+    const compiled = facade.getCompiled();
     if (!compiled) return;
     const netId = compiled.wireToNetId.get(wire);
     if (netId === undefined) return;
-    // Don't add duplicates
     if (watchedSignals.some(s => s.netId === netId)) return;
 
     const name = netIdToName(compiled, netId);
@@ -1665,7 +1920,6 @@ export function initApp(search?: string): void {
     const group = netIdToGroup(compiled, netId);
     watchedSignals.push({ name, netId, width, group });
 
-    // Open the viewer panel if not already open
     viewerPanel?.classList.add('open');
     rebuildViewers();
   }
@@ -1693,7 +1947,7 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     viewerPanel?.classList.add('open');
     showViewerTab(tabName);
-    if (watchedSignals.length > 0 && !activeTimingPanel && !activeDataTable) {
+    if (watchedSignals.length > 0 && !activeTimingPanel && !activeScopePanel && !activeDataTable) {
       rebuildViewers();
     }
   }
@@ -1721,6 +1975,121 @@ export function initApp(search?: string): void {
   // Menu items
   document.getElementById('btn-menu-timing')?.addEventListener('click', () => openViewer('timing'));
   document.getElementById('btn-menu-values')?.addEventListener('click', () => openViewer('values'));
+
+  // -------------------------------------------------------------------------
+  // AC Sweep dialog + Bode plot
+  // -------------------------------------------------------------------------
+
+  const acSweepDialog = document.getElementById('ac-sweep-dialog');
+  const bodePanel = document.getElementById('bode-panel');
+  const bodeCanvas = document.getElementById('bode-canvas') as HTMLCanvasElement | null;
+  const bodeRenderer = new BodePlotRenderer();
+
+  document.getElementById('btn-ac-sweep')?.addEventListener('click', () => {
+    if (circuit.metadata.engineType !== 'analog') {
+      showStatus('AC Sweep is only available for analog circuits', true);
+      return;
+    }
+    if (acSweepDialog) acSweepDialog.style.display = 'flex';
+  });
+
+  document.getElementById('ac-sweep-close')?.addEventListener('click', () => {
+    if (acSweepDialog) acSweepDialog.style.display = 'none';
+  });
+
+  document.getElementById('ac-sweep-run')?.addEventListener('click', () => {
+    if (acSweepDialog) acSweepDialog.style.display = 'none';
+
+    if (circuit.metadata.engineType !== 'analog') {
+      showStatus('AC Sweep requires an analog circuit', true);
+      return;
+    }
+
+    // Gather parameters from the dialog
+    const sweepType = (document.getElementById('ac-sweep-type') as HTMLSelectElement).value as 'lin' | 'dec' | 'oct';
+    const numPoints = parseInt((document.getElementById('ac-sweep-points') as HTMLInputElement).value, 10) || 50;
+    const fStart = parseFloat((document.getElementById('ac-sweep-fstart') as HTMLInputElement).value) || 1;
+    const fStop = parseFloat((document.getElementById('ac-sweep-fstop') as HTMLInputElement).value) || 1e6;
+    const sourceLabel = (document.getElementById('ac-sweep-source') as HTMLInputElement).value.trim();
+    const outputNodes = (document.getElementById('ac-sweep-outputs') as HTMLInputElement).value
+      .split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+    if (!sourceLabel) {
+      showStatus('AC Sweep: please specify an AC source label', true);
+      return;
+    }
+    if (outputNodes.length === 0) {
+      showStatus('AC Sweep: please specify at least one output node', true);
+      return;
+    }
+
+    const acParams: AcParams = { type: sweepType, numPoints, fStart, fStop, sourceLabel, outputNodes };
+
+    const acEng = facade.getEngine();
+    if (!acEng || facade.getCompiledAnalog() === null) {
+      showStatus('AC Sweep: analog engine not initialized — compile the circuit first', true);
+      return;
+    }
+
+    try {
+      const result = (acEng as unknown as { acAnalysis(p: AcParams): ReturnType<import('../core/analog-engine-interface.js').AnalogEngine['acAnalysis']> }).acAnalysis(acParams);
+
+      if (result.diagnostics.length > 0) {
+        const errs = result.diagnostics.filter(d => d.severity === 'error');
+        if (errs.length > 0) {
+          showStatus(`AC Sweep error: ${errs[0].summary}`, true);
+          return;
+        }
+      }
+
+      // Show Bode plot
+      if (bodePanel && bodeCanvas) {
+        bodePanel.style.display = 'block';
+        sizeCanvasToContainer(bodeCanvas);
+        const ctx = bodeCanvas.getContext('2d');
+        if (ctx) {
+          // Compute viewport from data ranges
+          let magMin = 0, magMax = -200, phaseMin = 0, phaseMax = -360;
+          for (const [, arr] of result.magnitude) {
+            for (let i = 0; i < arr.length; i++) {
+              if (arr[i] < magMin) magMin = arr[i];
+              if (arr[i] > magMax) magMax = arr[i];
+            }
+          }
+          for (const [, arr] of result.phase) {
+            for (let i = 0; i < arr.length; i++) {
+              if (arr[i] < phaseMin) phaseMin = arr[i];
+              if (arr[i] > phaseMax) phaseMax = arr[i];
+            }
+          }
+          // Add margins
+          const magRange = magMax - magMin || 20;
+          magMin -= magRange * 0.1;
+          magMax += magRange * 0.1;
+          const phaseRange = phaseMax - phaseMin || 90;
+          phaseMin -= phaseRange * 0.1;
+          phaseMax += phaseRange * 0.1;
+
+          const viewport: BodeViewport = {
+            x: 0, y: 0,
+            width: bodeCanvas.width, height: bodeCanvas.height,
+            fMin: fStart, fMax: fStop,
+            magMin, magMax,
+            phaseMin, phaseMax,
+          };
+          ctx.clearRect(0, 0, bodeCanvas.width, bodeCanvas.height);
+          bodeRenderer.render(ctx, result, viewport);
+        }
+      }
+      showStatus(`AC Sweep complete: ${result.frequencies.length} points`);
+    } catch (err) {
+      showStatus(`AC Sweep failed: ${err instanceof Error ? err.message : String(err)}`, true);
+    }
+  });
+
+  document.getElementById('bode-close')?.addEventListener('click', () => {
+    if (bodePanel) bodePanel.style.display = 'none';
+  });
 
   // -------------------------------------------------------------------------
   // Right-click context menu on wires — add/remove from viewer
@@ -1765,13 +2134,31 @@ export function initApp(search?: string): void {
       return;
     }
 
-    if (!binding.isBound || !compiled) return;
+    const compiled = facade.getCompiled();
+    const analogCompiled = facade.getCompiledAnalog();
+    if (!isSimActive() || (!compiled && !analogCompiled)) return;
 
     const wireHit = hitTestWires(worldPt, circuit.wires, HIT_THRESHOLD);
     if (!wireHit) return;
 
-    const netId = compiled.wireToNetId.get(wireHit);
-    if (netId === undefined) return;
+    let netId: number | undefined;
+    let signalName: string;
+    let width: number;
+
+    if (analogCompiled) {
+      netId = analogCompiled.wireToNodeId.get(wireHit);
+      if (netId === undefined) return;
+      signalName = `node${netId}`;
+      for (const [label, nid] of analogCompiled.labelToNodeId) {
+        if (nid === netId) { signalName = label; break; }
+      }
+      width = 1;
+    } else {
+      netId = compiled!.wireToNetId.get(wireHit);
+      if (netId === undefined) return;
+      signalName = netIdToName(compiled!, netId);
+      width = compiled!.netWidths[netId] ?? 1;
+    }
 
     // Remove existing context menu if any
     document.getElementById('wire-context-menu')?.remove();
@@ -1784,13 +2171,11 @@ export function initApp(search?: string): void {
     menu.style.top = `${e.clientY}px`;
 
     const isWatched = watchedSignals.some(s => s.netId === netId);
-    const signalName = netIdToName(compiled!, netId);
-    const width = compiled!.netWidths[netId] ?? 1;
 
     // Header showing what net this is
     const header = document.createElement('div');
     header.className = 'wire-context-header';
-    header.textContent = `${signalName} [${width}-bit]`;
+    header.textContent = facade.getCompiledAnalog() ? `${signalName}` : `${signalName} [${width}-bit]`;
     menu.appendChild(header);
 
     if (!isWatched) {
@@ -1884,8 +2269,9 @@ export function initApp(search?: string): void {
     const editor = new MemoryEditorDialog(dataField, body);
     editor.render();
 
-    if (engine.getState() === EngineState.RUNNING) {
-      editor.enableLiveUpdate(engine);
+    const memEng = facade.getEngine();
+    if (memEng?.getState?.() === EngineState.RUNNING) {
+      editor.enableLiveUpdate(memEng);
     }
 
     const footer = document.createElement('div');
@@ -2062,6 +2448,7 @@ export function initApp(search?: string): void {
     circuit.metadata = loaded.metadata;
     palette.setEngineTypeFilter(loaded.metadata.engineType === 'analog' ? 'analog' : null);
     paletteUI.render();
+    rebuildInsertMenu();
     updateCircuitModeLabel();
     selection.clear();
     viewport.fitToContent(circuit.elements, {
@@ -2521,18 +2908,19 @@ export function initApp(search?: string): void {
 
   const gifMenuItem = document.getElementById('btn-export-gif');
   document.getElementById('btn-export-gif')?.addEventListener('click', () => {
-    if (engine.getState() === EngineState.STOPPED) return;
-    exportGif(circuit, engine).then(blob => {
+    const gifEng = facade.getEngine();
+    if (!gifEng || gifEng.getState?.() === EngineState.STOPPED) return;
+    exportGif(circuit, gifEng).then(blob => {
       downloadBlob(blob, `${circuitBaseName()}.gif`);
     }).catch((err: unknown) => {
       showStatus(`GIF export failed: ${err instanceof Error ? err.message : String(err)}`, true);
     });
   });
 
-  // Keep GIF menu item greyed out when engine is stopped — update on File menu open
   function updateGifMenuState(): void {
     if (gifMenuItem) {
-      const stopped = engine.getState() === EngineState.STOPPED;
+      const gifEng = facade.getEngine();
+      const stopped = !gifEng || gifEng.getState?.() === EngineState.STOPPED;
       gifMenuItem.style.opacity = stopped ? '0.4' : '';
       gifMenuItem.style.pointerEvents = stopped ? 'none' : '';
     }
@@ -2947,7 +3335,7 @@ export function initApp(search?: string): void {
 
   // Apply saved settings on startup
   const initialEngineSettings = loadEngineSettings();
-  engine.setSnapshotBudget(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
+  (facade.getEngine() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
 
   const settingsOverlay = document.getElementById('settings-overlay');
   const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
@@ -2974,7 +3362,7 @@ export function initApp(search?: string): void {
     const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
     const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit };
     saveEngineSettings(newSettings);
-    engine.setSnapshotBudget(budgetMb * 1024 * 1024);
+    (facade.getEngine() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
     closeSettingsDialog();
     showStatus(`Settings saved. Oscillation limit: ${oscLimit}. Snapshot budget: ${budgetMb} MB.`);
   });
@@ -3094,6 +3482,7 @@ export function initApp(search?: string): void {
     circuit.metadata = { ...circuit.metadata, engineType: next };
     palette.setEngineTypeFilter(next === 'digital' ? null : 'analog');
     paletteUI.render();
+    rebuildInsertMenu();
     updateCircuitModeLabel();
     invalidateCompiled();
   });
@@ -3148,8 +3537,7 @@ export function initApp(search?: string): void {
       let ttModel: TruthTable | null = null;
       let analysisError: string | null = null;
       try {
-        const runner = new SimulationRunner(registry);
-        const result = analyseCircuit(runner as unknown as import('../headless/facade.js').SimulatorFacade, circuit);
+        const result = analyseCircuit(facade, circuit);
         const inputSpecs = result.inputs.map(s => ({ name: s.name, bitWidth: s.bitWidth }));
         const outputSpecs = result.outputs.map(s => ({ name: s.name, bitWidth: s.bitWidth }));
         const outCount = outputSpecs.length;
@@ -3589,28 +3977,28 @@ export function initApp(search?: string): void {
             return el.typeId === typeId && lbl === name;
           });
 
-        const facade: SequentialAnalysisFacade = {
+        const seqEng = facade.getEngine();
+        const seqFacade: SequentialAnalysisFacade = {
           setStateValue(name: string, value: bigint): void {
-            // Find flip-flop element by label, set its Q output via engine
             const el = circuit.elements.find(e => {
               if (!flipFlopNames.has(e.typeId)) return false;
               const p = e.getProperties();
               const lbl = p.has('label') ? String(p.get('label')) : `${e.typeId}_${e.instanceId}`;
               return lbl === name;
             });
-            if (el && engine) {
-              (engine as any).setFlipFlopState?.(el.instanceId, value);
+            if (el && seqEng) {
+              (seqEng as any).setFlipFlopState?.(el.instanceId, value);
             }
           },
           setInput(name: string, value: bigint): void {
             const el = engineEl(name, 'In');
-            if (el && engine) {
-              (engine as any).setInputValue?.(el.instanceId, value);
+            if (el && seqEng) {
+              (seqEng as any).setInputValue?.(el.instanceId, value);
             }
           },
           clockStep(): void {
-            if (engine) {
-              (engine as any).clockStep?.();
+            if (seqEng) {
+              (seqEng as any).clockStep?.();
             }
           },
           getStateValue(name: string): bigint {
@@ -3620,21 +4008,21 @@ export function initApp(search?: string): void {
               const lbl = p.has('label') ? String(p.get('label')) : `${e.typeId}_${e.instanceId}`;
               return lbl === name;
             });
-            if (el && engine) {
-              return (engine as any).getFlipFlopState?.(el.instanceId) ?? 0n;
+            if (el && seqEng) {
+              return (seqEng as any).getFlipFlopState?.(el.instanceId) ?? 0n;
             }
             return 0n;
           },
           getOutput(name: string): bigint {
             const el = engineEl(name, 'Out');
-            if (el && engine) {
-              return (engine as any).getOutputValue?.(el.instanceId) ?? 0n;
+            if (el && seqEng) {
+              return (seqEng as any).getOutputValue?.(el.instanceId) ?? 0n;
             }
             return 0n;
           },
         };
 
-        tableResult = analyseSequential(facade, stateVarSpecs, inputSpecs, outputSpecs);
+        tableResult = analyseSequential(seqFacade, stateVarSpecs, inputSpecs, outputSpecs);
       } catch (err) {
         const errDiv = document.createElement('div');
         errDiv.className = 'analysis-error';
@@ -3836,7 +4224,7 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
-  // postMessage listener
+  // postMessage adapter
   // -------------------------------------------------------------------------
 
   async function loadCircuitFromXml(xml: string): Promise<void> {
@@ -3849,206 +4237,69 @@ export function initApp(search?: string): void {
     applyLoadedCircuit(loaded);
   }
 
-  async function handleMessage(data: Record<string, unknown>): Promise<void> {
-    switch (data['type']) {
-      case 'digital-load-url': {
-        const url = String(data['url'] ?? '');
-        if (!url) {
-          window.parent.postMessage({ type: 'digital-error', error: 'No URL provided' }, '*');
-          return;
-        }
-        try {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`Failed to fetch: ${url}`);
-          const xml = await res.text();
-          await loadCircuitFromXml(xml);
-          window.parent.postMessage({ type: 'digital-loaded' }, '*');
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
-        }
-        break;
-      }
+  function renderMarkdownToHtml(markdown: string): string {
+    const escaped = markdown
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+?)`/g, '<code>$1</code>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+  }
 
-      case 'digital-load-data': {
-        const encoded = String(data['data'] ?? '');
-        if (!encoded) {
-          window.parent.postMessage({ type: 'digital-error', error: 'No data provided' }, '*');
-          return;
-        }
-        try {
-          const xml = atob(encoded);
-          await loadCircuitFromXml(xml);
-          window.parent.postMessage({ type: 'digital-loaded' }, '*');
-        } catch {
-          window.parent.postMessage({ type: 'digital-error', error: 'Invalid base64 data' }, '*');
-        }
-        break;
-      }
-
-      case 'digital-set-base': {
-        const basePath = String(data['basePath'] ?? './');
-        params.base = basePath;
-        window.parent.postMessage({ type: 'digital-loaded' }, '*');
-        break;
-      }
-
-      case 'digital-set-locked': {
-        const locked = Boolean(data['locked']);
-        params.locked = locked;
-        break;
-      }
-
-      case 'digital-set-palette': {
-        const raw = data['components'];
-        if (Array.isArray(raw)) {
-          const names = raw.map(String).filter((s) => s.length > 0);
-          palette.setAllowlist(names.length > 0 ? names : null);
-        } else {
-          palette.setAllowlist(null);
-        }
+  const postMessageAdapter = new PostMessageAdapter({
+    registry,
+    resolver: httpResolver,
+    target: window.parent,
+    eventSource: window,
+    hooks: {
+      loadCircuitXml: loadCircuitFromXml,
+      getCircuit: () => circuit,
+      serializeCircuit: () => serializeCircuitToDig(circuit, registry),
+      setBasePath: (basePath: string) => { params.base = basePath; },
+      setLocked: (locked: boolean) => { params.locked = locked; },
+      setPalette: (components: string[] | null) => {
+        palette.setAllowlist(components);
         paletteUI.render();
-        window.parent.postMessage({ type: 'digital-loaded' }, '*');
-        break;
-      }
-
-      // --- Tutorial postMessage extensions ---
-
-      case 'digital-test': {
-        const testDataStr = String(data['testData'] ?? '');
-        if (!testDataStr) {
-          window.parent.postMessage({ type: 'digital-error', error: 'No testData provided' }, '*');
-          return;
-        }
-        try {
-          const testRunner = new SimulationRunner(registry);
-          const testEngine = testRunner.compile(circuit);
-          // Auto-detect input/output split from circuit In/Out labels
-          const circuitInputLabels = new Set<string>();
-          const circuitOutputLabels = new Set<string>();
-          for (const el of circuit.elements) {
-            const def = registry.get(el.typeId);
-            if (!def) continue;
-            const lbl = el.getProperties().getOrDefault('label', '') as string;
-            if (!lbl) continue;
-            if (def.name === 'In' || def.name === 'Clock') circuitInputLabels.add(lbl);
-            else if (def.name === 'Out') circuitOutputLabels.add(lbl);
-          }
-          // Check that test vector signal names have matching labeled components
-          const hdrLine = testDataStr.split('\n').find((l) => l.trim().length > 0 && !l.trim().startsWith('#')) ?? '';
-          const hdrNames = hdrLine.trim().split(/\s+/).filter((n) => n.length > 0);
-          const missingLabels = hdrNames.filter((n) => !circuitInputLabels.has(n) && !circuitOutputLabels.has(n));
-          if (missingLabels.length > 0) {
-            const msg = `Test signals not found in circuit: ${missingLabels.join(', ')}. ` +
-              `Make sure your In/Out components have labels that match the test vector signal names ` +
-              `(${hdrNames.join(', ')}). Double-click a component to set its label.`;
-            window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
-            return;
-          }
-          let detectedInputCount = 0;
-          for (const n of hdrNames) {
-            if (circuitInputLabels.has(n)) detectedInputCount++;
-            else break;
-          }
-          const parsed = parseTestData(testDataStr, detectedInputCount > 0 ? detectedInputCount : undefined);
-          const results = executeTests(testRunner, testEngine, circuit, parsed);
-          window.parent.postMessage({
-            type: 'digital-test-result',
-            passed: results.passed,
-            failed: results.failed,
-            total: results.total,
-            details: results.vectors.map((v) => ({
-              passed: v.passed,
-              inputs: v.inputs,
-              expected: v.expectedOutputs,
-              actual: v.actualOutputs,
-            })),
-          }, '*');
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          let userMsg: string;
-          if (msg.includes('did not stabilize') || msg.includes('oscillation') || msg.includes('iterations')) {
-            userMsg = 'Circuit has a feedback loop that could not settle. '
-              + 'Check your wiring — a cross-coupled latch needs exactly two feedback paths. '
-              + 'Extra or missing connections can cause the circuit to oscillate forever.';
-          } else if (msg.includes('not found') || msg.includes('label')) {
-            userMsg = msg;
-          } else {
-            userMsg = `Test error: ${msg}`;
-          }
-          window.parent.postMessage({ type: 'digital-error', error: userMsg }, '*');
-        }
-        break;
-      }
-
-      case 'digital-get-circuit': {
-        try {
-          const xml = serializeCircuitToDig(circuit, registry);
-          const encoded = btoa(xml);
-          window.parent.postMessage({
-            type: 'digital-circuit-data',
-            data: encoded,
-            format: 'dig-xml-base64',
-          }, '*');
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          window.parent.postMessage({ type: 'digital-error', error: `Serialize failed: ${msg}` }, '*');
-        }
-        break;
-      }
-
-      case 'digital-highlight': {
-        const labels = data['labels'];
-        if (!Array.isArray(labels)) {
-          window.parent.postMessage({ type: 'digital-error', error: 'highlight requires labels array' }, '*');
-          return;
-        }
-        const labelSet = new Set(labels.map(String));
+      },
+      highlight: (labels: string[], durationMs: number) => {
+        const labelSet = new Set(labels);
         const toSelect = circuit.elements.filter(
           (el) => labelSet.has(String(el.getProperties().get('label') ?? '')),
         );
         selection.boxSelect(toSelect, []);
         scheduleRender();
-        // Auto-clear after duration (default 3 seconds)
-        const duration = typeof data['duration'] === 'number' ? data['duration'] : 3000;
-        if (duration > 0) {
+        if (durationMs > 0) {
           setTimeout(() => {
             selection.clear();
             scheduleRender();
-          }, duration);
+          }, durationMs);
         }
-        break;
-      }
-
-      case 'digital-clear-highlight': {
+      },
+      clearHighlight: () => {
         selection.clear();
         scheduleRender();
-        break;
-      }
-
-      case 'digital-set-readonly-components': {
-        const readonlyLabels = data['labels'];
-        if (readonlyLabels === null || readonlyLabels === undefined) {
-          // Clear all readonly flags
+      },
+      setReadonlyComponents: (labels: string[] | null) => {
+        if (labels === null) {
           for (const el of circuit.elements) {
             (el as unknown as Record<string, unknown>)['_readonly'] = false;
           }
-        } else if (Array.isArray(readonlyLabels)) {
-          const readonlySet = new Set(readonlyLabels.map(String));
+        } else {
+          const readonlySet = new Set(labels);
           for (const el of circuit.elements) {
             const label = String(el.getProperties().get('label') ?? '');
             (el as unknown as Record<string, unknown>)['_readonly'] = readonlySet.has(label);
           }
         }
-        break;
-      }
-
-      case 'digital-set-instructions': {
-        const markdown = data['markdown'];
+      },
+      setInstructions: (markdown: string | null) => {
         let instructionsPanel = document.getElementById('tutorial-instructions');
         let toggleBtn = document.getElementById('tutorial-toggle-btn');
-        if (markdown === null || markdown === undefined) {
-          // Hide/remove instructions panel and toggle
+        if (markdown === null) {
           if (instructionsPanel) instructionsPanel.style.display = 'none';
           if (toggleBtn) toggleBtn.style.display = 'none';
         } else {
@@ -4075,34 +4326,32 @@ export function initApp(search?: string): void {
           }
           instructionsPanel.style.display = '';
           toggleBtn.style.display = '';
-          // Simple markdown rendering (headers, bold, code, lists)
-          const escaped = String(markdown)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const html = escaped
-            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/`([^`]+?)`/g, '<code>$1</code>')
-            .replace(/^- (.+)$/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-          instructionsPanel.innerHTML = html;
+          instructionsPanel.innerHTML = renderMarkdownToHtml(markdown);
         }
-        break;
-      }
-
-      default:
-        break;
-    }
-  }
-
-  window.addEventListener('message', (event: MessageEvent) => {
-    const data = event.data as Record<string, unknown>;
-    if (typeof data !== 'object' || data === null) return;
-    handleMessage(data).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      window.parent.postMessage({ type: 'digital-error', error: message }, '*');
-    });
+      },
+      step() {
+        if (!compiledDirty) {
+          const eng = facade.getEngine();
+          if (eng) facade.step(eng);
+        }
+        scheduleRender();
+      },
+      setInput(label: string, value: number) {
+        const eng = facade.getEngine();
+        if (eng) facade.setInput(eng, label, value);
+      },
+      readOutput(label: string): number {
+        const eng = facade.getEngine();
+        if (!eng) throw new Error('No engine');
+        return facade.readOutput(eng, label);
+      },
+      readAllSignals(): Record<string, number> {
+        const eng = facade.getEngine();
+        if (!eng) return {};
+        return facade.readAllSignals(eng);
+      },
+      getFacade() { return facade; },
+    },
   });
 
   // -------------------------------------------------------------------------
@@ -4230,7 +4479,21 @@ export function initApp(search?: string): void {
   // Announce ready and auto-load
   // -------------------------------------------------------------------------
 
-  window.parent.postMessage({ type: 'digital-ready' }, '*');
+  // -------------------------------------------------------------------------
+  // Test bridge — exposes coordinate queries for E2E tests
+  // -------------------------------------------------------------------------
+
+  const analogTestCtx: AnalogTestContext = {
+    get engine() { return facade.getEngine() as unknown as import('../analog/analog-engine.js').MNAEngine | null; },
+    get compiled() { return facade.getCompiledAnalog(); },
+    compileAndBind: () => compileAndBind(),
+  };
+
+  (window as unknown as Record<string, unknown>).__test = createTestBridge(
+    circuit, viewport, canvas, palette, registry, analogTestCtx,
+  );
+
+  postMessageAdapter.init();
 
   if (params.file) {
     const fileUrl = `${params.base}${params.file}`;

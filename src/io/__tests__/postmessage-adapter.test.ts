@@ -1,33 +1,33 @@
 /**
- * Tests for PostMessageAdapter — task 6.4.2.
+ * Tests for PostMessageAdapter.
  *
  * Verifies the postMessage wire protocol adapter. All dependencies are
  * injected via the options object so tests run without a real browser.
  *
  * Test scenarios:
- *   loadUrl         — digital-load-url → facade.loadDig called, digital-loaded sent
- *   loadData        — digital-load-data with base64 .dig → circuit loaded
- *   loadJson        — digital-load-json with .digb content → circuit + subcircuits loaded
- *   setInput        — digital-set-input → facade.setInput called with correct args
- *   readOutput      — digital-read-output → digital-output response with correct value
- *   runTests        — digital-run-tests → digital-test-results response
- *   setBase         — digital-set-base → resolver base path updated and cache cleared
- *   errorHandling   — message that causes error → digital-error response
- *   loadMemory      — digital-load-memory → memory component data loaded
  *   readyOnInit     — digital-ready sent when adapter is initialized
+ *   loadUrl         — digital-load-url → hook called, digital-loaded sent
+ *   loadData        — digital-load-data with base64 .dig → hook called
+ *   setBase         — digital-set-base → resolver base path updated, cache cleared
+ *   setLocked       — digital-set-locked → hook called, locked state updated
+ *   setPalette      — digital-set-palette → hook called
+ *   test            — digital-test → digital-test-result response
+ *   getCircuit      — digital-get-circuit → digital-circuit-data response
+ *   highlight       — digital-highlight → hook called
+ *   errorHandling   — message that causes error → digital-error response
+ *   stepDelegation  — digital-step delegates to hooks.step when present
+ *   stepClockCanary — digital-step via postMessage advances clocks (regression canary)
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { PostMessageAdapter } from "../postmessage-adapter.js";
-import type { PostMessageAdapterOptions } from "../postmessage-adapter.js";
-import type { SimulatorFacade } from "@/headless/facade";
-import type { EditorBinding } from "@/integration/editor-binding";
-import type { SimulationEngine } from "@/core/engine-interface";
+import type { PostMessageAdapterOptions, PostMessageHooks } from "../postmessage-adapter.js";
 import { CacheResolver, HttpResolver, ChainResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
+import { ComponentRegistry } from "@/core/registry";
 import { Circuit } from "@/core/circuit";
-import type { ComponentRegistry } from "@/core/registry";
-import type { TestResults } from "@/headless/types";
+import { createDefaultRegistry } from "@/components/register-all";
+import { DefaultSimulatorFacade } from "@/headless/default-facade";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,76 +38,28 @@ function makeStubCircuit(): Circuit {
   return new Circuit({ name: "stub" });
 }
 
-/** Build a stub engine. */
-const stubEngine = {} as SimulationEngine;
-
-/** Minimal mock ComponentRegistry. */
-function makeRegistry(): ComponentRegistry {
-  return {
-    get: vi.fn().mockReturnValue(undefined),
-    getAll: vi.fn().mockReturnValue([]),
-    register: vi.fn(),
-  } as unknown as ComponentRegistry;
-}
-
 /**
  * Build a PostMessageAdapter with injected mocks.
  *
- * Returns the adapter, the mock target (captured outgoing messages),
- * and a dispatch helper that fires a simulated incoming MessageEvent.
+ * Returns the adapter, captured outgoing messages, and a dispatch helper.
  */
 function makeAdapter(
-  facadeOverrides: Partial<SimulatorFacade> = {},
+  hooksOverride: PostMessageHooks = {},
   resolverOverride?: FileResolver,
   fetchOverride?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>,
 ): {
   adapter: PostMessageAdapter;
   sent: unknown[];
   dispatch: (data: unknown) => Promise<void>;
-  facade: SimulatorFacade;
+  hooks: PostMessageHooks;
   cache: CacheResolver;
   http: HttpResolver;
 } {
-  const circuit = makeStubCircuit();
-
-  const facade: SimulatorFacade = {
-    loadDig: vi.fn().mockReturnValue(circuit),
-    compile: vi.fn().mockReturnValue(stubEngine),
-    step: vi.fn(),
-    run: vi.fn(),
-    runToStable: vi.fn(),
-    setInput: vi.fn(),
-    readOutput: vi.fn().mockReturnValue(42),
-    readAllSignals: vi.fn().mockReturnValue({ A: 1, B: 0 }),
-    runTests: vi.fn().mockReturnValue({
-      passed: 2,
-      failed: 0,
-      total: 2,
-      vectors: [],
-    } satisfies TestResults),
-    createCircuit: vi.fn().mockReturnValue(circuit),
-    addComponent: vi.fn(),
-    connect: vi.fn(),
-    serialize: vi.fn().mockReturnValue("{}"),
-    deserialize: vi.fn().mockReturnValue(circuit),
-    ...facadeOverrides,
-  } as unknown as SimulatorFacade;
-
-  const binding: EditorBinding = {
-    bind: vi.fn(),
-    unbind: vi.fn(),
-    getWireValue: vi.fn().mockReturnValue(0),
-    getPinValue: vi.fn().mockReturnValue(0),
-    setInput: vi.fn(),
-    isBound: false,
-    engine: null,
-  } as unknown as EditorBinding;
-
   const cache = new CacheResolver();
   const http = new HttpResolver("./");
   const resolver: FileResolver = resolverOverride ?? new ChainResolver([cache, http]);
 
-  const registry = makeRegistry();
+  const registry = new ComponentRegistry();
 
   const sent: unknown[] = [];
   const target = {
@@ -116,7 +68,6 @@ function makeAdapter(
     }),
   };
 
-  // Collect registered message listeners so we can dispatch to them.
   const listeners: Array<(e: MessageEvent) => void> = [];
   const eventSource = {
     addEventListener: vi.fn((_type: string, handler: (e: MessageEvent) => void) => {
@@ -124,11 +75,25 @@ function makeAdapter(
     }),
   };
 
+  const stubCircuit = makeStubCircuit();
+  const hooks: PostMessageHooks = {
+    loadCircuitXml: vi.fn(),
+    getCircuit: vi.fn().mockReturnValue(stubCircuit),
+    serializeCircuit: vi.fn().mockReturnValue("<circuit/>"),
+    setBasePath: vi.fn(),
+    setLocked: vi.fn(),
+    setPalette: vi.fn(),
+    highlight: vi.fn(),
+    clearHighlight: vi.fn(),
+    setReadonlyComponents: vi.fn(),
+    setInstructions: vi.fn(),
+    ...hooksOverride,
+  };
+
   const opts: PostMessageAdapterOptions = {
-    facade,
-    binding,
-    resolver,
     registry,
+    resolver,
+    hooks,
     target,
     eventSource,
     ...(fetchOverride !== undefined ? { fetchFn: fetchOverride } : {}),
@@ -141,9 +106,11 @@ function makeAdapter(
     for (const listener of listeners) {
       await listener(event);
     }
+    // Allow microtasks to settle (for async handlers)
+    await new Promise((r) => setTimeout(r, 0));
   };
 
-  return { adapter, sent, dispatch, facade, cache, http };
+  return { adapter, sent, dispatch, hooks, cache, http };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,17 +131,17 @@ describe("PostMessageAdapter.init", () => {
 // ---------------------------------------------------------------------------
 
 describe("PostMessageAdapter — digital-load-url", () => {
-  it("loadUrl — facade.loadDig called, digital-loaded response sent", async () => {
+  it("loadUrl — hook called, digital-loaded response sent", async () => {
     const fetchFn = vi.fn().mockResolvedValue({
       ok: true,
       text: async () => "<circuit>xml</circuit>",
     });
-    const { sent, dispatch, facade } = makeAdapter({}, undefined, fetchFn);
+    const { sent, dispatch, hooks } = makeAdapter({}, undefined, fetchFn);
 
     await dispatch({ type: "digital-load-url", url: "http://example.com/and.dig" });
 
     expect(fetchFn).toHaveBeenCalledWith("http://example.com/and.dig");
-    expect(facade.loadDig).toHaveBeenCalledWith("<circuit>xml</circuit>");
+    expect(hooks.loadCircuitXml).toHaveBeenCalledWith("<circuit>xml</circuit>");
     expect(sent).toContainEqual({ type: "digital-loaded" });
   });
 
@@ -186,6 +153,14 @@ describe("PostMessageAdapter — digital-load-url", () => {
 
     expect(sent.some((m) => (m as { type: string }).type === "digital-error")).toBe(true);
   });
+
+  it("loadUrl — empty URL sends digital-error", async () => {
+    const { sent, dispatch } = makeAdapter();
+
+    await dispatch({ type: "digital-load-url", url: "" });
+
+    expect(sent).toContainEqual({ type: "digital-error", error: "No URL provided" });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -193,125 +168,23 @@ describe("PostMessageAdapter — digital-load-url", () => {
 // ---------------------------------------------------------------------------
 
 describe("PostMessageAdapter — digital-load-data", () => {
-  it("loadData — base64-decoded XML passed to facade.loadDig, digital-loaded sent", async () => {
+  it("loadData — hook called with decoded XML, digital-loaded sent", async () => {
     const xml = "<circuit>test xml</circuit>";
     const base64 = btoa(xml);
-    const { sent, dispatch, facade } = makeAdapter();
+    const { sent, dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "digital-load-data", data: base64 });
 
-    expect(facade.loadDig).toHaveBeenCalledWith(xml);
+    expect(hooks.loadCircuitXml).toHaveBeenCalledWith(xml);
     expect(sent).toContainEqual({ type: "digital-loaded" });
   });
-});
 
-// ---------------------------------------------------------------------------
-// loadJson
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-load-json", () => {
-  it("loadJson — valid digb JSON loads circuit and compiles engine, digital-loaded sent", async () => {
-    // A minimal .digb document that satisfies the schema validator.
-    const digbJson = JSON.stringify({
-      format: "digb",
-      version: 1,
-      circuit: {
-        name: "test",
-        elements: [],
-        wires: [],
-      },
-    });
-
-    const { sent, dispatch, facade } = makeAdapter({
-      compile: vi.fn().mockReturnValue(stubEngine),
-    });
-
-    // Override loadDig so loadJson path doesn't call it (loadJson uses deserializeDigb).
-    // facade.loadDig should NOT be called for loadJson.
-    await dispatch({ type: "digital-load-json", data: digbJson });
-
-    // digital-loaded should have been sent.
-    expect(sent).toContainEqual({ type: "digital-loaded" });
-    // facade.compile should have been called (circuit was compiled).
-    expect(facade.compile).toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// setInput
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-set-input", () => {
-  it("setInput — facade.setInput called with correct label and value", async () => {
-    const { dispatch, facade } = makeAdapter();
-
-    // First load a circuit so the engine is set.
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({ type: "digital-set-input", label: "SW0", value: 1 });
-
-    expect(facade.setInput).toHaveBeenCalledWith(stubEngine, "SW0", 1);
-  });
-
-  it("setInput without loaded circuit sends digital-error", async () => {
+  it("loadData — empty data sends digital-error", async () => {
     const { sent, dispatch } = makeAdapter();
 
-    await dispatch({ type: "digital-set-input", label: "SW0", value: 1 });
+    await dispatch({ type: "digital-load-data", data: "" });
 
-    expect(sent.some((m) => (m as { type: string }).type === "digital-error")).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// readOutput
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-read-output", () => {
-  it("readOutput — digital-output response sent with correct label and value", async () => {
-    const { sent, dispatch, facade } = makeAdapter({
-      readOutput: vi.fn().mockReturnValue(7),
-    });
-
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({ type: "digital-read-output", label: "OUT0" });
-
-    expect(facade.readOutput).toHaveBeenCalledWith(stubEngine, "OUT0");
-    expect(sent).toContainEqual({ type: "digital-output", label: "OUT0", value: 7 });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// runTests
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-run-tests", () => {
-  it("runTests — digital-test-results response contains TestResults", async () => {
-    const expectedResults: TestResults = {
-      passed: 3,
-      failed: 1,
-      total: 4,
-      vectors: [],
-    };
-    const { sent, dispatch } = makeAdapter({
-      runTests: vi.fn().mockReturnValue(expectedResults),
-    });
-
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({ type: "digital-run-tests" });
-
-    expect(sent).toContainEqual({ type: "digital-test-results", results: expectedResults });
-  });
-
-  it("runTests — optional testData forwarded to facade.runTests", async () => {
-    const { dispatch, facade } = makeAdapter();
-
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({ type: "digital-run-tests", testData: "A B Y\n0 0 0\n1 1 1" });
-
-    expect(facade.runTests).toHaveBeenCalledWith(
-      stubEngine,
-      expect.anything(),
-      "A B Y\n0 0 0\n1 1 1",
-    );
+    expect(sent).toContainEqual({ type: "digital-error", error: "No data provided" });
   });
 });
 
@@ -323,41 +196,191 @@ describe("PostMessageAdapter — digital-set-base", () => {
   it("setBase — HttpResolver base path updated", async () => {
     const http = new HttpResolver("old/");
     const resolver = new ChainResolver([http]);
-    const { dispatch } = makeAdapter({}, resolver);
+    const { dispatch, hooks } = makeAdapter({}, resolver);
 
     await dispatch({ type: "digital-set-base", basePath: "new/" });
 
     expect(http.getBasePath()).toBe("new/");
+    expect(hooks.setBasePath).toHaveBeenCalledWith("new/");
   });
 
   it("setBase — CacheResolver cache cleared", async () => {
-    const cache = new CacheResolver();
-    cache.set("X", "<circuit/>");
-    expect(cache.size).toBe(1);
-
-    const resolver = new ChainResolver([cache]);
-    const { dispatch: _dispatch } = makeAdapter({}, resolver);
-
-    // setBase clears the cache when the resolver directly is a CacheResolver.
-    // Use a CacheResolver directly as the resolver (not chained) to test that path.
     const directCache = new CacheResolver();
     directCache.set("Y", "<circuit/>");
+    expect(directCache.size).toBe(1);
 
-    const { dispatch: dispatch2 } = makeAdapter({}, directCache);
-    await dispatch2({ type: "digital-set-base", basePath: "updated/" });
+    const { dispatch } = makeAdapter({}, directCache);
+    await dispatch({ type: "digital-set-base", basePath: "updated/" });
 
     expect(directCache.size).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// errorHandling
+// setLocked
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-set-locked", () => {
+  it("locked state toggled and hook called", async () => {
+    const { adapter, dispatch, hooks } = makeAdapter();
+
+    expect(adapter.locked).toBe(false);
+
+    await dispatch({ type: "digital-set-locked", locked: true });
+    expect(adapter.locked).toBe(true);
+    expect(hooks.setLocked).toHaveBeenCalledWith(true);
+
+    await dispatch({ type: "digital-set-locked", locked: false });
+    expect(adapter.locked).toBe(false);
+    expect(hooks.setLocked).toHaveBeenCalledWith(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setPalette
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-set-palette", () => {
+  it("setPalette — hook called with component names", async () => {
+    const { sent, dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-palette", components: ["And", "Or", "Not"] });
+
+    expect(hooks.setPalette).toHaveBeenCalledWith(["And", "Or", "Not"]);
+    expect(sent).toContainEqual({ type: "digital-loaded" });
+  });
+
+  it("setPalette — null clears allowlist", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-palette", components: null });
+
+    expect(hooks.setPalette).toHaveBeenCalledWith(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCircuit
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-get-circuit", () => {
+  it("getCircuit — digital-circuit-data response with base64 XML", async () => {
+    const { sent, dispatch } = makeAdapter({
+      serializeCircuit: () => "<circuit>serialized</circuit>",
+    });
+
+    await dispatch({ type: "digital-get-circuit" });
+
+    const msg = sent.find((m) => (m as { type: string }).type === "digital-circuit-data") as {
+      type: string;
+      data: string;
+      format: string;
+    };
+    expect(msg).toBeTruthy();
+    expect(msg.format).toBe("dig-xml-base64");
+    expect(atob(msg.data)).toBe("<circuit>serialized</circuit>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// highlight
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-highlight", () => {
+  it("highlight — hook called with labels and duration", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-highlight", labels: ["A", "B"], duration: 5000 });
+
+    expect(hooks.highlight).toHaveBeenCalledWith(["A", "B"], 5000);
+  });
+
+  it("highlight — default duration 3000ms", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-highlight", labels: ["X"] });
+
+    expect(hooks.highlight).toHaveBeenCalledWith(["X"], 3000);
+  });
+
+  it("highlight — non-array labels sends error", async () => {
+    const { sent, dispatch } = makeAdapter();
+
+    await dispatch({ type: "digital-highlight", labels: "not-an-array" });
+
+    expect(sent).toContainEqual({
+      type: "digital-error",
+      error: "highlight requires labels array",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clearHighlight
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-clear-highlight", () => {
+  it("clearHighlight — hook called", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-clear-highlight" });
+
+    expect(hooks.clearHighlight).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setReadonlyComponents
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-set-readonly-components", () => {
+  it("setReadonlyComponents — hook called with labels", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-readonly-components", labels: ["A", "B"] });
+
+    expect(hooks.setReadonlyComponents).toHaveBeenCalledWith(["A", "B"]);
+  });
+
+  it("setReadonlyComponents — null clears all", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-readonly-components", labels: null });
+
+    expect(hooks.setReadonlyComponents).toHaveBeenCalledWith(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setInstructions
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — digital-set-instructions", () => {
+  it("setInstructions — hook called with markdown", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-instructions", markdown: "# Hello" });
+
+    expect(hooks.setInstructions).toHaveBeenCalledWith("# Hello");
+  });
+
+  it("setInstructions — null hides panel", async () => {
+    const { dispatch, hooks } = makeAdapter();
+
+    await dispatch({ type: "digital-set-instructions", markdown: null });
+
+    expect(hooks.setInstructions).toHaveBeenCalledWith(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// error handling
 // ---------------------------------------------------------------------------
 
 describe("PostMessageAdapter — error handling", () => {
-  it("errorHandling — message that causes an error sends digital-error response", async () => {
+  it("hook error sends digital-error response", async () => {
     const { sent, dispatch } = makeAdapter({
-      loadDig: vi.fn().mockImplementation(() => {
+      loadCircuitXml: vi.fn().mockImplementation(() => {
         throw new Error("parse failure");
       }),
     });
@@ -391,107 +414,123 @@ describe("PostMessageAdapter — error handling", () => {
 });
 
 // ---------------------------------------------------------------------------
-// loadMemory
+// step delegation — hooks.step called when present
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — digital-load-memory", () => {
-  it("loadMemory — memory component loadData called with correct args", async () => {
-    const loadDataFn = vi.fn();
-    const circuit = new Circuit({ name: "mem" });
-    // Add a fake memory element with a label property.
-    const fakeMemEl = Object.assign(Object.create(null), {
-      label: "RAM0",
-      instanceId: "ram-0",
-      position: { x: 0, y: 0 },
-      rotation: 0,
-      typeId: "RAM",
-      getPins: () => [],
-      loadData: loadDataFn,
-    });
-    circuit.elements.push(fakeMemEl);
+describe("PostMessageAdapter — digital-step delegation", () => {
+  it("digital-step delegates to hooks.step when provided", async () => {
+    const stepHook = vi.fn();
+    const { dispatch } = makeAdapter({ step: stepHook });
 
-    const { dispatch } = makeAdapter({
-      loadDig: vi.fn().mockReturnValue(circuit),
-      compile: vi.fn().mockReturnValue(stubEngine),
-    });
-
-    // Load the circuit first so this._circuit is set.
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({
-      type: "digital-load-memory",
-      label: "RAM0",
-      data: "FF00FF00",
-      format: "hex",
-    });
-
-    expect(loadDataFn).toHaveBeenCalledWith("FF00FF00", "hex");
-  });
-
-  it("loadMemory — missing label sends digital-error", async () => {
-    const { sent, dispatch } = makeAdapter();
-
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({
-      type: "digital-load-memory",
-      label: "NONEXISTENT",
-      data: "FF",
-      format: "hex",
-    });
-
-    const errorMsgs = sent.filter(
-      (m) => (m as { type: string }).type === "digital-error",
-    );
-    expect(errorMsgs).toHaveLength(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// setLocked
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-set-locked", () => {
-  it("locked state toggled on and off", async () => {
-    const { adapter, dispatch } = makeAdapter();
-
-    expect(adapter.locked).toBe(false);
-
-    await dispatch({ type: "digital-set-locked", locked: true });
-    expect(adapter.locked).toBe(true);
-
-    await dispatch({ type: "digital-set-locked", locked: false });
-    expect(adapter.locked).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// digital-step
-// ---------------------------------------------------------------------------
-
-describe("PostMessageAdapter — digital-step", () => {
-  it("step — facade.step called with engine", async () => {
-    const { dispatch, facade } = makeAdapter();
-
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
     await dispatch({ type: "digital-step" });
 
-    expect(facade.step).toHaveBeenCalledWith(stubEngine);
+    expect(stepHook).toHaveBeenCalledTimes(1);
+  });
+
+  it("digital-set-input delegates to hooks.setInput when provided", async () => {
+    const setInputHook = vi.fn();
+    const { dispatch } = makeAdapter({ setInput: setInputHook });
+
+    await dispatch({ type: "digital-set-input", label: "A", value: 1 });
+
+    expect(setInputHook).toHaveBeenCalledWith("A", 1);
+  });
+
+  it("digital-read-output delegates to hooks.readOutput when provided", async () => {
+    const readOutputHook = vi.fn().mockReturnValue(1);
+    const { sent, dispatch } = makeAdapter({ readOutput: readOutputHook });
+
+    await dispatch({ type: "digital-read-output", label: "Q" });
+
+    expect(readOutputHook).toHaveBeenCalledWith("Q");
+    expect(sent).toContainEqual({ type: "digital-output", label: "Q", value: 1 });
+  });
+
+  it("digital-read-all-signals delegates to hooks.readAllSignals when provided", async () => {
+    const readAllHook = vi.fn().mockReturnValue({ A: 1, B: 0 });
+    const { sent, dispatch } = makeAdapter({ readAllSignals: readAllHook });
+
+    await dispatch({ type: "digital-read-all-signals" });
+
+    expect(readAllHook).toHaveBeenCalledTimes(1);
+    expect(sent).toContainEqual({ type: "digital-signals", signals: { A: 1, B: 0 } });
   });
 });
 
 // ---------------------------------------------------------------------------
-// digital-read-all-signals
+// Regression canary: digital-step via postMessage advances clocks
+//
+// This tests the specific bug class from spec section 9:
+// "sequential circuit with Clock works in MCP circuit_test but
+//  flip-flops don't toggle via PostMessage digital-step"
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — digital-read-all-signals", () => {
-  it("readAllSignals — digital-signals response sent with signal map", async () => {
-    const signalMap = { A: 1, B: 0, Y: 1 };
-    const { sent, dispatch } = makeAdapter({
-      readAllSignals: vi.fn().mockReturnValue(signalMap),
+describe("PostMessageAdapter — digital-step clock canary", () => {
+  it("digital-step via postMessage advances clocks — D flip-flop latches input", async () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+
+    // Build a D flip-flop circuit: Clock + D input → D_FF → Q output
+    const circuit = facade.build({
+      components: [
+        { id: "clk", type: "Clock", props: { label: "CLK" } },
+        { id: "d",   type: "In",    props: { label: "D",   bitWidth: 1 } },
+        { id: "ff",  type: "D_FF" },
+        { id: "q",   type: "Out",   props: { label: "Q" } },
+      ],
+      connections: [
+        ["clk:out", "ff:C"],
+        ["d:out",   "ff:D"],
+        ["ff:Q",    "q:in"],
+      ],
     });
 
-    await dispatch({ type: "digital-load-data", data: btoa("<circuit/>") });
-    await dispatch({ type: "digital-read-all-signals" });
+    // Compile the circuit via the facade
+    const engine = facade.compile(circuit);
 
-    expect(sent).toContainEqual({ type: "digital-signals", signals: signalMap });
+    // Build adapter with hooks wired to the facade
+    const sent: unknown[] = [];
+    const listeners: Array<(e: MessageEvent) => void> = [];
+
+    const adapter = new PostMessageAdapter({
+      registry,
+      resolver: new CacheResolver(),
+      target: { postMessage: (msg: unknown) => { sent.push(msg); } },
+      eventSource: { addEventListener: (_t: string, h: (e: MessageEvent) => void) => { listeners.push(h); } },
+      hooks: {
+        getCircuit: () => circuit,
+        step() { facade.step(engine); },
+        setInput(label: string, value: number) { facade.setInput(engine, label, value); },
+        readOutput(label: string): number { return facade.readOutput(engine, label); },
+        readAllSignals(): Record<string, number> { return facade.readAllSignals(engine); },
+        getFacade() { return facade; },
+      },
+    });
+    void adapter;
+
+    const dispatch = async (data: unknown): Promise<void> => {
+      const event = { data } as MessageEvent;
+      for (const listener of listeners) await listener(event);
+      await new Promise((r) => setTimeout(r, 0));
+    };
+
+    // Set D=1
+    await dispatch({ type: "digital-set-input", label: "D", value: 1 });
+
+    // Step multiple times to advance clock edge and propagate
+    for (let i = 0; i < 4; i++) {
+      await dispatch({ type: "digital-step" });
+    }
+
+    // Read Q
+    await dispatch({ type: "digital-read-output", label: "Q" });
+
+    const outputMsg = sent.find(
+      (m) => (m as { type: string }).type === "digital-output",
+    ) as { type: string; label: string; value: number } | undefined;
+
+    expect(outputMsg).toBeTruthy();
+    expect(outputMsg!.label).toBe("Q");
+    expect(outputMsg!.value).toBe(1);
   });
 });

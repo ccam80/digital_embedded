@@ -1,191 +1,193 @@
 /**
- * PostMessageAdapter — thin adapter translating postMessage wire protocol to
- * SimulatorFacade calls.
+ * PostMessageAdapter — single source of truth for the postMessage wire protocol.
  *
- * Listens for window messages from a parent frame and maps each message type
- * to the appropriate facade / binding call. Responses are posted back to the
- * originating frame via postMessage.
+ * Translates incoming messages from a parent frame into simulator operations
+ * and posts structured responses back. All message handling is centralized here
+ * — no inline handlers in app-init.ts.
  *
- * All incoming messages are wrapped in try/catch. Errors produce a
- * `digital-error` response message.
+ * GUI-specific operations (loading into the editor, palette filtering,
+ * highlighting, instructions panel) are handled via callback hooks injected
+ * at construction time, keeping this module free of DOM dependencies.
  *
  * Parent → Simulator message types:
- *   digital-load-url      — fetch URL then loadDig
- *   digital-load-data     — base64-decode then loadDig
- *   digital-load-json     — deserializeDts then load circuit + subcircuits
- *   digital-set-input     — set input signal by label
- *   digital-step          — single propagation step
- *   digital-run-tests     — run test vectors, optional testData override
- *   digital-read-output   — read output signal by label
- *   digital-read-all-signals — snapshot all labeled signals
- *   digital-set-base      — update resolver base path, clear subcircuit cache
- *   digital-set-locked    — enable / disable locked mode
- *   digital-load-memory   — load hex/binary data into a RAM/ROM component
+ *
+ *   Core:
+ *     digital-load-url          — fetch URL then load circuit
+ *     digital-load-data         — base64-decode then load circuit
+ *     digital-load-json         — deserialize DTS then load circuit
+ *     digital-set-input         — drive an input pin by label
+ *     digital-step              — single propagation step
+ *     digital-run-tests         — run test vectors (headless runner)
+ *     digital-test              — run test vectors (tutorial-style, with label validation)
+ *     digital-read-output       — read output signal by label
+ *     digital-read-all-signals  — snapshot all labeled signals
+ *     digital-get-circuit       — export current circuit as base64 .dig XML
+ *     digital-set-base          — update resolver base path
+ *     digital-set-locked        — enable / disable locked mode
+ *     digital-load-memory       — load hex/binary data into RAM/ROM
+ *
+ *   Tutorial / UI:
+ *     digital-set-palette             — restrict component palette
+ *     digital-highlight               — highlight components by label
+ *     digital-clear-highlight         — clear all highlights
+ *     digital-set-readonly-components — lock specific components
+ *     digital-set-instructions        — show/hide instructions panel
  *
  * Simulator → Parent response types:
- *   digital-ready         — sent once on init
- *   digital-loaded        — circuit loaded successfully
- *   digital-error         — error occurred
- *   digital-output        — response to digital-read-output
- *   digital-signals       — response to digital-read-all-signals
- *   digital-test-results  — response to digital-run-tests
+ *     digital-ready        — sent once on init
+ *     digital-loaded       — circuit/setting applied
+ *     digital-error        — error occurred
+ *     digital-output       — response to digital-read-output
+ *     digital-signals      — response to digital-read-all-signals
+ *     digital-test-result  — response to digital-test / digital-run-tests
+ *     digital-circuit-data — response to digital-get-circuit
  */
 
-import type { SimulatorFacade } from '../headless/facade.js';
-import type { EditorBinding } from '../integration/editor-binding.js';
 import type { FileResolver } from './file-resolver.js';
 import { CacheResolver, ChainResolver, HttpResolver } from './file-resolver.js';
 import { deserializeDts } from './dts-deserializer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
+import { DefaultSimulatorFacade } from '../headless/default-facade.js';
+import { parseTestData } from '../testing/parser.js';
+import { executeTests } from '../testing/executor.js';
+import type { RunnerFacade } from '../testing/executor.js';
+import { detectInputCount } from '../testing/detect-input-count.js';
+import type { SimulatorFacade } from '../headless/facade.js';
 
 // ---------------------------------------------------------------------------
-// Incoming message shapes
-// ---------------------------------------------------------------------------
-
-interface LoadUrlMessage {
-  type: 'digital-load-url';
-  url: string;
-}
-
-interface LoadDataMessage {
-  type: 'digital-load-data';
-  data: string;
-}
-
-interface LoadJsonMessage {
-  type: 'digital-load-json';
-  data: string;
-}
-
-interface SetInputMessage {
-  type: 'digital-set-input';
-  label: string;
-  value: number;
-}
-
-interface StepMessage {
-  type: 'digital-step';
-}
-
-interface RunTestsMessage {
-  type: 'digital-run-tests';
-  testData?: string;
-}
-
-interface ReadOutputMessage {
-  type: 'digital-read-output';
-  label: string;
-}
-
-interface ReadAllSignalsMessage {
-  type: 'digital-read-all-signals';
-}
-
-interface SetBaseMessage {
-  type: 'digital-set-base';
-  basePath: string;
-}
-
-interface SetLockedMessage {
-  type: 'digital-set-locked';
-  locked: boolean;
-}
-
-interface LoadMemoryMessage {
-  type: 'digital-load-memory';
-  label: string;
-  data: string;
-  format: 'hex' | 'binary';
-}
-
-type IncomingMessage =
-  | LoadUrlMessage
-  | LoadDataMessage
-  | LoadJsonMessage
-  | SetInputMessage
-  | StepMessage
-  | RunTestsMessage
-  | ReadOutputMessage
-  | ReadAllSignalsMessage
-  | SetBaseMessage
-  | SetLockedMessage
-  | LoadMemoryMessage;
-
-// ---------------------------------------------------------------------------
-// PostMessageAdapter
+// Callback hooks — injected by app-init.ts for GUI integration
 // ---------------------------------------------------------------------------
 
 /**
- * Adapter options injected at construction time.
+ * Hooks that the host (app-init.ts) provides for operations that touch
+ * the editor, canvas, or DOM. All are optional — headless-only hosts
+ * can omit them entirely.
  */
+export interface PostMessageHooks {
+  /**
+   * Load an XML circuit into the editor (updates canvas, viewport, palette).
+   * When provided, this is used instead of facade.loadDig() so the editor
+   * shows the loaded circuit. Should throw on parse errors.
+   */
+  loadCircuitXml?(xml: string): Promise<void> | void;
+
+  /**
+   * Return the editor's current live circuit.
+   * Required for operations that read or test the circuit the user sees.
+   */
+  getCircuit?(): Circuit;
+
+  /**
+   * Serialize the current circuit to .dig XML.
+   */
+  serializeCircuit?(): string;
+
+  /** Restrict palette to listed component type names (null = show all). */
+  setPalette?(components: string[] | null): void;
+
+  /** Highlight components by label, auto-clearing after `durationMs`. */
+  highlight?(labels: string[], durationMs: number): void;
+
+  /** Clear all highlights. */
+  clearHighlight?(): void;
+
+  /** Mark specific components as readonly (null = clear all). */
+  setReadonlyComponents?(labels: string[] | null): void;
+
+  /** Show/hide the instructions panel (null = hide). */
+  setInstructions?(markdown: string | null): void;
+
+  /** Update the base path for file resolution. */
+  setBasePath?(basePath: string): void;
+
+  /** Set locked mode on/off. */
+  setLocked?(locked: boolean): void;
+
+  /** Step the simulation (advance clocks + propagate). */
+  step?(): void;
+
+  /** Drive an input by label. */
+  setInput?(label: string, value: number): void;
+
+  /** Read an output by label. */
+  readOutput?(label: string): number;
+
+  /** Read all labeled signals. */
+  readAllSignals?(): Record<string, number>;
+
+  /** Compile the current circuit (for test execution). Returns the engine. */
+  compile?(): SimulationEngine;
+
+  /** Get the facade instance (for test runners that need it). */
+  getFacade?(): SimulatorFacade;
+}
+
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
 export interface PostMessageAdapterOptions {
-  /** The SimulatorFacade providing circuit operations. */
-  facade: SimulatorFacade;
-  /** The EditorBinding that holds current circuit / engine state. */
-  binding: EditorBinding;
+  /** The ComponentRegistry for component lookup and DTS deserialization. */
+  registry: ComponentRegistry;
   /** The FileResolver to use for subcircuit lookups. */
   resolver: FileResolver;
-  /** The ComponentRegistry for deserializing .dts documents. */
-  registry: ComponentRegistry;
+  /** GUI integration hooks (all optional for headless use). */
+  hooks?: PostMessageHooks;
   /**
-   * The postMessage target used for outgoing responses.
+   * The postMessage target for outgoing responses.
    * In browser context this is `window.parent`.
-   * Injected for testability.
    */
   target: { postMessage(msg: unknown, origin: string): void };
   /**
    * The event target that emits incoming 'message' events.
    * In browser context this is `window`.
-   * Injected for testability.
    */
   eventSource: { addEventListener(type: string, handler: (e: MessageEvent) => void): void };
   /**
    * Optional fetch implementation (defaults to globalThis.fetch).
-   * Injected for testability.
    */
   fetchFn?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
 }
 
-/**
- * PostMessageAdapter: bridges the postMessage wire protocol to facade calls.
- *
- * Construct with the required dependencies and call init() to send the
- * initial `digital-ready` message and start listening for incoming messages.
- */
+// ---------------------------------------------------------------------------
+// PostMessageAdapter
+// ---------------------------------------------------------------------------
+
 export class PostMessageAdapter {
-  private readonly _facade: SimulatorFacade;
-  private readonly _resolver: FileResolver;
   private readonly _registry: ComponentRegistry;
+  private readonly _resolver: FileResolver;
+  private readonly _hooks: PostMessageHooks;
   private readonly _target: { postMessage(msg: unknown, origin: string): void };
   private readonly _fetchFn: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
 
-  private _circuit: Circuit | null = null;
-  private _engine: SimulationEngine | null = null;
+  /** Facade created on-demand for headless simulation (no GUI hooks). */
+  private _facade: DefaultSimulatorFacade | null = null;
   private _locked: boolean = false;
 
   constructor(opts: PostMessageAdapterOptions) {
-    this._facade = opts.facade;
-    void opts.binding; // binding not stored; reserved for future use
-    this._resolver = opts.resolver;
     this._registry = opts.registry;
+    this._resolver = opts.resolver;
+    this._hooks = opts.hooks ?? {};
     this._target = opts.target;
     this._fetchFn =
       opts.fetchFn ??
-      ((globalThis as unknown as { fetch: typeof fetch }).fetch as typeof this._fetchFn);
+      ((url: string) => globalThis.fetch(url));
 
     opts.eventSource.addEventListener('message', (e: MessageEvent) => {
       void this._handleMessage(e);
     });
   }
 
-  /**
-   * Send the initial `digital-ready` message to the parent frame.
-   * Call once after the simulator has fully initialized.
-   */
+  /** Send the initial `digital-ready` message. Call once after init. */
   init(): void {
     this._post({ type: 'digital-ready' });
+  }
+
+  /** Read the current locked state. */
+  get locked(): boolean {
+    return this._locked;
   }
 
   // -------------------------------------------------------------------------
@@ -193,30 +195,30 @@ export class PostMessageAdapter {
   // -------------------------------------------------------------------------
 
   private async _handleMessage(e: MessageEvent): Promise<void> {
-    const msg = e.data as IncomingMessage;
+    const msg = e.data;
     if (typeof msg !== 'object' || msg === null || typeof msg.type !== 'string') {
       return;
     }
 
     try {
       switch (msg.type) {
+        // --- Core: circuit loading ---
         case 'digital-load-url':
           await this._handleLoadUrl(msg);
           break;
         case 'digital-load-data':
-          this._handleLoadData(msg);
+          await this._handleLoadData(msg);
           break;
         case 'digital-load-json':
           this._handleLoadJson(msg);
           break;
+
+        // --- Core: headless simulation ---
         case 'digital-set-input':
           this._handleSetInput(msg);
           break;
         case 'digital-step':
           this._handleStep();
-          break;
-        case 'digital-run-tests':
-          this._handleRunTests(msg);
           break;
         case 'digital-read-output':
           this._handleReadOutput(msg);
@@ -224,6 +226,21 @@ export class PostMessageAdapter {
         case 'digital-read-all-signals':
           this._handleReadAllSignals();
           break;
+
+        // --- Core: testing ---
+        case 'digital-test':
+          this._handleTestTutorial(msg);
+          break;
+        case 'digital-run-tests':
+          this._handleRunTests(msg);
+          break;
+
+        // --- Core: circuit export ---
+        case 'digital-get-circuit':
+          this._handleGetCircuit();
+          break;
+
+        // --- Core: configuration ---
         case 'digital-set-base':
           this._handleSetBase(msg);
           break;
@@ -233,8 +250,25 @@ export class PostMessageAdapter {
         case 'digital-load-memory':
           this._handleLoadMemory(msg);
           break;
+
+        // --- Tutorial / UI ---
+        case 'digital-set-palette':
+          this._handleSetPalette(msg);
+          break;
+        case 'digital-highlight':
+          this._handleHighlight(msg);
+          break;
+        case 'digital-clear-highlight':
+          this._hooks.clearHighlight?.();
+          break;
+        case 'digital-set-readonly-components':
+          this._handleSetReadonlyComponents(msg);
+          break;
+        case 'digital-set-instructions':
+          this._handleSetInstructions(msg);
+          break;
+
         default:
-          // Unknown message types are silently ignored.
           break;
       }
     } catch (err) {
@@ -244,93 +278,298 @@ export class PostMessageAdapter {
   }
 
   // -------------------------------------------------------------------------
-  // Handlers
+  // Loading handlers
   // -------------------------------------------------------------------------
 
-  private async _handleLoadUrl(msg: LoadUrlMessage): Promise<void> {
-    const response = await this._fetchFn(msg.url);
+  private async _handleLoadUrl(msg: { url?: unknown }): Promise<void> {
+    const url = String(msg.url ?? '');
+    if (!url) {
+      this._post({ type: 'digital-error', error: 'No URL provided' });
+      return;
+    }
+    const response = await this._fetchFn(url);
     if (!response.ok) {
-      throw new Error(`Failed to fetch circuit: ${msg.url}`);
+      throw new Error(`Failed to fetch circuit: ${url}`);
     }
     const xml = await response.text();
-    this._loadCircuit(xml);
+    await this._loadCircuit(xml);
     this._post({ type: 'digital-loaded' });
   }
 
-  private _handleLoadData(msg: LoadDataMessage): void {
-    const xml = atob(msg.data);
-    this._loadCircuit(xml);
+  private async _handleLoadData(msg: { data?: unknown }): Promise<void> {
+    const encoded = String(msg.data ?? '');
+    if (!encoded) {
+      this._post({ type: 'digital-error', error: 'No data provided' });
+      return;
+    }
+    const xml = atob(encoded);
+    await this._loadCircuit(xml);
     this._post({ type: 'digital-loaded' });
   }
 
-  private _handleLoadJson(msg: LoadJsonMessage): void {
-    const { circuit } = deserializeDts(msg.data, this._registry);
-    this._circuit = circuit;
-    this._engine = this._facade.compile(circuit);
+  private _handleLoadJson(msg: { data?: unknown }): void {
+    const { circuit } = deserializeDts(String(msg.data ?? ''), this._registry);
+    if (!this._hooks.loadCircuitXml) {
+      this._getOwnFacade().compile(circuit);
+    }
     this._post({ type: 'digital-loaded' });
   }
 
-  private _handleSetInput(msg: SetInputMessage): void {
-    const engine = this._requireEngine();
-    this._facade.setInput(engine, msg.label, msg.value);
+  // -------------------------------------------------------------------------
+  // Headless simulation handlers
+  // -------------------------------------------------------------------------
+
+  private _handleSetInput(msg: { label?: unknown; value?: unknown }): void {
+    const label = String(msg.label ?? '');
+    const value = Number(msg.value ?? 0);
+    if (this._hooks.setInput) {
+      this._hooks.setInput(label, value);
+    } else {
+      this._ensureFacade();
+      this._facade!.setInput(this._facade!.getEngine()!, label, value);
+    }
   }
 
   private _handleStep(): void {
-    const engine = this._requireEngine();
-    this._facade.step(engine);
+    if (this._hooks.step) {
+      this._hooks.step();
+    } else {
+      this._ensureFacade();
+      const engine = this._facade!.getEngine();
+      if (engine) this._facade!.step(engine);
+    }
   }
 
-  private _handleRunTests(msg: RunTestsMessage): void {
-    const engine = this._requireEngine();
-    const circuit = this._requireCircuit();
-    const results = this._facade.runTests(engine, circuit, msg.testData);
-    this._post({ type: 'digital-test-results', results });
-  }
-
-  private _handleReadOutput(msg: ReadOutputMessage): void {
-    const engine = this._requireEngine();
-    const value = this._facade.readOutput(engine, msg.label);
-    this._post({ type: 'digital-output', label: msg.label, value });
+  private _handleReadOutput(msg: { label?: unknown }): void {
+    const label = String(msg.label ?? '');
+    let value: number;
+    if (this._hooks.readOutput) {
+      value = this._hooks.readOutput(label);
+    } else {
+      this._ensureFacade();
+      value = this._facade!.readOutput(this._facade!.getEngine()!, label);
+    }
+    this._post({ type: 'digital-output', label, value });
   }
 
   private _handleReadAllSignals(): void {
-    const engine = this._requireEngine();
-    const signals = this._facade.readAllSignals(engine);
+    let signals: Record<string, number>;
+    if (this._hooks.readAllSignals) {
+      signals = this._hooks.readAllSignals();
+    } else {
+      this._ensureFacade();
+      signals = this._facade!.readAllSignals(this._facade!.getEngine()!);
+    }
     this._post({ type: 'digital-signals', signals });
   }
 
-  private _handleSetBase(msg: SetBaseMessage): void {
-    this._clearCaches();
-    this._updateResolverBasePath(msg.basePath);
+  // -------------------------------------------------------------------------
+  // Testing handlers
+  // -------------------------------------------------------------------------
+
+  /**
+   * `digital-run-tests` — headless test execution via SimulationRunner.
+   * Uses facade.runTests pattern: recompiles, runs all test vectors.
+   */
+  private _handleRunTests(msg: { testData?: unknown }): void {
+    const circuit = this._getCircuit();
+    const testDataStr = msg.testData != null ? String(msg.testData) : undefined;
+    const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
+    const engine = facade.compile(circuit);
+
+    if (testDataStr) {
+      const inputCount = detectInputCount(circuit, this._registry, testDataStr);
+      const parsed = parseTestData(testDataStr, inputCount);
+      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      this._postTestResult(results);
+    } else {
+      const testcaseEl = circuit.elements.find(el => el.typeId === 'Testcase');
+      if (!testcaseEl) {
+        throw new Error('No test data provided and no Testcase component found in circuit.');
+      }
+      const embedded = (testcaseEl.getProperties().get('testDataCompiled')
+        ?? testcaseEl.getProperties().get('testData')
+        ?? testcaseEl.getProperties().get('Testdata')
+        ?? '') as string;
+      if (!embedded) {
+        throw new Error('Testcase component has no test data.');
+      }
+      const inputCount = detectInputCount(circuit, this._registry, embedded);
+      const parsed = parseTestData(embedded, inputCount);
+      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      this._postTestResult(results);
+    }
   }
 
-  private _handleSetLocked(msg: SetLockedMessage): void {
-    this._locked = msg.locked;
-  }
-
-  private _handleLoadMemory(msg: LoadMemoryMessage): void {
-    const circuit = this._requireCircuit();
-    const engine = this._requireEngine();
-
-    const memoryElement = circuit.elements.find(
-      (el) => (el as { label?: string }).label === msg.label,
-    );
-    if (memoryElement === undefined) {
-      throw new Error(`No memory component with label "${msg.label}" found in circuit`);
+  /**
+   * `digital-test` — tutorial-style test execution with label validation
+   * and user-friendly error messages.
+   */
+  private _handleTestTutorial(msg: { testData?: unknown }): void {
+    const testDataStr = String(msg.testData ?? '');
+    if (!testDataStr) {
+      this._post({ type: 'digital-error', error: 'No testData provided' });
+      return;
     }
 
-    if (typeof (engine as unknown as { loadMemory?: unknown }).loadMemory === 'function') {
-      (
-        engine as unknown as {
-          loadMemory(label: string, data: string, format: string): void;
-        }
-      ).loadMemory(msg.label, msg.data, msg.format);
+    const circuit = this._getCircuit();
+
+    // Collect input/output labels from circuit
+    const circuitInputLabels = new Set<string>();
+    const circuitOutputLabels = new Set<string>();
+    for (const el of circuit.elements) {
+      const def = this._registry.get(el.typeId);
+      if (!def) continue;
+      const lbl = el.getProperties().getOrDefault('label', '') as string;
+      if (!lbl) continue;
+      if (def.name === 'In' || def.name === 'Clock') circuitInputLabels.add(lbl);
+      else if (def.name === 'Out') circuitOutputLabels.add(lbl);
+    }
+
+    // Validate signal names
+    const hdrLine = testDataStr.split('\n').find(
+      (l) => l.trim().length > 0 && !l.trim().startsWith('#'),
+    ) ?? '';
+    const hdrNames = hdrLine.trim().split(/\s+/).filter((n) => n.length > 0);
+    const missingLabels = hdrNames.filter(
+      (n) => !circuitInputLabels.has(n) && !circuitOutputLabels.has(n),
+    );
+    if (missingLabels.length > 0) {
+      const errorMsg =
+        `Test signals not found in circuit: ${missingLabels.join(', ')}. ` +
+        `Make sure your In/Out components have labels that match the test vector signal names ` +
+        `(${hdrNames.join(', ')}). Double-click a component to set its label.`;
+      this._post({ type: 'digital-error', error: errorMsg });
+      return;
+    }
+
+    try {
+      const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
+      const engine = facade.compile(circuit);
+      let detectedInputCount = 0;
+      for (const n of hdrNames) {
+        if (circuitInputLabels.has(n)) detectedInputCount++;
+        else break;
+      }
+      const parsed = parseTestData(
+        testDataStr,
+        detectedInputCount > 0 ? detectedInputCount : undefined,
+      );
+      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      this._postTestResult(results);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      let userMsg: string;
+      if (errMsg.includes('did not stabilize') || errMsg.includes('oscillation') || errMsg.includes('iterations')) {
+        userMsg =
+          'Circuit has a feedback loop that could not settle. ' +
+          'Check your wiring — a cross-coupled latch needs exactly two feedback paths. ' +
+          'Extra or missing connections can cause the circuit to oscillate forever.';
+      } else if (errMsg.includes('not found') || errMsg.includes('label')) {
+        userMsg = errMsg;
+      } else {
+        userMsg = `Test error: ${errMsg}`;
+      }
+      this._post({ type: 'digital-error', error: userMsg });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Circuit export
+  // -------------------------------------------------------------------------
+
+  private _handleGetCircuit(): void {
+    if (!this._hooks.serializeCircuit) {
+      throw new Error('Circuit export not available.');
+    }
+    const xml = this._hooks.serializeCircuit();
+    const encoded = btoa(xml);
+    this._post({
+      type: 'digital-circuit-data',
+      data: encoded,
+      format: 'dig-xml-base64',
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Configuration handlers
+  // -------------------------------------------------------------------------
+
+  private _handleSetBase(msg: { basePath?: unknown }): void {
+    const basePath = String(msg.basePath ?? './');
+    this._clearCaches();
+    this._updateResolverBasePath(basePath);
+    this._hooks.setBasePath?.(basePath);
+    this._post({ type: 'digital-loaded' });
+  }
+
+  private _handleSetLocked(msg: { locked?: unknown }): void {
+    this._locked = Boolean(msg.locked);
+    this._hooks.setLocked?.(this._locked);
+  }
+
+  private _handleLoadMemory(msg: { label?: unknown; data?: unknown; format?: unknown }): void {
+    const circuit = this._getCircuit();
+    const label = String(msg.label ?? '');
+    const memoryElement = circuit.elements.find(
+      (el) => (el as { label?: string }).label === label,
+    );
+    if (memoryElement === undefined) {
+      throw new Error(`No memory component with label "${label}" found in circuit`);
+    }
+
+    const hookFacade = this._hooks.getFacade?.();
+    const engine = (hookFacade as unknown as { getEngine?(): SimulationEngine | null } | undefined)?.getEngine?.()
+      ?? this._facade?.getEngine();
+    if (engine && typeof (engine as unknown as { loadMemory?: unknown }).loadMemory === 'function') {
+      (engine as unknown as { loadMemory(l: string, d: string, f: string): void })
+        .loadMemory(label, String(msg.data ?? ''), String(msg.format ?? 'hex'));
     } else {
-      (
-        memoryElement as unknown as {
-          loadData(data: string, format: string): void;
-        }
-      ).loadData(msg.data, msg.format);
+      (memoryElement as unknown as { loadData(d: string, f: string): void })
+        .loadData(String(msg.data ?? ''), String(msg.format ?? 'hex'));
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Tutorial / UI handlers
+  // -------------------------------------------------------------------------
+
+  private _handleSetPalette(msg: { components?: unknown }): void {
+    const raw = msg.components;
+    if (Array.isArray(raw)) {
+      const names = raw.map(String).filter((s: string) => s.length > 0);
+      this._hooks.setPalette?.(names.length > 0 ? names : null);
+    } else {
+      this._hooks.setPalette?.(null);
+    }
+    this._post({ type: 'digital-loaded' });
+  }
+
+  private _handleHighlight(msg: { labels?: unknown; duration?: unknown }): void {
+    const labels = msg.labels;
+    if (!Array.isArray(labels)) {
+      this._post({ type: 'digital-error', error: 'highlight requires labels array' });
+      return;
+    }
+    const duration = typeof msg.duration === 'number' ? msg.duration : 3000;
+    this._hooks.highlight?.(labels.map(String), duration);
+  }
+
+  private _handleSetReadonlyComponents(msg: { labels?: unknown }): void {
+    const labels = msg.labels;
+    if (labels === null || labels === undefined) {
+      this._hooks.setReadonlyComponents?.(null);
+    } else if (Array.isArray(labels)) {
+      this._hooks.setReadonlyComponents?.(labels.map(String));
+    }
+  }
+
+  private _handleSetInstructions(msg: { markdown?: unknown }): void {
+    const markdown = msg.markdown;
+    if (markdown === null || markdown === undefined) {
+      this._hooks.setInstructions?.(null);
+    } else {
+      this._hooks.setInstructions?.(String(markdown));
     }
   }
 
@@ -338,24 +577,57 @@ export class PostMessageAdapter {
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private _loadCircuit(xml: string): void {
-    const circuit = this._facade.loadDig(xml);
-    this._circuit = circuit;
-    this._engine = this._facade.compile(circuit);
+  /**
+   * Load a circuit from XML. Uses the GUI hook if available (so the editor
+   * shows the circuit), otherwise falls back to headless compilation.
+   */
+  private async _loadCircuit(xml: string): Promise<void> {
+    if (this._hooks.loadCircuitXml) {
+      await this._hooks.loadCircuitXml(xml);
+    } else {
+      const { loadDig } = await import('../io/dig-loader.js');
+      const circuit = loadDig(xml, this._registry);
+      this._getOwnFacade().compile(circuit);
+    }
   }
 
-  private _requireCircuit(): Circuit {
-    if (this._circuit === null) {
-      throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
+  /** Get the current circuit — prefers the GUI hook, falls back to error. */
+  private _getCircuit(): Circuit {
+    if (this._hooks.getCircuit) {
+      return this._hooks.getCircuit();
     }
-    return this._circuit;
+    throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
   }
 
-  private _requireEngine(): SimulationEngine {
-    if (this._engine === null) {
+  /** Get or create the adapter's own facade (headless-only mode). */
+  private _getOwnFacade(): DefaultSimulatorFacade {
+    if (!this._facade) {
+      this._facade = new DefaultSimulatorFacade(this._registry);
+    }
+    return this._facade;
+  }
+
+  /** Ensure own facade exists and has a compiled engine. */
+  private _ensureFacade(): void {
+    if (!this._facade?.getEngine()) {
       throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
     }
-    return this._engine;
+  }
+
+  /** Post a test result in the canonical format. */
+  private _postTestResult(results: { passed: number; failed: number; total: number; vectors: Array<{ passed: boolean; inputs: Record<string, number>; expectedOutputs: Record<string, number>; actualOutputs: Record<string, number> }> }): void {
+    this._post({
+      type: 'digital-test-result',
+      passed: results.passed,
+      failed: results.failed,
+      total: results.total,
+      details: results.vectors.map((v) => ({
+        passed: v.passed,
+        inputs: v.inputs,
+        expected: v.expectedOutputs,
+        actual: v.actualOutputs,
+      })),
+    });
   }
 
   private _clearCaches(): void {
@@ -375,15 +647,13 @@ export class PostMessageAdapter {
       if (r instanceof HttpResolver) {
         r.setBasePath(basePath);
       } else if (
-        typeof (r as unknown as { setBasePath?: (p: string) => void }).setBasePath ===
-        'function'
+        typeof (r as unknown as { setBasePath?: (p: string) => void }).setBasePath === 'function'
       ) {
         (r as unknown as { setBasePath(p: string): void }).setBasePath(basePath);
       }
     }
   }
 
-  /** Unwrap ChainResolver to access inner resolvers; otherwise return singleton. */
   private _flattenResolvers(): readonly FileResolver[] {
     if (this._resolver instanceof ChainResolver) {
       return this._resolver.resolvers;
@@ -393,12 +663,5 @@ export class PostMessageAdapter {
 
   private _post(msg: unknown): void {
     this._target.postMessage(msg, '*');
-  }
-
-  /**
-   * Read the current locked state.
-   */
-  get locked(): boolean {
-    return this._locked;
   }
 }
