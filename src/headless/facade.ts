@@ -18,6 +18,7 @@ import type {
   CircuitSpec,
   CircuitPatch,
   PatchOptions,
+  PatchResult,
 } from './netlist-types.js';
 
 /**
@@ -171,13 +172,14 @@ export interface SimulatorFacade {
   // ============================================
 
   /**
-   * Load a .dig circuit file or XML string
-   * Parses the Digital XML format and returns a Circuit object.
-   * @param pathOrXml - File path or raw .dig XML string
+   * Parse a .dig XML string and return a Circuit object.
+   * Accepts only raw XML strings (starting with "<").
+   * For file-path or URL loading use SimulationLoader directly.
+   * @param xml - Raw .dig XML content
    * @returns Parsed Circuit
    * @throws FacadeError if XML is invalid
    */
-  loadDig(pathOrXml: string): Circuit;
+  loadDigXml(xml: string): Circuit;
 
   /**
    * Serialize a circuit to JSON
@@ -279,5 +281,5 @@ export interface SimulatorFacade {
    * @returns Post-patch diagnostics
    * @throws FacadeError if targets cannot be resolved
    */
-  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): Diagnostic[];
+  patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): PatchResult;
 }

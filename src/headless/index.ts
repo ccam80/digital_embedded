@@ -44,10 +44,11 @@ export type {
 } from './netlist-types.js';
 
 // ============================================
-// Builder
+// Builder and facade
 // ============================================
 
 export { CircuitBuilder } from './builder.js';
+export { DefaultSimulatorFacade } from './default-facade.js';
 export { autoLayout, type LayoutOptions, type LayoutConstraint } from './auto-layout.js';
 
 // ============================================
