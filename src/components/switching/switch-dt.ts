@@ -25,7 +25,8 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSwitchDTAnalogElement } from "../../analog/behavioral-remaining.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -101,7 +102,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    return this.derivePins(buildPinDeclarations(poles), []);
+    return this.derivePins(buildPinDeclarations(poles, bitWidth), []);
   }
 
   getBoundingBox(): Rect {
@@ -180,9 +181,12 @@ export class SwitchDTElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeSwitchDT(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  void index;
-  void state;
-  void layout;
+  const stBase = layout.stateOffset(index);
+  const closed = layout.getProperty(index, "closed") ?? false;
+  const normallyClosed = layout.getProperty(index, "normallyClosed") ?? false;
+  // Effective state: NC inverts the meaning
+  const effectivelyClosed = normallyClosed ? !closed : closed;
+  state[stBase] = effectivelyClosed ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +212,26 @@ export const SWITCH_DT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "closed",
     propertyKey: "closed",
+    convert: (v) => v === "true",
+  },
+  {
+    xmlName: "Ron",
+    propertyKey: "Ron",
+    convert: (v) => parseFloat(v),
+  },
+  {
+    xmlName: "Roff",
+    propertyKey: "Roff",
+    convert: (v) => parseFloat(v),
+  },
+  {
+    xmlName: "momentary",
+    propertyKey: "momentary",
+    convert: (v) => v === "true",
+  },
+  {
+    xmlName: "normallyClosed",
+    propertyKey: "normallyClosed",
     convert: (v) => v === "true",
   },
 ];
@@ -249,7 +273,99 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: "",
     description: "Optional label shown near the component",
   },
+  {
+    key: "Ron",
+    type: PropertyType.FLOAT,
+    label: "Ron (Ω)",
+    defaultValue: 1,
+    min: 1e-12,
+    description: "On-state resistance in ohms (analog mode)",
+  },
+  {
+    key: "Roff",
+    type: PropertyType.FLOAT,
+    label: "Roff (Ω)",
+    defaultValue: 1e9,
+    min: 1,
+    description: "Off-state resistance in ohms (analog mode)",
+  },
+  {
+    key: "momentary",
+    type: PropertyType.BOOLEAN,
+    label: "Momentary",
+    defaultValue: false,
+    description: "When true, switch is only active while held (releases on mouseup)",
+  },
+  {
+    key: "normallyClosed",
+    type: PropertyType.BOOLEAN,
+    label: "Normally Closed",
+    defaultValue: false,
+    description: "When true, switch is closed at rest",
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// Analog helpers — SPDT variable-resistance model
+// ---------------------------------------------------------------------------
+
+function stampConductanceSpdt(
+  solver: SparseSolver,
+  nodeA: number,
+  nodeB: number,
+  G: number,
+): void {
+  if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
+  if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+  if (nodeA !== 0 && nodeB !== 0) {
+    solver.stamp(nodeA - 1, nodeB - 1, -G);
+    solver.stamp(nodeB - 1, nodeA - 1, -G);
+  }
+}
+
+export interface SpdtAnalogElement extends AnalogElement {
+  setClosed(closed: boolean): void;
+}
+
+function createSwitchDTAnalogElement(
+  nodeIds: number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): SpdtAnalogElement {
+  const nodeCommon = nodeIds[0];
+  const nodeB = nodeIds[1];
+  const nodeC = nodeIds[2];
+  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
+  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
+  const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
+  let closed = props.getOrDefault<boolean>("closed", false);
+  // Effective state: NC inverts the meaning
+  let effectivelyClosed = normallyClosed ? !closed : closed;
+
+  return {
+    nodeIndices: [nodeCommon, nodeB, nodeC],
+    branchIndex: -1,
+    isNonlinear: false,
+    isReactive: false,
+
+    stamp(solver: SparseSolver): void {
+      const Gon = 1 / ron;
+      const Goff = 1 / roff;
+      if (effectivelyClosed) {
+        stampConductanceSpdt(solver, nodeCommon, nodeB, Gon);
+        stampConductanceSpdt(solver, nodeCommon, nodeC, Goff);
+      } else {
+        stampConductanceSpdt(solver, nodeCommon, nodeB, Goff);
+        stampConductanceSpdt(solver, nodeCommon, nodeC, Gon);
+      }
+    },
+
+    setClosed(c: boolean): void {
+      closed = c;
+      effectivelyClosed = normallyClosed ? !closed : closed;
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // SwitchDTDefinition
@@ -281,6 +397,8 @@ export const SwitchDTDefinition: ComponentDefinition = {
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
+  stateSlotCount: 1,
+  switchPins: [0, 1],
   analogFactory: createSwitchDTAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["analog-internals", "logical"],
 };

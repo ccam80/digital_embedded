@@ -230,7 +230,7 @@ export const RegisterDefinition: ComponentDefinition = {
   executeFn: executeRegister,
   sampleFn: sampleRegister,
   analogFactory: makeBehavioralRegisterAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
   pinLayout: REGISTER_PIN_DECLARATIONS,
   propertyDefs: REGISTER_PROPERTY_DEFS,
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,

@@ -294,7 +294,7 @@ export const LedDefinition: ComponentDefinition = {
   name: "LED",
   typeId: -1,
   engineType: "both",
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
   factory: ledFactory,
   executeFn: executeLed,
   pinLayout: buildLedPinDeclarations(),

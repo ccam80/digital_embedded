@@ -149,71 +149,71 @@ describe("Fuse — attribute mappings", () => {
 // ---------------------------------------------------------------------------
 
 describe("Fuse — rendering", () => {
-  it("draw_intact — renders bezier wavy path (drawPath)", () => {
-    const props = new PropertyBag();
-    const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  function makeCtx() {
     const calls: string[] = [];
+    const colors: string[] = [];
+    const texts: string[] = [];
     const ctx = {
       save: () => calls.push("save"),
       restore: () => calls.push("restore"),
       translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
+      setColor: (c: string) => { calls.push("setColor"); colors.push(c); },
+      setRawColor: (c: string) => { calls.push("setRawColor"); colors.push(c); },
+      setLineWidth: () => calls.push("setLineWidth"),
       setFont: () => {},
+      setLineDash: () => {},
+      drawLine: () => calls.push("drawLine"),
+      drawArc: () => calls.push("drawArc"),
       drawPath: () => calls.push("drawPath"),
-      drawText: () => {},
+      drawText: (t: string) => { calls.push("drawText"); texts.push(t); },
     };
+    return { ctx, calls, colors, texts };
+  }
+
+  it("draw_intact — renders sine wave segments via drawLine", () => {
+    const props = new PropertyBag();
+    const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+    const { ctx, calls } = makeCtx();
     el.draw(ctx as never);
     expect(calls).toContain("save");
     expect(calls).toContain("restore");
-    // Fuse draws a wavy S-curve using drawPath (bezier), not drawRect/drawLine
-    expect(calls).toContain("drawPath");
+    expect(calls).toContain("drawLine");
   });
 
-  it("draw_blown — blown fuse draws same wavy path (no special blown color)", () => {
+  it("draw_blown — blown fuse draws broken segments and gap marker", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawPath: () => calls.push("drawPath"),
-      drawText: () => {},
-    };
+    const { ctx, calls } = makeCtx();
     el.draw(ctx as never);
-    // blown state is reflected in simulation state, not via a different draw color
-    expect(calls).toContain("drawPath");
+    // Blown draws left stub + right stub + gap X marker = many drawLine calls
+    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThanOrEqual(4);
   });
 
-  it("draw_notBlown — no WIRE_ERROR color when intact", () => {
+  it("draw_notBlown — COMPONENT color when intact and no heat", () => {
     const props = new PropertyBag();
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const colors: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: (c: string) => colors.push(c),
-      setLineWidth: () => {}, setFont: () => {},
-      drawPath: () => {}, drawText: () => {},
-    };
+    const { ctx, colors } = makeCtx();
     el.draw(ctx as never);
+    expect(colors).toContain("COMPONENT");
     expect(colors).not.toContain("WIRE_ERROR");
+  });
+
+  it("draw_heat — warm color when thermalRatio > 0.3", () => {
+    const props = new PropertyBag();
+    props.set("_thermalRatio", 0.6);
+    const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+    const { ctx, colors } = makeCtx();
+    el.draw(ctx as never);
+    // Should use setRawColor with an orange-ish heat color
+    expect(colors.some(c => c.startsWith("rgb("))).toBe(true);
   });
 
   it("draw_withLabel — renders label text when set", () => {
     const props = new PropertyBag();
     props.set("label", "F1");
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawPath: () => {}, drawText: (t: string) => texts.push(t),
-    };
+    const { ctx, texts } = makeCtx();
     el.draw(ctx as never);
     expect(texts).toContain("F1");
   });
@@ -221,12 +221,7 @@ describe("Fuse — rendering", () => {
   it("draw_noLabel — no text rendered when label is empty", () => {
     const props = new PropertyBag();
     const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawPath: () => {}, drawText: (t: string) => texts.push(t),
-    };
+    const { ctx, texts } = makeCtx();
     el.draw(ctx as never);
     expect(texts.length).toBe(0);
   });
@@ -265,8 +260,8 @@ describe("Fuse — ComponentDefinition", () => {
     const el = new FuseElement(crypto.randomUUID(), { x: 4, y: 6 }, 0, false, props);
     const bb = el.getBoundingBox();
     expect(bb.x).toBe(4);
-    // getBoundingBox offsets y by -0.25 (wavy path extends above pin centre)
-    expect(bb.y).toBeCloseTo(5.75);
+    // getBoundingBox offsets y by -0.4 (sine wave + heat glow extends above pin centre)
+    expect(bb.y).toBeCloseTo(5.6);
     expect(bb.width).toBeGreaterThanOrEqual(1);
     expect(bb.height).toBeGreaterThanOrEqual(0.4);
   });

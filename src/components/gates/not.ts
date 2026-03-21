@@ -231,7 +231,7 @@ export const NotDefinition: ComponentDefinition = {
   executeFn: executeNot,
   analogFactory: makeNotAnalogFactory(),
   transistorModel: "CmosInverter",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(1, false),
   propertyDefs: NOT_PROPERTY_DEFS,
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,

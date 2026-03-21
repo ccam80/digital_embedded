@@ -312,7 +312,7 @@ export const NOrDefinition: ComponentDefinition = {
   executeFn: executeNOr,
   analogFactory: makeNorAnalogFactory(0),
   transistorModel: "CmosNor2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NOR_PROPERTY_DEFS,
   attributeMap: NOR_ATTRIBUTE_MAPPINGS,

@@ -289,5 +289,5 @@ export const BusSplitterDefinition: ComponentDefinition = {
     "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
     "Splits a common bus into individual bit lines gated by OE.",
   analogFactory: createSplitterAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
 };

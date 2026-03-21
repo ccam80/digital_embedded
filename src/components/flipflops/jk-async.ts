@@ -252,5 +252,5 @@ export const JKAsyncDefinition: ComponentDefinition = {
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeJKAsyncFlipflopAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

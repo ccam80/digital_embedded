@@ -304,7 +304,7 @@ export const OrDefinition: ComponentDefinition = {
   executeFn: executeOr,
   analogFactory: makeOrAnalogFactory(0),
   transistorModel: "CmosOr2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: OR_PROPERTY_DEFS,
   attributeMap: OR_ATTRIBUTE_MAPPINGS,

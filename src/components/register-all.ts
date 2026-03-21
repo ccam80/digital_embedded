@@ -111,8 +111,6 @@ import { TransGateDefinition } from "./switching/trans-gate.js";
 import { FuseDefinition } from "./switching/fuse.js";
 import { SwitchDefinition } from "./switching/switch.js";
 import { SwitchDTDefinition } from "./switching/switch-dt.js";
-import { PlainSwitchDefinition } from "./switching/plain-switch.js";
-import { PlainSwitchDTDefinition } from "./switching/plain-switch-dt.js";
 
 // PLD
 import { DiodeDefinition, DiodeForwardDefinition, DiodeBackwardDefinition } from "./pld/diode.js";
@@ -137,7 +135,7 @@ import { KeyboardDefinition } from "./terminal/keyboard.js";
 import { ResistorDefinition } from "./passives/resistor.js";
 import { CapacitorDefinition } from "./passives/capacitor.js";
 import { InductorDefinition } from "./passives/inductor.js";
-import { AnalogFuseDefinition } from "./passives/analog-fuse.js";
+
 import { PotentiometerDefinition } from "./passives/potentiometer.js";
 import { TransformerDefinition } from "./passives/transformer.js";
 import { TappedTransformerDefinition } from "./passives/tapped-transformer.js";
@@ -316,8 +314,8 @@ export function createDefaultRegistry(
   registry.register(FuseDefinition);
   registry.register(SwitchDefinition);
   registry.register(SwitchDTDefinition);
-  registry.register(PlainSwitchDefinition);
-  registry.register(PlainSwitchDTDefinition);
+  registry.registerAlias("PlainSwitch", "Switch");
+  registry.registerAlias("PlainSwitchDT", "SwitchDT");
 
   // PLD
   registry.register(DiodeDefinition);
@@ -344,7 +342,7 @@ export function createDefaultRegistry(
   registry.register(ResistorDefinition);
   registry.register(CapacitorDefinition);
   registry.register(InductorDefinition);
-  registry.register(AnalogFuseDefinition);
+
   registry.register(PotentiometerDefinition);
   registry.register(TransformerDefinition);
   registry.register(TappedTransformerDefinition);

@@ -99,7 +99,7 @@ import { analyseSequential } from '../analysis/state-transition.js';
 import type { SequentialAnalysisFacade, SignalSpec } from '../analysis/state-transition.js';
 
 /** Component type names that are togglable during simulation — skip property popup on dblclick. */
-const TOGGLABLE_TYPES = new Set(["In", "Clock", "Button", "Switch", "DipSwitch"]);
+const TOGGLABLE_TYPES = new Set(["In", "Clock", "Button", "Switch", "SwitchDT", "DipSwitch"]);
 
 /**
  * After completing a wire to a pin or junction, check if the newly added
@@ -948,6 +948,52 @@ export function initApp(search?: string): void {
         if (elementHit) {
           selection.clear();
           selection.select(elementHit);
+
+          // Switch toggle during analog simulation — recompile to update conductance
+          if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
+            const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
+            try {
+              if (momentary) {
+                elementHit.setAttribute('closed', true);
+                const onPointerUp = (): void => {
+                  elementHit.setAttribute('closed', false);
+                  compiledDirty = true;
+                  if (compileAndBind()) {
+                    const acUp = facade.getCompiledAnalog();
+                    const engUp = facade.getEngine();
+                    if (acUp !== null && engUp) {
+                      engUp.start?.();
+                      startAnalogRenderLoop(
+                        engUp as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
+                        circuit,
+                        acUp,
+                      );
+                    }
+                  }
+                  scheduleRender();
+                };
+                document.addEventListener('pointerup', onPointerUp, { once: true });
+              } else {
+                const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+                elementHit.setAttribute('closed', !current);
+              }
+              compiledDirty = true;
+              if (compileAndBind()) {
+                const acToggle = facade.getCompiledAnalog();
+                const engToggle = facade.getEngine();
+                if (acToggle !== null && engToggle) {
+                  engToggle.start?.();
+                  startAnalogRenderLoop(
+                    engToggle as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
+                    circuit,
+                    acToggle,
+                  );
+                }
+              }
+            } catch {
+              // ignore toggle errors
+            }
+          }
         } else {
           selection.clear();
         }
@@ -977,6 +1023,37 @@ export function initApp(search?: string): void {
           const eng = facade.getEngine();
           if (eng?.getState?.() !== EngineState.RUNNING) {
             facade.step(eng!, { clockAdvance: elementHit.typeId !== 'Clock' });
+          }
+          scheduleRender();
+        } catch {
+          scheduleRender();
+        }
+      }
+
+      // Switch toggle: Switch (SPST) and SwitchDT (SPDT) clicked during simulation
+      if (elementHit && (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT')) {
+        const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
+        try {
+          if (momentary) {
+            // Momentary: set closed=true on pointerdown, release on pointerup
+            elementHit.setAttribute('closed', true);
+            const onPointerUp = (): void => {
+              elementHit.setAttribute('closed', false);
+              const eng = facade.getEngine();
+              if (eng?.getState?.() !== EngineState.RUNNING) {
+                facade.step(eng!, { clockAdvance: true });
+              }
+              scheduleRender();
+            };
+            document.addEventListener('pointerup', onPointerUp, { once: true });
+          } else {
+            // Latching: toggle closed property
+            const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+            elementHit.setAttribute('closed', !current);
+          }
+          const eng = facade.getEngine();
+          if (eng?.getState?.() !== EngineState.RUNNING) {
+            facade.step(eng!, { clockAdvance: true });
           }
           scheduleRender();
         } catch {

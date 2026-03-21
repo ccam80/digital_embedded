@@ -299,5 +299,5 @@ export const DemuxDefinition: ComponentDefinition = {
     "Selected output = input, all others = 0. N = 2^selectorBits.",
   engineType: "both",
   analogFactory: makeBehavioralDemuxAnalogFactory(1),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

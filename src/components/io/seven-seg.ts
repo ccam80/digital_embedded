@@ -301,5 +301,5 @@ export const SevenSegDefinition: ComponentDefinition = {
     "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
   analogFactory: createSevenSegAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
 };

@@ -285,11 +285,15 @@ export interface ComponentDefinition {
   /**
    * Available simulation modes for this component.
    *
-   * Gates and sequential components with analogFactory declare
-   * ['digital', 'behavioral']. Components with transistor-level models
-   * additionally include 'transistor'. Digital-only components omit this.
+   * The first entry is the default mode used when the user has not chosen one.
+   *
+   * Gates and sequential components: ['logical', 'analog-pins', ...] — default logical.
+   * Components with transistor-level models additionally include 'analog-internals'.
+   * Components whose analog model is already full-fidelity (fuse, switch, relay):
+   * ['analog-internals', 'logical'] — default analog-internals.
+   * Digital-only components omit this.
    */
-  simulationModes?: ('digital' | 'behavioral' | 'transistor')[];
+  simulationModes?: ('logical' | 'analog-pins' | 'analog-internals')[];
   /**
    * Name of a registered subcircuit for transistor-level expansion.
    * Populated in Phase 4c; field added here for forward declaration.
@@ -311,6 +315,7 @@ export interface ComponentDefinition {
 export class ComponentRegistry {
   private readonly _byName: Map<string, ComponentDefinition> = new Map();
   private readonly _byCategory: Map<ComponentCategory, ComponentDefinition[]> = new Map();
+  private readonly _aliases: Map<string, string> = new Map();
   private _nextTypeId = 0;
 
   /**
@@ -391,10 +396,34 @@ export class ComponentRegistry {
   }
 
   /**
-   * Look up a component definition by its type name.
+   * Register an alias for an existing canonical component name.
+   *
+   * When `get(alias)` is called it returns the canonical definition.
+   * Aliases do NOT appear in `getByCategory()` or `getAll()` results —
+   * they are invisible to the palette and component list.
+   *
+   * Throws if the canonical name is not already registered, or if the
+   * alias name is already registered as a canonical type.
+   */
+  registerAlias(alias: string, canonicalName: string): void {
+    if (this._byName.has(alias)) {
+      throw new Error(`ComponentRegistry: cannot register alias "${alias}" — a canonical type with that name already exists`);
+    }
+    if (!this._byName.has(canonicalName)) {
+      throw new Error(`ComponentRegistry: cannot register alias "${alias}" → "${canonicalName}" — canonical type is not registered`);
+    }
+    this._aliases.set(alias, canonicalName);
+  }
+
+  /**
+   * Look up a component definition by its type name or alias.
    * Returns undefined when the name is not registered.
    */
   get(name: string): ComponentDefinition | undefined {
+    const canonical = this._aliases.get(name);
+    if (canonical !== undefined) {
+      return this._byName.get(canonical);
+    }
     return this._byName.get(name);
   }
 

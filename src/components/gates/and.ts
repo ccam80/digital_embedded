@@ -291,7 +291,7 @@ export const AndDefinition: ComponentDefinition = {
   executeFn: executeAnd,
   analogFactory: makeAndAnalogFactory(0),
   transistorModel: "CmosAnd2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: AND_PROPERTY_DEFS,
   attributeMap: AND_ATTRIBUTE_MAPPINGS,

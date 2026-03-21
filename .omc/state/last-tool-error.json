@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:\\\\local_working_projects\\\\digital_in_browser\\\" && timeout 15 npx tsx -e '\\nimport { MNAEngine } from \\\"./src/analog/analog-engine.js\\\";\\nimport { makeVoltageSource, makeResistor } f...",
-  "error": "Exit code 124",
-  "timestamp": "2026-03-21T04:37:12.168Z",
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\src\\\\components\\\\switching\\\\__tests__\\\\switches.test.ts\"}",
+  "error": "File content (13398 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-21T10:42:34.963Z",
   "retry_count": 1
 }

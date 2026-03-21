@@ -278,5 +278,5 @@ export const DriverDefinition: ComponentDefinition = {
     "When sel=1: output = input.\n" +
     "When sel=0: output is high-impedance (disconnected).",
   analogFactory: createDriverAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
 };

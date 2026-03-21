@@ -1,7 +1,7 @@
 /**
- * Tests for the simulationMode: "digital" compiler path (inline bridge).
+ * Tests for the simulationMode: "logical" compiler path (inline bridge).
  *
- * Verifies that when a "both"-engine component has simulationMode: "digital",
+ * Verifies that when a "both"-engine component has simulationMode: "logical",
  * the analog compiler:
  *   1. Does NOT call the analogFactory
  *   2. Produces exactly one BridgeInstance in compiled.bridges
@@ -233,7 +233,7 @@ describe("DigitalBridgePath", () => {
   it("analog_factory_not_called_in_digital_mode", () => {
     const analogFactory = vi.fn(makeStubAnalogElement);
     const registry = buildRegistry(analogFactory);
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     compileAnalogCircuit(circuit, registry);
 
@@ -242,7 +242,7 @@ describe("DigitalBridgePath", () => {
 
   it("creates_one_bridge_instance", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
 
@@ -251,7 +251,7 @@ describe("DigitalBridgePath", () => {
 
   it("bridge_has_correct_adapter_counts", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const bridge = compiled.bridges[0]!;
@@ -266,7 +266,7 @@ describe("DigitalBridgePath", () => {
 
   it("inner_net_ids_are_valid", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const bridge = compiled.bridges[0]!;
@@ -286,7 +286,7 @@ describe("DigitalBridgePath", () => {
 
   it("adapter_outer_node_ids_are_positive", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const bridge = compiled.bridges[0]!;
@@ -301,7 +301,7 @@ describe("DigitalBridgePath", () => {
 
   it("no_errors_emitted_in_digital_mode", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
@@ -311,7 +311,7 @@ describe("DigitalBridgePath", () => {
   it("behavioral_mode_still_calls_analog_factory", () => {
     const analogFactory = vi.fn(makeStubAnalogElement);
     const registry = buildRegistry(analogFactory);
-    // No simulationMode → defaults to "behavioral"
+    // No simulationMode → defaults to "analog-pins"
     const circuit = buildCircuit();
 
     compileAnalogCircuit(circuit, registry);
@@ -322,7 +322,7 @@ describe("DigitalBridgePath", () => {
 
   it("adapter_labels_include_pin_name", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationMode", "digital"]]));
+    const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const bridge = compiled.bridges[0]!;

@@ -809,7 +809,7 @@ describe("Registration", () => {
     ];
 
     for (const { name, def } of gateTypes) {
-      expect(def.simulationModes, `${name} simulationModes`).toContain("transistor");
+      expect(def.simulationModes, `${name} simulationModes`).toContain("analog-internals");
     }
   });
 

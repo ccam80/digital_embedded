@@ -124,7 +124,7 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
     typeId: -1,
     engineType: "both" as const,
     transistorModel,
-    simulationModes: ["digital", "behavioral", "transistor"],
+    simulationModes: ["logical", "analog-pins", "analog-internals"],
     factory: (_props) => makeElement(name, crypto.randomUUID(), []),
     executeFn: noOpAnalogExecuteFn,
     pinLayout,

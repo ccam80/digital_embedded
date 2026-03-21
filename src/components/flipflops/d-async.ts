@@ -296,5 +296,5 @@ export const DAsyncDefinition: ComponentDefinition = {
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeDAsyncFlipflopAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

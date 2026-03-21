@@ -38,6 +38,10 @@ import { compileAnalogCircuit } from '../analog/compiler.js';
 import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
 import { MNAEngine } from '../analog/analog-engine.js';
+import { TransistorModelRegistry } from '../analog/transistor-model-registry.js';
+import { registerAllCmosGateModels } from '../analog/transistor-models/cmos-gates.js';
+import { registerCmosDFlipflop } from '../analog/transistor-models/cmos-flipflop.js';
+import { registerDarlingtonModels } from '../analog/transistor-models/darlington.js';
 import { detectEngineMode, partitionMixedCircuit } from '../engine/mixed-partition.js';
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/save.js';
@@ -45,6 +49,18 @@ import { deserializeCircuit } from '../io/load.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
+
+/** Lazily-built singleton TransistorModelRegistry with all known models. */
+let _transistorModels: TransistorModelRegistry | null = null;
+function getTransistorModels(): TransistorModelRegistry {
+  if (!_transistorModels) {
+    _transistorModels = new TransistorModelRegistry();
+    registerAllCmosGateModels(_transistorModels);
+    registerCmosDFlipflop(_transistorModels);
+    registerDarlingtonModels(_transistorModels);
+  }
+  return _transistorModels;
+}
 
 // ---------------------------------------------------------------------------
 // Step options — facade-specific, not on the SimulatorFacade interface
@@ -144,7 +160,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
         compileInput = circuit;
       }
 
-      const compiledAnalog = compileAnalogCircuit(compileInput, this._registry);
+      const compiledAnalog = compileAnalogCircuit(compileInput, this._registry, getTransistorModels());
       this._compiledAnalog = compiledAnalog;
 
       const analogEngine = new MNAEngine();

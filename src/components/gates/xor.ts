@@ -312,7 +312,7 @@ export const XOrDefinition: ComponentDefinition = {
   executeFn: executeXOr,
   analogFactory: makeXorAnalogFactory(0),
   transistorModel: "CmosXor2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XOR_PROPERTY_DEFS,
   attributeMap: XOR_ATTRIBUTE_MAPPINGS,

@@ -19,7 +19,23 @@ import { compileCircuit } from "@/engine/compiler";
 import { DigitalEngine } from "@/engine/digital-engine";
 import type { ConcreteCompiledCircuit } from "@/engine/digital-engine";
 import { compileAnalogCircuit } from "@/analog/compiler.js";
+import { TransistorModelRegistry } from "@/analog/transistor-model-registry.js";
+import { registerAllCmosGateModels } from "@/analog/transistor-models/cmos-gates.js";
+import { registerCmosDFlipflop } from "@/analog/transistor-models/cmos-flipflop.js";
+import { registerDarlingtonModels } from "@/analog/transistor-models/darlington.js";
 import { FacadeError } from "./types.js";
+
+/** Lazily-built singleton TransistorModelRegistry with all known models. */
+let _transistorModels: TransistorModelRegistry | null = null;
+function getTransistorModels(): TransistorModelRegistry {
+  if (!_transistorModels) {
+    _transistorModels = new TransistorModelRegistry();
+    registerAllCmosGateModels(_transistorModels);
+    registerCmosDFlipflop(_transistorModels);
+    registerDarlingtonModels(_transistorModels);
+  }
+  return _transistorModels;
+}
 
 /**
  * Factory function that creates and initialises a SimulationEngine from a
@@ -83,7 +99,7 @@ export class SimulationRunner {
    */
   compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationEngine {
     if (circuit.metadata.engineType === "analog") {
-      const compiled = compileAnalogCircuit(circuit, this._registry);
+      const compiled = compileAnalogCircuit(circuit, this._registry, getTransistorModels());
       const engine = compiled as unknown as AnalogEngine;
       this._records.set(engine, { engineType: "analog", engine, compiled });
       return engine as unknown as SimulationEngine;

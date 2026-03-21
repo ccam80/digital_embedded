@@ -307,5 +307,5 @@ export const RelayDefinition: ComponentDefinition = {
   defaultDelay: 0,
   switchPins: [2, 3],
   analogFactory: createRelayAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["analog-internals", "logical"],
 };

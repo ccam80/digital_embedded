@@ -136,8 +136,8 @@ describe("AnalogClock", () => {
     expect(ClockDefinition.engineType).toBe("both");
   });
 
-  it("simulationModes_includes_digital — digital clock behavior preserved", () => {
-    expect(ClockDefinition.simulationModes).toContain("digital");
+  it("simulationModes_includes_logical — logical clock behavior preserved", () => {
+    expect(ClockDefinition.simulationModes).toContain("logical");
   });
 
   it("analogFactory_creates_element — factory produces a valid AnalogElement", () => {

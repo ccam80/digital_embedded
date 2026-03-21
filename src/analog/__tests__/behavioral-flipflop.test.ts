@@ -322,9 +322,9 @@ describe("Registration", () => {
     expect(DDefinition.engineType).toBe("both");
   });
 
-  it("d_flipflop_simulation_modes_include_digital_and_behavioral", () => {
-    expect(DDefinition.simulationModes).toContain("digital");
-    expect(DDefinition.simulationModes).toContain("behavioral");
+  it("d_flipflop_simulation_modes_include_digital_and_simplified", () => {
+    expect(DDefinition.simulationModes).toContain("logical");
+    expect(DDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("analog_factory_returns_analog_element", () => {

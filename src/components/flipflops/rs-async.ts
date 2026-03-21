@@ -217,5 +217,5 @@ export const RSAsyncDefinition: ComponentDefinition = {
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeRSAsyncLatchAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

@@ -142,7 +142,7 @@ export class PropertyPanel {
    * the selected component has simulationModes with more than one entry. The
    * dropdown is appended after the regular property rows.
    *
-   * Default is "behavioral" (read at call time, never persisted on the element
+   * Default is "analog-pins" (read at call time, never persisted on the element
    * until the user changes it).
    *
    * @param element   The selected circuit element.
@@ -158,7 +158,7 @@ export class PropertyPanel {
     const bag = element.getProperties();
     const current = bag.has("simulationMode")
       ? (bag.get("simulationMode") as string)
-      : "behavioral";
+      : (modes[0] ?? "analog-pins");
 
     const select = document.createElement("select") as unknown as HTMLSelectElement & { value: string };
     for (const mode of modes) {
@@ -176,7 +176,7 @@ export class PropertyPanel {
       const newMode = select.value;
       const oldValue = bag.has("simulationMode")
         ? bag.get("simulationMode")
-        : "behavioral";
+        : (modes[0] ?? "analog-pins");
       bag.set("simulationMode", newMode);
       for (const cb of this._changeCallbacks) {
         cb("simulationMode", oldValue, newMode);

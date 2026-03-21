@@ -247,5 +247,5 @@ export const ButtonLEDDefinition: ComponentDefinition = {
     "Button behavior: output high while held, low when released (inverted if activeLow).\n" +
     "Interactive: the engine sets the output value on mouse-down/up events.",
   analogFactory: createButtonLEDAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
 };

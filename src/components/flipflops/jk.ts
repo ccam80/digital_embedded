@@ -233,5 +233,5 @@ export const JKDefinition: ComponentDefinition = {
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeJKFlipflopAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

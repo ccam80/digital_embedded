@@ -547,7 +547,7 @@ describe("Registration", () => {
     expect(DDefinition.transistorModel).toBe("CmosDFlipflop");
   });
 
-  it("d_flipflop_has_transistor_mode", () => {
-    expect(DDefinition.simulationModes).toContain("transistor");
+  it("d_flipflop_has_analog_mode", () => {
+    expect(DDefinition.simulationModes).toContain("analog-internals");
   });
 });

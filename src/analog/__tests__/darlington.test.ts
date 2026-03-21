@@ -258,8 +258,8 @@ describe("Registration", () => {
       expect(DarlingtonNpnDefinition.engineType).toBe("analog");
     });
 
-    it("DarlingtonNPN simulationModes includes transistor", () => {
-      expect(DarlingtonNpnDefinition.simulationModes).toContain("transistor");
+    it("DarlingtonNPN simulationModes includes analog", () => {
+      expect(DarlingtonNpnDefinition.simulationModes).toContain("analog-internals");
     });
 
     it("DarlingtonPNP has transistorModel set", () => {

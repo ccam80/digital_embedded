@@ -300,5 +300,5 @@ export const MuxDefinition: ComponentDefinition = {
     "Output = input[selector]. N = 2^selectorBits.",
   engineType: "both",
   analogFactory: makeBehavioralMuxAnalogFactory(1),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

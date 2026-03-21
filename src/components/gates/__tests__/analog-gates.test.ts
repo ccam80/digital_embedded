@@ -6,7 +6,7 @@
  *   - Each gate type has engineType === "both"
  *   - getByEngineType("analog") includes all gate types
  *   - getByEngineType("digital") still includes all gate types
- *   - simulationModes includes 'digital' and 'behavioral' for each gate
+ *   - simulationModes includes 'logical' and 'analog-pins' for each gate
  */
 
 import { describe, it, expect } from "vitest";
@@ -116,11 +116,11 @@ describe("SimulationModes", () => {
     const registry = makeGateRegistry();
     const def = registry.get("And")!;
     expect(def.simulationModes).toBeDefined();
-    expect(def.simulationModes).toContain("digital");
-    expect(def.simulationModes).toContain("behavioral");
+    expect(def.simulationModes).toContain("logical");
+    expect(def.simulationModes).toContain("analog-pins");
   });
 
-  it("all_gates_support_digital_and_behavioral", () => {
+  it("all_gates_support_digital_and_simplified", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
@@ -130,12 +130,12 @@ describe("SimulationModes", () => {
       ).toBeDefined();
       expect(
         def.simulationModes,
-        `${name} should include 'digital'`,
-      ).toContain("digital");
+        `${name} should include 'logical'`,
+      ).toContain("logical");
       expect(
         def.simulationModes,
-        `${name} should include 'behavioral'`,
-      ).toContain("behavioral");
+        `${name} should include 'analog-pins'`,
+      ).toContain("analog-pins");
     }
   });
 });

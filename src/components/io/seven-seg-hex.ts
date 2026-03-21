@@ -211,5 +211,5 @@ export const SevenSegHexDefinition: ComponentDefinition = {
     "4-bit input selects which hex digit (0–F) to display.\n" +
     "commonCathode=true: common cathode configuration (active high).",
   analogFactory: createSevenSegAnalogElement,
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
 };

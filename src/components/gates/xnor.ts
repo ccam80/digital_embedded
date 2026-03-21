@@ -320,7 +320,7 @@ export const XNOrDefinition: ComponentDefinition = {
   executeFn: executeXNOr,
   analogFactory: makeXnorAnalogFactory(0),
   transistorModel: "CmosXnor2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XNOR_PROPERTY_DEFS,
   attributeMap: XNOR_ATTRIBUTE_MAPPINGS,

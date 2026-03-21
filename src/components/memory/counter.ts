@@ -268,7 +268,7 @@ export const CounterDefinition: ComponentDefinition = {
   executeFn: executeCounter,
   sampleFn: sampleCounter,
   analogFactory: makeBehavioralCounterAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
   pinLayout: COUNTER_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PROPERTY_DEFS,
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,

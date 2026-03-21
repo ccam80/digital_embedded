@@ -440,8 +440,8 @@ export function compileAnalogCircuit(
       const passAProps = el.getProperties();
       const passAMode = passAProps.has("simulationMode")
         ? (passAProps.get("simulationMode") as string)
-        : "behavioral";
-      if (passAMode === "transistor" || passAMode === "digital") {
+        : (def.simulationModes?.[0] ?? "analog-pins");
+      if ((passAMode === "analog-internals" && def.transistorModel) || passAMode === "logical") {
         elementMeta.push({
           el,
           branchIdx: -1,
@@ -487,7 +487,7 @@ export function compileAnalogCircuit(
   // and the MNA matrix size = nodeCount + branchCount. We keep branchIdx
   // as 0-based — the assembler adds nodeCount to get the absolute row.
 
-  // Inline bridges created for flat "digital" simulationMode components.
+  // Inline bridges created for flat "logical" simulationMode components.
   // Collected here and merged into the main bridges array after Step 7.
   const inlineBridges: BridgeInstance[] = [];
 
@@ -525,20 +525,20 @@ export function compileAnalogCircuit(
     }
 
     // Handle simulationMode property for "both" components.
-    // The "digital" branch applies even when analogFactory is undefined
+    // The "logical" branch applies even when analogFactory is undefined
     // (the component will run as an inner digital engine, no analog stamping needed).
     if (elEngineType === "both") {
       const simulationMode = props.has("simulationMode")
         ? (props.get("simulationMode") as string)
-        : "behavioral";
+        : (def.simulationModes?.[0] ?? "analog-pins");
 
-      if (simulationMode === "transistor" && def.analogFactory !== undefined) {
+      if (simulationMode === "analog-internals" && def.transistorModel) {
         if (!transistorModels) {
           diagnostics.push(
             makeDiagnostic(
               "missing-transistor-model",
               "error",
-              `Component "${el.typeId}" is set to simulationMode 'transistor' but no TransistorModelRegistry was provided`,
+              `Component "${el.typeId}" is set to simulationMode 'analog-internals' but no TransistorModelRegistry was provided`,
               {
                 explanation:
                   `Pass a TransistorModelRegistry as the third argument to compileAnalogCircuit() ` +
@@ -549,43 +549,46 @@ export function compileAnalogCircuit(
           continue;
         }
 
-        // Resolve outer pin node IDs for this component
-        const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit, undefined, nodeMap.positionToNodeId);
+        if (def.analogFactory !== undefined) {
+          // Resolve outer pin node IDs for this component
+          const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit, undefined, nodeMap.positionToNodeId);
 
-        // Ensure the shared VDD node and VDD voltage source are created once
-        if (vddNodeId < 0) {
-          vddNodeId = nextInternalNode++;
-          // Allocate a branch row for the VDD voltage source
-          vddBranchIdx = branchCount++;
+          // Ensure the shared VDD node and VDD voltage source are created once
+          if (vddNodeId < 0) {
+            vddNodeId = nextInternalNode++;
+            // Allocate a branch row for the VDD voltage source
+            vddBranchIdx = branchCount++;
+          }
+
+          // Expand the transistor model
+          const expResult = expandTransistorModel(
+            def,
+            outerPinNodeIds,
+            transistorModels,
+            vddNodeId,
+            0, // gndNodeId is always 0
+            () => nextInternalNode++,
+          );
+
+          diagnostics.push(...expResult.diagnostics);
+
+          for (const expEl of expResult.elements) {
+            const expElIdx = analogElements.length;
+            analogElements.push(expEl);
+            elementToCircuitElement.set(expElIdx, el);
+            topologyInfo.push({
+              nodeIds: Array.from(expEl.nodeIndices),
+              isBranch: expEl.branchIndex >= 0,
+              typeHint: expEl.branchIndex >= 0
+                ? expEl.isReactive ? "inductor" : "voltage"
+                : "other",
+            });
+          }
+          continue;
         }
-
-        // Expand the transistor model
-        const expResult = expandTransistorModel(
-          def,
-          outerPinNodeIds,
-          transistorModels,
-          vddNodeId,
-          0, // gndNodeId is always 0
-          () => nextInternalNode++,
-        );
-
-        diagnostics.push(...expResult.diagnostics);
-
-        for (const expEl of expResult.elements) {
-          const expElIdx = analogElements.length;
-          analogElements.push(expEl);
-          elementToCircuitElement.set(expElIdx, el);
-          topologyInfo.push({
-            nodeIds: Array.from(expEl.nodeIndices),
-            isBranch: expEl.branchIndex >= 0,
-            typeHint: expEl.branchIndex >= 0
-              ? expEl.isReactive ? "inductor" : "voltage"
-              : "other",
-          });
-        }
-        continue;
-      } else if (simulationMode === "digital") {
-        // Digital bridge path: wrap this component in a minimal inner digital
+        // No transistorModel — fall through to analogFactory path below
+      } else if (simulationMode === "logical") {
+        // Logical bridge path: wrap this component in a minimal inner digital
         // circuit and create bridge adapters at each pin boundary.
 
         const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit, undefined, nodeMap.positionToNodeId);
@@ -723,14 +726,14 @@ export function compileAnalogCircuit(
         diagnostics.push(
           makeDiagnostic(
             "unconnected-analog-pin",
-            "error",
-            `The "${pinLabel}" pin on "${label}" (${el.typeId}) is not connected to any wire`,
+            "warning",
+            `The "${pinLabel}" pin on "${label}" (${el.typeId}) is not connected — component excluded from simulation`,
             {
               explanation:
                 `Component "${label}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
                 `endpoint in the circuit. This can happen when the component is rotated or ` +
-                `moved but the wires weren't updated to follow. The analog solver cannot ` +
-                `build a valid circuit matrix with unconnected pins.`,
+                `moved but the wires weren't updated to follow. The component has been ` +
+                `excluded from the analog simulation; the rest of the circuit will still run.`,
               suggestions: [
                 {
                   text: `Check the wiring around "${label}" — make sure each pin endpoint sits exactly on a wire.`,
@@ -1085,7 +1088,7 @@ export function compileAnalogCircuit(
     }
   }
 
-  // Step 7c: Merge inline bridges (from flat "digital" simulationMode components).
+  // Step 7c: Merge inline bridges (from flat "logical" simulationMode components).
   bridges.push(...inlineBridges);
 
   // Step 8: Build and return ConcreteCompiledAnalogCircuit

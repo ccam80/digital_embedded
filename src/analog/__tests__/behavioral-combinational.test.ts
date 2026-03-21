@@ -346,22 +346,22 @@ describe("Registration", () => {
   it("mux_has_analog_factory", () => {
     expect(MuxDefinition.engineType).toBe("both");
     expect(typeof MuxDefinition.analogFactory).toBe("function");
-    expect(MuxDefinition.simulationModes).toContain("digital");
-    expect(MuxDefinition.simulationModes).toContain("behavioral");
+    expect(MuxDefinition.simulationModes).toContain("logical");
+    expect(MuxDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("demux_has_analog_factory", () => {
     expect(DemuxDefinition.engineType).toBe("both");
     expect(typeof DemuxDefinition.analogFactory).toBe("function");
-    expect(DemuxDefinition.simulationModes).toContain("digital");
-    expect(DemuxDefinition.simulationModes).toContain("behavioral");
+    expect(DemuxDefinition.simulationModes).toContain("logical");
+    expect(DemuxDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("decoder_has_analog_factory", () => {
     expect(DecoderDefinition.engineType).toBe("both");
     expect(typeof DecoderDefinition.analogFactory).toBe("function");
-    expect(DecoderDefinition.simulationModes).toContain("digital");
-    expect(DecoderDefinition.simulationModes).toContain("behavioral");
+    expect(DecoderDefinition.simulationModes).toContain("logical");
+    expect(DecoderDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("factory_produces_nonlinear_element", () => {

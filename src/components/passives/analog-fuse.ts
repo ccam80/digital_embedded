@@ -1,5 +1,5 @@
 /**
- * Analog fuse — variable-resistance element with thermal I²t energy model.
+ * Analog fuse MNA element — variable-resistance with thermal I²t energy model.
  *
  * Models a fuse as a resistance that transitions from R_cold (intact) to
  * R_blown (open circuit) when the accumulated I²t energy exceeds the rating.
@@ -18,6 +18,12 @@
  *   where w = 0.05 * i2tRating (transition width).
  *   Below threshold R ≈ R_cold; above threshold R ≈ R_blown.
  *
+ * Cross-engine state propagation:
+ *   The factory captures the CircuitElement's PropertyBag and writes
+ *   `_thermalRatio` (0→1) and `blown` (boolean) into it each timestep.
+ *   The visual FuseElement.draw() reads these for heat glow and blown rendering.
+ *   The digital executeFuse reads `blown` for the bus resolver closed flag.
+ *
  * MNA topology:
  *   nodeIndices[0] = n_pos  (positive terminal)
  *   nodeIndices[1] = n_neg  (negative terminal)
@@ -34,19 +40,8 @@
 
 import type { AnalogElement } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
-import type { SolverDiagnostic, SolverDiagnosticCode } from "../../core/analog-engine-interface.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
-import type { PropertyDefinition } from "../../core/properties.js";
-import {
-  ComponentCategory,
-  type AttributeMapping,
-  type ComponentDefinition,
-} from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
-import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import { PinDirection } from "../../core/pin.js";
+import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
+import { PropertyBag } from "../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -95,6 +90,7 @@ export class AnalogFuseElement implements AnalogElement {
   private _currentVoltage: number = 0;
 
   private readonly _emitDiagnostic: (diag: SolverDiagnostic) => void;
+  private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
    * @param nodeIndices    - [n_pos, n_neg]
@@ -102,6 +98,7 @@ export class AnalogFuseElement implements AnalogElement {
    * @param rBlown         - Blown (open) resistance in ohms
    * @param i2tRating      - I²t energy rating in A²·s
    * @param emitDiagnostic - Callback invoked when fuse blows
+   * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    */
   constructor(
     nodeIndices: number[],
@@ -109,12 +106,14 @@ export class AnalogFuseElement implements AnalogElement {
     rBlown: number,
     i2tRating: number,
     emitDiagnostic?: (diag: SolverDiagnostic) => void,
+    onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
     this.nodeIndices = nodeIndices;
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
     this._emitDiagnostic = emitDiagnostic ?? (() => {});
+    this._onStateChange = onStateChange ?? null;
   }
 
   stamp(_solver: SparseSolver): void {
@@ -156,9 +155,6 @@ export class AnalogFuseElement implements AnalogElement {
     const vDiff = vPos - vNeg;
 
     // Compute current from the current resistance state.
-    // While intact, use R_cold for the thermal energy integral so that a
-    // fixed driving voltage produces the expected I²t accumulation. After
-    // blowing, use R_blown so the current collapses to near zero.
     const R_eff = this._blown ? this._rBlown : this._rCold;
     const I = vDiff / Math.max(R_eff, MIN_RESISTANCE);
 
@@ -168,6 +164,12 @@ export class AnalogFuseElement implements AnalogElement {
     // Check blow condition after integration
     if (!this._blown && this._thermalEnergy >= this._i2tRating) {
       this._blown = true;
+    }
+
+    // Propagate state to the visual/digital layer
+    const ratio = Math.min(this._thermalEnergy / this._i2tRating, 1);
+    if (this._onStateChange) {
+      this._onStateChange(this._blown, ratio);
     }
 
     // Emit diagnostic once when fuse first blows
@@ -201,6 +203,11 @@ export class AnalogFuseElement implements AnalogElement {
     return this._blown;
   }
 
+  /** Ratio of accumulated thermal energy to i2tRating (0→1). */
+  get thermalRatio(): number {
+    return Math.min(this._thermalEnergy / this._i2tRating, 1);
+  }
+
   /** Current effective resistance given accumulated thermal energy. */
   get currentResistance(): number {
     return smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
@@ -208,7 +215,7 @@ export class AnalogFuseElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// analogFactory
+// analogFactory — creates AnalogFuseElement with PropertyBag writeback
 // ---------------------------------------------------------------------------
 
 export function createAnalogFuseElement(
@@ -220,190 +227,11 @@ export function createAnalogFuseElement(
   const rCold = props.getOrDefault<number>("rCold", 0.01);
   const rBlown = props.getOrDefault<number>("rBlown", 1e9);
   const i2tRating = props.getOrDefault<number>("i2tRating", 1e-4);
-  return new AnalogFuseElement(nodeIds, rCold, rBlown, i2tRating);
-}
 
-// ---------------------------------------------------------------------------
-// Pin declarations
-// ---------------------------------------------------------------------------
-
-function buildAnalogFusePinDeclarations(): PinDeclaration[] {
-  return [
-    {
-      direction: PinDirection.INPUT,
-      label: "pos",
-      defaultBitWidth: 1,
-      position: { x: 0, y: 0 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "neg",
-      defaultBitWidth: 1,
-      position: { x: 1, y: 0 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-  ];
-}
-
-// ---------------------------------------------------------------------------
-// AnalogFuseCircuitElement — editor/visual layer
-// ---------------------------------------------------------------------------
-
-export class AnalogFuseCircuitElement extends AbstractCircuitElement {
-  constructor(
-    instanceId: string,
-    position: { x: number; y: number },
-    rotation: Rotation,
-    mirror: boolean,
-    props: PropertyBag,
-  ) {
-    super("AnalogFuse", instanceId, position, rotation, mirror, props);
-  }
-
-  getPins(): readonly Pin[] {
-    return this.derivePins(buildAnalogFusePinDeclarations(), []);
-  }
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.375, width: 1, height: 0.75 };
-  }
-
-  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-
-    ctx.save();
-    ctx.setLineWidth(1);
-
-    const vPos = signals?.getPinVoltage("pos");
-    const vNeg = signals?.getPinVoltage("neg");
-    const hasVoltage = vPos !== undefined && vNeg !== undefined;
-
-    // Falstad FuseElm: bodyLen=16*PX=1, hs=6*PX=0.375, 16 sine segments
-    // Leads coincide with pins (dn === bodyLen) — zero-length leads, body spans full width
-
-    // Sine wave body — 16 segments with gradient
-    const hs = 6 / 16; // 0.375
-    const segments = 16;
-    const len = 1; // distance(lead1, lead2)
-    const pts: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i <= segments; i++) {
-      pts.push({
-        x: (i * len) / segments,
-        y: hs * Math.sin((i * Math.PI * 2) / segments),
-      });
+  return new AnalogFuseElement(nodeIds, rCold, rBlown, i2tRating, undefined, (blown, thermalRatio) => {
+    props.set("_thermalRatio", thermalRatio);
+    if (blown) {
+      props.set("blown", true);
     }
-
-    if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(0, 0, 1, 0, [
-        { offset: 0, color: signals!.voltageColor(vPos) },
-        { offset: 1, color: signals!.voltageColor(vNeg) },
-      ]);
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    for (let i = 0; i < pts.length - 1; i++) {
-      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
-    }
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.5, -0.4, { horizontal: "center", vertical: "bottom" });
-    }
-
-    ctx.restore();
-  }
-
-  getHelpText(): string {
-    return (
-      "Analog fuse — variable-resistance element with I²t thermal model.\n" +
-      "Blows permanently when accumulated I²t energy exceeds the rating."
-    );
-  }
+  });
 }
-
-// ---------------------------------------------------------------------------
-// Property definitions
-// ---------------------------------------------------------------------------
-
-const ANALOG_FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "rCold",
-    type: PropertyType.FLOAT,
-    label: "Cold Resistance (Ω)",
-    defaultValue: 0.01,
-    min: 1e-12,
-    description: "Resistance when fuse is intact",
-  },
-  {
-    key: "rBlown",
-    type: PropertyType.FLOAT,
-    label: "Blown Resistance (Ω)",
-    defaultValue: 1e9,
-    min: 1,
-    description: "Resistance when fuse has blown (effectively open circuit)",
-  },
-  {
-    key: "currentRating",
-    type: PropertyType.FLOAT,
-    label: "Current Rating (A)",
-    defaultValue: 1.0,
-    min: 1e-6,
-    description: "Continuous current rating in amperes",
-  },
-  {
-    key: "i2tRating",
-    type: PropertyType.FLOAT,
-    label: "I²t Rating (A²·s)",
-    defaultValue: 1e-4,
-    min: 1e-12,
-    description: "Energy rating: fuse blows when accumulated I²·t exceeds this value",
-  },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional component label",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Attribute mappings
-// ---------------------------------------------------------------------------
-
-export const ANALOG_FUSE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "rCold", propertyKey: "rCold", convert: (v) => parseFloat(v) },
-  { xmlName: "rBlown", propertyKey: "rBlown", convert: (v) => parseFloat(v) },
-  { xmlName: "currentRating", propertyKey: "currentRating", convert: (v) => parseFloat(v) },
-  { xmlName: "i2tRating", propertyKey: "i2tRating", convert: (v) => parseFloat(v) },
-  { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-];
-
-// ---------------------------------------------------------------------------
-// AnalogFuseDefinition
-// ---------------------------------------------------------------------------
-
-function analogFuseCircuitFactory(props: PropertyBag): AnalogFuseCircuitElement {
-  return new AnalogFuseCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-}
-
-export const AnalogFuseDefinition: ComponentDefinition = {
-  name: "AnalogFuse",
-  typeId: -1,
-  engineType: "analog",
-  factory: analogFuseCircuitFactory,
-  executeFn: () => {},
-  pinLayout: buildAnalogFusePinDeclarations(),
-  propertyDefs: ANALOG_FUSE_PROPERTY_DEFS,
-  attributeMap: ANALOG_FUSE_ATTRIBUTE_MAPPINGS,
-  category: ComponentCategory.PASSIVES,
-  helpText:
-    "Analog fuse — variable-resistance element with I²t thermal model. " +
-    "Blows permanently when accumulated I²t energy exceeds the rating.",
-  analogFactory: createAnalogFuseElement,
-  requiresBranchRow: false,
-};

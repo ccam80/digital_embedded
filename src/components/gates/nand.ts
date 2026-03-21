@@ -290,7 +290,7 @@ export const NAndDefinition: ComponentDefinition = {
   executeFn: executeNAnd,
   analogFactory: makeNandAnalogFactory(0),
   transistorModel: "CmosNand2",
-  simulationModes: ["digital", "behavioral", "transistor"],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NAND_PROPERTY_DEFS,
   attributeMap: NAND_ATTRIBUTE_MAPPINGS,

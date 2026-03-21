@@ -329,7 +329,7 @@ export const ClockDefinition: ComponentDefinition = {
   name: "Clock",
   typeId: -1,
   engineType: "both",
-  simulationModes: ["digital", "behavioral"],
+  simulationModes: ["logical", "analog-pins"],
   factory: clockFactory,
   executeFn: executeClock,
   pinLayout: buildClockPinDeclarations(),

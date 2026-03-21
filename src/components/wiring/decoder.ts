@@ -241,5 +241,5 @@ export const DecoderDefinition: ComponentDefinition = {
     "Only output[input_value] is 1; all others are 0.",
   engineType: "both",
   analogFactory: makeBehavioralDecoderAnalogFactory(1),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
 };

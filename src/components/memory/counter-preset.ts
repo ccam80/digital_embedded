@@ -353,7 +353,7 @@ export const CounterPresetDefinition: ComponentDefinition = {
   executeFn: executeCounterPreset,
   sampleFn: sampleCounterPreset,
   analogFactory: makeBehavioralCounterPresetAnalogFactory(),
-  simulationModes: ['digital', 'behavioral'],
+  simulationModes: ['logical', 'analog-pins'],
   pinLayout: COUNTER_PRESET_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PRESET_PROPERTY_DEFS,
   attributeMap: COUNTER_PRESET_ATTRIBUTE_MAPPINGS,
