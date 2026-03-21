@@ -41,6 +41,13 @@ export interface TestBridge {
   /** Get screen coordinates of an element's origin (by label). */
   getElementPosition(elementLabel: string): { x: number; y: number } | null;
 
+  /**
+   * Get screen coordinates of an element's bounding box center (by label or index).
+   * More reliable than getElementPosition for hit-testing / double-click targeting,
+   * because the element origin may be at the edge of the component (e.g. Out pin side).
+   */
+  getElementCenter(labelOrIndex: string | number): { x: number; y: number } | null;
+
   /** Get a summary of the current circuit state. */
   getCircuitInfo(): {
     elementCount: number;
@@ -132,6 +139,20 @@ export function createTestBridge(
       return worldToScreen(el.position.x, el.position.y);
     },
 
+    getElementCenter(labelOrIndex: string | number) {
+      let el;
+      if (typeof labelOrIndex === 'number') {
+        el = circuit.elements[labelOrIndex] ?? null;
+      } else {
+        el = findElementByLabel(labelOrIndex);
+      }
+      if (!el) return null;
+      const bb = el.getBoundingBox();
+      const cx = bb.x + bb.width / 2;
+      const cy = bb.y + bb.height / 2;
+      return worldToScreen(cx, cy);
+    },
+
     getCircuitInfo() {
       return {
         elementCount: circuit.elements.length,
@@ -139,10 +160,13 @@ export function createTestBridge(
         elements: circuit.elements.map(el => {
           const label = el.getProperties().getOrDefault('label', '') as string;
           const def = registry.get(el.typeId);
+          const bb = el.getBoundingBox();
+          const centerScreen = worldToScreen(bb.x + bb.width / 2, bb.y + bb.height / 2);
           return {
             label,
             typeId: def?.name ?? el.typeId,
             position: { x: el.position.x, y: el.position.y },
+            center: { screenX: centerScreen.x, screenY: centerScreen.y },
             pins: el.getPins().map(pin => {
               const wp = pinWorldPosition(el, pin);
               const sp = worldToScreen(wp.x, wp.y);
