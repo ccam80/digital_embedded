@@ -18,8 +18,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -239,16 +239,34 @@ export class TunnelDiodeElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
+
+    const vA = signals?.getPinVoltage("A");
+    const vK = signals?.getPinVoltage("K");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
+    // Anode lead
+    if (signals && vA !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0, 0, 1.5, 0);
+
+    // Cathode lead
+    if (signals && vK !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vK));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(2.5, 0, 4, 0);
+
+    // Body (triangle, cathode bar, T-wings) stays COMPONENT color
+    ctx.setColor("COMPONENT");
 
     // Diode triangle (anode left, cathode right)
     ctx.drawPolygon([
@@ -257,10 +275,11 @@ export class TunnelDiodeElement extends AbstractCircuitElement {
       { x: 2.5, y: 0 },
     ], true);
 
-    // Cathode bar with T-shape (indicates tunnel diode)
+    // Cathode bar
     ctx.drawLine(2.5, -0.5, 2.5, 0.5);
-    ctx.drawLine(2.3, -0.5, 2.7, -0.5);
-    ctx.drawLine(2.3,  0.5, 2.7,  0.5);
+    // T-wings: cath2={2.3,-0.5}→cath0={2.5,-0.5}; cath3={2.3,0.5}→cath1={2.5,0.5}
+    ctx.drawLine(2.3, -0.5, 2.5, -0.5);
+    ctx.drawLine(2.3,  0.5, 2.5,  0.5);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");

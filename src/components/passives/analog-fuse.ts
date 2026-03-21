@@ -44,6 +44,7 @@ import {
 } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 
@@ -218,7 +219,7 @@ export function createAnalogFuseElement(
 ): AnalogElement {
   const rCold = props.getOrDefault<number>("rCold", 0.01);
   const rBlown = props.getOrDefault<number>("rBlown", 1e9);
-  const i2tRating = props.getOrDefault<number>("i2tRating", 1.0);
+  const i2tRating = props.getOrDefault<number>("i2tRating", 1e-4);
   return new AnalogFuseElement(nodeIds, rCold, rBlown, i2tRating);
 }
 
@@ -267,26 +268,45 @@ export class AnalogFuseCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.25, width: 1, height: 0.5 };
+    return { x: this.position.x, y: this.position.y - 0.375, width: 1, height: 0.75 };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Wavy fuse body
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0, y: 0 },
-        { op: "curveTo", cp1x: 0.1, cp1y: -0.25, cp2x: 0.15, cp2y: -0.25, x: 0.25, y: -0.25 },
-        { op: "curveTo", cp1x: 0.4, cp1y: -0.25, cp2x: 0.4, cp2y: 0, x: 0.5, y: 0 },
-        { op: "curveTo", cp1x: 0.6, cp1y: 0, cp2x: 0.6, cp2y: 0.25, x: 0.75, y: 0.25 },
-        { op: "curveTo", cp1x: 0.9, cp1y: 0.25, cp2x: 0.9, cp2y: 0, x: 1, y: 0 },
-      ],
-    });
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+    const hasVoltage = vPos !== undefined && vNeg !== undefined;
+
+    // Falstad FuseElm: bodyLen=16*PX=1, hs=6*PX=0.375, 16 sine segments
+    // Leads coincide with pins (dn === bodyLen) — zero-length leads, body spans full width
+
+    // Sine wave body — 16 segments with gradient
+    const hs = 6 / 16; // 0.375
+    const segments = 16;
+    const len = 1; // distance(lead1, lead2)
+    const pts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= segments; i++) {
+      pts.push({
+        x: (i * len) / segments,
+        y: hs * Math.sin((i * Math.PI * 2) / segments),
+      });
+    }
+
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(0, 0, 1, 0, [
+        { offset: 0, color: signals!.voltageColor(vPos) },
+        { offset: 1, color: signals!.voltageColor(vNeg) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+    }
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
@@ -338,7 +358,7 @@ const ANALOG_FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "i2tRating",
     type: PropertyType.FLOAT,
     label: "I²t Rating (A²·s)",
-    defaultValue: 1.0,
+    defaultValue: 1e-4,
     min: 1e-12,
     description: "Energy rating: fuse blows when accumulated I²·t exceeds this value",
   },

@@ -18,8 +18,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -243,35 +243,68 @@ export class PJfetElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vG = signals?.getPinVoltage("G");
+    const vD = signals?.getPinVoltage("D");
+    const vS = signals?.getPinVoltage("S");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Vertical channel line
-    ctx.drawLine(2, -1.5, 2, 1.5);
+    const PX = 1 / 16;
 
-    // Gate line with arrow pointing out of channel (P-type)
-    ctx.drawLine(0, 0, 2.0, 0);
+    const chanX = 1.8;
+    const chanTop = -1.0;
+    const chanBot = 1.0;
+
+    // Body (channel line, gate bar rect, arrow) stays COMPONENT color
+    ctx.drawLine(chanX, chanTop, chanX, chanBot);
+
+    const barWidth = 3 * PX;
+    ctx.drawRect(
+      chanX - barWidth / 2,
+      chanTop + 0.15,
+      barWidth,
+      chanBot - chanTop - 0.3,
+      true,
+    );
+
+    const arrowLen = 8 * PX;
+    const arrowWid = 3 * PX;
+    const barbF = 1 - arrowLen / chanX;
+    const barbX = chanX * (1 - barbF);
     ctx.drawPolygon([
-      { x: 0.2, y: -0.2 },
-      { x: 0.0, y: 0.0 },
-      { x: 0.2, y: 0.2 },
+      { x: 0, y: 0 },
+      { x: barbX, y: arrowWid },
+      { x: barbX, y: -arrowWid },
     ], true);
 
-    // Drain connection (top)
-    ctx.drawLine(2, -1, 3, -1.5);
-
-    // Source connection (bottom)
-    ctx.drawLine(2, 1, 3, 1.5);
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1.5, -1.8, { horizontal: "center", vertical: "bottom" });
+    // Gate lead
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, chanX, 0);
+
+    // Drain lead (top)
+    if (signals && vD !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vD));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanTop, 3, chanTop);
+    ctx.drawLine(3, chanTop, 3, -1.5);
+
+    // Source lead (bottom)
+    if (signals && vS !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vS));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanBot, 3, chanBot);
+    ctx.drawLine(3, chanBot, 3, 1.5);
 
     ctx.restore();
   }

@@ -13,6 +13,7 @@
 import type { MeasurementObserver, SimulationEngine } from "@/core/engine-interface";
 import type { DisplayFormat } from "@/core/signal";
 import { BitVector } from "@/core/signal";
+import type { AnalogEngine } from "@/core/analog-engine-interface";
 
 // ---------------------------------------------------------------------------
 // Signal group — categorises signals by component type
@@ -44,7 +45,7 @@ interface SignalRow {
   /** Display radix for this row's value column. */
   radix: DisplayFormat;
   /** Most recently read value, or null when cleared/not-yet-read. */
-  value: BitVector | null;
+  value: BitVector | number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +65,7 @@ interface SignalRow {
 export class DataTablePanel implements MeasurementObserver {
   private readonly _container: HTMLElement;
   private readonly _engine: SimulationEngine;
+  private readonly _analogEngine: AnalogEngine | null;
   private _rows: SignalRow[];
   private _sortByName = false;
   private _tableBody: HTMLTableSectionElement | null = null;
@@ -76,6 +78,9 @@ export class DataTablePanel implements MeasurementObserver {
   ) {
     this._container = container;
     this._engine = engine;
+    this._analogEngine = typeof (engine as unknown as AnalogEngine).getNodeVoltage === 'function'
+      ? engine as unknown as AnalogEngine
+      : null;
     this._rows = signals.map((d) => ({
       descriptor: d,
       radix: "dec" as DisplayFormat,
@@ -91,7 +96,11 @@ export class DataTablePanel implements MeasurementObserver {
   onStep(_stepCount: number): void {
     // Read values eagerly, throttle DOM updates to at most every 50ms.
     for (const row of this._rows) {
-      row.value = this._engine.getSignalValue(row.descriptor.netId);
+      if (this._analogEngine !== null) {
+        row.value = this._analogEngine.getNodeVoltage(row.descriptor.netId);
+      } else {
+        row.value = this._engine.getSignalValue(row.descriptor.netId);
+      }
     }
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (now - this._lastUpdateTime >= 50) {
@@ -164,7 +173,7 @@ export class DataTablePanel implements MeasurementObserver {
     if (row.value === null) {
       return "";
     }
-    return row.value.toString(row.radix);
+    return typeof row.value === "number" ? row.value.toFixed(4) + " V" : row.value.toString(row.radix);
   }
 
   /**
@@ -179,7 +188,7 @@ export class DataTablePanel implements MeasurementObserver {
     if (row.value === null) {
       return "";
     }
-    return row.value.toString(row.radix);
+    return typeof row.value === "number" ? row.value.toFixed(4) + " V" : row.value.toString(row.radix);
   }
 
   /**
@@ -299,7 +308,11 @@ export class DataTablePanel implements MeasurementObserver {
 
       const tdValue = document.createElement("td");
       tdValue.className = "data-table-cell-value";
-      tdValue.textContent = row.value === null ? "" : row.value.toString(row.radix);
+      tdValue.textContent = row.value === null
+        ? ""
+        : typeof row.value === "number"
+          ? row.value.toFixed(4) + " V"
+          : row.value.toString(row.radix);
 
       // Right-click context menu for radix switching
       tr.addEventListener("contextmenu", (e) => {

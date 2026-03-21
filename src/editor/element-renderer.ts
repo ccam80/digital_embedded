@@ -12,6 +12,10 @@ import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
 import { pinWorldPosition, rotatePoint } from "@/core/pin";
 import { worldBoundingBox } from "./hit-test.js";
+import type { PinVoltageAccess } from "./pin-voltage-access.js";
+
+/** Factory that creates a PinVoltageAccess for a given element, or undefined. */
+export type PinVoltageAccessFactory = (element: CircuitElement) => PinVoltageAccess | undefined;
 
 /** Radius of the filled circle drawn at each pin position (grid units). */
 const PIN_CIRCLE_RADIUS = 0.15;
@@ -41,6 +45,21 @@ function isVisible(element: CircuitElement, viewport: Rect): boolean {
 }
 
 export class ElementRenderer {
+  private _pinVoltageFactory: PinVoltageAccessFactory | null = null;
+
+  /** True when analog voltage coloring is active. */
+  hasAnalogContext(): boolean {
+    return this._pinVoltageFactory !== null;
+  }
+
+  /**
+   * Set the factory that produces PinVoltageAccess for analog elements.
+   * Pass null to disable voltage coloring (e.g. when analog sim stops).
+   */
+  setAnalogContext(factory: PinVoltageAccessFactory | null): void {
+    this._pinVoltageFactory = factory;
+  }
+
   /**
    * Render all visible elements in the circuit.
    *
@@ -48,7 +67,7 @@ export class ElementRenderer {
    *   - save context state
    *   - translate to element world position
    *   - apply rotation (in radians) and mirror scale transforms
-   *   - call element.draw(ctx)
+   *   - call element.draw(ctx, signals?) — analog elements receive PinVoltageAccess
    *   - draw pin indicators
    *   - draw selection highlight if element is in the selection set
    *   - restore context state
@@ -80,7 +99,8 @@ export class ElementRenderer {
         ctx.scale(1, -1);
       }
 
-      element.draw(ctx);
+      const signals = this._makePinVoltageAccess(element);
+      element.draw(ctx, signals);
 
       ctx.restore();
 
@@ -158,6 +178,14 @@ export class ElementRenderer {
     ctx.setColor("SELECTION");
     ctx.setLineWidth(1);
     ctx.drawRect(bb.x, bb.y, bb.width, bb.height, false);
+  }
+
+  /**
+   * Build a PinVoltageAccess for the given element, or undefined if voltage
+   * coloring is not available.
+   */
+  private _makePinVoltageAccess(element: CircuitElement): PinVoltageAccess | undefined {
+    return this._pinVoltageFactory?.(element);
   }
 
   /**

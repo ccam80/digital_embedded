@@ -154,8 +154,9 @@ describe("Sync", () => {
       coordinator.init();
 
       // Set analog voltage at the input node to 3.3V (above vIH = 2.0V)
+      // readMnaVoltage(nodeId, v) reads v[nodeId-1], so put value at index 0
       const voltages = new Float64Array(4);
-      voltages[INPUT_NODE] = 3.3;
+      voltages[INPUT_NODE - 1] = 3.3;
 
       coordinator.syncBeforeAnalogStep(voltages);
 
@@ -178,7 +179,7 @@ describe("Sync", () => {
 
       // Set analog voltage at the input node to 0.5V (below vIL = 0.8V)
       const voltages = new Float64Array(4);
-      voltages[INPUT_NODE] = 0.5;
+      voltages[INPUT_NODE - 1] = 0.5;
 
       coordinator.syncBeforeAnalogStep(voltages);
 
@@ -253,13 +254,13 @@ describe("Sync", () => {
 
       // First timestep: voltage at 1.0V (below vIL — logic low)
       const voltages1 = new Float64Array(4);
-      voltages1[INPUT_NODE] = 1.0;
+      voltages1[INPUT_NODE - 1] = 1.0;
       coordinator.syncBeforeAnalogStep(voltages1);
       coordinator.syncAfterAnalogStep(voltages1);
 
       // Second timestep: voltage at 3.0V (above vIH — logic high, threshold crossed)
       const voltages2 = new Float64Array(4);
-      voltages2[INPUT_NODE] = 3.0;
+      voltages2[INPUT_NODE - 1] = 3.0;
 
       // syncAfterAnalogStep detects the crossing and re-evaluates
       coordinator.syncAfterAnalogStep(voltages2);

@@ -105,16 +105,16 @@ function buildAndGateCircuit(
   vB: number,
   spec: ResolvedPinElectrical = CMOS_3V3,
 ): ConcreteCompiledAnalogCircuit {
-  // Input pin models: solver indices 0 and 1
+  // Input pin models: MNA node IDs 1 and 2 (1-based)
   const inA = new DigitalInputPinModel(spec);
-  inA.init(0, 0);
+  inA.init(1, 0);
 
   const inB = new DigitalInputPinModel(spec);
-  inB.init(1, 0);
+  inB.init(2, 0);
 
-  // Output pin model: solver index 2
+  // Output pin model: MNA node ID 3 (1-based)
   const outPin = new DigitalOutputPinModel(spec);
-  outPin.init(2, -1);
+  outPin.init(3, -1);
 
   const andGate = new BehavioralGateElement(
     [inA, inB],
@@ -164,13 +164,13 @@ function buildAndGateCircuit(
  */
 function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
   const inA = new DigitalInputPinModel(CMOS_3V3);
-  inA.init(0, 0); // solver node 0 = circuit node 1
+  inA.init(1, 0); // MNA node 1 = circuit node 1
 
   const inB = new DigitalInputPinModel(CMOS_3V3);
-  inB.init(1, 0); // solver node 1 = circuit node 2
+  inB.init(2, 0); // MNA node 2 = circuit node 2
 
   const outPin = new DigitalOutputPinModel(CMOS_3V3);
-  outPin.init(2, -1); // solver node 2 = circuit node 3
+  outPin.init(3, -1); // MNA node 3 = circuit node 3
 
   const andGate = new BehavioralGateElement(
     [inA, inB],
@@ -229,17 +229,17 @@ function buildDffToggleCircuit(): {
   element: BehavioralDFlipflopElement;
 } {
   const clockPin = new DigitalInputPinModel(CMOS_3V3);
-  clockPin.init(0, 0); // solver 0 = clock
+  clockPin.init(1, 0); // MNA node 1 = clock
 
-  // D and ~Q share solver node 3: feedback topology
+  // D and ~Q share MNA node 4: feedback topology
   const dPin = new DigitalInputPinModel(CMOS_3V3);
-  dPin.init(3, 0); // solver 3 = ~Q = D (toggling feedback)
+  dPin.init(4, 0); // MNA node 4 = ~Q = D (toggling feedback)
 
   const qPin = new DigitalOutputPinModel(CMOS_3V3);
-  qPin.init(2, -1); // solver 2 = Q
+  qPin.init(3, -1); // MNA node 3 = Q
 
   const qBarPin = new DigitalOutputPinModel(CMOS_3V3);
-  qBarPin.init(3, -1); // solver 3 = ~Q
+  qBarPin.init(4, -1); // MNA node 4 = ~Q
 
   const element = new BehavioralDFlipflopElement(
     clockPin,
@@ -299,8 +299,8 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
-    // Output node is solver index 2 (circuit node 3)
-    const vOut = engine.getNodeVoltage(2);
+    // Output node is MNA node 3 (circuit node 3)
+    const vOut = engine.getNodeVoltage(3);
     const expectedVout =
       CMOS_3V3.vOH * LOAD_R / (CMOS_3V3.rOut + LOAD_R);
 
@@ -322,8 +322,8 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    // Output node (solver index 2) should be near vOL=0V
-    const vOut = engine.getNodeVoltage(2);
+    // Output node (MNA node 3) should be near vOL=0V
+    const vOut = engine.getNodeVoltage(3);
     expect(vOut).toBeCloseTo(CMOS_3V3.vOL, 2);
   });
 
@@ -357,7 +357,7 @@ describe("Integration", () => {
     expect(engine.simTime).toBeGreaterThan(0);
 
     // Output should remain near HIGH (stable DC solution maintained during transient)
-    const vOut = engine.getNodeVoltage(2);
+    const vOut = engine.getNodeVoltage(3);
     const expectedVout = CMOS_3V3.vOH * LOAD_R / (CMOS_3V3.rOut + LOAD_R);
     expect(vOut).toBeGreaterThan(expectedVout * 0.99);
     expect(vOut).toBeLessThan(expectedVout * 1.01);
@@ -379,8 +379,8 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    // Input A node (solver 0) should be slightly below 3.3V due to rIn loading
-    const vInputA = engine.getNodeVoltage(0);
+    // Input A node (MNA node 1) should be slightly below 3.3V due to rIn loading
+    const vInputA = engine.getNodeVoltage(1);
     const expectedVoltage = 3.3 * CMOS_3V3.rIn / (CMOS_3V3.rIn + 100_000);
 
     // Within 1% tolerance
@@ -399,13 +399,13 @@ describe("Integration", () => {
     // Initial latched level is false, so AND gate output should be LOW.
     // This also verifies that TTL output levels (vOH=3.4V) are different from CMOS.
     const inA = new DigitalInputPinModel(TTL);
-    inA.init(0, 0);
+    inA.init(1, 0);
 
     const inB = new DigitalInputPinModel(TTL);
-    inB.init(1, 0);
+    inB.init(2, 0);
 
     const outPin = new DigitalOutputPinModel(TTL);
-    outPin.init(2, -1);
+    outPin.init(3, -1);
 
     const andGate = new BehavioralGateElement(
       [inA, inB],
@@ -435,7 +435,7 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
 
     // Input A is indeterminate → latch holds false → AND output LOW
-    const vOut = engine.getNodeVoltage(2);
+    const vOut = engine.getNodeVoltage(3);
     expect(vOut).toBeCloseTo(TTL.vOL, 1);
   });
 
@@ -545,8 +545,8 @@ describe("Integration", () => {
     // Verifies the factory path works end-to-end with MNAEngine.
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
-    // nodeIds: inputA=0 (solver 0), inputB=1 (solver 1), output=2 (solver 2)
-    const andGate = factory([0, 1, 2], -1, props, () => 0);
+    // nodeIds: 1-based MNA node IDs
+    const andGate = factory([1, 2, 3], -1, props, () => 0);
 
     const vsA = makeVoltageSource(1, 0, 3, 3.3);
     const vsB = makeVoltageSource(2, 0, 4, 3.3);
@@ -569,7 +569,7 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
 
     // Both inputs HIGH → output near vOH through load divider
-    const vOut = engine.getNodeVoltage(2);
+    const vOut = engine.getNodeVoltage(3);
     const expectedVout = CMOS_3V3.vOH * LOAD_R / (CMOS_3V3.rOut + LOAD_R);
     expect(vOut).toBeGreaterThan(expectedVout * 0.99);
     expect(vOut).toBeLessThan(expectedVout * 1.01);
@@ -581,10 +581,10 @@ describe("Integration", () => {
 
   it("dff_factory_runs_in_engine", () => {
     // Use makeDFlipflopAnalogFactory to create a D flip-flop element.
-    // nodeIds: [D=0, C=1, Q=2, ~Q=3] (0-based solver indices)
+    // nodeIds: [D=1, C=2, Q=3, ~Q=4] (1-based MNA node IDs)
     const factory = makeDFlipflopAnalogFactory();
     const props = new PropertyBag();
-    const dff = factory([0, 1, 2, 3], -1, props, () => 0);
+    const dff = factory([1, 2, 3, 4], -1, props, () => 0);
 
     // Load resistors on Q and ~Q for stable voltage nodes
     const rLoadQ = makeResistor(3, 0, LOAD_R);
@@ -609,8 +609,8 @@ describe("Integration", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     // After DC OP with no clock edge, Q should remain in initial state (false → vOL)
-    // Q is solver node 2 (circuit node 3 in 1-based)
-    const vQ = engine.getNodeVoltage(2);
+    // Q is MNA node 3 (solver index 2)
+    const vQ = engine.getNodeVoltage(3);
     // vOL=0V → through rOut (50Ω) and rLoad (10kΩ) → ≈0V
     expect(vQ).toBeCloseTo(CMOS_3V3.vOL, 1);
   });

@@ -462,8 +462,8 @@ describe("AnalogDispatch", () => {
     const runner = new SimulationRunner(registry);
     const circuit = buildHalfAdder(registry);
 
-    // Default engineType is "digital"
-    expect(circuit.metadata.engineType).toBe("digital");
+    // Default engineType is "auto" (resolves to digital for digital-only circuits)
+    expect(circuit.metadata.engineType).toBe("auto");
 
     const engine = runner.compile(circuit);
 

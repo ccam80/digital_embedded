@@ -16,8 +16,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -93,48 +93,74 @@ export class TransformerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Vertical extent: pins at y=±1, coil arcs fit within
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
+      y: this.position.y - 1,
       width: 4,
-      height: 3,
+      height: 2,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    const n = this._properties.getOrDefault<number>("turnsRatio", 1.0);
-
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Primary coil arcs (left side, above centre)
-    const arcR = 0.3;
-    for (let i = 0; i < 3; i++) {
-      ctx.drawArc(0.4 + i * 0.6, -0.5, arcR, Math.PI, 2 * Math.PI);
+    // Falstad TransformerElm: P1(0,-1), P2(0,1), S1(4,-1), S2(4,1)
+    // dn=2, ce=0.5-12*PX/2=0.5-0.375=0.125, cd=0.5-2*PX/2=0.5-0.0625=0.4375
+    const PX = 1 / 16;
+    const dn = 2;
+    const ce = 0.5 - 12 * PX / dn;  // 0.125
+    const cd = 0.5 - 2 * PX / dn;   // 0.4375
+
+    // Primary coil endpoints along P1(0,-1)→P2(0,1) (vertical)
+    const priCoil1Y = -1 + ce * 2;       // -1 + 0.25 = -0.75
+    const priCoil2Y = -1 + (1 - ce) * 2; // -1 + 1.75 = 0.75
+    const priCore1Y = -1 + cd * 2;       // -1 + 0.875 = -0.125
+    const priCore2Y = -1 + (1 - cd) * 2; // -1 + 1.125 = 0.125
+
+    // Secondary coil endpoints along S1(4,-1)→S2(4,1) (vertical)
+    const secCoil1Y = priCoil1Y;
+    const secCoil2Y = priCoil2Y;
+    const secCore1Y = priCore1Y;
+    const secCore2Y = priCore2Y;
+
+    // Lead lines (pin → coil attachment)
+    ctx.drawLine(0, -1, 0, priCoil1Y);
+    ctx.drawLine(0, 1, 0, priCoil2Y);
+    ctx.drawLine(4, -1, 4, secCoil1Y);
+    ctx.drawLine(4, 1, 4, secCoil2Y);
+
+    // Primary coil arcs (vertical winding, arcs open toward +x)
+    const priLen = priCoil2Y - priCoil1Y; // 1.5
+    const priLenPx = priLen / PX;
+    const priLoopCt = Math.ceil(priLenPx / 11);
+    const priHs = 6 * PX;
+    for (let loop = 0; loop < priLoopCt; loop++) {
+      const t = (loop + 0.5) / priLoopCt;
+      const cy = priCoil1Y + priLen * t;
+      const r = priLen / (2 * priLoopCt);
+      // Arc opens toward +x: center at (0 + priHs, cy), arc from 90° to 270°
+      ctx.drawArc(0 + priHs, cy, r, Math.PI / 2, 3 * Math.PI / 2);
     }
 
-    // Secondary coil arcs (right side, above centre)
-    for (let i = 0; i < 3; i++) {
-      ctx.drawArc(2.4 + i * 0.6, -0.5, arcR, 0, Math.PI);
+    // Secondary coil arcs (vertical winding, arcs open toward -x)
+    const secLen = secCoil2Y - secCoil1Y;
+    const secLenPx = secLen / PX;
+    const secLoopCt = Math.ceil(secLenPx / 11);
+    const secHs = 6 * PX;
+    for (let loop = 0; loop < secLoopCt; loop++) {
+      const t = (loop + 0.5) / secLoopCt;
+      const cy = secCoil1Y + secLen * t;
+      const r = secLen / (2 * secLoopCt);
+      // Arc opens toward -x: center at (4 - secHs, cy), arc from -90° to 90°
+      ctx.drawArc(4 - secHs, cy, r, -Math.PI / 2, Math.PI / 2);
     }
 
-    // Core lines
-    ctx.drawLine(1.9, -1, 1.9, 0);
-    ctx.drawLine(2.1, -1, 2.1, 0);
-
-    // Lead lines
-    ctx.drawLine(0, -1, 0.4, -1);
-    ctx.drawLine(0, 1, 0.4, 1);
-    ctx.drawLine(3.6, -1, 4, -1);
-    ctx.drawLine(3.6, 1, 4, 1);
-
-    // Label
-    const displayLabel = label.length > 0 ? label : `${n}:1`;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(displayLabel, 2, 1.2, { horizontal: "center", vertical: "top" });
+    // Core: two parallel vertical lines between the coils
+    ctx.drawLine(0 + 2 * PX, priCore1Y, 0 + 2 * PX, priCore2Y);
+    ctx.drawLine(4 - 2 * PX, secCore1Y, 4 - 2 * PX, secCore2Y);
 
     ctx.restore();
   }

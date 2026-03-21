@@ -506,7 +506,7 @@ describe("Astable", () => {
 
     // Now measure 5 complete steady-state periods
     let transitions = 0;
-    let prevOutVoltage = engine.getNodeVoltage(nOut - 1);
+    let prevOutVoltage = engine.getNodeVoltage(nOut);
     const midVoltage = VCC / 2;
     const measureStart = engine.simTime;
     const measureTime = 5 * periodExpected;
@@ -518,7 +518,7 @@ describe("Astable", () => {
       steps++;
       if (engine.getState() === EngineState.ERROR) break;
 
-      const vOut = engine.getNodeVoltage(nOut - 1);
+      const vOut = engine.getNodeVoltage(nOut);
       if ((prevOutVoltage < midVoltage && vOut >= midVoltage) ||
           (prevOutVoltage >= midVoltage && vOut < midVoltage)) {
         transitions++;
@@ -583,7 +583,7 @@ describe("Astable", () => {
       if (engine.getState() === EngineState.ERROR) break;
 
       const dt = engine.simTime - tBefore;
-      const vOut = engine.getNodeVoltage(nOut - 1);
+      const vOut = engine.getNodeVoltage(nOut);
       const isHigh = vOut > VCC / 2;
 
       if (isHigh) {
@@ -735,7 +735,7 @@ describe("Monostable", () => {
     const midVoltage = VCC / 2;
     let pulseStart = -1;
     let pulseEnd = -1;
-    let prevHigh = engine.getNodeVoltage(nOut - 1) > midVoltage;
+    let prevHigh = engine.getNodeVoltage(nOut) > midVoltage;
 
     // Release trigger (TRIG goes back to VCC)
     setTrig(VCC);
@@ -749,7 +749,7 @@ describe("Monostable", () => {
       steps++;
       if (engine.getState() === EngineState.ERROR) break;
 
-      const vOut = engine.getNodeVoltage(nOut - 1);
+      const vOut = engine.getNodeVoltage(nOut);
       const isHigh = vOut > midVoltage;
 
       if (!prevHigh && isHigh) {
@@ -796,7 +796,7 @@ describe("Monostable", () => {
     let pulseStart = -1;
     let pulseEnd = -1;
     let retriggered = false;
-    let prevHigh = engine.getNodeVoltage(nOut - 1) > VCC / 2;
+    let prevHigh = engine.getNodeVoltage(nOut) > VCC / 2;
 
     let steps = 0;
     const maxSteps = 50000;
@@ -807,7 +807,7 @@ describe("Monostable", () => {
       steps++;
       if (engine.getState() === EngineState.ERROR) break;
 
-      const vOut = engine.getNodeVoltage(nOut - 1);
+      const vOut = engine.getNodeVoltage(nOut);
       const isHigh = vOut > VCC / 2;
 
       if (!prevHigh && isHigh && pulseStart < 0) {

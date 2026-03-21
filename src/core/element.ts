@@ -12,6 +12,7 @@
  */
 
 import type { Point, Rect, RenderContext } from "./renderer-interface.js";
+import type { PinVoltageAccess } from "../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration } from "./pin.js";
 import type { Rotation } from "./pin.js";
 import {
@@ -109,9 +110,12 @@ export interface CircuitElement {
   /**
    * Draw the component using the engine-agnostic RenderContext.
    * Must not import Canvas2D, SVG, or any concrete renderer.
-   * Must not read any simulation state (no signal values, no net IDs).
+   *
+   * The optional `signals` parameter provides per-pin voltage access for
+   * analog components that want to color leads and bodies by node voltage.
+   * Digital components ignore this parameter.
    */
-  draw(ctx: RenderContext): void;
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void;
 
   /**
    * Bounding box of this component in world (grid) coordinates.
@@ -209,7 +213,7 @@ export abstract class AbstractCircuitElement implements CircuitElement {
   }
 
   abstract getPins(): readonly Pin[];
-  abstract draw(ctx: RenderContext): void;
+  abstract draw(ctx: RenderContext, signals?: PinVoltageAccess): void;
   abstract getBoundingBox(): Rect;
   abstract getHelpText(): string;
 

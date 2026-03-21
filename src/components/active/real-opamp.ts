@@ -49,6 +49,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -206,32 +207,77 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    const model = this._properties.getOrDefault<string>("model", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+
+    const vInp  = signals?.getPinVoltage("in+");
+    const vInn  = signals?.getPinVoltage("in-");
+    const vOut  = signals?.getPinVoltage("out");
+    const vVccP = signals?.getPinVoltage("Vcc+");
+    const vVccN = signals?.getPinVoltage("Vcc-");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Triangle body: pointing right
-    ctx.drawLine(0, -2, 0, 2);
-    ctx.drawLine(0, -2, 4, 0);
-    ctx.drawLine(0, 2, 4, 0);
+    const triLeft = 0.5;
+    const triRight = 3.5;
 
-    // + label at non-inverting input
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("+", 0.5, -1, { horizontal: "left", vertical: "middle" });
-
-    // - label at inverting input
-    ctx.drawText("−", 0.5, 1, { horizontal: "left", vertical: "middle" });
-
-    // Model/label display
-    const displayText = model.length > 0 ? model : label;
-    if (displayText.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(displayText, 2, -2.3, { horizontal: "center", vertical: "bottom" });
+    // Input lead in+
+    if (vInp !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInp));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, triLeft, -1);
+
+    // Input lead in-
+    if (vInn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInn));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, triLeft, 1);
+
+    // Triangle body — stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon(
+      [{ x: triLeft, y: -2 }, { x: triRight, y: 0 }, { x: triLeft, y: 2 }],
+      false,
+    );
+
+    // Output lead
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(triRight, 0, 4, 0);
+
+    // Supply rail stubs: Vcc+ stub
+    if (vVccP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vVccP));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, -2, 2, -1);
+
+    // Supply rail stubs: Vcc- stub
+    if (vVccN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vVccN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, 2, 2, 1);
+
+    // +/- signs — body decoration, stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    const signX = triLeft + 4 * PX;
+    const signSz = 6 * PX;
+    // + for in+ (top)
+    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
+    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
+    // - for in- (bottom)
+    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
 
     ctx.restore();
   }

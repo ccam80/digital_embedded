@@ -264,7 +264,7 @@ describe("End-to-end: tight transient tolerances", () => {
 
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
-    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 3);
+    expect(engine.getNodeVoltage(2)).toBeCloseTo(5.0, 3);
 
     const RC = 1e-3;
     let steps = 0;
@@ -276,7 +276,7 @@ describe("End-to-end: tight transient tolerances", () => {
 
     expect(engine.getState()).not.toBe(EngineState.ERROR);
     // Voltage must remain at 5V with <0.1% drift
-    const vCapFinal = engine.getNodeVoltage(1);
+    const vCapFinal = engine.getNodeVoltage(2);
     const driftPct = Math.abs(vCapFinal - 5.0) / 5.0 * 100;
     expect(driftPct).toBeLessThan(0.1);
   });
@@ -297,8 +297,8 @@ describe("End-to-end: tight transient tolerances", () => {
 
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 4);
     expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 4);
+    expect(engine.getNodeVoltage(2)).toBeCloseTo(5.0, 4);
 
     // Run 200 steps
     for (let i = 0; i < 200; i++) {
@@ -309,7 +309,7 @@ describe("End-to-end: tight transient tolerances", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     // Steady-state accuracy: <0.01% voltage deviation
-    const vNode2 = engine.getNodeVoltage(1);
+    const vNode2 = engine.getNodeVoltage(2);
     const errorPct = Math.abs(vNode2 - 5.0) / 5.0 * 100;
     expect(errorPct).toBeLessThan(0.01);
 
@@ -337,8 +337,8 @@ describe("End-to-end: tight transient tolerances", () => {
     expect(dcResult.converged).toBe(true);
 
     // node1=5V, node2=0V (inductor short to ground)
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 4);
-    expect(engine.getNodeVoltage(1)).toBeCloseTo(0.0, 4);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 4);
+    expect(engine.getNodeVoltage(2)).toBeCloseTo(0.0, 4);
 
     // Inductor current = 50mA
     const iL = engine.getBranchCurrent(1);
@@ -385,15 +385,15 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 2);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 2);
 
     // node3 = single diode drop ≈ 0.6–0.75V
-    const vNode3 = engine.getNodeVoltage(2);
+    const vNode3 = engine.getNodeVoltage(3);
     expect(vNode3).toBeGreaterThan(0.55);
     expect(vNode3).toBeLessThan(0.80);
 
     // node2 = two diode drops ≈ 1.2–1.5V
-    const vNode2 = engine.getNodeVoltage(1);
+    const vNode2 = engine.getNodeVoltage(2);
     expect(vNode2).toBeGreaterThan(1.1);
     expect(vNode2).toBeLessThan(1.6);
 
@@ -420,10 +420,10 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 2);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 2);
 
     // Diode forward voltage ≈ 0.6–0.75V
-    const vAnode = engine.getNodeVoltage(1);
+    const vAnode = engine.getNodeVoltage(2);
     expect(vAnode).toBeGreaterThan(0.55);
     expect(vAnode).toBeLessThan(0.80);
   });
@@ -446,9 +446,9 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 2);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 2);
 
-    const vMid = engine.getNodeVoltage(1);
+    const vMid = engine.getNodeVoltage(2);
     expect(vMid).toBeGreaterThan(0.55);
     expect(vMid).toBeLessThan(0.80);
     expect(vMid).toBeLessThan(2.5); // must be below no-diode value
@@ -473,7 +473,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
 
     expect(result.converged).toBe(true);
 
-    const vNode2 = engine.getNodeVoltage(1);
+    const vNode2 = engine.getNodeVoltage(2);
     expect(vNode2).toBeGreaterThan(0.55);
     expect(vNode2).toBeLessThan(0.80);
   });
@@ -501,7 +501,7 @@ describe("End-to-end: analytical verification", () => {
     expect(result.converged).toBe(true);
 
     const expected = 5.0 * 1000 / 3000;
-    expect(engine.getNodeVoltage(1)).toBeCloseTo(expected, 6);
+    expect(engine.getNodeVoltage(2)).toBeCloseTo(expected, 6);
 
     // Current = 5V / 3kΩ
     const expectedI = 5.0 / 3000;
@@ -531,7 +531,7 @@ describe("End-to-end: analytical verification", () => {
 
     expect(result.converged).toBe(true);
 
-    const vd = engine.getNodeVoltage(1);
+    const vd = engine.getNodeVoltage(2);
 
     const iOhm = (Vs - vd) / R;
     const iShockley = Is * (Math.exp(vd / (n * Vt)) - 1);
@@ -566,9 +566,9 @@ describe("End-to-end: analytical verification", () => {
 
     expect(result.converged).toBe(true);
 
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(10.0, 6);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(10.0, 6);
+    expect(engine.getNodeVoltage(3)).toBeCloseTo(5.0, 6);
     expect(engine.getNodeVoltage(2)).toBeCloseTo(5.0, 6);
-    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 6);
   });
 });
 

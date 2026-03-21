@@ -93,23 +93,23 @@ describe("Mux", () => {
     const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
-    // Selector pin models — 0-based solver indices 0 and 1
+    // Selector pin models — MNA node IDs 1 and 2 (1-based)
     const selPin0 = new DigitalInputPinModel(CMOS_3V3);
-    selPin0.init(0, 0);
+    selPin0.init(1, 0);
     const selPin1 = new DigitalInputPinModel(CMOS_3V3);
-    selPin1.init(1, 0);
+    selPin1.init(2, 0);
 
-    // Data input pin models — 0-based solver indices 2..5
+    // Data input pin models — MNA node IDs 3..6 (1-based)
     const dataPins: DigitalInputPinModel[][] = [];
     for (let i = 0; i < 4; i++) {
       const pin = new DigitalInputPinModel(CMOS_3V3);
-      pin.init(2 + i, 0);
+      pin.init(3 + i, 0);
       dataPins.push([pin]);
     }
 
-    // Output pin model — 0-based solver index 6
+    // Output pin model — MNA node ID 7 (1-based)
     const outPin = new DigitalOutputPinModel(CMOS_3V3);
-    outPin.init(6, -1);
+    outPin.init(7, -1);
 
     const mux = new BehavioralMuxElement([selPin0, selPin1], dataPins, [outPin], 4, 1);
 
@@ -186,19 +186,19 @@ describe("Demux", () => {
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
     const selPin0 = new DigitalInputPinModel(CMOS_3V3);
-    selPin0.init(0, 0);
+    selPin0.init(1, 0);
     const selPin1 = new DigitalInputPinModel(CMOS_3V3);
-    selPin1.init(1, 0);
+    selPin1.init(2, 0);
 
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < 4; i++) {
       const pin = new DigitalOutputPinModel(CMOS_3V3);
-      pin.init(2 + i, -1);
+      pin.init(3 + i, -1);
       outPins.push(pin);
     }
 
     const inPin = new DigitalInputPinModel(CMOS_3V3);
-    inPin.init(6, 0);
+    inPin.init(7, 0);
 
     const demux = new BehavioralDemuxElement([selPin0, selPin1], inPin, outPins, 4);
 
@@ -283,14 +283,14 @@ describe("Decoder", () => {
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
     const selPin0 = new DigitalInputPinModel(CMOS_3V3);
-    selPin0.init(0, 0);
+    selPin0.init(1, 0);
     const selPin1 = new DigitalInputPinModel(CMOS_3V3);
-    selPin1.init(1, 0);
+    selPin1.init(2, 0);
 
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < 4; i++) {
       const pin = new DigitalOutputPinModel(CMOS_3V3);
-      pin.init(2 + i, -1);
+      pin.init(3 + i, -1);
       outPins.push(pin);
     }
 
@@ -366,27 +366,27 @@ describe("Registration", () => {
 
   it("factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 2:1 mux (selectorBits=1): nodeIds = [sel(0), in_0(1), in_1(2), out(3)]
+    // 2:1 mux (selectorBits=1): nodeIds = 1-based MNA node IDs
     const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = factory([0, 1, 2, 3], -1, props, () => 0);
+    const element = factory([1, 2, 3, 4], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });
 
   it("demux_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 1:2 demux (selectorBits=1): nodeIds = [sel(0), out_0(1), out_1(2), in(3)]
+    // 1:2 demux (selectorBits=1): nodeIds = 1-based MNA node IDs
     const factory = makeBehavioralDemuxAnalogFactory(1);
-    const element = factory([0, 1, 2, 3], -1, props, () => 0);
+    const element = factory([1, 2, 3, 4], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });
 
   it("decoder_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 1-bit decoder (selectorBits=1): nodeIds = [sel(0), out_0(1), out_1(2)]
+    // 1-bit decoder (selectorBits=1): nodeIds = 1-based MNA node IDs
     const factory = makeBehavioralDecoderAnalogFactory(1);
-    const element = factory([0, 1, 2], -1, props, () => 0);
+    const element = factory([1, 2, 3], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });

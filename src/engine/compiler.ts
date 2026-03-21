@@ -20,7 +20,7 @@ import type { CircuitElement } from "@/core/element";
 import type { ComponentRegistry, ExecuteFunction, ComponentDefinition } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
 import type { Pin } from "@/core/pin";
-import { PinDirection } from "@/core/pin";
+import { PinDirection, pinWorldPosition } from "@/core/pin";
 import { BitsException } from "@/core/errors";
 import { CompiledCircuitImpl, FlatComponentLayout } from "./compiled-circuit.js";
 import type { EvaluationGroup } from "./digital-engine.js";
@@ -114,54 +114,68 @@ export function compileCircuit(
 
   // Delegate to shared traceNets() which uses pinWorldPosition() (F6 fix).
   const traced = traceNets(elements, wires, registry);
-  const { uf: uf2, slotBase: tracedSlotBase, wireVirtualBase } = traced;
+  const { slotToNetId: slotToNetIdArr, netCount } = traced;
+
+  // Cumulative pin offsets for slot addressing (mirrors slotBase inside traceNets)
+  const tracedSlotBase: number[] = new Array(componentCount).fill(0);
+  {
+    let offset = 0;
+    for (let i = 0; i < componentCount; i++) {
+      tracedSlotBase[i] = offset;
+      offset += allPinRefs[i]!.length;
+    }
+  }
 
   const slotOf = (elemIdx: number, pinIdx: number): number =>
     tracedSlotBase[elemIdx]! + pinIdx;
 
-  // -----------------------------------------------------------------------
-  // Step 4: Assign net IDs
-  // -----------------------------------------------------------------------
+  const slotToNetId = (slot: number): number => slotToNetIdArr[slot] ?? 0;
 
-  // Collect unique net roots (only for pin slots — not wire virtual nodes)
-  const rootToNetId = new Map<number, number>();
-  let nextNetId = 0;
+  // Build wireToNetId: assign each wire the net ID of the connected pin cluster.
+  // Wires form chains — intermediate wire endpoints may not touch any pin directly.
+  // We propagate net IDs through wire endpoints iteratively until stable.
 
+  // Step A: seed posToNetId from pin world positions (using pinWorldPosition, F6)
+  const posToNetId = new Map<string, number>();
   for (let i = 0; i < componentCount; i++) {
-    const refs = allPinRefs[i]!;
-    for (let j = 0; j < refs.length; j++) {
-      const slot = slotOf(i, j);
-      const root = uf2.find(slot);
-      if (!rootToNetId.has(root)) {
-        rootToNetId.set(root, nextNetId++);
+    const el = elements[i]!;
+    const pins = el.getPins();
+    for (let j = 0; j < pins.length; j++) {
+      const pin = pins[j]!;
+      const wp = pinWorldPosition(el, pin);
+      const key = `${wp.x},${wp.y}`;
+      if (!posToNetId.has(key)) {
+        posToNetId.set(key, slotToNetIdArr[tracedSlotBase[i]! + j] ?? 0);
       }
     }
   }
 
-  const netCount = nextNetId;
-
-  // Build slot → netId mapping for pins
-  const slotToNetId = (slot: number): number => {
-    const root = uf2.find(slot);
-    return rootToNetId.get(root) ?? 0;
-  };
-
-  // Build wireToNetId: each wire is assigned the net of its start node
-  const wireToNetId = new Map<Wire, number>();
-  for (let k = 0; k < wires.length; k++) {
-    const wire = wires[k]!;
-    const startNode = wireVirtualBase + k * 2;
-    // Map wire node root to net ID — find which net root it's connected to
-    // by checking if any pin slot shares this root
-    let netId = -1;
-    for (const [pinRoot, nId] of rootToNetId.entries()) {
-      if (uf2.find(pinRoot) === uf2.find(startNode)) {
-        netId = nId;
-        break;
+  // Step B: propagate through wires — repeat until no new positions are resolved
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const wire of wires) {
+      const sk = `${wire.start.x},${wire.start.y}`;
+      const ek = `${wire.end.x},${wire.end.y}`;
+      const sNet = posToNetId.get(sk);
+      const eNet = posToNetId.get(ek);
+      if (sNet !== undefined && eNet === undefined) {
+        posToNetId.set(ek, sNet);
+        changed = true;
+      } else if (eNet !== undefined && sNet === undefined) {
+        posToNetId.set(sk, eNet);
+        changed = true;
       }
     }
-    // If wire is floating (not connected to any pin), skip it
-    if (netId >= 0) {
+  }
+
+  // Step C: assign each wire its net ID from either endpoint
+  const wireToNetId = new Map<Wire, number>();
+  for (const wire of wires) {
+    const sk = `${wire.start.x},${wire.start.y}`;
+    const ek = `${wire.end.x},${wire.end.y}`;
+    const netId = posToNetId.get(sk) ?? posToNetId.get(ek);
+    if (netId !== undefined) {
       wireToNetId.set(wire, netId);
     }
   }
@@ -643,7 +657,6 @@ export function compileCircuit(
 
   // Sequential elements are those whose typeId name contains "Flipflop",
   // "Register", "Counter", or is explicitly tagged via a registry field.
-  // For now, identify by naming convention (Phase 5 will refine this).
   const sequentialIndices: number[] = [];
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
@@ -775,7 +788,6 @@ export function compileCircuit(
  */
 function isSequentialComponent(typeId: string): boolean {
   return (
-    // Java naming conventions (legacy .dig compat)
     typeId.startsWith("Flipflop") ||
     typeId === "DFF" ||
     typeId === "DFFSR" ||

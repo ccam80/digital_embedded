@@ -1,17 +1,17 @@
 /**
  * VoltageRangeTracker — maintains [min, max] voltage range for wire color mapping.
  *
- * Scans all node voltages once per render frame. Auto-scales by default with
- * exponential smoothing: expands instantly to accommodate new extremes, contracts
- * slowly to avoid jitter. The user can override with a fixed range.
+ * Scans all node voltages once per render frame. The range latches to the
+ * per-simulation-run min/max — it expands instantly to accommodate new extremes
+ * but never contracts until the simulation is reset/restarted.
  *
  * Ground (0V) is always included in the range.
+ *
+ * Normalization uses a logarithmic curve so that small voltages are still
+ * visually distinguishable when the range spans large values.
  */
 
 import type { AnalogEngine } from "@/core/analog-engine-interface";
-
-/** Smoothing factor for slow contraction (applied when range shrinks). */
-const CONTRACTION_ALPHA = 0.05;
 
 /** Default range when no nodes are present. */
 const DEFAULT_MIN = -5;
@@ -19,6 +19,13 @@ const DEFAULT_MAX = 5;
 
 /** Padding applied when all nodes are at the same voltage. */
 const UNIFORM_PADDING = 0.1;
+
+/**
+ * Log-curve shaping exponent. Values < 1 compress the upper end of the scale
+ * so that smaller voltages get more color differentiation. 0.4 gives roughly
+ * a square-root-like curve — 10% of the range maps to ~25% of the color span.
+ */
+const LOG_GAMMA = 0.4;
 
 export class VoltageRangeTracker {
   private _autoMin: number = DEFAULT_MIN;
@@ -29,18 +36,14 @@ export class VoltageRangeTracker {
   /**
    * Scan all MNA node voltages and update the tracked [min, max] range.
    *
-   * Uses exponential smoothing with instant expansion: the range expands
-   * immediately to accommodate new extremes but contracts slowly toward the
-   * observed range to prevent visual jitter.
+   * The range is latched: it only expands to accommodate new extremes and
+   * never contracts. Call `reset()` when the simulation restarts.
    *
    * @param engine - The active analog engine.
    * @param nodeCount - Number of non-ground MNA nodes.
    */
   update(engine: AnalogEngine, nodeCount: number): void {
     if (nodeCount <= 0) {
-      // No nodes — keep defaults, always include ground
-      this._autoMin = DEFAULT_MIN;
-      this._autoMax = DEFAULT_MAX;
       return;
     }
 
@@ -48,7 +51,7 @@ export class VoltageRangeTracker {
     let rawMin = 0; // ground always included
     let rawMax = 0;
 
-    for (let i = 0; i < nodeCount; i++) {
+    for (let i = 1; i <= nodeCount; i++) {
       const v = engine.getNodeVoltage(i);
       if (v < rawMin) rawMin = v;
       if (v > rawMax) rawMax = v;
@@ -61,18 +64,22 @@ export class VoltageRangeTracker {
       rawMax = mid + UNIFORM_PADDING;
     }
 
-    // Instant expansion, slow contraction
+    // Latching: only expand, never contract
     if (rawMax > this._autoMax) {
       this._autoMax = rawMax;
-    } else {
-      this._autoMax = (1 - CONTRACTION_ALPHA) * this._autoMax + CONTRACTION_ALPHA * rawMax;
     }
-
     if (rawMin < this._autoMin) {
       this._autoMin = rawMin;
-    } else {
-      this._autoMin = (1 - CONTRACTION_ALPHA) * this._autoMin + CONTRACTION_ALPHA * rawMin;
     }
+  }
+
+  /**
+   * Reset the auto-scaled range to defaults. Call when the simulation
+   * is started or restarted so the range re-latches from scratch.
+   */
+  reset(): void {
+    this._autoMin = DEFAULT_MIN;
+    this._autoMax = DEFAULT_MAX;
   }
 
   /**
@@ -116,15 +123,29 @@ export class VoltageRangeTracker {
   /**
    * Map a voltage to a normalized [0, 1] value for color interpolation.
    *
-   * 0V (ground) maps to 0.5 when the range is symmetric about ground.
-   * For asymmetric ranges, ground maps proportionally within the range.
+   * 0V (ground) always maps to 0.5 by using a symmetric range about ground:
+   * the effective range is [-absMax, +absMax] where absMax = max(|min|, |max|).
    *
-   * Returns 0.5 when min === max to avoid division by zero.
+   * The mapping uses a power curve (gamma) so that small voltages are visually
+   * distinguishable even when the range spans large values. The curve is
+   * applied symmetrically about 0.5 (ground).
+   *
+   * Returns 0.5 when the range is zero-width.
    */
   normalize(voltage: number): number {
     const lo = this.min;
     const hi = this.max;
-    if (hi === lo) return 0.5;
-    return (voltage - lo) / (hi - lo);
+    // Use symmetric range about ground so 0V always maps to 0.5
+    const absMax = Math.max(Math.abs(lo), Math.abs(hi));
+    if (absMax === 0) return 0.5;
+
+    // Linear fraction: [-absMax, +absMax] → [-1, +1]
+    const linear = voltage / absMax;
+    // Clamp to [-1, 1]
+    const clamped = Math.max(-1, Math.min(1, linear));
+    // Apply gamma curve symmetrically about 0: sign * |x|^gamma
+    const shaped = Math.sign(clamped) * Math.pow(Math.abs(clamped), LOG_GAMMA);
+    // Map [-1, +1] → [0, 1]
+    return (shaped + 1) / 2;
   }
 }

@@ -514,15 +514,23 @@ describe("PostMessageAdapter — digital-step clock canary", () => {
       await new Promise((r) => setTimeout(r, 0));
     };
 
+    // Read Q before any stepping — FF not yet latched, Q must be 0
+    await dispatch({ type: "digital-read-output", label: "Q" });
+    const initialOutputMsg = sent.find(
+      (m) => (m as { type: string }).type === "digital-output",
+    ) as { type: string; label: string; value: number } | undefined;
+    expect(initialOutputMsg).toBeTruthy();
+    expect(initialOutputMsg!.label).toBe("Q");
+    expect(initialOutputMsg!.value).toBe(0);
+
     // Set D=1
     await dispatch({ type: "digital-set-input", label: "D", value: 1 });
 
-    // Step multiple times to advance clock edge and propagate
-    for (let i = 0; i < 4; i++) {
-      await dispatch({ type: "digital-step" });
-    }
+    // Step once to advance clock edge and propagate — Q must become 1
+    await dispatch({ type: "digital-step" });
 
-    // Read Q
+    // Read Q after stepping
+    sent.length = 0; // clear previous messages so find() returns the new one
     await dispatch({ type: "digital-read-output", label: "Q" });
 
     const outputMsg = sent.find(

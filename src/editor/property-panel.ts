@@ -10,6 +10,10 @@ import type { PropertyDefinition, PropertyValue } from "@/core/properties";
 import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import type { ComponentDefinition } from "@/core/registry";
+import type { PinElectricalSpec } from "@/core/pin-electrical";
+import { resolvePinElectrical } from "@/core/pin-electrical.js";
+import type { LogicFamilyConfig } from "@/core/logic-family";
+import { PinDirection } from "@/core/pin";
 
 // ---------------------------------------------------------------------------
 // Change callback type
@@ -187,6 +191,123 @@ export class PropertyPanel {
       setValue: (v: PropertyValue) => { select.value = v as string; },
       getValue: () => select.value,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pin electrical overrides
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Show a collapsible "Pin Electrical" section for components in analog/mixed
+   * circuits. Displays per-pin override fields (rOut, rIn, vOH, vOL, vIH, vIL)
+   * with resolved defaults shown as placeholders. Overrides are stored in the
+   * element's PropertyBag as a JSON string under `_pinElectricalOverrides`.
+   */
+  showPinElectricalOverrides(
+    element: CircuitElement,
+    def: ComponentDefinition,
+    family: LogicFamilyConfig,
+  ): void {
+    const pins = def.pinLayout;
+    if (!pins || pins.length === 0) return;
+
+    const bag = element.getProperties();
+    const stored: Record<string, PinElectricalSpec> = bag.has("_pinElectricalOverrides")
+      ? JSON.parse(bag.get("_pinElectricalOverrides") as string)
+      : {};
+
+    // Section header (collapsible)
+    const section = document.createElement("div");
+    section.style.marginTop = "10px";
+
+    const toggle = document.createElement("div");
+    toggle.style.cssText = "font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;cursor:pointer;user-select:none;";
+    toggle.textContent = "▶ Pin Electrical";
+    const content = document.createElement("div");
+    content.style.display = "none";
+
+    toggle.addEventListener("click", () => {
+      const open = content.style.display !== "none";
+      content.style.display = open ? "none" : "block";
+      toggle.textContent = (open ? "▶" : "▼") + " Pin Electrical";
+    });
+
+    section.appendChild(toggle);
+    section.appendChild(content);
+
+    // Fields to show per pin, based on pin direction
+    const outputFields: (keyof PinElectricalSpec)[] = ["rOut", "vOH", "vOL"];
+    const inputFields: (keyof PinElectricalSpec)[] = ["rIn", "vIH", "vIL"];
+    const fieldLabels: Record<string, string> = {
+      rOut: "Rout (Ω)", rIn: "Rin (Ω)", vOH: "V_OH (V)", vOL: "V_OL (V)",
+      vIH: "V_IH (V)", vIL: "V_IL (V)",
+    };
+
+    for (const pin of pins) {
+      const pinLabel = pin.label;
+      const fields = pin.direction === PinDirection.OUTPUT ? outputFields : inputFields;
+      const pinOverride = def.pinElectricalOverrides?.[pinLabel];
+      const resolved = resolvePinElectrical(family, pinOverride, def.pinElectrical);
+
+      const pinDiv = document.createElement("div");
+      pinDiv.style.cssText = "margin:6px 0 0 8px;font-size:11px;";
+
+      const pinHeader = document.createElement("div");
+      pinHeader.style.cssText = "font-weight:600;margin-bottom:3px;";
+      pinHeader.textContent = `${pinLabel} (${pin.direction === PinDirection.OUTPUT ? "out" : "in"})`;
+      pinDiv.appendChild(pinHeader);
+
+      for (const field of fields) {
+        const overrideVal = stored[pinLabel]?.[field];
+        const resolvedVal = resolved[field as keyof typeof resolved] as number;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:6px;margin:2px 0;";
+
+        const label = document.createElement("span");
+        label.style.cssText = "min-width:70px;opacity:0.7;";
+        label.textContent = fieldLabels[field] ?? field;
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.step = "any";
+        input.placeholder = String(resolvedVal);
+        input.value = overrideVal !== undefined ? String(overrideVal) : "";
+        input.style.cssText = "width:80px;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
+
+        input.addEventListener("change", () => {
+          const current: Record<string, PinElectricalSpec> = bag.has("_pinElectricalOverrides")
+            ? JSON.parse(bag.get("_pinElectricalOverrides") as string)
+            : {};
+          if (!current[pinLabel]) current[pinLabel] = {};
+          const val = input.value.trim();
+          if (val === "") {
+            delete current[pinLabel]![field];
+            if (Object.keys(current[pinLabel]!).length === 0) delete current[pinLabel];
+          } else {
+            current[pinLabel]![field] = parseFloat(val);
+          }
+          const oldValue = bag.has("_pinElectricalOverrides") ? bag.get("_pinElectricalOverrides") : undefined;
+          const newValue = Object.keys(current).length > 0 ? JSON.stringify(current) : undefined;
+          if (newValue !== undefined) {
+            bag.set("_pinElectricalOverrides", newValue);
+          } else if (bag.has("_pinElectricalOverrides")) {
+            bag.set("_pinElectricalOverrides", "{}");
+          }
+          for (const cb of this._changeCallbacks) {
+            cb("_pinElectricalOverrides", oldValue ?? "{}", newValue ?? "{}");
+          }
+        });
+
+        row.appendChild(label);
+        row.appendChild(input);
+        pinDiv.appendChild(row);
+      }
+
+      content.appendChild(pinDiv);
+    }
+
+    this._container.appendChild(section);
   }
 
   // ---------------------------------------------------------------------------

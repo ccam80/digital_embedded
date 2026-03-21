@@ -62,26 +62,47 @@ describe("VoltageRange", () => {
     expect(tracker.max).toBeGreaterThanOrEqual(8);
   });
 
-  it("smoothing_contracts_slowly", () => {
-    // Establish a wide range first: [-10, 10]
-    const wideEngine = makeEngine([-10, 10]);
+  it("latches_never_contracts", () => {
+    // Node IDs start at 1; index 0 is ground (unused by tracker).
+    // Establish a wide range: node1=-10, node2=10
+    const wideEngine = makeEngine([0, -10, 10]);
     tracker.update(wideEngine, 2);
 
-    const prevMax = tracker.max;
-    const prevMin = tracker.min;
-
-    // Now feed a narrow range: [-1, 1]
-    const narrowEngine = makeEngine([-1, 1]);
+    // Now feed a narrow range: node1=-1, node2=1
+    const narrowEngine = makeEngine([0, -1, 1]);
     tracker.update(narrowEngine, 2);
 
-    // Range must NOT have snapped to [-1, 1] — smoothing prevents instant contraction
-    expect(tracker.max).toBeGreaterThan(1);
-    expect(tracker.min).toBeLessThan(-1);
+    // Range must NOT have contracted — latching holds the peak
+    expect(tracker.max).toBeGreaterThanOrEqual(10);
+    expect(tracker.min).toBeLessThanOrEqual(-10);
+  });
 
-    // Sanity: the range did move toward [-1, 1] (it is not still the same as prevMax/prevMin)
-    // After one frame: smoothedMax = 0.95 * 10 + 0.05 * 1 = 9.55
-    expect(tracker.max).toBeLessThan(prevMax);
-    expect(tracker.min).toBeGreaterThan(prevMin);
+  it("reset_clears_latched_range", () => {
+    // Establish a wide range
+    const wideEngine = makeEngine([0, -10, 10]);
+    tracker.update(wideEngine, 2);
+    expect(tracker.max).toBeGreaterThanOrEqual(10);
+
+    // Reset and feed a narrow range
+    tracker.reset();
+    const narrowEngine = makeEngine([0, -1, 1]);
+    tracker.update(narrowEngine, 2);
+
+    // Range should now reflect the narrow values, not the old latched peak
+    expect(tracker.max).toBeLessThan(10);
+  });
+
+  it("normalize_logarithmic_curve", () => {
+    // With a fixed range, small voltages should map to > linear fraction
+    tracker.setFixedRange(-10, 10);
+    // 1V is 10% of range linearly; with log curve it should map to > 10% of color
+    const norm1V = tracker.normalize(1);
+    // Linear would give (1/10 + 1)/2 = 0.55; log curve should push it further from 0.5
+    expect(norm1V).toBeGreaterThan(0.55);
+    // But still less than 1.0
+    expect(norm1V).toBeLessThan(1.0);
+    // Ground must still be 0.5
+    expect(tracker.normalize(0)).toBe(0.5);
   });
 
   it("expands_instantly", () => {

@@ -77,6 +77,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Maps element index to the originating CircuitElement for diagnostics. */
   readonly elementToCircuitElement: Map<number, CircuitElement>;
 
+  /** Maps element index to the wire vertex each pin connects to.
+   *  Used by WireCurrentResolver to place current injections at exact
+   *  wire graph vertices without re-doing spatial matching. */
+  readonly elementPinVertices: Map<number, Array<{ x: number; y: number } | null>>;
+
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
@@ -102,6 +107,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     wireToNodeId: Map<Wire, number>;
     models: Map<string, DeviceModel>;
     elementToCircuitElement: Map<number, CircuitElement>;
+    elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
     diagnostics?: SolverDiagnostic[];
     bridges?: BridgeInstance[];
     timeRef?: { value: number };
@@ -114,6 +120,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.wireToNodeId = params.wireToNodeId;
     this.models = params.models;
     this.elementToCircuitElement = params.elementToCircuitElement;
+    this.elementPinVertices = params.elementPinVertices ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.bridges = params.bridges ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };

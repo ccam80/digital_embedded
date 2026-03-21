@@ -90,15 +90,17 @@ function buildCounter(bitWidth = 4): {
     CMOS33.vIL,
   );
 
-  const nodeCount = 4 + bitWidth + 1 + 1; // ground + en + clock + clr + bits + ovf
-  const solver = new SparseSolver(nodeCount, 0);
+  // Max MNA node = 4 + bitWidth (ovf pin). Solver size = max node ID.
+  const solverSize = 4 + bitWidth; // nodes 1=en, 2=clock, 3=clr, 4..3+bitWidth=bits, 4+bitWidth=ovf
+  const solver = new SparseSolver(solverSize, 0);
 
   const makeVoltages = (en: number, clock: number, clr: number): Float64Array => {
-    const v = new Float64Array(nodeCount);
-    v[0] = 0;
-    v[1] = en;
-    v[2] = clock;
-    v[3] = clr;
+    // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
+    // en=node1→v[0], clock=node2→v[1], clr=node3→v[2]
+    const v = new Float64Array(solverSize);
+    v[0] = en;
+    v[1] = clock;
+    v[2] = clr;
     return v;
   };
 
@@ -151,17 +153,21 @@ function buildRegister(bitWidth = 8): {
     CMOS33.vIL,
   );
 
-  const nodeCount = 1 + bitWidth + 1 + 1 + bitWidth;
-  const solver = new SparseSolver(nodeCount, 0);
+  // Max MNA node = 1 + bitWidth + 2 + bitWidth - 1 = 2*bitWidth + 2 (last Q bit)
+  const solverSize = 2 * bitWidth + 2;
+  const solver = new SparseSolver(solverSize, 0);
 
   const makeVoltages = (data: number, en: number, clock: number): Float64Array => {
-    const v = new Float64Array(nodeCount);
-    v[0] = 0;
+    // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
+    // D bits: nodes 1..bitWidth → v[0..bitWidth-1]
+    // clock: node 1+bitWidth → v[bitWidth]
+    // en: node 2+bitWidth → v[bitWidth+1]
+    const v = new Float64Array(solverSize);
     for (let bit = 0; bit < bitWidth; bit++) {
-      v[1 + bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
+      v[bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
     }
-    v[1 + bitWidth] = clock;
-    v[1 + bitWidth + 1] = en;
+    v[bitWidth] = clock;
+    v[bitWidth + 1] = en;
     return v;
   };
 
@@ -245,9 +251,10 @@ describe("Counter", () => {
     element.stampNonlinear(solver);
 
     // Apply 5 clock edges: count = 5 = 0b0101
+    // MNA node IDs 1-based: en=node1→v[0], clock=node2→v[1], clr=node3→v[2]
     const makeV = (en: number, clock: number, clr: number): Float64Array => {
       const v = new Float64Array(nodeCount);
-      v[1] = en; v[2] = clock; v[3] = clr;
+      v[0] = en; v[1] = clock; v[2] = clr;
       return v;
     };
 

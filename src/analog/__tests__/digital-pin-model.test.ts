@@ -100,13 +100,13 @@ describe("OutputPin", () => {
     pin.setLogicLevel(true);
     pin.stamp(solver as any);
 
-    // Conductance 1/rOut at (node, node)
+    // Conductance 1/rOut at (node-1, node-1) — MNA node IDs are 1-based
     const gOut = 1 / CMOS_3V3.rOut; // 1/50 = 0.02
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gOut, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gOut, 10);
 
     // RHS current V_out/rOut = 3.3/50
     const expectedCurrent = CMOS_3V3.vOH / CMOS_3V3.rOut;
-    expect(solver.sumRhs(NODE)).toBeCloseTo(expectedCurrent, 10);
+    expect(solver.sumRhs(NODE - 1)).toBeCloseTo(expectedCurrent, 10);
   });
 
   it("stamps_hiz_resistance", () => {
@@ -115,7 +115,7 @@ describe("OutputPin", () => {
 
     // Only 1/rHiZ conductance — no current source
     const gHiZ = 1 / CMOS_3V3.rHiZ;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gHiZ, 15);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gHiZ, 15);
     expect(solver.rhs.length).toBe(0);
   });
 
@@ -125,7 +125,7 @@ describe("OutputPin", () => {
     pin.setHighZ(false);
     pin.stamp(solver as any);
     expect(solver.rhs.length).toBeGreaterThan(0);
-    const driveG = solver.sumStamp(NODE, NODE);
+    const driveG = solver.sumStamp(NODE - 1, NODE - 1);
 
     solver.reset();
 
@@ -133,7 +133,7 @@ describe("OutputPin", () => {
     pin.setHighZ(true);
     pin.stamp(solver as any);
     expect(solver.rhs.length).toBe(0);
-    const hizG = solver.sumStamp(NODE, NODE);
+    const hizG = solver.sumStamp(NODE - 1, NODE - 1);
 
     expect(driveG).not.toBeCloseTo(hizG, 6);
 
@@ -143,7 +143,7 @@ describe("OutputPin", () => {
     pin.setHighZ(false);
     pin.stamp(solver as any);
     expect(solver.rhs.length).toBeGreaterThan(0);
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(driveG, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(driveG, 10);
   });
 
   it("companion_stamps_capacitance", () => {
@@ -153,7 +153,7 @@ describe("OutputPin", () => {
     // Trapezoidal: geq = 2*C/dt
     const C = CMOS_3V3.cOut;
     const geqExpected = (2 * C) / dt;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(geqExpected, 20);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 20);
   });
 
   it("nodeId_reflects_init", () => {
@@ -196,7 +196,7 @@ describe("InputPin", () => {
     pin.stamp(solver as any);
 
     const gIn = 1 / CMOS_3V3.rIn; // 1e-7
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gIn, 15);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gIn, 15);
   });
 
   it("threshold_detection_high", () => {
@@ -239,7 +239,7 @@ describe("InputPin", () => {
     // Trapezoidal: geq = 2*C/dt
     const C = CMOS_3V3.cIn;
     const geqExpected = (2 * C) / dt;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(geqExpected, 20);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 20);
   });
 
   it("companion_bdf1_stamps_correct_conductance", () => {
@@ -248,7 +248,7 @@ describe("InputPin", () => {
 
     const C = CMOS_3V3.cIn;
     const geqExpected = C / dt; // BDF-1: C/h
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(geqExpected, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 10);
   });
 
   it("companion_bdf2_stamps_correct_conductance", () => {
@@ -257,7 +257,7 @@ describe("InputPin", () => {
 
     const C = CMOS_3V3.cIn;
     const geqExpected = (3 * C) / (2 * dt); // BDF-2: 3C/2h
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(geqExpected, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 10);
   });
 
   it("nodeId_reflects_init", () => {

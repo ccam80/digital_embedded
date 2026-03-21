@@ -73,6 +73,14 @@ export interface PathData {
   operations: PathOperation[];
 }
 
+/** A color stop within a linear gradient. */
+export interface GradientStop {
+  /** Position along the gradient axis, in [0, 1]. */
+  offset: number;
+  /** CSS color string (e.g. `rgb(r, g, b)` or `#rrggbb`). */
+  color: string;
+}
+
 export interface RenderContext {
   drawLine(x1: number, y1: number, x2: number, y2: number): void;
   drawRect(x: number, y: number, width: number, height: number, filled: boolean): void;
@@ -90,6 +98,17 @@ export interface RenderContext {
 
   setColor(color: ThemeColor): void;
   setRawColor?(css: string): void;
+  /**
+   * Set the stroke and fill to a linear gradient in local coordinates.
+   * Subsequent drawLine/drawPath/drawArc calls use this gradient as their
+   * stroke style. The gradient is defined along the axis (x1,y1)→(x2,y2)
+   * with the given color stops. Optional — renderers that don't support
+   * gradients may omit this method.
+   */
+  setLinearGradient?(
+    x1: number, y1: number, x2: number, y2: number,
+    stops: readonly GradientStop[],
+  ): void;
   setLineWidth(width: number): void;
   setFont(font: FontSpec): void;
   setLineDash(pattern: number[]): void;
@@ -113,8 +132,8 @@ const LIGHT_COLORS: ColorMap = {
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff4444",
   WIRE_ANALOG: "#2266cc",
-  WIRE_VOLTAGE_POS: "#cc0000",
-  WIRE_VOLTAGE_NEG: "#008800",
+  WIRE_VOLTAGE_POS: "#008800",
+  WIRE_VOLTAGE_NEG: "#cc0000",
   WIRE_VOLTAGE_GND: "#666666",
   CURRENT_DOT: "#cc9900",
   COMPONENT: "#000000",
@@ -134,8 +153,8 @@ const DARK_COLORS: ColorMap = {
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff8800",
   WIRE_ANALOG: "#4488ff",
-  WIRE_VOLTAGE_POS: "#ff4444",
-  WIRE_VOLTAGE_NEG: "#44cc44",
+  WIRE_VOLTAGE_POS: "#44cc44",
+  WIRE_VOLTAGE_NEG: "#ff4444",
   WIRE_VOLTAGE_GND: "#888888",
   CURRENT_DOT: "#ffcc00",
   COMPONENT: "#cccccc",
@@ -155,8 +174,8 @@ const HIGH_CONTRAST_COLORS: ColorMap = {
   WIRE_ERROR: "#ff0000",
   WIRE_UNDEFINED: "#ff4444",
   WIRE_ANALOG: "#66aaff",
-  WIRE_VOLTAGE_POS: "#ff0000",
-  WIRE_VOLTAGE_NEG: "#00ff00",
+  WIRE_VOLTAGE_POS: "#00ff00",
+  WIRE_VOLTAGE_NEG: "#ff0000",
   WIRE_VOLTAGE_GND: "#ffffff",
   CURRENT_DOT: "#ffff00",
   COMPONENT: "#ffffff",

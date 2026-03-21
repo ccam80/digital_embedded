@@ -31,6 +31,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
@@ -123,23 +124,44 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const freq = this._properties.getOrDefault<number>("frequency", 32768);
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 0.6, 0);
-    ctx.drawLine(1.4, 0, 2, 0);
+    const vA = signals?.getPinVoltage("A");
+    const vB = signals?.getPinVoltage("B");
+    const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Outer plates (electrode capacitance symbol)
+    // Left lead + plate — colored by pin A voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, 0.6, 0);
     ctx.drawLine(0.6, -0.4, 0.6, 0.4);
+
+    // Right lead + plate — colored by pin B voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1.4, 0, 2, 0);
     ctx.drawLine(1.4, -0.4, 1.4, 0.4);
 
-    // Rectangular crystal body between the plates
+    // Rectangular crystal body between the plates — gradient
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(0.7, 0, 1.3, 0, [
+        { offset: 0, color: signals!.voltageColor(vA) },
+        { offset: 1, color: signals!.voltageColor(vB) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0.7, -0.3, 1.3, -0.3);
     ctx.drawLine(0.7, 0.3, 1.3, 0.3);
     ctx.drawLine(0.7, -0.3, 0.7, 0.3);

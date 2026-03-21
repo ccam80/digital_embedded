@@ -8,8 +8,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -52,7 +52,7 @@ export class AnalogGroundElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogGround", instanceId, position, rotation, mirror, props);
+    super("Ground", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -61,25 +61,32 @@ export class AnalogGroundElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 1,
+      x: this.position.x - 0.6,
       y: this.position.y,
-      width: 2,
-      height: 1.5,
+      width: 1.2,
+      height: 1.0,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vGnd = signals?.getPinVoltage("gnd");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Vertical stem from pin (y=0) down to first bar (y=0.5)
+    // Vertical stem from pin (y=0) down to first bar — colored by pin voltage
+    if (vGnd !== undefined) {
+      ctx.setColor(signals!.voltageColor(vGnd));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0, 0, 0, 0.5);
 
-    // Three decreasing-width horizontal bars
-    ctx.drawLine(-1.0, 0.5, 1.0, 0.5);
-    ctx.drawLine(-0.65, 0.9, 0.65, 0.9);
-    ctx.drawLine(-0.3, 1.3, 0.3, 1.3);
+    // Three decreasing-width horizontal bars stay COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(-0.6, 0.5, 0.6, 0.5);
+    ctx.drawLine(-0.4, 0.75, 0.4, 0.75);
+    ctx.drawLine(-0.2, 1.0, 0.2, 1.0);
 
     ctx.restore();
   }

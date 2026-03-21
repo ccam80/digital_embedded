@@ -109,11 +109,11 @@ describe("OutputAdapter", () => {
     adapter.stampNonlinear(solver as any);
 
     const gOut = 1 / CMOS_3V3.rOut; // 1/50 = 0.02
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gOut, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gOut, 10);
 
     // RHS current: V_out / rOut = 3.3 / 50
     const expectedCurrent = CMOS_3V3.vOH / CMOS_3V3.rOut;
-    expect(solver.sumRhs(NODE)).toBeCloseTo(expectedCurrent, 10);
+    expect(solver.sumRhs(NODE - 1)).toBeCloseTo(expectedCurrent, 10);
   });
 
   it("stamps_norton_for_logic_low", () => {
@@ -123,11 +123,11 @@ describe("OutputAdapter", () => {
     adapter.stampNonlinear(solver as any);
 
     const gOut = 1 / CMOS_3V3.rOut;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gOut, 10);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gOut, 10);
 
     // vOL = 0.0, so RHS current = 0.0 / 50 = 0.0
     const expectedCurrent = CMOS_3V3.vOL / CMOS_3V3.rOut;
-    expect(solver.sumRhs(NODE)).toBeCloseTo(expectedCurrent, 10);
+    expect(solver.sumRhs(NODE - 1)).toBeCloseTo(expectedCurrent, 10);
   });
 
   it("hiz_stamps_rhiz", () => {
@@ -136,7 +136,7 @@ describe("OutputAdapter", () => {
 
     // Hi-Z: only 1/rHiZ conductance — no current source
     const gHiZ = 1 / CMOS_3V3.rHiZ;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gHiZ, 15);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gHiZ, 15);
     expect(solver.rhs.length).toBe(0);
   });
 
@@ -144,14 +144,14 @@ describe("OutputAdapter", () => {
     // Set high, stamp once — record RHS current
     adapter.setLogicLevel(true);
     adapter.stamp(solver as any);
-    const rhsHigh = solver.sumRhs(NODE);
+    const rhsHigh = solver.sumRhs(NODE - 1);
 
     solver.reset();
 
     // Switch to low, stampNonlinear — verify RHS current changed
     adapter.setLogicLevel(false);
     adapter.stampNonlinear(solver as any);
-    const rhsLow = solver.sumRhs(NODE);
+    const rhsLow = solver.sumRhs(NODE - 1);
 
     expect(rhsHigh).toBeCloseTo(CMOS_3V3.vOH / CMOS_3V3.rOut, 10);
     expect(rhsLow).toBeCloseTo(CMOS_3V3.vOL / CMOS_3V3.rOut, 10);
@@ -201,9 +201,9 @@ describe("InputAdapter", () => {
   it("stamps_input_loading", () => {
     adapter.stamp(solver as any);
 
-    // Conductance 1/rIn at (node, node)
+    // Conductance 1/rIn at (node-1, node-1) — MNA node IDs are 1-based
     const gIn = 1 / CMOS_3V3.rIn; // 1e-7
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(gIn, 15);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gIn, 15);
 
     // Input loading is a linear resistor — no RHS entry
     expect(solver.rhs.length).toBe(0);
@@ -255,6 +255,6 @@ describe("InputAdapter", () => {
     // Trapezoidal: geq = 2*C/dt
     const C = CMOS_3V3.cIn;
     const geqExpected = (2 * C) / dt;
-    expect(solver.sumStamp(NODE, NODE)).toBeCloseTo(geqExpected, 20);
+    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 20);
   });
 });

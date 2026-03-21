@@ -16,8 +16,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -276,42 +276,53 @@ export class ScrElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1,
+      y: this.position.y - 0.5,
       width: 4,
       height: 2,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vA = signals?.getPinVoltage("A");
+    const vK = signals?.getPinVoltage("K");
+    const vG = signals?.getPinVoltage("G");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 1.5, 0);
-    ctx.drawLine(2.5, 0, 4, 0);
-
-    // Thyristor body: triangle (anode left, cathode right)
+    // Body (triangle and cathode bar) stays COMPONENT color
     ctx.drawPolygon([
       { x: 1.5, y: -0.5 },
       { x: 1.5, y: 0.5 },
       { x: 2.5, y: 0 },
     ], true);
-
-    // Cathode bar
     ctx.drawLine(2.5, -0.5, 2.5, 0.5);
 
-    // Gate lead (downward from cathode bar)
-    ctx.drawLine(2.5, 0.5, 2.5, 1);
-    ctx.drawLine(2.5, 1, 3.5, 1);
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 2, -0.75, { horizontal: "center", vertical: "bottom" });
+    // Anode lead
+    if (signals && vA !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1.5, 0);
+
+    // Cathode lead
+    if (signals && vK !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vK));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.5, 0, 4, 0);
+
+    // Gate lead
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.5, 0, 2, 1.5);
+    ctx.drawLine(2, 1.5, 3, 1);
 
     ctx.restore();
   }
@@ -351,7 +362,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: 1,
-      position: { x: 3.5, y: 1 },
+      position: { x: 3, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },

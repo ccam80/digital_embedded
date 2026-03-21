@@ -46,6 +46,7 @@
 import type { FileResolver } from './file-resolver.js';
 import { CacheResolver, ChainResolver, HttpResolver } from './file-resolver.js';
 import { deserializeDts } from './dts-deserializer.js';
+import { serializeCircuitToDig } from './dig-serializer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
@@ -116,9 +117,6 @@ export interface PostMessageHooks {
 
   /** Read all labeled signals. */
   readAllSignals?(): Record<string, number>;
-
-  /** Compile the current circuit (for test execution). Returns the engine. */
-  compile?(): SimulationEngine;
 
   /** Get the facade instance (for test runners that need it). */
   getFacade?(): SimulatorFacade;
@@ -210,7 +208,7 @@ export class PostMessageAdapter {
           await this._handleLoadData(msg);
           break;
         case 'digital-load-json':
-          this._handleLoadJson(msg);
+          await this._handleLoadJson(msg);
           break;
 
         // --- Core: headless simulation ---
@@ -307,9 +305,12 @@ export class PostMessageAdapter {
     this._post({ type: 'digital-loaded' });
   }
 
-  private _handleLoadJson(msg: { data?: unknown }): void {
+  private async _handleLoadJson(msg: { data?: unknown }): Promise<void> {
     const { circuit } = deserializeDts(String(msg.data ?? ''), this._registry);
-    if (!this._hooks.loadCircuitXml) {
+    if (this._hooks.loadCircuitXml) {
+      const xml = serializeCircuitToDig(circuit, this._registry);
+      await this._hooks.loadCircuitXml(xml);
+    } else {
       this._getOwnFacade().compile(circuit);
     }
     this._post({ type: 'digital-loaded' });

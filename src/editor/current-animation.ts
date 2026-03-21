@@ -5,102 +5,124 @@
  * speeds proportional to current magnitude. Uses WireCurrentResolver to
  * obtain per-wire currents and directions.
  *
- * Dots are represented as phase values in [0, 1) along each wire's length.
- * Advancing phase by `current * speedScale * dt` each frame makes the
- * apparent velocity proportional to current. Dots wrap at 0/1 boundaries.
+ * Dots move at a uniform **absolute** speed (grid units / second) for a
+ * given current magnitude — short stubs and long runs move at the same
+ * rate. Each segment stores a single scalar offset (in grid units) rather
+ * than per-dot phase arrays. All segments initialise their offset to 0
+ * and advance by `|I| × speedScale × dt`, so segments carrying the same
+ * current stay in lock-step. At render time dots are placed at
+ * `(offset mod spacing)` intervals along the segment, which produces a
+ * visually continuous dot stream across wire→component→wire junctions
+ * without any explicit path-tracing.
  *
- * Zero current: dots freeze in place (phase unchanged).
- * Very small current (|I| < minCurrentThreshold): dots are not rendered.
- * Negative current: dots advance in the opposite direction.
- *
- * Dot radius is specified in grid units (0.1) for zoom-independence.
- * Dot spacing is 20 pixels (at default zoom, ~1 grid unit) between dots.
+ * Supports two scale modes:
+ *   - **linear**: dot speed is directly proportional to current magnitude
+ *   - **logarithmic**: dot speed ∝ log(1 + |I|/ref), making small
+ *     currents visible alongside large ones
  */
 
 import type { RenderContext } from "@/core/renderer-interface";
 import type { Wire, Circuit } from "@/core/circuit";
-import type { WireCurrentResolver } from "./wire-current-resolver";
+import type { WireCurrentResolver, ComponentCurrentPath } from "./wire-current-resolver";
 
-/** Dot radius in grid units. Renders as ~2px at default zoom. */
-const DOT_RADIUS_GRID = 0.1;
+/** Dot radius in grid units — slightly wider than wire for visibility. */
+const DOT_RADIUS_GRID = 0.08;
 
-/** Default spacing between dots along a wire, in grid units. */
+/** Spacing between dots along any segment, in grid units. */
 const DOT_SPACING_GRID = 1.0;
 
-/** Default minimum current threshold below which dots are invisible. */
-const DEFAULT_MIN_CURRENT_THRESHOLD = 1e-6;
+/** Default speed scale multiplier (grid-units per amp-second). */
+const DEFAULT_SPEED_SCALE = 200;
 
-/** Default speed scale multiplier. */
-const DEFAULT_SPEED_SCALE = 1.0;
+/** Reference current for logarithmic scaling (1 mA). */
+const LOG_REFERENCE_CURRENT = 1e-3;
 
-/** Minimum allowed speed scale. */
-const MIN_SPEED_SCALE = 0.01;
-
-/** Maximum allowed speed scale. */
-const MAX_SPEED_SCALE = 100;
+export type CurrentScaleMode = "linear" | "logarithmic";
 
 export class CurrentFlowAnimator {
   private _resolver: WireCurrentResolver;
   private _speedScale: number = DEFAULT_SPEED_SCALE;
+  private _scaleMode: CurrentScaleMode = "linear";
   private _enabled: boolean = true;
-  private _minCurrentThreshold: number;
 
   /**
-   * Internal state: dot phase positions per wire.
-   * Each entry is an array of phase values in [0, 1), evenly spaced.
+   * Per-wire offset in grid units.  Positive = start→end direction.
+   * All offsets start at 0 so series-connected segments are in phase.
    */
-  private _dotPhases: Map<Wire, number[]> = new Map();
+  private _wireOffsets: Map<Wire, number> = new Map();
 
-  /**
-   * @param resolver - The WireCurrentResolver providing per-wire currents.
-   * @param minCurrentThreshold - Current below which dots are invisible (default 1e-6 A).
-   */
-  constructor(resolver: WireCurrentResolver, minCurrentThreshold: number = DEFAULT_MIN_CURRENT_THRESHOLD) {
+  /** Per-component-body offset keyed by pin-position string. */
+  private _componentOffsets: Map<string, number> = new Map();
+
+  constructor(resolver: WireCurrentResolver) {
     this._resolver = resolver;
-    this._minCurrentThreshold = minCurrentThreshold;
   }
 
   /**
-   * Advance all dot positions proportional to current × speedScale × dt.
-   *
-   * For a wire with current I and speed scale S, each dot advances by
-   * I * S * dtSeconds along the wire's unit-length phase axis.
-   * Dots wrap around when they reach 0 or 1.
-   * Zero current leaves dots frozen. Negative current reverses direction.
+   * Set the speed scale multiplier.
+   * Effective absolute speed = |I| × speedScale  (grid units / second)
+   */
+  setSpeedScale(scale: number): void {
+    this._speedScale = Math.max(0.1, Math.min(100000, scale));
+  }
+
+  get speedScale(): number {
+    return this._speedScale;
+  }
+
+  setScaleMode(mode: CurrentScaleMode): void {
+    this._scaleMode = mode;
+  }
+
+  get scaleMode(): CurrentScaleMode {
+    return this._scaleMode;
+  }
+
+  /**
+   * Advance all dot offsets based on wire currents.
    *
    * @param dtSeconds - Frame delta time in seconds.
+   * @param circuit - The circuit (needed to iterate wires).
    */
-  update(dtSeconds: number): void {
+  update(dtSeconds: number, circuit: Circuit): void {
     if (!this._enabled) return;
 
-    for (const [wire, phases] of this._dotPhases) {
+    for (const wire of circuit.wires) {
       const result = this._resolver.getWireCurrent(wire);
-      if (result === undefined) continue;
+      if (result === undefined || result.current === 0) continue;
 
-      // Signed current: magnitude × direction sign along wire axis.
-      // We use a simplified signed current based on resolver result.
-      const I = result.current;
-      if (I === 0) continue;
-
-      const advance = I * this._speedScale * dtSeconds;
-
-      for (let i = 0; i < phases.length; i++) {
-        let p = phases[i] + advance;
-        // Wrap into [0, 1)
-        p = p - Math.floor(p);
-        phases[i] = p;
+      // Absolute speed in grid units / frame
+      let speed: number;
+      if (this._scaleMode === "logarithmic") {
+        speed = Math.log1p(result.current / LOG_REFERENCE_CURRENT) * this._speedScale * dtSeconds;
+      } else {
+        speed = result.current * this._speedScale * dtSeconds;
       }
+      speed *= result.flowSign;
+
+      const prev = this._wireOffsets.get(wire) ?? 0;
+      this._wireOffsets.set(wire, prev + speed);
+    }
+
+    for (const path of this._resolver.getComponentPaths()) {
+      if (path.current === 0) continue;
+
+      let speed: number;
+      if (this._scaleMode === "logarithmic") {
+        speed = Math.log1p(path.current / LOG_REFERENCE_CURRENT) * this._speedScale * dtSeconds;
+      } else {
+        speed = path.current * this._speedScale * dtSeconds;
+      }
+      speed *= path.flowSign;
+
+      const key = this._componentPathKey(path);
+      const prev = this._componentOffsets.get(key) ?? 0;
+      this._componentOffsets.set(key, prev + speed);
     }
   }
 
   /**
-   * Draw current-flow dots on all wire segments with non-zero current.
-   *
-   * Dots are rendered as filled circles using the CURRENT_DOT theme color.
-   * Wires with current below minCurrentThreshold are skipped entirely.
-   *
-   * @param ctx - The render context.
-   * @param circuit - The circuit containing wires.
+   * Draw current-flow dots on all wire segments and through component bodies.
    */
   render(ctx: RenderContext, circuit: Circuit): void {
     if (!this._enabled) return;
@@ -108,50 +130,39 @@ export class CurrentFlowAnimator {
     ctx.save();
     ctx.setColor("CURRENT_DOT");
 
+    // --- wires ---
     for (const wire of circuit.wires) {
       const result = this._resolver.getWireCurrent(wire);
       if (result === undefined) continue;
-      if (result.current < this._minCurrentThreshold) continue;
-
-      const phases = this._getOrInitPhases(wire);
 
       const dx = wire.end.x - wire.start.x;
       const dy = wire.end.y - wire.start.y;
       const wireLen = Math.sqrt(dx * dx + dy * dy);
       if (wireLen < 1e-12) continue;
 
-      for (const phase of phases) {
-        const t = phase;
-        const x = wire.start.x + dx * t;
-        const y = wire.start.y + dy * t;
-        ctx.drawCircle(x, y, DOT_RADIUS_GRID, true);
-      }
+      const offset = this._wireOffsets.get(wire) ?? 0;
+      this._renderDotsAlongSegment(ctx, wire.start.x, wire.start.y, dx, dy, wireLen, offset);
+    }
+
+    // --- component bodies ---
+    for (const path of this._resolver.getComponentPaths()) {
+      const dx = path.pin1.x - path.pin0.x;
+      const dy = path.pin1.y - path.pin0.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-12) continue;
+
+      const key = this._componentPathKey(path);
+      const offset = this._componentOffsets.get(key) ?? 0;
+      this._renderDotsAlongSegment(ctx, path.pin0.x, path.pin0.y, dx, dy, len, offset);
     }
 
     ctx.restore();
   }
 
-  /**
-   * Set the speed scale multiplier.
-   * Velocity = current × scale. Clamped to [0.01, 100].
-   *
-   * @param scale - Linear speed multiplier.
-   */
-  setSpeedScale(scale: number): void {
-    this._speedScale = Math.max(MIN_SPEED_SCALE, Math.min(MAX_SPEED_SCALE, scale));
-  }
-
-  /**
-   * Enable or disable the animator.
-   * When disabled, update() and render() are no-ops.
-   *
-   * @param enabled - True to activate, false to deactivate.
-   */
   setEnabled(enabled: boolean): void {
     this._enabled = enabled;
   }
 
-  /** Whether the animator is currently active. */
   get enabled(): boolean {
     return this._enabled;
   }
@@ -161,23 +172,35 @@ export class CurrentFlowAnimator {
   // ---------------------------------------------------------------------------
 
   /**
-   * Return (or initialize) the dot phases for a wire.
-   * Dots are evenly spaced by DOT_SPACING_GRID along the wire length.
+   * Place dots at absolute DOT_SPACING_GRID intervals along a segment.
+   *
+   * The first dot is at distance `((offset % spacing) + spacing) % spacing`
+   * from the segment start, then every `spacing` until the segment ends.
+   * Because all segments sharing the same current share the same offset
+   * advancement rate (and start at 0), dots are continuous across junctions.
    */
-  private _getOrInitPhases(wire: Wire): number[] {
-    let phases = this._dotPhases.get(wire);
-    if (phases !== undefined) return phases;
+  private _renderDotsAlongSegment(
+    ctx: RenderContext,
+    startX: number, startY: number,
+    dx: number, dy: number,
+    segLen: number,
+    offset: number,
+  ): void {
+    // Normalise offset into [0, spacing)
+    const first = ((offset % DOT_SPACING_GRID) + DOT_SPACING_GRID) % DOT_SPACING_GRID;
 
-    const dx = wire.end.x - wire.start.x;
-    const dy = wire.end.y - wire.start.y;
-    const wireLen = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / segLen;
+    const uy = dy / segLen;
 
-    const dotCount = Math.max(1, Math.round(wireLen / DOT_SPACING_GRID));
-    phases = [];
-    for (let i = 0; i < dotCount; i++) {
-      phases.push(i / dotCount);
+    for (let d = first; d < segLen; d += DOT_SPACING_GRID) {
+      const x = startX + ux * d;
+      const y = startY + uy * d;
+      ctx.drawCircle(x, y, DOT_RADIUS_GRID, true);
     }
-    this._dotPhases.set(wire, phases);
-    return phases;
+  }
+
+  /** Key for component path offset lookup (stable across resolve calls). */
+  private _componentPathKey(path: ComponentCurrentPath): string {
+    return `${path.pin0.x},${path.pin0.y}-${path.pin1.x},${path.pin1.y}`;
   }
 }

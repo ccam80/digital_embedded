@@ -28,7 +28,7 @@ import type { ComponentLayout } from "../../../core/registry.js";
 // Layout helper
 // ---------------------------------------------------------------------------
 
-function makeFuseLayout(stateCount: number): {
+function makeFuseLayout(stateCount: number, blown: boolean = false): {
   layout: ComponentLayout & FETLayout;
   state: Uint32Array;
 } {
@@ -41,7 +41,7 @@ function makeFuseLayout(stateCount: number): {
     outputCount: (_i: number) => 0,
     outputOffset: (_i: number) => 0,
     stateOffset: (_i: number) => 0,
-    getProperty: () => undefined,
+    getProperty: (_i: number, key: string) => (key === "blown" ? blown : undefined),
   };
   return { layout, state };
 }
@@ -51,41 +51,32 @@ function makeFuseLayout(stateCount: number): {
 // ---------------------------------------------------------------------------
 
 describe("Fuse — executeFn", () => {
-  it("initiallyClosedState — engine sets state=1 for not-blown fuse", () => {
-    // Engine sets state[stBase]=1 at compile time for blown=false.
-    // executeFuse is a no-op; it must not corrupt that initial value.
-    const { layout, state } = makeFuseLayout(1);
+  it("initiallyClosedState — blown=false writes state=1 (closed)", () => {
+    const { layout, state } = makeFuseLayout(1, false);
     const highZs = new Uint32Array(state.length);
-    state[0] = 1; // engine pre-initialises: closed
     executeFuse(0, state, highZs, layout);
-    expect(state[0]).toBe(1); // still closed
+    expect(state[0]).toBe(1); // closed
   });
 
-  it("blownState — engine sets state=0 for blown fuse, executeFuse preserves it", () => {
-    const { layout, state } = makeFuseLayout(1);
+  it("blownState — blown=true writes state=0 (open)", () => {
+    const { layout, state } = makeFuseLayout(1, true);
     const highZs = new Uint32Array(state.length);
-    state[0] = 0; // engine pre-initialises: open (blown)
     executeFuse(0, state, highZs, layout);
-    expect(state[0]).toBe(0); // still open
+    expect(state[0]).toBe(0); // open
   });
 
-  it("cannotReclose — setting state=1 then running executeFuse leaves state unchanged", () => {
-    // There is no gate input, so executeFuse is a true no-op.
-    // Once the engine sets blown=true → state=0, nothing can change it.
-    const { layout, state } = makeFuseLayout(1);
+  it("cannotReclose — blown fuse stays open across multiple executions", () => {
+    const { layout, state } = makeFuseLayout(1, true);
     const highZs = new Uint32Array(state.length);
-    state[0] = 0; // blown (open)
     executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(0);
-    // Try again — still no change
     executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(0);
   });
 
-  it("multipleCallsPreserveState — repeated execution preserves initial closed state", () => {
-    const { layout, state } = makeFuseLayout(1);
+  it("multipleCallsPreserveState — repeated execution preserves closed state", () => {
+    const { layout, state } = makeFuseLayout(1, false);
     const highZs = new Uint32Array(state.length);
-    state[0] = 1; // closed
     executeFuse(0, state, highZs, layout);
     executeFuse(0, state, highZs, layout);
     expect(state[0]).toBe(1);

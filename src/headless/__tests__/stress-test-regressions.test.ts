@@ -1,17 +1,6 @@
 /**
- * Stress-test regression suite — bugs found via MCP circuit stress testing.
- *
- * Each test is tagged with a bug ID and targets a specific defect found during
- * systematic circuit building + test-vector validation across complexity tiers.
- *
- * Bug catalog:
- *   BUG-1: Builder silently ignores unknown property names (no diagnostic)
- *   BUG-2: executeSplitter() hardcodes width=1 for all output ports
- *   BUG-3: RegisterFile pins don't scale with bitWidth/addrBits properties
- *   BUG-4: ROM data property as string silently ignored (needs array)
- *   BUG-5a: D_FF ~Q output not masked to bit width (32-bit NOT on 1-bit value)
- *   BUG-5b: isSequentialComponent() doesn't match TS type names — sampleFn never called
- *   BUG-7: executeBarrelShifter() hardcodes bitWidth=8, ignoring component properties
+ * Regression suite — component execution and registry validation tests
+ * found via MCP circuit stress testing.
  */
 
 import { describe, it, expect } from "vitest";
@@ -56,23 +45,15 @@ function createFullRegistry(): ComponentRegistry {
 }
 
 // ===========================================================================
-// BUG-2: executeSplitter() hardcodes width=1 for all output ports
+// Splitter port-width extraction
 // ===========================================================================
-//
-// The default executeSplitter at splitter.ts:354-357 always extracts 1 bit
-// per output port and advances by 1, ignoring the actual port widths from
-// the splitting pattern. A 16→8,8 split should extract bits [0..7] and
-// [8..15] but instead extracts bit 0 and bit 1.
 
-describe("BUG-2: Splitter executeFn ignores port widths", () => {
-  it("executeSplitter should split 16-bit value into two 8-bit halves", () => {
-    // Splitter configured as input=16, output="8,8"
-    // Layout: 1 input (the 16-bit bus), 2 outputs (8-bit halves)
-    const layout = makeLayout(1, 2, { props: { output: "8,8" } });
+describe("Splitter executeFn respects port widths", () => {
+  it("executeSplitter splits 16-bit value into two 8-bit halves", () => {
+    const layout = makeLayout(1, 2, { props: { "output splitting": "8,8" } });
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(3);
 
-    // Input: 0xABCD → expect output[0]=0xCD (low 8), output[1]=0xAB (high 8)
     state[0] = 0xABCD;
 
     executeSplitter(0, state, highZs, layout);
@@ -97,15 +78,11 @@ describe("BUG-2: Splitter executeFn ignores port widths", () => {
 });
 
 // ===========================================================================
-// BUG-3: RegisterFile pins don't scale with bitWidth/addrBits
+// RegisterFile pin scaling
 // ===========================================================================
-//
-// REGISTER_FILE_PIN_DECLARATIONS has defaultBitWidth=1 for all pins.
-// getPins() calls derivePins() without overriding widths from the
-// bitWidth/addrBits properties, so pins stay 1-bit regardless of settings.
 
-describe("BUG-3: RegisterFile pin scaling", () => {
-  it("RegisterFile data pins should scale with bitWidth property", () => {
+describe("RegisterFile pin scaling", () => {
+  it("data pins scale with bitWidth, address pins scale with addrBits", () => {
     const registry = createFullRegistry();
     const def = registry.get("RegisterFile");
     expect(def).toBeDefined();
@@ -122,33 +99,25 @@ describe("BUG-3: RegisterFile pin scaling", () => {
     const rwPin = pins.find(p => p.label === "Rw");
     const raPin = pins.find(p => p.label === "Ra");
 
-    // Data pins should be 16-bit
     expect(dinPin?.bitWidth).toBe(16);
     expect(daPin?.bitWidth).toBe(16);
     expect(dbPin?.bitWidth).toBe(16);
 
-    // Address pins should be 3-bit (addrBits=3)
     expect(rwPin?.bitWidth).toBe(3);
     expect(raPin?.bitWidth).toBe(3);
   });
 });
 
 // ===========================================================================
-// BUG-5a: D_FF ~Q output not masked to bit width
+// D_FF ~Q output bit-width masking
 // ===========================================================================
-//
-// executeD at d.ts:166 does: state[~Q] = (~q) >>> 0
-// For q=0 (1-bit FF), this produces 0xFFFFFFFF instead of 1.
-// Should be masked: (~q & mask) >>> 0 where mask = (1 << bitWidth) - 1.
 
-describe("BUG-5a: D_FF ~Q output not bit-width masked", () => {
-  it("~Q should be 1 when Q is 0 for a 1-bit D flip-flop", () => {
-    // D_FF layout: inputs=[D, C], outputs=[Q, ~Q], state=[storedQ, prevClock]
+describe("D_FF ~Q output is bit-width masked", () => {
+  it("~Q is 1 when Q is 0 for a 1-bit D flip-flop", () => {
     const layout = makeLayout(2, 2, { stateSlots: 2 });
     const state = new Uint32Array(6);
     const highZs = new Uint32Array(6);
 
-    // Initial state: storedQ=0, prevClock=0
     state[4] = 0; // storedQ
     state[5] = 0; // prevClock
 
@@ -158,11 +127,10 @@ describe("BUG-5a: D_FF ~Q output not bit-width masked", () => {
     const notQ = state[layout.wiringTable[layout.outputOffset(0) + 1]];
 
     expect(q).toBe(0);
-    // BUG: notQ is 0xFFFFFFFF (4294967295) instead of 1
     expect(notQ).toBe(1);
   });
 
-  it("~Q should be 0 when Q is 1 for a 1-bit D flip-flop", () => {
+  it("~Q is 0 when Q is 1 for a 1-bit D flip-flop", () => {
     const layout = makeLayout(2, 2, { stateSlots: 2 });
     const state = new Uint32Array(6);
     const highZs = new Uint32Array(6);
@@ -179,8 +147,7 @@ describe("BUG-5a: D_FF ~Q output not bit-width masked", () => {
     expect(notQ).toBe(0);
   });
 
-  it("~Q should be bit-masked for multi-bit D flip-flop (8-bit, Q=0x00)", () => {
-    // For an 8-bit DFF, ~Q of 0x00 should be 0xFF, not 0xFFFFFFFF
+  it("~Q is masked for default bitWidth (1-bit)", () => {
     const layout = makeLayout(2, 2, { stateSlots: 2 });
     const state = new Uint32Array(6);
     const highZs = new Uint32Array(6);
@@ -190,48 +157,29 @@ describe("BUG-5a: D_FF ~Q output not bit-width masked", () => {
     executeD(0, state, highZs, layout);
 
     const notQ = state[layout.wiringTable[layout.outputOffset(0) + 1]];
-
-    // Without bit-width info, at minimum it shouldn't be 0xFFFFFFFF for any
-    // reasonable bit width. The execute function should respect bitWidth.
-    // For 1-bit default: expect 1. For 8-bit: expect 0xFF. For 32-bit: 0xFFFFFFFF.
-    // Since the default bitWidth is 1, expect 1.
     expect(notQ).toBe(1);
   });
 });
 
 // ===========================================================================
-// BUG-5b: isSequentialComponent() doesn't match TS type names
+// Sequential component classification
 // ===========================================================================
-//
-// compiler.ts:897 isSequentialComponent() checks for "Flipflop*",
-// "Register*", "Counter*", "DFF", "DFFSR" — Java naming conventions.
-// The TS port uses "D_FF", "JK_FF", "RS_FF", "T_FF", "D_FF_AS", etc.
-// Result: no flip-flop sampleFn is ever called → they never capture data.
 
-describe("BUG-5b: Sequential component classification", () => {
-  // We can't easily import isSequentialComponent (it's a private function),
-  // so we test the D_FF sampleFn is called by verifying the full pipeline:
-  // set D=1, clock edge → Q should become 1.
-
+describe("Sequential component classification", () => {
   it("sampleD captures D input on rising clock edge", () => {
-    // D_FF: inputs=[D, C], outputs=[Q, ~Q], state=[storedQ, prevClock]
     const layout = makeLayout(2, 2, { stateSlots: 2 });
     const state = new Uint32Array(6);
     const highZs = new Uint32Array(6);
 
-    // Set D=1, clock rising edge (prevClock=0, clock=1)
     state[0] = 1; // D input
     state[1] = 1; // C input (clock high)
     state[4] = 0; // storedQ (initial)
     state[5] = 0; // prevClock (was low)
 
-    // Call sampleFn to capture
     sampleD(0, state, highZs, layout);
 
-    // storedQ should now be 1
     expect(state[4]).toBe(1);
 
-    // Call executeFn to output
     executeD(0, state, highZs, layout);
 
     const q = state[layout.wiringTable[layout.outputOffset(0)]];
@@ -239,10 +187,7 @@ describe("BUG-5b: Sequential component classification", () => {
   });
 
   it("synchronous flip-flop definitions have sampleFn", () => {
-    // Edge-triggered (synchronous) flip-flops need sampleFn for two-phase evaluation.
-    // Async flip-flops (D_FF_AS, JK_FF_AS, RS_FF_AS) intentionally have no sampleFn.
     const syncFlipFlopNames = ["D_FF", "JK_FF", "RS_FF", "T_FF", "Monoflop"];
-
     const registry = createFullRegistry();
 
     for (const name of syncFlipFlopNames) {
@@ -254,7 +199,6 @@ describe("BUG-5b: Sequential component classification", () => {
 
   it("sequential memory components have sampleFn", () => {
     const memoryNames = ["Counter", "CounterPreset", "Register", "RegisterFile"];
-
     const registry = createFullRegistry();
 
     for (const name of memoryNames) {
@@ -266,35 +210,25 @@ describe("BUG-5b: Sequential component classification", () => {
 });
 
 // ===========================================================================
-// BUG-7: executeBarrelShifter hardcodes bitWidth=8
+// BarrelShifter bitWidth from properties
 // ===========================================================================
-//
-// barrel-shifter.ts:196-198 — the static executeBarrelShifter function
-// always delegates to makeExecuteBarrelShifter(8, ...), ignoring the
-// component's actual bitWidth property. A 32-bit barrel shifter silently
-// operates at 8-bit width.
 
-describe("BUG-7: BarrelShifter executeBarrelShifter ignores bitWidth", () => {
-  it("executeBarrelShifter reads bitWidth from getProperty", () => {
-    // With getProperty providing bitWidth=32, the shifter should operate at full width
+describe("BarrelShifter reads bitWidth from properties", () => {
+  it("executeBarrelShifter uses bitWidth=32 from getProperty", () => {
     const layout = makeLayout(2, 1, { props: { bitWidth: 32 } });
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(3);
 
-    // Input: 0xFF, shift left by 4
     state[0] = 0xFF;
     state[1] = 4;
 
     executeBarrelShifter(0, state, highZs, layout);
 
     const result = state[layout.wiringTable[layout.outputOffset(0)]];
-
-    // With bitWidth=32: 0xFF << 4 = 0xFF0 (not truncated to 8 bits)
     expect(result).toBe(0xFF0);
   });
 
-  it("makeExecuteBarrelShifter(32, ...) correctly handles 32-bit shifts", () => {
-    // The factory function itself is correct — verify it works
+  it("makeExecuteBarrelShifter(32, ...) handles 32-bit shifts", () => {
     const execute32 = makeExecuteBarrelShifter(32, false, "logical", "left");
     const layout = makeLayout(2, 1);
     const state = new Uint32Array(3);
@@ -330,39 +264,31 @@ describe("BUG-7: BarrelShifter executeBarrelShifter ignores bitWidth", () => {
 });
 
 // ===========================================================================
-// BUG-1: Builder silently ignores unknown property names
+// Builder property key validation
 // ===========================================================================
-//
-// builder.ts:138 — addComponent copies all props into PropertyBag without
-// checking if they match the component's declared propertyDefs. Unknown
-// properties are silently dropped, leading to confusing runtime behavior
-// (e.g., using "Bits" instead of "bitWidth" silently creates 1-bit components).
 
-describe("BUG-1: Builder should warn on unknown property names", () => {
-  it("registry component property definitions should be queryable", () => {
+describe("Builder property key validation", () => {
+  it("registry component property definitions are queryable", () => {
     const registry = createFullRegistry();
 
-    // Verify key components declare their properties
     const addDef = registry.get("Add");
     expect(addDef).toBeDefined();
     expect(addDef!.propertyDefs).toBeDefined();
     expect(addDef!.propertyDefs!.length).toBeGreaterThan(0);
 
-    // "bitWidth" should be a valid property for Add
     const hasBitWidth = addDef!.propertyDefs!.some(d => d.key === "bitWidth");
     expect(hasBitWidth).toBe(true);
 
-    // "Bits" should NOT be a valid property key (it's the XML attribute name)
+    // "Bits" is the XML attribute name, not the internal property key
     const hasBits = addDef!.propertyDefs!.some(d => d.key === "Bits");
     expect(hasBits).toBe(false);
   });
 
-  it("In component uses 'bitWidth' not 'Bits' as property key", () => {
+  it("In component uses 'bitWidth' as property key", () => {
     const registry = createFullRegistry();
     const inDef = registry.get("In");
     expect(inDef).toBeDefined();
 
-    // Verify creating with correct property name works
     const props = new PropertyBag();
     props.set("bitWidth", 4);
     const element = inDef!.factory(props);
@@ -373,11 +299,11 @@ describe("BUG-1: Builder should warn on unknown property names", () => {
 });
 
 // ===========================================================================
-// BUG-4: ROM data property needs array, string silently ignored
+// ROM data property format
 // ===========================================================================
 
-describe("BUG-4: ROM data property format", () => {
-  it("ROM data property definition should accept HEX_DATA type", () => {
+describe("ROM data property format", () => {
+  it("ROM data property definition uses HEX_DATA type", () => {
     const registry = createFullRegistry();
     const romDef = registry.get("ROM");
     expect(romDef).toBeDefined();
@@ -387,7 +313,7 @@ describe("BUG-4: ROM data property format", () => {
     expect(dataProp!.defaultValue).toEqual([]);
   });
 
-  it("ROM data should be loadable as number array", () => {
+  it("ROM data is loadable as number array", () => {
     const registry = createFullRegistry();
     const romDef = registry.get("ROM");
 
@@ -397,10 +323,8 @@ describe("BUG-4: ROM data property format", () => {
     props.set("data", [0, 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225]);
 
     const element = romDef!.factory(props);
-    // The element should be created successfully with data
     expect(element).toBeDefined();
 
-    // The property should be retrievable as an array
     const elementProps = element.getProperties();
     const data = elementProps.get("data");
     expect(Array.isArray(data)).toBe(true);

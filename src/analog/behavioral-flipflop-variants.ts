@@ -23,6 +23,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 import { makeDiagnostic } from "./diagnostics.js";
@@ -137,17 +138,14 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const jNodeId = this._jPin.nodeId;
-      const kNodeId = this._kPin.nodeId;
-      const jV = jNodeId < voltages.length ? voltages[jNodeId] : 0;
-      const kV = kNodeId < voltages.length ? voltages[kNodeId] : 0;
+      const jV = readMnaVoltage(this._jPin.nodeId, voltages);
+      const kV = readMnaVoltage(this._kPin.nodeId, voltages);
 
       const jLevel = this._jPin.readLogicLevel(jV);
       const kLevel = this._kPin.readLogicLevel(kV);
@@ -165,21 +163,11 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
 
     this._prevClockVoltage = currentClockV;
 
-    const jNodeId = this._jPin.nodeId;
-    const jV = jNodeId < voltages.length ? voltages[jNodeId] : 0;
-    this._jPin.updateCompanion(dt, method, jV);
+    this._jPin.updateCompanion(dt, method, readMnaVoltage(this._jPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const kNodeId = this._kPin.nodeId;
-    const kV = kNodeId < voltages.length ? voltages[kNodeId] : 0;
-    this._kPin.updateCompanion(dt, method, kV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._kPin.updateCompanion(dt, method, readMnaVoltage(this._kPin.nodeId, voltages));
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -287,17 +275,14 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const sNodeId = this._sPin.nodeId;
-      const rNodeId = this._rPin.nodeId;
-      const sV = sNodeId < voltages.length ? voltages[sNodeId] : 0;
-      const rV = rNodeId < voltages.length ? voltages[rNodeId] : 0;
+      const sV = readMnaVoltage(this._sPin.nodeId, voltages);
+      const rV = readMnaVoltage(this._rPin.nodeId, voltages);
 
       const sLevel = this._sPin.readLogicLevel(sV);
       const rLevel = this._rPin.readLogicLevel(rV);
@@ -328,21 +313,11 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
 
     this._prevClockVoltage = currentClockV;
 
-    const sNodeId = this._sPin.nodeId;
-    const sV = sNodeId < voltages.length ? voltages[sNodeId] : 0;
-    this._sPin.updateCompanion(dt, method, sV);
+    this._sPin.updateCompanion(dt, method, readMnaVoltage(this._sPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const rNodeId = this._rPin.nodeId;
-    const rV = rNodeId < voltages.length ? voltages[rNodeId] : 0;
-    this._rPin.updateCompanion(dt, method, rV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._rPin.updateCompanion(dt, method, readMnaVoltage(this._rPin.nodeId, voltages));
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -436,8 +411,7 @@ export class BehavioralTFlipflopElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
@@ -447,8 +421,7 @@ export class BehavioralTFlipflopElement implements AnalogElement {
         // No T enable — always toggle
         this._latchedQ = !this._latchedQ;
       } else {
-        const tNodeId = this._tPin.nodeId;
-        const tV = tNodeId < voltages.length ? voltages[tNodeId] : 0;
+        const tV = readMnaVoltage(this._tPin.nodeId, voltages);
         const tLevel = this._tPin.readLogicLevel(tV);
         if (tLevel === true) {
           this._latchedQ = !this._latchedQ;
@@ -459,19 +432,11 @@ export class BehavioralTFlipflopElement implements AnalogElement {
     this._prevClockVoltage = currentClockV;
 
     if (this._tPin !== null) {
-      const tNodeId = this._tPin.nodeId;
-      const tV = tNodeId < voltages.length ? voltages[tNodeId] : 0;
-      this._tPin.updateCompanion(dt, method, tV);
+      this._tPin.updateCompanion(dt, method, readMnaVoltage(this._tPin.nodeId, voltages));
     }
     this._clockPin.updateCompanion(dt, method, currentClockV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -582,17 +547,14 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const jNodeId = this._jPin.nodeId;
-      const kNodeId = this._kPin.nodeId;
-      const jV = jNodeId < voltages.length ? voltages[jNodeId] : 0;
-      const kV = kNodeId < voltages.length ? voltages[kNodeId] : 0;
+      const jV = readMnaVoltage(this._jPin.nodeId, voltages);
+      const kV = readMnaVoltage(this._kPin.nodeId, voltages);
       const jLevel = this._jPin.readLogicLevel(jV);
       const kLevel = this._kPin.readLogicLevel(kV);
 
@@ -608,14 +570,12 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
     }
 
     // Async Set/Clr override clock-triggered state
-    const setNodeId = this._setPin.nodeId;
-    const setV = setNodeId < voltages.length ? voltages[setNodeId] : 0;
+    const setV = readMnaVoltage(this._setPin.nodeId, voltages);
     if (setV > this._vIH) {
       this._latchedQ = true;
     }
 
-    const clrNodeId = this._clrPin.nodeId;
-    const clrV = clrNodeId < voltages.length ? voltages[clrNodeId] : 0;
+    const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
     if (clrV > this._vIH) {
       this._latchedQ = false;
     }
@@ -623,22 +583,12 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
     this._prevClockVoltage = currentClockV;
 
     this._setPin.updateCompanion(dt, method, setV);
-    const jNodeId = this._jPin.nodeId;
-    const jV = jNodeId < voltages.length ? voltages[jNodeId] : 0;
-    this._jPin.updateCompanion(dt, method, jV);
+    this._jPin.updateCompanion(dt, method, readMnaVoltage(this._jPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const kNodeId = this._kPin.nodeId;
-    const kV = kNodeId < voltages.length ? voltages[kNodeId] : 0;
-    this._kPin.updateCompanion(dt, method, kV);
+    this._kPin.updateCompanion(dt, method, readMnaVoltage(this._kPin.nodeId, voltages));
     this._clrPin.updateCompanion(dt, method, clrV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -736,10 +686,8 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const sNodeId = this._sPin.nodeId;
-    const rNodeId = this._rPin.nodeId;
-    const sV = sNodeId < voltages.length ? voltages[sNodeId] : 0;
-    const rV = rNodeId < voltages.length ? voltages[rNodeId] : 0;
+    const sV = readMnaVoltage(this._sPin.nodeId, voltages);
+    const rV = readMnaVoltage(this._rPin.nodeId, voltages);
 
     const sLevel = this._sPin.readLogicLevel(sV);
     const rLevel = this._rPin.readLogicLevel(rV);
@@ -768,14 +716,8 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
 
     this._sPin.updateCompanion(dt, method, sV);
     this._rPin.updateCompanion(dt, method, rV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -881,15 +823,13 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
   }
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const dNodeId = this._dPin.nodeId;
-      const dV = dNodeId < voltages.length ? voltages[dNodeId] : 0;
+      const dV = readMnaVoltage(this._dPin.nodeId, voltages);
       const dLevel = this._dPin.readLogicLevel(dV);
       if (dLevel !== undefined) {
         this._latchedQ = dLevel;
@@ -897,14 +837,12 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
     }
 
     // Async Set/Clr
-    const setNodeId = this._setPin.nodeId;
-    const setV = setNodeId < voltages.length ? voltages[setNodeId] : 0;
+    const setV = readMnaVoltage(this._setPin.nodeId, voltages);
     if (setV > this._vIH) {
       this._latchedQ = true;
     }
 
-    const clrNodeId = this._clrPin.nodeId;
-    const clrV = clrNodeId < voltages.length ? voltages[clrNodeId] : 0;
+    const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
     if (clrV > this._vIH) {
       this._latchedQ = false;
     }
@@ -912,19 +850,11 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
     this._prevClockVoltage = currentClockV;
 
     this._setPin.updateCompanion(dt, method, setV);
-    const dNodeId = this._dPin.nodeId;
-    const dV = dNodeId < voltages.length ? voltages[dNodeId] : 0;
-    this._dPin.updateCompanion(dt, method, dV);
+    this._dPin.updateCompanion(dt, method, readMnaVoltage(this._dPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
     this._clrPin.updateCompanion(dt, method, clrV);
-
-    const qNodeId = this._qPin.nodeId;
-    const qV = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qV);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarV = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarV);
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {

@@ -28,7 +28,10 @@ import { drawSpectrum, drawFrequencyAxis } from "./fft-renderer.js";
 // Channel descriptors
 // ---------------------------------------------------------------------------
 
-type ChannelKind = "voltage" | "current";
+type ChannelKind = "voltage" | "current" | "elementCurrent";
+
+/** Which statistical overlays to draw for a channel. */
+export type OverlayKind = "min" | "max" | "mean" | "rms";
 
 interface ScopeChannel {
   label: string;
@@ -40,6 +43,8 @@ interface ScopeChannel {
   autoRange: boolean;
   yMin: number;
   yMax: number;
+  /** Active stat overlays. */
+  overlays: Set<OverlayKind>;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,20 +103,46 @@ export class AnalogScopePanel implements MeasurementObserver {
   private _fftEnabled = false;
   private _fftChannelLabel: string | null = null;
 
+  private _wheelHandler: ((e: WheelEvent) => void) | null = null;
+
   constructor(canvas: HTMLCanvasElement | null, engine: AnalogEngine) {
     this._canvas = canvas;
     this._engine = engine;
     engine.addMeasurementObserver(this);
+
+    // Wire up scroll-to-zoom on the scope canvas
+    if (canvas) {
+      this._wheelHandler = (e: WheelEvent) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.3 : 1 / 1.3;
+        this.zoom(factor);
+      };
+      canvas.addEventListener("wheel", this._wheelHandler, { passive: false });
+    }
   }
 
   /** Deregister from the engine. Call when the panel is no longer needed. */
   dispose(): void {
     this._engine.removeMeasurementObserver(this);
+    if (this._canvas && this._wheelHandler) {
+      this._canvas.removeEventListener("wheel", this._wheelHandler);
+      this._wheelHandler = null;
+    }
   }
 
   // -------------------------------------------------------------------------
   // Channel management
   // -------------------------------------------------------------------------
+
+  /** Read-only channel info for UI (e.g. context menus). */
+  getChannelDescriptors(): Array<{ label: string; kind: ChannelKind; autoRange: boolean; yMin: number; yMax: number; overlays: ReadonlySet<OverlayKind> }> {
+    return this._channels.map(c => ({
+      label: c.label, kind: c.kind, autoRange: c.autoRange, yMin: c.yMin, yMax: c.yMax, overlays: c.overlays,
+    }));
+  }
+
+  isFftEnabled(): boolean { return this._fftEnabled; }
+  getFftChannelLabel(): string | null { return this._fftChannelLabel; }
 
   addVoltageChannel(nodeId: number, label: string, color?: string): void {
     const ch = this._makeChannel(label, "voltage", nodeId, color);
@@ -120,6 +151,11 @@ export class AnalogScopePanel implements MeasurementObserver {
 
   addCurrentChannel(branchId: number, label: string, color?: string): void {
     const ch = this._makeChannel(label, "current", branchId, color);
+    this._channels.push(ch);
+  }
+
+  addElementCurrentChannel(elementId: number, label: string, color?: string): void {
+    const ch = this._makeChannel(label, "elementCurrent", elementId, color);
     this._channels.push(ch);
   }
 
@@ -145,6 +181,7 @@ export class AnalogScopePanel implements MeasurementObserver {
       autoRange: true,
       yMin: -1,
       yMax: 1,
+      overlays: new Set<OverlayKind>(),
     };
   }
 
@@ -156,22 +193,24 @@ export class AnalogScopePanel implements MeasurementObserver {
     const t = this._engine.simTime;
 
     for (const ch of this._channels) {
-      const value =
-        ch.kind === "voltage"
-          ? this._engine.getNodeVoltage(ch.nodeOrBranchId)
-          : this._engine.getBranchCurrent(ch.nodeOrBranchId);
+      let value: number;
+      if (ch.kind === "voltage") {
+        value = this._engine.getNodeVoltage(ch.nodeOrBranchId);
+      } else if (ch.kind === "elementCurrent") {
+        value = this._engine.getElementCurrent(ch.nodeOrBranchId);
+      } else {
+        value = this._engine.getBranchCurrent(ch.nodeOrBranchId);
+      }
       ch.buffer.push(t, value);
     }
 
     if (!this._hasData) {
       this._hasData = true;
-      this._viewEnd = t + this._viewDuration;
     }
 
-    // Auto-scroll: keep view end past latest time
-    if (t > this._viewEnd) {
-      this._viewEnd = t + this._viewDuration * 0.1;
-    }
+    // Auto-scroll: smoothly track latest sim time, keeping the view window
+    // ending at the current time so traces paint right-to-left continuously.
+    this._viewEnd = t;
   }
 
   onReset(): void {
@@ -204,6 +243,13 @@ export class AnalogScopePanel implements MeasurementObserver {
     const ch = this._channels.find((c) => c.label === channelLabel);
     if (!ch) return;
     ch.autoRange = true;
+  }
+
+  toggleOverlay(channelLabel: string, overlay: OverlayKind): void {
+    const ch = this._channels.find((c) => c.label === channelLabel);
+    if (!ch) return;
+    if (ch.overlays.has(overlay)) ch.overlays.delete(overlay);
+    else ch.overlays.add(overlay);
   }
 
   zoom(factor: number): void {
@@ -274,22 +320,41 @@ export class AnalogScopePanel implements MeasurementObserver {
     // Draw grid and time axis
     this._drawTimeGrid(ctx, tStart, tEnd, LEFT_MARGIN, offsetY + TOP_MARGIN, drawW, drawH);
 
-    // Draw each channel
+    // Compute shared Y range across all channels so traces are comparable
+    const sharedRange = this._computeSharedYRange(tStart, tEnd);
+
+    // Draw each channel using the shared viewport
+    const sharedVp: ScopeViewport = {
+      x: LEFT_MARGIN,
+      y: offsetY + TOP_MARGIN,
+      width: drawW,
+      height: drawH,
+      tStart,
+      tEnd,
+      yMin: sharedRange.yMin,
+      yMax: sharedRange.yMax,
+    };
+
     for (const ch of this._channels) {
-      const vp = this._buildViewport(ch, tStart, tEnd, LEFT_MARGIN, offsetY + TOP_MARGIN, drawW, drawH);
       const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
 
       if (samples.time.length >= ENVELOPE_THRESHOLD) {
         const env = ch.buffer.getEnvelope(tStart, tEnd, Math.min(drawW, 512));
-        drawEnvelopeTrace(ctx, env, vp, ch.color);
+        drawEnvelopeTrace(ctx, env, sharedVp, ch.color);
       } else {
-        drawPolylineTrace(ctx, samples, vp, ch.color);
+        drawPolylineTrace(ctx, samples, sharedVp, ch.color);
       }
 
-      // Y-axis
-      const unit = ch.kind === "voltage" ? "V" : "A";
-      drawYAxis(ctx, [vp.yMin, vp.yMax], vp, unit, "left");
+      // Draw stat overlay lines
+      if (ch.overlays.size > 0 && samples.value.length > 0) {
+        this._drawOverlays(ctx, ch, samples.value, sharedVp);
+      }
     }
+
+    // Single shared Y-axis
+    const hasCurrent = this._channels.some(c => c.kind === "current" || c.kind === "elementCurrent");
+    const unit = hasCurrent ? "V/A" : "V";
+    drawYAxis(ctx, [sharedRange.yMin, sharedRange.yMax], sharedVp, unit, "left");
 
     // Channel legend
     this._drawLegend(ctx, W, offsetY + TOP_MARGIN);
@@ -303,6 +368,60 @@ export class AnalogScopePanel implements MeasurementObserver {
       offsetY + TOP_MARGIN + drawH,
       drawW,
     );
+  }
+
+  private _drawOverlays(
+    ctx: CanvasRenderingContext2D,
+    ch: ScopeChannel,
+    values: Float64Array,
+    vp: ScopeViewport,
+  ): void {
+    const n = values.length;
+    if (n === 0) return;
+
+    // Compute requested stats
+    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+    for (let i = 0; i < n; i++) {
+      const v = values[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      sumSq += v * v;
+    }
+    const mean = sum / n;
+    const rms = Math.sqrt(sumSq / n);
+
+    const stats: Array<{ kind: OverlayKind; value: number; dash: number[] }> = [];
+    if (ch.overlays.has("min"))  stats.push({ kind: "min",  value: min,  dash: [4, 4] });
+    if (ch.overlays.has("max"))  stats.push({ kind: "max",  value: max,  dash: [4, 4] });
+    if (ch.overlays.has("mean")) stats.push({ kind: "mean", value: mean, dash: [8, 4] });
+    if (ch.overlays.has("rms"))  stats.push({ kind: "rms",  value: rms,  dash: [2, 2] });
+
+    const yRange = vp.yMax - vp.yMin;
+    if (yRange === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.font = "10px monospace";
+    for (const stat of stats) {
+      const yFrac = 1 - (stat.value - vp.yMin) / yRange;
+      const yPx = vp.y + yFrac * vp.height;
+      if (yPx < vp.y || yPx > vp.y + vp.height) continue;
+
+      ctx.strokeStyle = ch.color;
+      ctx.setLineDash(stat.dash);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(vp.x, yPx);
+      ctx.lineTo(vp.x + vp.width, yPx);
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = ch.color;
+      ctx.fillText(`${stat.kind}: ${stat.value.toPrecision(4)}`, vp.x + vp.width - 120, yPx - 3);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   private _renderFft(
@@ -389,37 +508,33 @@ export class AnalogScopePanel implements MeasurementObserver {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private _buildViewport(
-    ch: ScopeChannel,
+  /**
+   * Compute a shared Y range that encompasses all channels' visible samples.
+   * Adds 10% padding so traces don't touch the edges.
+   */
+  private _computeSharedYRange(
     tStart: number,
     tEnd: number,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-  ): ScopeViewport {
-    let yMin = ch.yMin;
-    let yMax = ch.yMax;
+  ): { yMin: number; yMax: number } {
+    let globalMin = Infinity;
+    let globalMax = -Infinity;
 
-    if (ch.autoRange) {
+    for (const ch of this._channels) {
       const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
-      if (samples.value.length > 0) {
-        let mn = samples.value[0];
-        let mx = samples.value[0];
-        for (let i = 1; i < samples.value.length; i++) {
-          const v = samples.value[i];
-          if (v < mn) mn = v;
-          if (v > mx) mx = v;
-        }
-        const padding = (mx - mn) * 0.1 || 0.5;
-        yMin = mn - padding;
-        yMax = mx + padding;
-        ch.yMin = yMin;
-        ch.yMax = yMax;
+      for (let i = 0; i < samples.value.length; i++) {
+        const v = samples.value[i];
+        if (v < globalMin) globalMin = v;
+        if (v > globalMax) globalMax = v;
       }
     }
 
-    return { x, y, width: w, height: h, tStart, tEnd, yMin, yMax };
+    if (!isFinite(globalMin) || !isFinite(globalMax)) {
+      return { yMin: -1, yMax: 1 };
+    }
+
+    const span = globalMax - globalMin;
+    const padding = span > 0 ? span * 0.1 : 0.5;
+    return { yMin: globalMin - padding, yMax: globalMax + padding };
   }
 
   private _drawTimeGrid(

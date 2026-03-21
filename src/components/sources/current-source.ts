@@ -11,6 +11,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import { PinDirection, type Pin, type PinDeclaration, type Rotation } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -45,29 +46,52 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 1,
-      y: this.position.y - 2,
-      width: 2,
-      height: 4,
+      x: this.position.x,
+      y: this.position.y - 0.75,
+      width: 4,
+      height: 1.5,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    // Circle body: radius 1, centered at (0, 0)
-    ctx.drawCircle(0, 0, 1, false);
-    // Arrow indicating current direction (upward from neg to pos)
-    ctx.drawLine(0, 0.7, 0, -0.7);
-    ctx.drawLine(0, -0.7, -0.3, -0.3);
-    ctx.drawLine(0, -0.7, 0.3, -0.3);
-    // Label
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(label, 0, -1.4, { horizontal: "center", vertical: "bottom" });
+
+    // Lead from pos pin to body
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1.1875, 0);
+
+    // Lead from neg pin to body
+    if (vNeg !== undefined) {
+      ctx.setColor(signals!.voltageColor(vNeg));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.8125, 0, 4, 0);
+
+    // Body (circle and arrow) stays COMPONENT color
+    ctx.setColor("COMPONENT");
+
+    // Circle at center
+    ctx.drawCircle(2, 0, 0.75, false);
+
+    // Arrow shaft
+    ctx.drawLine(1.59375, 0, 2.1625, 0);
+
+    // Arrow head: calcArrow((2,0), (2.40625,0), 0.25, 0.25)
+    ctx.drawPolygon([
+      { x: 2.40625, y: 0 },
+      { x: 2.15625, y: 0.25 },
+      { x: 2.15625, y: -0.25 },
+    ], true);
+
     ctx.restore();
   }
 
@@ -84,7 +108,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
     label: "pos",
     direction: PinDirection.INPUT,
-    position: { x: 0, y: -2 },
+    position: { x: 0, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,
@@ -92,7 +116,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
     label: "neg",
     direction: PinDirection.OUTPUT,
-    position: { x: 0, y: 2 },
+    position: { x: 4, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,

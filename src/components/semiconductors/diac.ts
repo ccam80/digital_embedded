@@ -15,8 +15,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -203,45 +203,66 @@ export class DiacElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 1,
       width: 4,
-      height: 1,
+      height: 2,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
+
+    const vA = signals?.getPinVoltage("A");
+    const vB = signals?.getPinVoltage("B");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
+    const hs = 1.0;
+
+    // A lead
+    if (signals && vA !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0, 0, 1.5, 0);
+
+    // B lead
+    if (signals && vB !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(2.5, 0, 4, 0);
 
-    // Forward triangle
+    // Body (plate bars and triangles) stays COMPONENT color
+    ctx.setColor("COMPONENT");
+
+    // plate1 bar at x=1.5
+    ctx.drawLine(1.5, -hs, 1.5, hs);
+    // plate2 bar at x=2.5
+    ctx.drawLine(2.5, -hs, 2.5, hs);
+
+    // arr0: forward triangle pointing right
     ctx.drawPolygon([
-      { x: 1.5, y: -0.4 },
-      { x: 1.5, y: 0.4 },
-      { x: 2.2, y: 0 },
+      { x: 1.5, y: 0.5 },
+      { x: 2.5, y: 1.0 },
+      { x: 2.5, y: 0 },
     ], true);
 
-    // Reverse triangle (anti-parallel, no gate)
+    // arr1: reverse triangle pointing left
     ctx.drawPolygon([
-      { x: 2.5, y: -0.4 },
-      { x: 2.5, y: 0.4 },
-      { x: 1.8, y: 0 },
+      { x: 2.5, y: -0.5 },
+      { x: 1.5, y: -1.0 },
+      { x: 1.5, y: 0 },
     ], true);
-
-    // Bars at both ends
-    ctx.drawLine(1.5, -0.4, 1.5, 0.4);
-    ctx.drawLine(2.5, -0.4, 2.5, 0.4);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 2, -0.75, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, 2, -1.25, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

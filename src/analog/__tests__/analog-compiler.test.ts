@@ -369,19 +369,116 @@ describe("SimulationMode", () => {
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 
-  it("digital_mode_falls_through_to_analog_factory", () => {
+  it("digital_mode_creates_bridge_instance", () => {
+    // simulationMode: "digital" synthesizes an inner digital circuit and
+    // creates a BridgeInstance — the analogFactory is NOT called.
+
+    // Build a fresh registry that includes In, Out, Ground, and BehavioralAnd
+    // with a working factory (needed by synthesizeDigitalCircuit).
+    const registry = new ComponentRegistry();
+    const factorySpy = vi.fn();
+
+    // Helper: make a minimal element stub for a given typeId and pin list
+    function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]) {
+      return (props: PropertyBag): CircuitElement => ({
+        typeId,
+        instanceId: crypto.randomUUID(),
+        position: { x: 0, y: 0 },
+        rotation: 0 as const,
+        mirror: false,
+        getPins() { return pinsFn(props); },
+        getProperties() { return props; },
+        getAttribute(k: string) { return props.has(k) ? props.get(k) : undefined; },
+        draw() {},
+        getBoundingBox() { return { x: 0, y: 0, width: 4, height: 4 }; },
+        serialize() { return { typeId, instanceId: this.instanceId, position: this.position, rotation: 0, mirror: false, properties: {} }; },
+        getHelpText() { return ""; },
+      } as unknown as CircuitElement);
+    }
+
+    registry.register({
+      ...makeBaseDef("Ground"),
+      engineType: "analog" as const,
+    });
+
+    registry.register({
+      ...makeBaseDef("In"),
+      factory: makeStubElFactory("In", (props) => [{
+        direction: PinDirection.OUTPUT,
+        position: { x: 0, y: 0 },
+        label: "out",
+        bitWidth: props.getOrDefault<number>("bitWidth", 1),
+        isNegated: false,
+        isClock: false,
+      }]),
+      executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
+      pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+    });
+
+    registry.register({
+      ...makeBaseDef("Out"),
+      factory: makeStubElFactory("Out", (props) => [{
+        direction: PinDirection.INPUT,
+        position: { x: 0, y: 0 },
+        label: "in",
+        bitWidth: props.getOrDefault<number>("bitWidth", 1),
+        isNegated: false,
+        isClock: false,
+      }]),
+      executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
+      pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+    });
+
+    registry.register({
+      ...makeBaseDef("BehavioralAnd"),
+      engineType: "both" as const,
+      pinLayout: makeGatePinLayout(2),
+      simulationModes: ["digital", "behavioral"] as const,
+      factory: makeStubElFactory("BehavioralAnd", (_props) => [
+        { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false },
+        { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false },
+        { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false },
+      ]),
+      analogFactory: factorySpy as unknown as import("../../core/registry.js").ComponentDefinition["analogFactory"],
+    });
+
+    // Build the outer analog circuit with the AND gate set to simulationMode: "digital"
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "digital"]]);
-    const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
+    const circuit = new Circuit({ engineType: "analog" });
+
+    const andGate = makeElement("BehavioralAnd", "and1", [
+      { x: 10, y: 0, label: "In_1" },
+      { x: 20, y: 0, label: "In_2" },
+      { x: 30, y: 0, label: "out" },
+    ], propsMap);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+
+    circuit.addElement(andGate);
+    circuit.addElement(gnd);
+
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
+    circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
+
     const compiled = compileAnalogCircuit(circuit, registry);
 
-    // Factory SHOULD be called — digital mode falls through to behavioral (analogFactory)
-    expect(factorySpy).toHaveBeenCalled();
+    // analogFactory should NOT be called — bridge path bypasses it
+    expect(factorySpy).not.toHaveBeenCalled();
 
-    // No stub diagnostic should be emitted
-    const stubDiags = compiled.diagnostics.filter(
-      (d) => d.code === ("digital-bridge-not-yet-implemented" as string),
-    );
-    expect(stubDiags).toHaveLength(0);
+    // Should produce exactly one bridge instance for the digital component
+    expect(compiled.bridges).toHaveLength(1);
+    const bridge = compiled.bridges[0]!;
+    expect(bridge.compiledInner).toBeDefined();
+
+    // BehavioralAnd has 2 inputs and 1 output
+    expect(bridge.inputAdapters).toHaveLength(2);
+    expect(bridge.outputAdapters).toHaveLength(1);
+
+    // No errors
+    expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 
   it("transistor_mode_without_registry_emits_diagnostic", () => {

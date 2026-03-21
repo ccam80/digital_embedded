@@ -178,7 +178,7 @@ function getVoltageAtX(
       (Math.abs(wire.start.x - targetX) < 0.5 || Math.abs(wire.end.x - targetX) < 0.5) &&
       nodeId > 0
     ) {
-      return engine.getNodeVoltage(nodeId - 1);
+      return engine.getNodeVoltage(nodeId);
     }
   }
   return 0;

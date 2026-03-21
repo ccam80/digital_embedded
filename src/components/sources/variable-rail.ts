@@ -25,6 +25,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -58,21 +59,27 @@ export class VariableRailElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x - 1, y: this.position.y - 1, width: 4, height: 2 };
+    return { x: this.position.x - 2, y: this.position.y - 1, width: 4, height: 2 };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vPos = signals?.getPinVoltage("pos");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(1, 0, 1, false);
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("±", 1, 0, { horizontal: "center", vertical: "center" });
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(label, 1, -1.2, { horizontal: "center", vertical: "bottom" });
+
+    // Lead from pos pin to body
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(-2, 0, 0, 0);
+
+    // Circle body stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawCircle(1, 0, 1, false);
+
     ctx.restore();
   }
 
@@ -87,18 +94,10 @@ export class VariableRailElement extends AbstractCircuitElement {
 
 const VARIABLE_RAIL_PIN_LAYOUT: PinDeclaration[] = [
   {
-    direction: PinDirection.INPUT,
     label: "pos",
+    direction: PinDirection.INPUT,
+    position: { x: 0, y: 0 },
     defaultBitWidth: 1,
-    position: { x: -2, y: 0 },
-    isNegatable: false,
-    isClockCapable: false,
-  },
-  {
-    direction: PinDirection.OUTPUT,
-    label: "neg",
-    defaultBitWidth: 1,
-    position: { x: 4, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },
@@ -248,11 +247,11 @@ export const VariableRailDefinition: ComponentDefinition = {
   ): AnalogElement {
     const voltage = props.getOrDefault<number>("voltage", 5);
     const resistance = props.getOrDefault<number>("resistance", 0.01);
-    // nodeIds[0] = positive terminal, nodeIds[1] = negative terminal
-    // nodeIds[2] = internal node (allocated by compiler for internal resistance)
+    // nodeIds[0] = positive terminal (single pin); neg terminal is ground (node 0)
+    // nodeIds[1] = internal node (allocated by compiler for internal resistance), if any
     const nodePos = nodeIds[0];
-    const nodeNeg = nodeIds[1];
-    const nodeInt = nodeIds[2] ?? nodeIds[0];
+    const nodeNeg = 0;
+    const nodeInt = nodeIds[1] ?? nodeIds[0];
     return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
   },
 };

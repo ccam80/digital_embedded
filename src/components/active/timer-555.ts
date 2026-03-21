@@ -24,6 +24,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -142,26 +143,86 @@ export class Timer555Element extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    const variant = this._properties.getOrDefault<string>("variant", "bipolar");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vVcc  = signals?.getPinVoltage("VCC");
+    const vGnd  = signals?.getPinVoltage("GND");
+    const vTrig = signals?.getPinVoltage("TRIG");
+    const vThr  = signals?.getPinVoltage("THR");
+    const vCtrl = signals?.getPinVoltage("CTRL");
+    const vRst  = signals?.getPinVoltage("RST");
+    const vDis  = signals?.getPinVoltage("DIS");
+    const vOut  = signals?.getPinVoltage("OUT");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    ctx.drawRect(0, -3, 4, 6, false);
+    // IC body rectangle — stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawRect(0.5, -3.5, 3, 7, false);
 
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("555", 2, -0.5, { horizontal: "center", vertical: "middle" });
-
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText(variant, 2, 0.8, { horizontal: "center", vertical: "middle" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -3.5, { horizontal: "center", vertical: "bottom" });
+    // DIS lead (west)
+    if (vDis !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vDis));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, 0.5, -1);
+
+    // THR lead (west)
+    if (vThr !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vThr));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, 0.5, 0);
+
+    // TRIG lead (west)
+    if (vTrig !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vTrig));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 2, 0.5, 2);
+
+    // OUT lead (east)
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3.5, -1, 4, -1);
+
+    // CTRL lead (east)
+    if (vCtrl !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrl));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3.5, 1, 4, 1);
+
+    // VCC lead (north) — pin at (2,-4), body top at y=-3.5
+    if (vVcc !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vVcc));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, -4, 2, -3.5);
+
+    // RST lead (north) — pin at (2,-3), body top at y=-3.5
+    if (vRst !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vRst));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, -3, 2, -3.5);
+
+    // GND lead (south)
+    if (vGnd !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vGnd));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, 3.5, 2, 4);
 
     ctx.restore();
   }

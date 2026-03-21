@@ -209,19 +209,13 @@ export function validateModel(model: DeviceModel): SolverDiagnostic[] {
     diagnostics.push(
       makeDiagnostic(
         "model-level-unsupported",
-        "warning",
+        "error",
         `Model "${model.name}" requests Level ${model.level} equations for ${model.type}, but only Level 1 and 2 are supported`,
         {
           explanation:
             `Model level ${model.level} is not implemented. ` +
-            `Simulation will use Level 2 equations with the provided parameters. ` +
-            `Results may differ from a full Level ${model.level} simulation.`,
-          suggestions: [
-            {
-              text: `Use a Level 1 or Level 2 .MODEL statement for accurate results.`,
-              automatable: false,
-            },
-          ],
+            `Level 2 equations will be used, but results will be incorrect for BSIM3/4 and Level 3+ MOSFETs. ` +
+            `Use a Level 1 or Level 2 .MODEL statement instead.`,
         },
       ),
     );

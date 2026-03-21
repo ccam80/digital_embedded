@@ -34,6 +34,7 @@ import {
 } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 
@@ -295,36 +296,56 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.25, width: 1, height: 0.5 };
+    return {
+      x: this.position.x - 0.375,
+      y: this.position.y - 0.75,
+      width: 1.375,
+      height: 1.5,
+    };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
 
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+    const hasVoltage = vPos !== undefined && vNeg !== undefined;
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Resistor body rectangle
-    ctx.drawRect(0.15, -0.2, 0.7, 0.4);
+    // Zigzag resistor body: bodyLen=32px=2gu > span=1gu → lead1=(0,0), lead2=(1,0)
+    const hs = 6 / 16; // 0.375 grid units perpendicular offset
+    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
+    for (let i = 0; i < 4; i++) {
+      pts.push({ x: ((1 + 4 * i) * 1) / 16, y: hs });
+      pts.push({ x: ((3 + 4 * i) * 1) / 16, y: -hs });
+    }
+    pts.push({ x: 1, y: 0 });
 
-    // Lead lines
-    ctx.drawLine(0, 0, 0.15, 0);
-    ctx.drawLine(0.85, 0, 1, 0);
+    // Zigzag gradient from pos→neg
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(0, 0, 1, 0, [
+        { offset: 0, color: signals!.voltageColor(vPos!) },
+        { offset: 1, color: signals!.voltageColor(vNeg!) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+    }
 
-    // NTC arrow indicating negative temperature coefficient
-    ctx.drawLine(0.7, 0.2, 0.85, -0.2);
-    ctx.drawLine(0.8, -0.2, 0.85, -0.2);
-    ctx.drawLine(0.85, -0.2, 0.85, -0.1);
-
-    // "T" label inside body
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.3 });
-    ctx.drawText("T", 0.5, 0, { horizontal: "center", vertical: "center" });
+    // NTC hockey stick: horizontal segment then diagonal sweep — body decoration, stays COMPONENT
+    // From (-0.375, 0.75) → (0.375, 0.75) → (1.0, -0.75)
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(-0.375, 0.75, 0.375, 0.75);
+    ctx.drawLine(0.375, 0.75, 1.0, -0.75);
 
     if (label.length > 0) {
+      ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.5, -0.35, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, 0.5, 0.375, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

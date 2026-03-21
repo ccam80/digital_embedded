@@ -6,135 +6,27 @@
  */
 
 import type { Point } from "@/core/renderer-interface";
-import type { CircuitElement } from "@/core/element";
-import type { Wire } from "@/core/circuit";
-import type { HitResult } from "./hit-test.js";
 
 // ---------------------------------------------------------------------------
-// MenuAction
+// MenuItem — actions and separators
 // ---------------------------------------------------------------------------
 
 export interface MenuAction {
+  kind?: "action";
   label: string;
   shortcut?: string;
   action: () => void;
   enabled: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Action factory functions
-// ---------------------------------------------------------------------------
-
-/**
- * Build a context menu action list for a selected element.
- */
-export function buildMenuForElement(
-  _element: CircuitElement,
-  callbacks: {
-    rotate?: () => void;
-    mirror?: () => void;
-    delete?: () => void;
-    copy?: () => void;
-    properties?: () => void;
-    help?: () => void;
-    openSubcircuit?: () => void;
-  } = {},
-): MenuAction[] {
-  const actions: MenuAction[] = [];
-  if (callbacks.openSubcircuit) {
-    actions.push({
-      label: "Open Subcircuit",
-      action: callbacks.openSubcircuit,
-      enabled: true,
-    });
-  }
-  actions.push(
-    {
-      label: "Rotate",
-      shortcut: "R",
-      action: callbacks.rotate ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Mirror",
-      shortcut: "M",
-      action: callbacks.mirror ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Delete",
-      shortcut: "Delete",
-      action: callbacks.delete ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Copy",
-      shortcut: "Ctrl+C",
-      action: callbacks.copy ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Properties",
-      action: callbacks.properties ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Help",
-      action: callbacks.help ?? (() => {}),
-      enabled: true,
-    },
-  );
-  return actions;
+export interface MenuSeparator {
+  kind: "separator";
 }
 
-/**
- * Build a context menu action list for a selected wire.
- */
-export function buildMenuForWire(
-  _wire: Wire,
-  callbacks: {
-    delete?: () => void;
-    split?: () => void;
-  } = {},
-): MenuAction[] {
-  return [
-    {
-      label: "Delete",
-      shortcut: "Delete",
-      action: callbacks.delete ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Split",
-      action: callbacks.split ?? (() => {}),
-      enabled: true,
-    },
-  ];
-}
+export type MenuItem = MenuAction | MenuSeparator;
 
-/**
- * Build a context menu action list for an empty canvas area.
- */
-export function buildMenuForCanvas(
-  callbacks: {
-    paste?: () => void;
-    selectAll?: () => void;
-  } = {},
-): MenuAction[] {
-  return [
-    {
-      label: "Paste",
-      shortcut: "Ctrl+V",
-      action: callbacks.paste ?? (() => {}),
-      enabled: true,
-    },
-    {
-      label: "Select All",
-      shortcut: "Ctrl+A",
-      action: callbacks.selectAll ?? (() => {}),
-      enabled: true,
-    },
-  ];
+export function separator(): MenuSeparator {
+  return { kind: "separator" };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,35 +42,60 @@ export function buildMenuForCanvas(
 export class ContextMenu {
   private readonly _container: HTMLElement;
   private _menuEl: HTMLElement | null = null;
-  private _dismissHandler: (() => void) | null = null;
+  private _dismissHandler: ((e: Event) => void) | null = null;
 
   constructor(container: HTMLElement) {
     this._container = container;
   }
 
   /**
-   * Display a context menu at the given screen position with the given actions.
+   * Display a context menu at the given screen position with the given items.
    * Any previously shown menu is hidden first.
    */
-  show(position: Point, _target: HitResult, actions: MenuAction[]): void {
+  showItems(x: number, y: number, items: MenuItem[]): void {
     this.hide();
+    if (items.length === 0) return;
 
-    const menu = this._buildMenu(actions);
-    menu.style.left = `${position.x}px`;
-    menu.style.top = `${position.y}px`;
-    menu.style.position = "absolute";
+    const menu = this._buildMenu(items);
+    menu.style.position = "fixed";
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
 
     this._container.appendChild(menu);
     this._menuEl = menu;
 
-    // Dismiss on next click outside the menu.
-    const dismiss = () => {
-      this.hide();
+    // Clamp to viewport edges after the element has a layout size.
+    requestAnimationFrame(() => {
+      if (!this._menuEl) return;
+      const rect = this._menuEl.getBoundingClientRect();
+      if (rect.right > window.innerWidth) {
+        this._menuEl.style.left = `${Math.max(0, window.innerWidth - rect.width - 4)}px`;
+      }
+      if (rect.bottom > window.innerHeight) {
+        this._menuEl.style.top = `${Math.max(0, window.innerHeight - rect.height - 4)}px`;
+      }
+    });
+
+    // Dismiss on next pointer-down outside the menu, or Escape.
+    const dismiss = (ev: Event) => {
+      if (ev instanceof KeyboardEvent) {
+        if (ev.key === "Escape") this.hide();
+        return;
+      }
+      if (this._menuEl && !this._menuEl.contains(ev.target as Node)) {
+        this.hide();
+      }
     };
     this._dismissHandler = dismiss;
     setTimeout(() => {
-      document.addEventListener("click", dismiss, { once: true });
+      document.addEventListener("pointerdown", dismiss);
+      document.addEventListener("keydown", dismiss);
     }, 0);
+  }
+
+  /** Legacy overload kept for any existing callers. */
+  show(position: Point, _target: unknown, actions: MenuAction[]): void {
+    this.showItems(position.x, position.y, actions);
   }
 
   /**
@@ -186,13 +103,12 @@ export class ContextMenu {
    */
   hide(): void {
     if (this._menuEl !== null) {
-      if (this._menuEl.parentNode !== null) {
-        this._menuEl.parentNode.removeChild(this._menuEl);
-      }
+      this._menuEl.remove();
       this._menuEl = null;
     }
     if (this._dismissHandler !== null) {
-      document.removeEventListener("click", this._dismissHandler);
+      document.removeEventListener("pointerdown", this._dismissHandler);
+      document.removeEventListener("keydown", this._dismissHandler);
       this._dismissHandler = null;
     }
   }
@@ -210,45 +126,55 @@ export class ContextMenu {
   getVisibleLabels(): string[] {
     if (this._menuEl === null) return [];
     const items = this._menuEl.querySelectorAll(".ctx-menu-item");
-    return Array.from(items).map((el) => (el as HTMLElement).textContent ?? "");
+    return Array.from(items).map(
+      (el) => el.querySelector(".ctx-menu-label")?.textContent ?? "",
+    );
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private _buildMenu(actions: MenuAction[]): HTMLElement {
+  private _buildMenu(items: MenuItem[]): HTMLElement {
     const menu = document.createElement("ul");
     menu.className = "ctx-menu";
 
-    for (const action of actions) {
-      const item = document.createElement("li");
-      item.className = "ctx-menu-item";
+    for (const item of items) {
+      if (item.kind === "separator") {
+        const sep = document.createElement("li");
+        sep.className = "ctx-menu-separator";
+        menu.appendChild(sep);
+        continue;
+      }
+
+      const action = item as MenuAction;
+      const li = document.createElement("li");
+      li.className = "ctx-menu-item";
       if (!action.enabled) {
-        item.className += " ctx-menu-item--disabled";
+        li.classList.add("ctx-menu-item--disabled");
       }
 
       const labelSpan = document.createElement("span");
       labelSpan.className = "ctx-menu-label";
       labelSpan.textContent = action.label;
-      item.appendChild(labelSpan);
+      li.appendChild(labelSpan);
 
       if (action.shortcut !== undefined) {
         const shortcutSpan = document.createElement("span");
         shortcutSpan.className = "ctx-menu-shortcut";
         shortcutSpan.textContent = action.shortcut;
-        item.appendChild(shortcutSpan);
+        li.appendChild(shortcutSpan);
       }
 
       if (action.enabled) {
-        item.addEventListener("click", (e) => {
+        li.addEventListener("click", (e) => {
           e.stopPropagation();
           action.action();
           this.hide();
         });
       }
 
-      menu.appendChild(item);
+      menu.appendChild(li);
     }
 
     return menu;

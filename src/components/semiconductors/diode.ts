@@ -16,8 +16,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -262,18 +262,34 @@ export class DiodeElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
+
+    const vA = signals?.getPinVoltage("A");
+    const vK = signals?.getPinVoltage("K");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines from pins to diode body
+    // Anode lead
+    if (signals && vA !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0, 0, 1.5, 0);
+
+    // Cathode lead
+    if (signals && vK !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vK));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(2.5, 0, 4, 0);
 
-    // Triangle body pointing right (anode left, cathode right)
+    // Triangle body pointing right (anode left, cathode right) — body stays COMPONENT
+    ctx.setColor("COMPONENT");
     ctx.drawPolygon([
       { x: 1.5, y: -0.5 },
       { x: 1.5, y: 0.5 },

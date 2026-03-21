@@ -15,6 +15,7 @@ import type {
   ThemeColor,
   FontSpec,
   ColorScheme,
+  GradientStop,
 } from "@/core/renderer-interface";
 
 export class CanvasRenderer implements RenderContext {
@@ -168,6 +169,18 @@ export class CanvasRenderer implements RenderContext {
   setRawColor(css: string): void {
     this._ctx.strokeStyle = css;
     this._ctx.fillStyle = css;
+  }
+
+  setLinearGradient(
+    x1: number, y1: number, x2: number, y2: number,
+    stops: readonly GradientStop[],
+  ): void {
+    const grad = this._ctx.createLinearGradient(x1, y1, x2, y2);
+    for (const stop of stops) {
+      grad.addColorStop(stop.offset, stop.color);
+    }
+    this._ctx.strokeStyle = grad;
+    this._ctx.fillStyle = grad;
   }
 
   setLineWidth(width: number): void {

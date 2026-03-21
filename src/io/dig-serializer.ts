@@ -90,7 +90,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
     return `<string>${escapeXml(value)}</string>`;
   }
   if (typeof value === "number") {
-    return `<int>${value}</int>`;
+    return Number.isInteger(value) ? `<int>${value}</int>` : `<double>${value}</double>`;
   }
   if (typeof value === "bigint") {
     return `<long>${value}</long>`;
@@ -101,6 +101,15 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
   // number[] — unlikely in element attributes, but handle gracefully
   if (Array.isArray(value)) {
     return `<string>${value.join(",")}</string>`;
+  }
+  // Guard against plain objects — JSON-serialize rather than toString()
+  // which would produce "[object Object]"
+  if (typeof value === "object" && value !== null) {
+    try {
+      return `<string>${escapeXml(JSON.stringify(value))}</string>`;
+    } catch {
+      return `<string>[unserializable]</string>`;
+    }
   }
   return `<string>${String(value)}</string>`;
 }
@@ -199,6 +208,13 @@ function serializeElement(
 
     // Skip rotation/mirror — already handled above
     if (propKey === "rotation" || propKey === "mirror") continue;
+
+    // Skip compiler-injected transient state that is regenerated on every
+    // compile. _pinElectrical is a resolved object injected by the analog
+    // compiler — it must not be serialized (it would produce "[object Object]").
+    // User per-pin overrides are stored separately as _pinElectricalOverrides
+    // (a JSON string) which serializes correctly.
+    if (propKey === "_pinElectrical") continue;
 
     // Skip internal-only keys that don't map to XML
     if (propKey === "_inverterLabels") {

@@ -135,11 +135,39 @@ import { KeyboardDefinition } from "./terminal/keyboard.js";
 
 // Analog passives
 import { ResistorDefinition } from "./passives/resistor.js";
+import { CapacitorDefinition } from "./passives/capacitor.js";
+import { InductorDefinition } from "./passives/inductor.js";
+import { AnalogFuseDefinition } from "./passives/analog-fuse.js";
+import { PotentiometerDefinition } from "./passives/potentiometer.js";
+import { TransformerDefinition } from "./passives/transformer.js";
+import { TappedTransformerDefinition } from "./passives/tapped-transformer.js";
+import { CrystalDefinition } from "./passives/crystal.js";
+import { MemristorDefinition } from "./passives/memristor.js";
+import { PolarizedCapDefinition } from "./passives/polarized-cap.js";
+import { TransmissionLineDefinition } from "./passives/transmission-line.js";
+
+// Analog semiconductors
+import { DiodeDefinition as AnalogDiodeDefinition } from "./semiconductors/diode.js";
+import { ZenerDiodeDefinition } from "./semiconductors/zener.js";
+import { NpnBjtDefinition } from "./semiconductors/bjt.js";
+import { PnpBjtDefinition } from "./semiconductors/bjt.js";
+import { NmosfetDefinition } from "./semiconductors/mosfet.js";
+import { PmosfetDefinition } from "./semiconductors/mosfet.js";
+import { NJfetDefinition } from "./semiconductors/njfet.js";
+import { PJfetDefinition } from "./semiconductors/pjfet.js";
+import { ScrDefinition } from "./semiconductors/scr.js";
+import { TriacDefinition } from "./semiconductors/triac.js";
+import { DiacDefinition } from "./semiconductors/diac.js";
+import { TunnelDiodeDefinition } from "./semiconductors/tunnel-diode.js";
+import { VaractorDefinition } from "./semiconductors/varactor.js";
+import { TriodeDefinition } from "./semiconductors/triode.js";
 
 // Analog sources
 import { AnalogGroundDefinition } from "./sources/ground.js";
 import { DcVoltageSourceDefinition } from "./sources/dc-voltage-source.js";
 import { CurrentSourceDefinition } from "./sources/current-source.js";
+import { AcVoltageSourceDefinition } from "./sources/ac-voltage-source.js";
+import { VariableRailDefinition } from "./sources/variable-rail.js";
 
 // Analog active
 import { AnalogComparatorDefinition } from "./active/comparator.js";
@@ -149,6 +177,20 @@ import { OTADefinition } from "./active/ota.js";
 import { OptocouplerDefinition } from "./active/optocoupler.js";
 import { DACDefinition } from "./active/dac.js";
 import { ADCDefinition } from "./active/adc.js";
+import { OpAmpDefinition } from "./active/opamp.js";
+import { VCVSDefinition } from "./active/vcvs.js";
+import { VCCSDefinition } from "./active/vccs.js";
+import { CCVSDefinition } from "./active/ccvs.js";
+import { CCCSDefinition } from "./active/cccs.js";
+import { SchmittInvertingDefinition } from "./active/schmitt-trigger.js";
+import { SchmittNonInvertingDefinition } from "./active/schmitt-trigger.js";
+import { AnalogSwitchSPSTDefinition } from "./active/analog-switch.js";
+import { AnalogSwitchSPDTDefinition } from "./active/analog-switch.js";
+
+// Sensors (analog, registered under PASSIVES category)
+import { LDRDefinition } from "./sensors/ldr.js";
+import { NTCThermistorDefinition } from "./sensors/ntc-thermistor.js";
+import { SparkGapDefinition } from "./sensors/spark-gap.js";
 
 // Basic
 import { BooleanFunctionDefinition } from "./basic/function.js";
@@ -300,11 +342,39 @@ export function createDefaultRegistry(
 
   // Analog passives
   registry.register(ResistorDefinition);
+  registry.register(CapacitorDefinition);
+  registry.register(InductorDefinition);
+  registry.register(AnalogFuseDefinition);
+  registry.register(PotentiometerDefinition);
+  registry.register(TransformerDefinition);
+  registry.register(TappedTransformerDefinition);
+  registry.register(CrystalDefinition);
+  registry.register(MemristorDefinition);
+  registry.register(PolarizedCapDefinition);
+  registry.register(TransmissionLineDefinition);
+
+  // Analog semiconductors
+  registry.register(AnalogDiodeDefinition);
+  registry.register(ZenerDiodeDefinition);
+  registry.register(NpnBjtDefinition);
+  registry.register(PnpBjtDefinition);
+  registry.register(NmosfetDefinition);
+  registry.register(PmosfetDefinition);
+  registry.register(NJfetDefinition);
+  registry.register(PJfetDefinition);
+  registry.register(ScrDefinition);
+  registry.register(TriacDefinition);
+  registry.register(DiacDefinition);
+  registry.register(TunnelDiodeDefinition);
+  registry.register(VaractorDefinition);
+  registry.register(TriodeDefinition);
 
   // Analog sources
   registry.register(AnalogGroundDefinition);
   registry.register(DcVoltageSourceDefinition);
   registry.register(CurrentSourceDefinition);
+  registry.register(AcVoltageSourceDefinition);
+  registry.register(VariableRailDefinition);
 
   // Analog active
   registry.register(AnalogComparatorDefinition);
@@ -314,6 +384,20 @@ export function createDefaultRegistry(
   registry.register(OptocouplerDefinition);
   registry.register(DACDefinition);
   registry.register(ADCDefinition);
+  registry.register(OpAmpDefinition);
+  registry.register(VCVSDefinition);
+  registry.register(VCCSDefinition);
+  registry.register(CCVSDefinition);
+  registry.register(CCCSDefinition);
+  registry.register(SchmittInvertingDefinition);
+  registry.register(SchmittNonInvertingDefinition);
+  registry.register(AnalogSwitchSPSTDefinition);
+  registry.register(AnalogSwitchSPDTDefinition);
+
+  // Sensors (analog)
+  registry.register(LDRDefinition);
+  registry.register(NTCThermistorDefinition);
+  registry.register(SparkGapDefinition);
 
   // Basic
   registry.register(BooleanFunctionDefinition);

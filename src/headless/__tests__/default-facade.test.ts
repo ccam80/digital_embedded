@@ -69,7 +69,7 @@ describe('DefaultSimulatorFacade', () => {
     const circuit = buildAndGate(facade);
 
     const engine = facade.compile(circuit);
-    expect(engine).toBeDefined();
+    expect(facade.getEngine()).toBe(engine);
 
     // A=1, B=1 → Y should be 1 after propagation
     facade.setInput(engine, 'A', 1);
@@ -167,7 +167,7 @@ describe('DefaultSimulatorFacade', () => {
 
     // Must be a plain object, not a Map
     expect(signals).not.toBeInstanceOf(Map);
-    expect(typeof signals).toBe('object');
+    expect(signals).not.toBeNull();
 
     // Must contain the labeled signals
     expect('A' in signals).toBe(true);
@@ -187,7 +187,8 @@ describe('DefaultSimulatorFacade', () => {
     const result = facade.patch(circuit, [
       {
         op: 'add',
-        spec: { id: 'newIn', type: 'In', props: { label: 'C', bitWidth: 1 } },
+        spec: { id: 'newGate', type: 'And' },
+        // intentionally no connections — leaves And inputs unconnected
       },
     ]);
 
@@ -195,11 +196,50 @@ describe('DefaultSimulatorFacade', () => {
     expect(result).toHaveProperty('diagnostics');
     expect(result).toHaveProperty('addedIds');
     expect(Array.isArray(result.diagnostics)).toBe(true);
-    expect(typeof result.addedIds).toBe('object');
+    expect(result.addedIds).not.toBeNull();
+    expect(result.addedIds).not.toBeInstanceOf(Map);
+
+    // The added And gate with unconnected inputs produces unconnected-input diagnostics
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain('unconnected-input');
 
     // The added component should appear in addedIds
-    expect('newIn' in result.addedIds).toBe(true);
-    expect(typeof result.addedIds['newIn']).toBe('string');
+    expect('newGate' in result.addedIds).toBe(true);
+    expect(typeof result.addedIds['newGate']).toBe('string');
+  });
+
+  // -------------------------------------------------------------------------
+  // G1: Analog dispatch — facade routes analog circuits to MNA engine
+  // -------------------------------------------------------------------------
+
+  it('routes analog circuits to analog engine and populates getCompiledAnalog()', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = buildAndGate(facade);
+    circuit.metadata.engineType = 'analog';
+
+    const engine = facade.compile(circuit);
+
+    expect(facade.getEngine()).toBe(engine);
+    // getCompiledAnalog() is populated for analog circuits
+    expect(facade.getCompiledAnalog()).not.toBeNull();
+    // getCompiled() is null for analog circuits (digital-only field)
+    expect(facade.getCompiled()).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // G2: Engine dispose-on-recompile
+  // -------------------------------------------------------------------------
+
+  it('replaces and disposes the engine on recompile', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = buildAndGate(facade);
+
+    const engine1 = facade.compile(circuit);
+    expect(facade.getEngine()).toBe(engine1);
+
+    const engine2 = facade.compile(circuit);
+    expect(facade.getEngine()).toBe(engine2);
+    expect(engine2).not.toBe(engine1);
   });
 
 });

@@ -39,6 +39,7 @@ export function createInput(
 ): PropertyInput {
   switch (definition.type) {
     case PropertyType.INT:
+    case PropertyType.FLOAT:
     case PropertyType.BIT_WIDTH:
     case PropertyType.LONG:
       return new NumberInput(definition, currentValue);
@@ -68,20 +69,26 @@ export function createInput(
 }
 
 // ---------------------------------------------------------------------------
-// NumberInput — for INT, BIT_WIDTH, LONG, ROTATION
+// NumberInput — for INT, FLOAT, BIT_WIDTH, LONG, ROTATION
 // ---------------------------------------------------------------------------
 
 export class NumberInput implements PropertyInput {
   element: HTMLElement;
   private readonly _input: HTMLInputElement;
+  private readonly _isFloat: boolean;
   private _callbacks: Array<(v: PropertyValue) => void> = [];
 
   constructor(definition: PropertyDefinition, initial: PropertyValue) {
+    this._isFloat = definition.type === PropertyType.FLOAT;
+
     const wrapper = document.createElement("div");
     wrapper.className = "prop-input prop-number";
 
     const input = document.createElement("input");
     input.type = "number";
+    if (this._isFloat) {
+      input.step = "any";
+    }
     if (definition.min !== undefined) {
       input.min = String(definition.min);
     }

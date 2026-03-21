@@ -24,8 +24,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -594,36 +594,59 @@ export class NmosfetElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vD = signals?.getPinVoltage("D");
+    const vG = signals?.getPinVoltage("G");
+    const vS = signals?.getPinVoltage("S");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Vertical channel line
-    ctx.drawLine(2, -1.5, 2, 1.5);
+    const chanX = 2.0;
+    const chanTop = -1.2;
+    const chanBot = 1.2;
 
-    // Gate line (horizontal, with gap for oxide)
-    ctx.drawLine(0, 0, 1.5, 0);
-    ctx.drawLine(1.5, -1, 1.5, 1);
+    // Body (channel segments, gate bar, body connection line, arrow) stays COMPONENT color
+    const segH = (chanBot - chanTop) / 6;
+    ctx.drawLine(chanX, chanTop, chanX, chanTop + segH);
+    ctx.drawLine(chanX, chanTop + 2 * segH, chanX, chanTop + 4 * segH);
+    ctx.drawLine(chanX, chanTop + 5 * segH, chanX, chanBot);
 
-    // Drain connection (top)
-    ctx.drawLine(2, -1, 3, -1.5);
-
-    // Source connection (bottom) with arrow pointing in (NMOS: inward current)
-    ctx.drawLine(2, 1, 3, 1.5);
+    const gateBarX = 1.6;
+    ctx.drawLine(gateBarX, chanTop, gateBarX, chanBot);
+    ctx.drawLine(chanX, 0, 2.5, 0);
     ctx.drawPolygon([
-      { x: 2.2, y: 0.7 },
-      { x: 2.5, y: 1.0 },
-      { x: 2.0, y: 1.05 },
+      { x: 2, y: 0 },
+      { x: 2.1761691877498903, y: 0.5042507319664117 },
+      { x: 2.4642119213592, y: 0.2642119213592003 },
     ], true);
 
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1.5, -1.8, { horizontal: "center", vertical: "bottom" });
+    // Gate lead (horizontal from pin to gate bar)
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, gateBarX, 0);
+
+    // Drain lead (horizontal stub from channel, then to drain pin)
+    if (signals && vD !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vD));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanTop, 3, chanTop);
+    ctx.drawLine(3, chanTop, 3, -1.5);
+
+    // Source lead (horizontal stub from channel, then to source pin)
+    if (signals && vS !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vS));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanBot, 3, chanBot);
+    ctx.drawLine(3, chanBot, 3, 1.5);
 
     ctx.restore();
   }
@@ -661,37 +684,60 @@ export class PmosfetElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vD = signals?.getPinVoltage("D");
+    const vG = signals?.getPinVoltage("G");
+    const vS = signals?.getPinVoltage("S");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Vertical channel line
-    ctx.drawLine(2, -1.5, 2, 1.5);
+    const chanX = 2.0;
+    const chanTop = -1.2;
+    const chanBot = 1.2;
 
-    // Gate line with bubble (circle) indicating PMOS
-    ctx.drawLine(0, 0, 1.3, 0);
-    ctx.drawCircle(1.4, 0, 0.1, false);
-    ctx.drawLine(1.5, -1, 1.5, 1);
+    // Body (channel segments, gate bar, bubble, body line, arrow) stays COMPONENT color
+    const segH = (chanBot - chanTop) / 6;
+    ctx.drawLine(chanX, chanTop, chanX, chanTop + segH);
+    ctx.drawLine(chanX, chanTop + 2 * segH, chanX, chanTop + 4 * segH);
+    ctx.drawLine(chanX, chanTop + 5 * segH, chanX, chanBot);
 
-    // Drain connection (top)
-    ctx.drawLine(2, -1, 3, -1.5);
-
-    // Source connection (bottom) with arrow pointing out (PMOS: outward current)
-    ctx.drawLine(2, 1, 3, 1.5);
+    const gateBarX = 1.6;
+    ctx.drawLine(gateBarX, chanTop, gateBarX, chanBot);
+    ctx.drawCircle(gateBarX - 0.1, 0, 0.1, false);
+    ctx.drawLine(chanX, 0, 2.5, 0);
     ctx.drawPolygon([
-      { x: 2.4, y: 0.85 },
-      { x: 2.1, y: 0.7 },
-      { x: 2.15, y: 1.05 },
+      { x: 3, y: 1.2 },
+      { x: 2.5358880786408, y: 0.9357880786408 },
+      { x: 2.8238308122501097, y: 0.6957492680335883 },
     ], true);
 
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1.5, -1.8, { horizontal: "center", vertical: "bottom" });
+    // Gate lead (from pin to bubble, stopping before bubble)
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, gateBarX - 0.2, 0);
+
+    // Drain lead (horizontal stub from channel, then to drain pin)
+    if (signals && vD !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vD));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanTop, 3, chanTop);
+    ctx.drawLine(3, chanTop, 3, -1.5);
+
+    // Source lead (horizontal stub from channel, then to source pin)
+    if (signals && vS !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vS));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(chanX, chanBot, 3, chanBot);
+    ctx.drawLine(3, chanBot, 3, 1.5);
 
     ctx.restore();
   }

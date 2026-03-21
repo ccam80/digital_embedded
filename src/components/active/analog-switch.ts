@@ -21,6 +21,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -265,25 +266,45 @@ export class AnalogSwitchSPSTElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 4 };
+    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 2 };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vIn   = signals?.getPinVoltage("in");
+    const vOut  = signals?.getPinVoltage("out");
+    const vCtrl = signals?.getPinVoltage("ctrl");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Switch body: two terminals with a gap in the middle and control line
-    ctx.drawLine(0, 0, 1.5, 0);       // in stub
-    ctx.drawLine(2.5, 0, 4, 0);       // out stub
-    ctx.drawLine(1.5, 0, 2.0, -0.8);  // switch blade (open position indicator)
-    ctx.drawLine(1, -2, 1, -0.3);     // control line (dashed style approximation)
+    // Blade — body, stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(1, 0, 3, -1);
 
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.5, { horizontal: "center", vertical: "bottom" });
+    // in lead
+    if (vIn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vIn));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1, 0);
+
+    // out lead
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, 0, 4, 0);
+
+    // ctrl lead
+    if (vCtrl !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrl));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1, -2, 2, -1);
+
     ctx.restore();
   }
 
@@ -309,25 +330,54 @@ export class AnalogSwitchSPDTElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 4 };
+    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 3 };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vCom  = signals?.getPinVoltage("com");
+    const vNo   = signals?.getPinVoltage("no");
+    const vNc   = signals?.getPinVoltage("nc");
+    const vCtrl = signals?.getPinVoltage("ctrl");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // COM on left, NO on top-right, NC on bottom-right
-    ctx.drawLine(0, 0, 1.5, 0);       // com stub
-    ctx.drawLine(2.5, -1, 4, -1);     // no stub
-    ctx.drawLine(2.5, 1, 4, 1);       // nc stub
-    ctx.drawLine(1.5, 0, 2.0, -0.7);  // blade toward NO
+    // Blade — body, stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(1, 0, 3, -1);
 
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.5, { horizontal: "center", vertical: "bottom" });
+    // COM lead
+    if (vCom !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCom));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1, 0);
+
+    // NO lead
+    if (vNo !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vNo));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, -1, 4, -1);
+
+    // NC lead
+    if (vNc !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vNc));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, 1, 4, 1);
+
+    // ctrl lead
+    if (vCtrl !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrl));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, -2, 2, -1);
+
     ctx.restore();
   }
 

@@ -21,6 +21,7 @@ import {
   makeCapacitor,
   makeDiode,
 } from "../test-elements.js";
+import { AnalogFuseElement } from "../../components/passives/analog-fuse.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { ComponentRegistry } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -151,9 +152,9 @@ describe("MNAEngine", () => {
 
     expect(result.converged).toBe(true);
     // node1 (voltages[0]) = 5V (connected directly to positive terminal of Vs)
-    expect(engine.getNodeVoltage(0)).toBeCloseTo(5.0, 4);
+    expect(engine.getNodeVoltage(1)).toBeCloseTo(5.0, 4);
     // node2 (voltages[1]) = 2.5V (midpoint of equal resistors)
-    expect(engine.getNodeVoltage(1)).toBeCloseTo(2.5, 4);
+    expect(engine.getNodeVoltage(2)).toBeCloseTo(2.5, 4);
   });
 
   it("dc_op_diode_circuit", () => {
@@ -163,7 +164,7 @@ describe("MNAEngine", () => {
 
     expect(result.converged).toBe(true);
     // Diode forward voltage should be between 0.6V and 0.75V for typical silicon
-    const vAnode = engine.getNodeVoltage(1);   // node2 = anode
+    const vAnode = engine.getNodeVoltage(2);   // node2 = anode
     expect(vAnode).toBeGreaterThan(0.6);
     expect(vAnode).toBeLessThan(0.75);
   });
@@ -212,7 +213,7 @@ describe("MNAEngine", () => {
     expect(engine.simTime).toBeGreaterThan(0);
     expect(steps).toBeGreaterThan(0);
     // node2 should remain near Vs (charged through R, stabilized by Vs)
-    const v2 = engine.getNodeVoltage(1);
+    const v2 = engine.getNodeVoltage(2);
     expect(v2).toBeGreaterThan(4.5); // should be close to 5V since Vs is connected
     expect(v2).toBeLessThanOrEqual(5.01);
   });
@@ -258,8 +259,8 @@ describe("MNAEngine", () => {
     engine.reset();
 
     expect(engine.simTime).toBe(0);
-    expect(engine.getNodeVoltage(0)).toBe(0);
     expect(engine.getNodeVoltage(1)).toBe(0);
+    expect(engine.getNodeVoltage(2)).toBe(0);
     expect(engine.getState()).toBe(EngineState.STOPPED);
   });
 
@@ -428,6 +429,41 @@ describe("MNAEngine", () => {
 
     // Listener removed; states array should remain empty
     expect(states).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Analog fuse integration
+  // -------------------------------------------------------------------------
+
+  it("transient_fuse_blows_under_overcurrent", () => {
+    // Circuit: 5V → fuse (1Ω, i2tRating=1e-8 A²·s) → 9Ω → ground
+    // I = 0.5A, I² = 0.25, blow time = 1e-8/0.25 = 4e-8s = 40ns
+    // With maxTimeStep=5µs, should blow in first step.
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const fuse = new AnalogFuseElement([1, 2], 1.0, 1e9, 1e-8);
+    const rLoad = makeResistor(2, 0, 9.0);
+
+    const circuit: ConcreteCompiledAnalogCircuit = {
+      netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
+      elements: [vs, fuse, rLoad],
+      labelToNodeId: new Map(), wireToNodeId: new Map(),
+    };
+
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+
+    // Before transient: fuse should be intact
+    expect(fuse.blown).toBe(false);
+    expect(fuse.currentResistance).toBeLessThan(2); // close to rCold=1Ω
+
+    // Run a few transient steps — fuse should blow almost immediately
+    for (let i = 0; i < 10; i++) {
+      engine.step();
+      if (fuse.blown) break;
+    }
+
+    expect(fuse.blown).toBe(true);
+    expect(fuse.currentResistance).toBeGreaterThan(1e8); // near rBlown
   });
 });
 

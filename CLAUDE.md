@@ -10,13 +10,12 @@ A browser-based digital logic circuit simulator for embedding in university cour
 
 ## Current State
 
-Phase 0 (dead code removal) is complete. All legacy prototype artifacts have been removed. No native TS code has been written yet.
+The digital engine, headless facade, editor, and analog engine core are implemented. The codebase is a working circuit simulator with a browser-based editor, postMessage integration, and headless/MCP agent interfaces.
 
 | File/Dir | Purpose |
 |---|---|
 | `spec/plan.md` | Authoritative implementation plan — 12 phases, ~160 tasks |
 | `spec/progress.md` | Task completion tracking |
-| `spec/phase-0-dead-code-removal.md` | Phase 0 detailed spec |
 | `circuits/*.dig` | Example checkpoint circuits (AND gate, half adder, SR latch) |
 
 ## Reference Codebase
@@ -61,19 +60,26 @@ python3 -m http.server 8080
 
 ## postMessage API (tutorial host ↔ simulator iframe)
 
-This API must be preserved by the native JS simulator:
+All postMessage handling is centralized in `src/io/postmessage-adapter.ts` (single source of truth). App-init.ts wires it up with GUI hooks — no inline message handlers.
 
 ~~~
 Parent → iframe (core):
   { type: 'digital-load-url', url: '<url>' }          — Load a .dig circuit file
   { type: 'digital-load-data', data: '<base64>' }     — Load inline circuit data (base64 .dig XML)
+  { type: 'digital-load-json', data: '<json>' }       — Load DTS format circuit
+  { type: 'digital-set-input', label, value }          — Drive an input pin by label
+  { type: 'digital-step' }                             — Single propagation step
+  { type: 'digital-read-output', label }               — Read output signal by label
+  { type: 'digital-read-all-signals' }                 — Snapshot all labeled signals
+  { type: 'digital-run-tests', testData? }             — Run test vectors (headless)
+  { type: 'digital-get-circuit' }                      — Export current circuit as base64
   { type: 'digital-set-base', basePath: '<path>' }    — Set HTTP base path for file resolution
   { type: 'digital-set-locked', locked: true|false }  — Lock/unlock editor
+  { type: 'digital-load-memory', label, data, format } — Load data into RAM/ROM
   { type: 'digital-set-palette', components: [...] }  — Restrict palette to listed types (null = show all)
 
 Parent → iframe (tutorial):
-  { type: 'digital-test', testData: '<test vectors>' }              — Run test vectors, get results back
-  { type: 'digital-get-circuit' }                                    — Export current circuit as base64
+  { type: 'digital-test', testData: '<test vectors>' }              — Run test vectors with label validation
   { type: 'digital-highlight', labels: [...], duration?: ms }       — Highlight components by label
   { type: 'digital-clear-highlight' }                                — Clear all highlights
   { type: 'digital-set-readonly-components', labels: [...] | null } — Lock specific components
@@ -84,6 +90,8 @@ Iframe → parent:
   { type: 'digital-loaded' }                       — Circuit/setting applied
   { type: 'digital-error', error: '...' }          — Error occurred
   { type: 'digital-test-result', passed, failed, total, details: [...] }  — Test results
+  { type: 'digital-output', label, value }         — Response to digital-read-output
+  { type: 'digital-signals', signals: {...} }      — Response to digital-read-all-signals
   { type: 'digital-circuit-data', data: '<base64>', format: 'dig-xml-base64' }  — Circuit export
 ~~~
 
@@ -139,7 +147,28 @@ Structured tutorial authoring and runtime for step-by-step circuit-building exer
 }
 ~~~
 
-## Agent Circuit API (Headless Facade)
+## Headless Architecture
+
+All programmatic access (MCP server, postMessage bridge, CLI, tests) goes through `DefaultSimulatorFacade` — the single unified entry point. It composes three internal modules:
+
+| Module | Class | Purpose |
+|--------|-------|---------|
+| Builder | `CircuitBuilder` | Create/patch circuits, netlist introspection, component registry queries |
+| Runner | `SimulationRunner` | Compile → engine, step/run/runToStable, label-based signal I/O (WeakMap tracks engine↔compiled records) |
+| Loader | `SimulationLoader` | Load .dig XML or JSON — environment-aware (Node.js `fs.readFile` / browser `fetch`) |
+
+`DefaultSimulatorFacade` also owns engine lifecycle (fresh engine per `compile()`, clock management, dispose) and delegates test execution to `TestRunner` (resolves test data → parses → executes via `testing/executor`).
+
+**Consumers:**
+
+| Consumer | How it uses the facade |
+|----------|----------------------|
+| MCP server (`scripts/circuit-mcp-server.ts`) | Creates one `DefaultSimulatorFacade`, holds circuits in a handle map |
+| PostMessage adapter (`src/io/postmessage-adapter.ts`) | Creates own facade for headless mode; GUI mode injects hooks that delegate to app-init's facade |
+| App-init (`src/app/app-init.ts`) | Creates a `DefaultSimulatorFacade`, wires it into the editor binding and postMessage hooks |
+| Tests | Import `DefaultSimulatorFacade` directly |
+
+## Agent Circuit API
 
 A string-addressed facade for LLM agents to inspect and modify circuits without touching wire coordinates or object references.
 
@@ -155,6 +184,7 @@ A string-addressed facade for LLM agents to inspect and modify circuits without 
 |------|-------|--------|
 | `circuit_list` | `{ category? }` | All component types grouped by category |
 | `circuit_describe` | `{ typeName }` | Pin layout, properties (with descriptions, min/max), help text |
+| `circuit_describe_file` | `{ path }` | Lightweight pin interface scan (In/Out) without full load |
 | `circuit_load` | `{ path }` | Handle + summary |
 | `circuit_netlist` | `{ handle }` | Components, nets with connectivity, diagnostics |
 | `circuit_validate` | `{ handle }` | Diagnostics only |
@@ -162,7 +192,8 @@ A string-addressed facade for LLM agents to inspect and modify circuits without 
 | `circuit_build` | `{ spec }` | Handle + diagnostics |
 | `circuit_compile` | `{ handle }` | Success or structured errors |
 | `circuit_test` | `{ handle, testData? }` | Pass/fail results |
-| `circuit_save` | `{ handle, path }` | Confirmation |
+| `circuit_test_equivalence` | `{ handleA, handleB, maxInputBits? }` | Exhaustive behavioral equivalence check |
+| `circuit_save` | `{ handle, path, save_all? }` | Confirmation (optionally copies subcircuit files) |
 
 **Discovery workflow:** `circuit_list` (browse types) → `circuit_describe` (learn pins + properties) → `circuit_build` (create)
 
@@ -207,16 +238,33 @@ Everything uses the same string addresses — read format equals write format.
 
 If `netlist()` reports `sysreg:ADD [1-bit]`, the patch target is `{ op: 'set', target: 'ADD', props: { bitWidth: 16 } }`.
 
-### Introspection Methods
+### Facade Methods (via `DefaultSimulatorFacade`)
 
+Building:
+- `createCircuit(opts?)` — create an empty circuit
+- `addComponent(circuit, typeName, props?)` — add a component by type
+- `connect(circuit, src, srcPin, dst, dstPin)` — wire two pins
+- `build(spec)` — create a circuit from a declarative `CircuitSpec` (no coordinates required)
+- `patch(circuit, ops, opts?)` — apply `PatchOp` edits using label:pin addressing; returns diagnostics
+
+Simulation:
+- `compile(circuit)` — compile to a `SimulationEngine` (fresh engine each call)
+- `step(engine)` — one propagation cycle (with clock advancement for digital)
+- `run(engine, cycles)` — N propagation cycles
+- `runToStable(engine, maxIter?)` — run until signals stabilize
+- `setInput(engine, label, value)` / `readOutput(engine, label)` / `readAllSignals(engine)` — label-based I/O
+
+Introspection:
 - `netlist(circuit)` — returns `Netlist` with components, nets (all connected pins per net), and diagnostics
 - `validate(circuit)` — returns `Diagnostic[]`; convenience wrapper for `netlist().diagnostics`
 - `describeComponent(typeName)` — queries registry for pin layout and configurable properties
 
-### Editing Methods
+Testing:
+- `runTests(engine, circuit, testData?)` — execute test vectors (embedded or external)
 
-- `build(spec)` — create a circuit from a declarative `CircuitSpec` (no coordinates required)
-- `patch(circuit, ops, opts?)` — apply one or more `PatchOp` edits using label:pin addressing; returns updated diagnostics
+File I/O:
+- `loadDigXml(xml)` — parse .dig XML string → `Circuit`
+- `serialize(circuit)` / `deserialize(json)` — JSON round-trip
 
 ### Patch Operations
 
@@ -337,11 +385,15 @@ Common component types: `In`, `Out`, `And`, `Or`, `XOr`, `Not`, `NAnd`, `NOr`, `
 |------|---------|
 | `scripts/circuit-mcp-server.ts` | MCP server — agent circuit interface |
 | `scripts/circuit-cli.ts` | CLI tool — `list`, `describe`, `build`, `netlist`, `validate`, `compile`, `test` |
-| `src/headless/facade.ts` | `SimulatorFacade` interface |
+| `src/headless/facade.ts` | `SimulatorFacade` interface (contract) |
+| `src/headless/default-facade.ts` | `DefaultSimulatorFacade` — unified concrete implementation |
+| `src/headless/runner.ts` | `SimulationRunner` — compile, step/run, label-based signal I/O |
+| `src/headless/loader.ts` | `SimulationLoader` — .dig XML and JSON loading (Node.js / browser) |
+| `src/headless/builder.ts` | `CircuitBuilder` with `build()` and `patch()` |
+| `src/headless/test-runner.ts` | `TestRunner` + `extractEmbeddedTestData()` |
 | `src/headless/netlist-types.ts` | `Netlist`, `Diagnostic`, `CircuitSpec`, `PatchOp` types |
 | `src/headless/netlist.ts` | `resolveNets()` implementation |
 | `src/headless/address.ts` | Address resolution utilities |
-| `src/headless/builder.ts` | `CircuitBuilder` with `build()` and `patch()` |
 | `src/headless/auto-layout.ts` | Sugiyama-style auto-layout engine for `build()` |
 | `src/headless/types.ts` | `FacadeError`, `TestResults` |
 | `src/headless/index.ts` | Public API exports |
@@ -353,3 +405,123 @@ Common component types: `In`, `Out`, `And`, `Or`, `XOr`, `Not`, `NAnd`, `NOr`, `
 - **Validate after every edit** — `patch()` returns diagnostics automatically
 - **No object references** — everything is string-addressed for LLM compatibility
 - **Diagnostics, not exceptions** — `validate()` collects all issues instead of throwing on the first
+
+## Editor / UI Architecture
+
+The browser UI is engine-agnostic — it works with any simulation backend via the `SimulationEngine` interface. All circuit mutations go through the command-pattern `UndoRedoStack` for undo/redo support.
+
+### Rendering Pipeline
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `CanvasRenderer` | `src/editor/canvas-renderer.ts` | Implements `RenderContext` over Canvas2D — drawing primitives, color resolution |
+| `ElementRenderer` | `src/editor/element-renderer.ts` | Iterates elements, applies transforms (rotation/mirror), delegates to `element.draw(ctx)`, draws pin indicators and selection highlights |
+| `WireRenderer` | `src/editor/wire-renderer.ts` | Draws wire segments with signal-state coloring (HIGH/LOW/Z/UNDEFINED), junction dots, bus width markers, analog voltage gradients |
+| `GridRenderer` | `src/editor/grid.ts` | Background grid |
+
+The same `RenderContext` interface is implemented by `CanvasRenderer` (live canvas), `SVGRenderContext` (SVG export), and test mocks.
+
+### Interaction Modes
+
+| Mode | File | Trigger |
+|------|------|---------|
+| `SelectionModel` | `src/editor/selection.ts` | Default — click/box-select elements and wires, fires change listeners |
+| `PlacementMode` | `src/editor/placement.ts` | Palette click — ghost follows cursor (grid-snapped), R rotates, M mirrors, click places |
+| `WireDrawingMode` | `src/editor/wire-drawing.ts` | Click output pin — Manhattan-routed preview, waypoints, click input pin completes |
+| `WireDragMode` | `src/editor/wire-drag.ts` | Drag wire segment — constrained perpendicular movement, dogleg routing |
+
+### Coordinate System
+
+`screenToWorld()` / `worldToScreen()` in `src/editor/coordinates.ts`. Grid spacing = 20 screen pixels per grid unit. All placements snap to 1-grid-unit increments.
+
+`Viewport` (`src/editor/viewport.ts`) manages pan/zoom (range 0.1–10.0). Transform: `screen = world * zoom * GRID_SPACING + pan`.
+
+### Editor Subsystems
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `UndoRedoStack` | `src/editor/undo-redo.ts` | Command-pattern stack (default depth 100). All mutations are reversible `EditCommand` objects |
+| Edit operations | `src/editor/edit-operations.ts` | `moveSelection`, `rotateSelection`, `mirrorSelection`, `deleteSelection`, `copyToClipboard`, `pasteFromClipboard`, `placeComponent` |
+| `PropertyPanel` | `src/editor/property-panel.ts` | Right-side panel showing properties of selected element with undo integration |
+| `ComponentPalette` | `src/editor/palette.ts` | Pure logic — category tree, search/filter, recent history, allowlist filtering |
+| `PaletteUI` | `src/editor/palette-ui.ts` | DOM rendering for palette — tree view, search input, touch drag-to-place |
+| `LockedModeGuard` | `src/editor/locked-mode.ts` | Read-only mode — disables editing interactions |
+| `ColorSchemeManager` | `src/editor/color-scheme.ts` | Theme management (light/dark/high-contrast/monochrome) |
+| `TouchGestureTracker` | `src/editor/touch-gestures.ts` | Pinch zoom, two-finger pan, single-touch selection |
+| Hit testing | `src/editor/hit-test.ts` | Priority: pin > element > wire > none. Min click target 1.5 grid units |
+| `autoConnectPower` | `src/editor/auto-power.ts` | Auto-inserts power/ground for dangling inputs/outputs |
+
+### Integration Layer
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `EditorBinding` | `src/integration/editor-binding.ts` | Bridges compiled engine ↔ editor: wire→netId and pin→netId mappings for live signal display and input driving |
+| `SpeedControl` | `src/integration/speed-control.ts` | Simulation speed (1–10M steps/sec) with text parsing |
+
+### Runtime Panels
+
+| Panel | File | Purpose |
+|-------|------|---------|
+| `DataTablePanel` | `src/runtime/data-table.ts` | Live tabular signal view with configurable radix (dec/hex/bin/oct), grouped by type |
+| `TimingDiagramPanel` | `src/runtime/timing-diagram.ts` | Waveform view — records samples per step, time cursor, zoom/pan, snapshot integration |
+| `AnalogScopePanel` | `src/runtime/analog-scope-panel.ts` | Oscilloscope — voltage/current channels, auto Y-range, envelope decimation, FFT spectrum view |
+| `BodePlotRenderer` | `src/runtime/bode-plot.ts` | Bode magnitude/phase plots from AC analysis — -3dB detection, phase margin markers |
+
+All runtime panels implement `MeasurementObserver` (`onStep()`, `onReset()`).
+
+### Analysis Tools
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `analyseCircuit()` | `src/analysis/model-analyser.ts` | Enumerates all 2^N input combinations → truth table (max 20 input bits) |
+| `TruthTable` | `src/analysis/truth-table.ts` | Data model with ternary values (0/1/don't-care), change events |
+| `TruthTableTab` | `src/analysis/truth-table-ui.ts` | UI controller for truth table display |
+| `KarnaughMapTab` | `src/analysis/karnaugh-map.ts` | K-map visualization (2–6 vars), Gray code ordering, prime implicant loop rendering |
+
+### Export
+
+| Format | File | Notes |
+|--------|------|-------|
+| SVG | `src/export/svg.ts` | Uses `SVGRenderContext`; optional live signal coloring |
+| PNG | `src/export/png.ts` | Canvas render → PNG blob |
+| GIF | `src/export/gif.ts` | Animated circuit states from timing diagram snapshots |
+| ZIP | `src/export/zip.ts` | Bundles circuit + diagrams |
+
+## Tests
+
+### Framework
+
+| Type | Framework | Config | Pattern |
+|------|-----------|--------|---------|
+| Unit / Integration | Vitest 2.0 | `vitest.config.ts` | `src/**/__tests__/*.test.ts` |
+| E2E | Playwright | `playwright.config.ts` | `e2e/**/*.spec.ts` |
+
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm test` | Run all Vitest unit/integration tests |
+| `npm run test:watch` | Vitest watch mode |
+| `npm run test:e2e` | Playwright E2E tests (auto-launches Vite on port 5173) |
+| `npm run test:all` | Both Vitest and Playwright sequentially |
+
+### Three-Surface Testing Rule
+
+**Every user-facing feature MUST be tested across all three surfaces:**
+
+1. **Headless API test** (`src/**/__tests__/*.test.ts`) — Import `DefaultSimulatorFacade`, call methods directly, assert results. This validates the core logic without any transport layer.
+
+2. **MCP tool test** (`src/**/__tests__/*.test.ts` or dedicated MCP test file) — Exercise the feature through the MCP server's tool handlers (same code paths as `scripts/circuit-mcp-server.ts`). This validates the agent-facing contract: serialization, handle management, error formatting.
+
+3. **E2E / UI test** (`e2e/**/*.spec.ts`) — Drive the feature through simulated mouse/keyboard interaction in the browser via Playwright. For postMessage-driven features, use the `SimulatorHarness` fixture (`e2e/fixtures/simulator-harness.ts`) to send messages and assert responses. This validates the full stack including DOM rendering, event handling, and the postMessage wire protocol.
+
+**Why all three?** A feature can work in the headless API but break in MCP serialization. It can work in MCP but fail in the browser due to DOM wiring. Testing all three surfaces catches integration gaps at each boundary.
+
+### E2E Test Structure
+
+| Category | Directory | Purpose |
+|----------|-----------|---------|
+| GUI tests | `e2e/gui/` | Browser interaction — canvas, palette, menus, simulation controls, circuit building |
+| Parity tests | `e2e/parity/` | PostMessage API — load circuits, set-input/step/read-output, error handling |
+
+**SimulatorHarness** (`e2e/fixtures/simulator-harness.ts`) wraps the postMessage protocol for E2E tests: `loadDigXml()`, `loadDigUrl()`, `postToSim()`, `waitForMessage()`, `runTests()`, `getCircuit()`.

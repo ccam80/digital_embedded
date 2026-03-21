@@ -7,7 +7,7 @@
 
 import type { Circuit } from "@/core/circuit";
 import { Wire } from "@/core/circuit";
-import { PinDirection } from "@/core/pin";
+import { PinDirection, pinWorldPosition } from "@/core/pin";
 import type { Pin } from "@/core/pin";
 import type { CircuitElement } from "@/core/element";
 import { FacadeError } from "@/headless/types";
@@ -24,6 +24,7 @@ import { FacadeError } from "@/headless/types";
 export function checkWireConsistency(
   circuit: Circuit,
   newWires: Wire[],
+  analogTypeIds?: ReadonlySet<string>,
 ): FacadeError | undefined {
   // Build the combined wire list (existing + new)
   const allWires = [...circuit.wires, ...newWires];
@@ -42,11 +43,13 @@ export function checkWireConsistency(
     if (pin.direction !== PinDirection.OUTPUT) {
       continue;
     }
+    // Analog components legitimately share nets via their output terminals
+    if (analogTypeIds?.has(element.typeId)) {
+      continue;
+    }
 
-    const pinKey = pointKey(
-      element.position.x + pin.position.x,
-      element.position.y + pin.position.y,
-    );
+    const wp = pinWorldPosition(element, pin);
+    const pinKey = pointKey(wp.x, wp.y);
 
     if (visited.has(pinKey)) {
       continue;
@@ -62,11 +65,10 @@ export function checkWireConsistency(
 
     // Check which element pins land on points in this net
     for (const candidate of pins) {
-      const candidateKey = pointKey(
-        candidate.element.position.x + candidate.pin.position.x,
-        candidate.element.position.y + candidate.pin.position.y,
-      );
-      if (netPoints.has(candidateKey) && candidate.pin.direction === PinDirection.OUTPUT) {
+      const candidateWp = pinWorldPosition(candidate.element, candidate.pin);
+      const candidateKey = pointKey(candidateWp.x, candidateWp.y);
+      if (netPoints.has(candidateKey) && candidate.pin.direction === PinDirection.OUTPUT
+          && !analogTypeIds?.has(candidate.element.typeId)) {
         outputPinsOnNet.push(candidate);
       }
     }

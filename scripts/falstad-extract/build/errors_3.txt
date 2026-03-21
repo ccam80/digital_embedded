@@ -1,0 +1,304 @@
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:57: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	    waveform = new Integer(st.nextToken()).intValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:58: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    frequency = new Double(st.nextToken()).doubleValue();
+	                ^
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:59: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    maxVoltage = new Double(st.nextToken()).doubleValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:60: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    bias = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:61: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    phaseShift = new Double(st.nextToken()).doubleValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\VoltageElm.java:62: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    dutyCycle = new Double(st.nextToken()).doubleValue();
+	                ^
+src\com\lushprojects\circuitjs1\client\ChipElm.java:40: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+		bits = new Integer(st.nextToken()).intValue();
+		       ^
+src\com\lushprojects\circuitjs1\client\ChipElm.java:47: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		    volts[i] = new Double(st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\ChipElm.java:49: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		    volts[i] = new Double(st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\AMElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	carrierfreq = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\AMElm.java:38: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	signalfreq= new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\AMElm.java:39: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    maxVoltage = new Double(st.nextToken()).doubleValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\AnalogSwitchElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    r_on = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\AnalogSwitchElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    r_off = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\GateElm.java:46: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	    inputCount = new Integer(st.nextToken()).intValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\GateElm.java:47: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    double lastOutputVoltage = new Double (st.nextToken()).doubleValue();
+	                               ^
+src\com\lushprojects\circuitjs1\client\GateElm.java:51: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		highVoltage = new Double(st.nextToken()).doubleValue();
+		              ^
+src\com\lushprojects\circuitjs1\client\CapacitorElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    capacitance = new Double(st.nextToken()).doubleValue();
+	                  ^
+src\com\lushprojects\circuitjs1\client\CapacitorElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    voltdiff = new Double(st.nextToken()).doubleValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\CapacitorElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		initialVoltage = new Double(st.nextToken()).doubleValue();
+		                 ^
+src\com\lushprojects\circuitjs1\client\CC2Elm.java:29: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    gain = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\CompositeElm.java:83: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+		int flags = new Integer(stCe.nextToken()).intValue();
+		            ^
+src\com\lushprojects\circuitjs1\client\CompositeElm.java:90: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+		int nodeOfThisPost = new Integer(stModel.nextToken()).intValue();
+		                     ^
+src\com\lushprojects\circuitjs1\client\CurrentElm.java:33: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		currentValue = new Double(st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\DarlingtonElm.java:31: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	pnp = new Integer(st.nextToken()).intValue();
+	      ^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	inductance = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	resistance = new Double(st.nextToken()).doubleValue(); 
+	             ^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:38: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	K = 		new Double(st.nextToken()).doubleValue();
+	    		^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:39: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	Kb = 		new Double(st.nextToken()).doubleValue();
+	     		^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	J = 		new Double(st.nextToken()).doubleValue();
+	    		^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	b = 		new Double(st.nextToken()).doubleValue();
+	    		^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:42: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	gearRatio = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\DCMotorElm.java:43: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	tau = 		new Double(st.nextToken()).doubleValue();
+	      		^
+src\com\lushprojects\circuitjs1\client\DiacElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	onresistance = new Double(st.nextToken()).doubleValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\DiacElm.java:42: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	offresistance = new Double(st.nextToken()).doubleValue();
+	                ^
+src\com\lushprojects\circuitjs1\client\DiacElm.java:43: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	breakdown = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\DiacElm.java:44: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	holdcurrent = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\DiodeModel.java:203: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	flags = new Integer(st.nextToken()).intValue();
+	        ^
+src\com\lushprojects\circuitjs1\client\DiodeElm.java:56: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		    fwdrop = new Double(st.nextToken()).doubleValue();
+		             ^
+src\com\lushprojects\circuitjs1\client\TransistorModel.java:136: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	flags = new Integer(st.nextToken()).intValue();
+	        ^
+src\com\lushprojects\circuitjs1\client\FMElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	carrierfreq = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\FMElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	signalfreq= new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\FMElm.java:42: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	maxVoltage = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\FMElm.java:43: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	deviation = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\FuseElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    resistance = new Double(st.nextToken()).doubleValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\FuseElm.java:38: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    i2t = new Double(st.nextToken()).doubleValue();
+	          ^
+src\com\lushprojects\circuitjs1\client\FuseElm.java:39: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    heat = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\FuseElm.java:40: warning: [removal] Boolean(String) in Boolean has been deprecated and marked for removal
+	    blown = new Boolean(st.nextToken()).booleanValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\InductorElm.java:35: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    inductance = new Double(st.nextToken()).doubleValue();
+	                 ^
+src\com\lushprojects\circuitjs1\client\InductorElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    current = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\InverterElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		slewRate = new Double (st.nextToken()).doubleValue();
+		           ^
+src\com\lushprojects\circuitjs1\client\InverterElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		highVoltage = new Double (st.nextToken()).doubleValue();
+		              ^
+src\com\lushprojects\circuitjs1\client\InvertingSchmittElm.java:53: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		slewRate = new Double (st.nextToken()).doubleValue();
+		           ^
+src\com\lushprojects\circuitjs1\client\InvertingSchmittElm.java:54: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		lowerTrigger = new Double (st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\InvertingSchmittElm.java:55: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		upperTrigger = new Double (st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\InvertingSchmittElm.java:56: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		logicOnLevel = new Double (st.nextToken()).doubleValue();
+		               ^
+src\com\lushprojects\circuitjs1\client\InvertingSchmittElm.java:57: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		logicOffLevel = new Double (st.nextToken()).doubleValue();
+		                ^
+src\com\lushprojects\circuitjs1\client\MosfetElm.java:63: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		vt = new Double(st.nextToken()).doubleValue();
+		     ^
+src\com\lushprojects\circuitjs1\client\MosfetElm.java:64: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		beta = new Double(st.nextToken()).doubleValue();
+		       ^
+src\com\lushprojects\circuitjs1\client\LabeledNodeElm.java:70: warning: [removal] Integer(int) in Integer has been deprecated and marked for removal
+	    nodeList.put(text, new Integer(n));
+	                       ^
+src\com\lushprojects\circuitjs1\client\LampElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    temp = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\LampElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    nom_pow = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\LampElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    nom_v = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\LampElm.java:42: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    warmTime = new Double(st.nextToken()).doubleValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\LampElm.java:43: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    coolTime = new Double(st.nextToken()).doubleValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\LDRElm.java:41: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	position = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\LEDElm.java:43: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    colorR = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\LEDElm.java:44: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    colorG = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\LEDElm.java:45: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    colorB = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\LEDElm.java:48: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		maxBrightnessCurrent = new Double(st.nextToken()).doubleValue();
+		                       ^
+src\com\lushprojects\circuitjs1\client\SwitchElm.java:48: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	    position = new Integer(str).intValue();
+	               ^
+src\com\lushprojects\circuitjs1\client\SwitchElm.java:49: warning: [removal] Boolean(String) in Boolean has been deprecated and marked for removal
+	momentary = new Boolean(st.nextToken()).booleanValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\LogicInputElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		hiV = new Double(st.nextToken()).doubleValue();
+		      ^
+src\com\lushprojects\circuitjs1\client\LogicInputElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		loV = new Double(st.nextToken()).doubleValue();
+		      ^
+src\com\lushprojects\circuitjs1\client\LogicOutputElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		threshold = new Double(st.nextToken()).doubleValue();
+		            ^
+src\com\lushprojects\circuitjs1\client\MBBSwitchElm.java:44: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	    link = new Integer(st.nextToken()).intValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\MemristorElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	r_on = new Double(st.nextToken()).doubleValue();
+	       ^
+src\com\lushprojects\circuitjs1\client\MemristorElm.java:37: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	r_off = new Double(st.nextToken()).doubleValue();
+	        ^
+src\com\lushprojects\circuitjs1\client\MemristorElm.java:38: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	dopeWidth = new Double(st.nextToken()).doubleValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\MemristorElm.java:39: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	totalWidth = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\MemristorElm.java:40: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	mobility = new Double(st.nextToken()).doubleValue();
+	           ^
+src\com\lushprojects\circuitjs1\client\MonostableElm.java:35: warning: [removal] Boolean(String) in Boolean has been deprecated and marked for removal
+	retriggerable=new Boolean(st.nextToken()).booleanValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\MonostableElm.java:36: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	delay=new Double(st.nextToken()).doubleValue();
+	      ^
+src\com\lushprojects\circuitjs1\client\TransistorElm.java:48: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	    pnp = new Integer(st.nextToken()).intValue();
+	          ^
+src\com\lushprojects\circuitjs1\client\TransistorElm.java:51: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		lastvbe = new Double(st.nextToken()).doubleValue();
+		          ^
+src\com\lushprojects\circuitjs1\client\TransistorElm.java:52: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		lastvbc = new Double(st.nextToken()).doubleValue();
+		          ^
+src\com\lushprojects\circuitjs1\client\TransistorElm.java:56: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		beta = new Double(st.nextToken()).doubleValue();
+		       ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:49: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		maxOut = new Double(st.nextToken()).doubleValue();
+		         ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:50: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		minOut = new Double(st.nextToken()).doubleValue();
+		         ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:51: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		gbw = new Double(st.nextToken()).doubleValue();
+		      ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:52: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		volts[0] = new Double(st.nextToken()).doubleValue();
+		           ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:53: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		volts[1] = new Double(st.nextToken()).doubleValue();
+		           ^
+src\com\lushprojects\circuitjs1\client\OpAmpElm.java:54: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+		gain = new Double(st.nextToken()).doubleValue();
+		       ^
+src\com\lushprojects\circuitjs1\client\PolarCapacitorElm.java:13: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	    maxNegativeVoltage = new Double(st.nextToken()).doubleValue();
+	                         ^
+src\com\lushprojects\circuitjs1\client\PotElm.java:48: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+    	maxResistance = new Double(st.nextToken()).doubleValue();
+    	                ^
+src\com\lushprojects\circuitjs1\client\PotElm.java:49: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+    	position = new Double(st.nextToken()).doubleValue();
+    	           ^
+src\com\lushprojects\circuitjs1\client\RelayElm.java:64: warning: [removal] Integer(String) in Integer has been deprecated and marked for removal
+	poleCount = new Integer(st.nextToken()).intValue();
+	            ^
+src\com\lushprojects\circuitjs1\client\RelayElm.java:65: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	inductance = new Double(st.nextToken()).doubleValue();
+	             ^
+src\com\lushprojects\circuitjs1\client\RelayElm.java:66: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	coilCurrent = new Double(st.nextToken()).doubleValue();
+	              ^
+src\com\lushprojects\circuitjs1\client\RelayElm.java:67: warning: [removal] Double(String) in Double has been deprecated and marked for removal
+	r_on = new Double(st.nextToken()).doubleValue();
+	       ^
+Note: Some input files additionally use or override a deprecated API that is marked for removal.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+100 warnings

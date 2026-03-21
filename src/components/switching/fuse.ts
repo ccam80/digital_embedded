@@ -141,18 +141,15 @@ export class FuseElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeFuse — flat simulation function
 //
-// No gate inputs. The blown property is baked into state[stBase] by the
-// engine at compile time: blown=false → state[stBase]=1 (closed);
-// blown=true → state[stBase]=0 (open).
-//
-// At runtime this function simply preserves the compiled-in state.
-// It is a no-op because the engine initialises the state slot correctly
-// from the blown property and no runtime input can change it.
+// No gate inputs. Reads the blown property and writes the closed flag
+// into state[stBase] for the bus resolver: blown=false → 1 (closed),
+// blown=true → 0 (open).
 // ---------------------------------------------------------------------------
 
-export function executeFuse(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
-  // Blown state is set by the engine from the blown property at compile time.
-  // No inputs to read; state[stBase] is already correct.
+export function executeFuse(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+  const stBase = layout.stateOffset(index);
+  const blown = layout.getProperty(index, "blown") ?? false;
+  state[stBase] = blown ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +204,8 @@ export const FuseDefinition: ComponentDefinition = {
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "Fuse — one-time irreversible switch. blown=false → closed; blown=true → permanently open.",
+  stateSlotCount: 1,
+  switchPins: [0, 1],
   defaultDelay: 0,
   analogFactory: createAnalogFuseElement,
 };

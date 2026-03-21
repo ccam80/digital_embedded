@@ -1,8 +1,8 @@
 /**
  * Ideal Op-Amp analog component.
  *
- * Five-terminal nonlinear element: in+ (non-inverting), in- (inverting),
- * out (output), Vcc+ (positive supply), Vcc- (negative supply).
+ * Three-terminal nonlinear element: in+ (non-inverting), in- (inverting),
+ * out (output). Supply rails are fixed at +15 V and -15 V.
  *
  * MNA Norton approximation:
  *   - Output conductance G_out = 1/R_out stamped from out node to ground.
@@ -18,6 +18,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -61,22 +62,6 @@ function buildOpAmpPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
     },
-    {
-      direction: PinDirection.INPUT,
-      label: "Vcc+",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -2 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "Vcc-",
-      defaultBitWidth: 1,
-      position: { x: 2, y: 2 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
   ];
 }
 
@@ -108,38 +93,51 @@ export class OpAmpElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vInp = signals?.getPinVoltage("in+");
+    const vInn = signals?.getPinVoltage("in-");
+    const vOut = signals?.getPinVoltage("out");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Triangle body: pointing right
-    // Vertices: (0, -2), (0, 2), (4, 0)
-    ctx.drawLine(0, -2, 0, 2);
-    ctx.drawLine(0, -2, 4, 0);
-    ctx.drawLine(0, 2, 4, 0);
+    // Triangle body — stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(0.5, -2, 0.5, 2);
+    ctx.drawLine(0.5, -2, 3.5, 0);
+    ctx.drawLine(0.5, 2, 3.5, 0);
 
-    // + label at non-inverting input (top-left)
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("+", 0.5, -1, { horizontal: "left", vertical: "center" });
-
-    // - label at inverting input (bottom-left)
-    ctx.drawText("−", 0.5, 1, { horizontal: "left", vertical: "center" });
-
-    // Optional label above
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.3, { horizontal: "center", vertical: "bottom" });
+    // Input lead in+ colored by its pin voltage
+    if (vInp !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInp));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, 0.5, -1);
+
+    // Input lead in- colored by its pin voltage
+    if (vInn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInn));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, 0.5, 1);
+
+    // Output lead colored by its pin voltage
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3.5, 0, 4, 0);
 
     ctx.restore();
   }
 
+
   getHelpText(): string {
     return (
-      "Ideal Op-Amp — 5-terminal nonlinear element with high gain, output saturation " +
+      "Ideal Op-Amp — 3-terminal nonlinear element with high gain, output saturation " +
       "at supply rails, and configurable output impedance."
     );
   }
@@ -157,8 +155,8 @@ export class OpAmpElement extends AbstractCircuitElement {
  *   nodeIds[0] = in+ (non-inverting input)
  *   nodeIds[1] = in- (inverting input)
  *   nodeIds[2] = out (output)
- *   nodeIds[3] = Vcc+ (positive supply)
- *   nodeIds[4] = Vcc- (negative supply)
+ *
+ * Supply rails are fixed constants: +15 V and -15 V.
  *
  * The output is modelled as a Norton equivalent:
  *   - Conductance G_out = 1/R_out between out and ground
@@ -179,9 +177,6 @@ function createOpAmpElement(
   const nInp = nodeIds[0]; // in+ node (1-based, 0=ground)
   const nInn = nodeIds[1]; // in- node
   const nOut = nodeIds[2]; // out node
-  const nVccP = nodeIds[3]; // Vcc+ node
-  const nVccN = nodeIds[4]; // Vcc- node
-
   // Operating-point state updated by updateOperatingPoint
   let vInp = 0;
   let vInn = 0;
@@ -199,7 +194,7 @@ function createOpAmpElement(
   }
 
   return {
-    nodeIndices: [nInp, nInn, nOut, nVccP, nVccN],
+    nodeIndices: [nInp, nInn, nOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -241,8 +236,6 @@ function createOpAmpElement(
     updateOperatingPoint(voltages: Float64Array): void {
       vInp = readNode(voltages, nInp);
       vInn = readNode(voltages, nInn);
-      vVccP = readNode(voltages, nVccP);
-      vVccN = readNode(voltages, nVccN);
 
       // Saturation is determined by the current output voltage, not the ideal
       // open-loop voltage. This prevents oscillation: the linear stamp is used
@@ -320,7 +313,7 @@ export const OpAmpDefinition: ComponentDefinition = {
   attributeMap: OPAMP_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Ideal Op-Amp — 5-terminal nonlinear element (in+, in-, out, Vcc+, Vcc-). " +
+    "Ideal Op-Amp — 3-terminal nonlinear element (in+, in-, out). " +
     "High-gain voltage amplifier with output saturation at supply rails.",
 
   factory(props: PropertyBag): OpAmpElement {

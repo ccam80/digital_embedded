@@ -6,8 +6,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -74,29 +74,59 @@ export class ResistorElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 0.375,
       width: 4,
-      height: 1,
+      height: 0.75,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const resistance = this._properties.getOrDefault<number>("resistance", 1000);
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines: left lead from x=0 to x=1, right lead from x=3 to x=4
+    const vA = signals?.getPinVoltage("A");
+    const vB = signals?.getPinVoltage("B");
+    const hasVoltage = vA !== undefined && vB !== undefined;
+
+    // Lead wires — colored by their respective node voltages
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(0, 0, 1, 0);
+
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
     ctx.drawLine(3, 0, 4, 0);
 
-    // IEEE zigzag body between x=1 and x=3, 6 segments at alternating ±0.5 y
-    const zigX = [1, 1.333, 1.667, 2.0, 2.333, 2.667, 3];
-    const zigY = [0, -0.5, 0.5, -0.5, 0.5, -0.5, 0];
-    for (let i = 0; i < zigX.length - 1; i++) {
-      ctx.drawLine(zigX[i], zigY[i], zigX[i + 1], zigY[i + 1]);
+    // Zigzag body: 4 iterations producing 8 peaks + start/end
+    const hs = 6 / 16; // 0.375 grid units
+    const segLen = 2; // distance(lead1, lead2)
+    const pts: Array<{ x: number; y: number }> = [{ x: 1, y: 0 }];
+    for (let i = 0; i < 4; i++) {
+      pts.push({ x: 1 + ((1 + 4 * i) * segLen) / 16, y: hs });
+      pts.push({ x: 1 + ((3 + 4 * i) * segLen) / 16, y: -hs });
+    }
+    pts.push({ x: 3, y: 0 });
+
+    // Body gradient: interpolate voltage from vA→vB along the zigzag
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(1, 0, 3, 0, [
+        { offset: 0, color: signals!.voltageColor(vA) },
+        { offset: 1, color: signals!.voltageColor(vB) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
     // Value label below body
@@ -149,6 +179,12 @@ function createResistorElement(
       stampG(solver, n0, n1, -G);
       stampG(solver, n1, n0, -G);
       stampG(solver, n1, n1, G);
+    },
+
+    getCurrent(voltages: Float64Array): number {
+      const vA = n0 > 0 ? voltages[n0 - 1] : 0;
+      const vB = n1 > 0 ? voltages[n1 - 1] : 0;
+      return G * (vA - vB);
     },
   };
 }

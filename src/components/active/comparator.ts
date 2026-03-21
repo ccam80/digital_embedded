@@ -32,6 +32,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -106,33 +107,54 @@ export class ComparatorElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+
+    const vInp = signals?.getPinVoltage("in+");
+    const vInn = signals?.getPinVoltage("in-");
+    const vOut = signals?.getPinVoltage("out");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Triangle body pointing right (same as op-amp)
-    ctx.drawLine(0, -2, 0, 2);
-    ctx.drawLine(0, -2, 4, 0);
-    ctx.drawLine(0, 2, 4, 0);
+    // Triangle body — stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon(
+      [{ x: 0.5, y: -2 }, { x: 3.5, y: 0 }, { x: 0.5, y: 2 }],
+      false,
+    );
 
-    // + label at non-inverting input
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("+", 0.5, -1, { horizontal: "left", vertical: "center" });
-
-    // - label at inverting input
-    ctx.drawText("−", 0.5, 1, { horizontal: "left", vertical: "center" });
-
-    // "CMP" indicator
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("CMP", 2, 0.3, { horizontal: "center", vertical: "center" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.3, { horizontal: "center", vertical: "bottom" });
+    // Input lead in+
+    if (vInp !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInp));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, 0.5, -1);
+
+    // Input lead in-
+    if (vInn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vInn));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, 0.5, 1);
+
+    // Output lead
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3.5, 0, 4, 0);
+
+    // +/- signs — body decoration, stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    const signX = 0.5 + 4 * PX;
+    const signSz = 6 * PX;
+    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
+    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
+    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
 
     ctx.restore();
   }

@@ -12,6 +12,7 @@
 import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { Point } from "../core/renderer-interface.js";
+import { pinWorldPosition } from "../core/pin.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
 
@@ -53,6 +54,14 @@ export interface NodeMap {
    * Populated by the analog compiler; `buildNodeMap` returns this as empty.
    */
   elementNodes: Map<CircuitElement, number[]>;
+
+  /**
+   * Maps world-space position keys ("x,y") to MNA node IDs.
+   * Includes both wire endpoints and component pin positions.
+   * Used by resolveElementNodes to find node IDs for pins that
+   * overlap other pins without an explicit wire.
+   */
+  positionToNodeId: Map<string, number>;
 
   /** Any diagnostics emitted during node mapping (e.g. missing ground). */
   diagnostics: SolverDiagnostic[];
@@ -151,18 +160,19 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
     union(parent, rank, wireStartIds[i], wireEndIds[i]);
   }
 
-  // Also union endpoints that share a coordinate with a component's pin
-  // (so that "wire touches pin" connectivity is captured).
+  // Add component pin world positions to the point set so that overlapping
+  // pins (two component pins at the same position) share the same union-find
+  // ID — no explicit wire needed. getOrCreateId returns the existing ID when
+  // a wire endpoint or another pin already occupies the same position.
   for (const el of circuit.elements) {
     const pins = el.getPins();
     for (const pin of pins) {
-      const pinKey = pointKey(pin.position);
-      const existing = pointToId.get(pinKey);
-      if (existing !== undefined) {
-        // The pin position matches a wire endpoint — no extra union needed;
-        // the endpoint is already in the set. We just need to record the
-        // association for label mapping below.
-        void existing;
+      const wp = pinWorldPosition(el, pin);
+      const pinId = getOrCreateId(wp);
+      // Grow union-find arrays for any newly created IDs
+      while (parent.length <= pinId) {
+        parent.push(parent.length);
+        rank.push(0);
       }
     }
   }
@@ -171,14 +181,17 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
   // Step 3: identify ground group
   // -------------------------------------------------------------------------
   const groundElements = circuit.elements.filter(
-    (el) => el.typeId === "Ground" || el.typeId === "ground",
+    (el) => el.typeId === "Ground" || el.typeId === "ground" || el.typeId === "AnalogGround",
   );
 
   let groundRoots = new Set<number>();
 
   for (const gnd of groundElements) {
     for (const pin of gnd.getPins()) {
-      const id = pointToId.get(pointKey(pin.position));
+      // Use world position (element pos + pin offset) to match wire endpoints.
+      // pin.position is local; pinWorldPosition applies rotation/mirror/offset.
+      const wp = pinWorldPosition(gnd, pin);
+      const id = pointToId.get(pointKey(wp));
       if (id !== undefined) {
         groundRoots.add(find(parent, id));
       }
@@ -275,9 +288,10 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
     }
     if (!label) continue;
 
-    // Find the node ID for any pin of this element
+    // Find the node ID for any pin of this element (use world position)
     for (const pin of el.getPins()) {
-      const id = pointToId.get(pointKey(pin.position));
+      const wp = pinWorldPosition(el, pin);
+      const id = pointToId.get(pointKey(wp));
       if (id !== undefined) {
         const root = find(parent, id);
         const nodeId = rootToNodeId.get(root) ?? 0;
@@ -287,12 +301,23 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Step 7: build positionToNodeId map — all positions → MNA node ID
+  // -------------------------------------------------------------------------
+  const positionToNodeId = new Map<string, number>();
+  for (const [key, id] of pointToId) {
+    const root = find(parent, id);
+    const nodeId = rootToNodeId.get(root) ?? 0;
+    positionToNodeId.set(key, nodeId);
+  }
+
   return {
     nodeCount,
     branchCount: 0,
     matrixSize: nodeCount,
     wireToNodeId,
     labelToNodeId,
+    positionToNodeId,
     elementNodes: new Map(),
     diagnostics,
   };

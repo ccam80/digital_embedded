@@ -87,6 +87,12 @@ export interface FlattenResult {
   circuit: Circuit;
   /** Boundaries that the compiler must handle via bridge adapters. */
   crossEngineBoundaries: CrossEngineBoundary[];
+  /**
+   * Mixed-mode partitions produced by the mixed-mode partitioner when a
+   * circuit contains both analog-only and digital-only components at the
+   * top level. The analog compiler creates bridge instances for each.
+   */
+  mixedModePartitions?: import("./mixed-partition.js").MixedModePartition[];
 }
 
 // ---------------------------------------------------------------------------

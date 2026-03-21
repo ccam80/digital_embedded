@@ -18,6 +18,7 @@ import type {
   ThemeColor,
   FontSpec,
   ColorScheme,
+  GradientStop,
 } from "@/core/renderer-interface";
 
 /**
@@ -128,6 +129,12 @@ export class SVGRenderContext implements RenderContext {
   /** SVG element strings accumulated at current nesting level. */
   private _elements: string[] = [];
 
+  /** SVG `<defs>` entries (gradient definitions, etc.). */
+  private _defs: string[] = [];
+
+  /** Auto-incrementing counter for unique gradient IDs. */
+  private _gradientCounter = 0;
+
   /** State save stack — each save() pushes, restore() pops. */
   private _stateStack: DrawState[] = [];
 
@@ -146,6 +153,8 @@ export class SVGRenderContext implements RenderContext {
   /** Call before issuing draw calls. Returns this for chaining. */
   beginDocument(): this {
     this._elements = [];
+    this._defs = [];
+    this._gradientCounter = 0;
     this._stateStack = [];
     this._state = defaultDrawState();
     return this;
@@ -168,11 +177,15 @@ export class SVGRenderContext implements RenderContext {
       ? `<rect x="${fmt(viewBoxX)}" y="${fmt(viewBoxY)}" width="${fmt(viewBoxW)}" height="${fmt(viewBoxH)}" fill="${escapeXml(bg)}"/>\n`
       : "";
 
+    const defsBlock = this._defs.length > 0
+      ? `<defs>\n${this._defs.join("\n")}\n</defs>\n`
+      : "";
     const body = this._elements.join("\n");
     return (
       `<svg xmlns="http://www.w3.org/2000/svg"` +
       ` viewBox="${fmt(viewBoxX)} ${fmt(viewBoxY)} ${fmt(viewBoxW)} ${fmt(viewBoxH)}"` +
       ` width="${fmt(viewBoxW)}" height="${fmt(viewBoxH)}">\n` +
+      defsBlock +
       bgElement +
       body +
       `\n</svg>`
@@ -229,6 +242,20 @@ export class SVGRenderContext implements RenderContext {
 
   setLineDash(pattern: number[]): void {
     this._state.lineDash = [...pattern];
+  }
+
+  setLinearGradient(
+    x1: number, y1: number, x2: number, y2: number,
+    stops: readonly GradientStop[],
+  ): void {
+    const id = `vgrad${this._gradientCounter++}`;
+    const stopElements = stops
+      .map((s) => `<stop offset="${fmt(s.offset)}" stop-color="${escapeXml(s.color)}"/>`)
+      .join("");
+    this._defs.push(
+      `<linearGradient id="${id}" x1="${fmt(x1)}" y1="${fmt(y1)}" x2="${fmt(x2)}" y2="${fmt(y2)}" gradientUnits="userSpaceOnUse">${stopElements}</linearGradient>`,
+    );
+    this._state.color = `url(#${id})`;
   }
 
   // ---------------------------------------------------------------------------

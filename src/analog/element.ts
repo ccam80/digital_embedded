@@ -201,6 +201,19 @@ export interface AnalogElement {
   readonly isReactive: boolean;
 
   /**
+   * Compute the current through this element from the MNA solution vector.
+   *
+   * Elements with `branchIndex >= 0` (voltage sources, inductors) have their
+   * current available directly from the solution vector. Elements without a
+   * branch row (resistors, capacitors, current sources) implement this method
+   * to compute current from node voltages (e.g. I = G × (V_A - V_B)).
+   *
+   * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
+   * @returns Current in amperes (positive = conventional flow from node[0] to node[1])
+   */
+  getCurrent?(voltages: Float64Array): number;
+
+  /**
    * Optional display label for diagnostic attribution.
    *
    * When present, used in `SolverDiagnostic.involvedElements` descriptions

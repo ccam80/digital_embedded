@@ -16,8 +16,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -276,44 +276,63 @@ export class TriacElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vMT1 = signals?.getPinVoltage("MT1");
+    const vMT2 = signals?.getPinVoltage("MT2");
+    const vG = signals?.getPinVoltage("G");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 1.5, 0);
-    ctx.drawLine(2.5, 0, 4, 0);
+    const PX = 1 / 16;
+    const hs = 16 * PX;
 
-    // Forward triangle (MT1→MT2 direction)
+    const lead1x = 1.5;
+    const lead2x = 2.5;
+
+    // Body (plate bars and arrow triangles) stays COMPONENT color
+    ctx.drawLine(lead1x, -hs, lead1x, hs);
+    ctx.drawLine(lead2x, -hs, lead2x, hs);
+
     ctx.drawPolygon([
-      { x: 1.5, y: -0.4 },
-      { x: 1.5, y: 0.4 },
-      { x: 2.3, y: 0 },
+      { x: lead1x, y: 8 * PX },
+      { x: lead2x, y: 16 * PX },
+      { x: lead2x, y: 0 },
     ], true);
 
-    // Reverse triangle (MT2→MT1 direction — anti-parallel)
     ctx.drawPolygon([
-      { x: 2.5, y: -0.4 },
-      { x: 2.5, y: 0.4 },
-      { x: 1.7, y: 0 },
+      { x: lead2x, y: -8 * PX },
+      { x: lead1x, y: -16 * PX },
+      { x: lead1x, y: 0 },
     ], true);
 
-    // Cathode bars
-    ctx.drawLine(1.5, -0.4, 1.5, 0.4);
-    ctx.drawLine(2.5, -0.4, 2.5, 0.4);
+    // MT1 lead
+    if (signals && vMT1 !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vMT1));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, lead1x, 0);
+
+    // MT2 lead
+    if (signals && vMT2 !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vMT2));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(lead2x, 0, 4, 0);
 
     // Gate lead
-    ctx.drawLine(2.5, 0.4, 2.5, 1.0);
-    ctx.drawLine(2.5, 1.0, 3.5, 1.0);
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 2, -0.75, { horizontal: "center", vertical: "bottom" });
+    const gateCornerX = lead2x;
+    const gateCornerY = 1;
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(lead2x, 0, gateCornerX, gateCornerY);
+    ctx.drawLine(gateCornerX, gateCornerY, 3, 1);
 
     ctx.restore();
   }
@@ -353,7 +372,7 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: 1,
-      position: { x: 3.5, y: 1 },
+      position: { x: 3, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },

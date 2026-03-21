@@ -148,8 +148,16 @@ export function parseAttributeValue(valueElement: Element, rootElement: Element)
     case "string":
       return { type: "string", value: textContent(valueElement) };
 
-    case "int":
-      return { type: "int", value: parseInt(textContent(valueElement), 10) };
+    case "int": {
+      const raw = textContent(valueElement);
+      const asFloat = parseFloat(raw);
+      // Use parseFloat when the value contains a decimal point (e.g. "0.0001")
+      // to handle files where floats were incorrectly serialized as <int>.
+      const value = raw.includes(".") || raw.includes("e") || raw.includes("E")
+        ? asFloat
+        : parseInt(raw, 10);
+      return { type: "int", value };
+    }
 
     case "long":
       return { type: "long", value: BigInt(textContent(valueElement)) };

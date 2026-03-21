@@ -72,36 +72,22 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
 
   // Delegate to shared traceNets() which uses pinWorldPosition() (F6 fix).
   const traced = traceNets(elements, wires, registry);
-  const uf = traced.uf;
-  const slotBase = traced.slotBase;
+  const { slotToNetId: slotToNetIdArr, netCount } = traced;
+
+  // Cumulative pin offsets for slot addressing (mirrors slotBase inside traceNets)
+  const slotBase: number[] = new Array(componentCount).fill(0);
+  {
+    let offset = 0;
+    for (let i = 0; i < componentCount; i++) {
+      slotBase[i] = offset;
+      offset += allPins[i]!.length;
+    }
+  }
 
   const slotOf = (elemIdx: number, pinIdx: number): number =>
     slotBase[elemIdx]! + pinIdx;
 
-  // -------------------------------------------------------------------------
-  // Step 4: Assign net IDs (only for pin slots, not wire virtual nodes)
-  // -------------------------------------------------------------------------
-
-  const rootToNetId = new Map<number, number>();
-  let nextNetId = 0;
-
-  for (let i = 0; i < componentCount; i++) {
-    const pins = allPins[i]!;
-    for (let j = 0; j < pins.length; j++) {
-      const slot = slotOf(i, j);
-      const root = uf.find(slot);
-      if (!rootToNetId.has(root)) {
-        rootToNetId.set(root, nextNetId++);
-      }
-    }
-  }
-
-  const netCount = nextNetId;
-
-  const slotToNetId = (slot: number): number => {
-    const root = uf.find(slot);
-    return rootToNetId.get(root) ?? 0;
-  };
+  const slotToNetId = (slot: number): number => slotToNetIdArr[slot] ?? 0;
 
   // -------------------------------------------------------------------------
   // Step 5: Determine net widths and collect width-mismatch diagnostics

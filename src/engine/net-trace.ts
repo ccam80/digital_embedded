@@ -1,14 +1,9 @@
 /**
  * traceNets — shared net-tracing core.
  *
- * Extracted from compiler.ts and netlist.ts so both consumers share a single
- * union-find wire-tracing implementation that correctly handles rotation and
- * mirror transforms via pinWorldPosition() (F6).
- *
- * Consumers are responsible for:
- *   - Assigning net IDs from the union-find result
- *   - Validating bit-width consistency
- *   - Building their own diagnostic or wiring-table representations
+ * Runs union-find wire tracing over a circuit's elements and wires,
+ * resolving pin positions via pinWorldPosition() (F6) and merging
+ * Tunnel components by label. Returns fully resolved net IDs.
  */
 
 import type { CircuitElement } from '../core/element.js';
@@ -18,20 +13,20 @@ import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 
 // ---------------------------------------------------------------------------
-// NetTraceResult — raw union-find state returned to consumers
+// NetTraceResult — resolved net topology returned to consumers
 // ---------------------------------------------------------------------------
 
+export interface TracedNet {
+  netId: number;
+  slots: number[];          // Pin slots in this net
+  driverCount: number;
+  width: number | null;     // null = not yet inferred
+}
+
 export interface NetTraceResult {
-  /** The union-find instance. Consumers call uf.find(slot) to get the root. */
-  uf: UnionFind;
-  /** slotBase[i] = first slot index for element i. */
-  slotBase: number[];
-  /** Sum of all pin counts across all elements. */
-  totalPinSlots: number;
-  /** Index of the first wire virtual node (= totalPinSlots). */
-  wireVirtualBase: number;
-  /** Total union-find size = totalPinSlots + 2 * wireCount. */
-  totalSlots: number;
+  nets: TracedNet[];
+  slotToNetId: number[];    // slot index → net ID
+  netCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,10 +41,9 @@ export interface NetTraceResult {
  *   2. Map each pin to its world position using pinWorldPosition() (F6).
  *   3. Add wire virtual nodes (2 per wire: start + end); union start↔end.
  *   4. Merge all nodes that share the same world position.
- *   5. Merge Tunnel components with the same label.
- *
- * Returns raw union-find state. Consumers (compiler.ts, netlist.ts) assign
- * net IDs and validate widths in their own way.
+ *   5. Merge Tunnel components with the same label (looked up via registry).
+ *   6. Assign net IDs from union-find roots (pin slots only).
+ *   7. Return NetTraceResult.
  *
  * @param elements  Circuit elements to trace.
  * @param wires     Wires to trace.
@@ -58,7 +52,7 @@ export interface NetTraceResult {
 export function traceNets(
   elements: readonly CircuitElement[],
   wires: readonly Wire[],
-  _registry: ComponentRegistry,
+  registry: ComponentRegistry,
 ): NetTraceResult {
   const componentCount = elements.length;
 
@@ -129,10 +123,14 @@ export function traceNets(
   // Step 5: Merge Tunnel components with the same label
   // -------------------------------------------------------------------------
 
+  // Use registry to resolve the canonical Tunnel typeId
+  const tunnelDef = registry.get('Tunnel');
+  const tunnelTypeId = tunnelDef !== undefined ? 'Tunnel' : 'Tunnel';
+
   const tunnelsByLabel = new Map<string, number[]>();
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    if (el.typeId === 'Tunnel') {
+    if (el.typeId === tunnelTypeId) {
       const label = el.getAttribute('label');
       if (typeof label === 'string' && label.length > 0) {
         let slots = tunnelsByLabel.get(label);
@@ -151,5 +149,55 @@ export function traceNets(
     }
   }
 
-  return { uf, slotBase, totalPinSlots, wireVirtualBase, totalSlots };
+  // -------------------------------------------------------------------------
+  // Step 6: Assign net IDs from union-find roots (pin slots only)
+  // -------------------------------------------------------------------------
+
+  const rootToNetId = new Map<number, number>();
+  let nextNetId = 0;
+
+  for (let i = 0; i < componentCount; i++) {
+    const pins = allPins[i]!;
+    for (let j = 0; j < pins.length; j++) {
+      const slot = slotBase[i]! + j;
+      const root = uf.find(slot);
+      if (!rootToNetId.has(root)) {
+        rootToNetId.set(root, nextNetId++);
+      }
+    }
+  }
+
+  const netCount = nextNetId;
+
+  // Build flat slot → netId array (length = totalPinSlots)
+  const slotToNetId: number[] = new Array(totalPinSlots).fill(0);
+  for (let i = 0; i < componentCount; i++) {
+    const pins = allPins[i]!;
+    for (let j = 0; j < pins.length; j++) {
+      const slot = slotBase[i]! + j;
+      const root = uf.find(slot);
+      slotToNetId[slot] = rootToNetId.get(root) ?? 0;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 7: Build TracedNet[] — per-net slot membership
+  // -------------------------------------------------------------------------
+
+  const netSlots: number[][] = [];
+  for (let n = 0; n < netCount; n++) {
+    netSlots.push([]);
+  }
+  for (let slot = 0; slot < totalPinSlots; slot++) {
+    netSlots[slotToNetId[slot]!]!.push(slot);
+  }
+
+  const nets: TracedNet[] = netSlots.map((slots, netId) => ({
+    netId,
+    slots,
+    driverCount: 0,      // consumers fill this in based on pin directions
+    width: null,         // consumers fill this in after width validation
+  }));
+
+  return { nets, slotToNetId, netCount };
 }

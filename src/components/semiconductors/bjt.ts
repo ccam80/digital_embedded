@@ -17,8 +17,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -342,45 +342,57 @@ export class NpnBjtElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 0.5,
+      x: this.position.x,
       y: this.position.y - 1.5,
-      width: 3,
+      width: 2.4,
       height: 3,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vB = signals?.getPinVoltage("B");
+    const vC = signals?.getPinVoltage("C");
+    const vE = signals?.getPinVoltage("E");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Body circle
-    ctx.drawCircle(1, 0, 1.2, false);
+    // Body (circle and vertical bar) stays COMPONENT color
+    ctx.drawCircle(1.2, 0, 1.2, false);
+    ctx.drawLine(1.0, -0.7, 1.0, 0.7);
 
-    // Base lead (left)
-    ctx.drawLine(0, 0, 1, 0);
-    // Vertical base line inside circle
-    ctx.drawLine(1, -0.8, 1, 0.8);
-
-    // Collector lead (top-right) — from base line to collector pin
-    ctx.drawLine(1, -0.8, 2, -1.5);
-
-    // Emitter lead (bottom-right) with arrow
-    ctx.drawLine(1, 0.8, 2, 1.5);
-    // Arrow on emitter (pointing out for NPN)
-    ctx.drawPolygon([
-      { x: 1.6, y: 1.1 },
-      { x: 1.8, y: 1.3 },
-      { x: 1.4, y: 1.35 },
-    ], true);
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1, -1.8, { horizontal: "center", vertical: "bottom" });
+    // Base lead
+    if (signals && vB !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1.0, 0);
+
+    // Collector lead (from bar to collector pin)
+    if (signals && vC !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vC));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1.0, -0.7, 2, -1.5);
+
+    // Emitter lead (from bar to emitter pin)
+    if (signals && vE !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vE));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1.0, 0.7, 2, 1.5);
+
+    // Arrow on emitter (pointing outward for NPN) — body stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon([
+      { x: 2, y: 1.5 },
+      { x: 1.6682292076469702, y: 0.9144325628653415 },
+      { x: 1.3557707923530296, y: 1.3047674371346582 },
+    ], true);
 
     ctx.restore();
   }
@@ -411,43 +423,57 @@ export class PnpBjtElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 0.5,
+      x: this.position.x,
       y: this.position.y - 1.5,
-      width: 3,
+      width: 2.4,
       height: 3,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vB = signals?.getPinVoltage("B");
+    const vC = signals?.getPinVoltage("C");
+    const vE = signals?.getPinVoltage("E");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Body circle
-    ctx.drawCircle(1, 0, 1.2, false);
+    // Body (circle and vertical bar) stays COMPONENT color
+    ctx.drawCircle(1.2, 0, 1.2, false);
+    ctx.drawLine(1.0, -0.7, 1.0, 0.7);
 
-    // Base lead (left)
-    ctx.drawLine(0, 0, 1, 0);
-    ctx.drawLine(1, -0.8, 1, 0.8);
-
-    // Collector lead (top-right)
-    ctx.drawLine(1, -0.8, 2, -1.5);
-
-    // Emitter lead (bottom-right) with arrow pointing IN (PNP)
-    ctx.drawLine(1, 0.8, 2, 1.5);
-    ctx.drawPolygon([
-      { x: 1.4, y: 1.1 },
-      { x: 1.6, y: 1.3 },
-      { x: 1.2, y: 1.3 },
-    ], true);
-
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1, -1.8, { horizontal: "center", vertical: "bottom" });
+    // Base lead
+    if (signals && vB !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1.0, 0);
+
+    // Collector lead (from bar to collector pin)
+    if (signals && vC !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vC));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1.0, -0.7, 2, -1.5);
+
+    // Emitter lead (from bar to emitter pin)
+    if (signals && vE !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vE));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(1.0, 0.7, 2, 1.5);
+
+    // Arrow on emitter pointing INWARD (PNP) — body stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon([
+      { x: 1.0, y: 0.7 },
+      { x: 1.3317707923530298, y: 1.2855674371346585 },
+      { x: 1.6442292076469704, y: 0.8952325628653418 },
+    ], true);
 
     ctx.restore();
   }

@@ -113,8 +113,8 @@ describe('traceNets', () => {
     const registry = makeRegistry('G');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    // Slot 0 = element 0 pin 0; Slot 1 = element 1 pin 0
-    expect(traced.uf.connected(0, 1)).toBe(true);
+    // Slot 0 = element 0 pin 0; Slot 1 = element 1 pin 0 — same net
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);
   });
 
   // -------------------------------------------------------------------------
@@ -134,8 +134,8 @@ describe('traceNets', () => {
     const registry = makeRegistry('G');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    // Slots: 0 = a:pin0, 1 = b:pin0
-    expect(traced.uf.connected(0, 1)).toBe(true);
+    // Slots: 0 = a:pin0, 1 = b:pin0 — same net via wire
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);
   });
 
   // -------------------------------------------------------------------------
@@ -160,9 +160,9 @@ describe('traceNets', () => {
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
     // Slots: 0=a, 1=b, 2=c, 3=d
-    expect(traced.uf.connected(0, 1)).toBe(true);   // wired together
-    expect(traced.uf.connected(2, 3)).toBe(false);  // not wired
-    expect(traced.uf.connected(0, 2)).toBe(false);  // different groups
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);   // wired together
+    expect(traced.slotToNetId[2]).not.toBe(traced.slotToNetId[3]);  // not wired — each isolated
+    expect(traced.slotToNetId[0]).not.toBe(traced.slotToNetId[2]);  // different groups
   });
 
   // -------------------------------------------------------------------------
@@ -186,8 +186,8 @@ describe('traceNets', () => {
     const registry = makeRegistry('Tunnel');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    // Slots: 0 = tunnelA pin 0, 1 = tunnelB pin 0
-    expect(traced.uf.connected(0, 1)).toBe(true);
+    // Slots: 0 = tunnelA pin 0, 1 = tunnelB pin 0 — same net via label
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);
   });
 
   // -------------------------------------------------------------------------
@@ -209,7 +209,7 @@ describe('traceNets', () => {
     const registry = makeRegistry('Tunnel');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    expect(traced.uf.connected(0, 1)).toBe(false);
+    expect(traced.slotToNetId[0]).not.toBe(traced.slotToNetId[1]);
   });
 
   // -------------------------------------------------------------------------
@@ -238,20 +238,19 @@ describe('traceNets', () => {
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
     // With correct rotation: rotated pin lands at (10,8) → same as targetElem pin → merged
-    expect(traced.uf.connected(0, 1)).toBe(true);
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);
 
     // Verify that raw addition would NOT produce the same result:
     // raw = (10+2, 10+0) = (12, 10), which differs from targetElem pin at (10, 8)
-    // So if the implementation used raw addition, connected() would be false.
-    // We can't "call raw addition" directly here, but the above assertion passing
-    // with the rotated element proves pinWorldPosition() is being used correctly.
+    // So if the implementation used raw addition, slotToNetId[0] !== slotToNetId[1].
+    // The above assertion passing proves pinWorldPosition() is being used correctly.
   });
 
   // -------------------------------------------------------------------------
-  // slotBase correctly offsets multi-pin elements
+  // netCount is correct for multi-pin elements
   // -------------------------------------------------------------------------
-  it('slotBaseIsComputedCorrectly', () => {
-    // Element 0 has 2 pins, element 1 has 3 pins
+  it('netCountIsComputedCorrectly', () => {
+    // Element 0 has 2 pins (isolated), element 1 has 3 pins (isolated) → 5 nets total
     const a = new TestElement('G', 'ea', { x: 0, y: 0 }, [
       outputPin(0, 0, 'out'),
       inputPin(0, 1, 'in'),
@@ -269,10 +268,8 @@ describe('traceNets', () => {
     const registry = makeRegistry('G');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    expect(traced.slotBase[0]).toBe(0);
-    expect(traced.slotBase[1]).toBe(2);
-    expect(traced.totalPinSlots).toBe(5);
-    expect(traced.wireVirtualBase).toBe(5);
+    expect(traced.netCount).toBe(5);
+    expect(traced.slotToNetId).toHaveLength(5);
   });
 
   // -------------------------------------------------------------------------
@@ -291,14 +288,14 @@ describe('traceNets', () => {
     const registry = makeRegistry('G');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    // Slots: 0 = a pin 0, 1 = b pin 0
-    expect(traced.uf.connected(0, 1)).toBe(true);
+    // Slots: 0 = a pin 0, 1 = b pin 0 — same net via chained wires
+    expect(traced.slotToNetId[0]).toBe(traced.slotToNetId[1]);
   });
 
   // -------------------------------------------------------------------------
-  // wireVirtualBase and totalSlots are correct
+  // nets array has correct membership
   // -------------------------------------------------------------------------
-  it('wireVirtualBaseAndTotalSlotsAreCorrect', () => {
+  it('netsArrayHasCorrectMembership', () => {
     const a = new TestElement('G', 'ea', { x: 0, y: 0 }, [outputPin(0, 0)]);
     const b = new TestElement('G', 'eb', { x: 4, y: 0 }, [inputPin(0, 0)]);
 
@@ -306,14 +303,14 @@ describe('traceNets', () => {
     circuit.addElement(a);
     circuit.addElement(b);
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 4, y: 0 }));
-    circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 4, y: 1 }));
 
     const registry = makeRegistry('G');
     const traced = traceNets(circuit.elements, circuit.wires, registry);
 
-    // 2 pins + 2 wires * 2 virtual nodes = 6 total slots
-    expect(traced.totalPinSlots).toBe(2);
-    expect(traced.wireVirtualBase).toBe(2);
-    expect(traced.totalSlots).toBe(6);
+    // Only 1 net (both pins merged by wire)
+    expect(traced.netCount).toBe(1);
+    expect(traced.nets).toHaveLength(1);
+    expect(traced.nets[0]!.slots).toContain(0);
+    expect(traced.nets[0]!.slots).toContain(1);
   });
 });

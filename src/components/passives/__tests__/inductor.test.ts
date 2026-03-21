@@ -78,12 +78,17 @@ describe("Inductor", () => {
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      // Should have: 4 conductance stamps + 3 branch incidence stamps = 7
-      // Conductance: (0,0), (1,1), (0,1), (1,0) — geq=0 initially
-      // Branch: (2,0)=+1, (2,1)=-1, (2,2)=-geq
-      expect(stamps.length).toBe(7);
+      // Should have: 2 B-matrix incidence + 3 C/D-matrix branch = 5
+      // B-matrix (node rows): (0,2)=+1, (1,2)=-1
+      // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1, (2,2)=-geq
+      expect(stamps.length).toBe(5);
 
-      // Check for branch incidence entries at branch row 2
+      // B sub-matrix: branch current incidence in node KCL rows
+      const nodeEntries = stamps.filter((s) => s.row < 2);
+      expect(nodeEntries.some((s) => s.row === 0 && s.col === 2 && s.value === 1)).toBe(true);
+      expect(nodeEntries.some((s) => s.row === 1 && s.col === 2 && s.value === -1)).toBe(true);
+
+      // C sub-matrix: branch equation entries
       const branchEntries = stamps.filter((s) => s.row === 2);
       expect(branchEntries.some((s) => s.col === 0 && s.value === 1)).toBe(true);
       expect(branchEntries.some((s) => s.col === 1 && s.value === -1)).toBe(true);
@@ -111,10 +116,10 @@ describe("Inductor", () => {
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      // Filter for diagonal conductance stamps (positive values, not branch row)
-      const geqStamps = stamps.filter((s) => s.value > 0 && s.row < 2 && s.col < 2);
-      expect(geqStamps.length).toBeGreaterThan(0);
-      expect(geqStamps[0].value).toBeCloseTo(200, 3);
+      // geq appears as -geq on the branch diagonal (row=2, col=2)
+      const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
+      expect(branchDiag).toBeDefined();
+      expect(branchDiag!.value).toBeCloseTo(-200, 3);
     });
   });
 
@@ -137,8 +142,9 @@ describe("Inductor", () => {
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      const geqStamps = stamps.filter((s) => s.value > 0 && s.row < 2 && s.col < 2);
-      expect(geqStamps[0].value).toBeCloseTo(100, 3);
+      const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
+      expect(branchDiag).toBeDefined();
+      expect(branchDiag!.value).toBeCloseTo(-100, 3);
     });
   });
 

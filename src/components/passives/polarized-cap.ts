@@ -29,8 +29,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -72,7 +72,7 @@ function buildPolarizedCapPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "neg",
       defaultBitWidth: 1,
-      position: { x: 2, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -101,36 +101,78 @@ export class PolarizedCapElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 0.75,
       width: 2,
-      height: 1,
+      height: 1.5 + 1e-10,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const capacitance = this._properties.getOrDefault<number>("capacitance", 100e-6);
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    ctx.drawLine(0, 0, 0.75, 0);
-    ctx.drawLine(1.25, 0, 2, 0);
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+    const hasVoltage = vPos !== undefined && vNeg !== undefined;
 
-    // Positive plate (straight)
-    ctx.drawLine(0.75, -0.4, 0.75, 0.4);
-    // Negative plate (straight — curved appearance is a rendering convention)
-    ctx.drawLine(1.25, -0.4, 1.25, 0.4);
+    const PX = 1 / 16;
+    const plateOffset = 12 * PX; // 0.75
 
-    // Polarity marker
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("+", 0.55, -0.45, { horizontal: "center", vertical: "top" });
+    // Left lead — colored by pos voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, plateOffset, 0);
 
-    const displayLabel = label.length > 0 ? label : `${capacitance * 1e6}µF`;
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(displayLabel, 1, 0.65, { horizontal: "center", vertical: "top" });
+    // Right lead — colored by neg voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vNeg));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, 0, 2 - plateOffset, 0);
+
+    // Plate 1 — straight line (positive/anode plate): gradient pos→neg
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(plateOffset, 0, 2 - plateOffset, 0, [
+        { offset: 0, color: signals!.voltageColor(vPos) },
+        { offset: 1, color: signals!.voltageColor(vNeg) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(plateOffset, -0.75, plateOffset, 0.75);
+
+    // Plate 2 — curved (8-point polyline approximation)
+    // Falstad: fwdOffset = 5*PX*(1 - sqrt(1 - q^2)) * 0.5
+    const plateHeight = 1.5; // 2 * plateOffset
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(plateOffset, 0, 2 - plateOffset, 0, [
+        { offset: 0, color: signals!.voltageColor(vPos) },
+        { offset: 1, color: signals!.voltageColor(vNeg) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let i = 0; i < 7; i++) {
+      const q0 = (i - 3.5) / 3.5;
+      const q1 = (i + 1 - 3.5) / 3.5;
+      const fwd0 = 5 * PX * (1 - Math.sqrt(1 - q0 * q0)) * 0.5;
+      const fwd1 = 5 * PX * (1 - Math.sqrt(1 - q1 * q1)) * 0.5;
+      const y0 = -0.75 + (i / 7) * plateHeight;
+      const y1 = -0.75 + ((i + 1) / 7) * plateHeight;
+      ctx.drawLine(2 - plateOffset + fwd0, y0, 2 - plateOffset + fwd1, y1);
+    }
+
+    if (label.length > 0) {
+      ctx.setColor("TEXT");
+      ctx.setFont({ family: "sans-serif", size: 0.7 });
+      ctx.drawText(label, 1, 0.8, { horizontal: "center", vertical: "top" });
+    }
 
     ctx.restore();
   }

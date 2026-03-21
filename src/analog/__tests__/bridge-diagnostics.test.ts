@@ -93,8 +93,8 @@ function runStepsWithVoltage(
   voltage: number,
   steps: number,
 ): void {
-  const voltages = new Float64Array(nodeId + 2);
-  voltages[nodeId] = voltage;
+  const voltages = new Float64Array(nodeId + 1);
+  voltages[nodeId - 1] = voltage;
   for (let i = 0; i < steps; i++) {
     coordinator.syncBeforeAnalogStep(voltages);
   }
@@ -174,20 +174,20 @@ describe("Diagnostics", () => {
       const highVoltage = 2.1;  // readLogicLevel → true
 
       // Prime the previous voltage: first step with highVoltage so prevInputVoltages is set
-      const voltagesHigh = new Float64Array(INPUT_NODE + 2);
-      voltagesHigh[INPUT_NODE] = highVoltage;
+      const voltagesHigh = new Float64Array(INPUT_NODE + 1);
+      voltagesHigh[INPUT_NODE - 1] = highVoltage;
       coordinator.syncBeforeAnalogStep(voltagesHigh);
       coordinator.syncAfterAnalogStep(voltagesHigh);
 
       // Now alternate for 25 steps to trigger the M=20 threshold
       for (let step = 0; step < 25; step++) {
         const v = step % 2 === 0 ? lowVoltage : highVoltage;
-        const voltages = new Float64Array(INPUT_NODE + 2);
-        voltages[INPUT_NODE] = v;
+        const voltages = new Float64Array(INPUT_NODE + 1);
+        voltages[INPUT_NODE - 1] = v;
 
         const prevV = step % 2 === 0 ? highVoltage : lowVoltage;
-        const prevVoltages = new Float64Array(INPUT_NODE + 2);
-        prevVoltages[INPUT_NODE] = prevV;
+        const prevVoltages = new Float64Array(INPUT_NODE + 1);
+        prevVoltages[INPUT_NODE - 1] = prevV;
 
         // syncAfterAnalogStep compares currVoltage to prevInputVoltages[i]
         // which was set in the previous call
@@ -406,12 +406,13 @@ describe("bridge-impedance-mismatch", () => {
       isNegated: false,
       isClock: false,
     };
+    // Pin position is LOCAL: pinWorldPosition(el, pin) = (8,0) + (2,0) = (10,0)
     const subcircuitEl = new BridgeSubcircuitElement(
       "DigSub",
       "digsub_0",
       { x: 8, y: 0 },
       innerCircuit,
-      [subcircuitPin],
+      [{ ...subcircuitPin, position: { x: 2, y: 0 } }],
     );
     outerCircuit.addElement(subcircuitEl);
 

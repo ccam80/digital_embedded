@@ -43,6 +43,7 @@ import {
 } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 
@@ -250,39 +251,55 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.3, width: 1, height: 0.6 };
+    return {
+      x: this.position.x - 0.25,
+      y: this.position.y - 0.5,
+      width: 1.5,
+      height: 1.0,
+    };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Left electrode
-    ctx.drawLine(0, 0, 0.35, 0);
-    ctx.drawLine(0.35, -0.25, 0.35, 0.25);
-
-    // Right electrode
-    ctx.drawLine(0.65, 0, 1, 0);
-    ctx.drawLine(0.65, -0.25, 0.65, 0.25);
-
-    // Spark symbol (zigzag between electrodes)
-    ctx.drawPath({
-      operations: [
-        { op: "moveTo", x: 0.35, y: 0 },
-        { op: "lineTo", x: 0.45, y: -0.1 },
-        { op: "lineTo", x: 0.55, y: 0.1 },
-        { op: "lineTo", x: 0.65, y: 0 },
+    // Electrode arrows — body, stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon(
+      [
+        { x: 0.25, y: 0 },
+        { x: -0.25, y: 0.5 },
+        { x: -0.25, y: -0.5 },
       ],
-    });
+      true,
+    );
+    ctx.drawPolygon(
+      [
+        { x: 0.75, y: 0 },
+        { x: 1.25, y: -0.5 },
+        { x: 1.25, y: 0.5 },
+      ],
+      true,
+    );
 
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.5, -0.35, { horizontal: "center", vertical: "bottom" });
+    // pos lead
+    if (vPos !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 0.25, 0);
+
+    // neg lead
+    if (vNeg !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vNeg));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0.75, 0, 1, 0);
 
     ctx.restore();
   }

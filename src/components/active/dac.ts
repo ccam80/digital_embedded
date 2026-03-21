@@ -25,6 +25,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -132,7 +133,7 @@ export class DACElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     const bits = this._properties.getOrDefault<number>("bits", 8);
     const label = this._properties.getOrDefault<string>("label", "");
     const halfH = Math.floor(bits / 2) + 1;
@@ -227,7 +228,7 @@ function createDACElement(
     const model = new DigitalInputPinModel(inputSpec);
     const nD = nodeIds[i];
     if (nD > 0) {
-      model.init(nD - 1, 0);
+      model.init(nD, 0);
     }
     inputModels.push(model);
   }

@@ -97,7 +97,7 @@ export interface CustomShapeData {
 // ---------------------------------------------------------------------------
 
 /** Simulation engine type for a circuit. */
-export type EngineType = "digital" | "analog";
+export type EngineType = "digital" | "analog" | "auto";
 
 export interface CircuitMetadata {
   /** Display name for this circuit. */
@@ -140,7 +140,7 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     chipWidth: 3,
     chipHeight: 3,
     shapeType: "DEFAULT",
-    engineType: "digital",
+    engineType: "auto",
   };
 }
 

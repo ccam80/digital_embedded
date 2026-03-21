@@ -88,4 +88,24 @@ describe('detectInputCount', () => {
     const result = detectInputCount(circuit, registry, testData);
     expect(result).toBe(1);
   });
+
+  it('counts Clock components as inputs', () => {
+    const circuit: Circuit = builder.build({
+      components: [
+        { id: 'clk', type: 'Clock', props: { label: 'CLK' } },
+        { id: 'd',   type: 'In',    props: { label: 'D', bitWidth: 1 } },
+        { id: 'ff',  type: 'D_FF' },
+        { id: 'q',   type: 'Out',   props: { label: 'Q', bitWidth: 1 } },
+      ],
+      connections: [
+        ['clk:out', 'ff:C'],
+        ['d:out',   'ff:D'],
+        ['ff:Q',    'q:in'],
+      ],
+    });
+
+    // CLK and D are inputs, Q is output — so inputCount should be 2
+    const result = detectInputCount(circuit, registry, 'CLK D Q\n0 0 0');
+    expect(result).toBe(2);
+  });
 });

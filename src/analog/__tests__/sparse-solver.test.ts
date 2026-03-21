@@ -407,7 +407,7 @@ describe("SparseSolver real MNA circuit", () => {
     expect(dcResult.converged).toBe(true);
 
     // Voltage source enforces node 50 = 10V
-    const v50 = engine.getNodeVoltage(49); // 0-based
+    const v50 = engine.getNodeVoltage(50); // MNA node ID
     expect(v50).toBeCloseTo(10.0, 1);
 
     // --- Transient simulation: 100 steps ---

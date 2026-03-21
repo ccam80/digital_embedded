@@ -10,8 +10,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -29,6 +29,65 @@ import type { SparseSolver } from "../../analog/sparse-solver.js";
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
+
+// ---------------------------------------------------------------------------
+// Inline geometry helpers (Falstad coordinate system)
+// ---------------------------------------------------------------------------
+
+const PX = 1 / 16;
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+function distance(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function calcLeads(
+  p1: Point,
+  p2: Point,
+  bodyLen: number,
+): { lead1: Point; lead2: Point } {
+  const dn = distance(p1, p2);
+  const f = (1 - bodyLen / dn) / 2;
+  return {
+    lead1: { x: p1.x + (p2.x - p1.x) * f, y: p1.y + (p2.y - p1.y) * f },
+    lead2: { x: p1.x + (p2.x - p1.x) * (1 - f), y: p1.y + (p2.y - p1.y) * (1 - f) },
+  };
+}
+
+function interpPoint(p1: Point, p2: Point, f: number): Point {
+  return { x: p1.x + (p2.x - p1.x) * f, y: p1.y + (p2.y - p1.y) * f };
+}
+
+function interpPointSingle(p1: Point, p2: Point, f: number, g: number): Point {
+  const dn = distance(p1, p2);
+  const dx = (p2.x - p1.x) / dn;
+  const dy = (p2.y - p1.y) / dn;
+  return {
+    x: p1.x + (p2.x - p1.x) * f + dy * g,
+    y: p1.y + (p2.y - p1.y) * f - dx * g,
+  };
+}
+
+function interpPoint2(
+  p1: Point,
+  p2: Point,
+  f: number,
+  g: number,
+): [Point, Point] {
+  const dn = distance(p1, p2);
+  const dx = (p2.x - p1.x) / dn;
+  const dy = (p2.y - p1.y) / dn;
+  const bx = p1.x + (p2.x - p1.x) * f;
+  const by = p1.y + (p2.y - p1.y) * f;
+  return [
+    { x: bx + dy * g, y: by - dx * g },
+    { x: bx - dy * g, y: by + dx * g },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -83,43 +142,71 @@ export class PotentiometerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // post3 is at y = -offset = -1 (below axis), zigzag peak at y = +hs = +0.5
     return {
       x: this.position.x,
-      y: this.position.y - 0.6,
+      y: this.position.y - 1,
       width: 2,
-      height: 1.2,
+      height: 1.5,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const resistance = this._properties.getOrDefault<number>("resistance", 10000);
-    const position = this._properties.getOrDefault<number>("position", 0.5);
-    const label = this._properties.getOrDefault<string>("label", "");
-
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines: left lead from x=0 to x=0.4, right lead from x=1.6 to x=2
-    ctx.drawLine(0, 0, 0.4, 0);
-    ctx.drawLine(1.6, 0, 2, 0);
+    // Falstad PotElm: calcLeads(32px) on span (0,0)→(2,0), bodyLen=2gu=distance
+    // → lead1=(0,0), lead2=(2,0). hs=8*PX=0.5
+    const PX = 1 / 16;
+    const hs = 8 * PX; // 0.5
 
-    // Resistor body (zigzag)
-    const zigX = [0.4, 0.667, 0.933, 1.2, 1.467, 1.6];
-    const zigY = [0, -0.3, 0.3, -0.3, 0.3, 0];
-    for (let i = 0; i < zigX.length - 1; i++) {
-      ctx.drawLine(zigX[i], zigY[i], zigX[i + 1], zigY[i + 1]);
+    // Lead wires (zero-length since lead endpoints = pin endpoints)
+    // Zigzag resistor body — 16 segments (non-euro PotElm)
+    // nx cycles: 0→1→0→-1→0→1→... per i&3 switch
+    const segments = 16;
+    let ox = 0;
+    for (let i = 0; i < segments; i++) {
+      let nx = 0;
+      switch (i & 3) {
+        case 0: nx = 1; break;
+        case 2: nx = -1; break;
+        default: nx = 0; break;
+      }
+      // interpPointSingle(lead1, lead2, f, g) along horizontal (0,0)→(2,0):
+      // result = (2*f, -g) since perpendicular to +x is -y
+      const fromX = (i / segments) * 2;
+      const fromY = -(hs * ox);
+      const toX = ((i + 1) / segments) * 2;
+      const toY = -(hs * nx);
+      ctx.drawLine(fromX, fromY, toX, toY);
+      ox = nx;
     }
 
-    // Wiper position line from center to wiper pin (right side)
-    const wiperX = 0.4 + (1.6 - 0.4) * position;
-    ctx.drawLine(wiperX, 0, 2, 0.5);
+    // Wiper: position=0.5 → midpoint of body axis
+    // For horizontal (0,0)→(2,0), interpPointSingle perpendicular: y = -g
+    // corner2 = interpPoint(pA, pB, 0.5) = (1, 0)
+    // post3 = interpPointSingle(pA, pB, 0.5, offset=1) = (1, -1)
+    // arrowPoint = interpPointSingle(pA, pB, 0.5, 8*PX) = (1, -0.5)
+    const corner2X = 1;
+    const corner2Y = 0;
+    const post3X = 1;
+    const post3Y = -1;
+    const arrowPointX = 1;
+    const arrowPointY = -(8 * PX); // -0.5
 
-    // Value label below body
-    const displayLabel = label.length > 0 ? label : `${resistance}Ω`;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(displayLabel, 1, 0.8, { horizontal: "center", vertical: "top" });
+    // Wiper lines: post3 → corner2 → arrowPoint
+    ctx.drawLine(post3X, post3Y, corner2X, corner2Y);
+    ctx.drawLine(corner2X, corner2Y, arrowPointX, arrowPointY);
+
+    // Arrow barbs: interpPoint2(corner2, arrowPoint, f=(clen-8*PX)/clen, g=8*PX)
+    // clen = |offset| - 8*PX = 1 - 0.5 = 0.5
+    // f = (0.5 - 0.5)/0.5 = 0 → at corner2
+    // corner2→arrowPoint: dx=0, dy=-0.5, len=0.5
+    // gx = (dy/len)*g = (-1)*0.5 = -0.5, gy = (-dx/len)*g = 0
+    // arrow1 = (1-0.5, 0) = (0.5, 0), arrow2 = (1+0.5, 0) = (1.5, 0)
+    ctx.drawLine(0.5, 0, arrowPointX, arrowPointY);
+    ctx.drawLine(1.5, 0, arrowPointX, arrowPointY);
 
     ctx.restore();
   }

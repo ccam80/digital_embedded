@@ -38,8 +38,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -122,34 +122,38 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Falstad: rect from (0,-1) to (6,0), pins at (0,0) and (6,0)
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 1,
       width: 6,
       height: 1,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const z0 = this._properties.getOrDefault<number>("impedance", 50);
-    const label = this._properties.getOrDefault<string>("label", "");
-
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    ctx.drawLine(0, 0, 0.5, 0);
-    ctx.drawLine(5.5, 0, 6, 0);
+    // Falstad TransLineElm: filled rect between two conductors + outline
+    // Top conductor at y=0 (pin level), bottom conductor at y=-1
+    // Left end x=0, right end x=6
 
-    ctx.drawLine(0.5, -0.3, 5.5, -0.3);
-    ctx.drawLine(0.5, 0.3, 5.5, 0.3);
-    ctx.drawLine(0.5, -0.4, 0.5, 0.4);
-    ctx.drawLine(5.5, -0.4, 5.5, 0.4);
+    // Filled rectangle between the two conductors
+    ctx.drawRect(0, -1, 6, 1, true);
 
-    const displayLabel = label.length > 0 ? label : `TL ${z0}\u03A9`;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(displayLabel, 3, 0.6, { horizontal: "center", vertical: "top" });
+    // Top conductor line
+    ctx.drawLine(0, 0, 6, 0);
+
+    // Bottom conductor line
+    ctx.drawLine(0, -1, 6, -1);
+
+    // Left end cap
+    ctx.drawLine(0, 0, 0, -1);
+
+    // Right end cap
+    ctx.drawLine(6, 0, 6, -1);
 
     ctx.restore();
   }
@@ -253,13 +257,7 @@ class SegmentInductorElement implements AnalogElement {
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
     if (nB !== 0) solver.stamp(nB - 1, b, -1);
 
-    // G sub-matrix: companion model conductance between nA and nB.
-    if (nA !== 0) solver.stamp(nA - 1, nA - 1, this.geq);
-    if (nB !== 0) solver.stamp(nB - 1, nB - 1, this.geq);
-    if (nA !== 0 && nB !== 0) solver.stamp(nA - 1, nB - 1, -this.geq);
-    if (nB !== 0 && nA !== 0) solver.stamp(nB - 1, nA - 1, -this.geq);
-
-    // Branch equation: V_A - V_B - geq*I_b = ieq
+    // C sub-matrix: branch equation V_A - V_B - geq*I_b = ieq
     // When geq=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);
@@ -362,13 +360,7 @@ class CombinedRLElement implements AnalogElement {
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
     if (nB !== 0) solver.stamp(nB - 1, b, -1);
 
-    // G sub-matrix: companion conductance between nA and nB (from L companion).
-    if (nA !== 0) solver.stamp(nA - 1, nA - 1, this.geqL);
-    if (nB !== 0) solver.stamp(nB - 1, nB - 1, this.geqL);
-    if (nA !== 0 && nB !== 0) solver.stamp(nA - 1, nB - 1, -this.geqL);
-    if (nB !== 0 && nA !== 0) solver.stamp(nB - 1, nA - 1, -this.geqL);
-
-    // Branch equation: V_A - V_B - (R + geqL)*I_b = ieq
+    // C sub-matrix: branch equation V_A - V_B - (R + geqL)*I_b = ieq
     // When geqL=0 and R=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);

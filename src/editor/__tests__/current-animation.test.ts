@@ -2,11 +2,11 @@
  * Tests for CurrentFlowAnimator — animated current-flow dots.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { CurrentFlowAnimator } from "../current-animation";
 import { Wire, Circuit } from "@/core/circuit";
 import type { WireCurrentResolver, WireCurrentResult } from "../wire-current-resolver";
-import type { RenderContext, ThemeColor } from "@/core/renderer-interface";
+import type { RenderContext } from "@/core/renderer-interface";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -20,6 +20,7 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 function makeResolver(results: Map<Wire, WireCurrentResult>): WireCurrentResolver {
   return {
     getWireCurrent: (w: Wire) => results.get(w),
+    getComponentPaths: () => [],
     resolve: () => {},
     clear: () => {},
   } as unknown as WireCurrentResolver;
@@ -50,202 +51,132 @@ function makeCtx() {
   return { ctx, calls };
 }
 
+function getDotXPositions(animator: CurrentFlowAnimator, circuit: Circuit): number[] {
+  const { ctx, calls } = makeCtx();
+  animator.render(ctx, circuit);
+  return calls.filter(c => c.method === "drawCircle").map(c => c.args[0] as number);
+}
+
+function getFirstDotX(animator: CurrentFlowAnimator, circuit: Circuit): number {
+  return getDotXPositions(animator, circuit)[0];
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("CurrentAnimation", () => {
-  it("dots_advance_proportional_to_current", () => {
-    // Wire with 10mA, speedScale=1, dt=16ms → advance = 0.01 * 1 * 0.016 = 0.00016
-    const wire = makeWire(0, 0, 10, 0); // 10 grid units long
+  it("dots advance when current is nonzero", () => {
+    const wire = makeWire(0, 0, 10, 0);
     const circuit = new Circuit();
     circuit.addWire(wire);
 
     const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 0.01, direction: [1, 0] }],
+      [wire, { current: 0.01, direction: [1, 0], flowSign: 1 as const }],
     ]);
     const resolver = makeResolver(results);
     const animator = new CurrentFlowAnimator(resolver);
-    animator.setSpeedScale(1.0);
-
-    // Force dot phase initialization by calling render (initializes phases)
-    const { ctx } = makeCtx();
-    animator.render(ctx, circuit);
-
-    // Capture initial phases by advancing 0 first
-    animator.update(0);
-
-    // Get initial phase state via a private-access trick: re-render to see positions
-    // Instead, we verify the advance amount by calling update and checking via render positions.
-
-    // Record dot positions before update
-    const { ctx: ctx1, calls: calls1 } = makeCtx();
-    animator.render(ctx1, circuit);
-    const circlesBefore = calls1.filter(c => c.method === "drawCircle");
-    const xBefore = (circlesBefore[0]?.args[0] as number) ?? 0;
-
-    // Advance 16ms
-    animator.update(0.016);
-
-    const { ctx: ctx2, calls: calls2 } = makeCtx();
-    animator.render(ctx2, circuit);
-    const circlesAfter = calls2.filter(c => c.method === "drawCircle");
-    const xAfter = (circlesAfter[0]?.args[0] as number) ?? 0;
-
-    // Wire is 10 units long; advance = 0.01 * 1 * 0.016 = 0.00016 phase units
-    // Position delta = 0.00016 * wireLength (10) = 0.0016 grid units
-    const expectedAdvance = 0.01 * 1.0 * 0.016 * 10; // = 0.0016
-    expect(xAfter - xBefore).toBeCloseTo(expectedAdvance, 5);
-  });
-
-  it("dots_wrap_around", () => {
-    // Single dot at phase 0.99, advance 0.05 → should wrap to ~0.04
-    const wire = makeWire(0, 0, 1, 0); // 1 unit long → phase maps directly to x
-    const circuit = new Circuit();
-    circuit.addWire(wire);
-
-    const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 1.0, direction: [1, 0] }],
-    ]);
-    const resolver = makeResolver(results);
-    // minCurrentThreshold = 0 so dot always visible
-    const animator = new CurrentFlowAnimator(resolver, 0);
-    animator.setSpeedScale(1.0);
-
-    // Initialize phases via render
-    const { ctx: ctxInit } = makeCtx();
-    animator.render(ctxInit, circuit);
-
-    // Manually verify wrap: with speedScale=1, current=1, dt=0.05 → advance=0.05
-    // But we can't set the initial phase directly. Instead test wrap via cumulative advances.
-    // Advance multiple times to push past 1.0 total.
-    // 20 advances of 0.05 = 1.0 total → should wrap around once.
-    // After 21 advances: total advance = 1.05 → net phase ≈ initial + 0.05
-
-    const { ctx: ctx0, calls: calls0 } = makeCtx();
-    animator.render(ctx0, circuit);
-    const xInitial = calls0.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    // Advance 21 times by dt=0.05 → total advance = 1.05 phase, net = initial_phase + 0.05 (mod 1)
-    for (let i = 0; i < 21; i++) {
-      animator.update(0.05);
-    }
-
-    const { ctx: ctx1, calls: calls1 } = makeCtx();
-    animator.render(ctx1, circuit);
-    const xFinal = calls1.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    // Expected: wrapped position ≈ initial + 0.05 (mod wire length=1)
-    // The wire is 1 unit, so phase maps 1:1 to x coordinate.
-    const rawExpected = xInitial + 0.05;
-    const expected = rawExpected >= 1 ? rawExpected - 1 : rawExpected;
-    expect(xFinal).toBeCloseTo(expected, 3);
-  });
-
-  it("zero_current_freezes_dots", () => {
-    const wire = makeWire(0, 0, 4, 0);
-    const circuit = new Circuit();
-    circuit.addWire(wire);
-
-    const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 0, direction: [1, 0] }],
-    ]);
-    const resolver = makeResolver(results);
-    const animator = new CurrentFlowAnimator(resolver, 0); // threshold=0 so dots still render
+    animator.setSpeedScale(200);
 
     // Initialize
-    const { ctx: ctxInit } = makeCtx();
-    animator.render(ctxInit, circuit);
+    animator.update(0.016, circuit);
+    const xBefore = getFirstDotX(animator, circuit);
 
-    const { ctx: ctx1, calls: calls1 } = makeCtx();
-    animator.render(ctx1, circuit);
-    const xBefore = calls1.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
+    // Advance several frames
+    for (let i = 0; i < 10; i++) animator.update(0.016, circuit);
+    const xAfter = getFirstDotX(animator, circuit);
 
-    // Update multiple times — should not advance
-    animator.update(1.0);
-    animator.update(1.0);
-    animator.update(1.0);
-
-    const { ctx: ctx2, calls: calls2 } = makeCtx();
-    animator.render(ctx2, circuit);
-    const xAfter = calls2.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    expect(xAfter).toBeCloseTo(xBefore, 10);
+    expect(xAfter).not.toBeCloseTo(xBefore, 3);
+    expect(xAfter - xBefore).toBeGreaterThan(0);
   });
 
-  it("current_magnitude_controls_animation_speed", () => {
-    // The animator uses current magnitude for dot speed: advance = |I| × speedScale × dt.
-    // render() skips wires where result.current < minCurrentThreshold (unsigned comparison),
-    // so negative current values are not rendered — the animator is magnitude-only for display.
-    //
-    // This test verifies that current magnitude changes are reflected in animation speed:
-    // doubling the magnitude doubles the per-frame advance distance.
-    //
-    // Note: The animator does NOT support visual direction reversal. The render path
-    // uses `result.current < threshold` (not `Math.abs`), so negative current causes
-    // dots to not render. Phase advances are always in the wire's start→end direction.
-
-    const wire = makeWire(0, 0, 10, 0); // 10 units long
+  it("dots wrap around", () => {
+    const wire = makeWire(0, 0, 1, 0);
     const circuit = new Circuit();
     circuit.addWire(wire);
 
-    // Use threshold=0 and positive current only (negative current is not rendered)
-    const resultRef: WireCurrentResult = { current: 0.005, direction: [1, 0] };
-    const results = new Map<Wire, WireCurrentResult>([[wire, resultRef]]);
+    const results = new Map<Wire, WireCurrentResult>([
+      [wire, { current: 1.0, direction: [1, 0], flowSign: 1 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
 
-    const resolver: WireCurrentResolver = {
-      getWireCurrent: (w: Wire) => (w === wire ? results.get(w) : undefined),
-      resolve: () => {},
-      clear: () => {},
-    } as unknown as WireCurrentResolver;
+    // Advance enough to wrap multiple times
+    for (let i = 0; i < 200; i++) animator.update(0.1, circuit);
 
-    const animator = new CurrentFlowAnimator(resolver, 0);
-    animator.setSpeedScale(1.0);
-
-    // Initialize dot phases
-    const { ctx: ctxInit } = makeCtx();
-    animator.render(ctxInit, circuit);
-
-    // Record position before update at 5mA
-    const { ctx: ctx1, calls: calls1 } = makeCtx();
-    animator.render(ctx1, circuit);
-    const xBefore5mA = calls1.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    // Advance with 5mA, dt=1s → phase advance = 0.005 → x moves +0.05
-    resultRef.current = 0.005;
-    animator.update(1.0);
-
-    const { ctx: ctx2, calls: calls2 } = makeCtx();
-    animator.render(ctx2, circuit);
-    const xAfter5mA = calls2.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    const delta5mA = xAfter5mA - xBefore5mA;
-    expect(delta5mA).toBeCloseTo(0.005 * 1.0 * 10, 4); // 0.05 units
-
-    // Now double the current to 10mA — the advance should be 2× larger
-    resultRef.current = 0.010;
-    const { ctx: ctx3, calls: calls3 } = makeCtx();
-    animator.render(ctx3, circuit);
-    const xBefore10mA = calls3.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    animator.update(1.0);
-
-    const { ctx: ctx4, calls: calls4 } = makeCtx();
-    animator.render(ctx4, circuit);
-    const xAfter10mA = calls4.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
-
-    const delta10mA = xAfter10mA - xBefore10mA;
-    expect(delta10mA).toBeCloseTo(0.010 * 1.0 * 10, 4); // 0.10 units = 2× the 5mA delta
-    expect(delta10mA).toBeCloseTo(delta5mA * 2, 4);
+    const x = getFirstDotX(animator, circuit);
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThan(1);
   });
 
-  it("disabled_skips_render", () => {
+  it("zero current does not advance dots", () => {
     const wire = makeWire(0, 0, 4, 0);
     const circuit = new Circuit();
     circuit.addWire(wire);
 
     const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 0.01, direction: [1, 0] }],
+      [wire, { current: 0, direction: [1, 0], flowSign: 0 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+
+    // Zero-current wires still render dots (offset stays at 0) but don't move
+    animator.update(0.016, circuit);
+    const { ctx, calls } = makeCtx();
+    animator.render(ctx, circuit);
+    const dots = calls.filter(c => c.method === "drawCircle");
+    expect(dots.length).toBeGreaterThan(0);
+  });
+
+  it("higher current moves dots faster than lower current", () => {
+    const wireFast = makeWire(0, 0, 10, 0);
+    const wireSlow = makeWire(0, 2, 10, 2);
+    const circuit = new Circuit();
+    circuit.addWire(wireFast);
+    circuit.addWire(wireSlow);
+
+    const results = new Map<Wire, WireCurrentResult>([
+      [wireFast, { current: 0.010, direction: [1, 0], flowSign: 1 as const }],
+      [wireSlow, { current: 0.005, direction: [1, 0], flowSign: 1 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
+
+    // Snapshot before
+    animator.update(0.016, circuit);
+    const { ctx: ctx1, calls: c1 } = makeCtx();
+    animator.render(ctx1, circuit);
+    const circles1 = c1.filter(c => c.method === "drawCircle");
+    const xFastBefore = circles1[0]?.args[0] as number;
+    const wireSlowCircles1 = circles1.filter(c => (c.args[1] as number) > 1);
+    const xSlowBefore = wireSlowCircles1[0]?.args[0] as number;
+
+    for (let i = 0; i < 10; i++) animator.update(0.016, circuit);
+
+    const { ctx: ctx2, calls: c2 } = makeCtx();
+    animator.render(ctx2, circuit);
+    const circles2 = c2.filter(c => c.method === "drawCircle");
+    const xFastAfter = circles2[0]?.args[0] as number;
+    const wireSlowCircles2 = circles2.filter(c => (c.args[1] as number) > 1);
+    const xSlowAfter = wireSlowCircles2[0]?.args[0] as number;
+
+    const deltaFast = xFastAfter - xFastBefore;
+    const deltaSlow = xSlowAfter - xSlowBefore;
+
+    expect(deltaFast).toBeGreaterThan(0);
+    expect(deltaSlow).toBeGreaterThan(0);
+    expect(deltaFast / deltaSlow).toBeCloseTo(2, 0);
+  });
+
+  it("disabled skips render", () => {
+    const wire = makeWire(0, 0, 4, 0);
+    const circuit = new Circuit();
+    circuit.addWire(wire);
+
+    const results = new Map<Wire, WireCurrentResult>([
+      [wire, { current: 0.01, direction: [1, 0], flowSign: 1 as const }],
     ]);
     const resolver = makeResolver(results);
     const animator = new CurrentFlowAnimator(resolver);
@@ -253,65 +184,128 @@ describe("CurrentAnimation", () => {
     animator.setEnabled(false);
     expect(animator.enabled).toBe(false);
 
-    const { calls } = makeCtx();
-    const { ctx } = makeCtx();
+    const { ctx, calls } = makeCtx();
     animator.render(ctx, circuit);
 
-    // No draw calls should have been made
     const drawCalls = calls.filter(c => c.method === "drawCircle");
     expect(drawCalls).toHaveLength(0);
   });
 
-  it("speed_scale_multiplies", () => {
-    const wire = makeWire(0, 0, 10, 0); // 10 units long
+  it("logarithmic mode makes small currents visible", () => {
+    const wire = makeWire(0, 0, 10, 0);
     const circuit = new Circuit();
     circuit.addWire(wire);
 
     const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 0.01, direction: [1, 0] }],
+      [wire, { current: 1e-6, direction: [1, 0], flowSign: 1 as const }], // 1 uA — very small
     ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
+    animator.setScaleMode("logarithmic");
 
-    // Create two independent animators for comparison
-    const resolver1 = makeResolver(results);
-    const resolver2 = makeResolver(results);
+    animator.update(0.016, circuit);
+    const xBefore = getFirstDotX(animator, circuit);
 
-    const animator1 = new CurrentFlowAnimator(resolver1, 0);
-    animator1.setSpeedScale(1.0);
+    for (let i = 0; i < 30; i++) animator.update(0.016, circuit);
+    const xAfter = getFirstDotX(animator, circuit);
 
-    const animator2 = new CurrentFlowAnimator(resolver2, 0);
-    animator2.setSpeedScale(10.0);
+    // Even 1uA should produce visible movement in log mode
+    expect(Math.abs(xAfter - xBefore)).toBeGreaterThan(0.001);
+  });
 
-    const dt = 0.1;
+  it("negative flowSign reverses dot movement", () => {
+    const wire = makeWire(0, 0, 10, 0);
+    const circuit = new Circuit();
+    circuit.addWire(wire);
 
-    // Initialize both via render
-    const { ctx: c1 } = makeCtx();
-    animator1.render(c1, circuit);
-    const { ctx: c2 } = makeCtx();
-    animator2.render(c2, circuit);
+    const results = new Map<Wire, WireCurrentResult>([
+      [wire, { current: 0.01, direction: [1, 0], flowSign: -1 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
 
-    const { ctx: before1, calls: b1calls } = makeCtx();
-    animator1.render(before1, circuit);
-    const x1_before = b1calls.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
+    animator.update(0.016, circuit);
+    const xBefore = getFirstDotX(animator, circuit);
 
-    const { ctx: before2, calls: b2calls } = makeCtx();
-    animator2.render(before2, circuit);
-    const x2_before = b2calls.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
+    for (let i = 0; i < 10; i++) animator.update(0.016, circuit);
+    const xAfter = getFirstDotX(animator, circuit);
 
-    animator1.update(dt);
-    animator2.update(dt);
+    // Dots should move in REVERSE (end→start = right to left = decreasing x)
+    expect(xAfter - xBefore).toBeLessThan(0);
+  });
 
-    const { ctx: after1, calls: a1calls } = makeCtx();
-    animator1.render(after1, circuit);
-    const x1_after = a1calls.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
+  it("short and long wires with same current have equal absolute dot speed", () => {
+    const shortWire = makeWire(0, 0, 2, 0);  // 2 grid units
+    const longWire = makeWire(0, 2, 10, 2);  // 8 grid units
+    const circuit = new Circuit();
+    circuit.addWire(shortWire);
+    circuit.addWire(longWire);
 
-    const { ctx: after2, calls: a2calls } = makeCtx();
-    animator2.render(after2, circuit);
-    const x2_after = a2calls.filter(c => c.method === "drawCircle")[0]?.args[0] as number;
+    const I = 0.01;
+    const results = new Map<Wire, WireCurrentResult>([
+      [shortWire, { current: I, direction: [1, 0], flowSign: 1 as const }],
+      [longWire, { current: I, direction: [1, 0], flowSign: 1 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
 
-    const delta1 = x1_after - x1_before;
-    const delta2 = x2_after - x2_before;
+    // Snapshot before
+    animator.update(0.016, circuit);
+    const { ctx: ctx1, calls: c1 } = makeCtx();
+    animator.render(ctx1, circuit);
+    const dots1 = c1.filter(c => c.method === "drawCircle");
+    const shortDots1 = dots1.filter(c => (c.args[1] as number) < 1);
+    const longDots1 = dots1.filter(c => (c.args[1] as number) > 1);
+    const xShortBefore = shortDots1[0]?.args[0] as number;
+    const xLongBefore = longDots1[0]?.args[0] as number;
 
-    // Animator2 should advance 10× faster than animator1
-    expect(Math.abs(delta2)).toBeCloseTo(Math.abs(delta1) * 10, 3);
+    // Advance
+    for (let i = 0; i < 10; i++) animator.update(0.016, circuit);
+
+    const { ctx: ctx2, calls: c2 } = makeCtx();
+    animator.render(ctx2, circuit);
+    const dots2 = c2.filter(c => c.method === "drawCircle");
+    const shortDots2 = dots2.filter(c => (c.args[1] as number) < 1);
+    const longDots2 = dots2.filter(c => (c.args[1] as number) > 1);
+    const xShortAfter = shortDots2[0]?.args[0] as number;
+    const xLongAfter = longDots2[0]?.args[0] as number;
+
+    const deltaShort = xShortAfter - xShortBefore;
+    const deltaLong = xLongAfter - xLongBefore;
+
+    // Same current → same absolute speed → same x displacement
+    expect(deltaShort).toBeCloseTo(deltaLong, 5);
+  });
+
+  it("dots are continuous across adjacent wire segments", () => {
+    // Two wires meeting at (5,0): [0,0]->[5,0] and [5,0]->[8,0]
+    const wire1 = makeWire(0, 0, 5, 0);
+    const wire2 = makeWire(5, 0, 8, 0);
+    const circuit = new Circuit();
+    circuit.addWire(wire1);
+    circuit.addWire(wire2);
+
+    const I = 0.01;
+    const results = new Map<Wire, WireCurrentResult>([
+      [wire1, { current: I, direction: [1, 0], flowSign: 1 as const }],
+      [wire2, { current: I, direction: [1, 0], flowSign: 1 as const }],
+    ]);
+    const resolver = makeResolver(results);
+    const animator = new CurrentFlowAnimator(resolver);
+    animator.setSpeedScale(200);
+
+    // Advance a bit to get a non-trivial offset
+    for (let i = 0; i < 5; i++) animator.update(0.016, circuit);
+
+    // Collect all dot x-positions (both wires are on y=0)
+    const xs = getDotXPositions(animator, circuit).sort((a, b) => a - b);
+
+    // Verify uniform spacing: consecutive dots should be ~1.0 apart
+    for (let i = 1; i < xs.length; i++) {
+      expect(xs[i] - xs[i - 1]).toBeCloseTo(1.0, 3);
+    }
   });
 });

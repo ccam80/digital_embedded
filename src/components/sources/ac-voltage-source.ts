@@ -17,6 +17,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -188,21 +189,36 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x - 1, y: this.position.y - 1, width: 4, height: 2 };
+    return { x: this.position.x, y: this.position.y - 1.0625, width: 4, height: 2.125 };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    ctx.drawCircle(1, 0, 1, false);
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("~", 1, 0, { horizontal: "center", vertical: "center" });
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(label, 1, -1.2, { horizontal: "center", vertical: "bottom" });
+
+    // Lead from pos pin to body
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 0.9375, 0);
+
+    // Lead from neg pin to body
+    if (vNeg !== undefined) {
+      ctx.setColor(signals!.voltageColor(vNeg));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3.0625, 0, 4, 0);
+
+    // Circle body stays COMPONENT color
+    ctx.setColor("COMPONENT");
+    ctx.drawCircle(2, 0, 1.0625, false);
+
     ctx.restore();
   }
 
@@ -220,7 +236,7 @@ const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     direction: PinDirection.INPUT,
     label: "pos",
     defaultBitWidth: 1,
-    position: { x: -2, y: 0 },
+    position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
   },

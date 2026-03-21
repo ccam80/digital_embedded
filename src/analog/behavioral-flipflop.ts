@@ -20,6 +20,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -207,8 +208,8 @@ export class BehavioralDFlipflopElement implements AnalogElement {
   ): void {
     const clockNodeId = this._clockPin.nodeId;
     const dNodeId = this._dPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
-    const dVoltage = dNodeId < voltages.length ? voltages[dNodeId] : 0;
+    const currentClockV = readMnaVoltage(clockNodeId, voltages);
+    const dVoltage = readMnaVoltage(dNodeId, voltages);
 
     // Rising edge detection
     const risingEdge =
@@ -224,8 +225,7 @@ export class BehavioralDFlipflopElement implements AnalogElement {
 
     // Asynchronous set/reset — override latched state
     if (this._setPin !== null) {
-      const setNodeId = this._setPin.nodeId;
-      const setV = setNodeId < voltages.length ? voltages[setNodeId] : 0;
+      const setV = readMnaVoltage(this._setPin.nodeId, voltages);
       // Set is active-high
       if (setV > this._vIH) {
         this._latchedQ = true;
@@ -233,8 +233,7 @@ export class BehavioralDFlipflopElement implements AnalogElement {
     }
 
     if (this._resetPin !== null) {
-      const resetNodeId = this._resetPin.nodeId;
-      const resetV = resetNodeId < voltages.length ? voltages[resetNodeId] : 0;
+      const resetV = readMnaVoltage(this._resetPin.nodeId, voltages);
       if (this._resetActiveLevel === 'low') {
         if (resetV < this._vIL) {
           this._latchedQ = false;
@@ -252,24 +251,15 @@ export class BehavioralDFlipflopElement implements AnalogElement {
     this._clockPin.updateCompanion(dt, method, currentClockV);
     this._dPin.updateCompanion(dt, method, dVoltage);
 
-    const qNodeId = this._qPin.nodeId;
-    const qVoltage = qNodeId < voltages.length ? voltages[qNodeId] : 0;
-    this._qPin.updateCompanion(dt, method, qVoltage);
-
-    const qBarNodeId = this._qBarPin.nodeId;
-    const qBarVoltage = qBarNodeId < voltages.length ? voltages[qBarNodeId] : 0;
-    this._qBarPin.updateCompanion(dt, method, qBarVoltage);
+    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
 
     if (this._setPin !== null) {
-      const setNodeId = this._setPin.nodeId;
-      const setV = setNodeId < voltages.length ? voltages[setNodeId] : 0;
-      this._setPin.updateCompanion(dt, method, setV);
+      this._setPin.updateCompanion(dt, method, readMnaVoltage(this._setPin.nodeId, voltages));
     }
 
     if (this._resetPin !== null) {
-      const resetNodeId = this._resetPin.nodeId;
-      const resetV = resetNodeId < voltages.length ? voltages[resetNodeId] : 0;
-      this._resetPin.updateCompanion(dt, method, resetV);
+      this._resetPin.updateCompanion(dt, method, readMnaVoltage(this._resetPin.nodeId, voltages));
     }
   }
 

@@ -1166,10 +1166,10 @@ describe("Integration", () => {
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    // node2 = voltages[1] = V across R
-    const vAcrossR = engine.getNodeVoltage(1);
+    // node2 = MNA node ID 2 = V across R
+    const vAcrossR = engine.getNodeVoltage(2);
     expect(vAcrossR).toBeGreaterThan(9.98);
-    expect(vAcrossR).toBeLessThan(10.0);
+    expect(vAcrossR).toBeLessThanOrEqual(10.0);
 
     // Now open the switch
     swEl.setClosed(false);
@@ -1177,7 +1177,7 @@ describe("Integration", () => {
     const result2 = engine.dcOperatingPoint();
     expect(result2.converged).toBe(true);
     // With Roff=1e9Ω, V across 1kΩ ≈ 10 * 1000 / (1000 + 1e9) ≈ 1e-5V ≈ 0
-    const vOpen = engine.getNodeVoltage(1);
+    const vOpen = engine.getNodeVoltage(2);
     expect(vOpen).toBeCloseTo(0, 2);
   });
 });

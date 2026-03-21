@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1773828047193,
+  "lastScanned": 1774007841674,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -22,6 +22,11 @@
       }
     ],
     "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.58.2",
+        "category": "testing"
+      },
       {
         "name": "vite",
         "version": "5.4.0",
@@ -46,6 +51,8 @@
       "build": "vite build",
       "test": "vitest run",
       "test:watch": "vitest",
+      "test:e2e": "playwright test",
+      "test:all": "vitest run && playwright test",
       "lint": "eslint src",
       "typecheck": "tsc --noEmit"
     }
@@ -73,7 +80,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1773828047076,
+      "lastAccessed": 1774007841551,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -85,19 +92,27 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1773828047077,
+      "lastAccessed": 1774007841552,
       "keyFiles": [
         "main.js"
       ]
     },
+    "e2e": {
+      "path": "e2e",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774007841553,
+      "keyFiles": []
+    },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 4,
-      "lastAccessed": 1773828047078,
+      "fileCount": 7,
+      "lastAccessed": 1774007841618,
       "keyFiles": [
         "broken_chain.dig",
         "chained_inverters.dig",
+        "falstad-shapes.json",
         "java-shapes-errors.txt",
         "java-shapes.json"
       ]
@@ -106,21 +121,21 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1773828047079,
+      "lastAccessed": 1774007841618,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1773828047080,
+      "lastAccessed": 1774007841619,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 9,
-      "lastAccessed": 1773828047138,
+      "lastAccessed": 1774007841619,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
@@ -132,37 +147,34 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 18,
-      "lastAccessed": 1773828047139,
+      "fileCount": 2,
+      "lastAccessed": 1774007841620,
       "keyFiles": [
-        "architectural-refactor-derive-on-read.md",
-        "author_instructions.md",
-        "circuits-engine-spec.md",
-        "engine-remaining-work-spec.md",
-        "phase-0-interface-abstraction.md"
+        "analog-ui-fixup.md",
+        "facade-unification.md"
       ]
-    },
-    "specs": {
-      "path": "specs",
-      "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1773828047139,
-      "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1773828047140,
+      "lastAccessed": 1774007841621,
       "keyFiles": [
         "main.ts"
       ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774007841622,
+      "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1773828047141,
+      "lastAccessed": 1774007841623,
       "keyFiles": [
         "index.json"
       ]
@@ -171,19 +183,30 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1773828047142,
+      "lastAccessed": 1774007841625,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js"
       ]
     },
+    "e2e\\fixtures": {
+      "path": "e2e\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 2,
+      "lastAccessed": 1774007841626,
+      "keyFiles": [
+        "harness.html",
+        "simulator-harness.ts"
+      ]
+    },
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
-      "fileCount": 2,
-      "lastAccessed": 1773828047145,
+      "fileCount": 3,
+      "lastAccessed": 1774007841628,
       "keyFiles": [
         "app-init.ts",
+        "test-bridge.ts",
         "url-params.ts"
       ]
     },
@@ -191,7 +214,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 3,
-      "lastAccessed": 1773828047146,
+      "lastAccessed": 1774007841629,
       "keyFiles": [
         "generic-shape.ts",
         "library-74xx.ts",
@@ -202,10 +225,311 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1773828047146,
+      "lastAccessed": 1774007841629,
       "keyFiles": []
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 153,
+      "lastAccessed": 1774069108199,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\compiler.ts",
+      "accessCount": 77,
+      "lastAccessed": 1774069015236,
+      "type": "file"
+    },
+    {
+      "path": "simulator.html",
+      "accessCount": 25,
+      "lastAccessed": 1774065853810,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\__tests__\\bridge-integration.test.ts",
+      "accessCount": 19,
+      "lastAccessed": 1774063757158,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\analog-engine.ts",
+      "accessCount": 15,
+      "lastAccessed": 1774067778843,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\bridge-adapter.ts",
+      "accessCount": 15,
+      "lastAccessed": 1774068992813,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-integration.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774063714696,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\behavioral-flipflop-variants.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774059811077,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\mixed-signal-coordinator.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774068993688,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\behavioral-combinational.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774059680614,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-gate.test.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774060206438,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-combinational.test.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774060272244,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 9,
+      "lastAccessed": 1774068928981,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\digital-pin-model.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774059617061,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog",
+      "accessCount": 8,
+      "lastAccessed": 1774068238400,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-flipflop-variants.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774060483767,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-sequential.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774060573439,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 7,
+      "lastAccessed": 1774064711291,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\behavioral-sequential.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774059875342,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\behavioral-remaining.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774059924874,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\digital-pin-model.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774060058276,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\__tests__\\bridge-adapter.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774060089734,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774069004517,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\bridge-diagnostics.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774060778115,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\mixed-signal-coordinator.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774060786451,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-drawing.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774061858438,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\behavioral-gate.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774063777268,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\edit-operations.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774066071645,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\element.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774068992356,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\behavioral-flipflop.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774059707492,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-remaining.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774060538760,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\bridge-instance.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774064695322,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sources\\ac-voltage-source.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774064726001,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1774064743050,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\property-panel.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774065644158,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774068942072,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\placement.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774008286380,
+      "type": "file"
+    },
+    {
+      "path": "fixtures\\lrcxor.dig",
+      "accessCount": 3,
+      "lastAccessed": 1774064689643,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\mna-assembler.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774066002276,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\analog-engine-interface.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774068950156,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\__tests__\\behavioral-flipflop.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774060423900,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\schmitt-trigger.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774061126101,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\dac.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774061145274,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\adc.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774061151100,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\newton-raphson.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774065992973,
+      "type": "file"
+    },
+    {
+      "path": "src\\integration\\editor-binding.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774007955407,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\engine-interface.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774008109428,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sources",
+      "accessCount": 1,
+      "lastAccessed": 1774059118686,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774061109016,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\comparator.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774061162348,
+      "type": "directory"
+    }
+  ],
   "userDirectives": []
 }

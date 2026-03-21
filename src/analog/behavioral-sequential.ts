@@ -14,6 +14,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -155,17 +156,14 @@ export class BehavioralCounterElement implements AnalogElement {
     method: IntegrationMethod,
     voltages: Float64Array,
   ): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enNodeId = this._enPin.nodeId;
-      const enV = enNodeId < voltages.length ? voltages[enNodeId] : 0;
-      const clrNodeId = this._clrPin.nodeId;
-      const clrV = clrNodeId < voltages.length ? voltages[clrNodeId] : 0;
+      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
+      const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
 
       const enLevel = this._enPin.readLogicLevel(enV);
       const clrLevel = this._clrPin.readLogicLevel(clrV);
@@ -184,22 +182,14 @@ export class BehavioralCounterElement implements AnalogElement {
 
     this._prevClockVoltage = currentClockV;
 
-    const enNodeId = this._enPin.nodeId;
-    const enV = enNodeId < voltages.length ? voltages[enNodeId] : 0;
-    this._enPin.updateCompanion(dt, method, enV);
+    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const clrNodeId = this._clrPin.nodeId;
-    const clrV = clrNodeId < voltages.length ? voltages[clrNodeId] : 0;
-    this._clrPin.updateCompanion(dt, method, clrV);
+    this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
 
     for (const pin of this._outBitPins) {
-      const nodeId = pin.nodeId;
-      const v = nodeId < voltages.length ? voltages[nodeId] : 0;
-      pin.updateCompanion(dt, method, v);
+      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
     }
-    const ovfNodeId = this._ovfPin.nodeId;
-    const ovfV = ovfNodeId < voltages.length ? voltages[ovfNodeId] : 0;
-    this._ovfPin.updateCompanion(dt, method, ovfV);
+    this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {
@@ -326,22 +316,19 @@ export class BehavioralRegisterElement implements AnalogElement {
     method: IntegrationMethod,
     voltages: Float64Array,
   ): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enNodeId = this._enPin.nodeId;
-      const enV = enNodeId < voltages.length ? voltages[enNodeId] : 0;
+      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
       const enLevel = this._enPin.readLogicLevel(enV);
 
       if (enLevel === true) {
         let newValue = 0;
         for (let bit = 0; bit < this._bitWidth; bit++) {
-          const nodeId = this._dataPins[bit].nodeId;
-          const v = nodeId < voltages.length ? voltages[nodeId] : 0;
+          const v = readMnaVoltage(this._dataPins[bit].nodeId, voltages);
           const level = this._dataPins[bit].readLogicLevel(v);
           if (level === true) {
             newValue |= (1 << bit);
@@ -354,19 +341,13 @@ export class BehavioralRegisterElement implements AnalogElement {
     this._prevClockVoltage = currentClockV;
 
     for (const pin of this._dataPins) {
-      const nodeId = pin.nodeId;
-      const v = nodeId < voltages.length ? voltages[nodeId] : 0;
-      pin.updateCompanion(dt, method, v);
+      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
     }
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const enNodeId = this._enPin.nodeId;
-    const enV = enNodeId < voltages.length ? voltages[enNodeId] : 0;
-    this._enPin.updateCompanion(dt, method, enV);
+    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
 
     for (const pin of this._outBitPins) {
-      const nodeId = pin.nodeId;
-      const v = nodeId < voltages.length ? voltages[nodeId] : 0;
-      pin.updateCompanion(dt, method, v);
+      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
     }
   }
 
@@ -545,18 +526,14 @@ export class BehavioralCounterPresetElement implements AnalogElement {
       this._outBitPins[bit].stamp(solver);
     }
     const dirHigh = this._dirPin.readLogicLevel(
-      this._dirPin.nodeId < this._cachedVoltages.length
-        ? this._cachedVoltages[this._dirPin.nodeId]
-        : 0,
+      readMnaVoltage(this._dirPin.nodeId, this._cachedVoltages),
     );
     const countingDown = dirHigh === true;
     const atOverflow = countingDown
       ? this._count === 0
       : this._count === this._maxValue;
     const enHigh = this._enPin.readLogicLevel(
-      this._enPin.nodeId < this._cachedVoltages.length
-        ? this._cachedVoltages[this._enPin.nodeId]
-        : 0,
+      readMnaVoltage(this._enPin.nodeId, this._cachedVoltages),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
     this._ovfPin.stamp(solver);
@@ -591,17 +568,16 @@ export class BehavioralCounterPresetElement implements AnalogElement {
     method: IntegrationMethod,
     voltages: Float64Array,
   ): void {
-    const clockNodeId = this._clockPin.nodeId;
-    const currentClockV = clockNodeId < voltages.length ? voltages[clockNodeId] : 0;
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enV = this._enPin.nodeId < voltages.length ? voltages[this._enPin.nodeId] : 0;
-      const dirV = this._dirPin.nodeId < voltages.length ? voltages[this._dirPin.nodeId] : 0;
-      const ldV = this._ldPin.nodeId < voltages.length ? voltages[this._ldPin.nodeId] : 0;
-      const clrV = this._clrPin.nodeId < voltages.length ? voltages[this._clrPin.nodeId] : 0;
+      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
+      const dirV = readMnaVoltage(this._dirPin.nodeId, voltages);
+      const ldV = readMnaVoltage(this._ldPin.nodeId, voltages);
+      const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
 
       const enLevel = this._enPin.readLogicLevel(enV);
       const dirLevel = this._dirPin.readLogicLevel(dirV);
@@ -631,9 +607,7 @@ export class BehavioralCounterPresetElement implements AnalogElement {
       } else if (ldLevel === true) {
         let loadVal = 0;
         for (let bit = 0; bit < this._bitWidth; bit++) {
-          const v = this._inBitPins[bit].nodeId < voltages.length
-            ? voltages[this._inBitPins[bit].nodeId]
-            : 0;
+          const v = readMnaVoltage(this._inBitPins[bit].nodeId, voltages);
           if (this._inBitPins[bit].readLogicLevel(v) === true) {
             loadVal |= (1 << bit);
           }
@@ -645,26 +619,19 @@ export class BehavioralCounterPresetElement implements AnalogElement {
 
     this._prevClockVoltage = currentClockV;
 
-    const enV = this._enPin.nodeId < voltages.length ? voltages[this._enPin.nodeId] : 0;
-    this._enPin.updateCompanion(dt, method, enV);
+    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
     this._clockPin.updateCompanion(dt, method, currentClockV);
-    const dirV = this._dirPin.nodeId < voltages.length ? voltages[this._dirPin.nodeId] : 0;
-    this._dirPin.updateCompanion(dt, method, dirV);
+    this._dirPin.updateCompanion(dt, method, readMnaVoltage(this._dirPin.nodeId, voltages));
     for (const pin of this._inBitPins) {
-      const v = pin.nodeId < voltages.length ? voltages[pin.nodeId] : 0;
-      pin.updateCompanion(dt, method, v);
+      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
     }
-    const ldV = this._ldPin.nodeId < voltages.length ? voltages[this._ldPin.nodeId] : 0;
-    this._ldPin.updateCompanion(dt, method, ldV);
-    const clrV = this._clrPin.nodeId < voltages.length ? voltages[this._clrPin.nodeId] : 0;
-    this._clrPin.updateCompanion(dt, method, clrV);
+    this._ldPin.updateCompanion(dt, method, readMnaVoltage(this._ldPin.nodeId, voltages));
+    this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
 
     for (const pin of this._outBitPins) {
-      const v = pin.nodeId < voltages.length ? voltages[pin.nodeId] : 0;
-      pin.updateCompanion(dt, method, v);
+      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
     }
-    const ovfV = this._ovfPin.nodeId < voltages.length ? voltages[this._ovfPin.nodeId] : 0;
-    this._ovfPin.updateCompanion(dt, method, ovfV);
+    this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   updateState(_dt: number, _voltages: Float64Array): void {

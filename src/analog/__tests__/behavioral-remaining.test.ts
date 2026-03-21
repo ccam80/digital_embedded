@@ -103,8 +103,8 @@ describe("Driver", () => {
    */
   it("tri_state_high", () => {
     const props = new PropertyBag();
-    // nodeIds are 0-based solver indices: nodeIn=0, nodeSel=1, nodeOut=2
-    const driver = createDriverAnalogElement([0, 1, 2], -1, props);
+    // nodeIds are 1-based MNA node IDs: nodeIn=1, nodeSel=2, nodeOut=3
+    const driver = createDriverAnalogElement([1, 2, 3], -1, props);
 
     // Circuit node 1 (1-based) = solver row 0 = nodeIn; branch row 3
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);
@@ -136,7 +136,7 @@ describe("Driver", () => {
    */
   it("tri_state_hiz", () => {
     const props = new PropertyBag();
-    const driver = createDriverAnalogElement([0, 1, 2], -1, props);
+    const driver = createDriverAnalogElement([1, 2, 3], -1, props);
 
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);  // data input HIGH
     const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 → Hi-Z

@@ -512,12 +512,14 @@ export class MNAEngine implements AnalogEngine {
   /**
    * Return the voltage at MNA node `nodeId` (referenced to ground).
    *
-   * Node IDs are 0-based in the solver's solution vector. Node 0 is ground
-   * (always 0 V). Nodes 1..nodeCount are non-ground voltages.
+   * Node 0 is ground (always 0 V). Nodes 1..nodeCount are non-ground
+   * voltages stored at solver indices 0..nodeCount-1.
    */
   getNodeVoltage(nodeId: number): number {
-    if (nodeId < 0 || nodeId >= this._voltages.length) return 0;
-    return this._voltages[nodeId];
+    if (nodeId <= 0) return 0;
+    const idx = nodeId - 1;
+    if (idx >= this._voltages.length) return 0;
+    return this._voltages[idx];
   }
 
   /**
@@ -546,14 +548,21 @@ export class MNAEngine implements AnalogEngine {
     const el = this._compiled.elements[elementId];
     if (!el) return 0;
 
-    // If the element has a branch current row, return it directly
+    // If the element has a branch current row, read it directly from the
+    // solution vector. branchIndex is an absolute solver row index
+    // (already includes the nodeCount offset), so read directly.
     if (el.branchIndex >= 0) {
-      return this.getBranchCurrent(el.branchIndex);
+      if (el.branchIndex < this._voltages.length) {
+        return this._voltages[el.branchIndex];
+      }
+      return 0;
     }
 
-    // For two-terminal elements without branch row: I = (V_A - V_B) × G
-    // We can't recover G from the sealed element, so use node voltages
-    // with a best-effort approach: return zero for elements we can't introspect
+    // Delegate to the element's getCurrent() if it implements it
+    if (el.getCurrent !== undefined) {
+      return el.getCurrent(this._voltages);
+    }
+
     return 0;
   }
 
@@ -570,8 +579,8 @@ export class MNAEngine implements AnalogEngine {
     const nA = el.nodeIndices[0] ?? 0;
     const nB = el.nodeIndices[1] ?? 0;
 
-    const vA = nA > 0 ? this.getNodeVoltage(nA - 1) : 0;
-    const vB = nB > 0 ? this.getNodeVoltage(nB - 1) : 0;
+    const vA = this.getNodeVoltage(nA);
+    const vB = this.getNodeVoltage(nB);
     const vAB = vA - vB;
 
     const current = this.getElementCurrent(elementId);

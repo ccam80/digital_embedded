@@ -38,10 +38,39 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   [ComponentCategory.TERMINAL]: "Terminal",
   [ComponentCategory.SEVENTY_FOUR_XX]: "74xx",
   [ComponentCategory.SUBCIRCUIT]: "Subcircuits",
+  [ComponentCategory.PASSIVES]: "Passives",
+  [ComponentCategory.SEMICONDUCTORS]: "Semiconductors",
+  [ComponentCategory.SOURCES]: "Sources",
+  [ComponentCategory.ACTIVE]: "Active",
 };
 
-/** All ComponentCategory values in display order. Used instead of Object.values() which doesn't work with const enums. */
-const ALL_CATEGORIES: readonly ComponentCategory[] = [
+/** Digital-first category order (default). */
+const CATEGORIES_DIGITAL: readonly ComponentCategory[] = [
+  ComponentCategory.IO,
+  ComponentCategory.WIRING,
+  ComponentCategory.LOGIC,
+  ComponentCategory.SWITCHING,
+  ComponentCategory.FLIP_FLOPS,
+  ComponentCategory.MEMORY,
+  ComponentCategory.ARITHMETIC,
+  ComponentCategory.PLD,
+  ComponentCategory.MISC,
+  ComponentCategory.GRAPHICS,
+  ComponentCategory.TERMINAL,
+  ComponentCategory.SEVENTY_FOUR_XX,
+  ComponentCategory.SUBCIRCUIT,
+  ComponentCategory.PASSIVES,
+  ComponentCategory.SEMICONDUCTORS,
+  ComponentCategory.SOURCES,
+  ComponentCategory.ACTIVE,
+];
+
+/** Analog-first category order — analog categories promoted, digital demoted. */
+const CATEGORIES_ANALOG: readonly ComponentCategory[] = [
+  ComponentCategory.PASSIVES,
+  ComponentCategory.SEMICONDUCTORS,
+  ComponentCategory.SOURCES,
+  ComponentCategory.ACTIVE,
   ComponentCategory.IO,
   ComponentCategory.WIRING,
   ComponentCategory.LOGIC,
@@ -57,6 +86,9 @@ const ALL_CATEGORIES: readonly ComponentCategory[] = [
   ComponentCategory.SUBCIRCUIT,
 ];
 
+/** All categories for initialization (superset). */
+const ALL_CATEGORIES = CATEGORIES_DIGITAL;
+
 /**
  * Default palette inclusion set per category. When no allowlist is active,
  * only these components are shown, in the order listed here. Categories
@@ -69,6 +101,7 @@ const PALETTE_DEFAULT_COMPONENTS: ReadonlyMap<ComponentCategory, readonly string
   [ComponentCategory.SWITCHING, ["NFET", "PFET", "Switch", "SwitchDT"]],
   [ComponentCategory.FLIP_FLOPS, ["D_FF", "JK_FF", "RS_FF", "T_FF", "D_FF_AS", "JK_FF_AS", "RS_FF_AS"]],
   [ComponentCategory.MEMORY, ["Counter", "CounterPreset", "Register", "RegisterFile", "ROM", "EEPROM", "LookUpTable", "RAMSinglePort"]],
+  // No defaults for analog categories — show all registered components.
 ]);
 
 const MAX_RECENT_HISTORY = 10;
@@ -81,8 +114,24 @@ const MAX_RECENT_HISTORY = 10;
  * Palette state: tree of categories, search filter, recent history, and
  * collapsed flag for iframe-embedded mode.
  */
-/** Categories hidden from the sidebar palette (available via Insert menu). */
-const PALETTE_HIDDEN_CATEGORIES: ReadonlySet<ComponentCategory> = new Set([
+/** Categories hidden from the sidebar palette when in digital mode (available via Insert menu). */
+const PALETTE_HIDDEN_CATEGORIES_DIGITAL: ReadonlySet<ComponentCategory> = new Set([
+  ComponentCategory.ARITHMETIC,
+  ComponentCategory.GRAPHICS,
+  ComponentCategory.TERMINAL,
+  ComponentCategory.PLD,
+  ComponentCategory.SEVENTY_FOUR_XX,
+  ComponentCategory.MISC,
+  ComponentCategory.SUBCIRCUIT,
+  // Analog-only categories hidden in digital mode
+  ComponentCategory.PASSIVES,
+  ComponentCategory.SEMICONDUCTORS,
+  ComponentCategory.SOURCES,
+  ComponentCategory.ACTIVE,
+]);
+
+/** Categories hidden from the sidebar palette when in analog mode. */
+const PALETTE_HIDDEN_CATEGORIES_ANALOG: ReadonlySet<ComponentCategory> = new Set([
   ComponentCategory.ARITHMETIC,
   ComponentCategory.GRAPHICS,
   ComponentCategory.TERMINAL,
@@ -150,10 +199,10 @@ export class ComponentPalette {
 
   /**
    * Set engine type filter. When set, only components matching this engine
-   * type are shown. Pass null to show all components (default).
+   * type are shown. Pass null or "auto" to show all components (additive).
    */
-  setEngineTypeFilter(engineType: "digital" | "analog" | null): void {
-    this._engineTypeFilter = engineType;
+  setEngineTypeFilter(engineType: "digital" | "analog" | "auto" | null): void {
+    this._engineTypeFilter = engineType === "auto" ? null : engineType;
   }
 
   /** Returns the current engine type filter, or null if not active. */
@@ -170,7 +219,10 @@ export class ComponentPalette {
   /** Apply the engine type filter to a list of component definitions. */
   private _applyEngineTypeFilter(defs: ComponentDefinition[]): ComponentDefinition[] {
     if (this._engineTypeFilter === null) return defs;
-    return defs.filter((d) => (d.engineType ?? "digital") === this._engineTypeFilter);
+    return defs.filter((d) => {
+      const et = d.engineType ?? "digital";
+      return et === this._engineTypeFilter || et === "both";
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -184,12 +236,22 @@ export class ComponentPalette {
    */
   getTree(): PaletteNode[] {
     const nodes: PaletteNode[] = [];
+    const isAnalog = this._engineTypeFilter === "analog";
+    const isAll = this._engineTypeFilter === null;
+    // Auto/null mode: use analog order (superset of both) with no engine-specific hiding.
+    // Only hide the "always hidden" categories (arithmetic, graphics, etc.).
+    const categoryOrder = (isAnalog || isAll) ? CATEGORIES_ANALOG : CATEGORIES_DIGITAL;
+    const hiddenSet = isAll
+      ? PALETTE_HIDDEN_CATEGORIES_ANALOG  // analog hidden set doesn't hide PASSIVES/SEMICONDUCTORS/etc.
+      : isAnalog
+        ? PALETTE_HIDDEN_CATEGORIES_ANALOG
+        : PALETTE_HIDDEN_CATEGORIES_DIGITAL;
 
-    for (const category of ALL_CATEGORIES) {
+    for (const category of categoryOrder) {
       // When an allowlist is active, show all categories that have matching
       // components — don't hide the default-hidden categories since the
       // allowlist is the explicit override.
-      if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
+      if (this._allowlist === null && hiddenSet.has(category)) continue;
       const all = this._applyEngineTypeFilter(this._registry.getByCategory(category));
       let children: ComponentDefinition[];
       if (this._allowlist !== null) {
@@ -236,8 +298,9 @@ export class ComponentPalette {
 
     const lowerQuery = query.toLowerCase();
     const nodes: PaletteNode[] = [];
+    const categoryOrder = this._engineTypeFilter === "analog" ? CATEGORIES_ANALOG : CATEGORIES_DIGITAL;
 
-    for (const category of ALL_CATEGORIES) {
+    for (const category of categoryOrder) {
       const cat = category as ComponentCategory;
       const all = this._applyAllowlist(this._applyEngineTypeFilter(this._registry.getByCategory(cat)));
       const matched = all.filter((def) =>

@@ -25,8 +25,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -184,7 +184,7 @@ function buildMemristorPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "B",
       defaultBitWidth: 1,
-      position: { x: 2, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -211,40 +211,55 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // hs=10*PX=0.625, zigzag spans y:[-0.625, 0.625], x:[0,2]
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 0.625,
       width: 2,
-      height: 1,
+      height: 1.25,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 0.5, 0);
-    ctx.drawLine(1.5, 0, 2, 0);
+    const vA = signals?.getPinVoltage("A");
+    const vB = signals?.getPinVoltage("B");
+    const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Rectangular body
-    ctx.drawLine(0.5, -0.35, 1.5, -0.35);
-    ctx.drawLine(0.5, 0.35, 1.5, 0.35);
-    ctx.drawLine(0.5, -0.35, 0.5, 0.35);
-    ctx.drawLine(1.5, -0.35, 1.5, 0.35);
+    // Falstad MemristorElm: calcLeads(32) on (0,0)→(2,0), bodyLen=2=distance
+    // lead1=(0,0), lead2=(2,0). hs=10*PX=0.625
+    // Lead wires are zero-length (lead endpoints = pin endpoints)
+    // 6 segments: each draws vertical spike then horizontal segment
+    // interpPointSingle on horizontal: (2*f, -g)
+    const hs = 10 / 16; // 0.625
+    const segments = 6;
 
-    // Hatched region on right side (indicates doped region)
-    ctx.drawLine(1.15, -0.35, 1.15, 0.35);
-    ctx.drawLine(1.15, -0.35, 1.5, -0.35);
-    ctx.drawLine(1.15, 0.35, 1.5, 0.35);
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(0, 0, 2, 0, [
+        { offset: 0, color: signals!.voltageColor(vA) },
+        { offset: 1, color: signals!.voltageColor(vB) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
 
-    if (label.length > 0) {
-      ctx.setColor("TEXT");
-      ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1, 0.55, { horizontal: "center", vertical: "top" });
+    let ox = 0;
+    for (let i = 0; i <= segments; i++) {
+      const atEnd = i === segments;
+      const nx = atEnd ? 0 : (i & 1) === 0 ? 1 : -1;
+
+      // Vertical line from hs*ox to hs*nx at position i/segments
+      const px = (i / segments) * 2;
+      ctx.drawLine(px, -(hs * ox), px, -(hs * nx));
+
+      if (!atEnd) {
+        // Horizontal line from hs*nx at i to hs*nx at i+1
+        const px2 = ((i + 1) / segments) * 2;
+        ctx.drawLine(px, -(hs * nx), px2, -(hs * nx));
+      }
+      ox = nx;
     }
 
     ctx.restore();

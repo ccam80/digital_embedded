@@ -15,7 +15,7 @@ import { defaultColorScheme } from "@/core/renderer-interface";
 import type { Wire } from "@/core/circuit";
 import type { WireSignalAccess } from "./wire-signal-access";
 import type { VoltageRangeTracker } from "./voltage-range";
-import { interpolateColor } from "./color-interpolation";
+import { voltageToColor } from "./voltage-color";
 
 /** Radius (in grid units) of a junction dot. */
 const JUNCTION_RADIUS = 0.15;
@@ -87,7 +87,7 @@ export class WireRenderer {
       if (selection.has(wire)) {
         ctx.setColor("SELECTION");
       } else if (isAnalog && this._voltageTracker !== null && ctx.setRawColor !== undefined) {
-        const cssColor = this._analogVoltageColor((value as { voltage: number }).voltage);
+        const cssColor = voltageToColor((value as { voltage: number }).voltage, this._voltageTracker, this._colorScheme);
         ctx.setRawColor(cssColor);
       } else {
         ctx.setColor(this._colorForValue(value));
@@ -200,34 +200,6 @@ export class WireRenderer {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
-
-  /**
-   * Compute a CSS color string for an analog wire based on its voltage.
-   *
-   * Queries the VoltageRangeTracker for the normalized voltage (0–1), then
-   * interpolates between the theme's endpoint colors:
-   *   normalized < 0.5: WIRE_VOLTAGE_NEG → WIRE_VOLTAGE_GND
-   *   normalized > 0.5: WIRE_VOLTAGE_GND → WIRE_VOLTAGE_POS
-   *   normalized === 0.5: WIRE_VOLTAGE_GND
-   */
-  private _analogVoltageColor(voltage: number): string {
-    const tracker = this._voltageTracker!;
-    const normalized = tracker.normalize(voltage);
-
-    const posColor = this._colorScheme.resolve("WIRE_VOLTAGE_POS");
-    const negColor = this._colorScheme.resolve("WIRE_VOLTAGE_NEG");
-    const gndColor = this._colorScheme.resolve("WIRE_VOLTAGE_GND");
-
-    if (normalized < 0.5) {
-      const t = normalized / 0.5;
-      return interpolateColor(negColor, gndColor, t);
-    } else if (normalized > 0.5) {
-      const t = (normalized - 0.5) / 0.5;
-      return interpolateColor(gndColor, posColor, t);
-    } else {
-      return interpolateColor(gndColor, gndColor, 0);
-    }
-  }
 
   private _colorForValue(
     value: { raw: number; width: number } | { voltage: number } | undefined,

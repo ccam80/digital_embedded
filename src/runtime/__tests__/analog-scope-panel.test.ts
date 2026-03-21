@@ -160,37 +160,13 @@ describe("AnalogScope", () => {
       panel.onStep(i);
     }
 
-    // Build viewport to trigger auto-range computation
-    const channels = (panel as unknown as {
-      _channels: {
-        buffer: AnalogScopeBuffer;
-        autoRange: boolean;
-        yMin: number;
-        yMax: number;
-      }[];
-      _buildViewport: (
-        ch: unknown,
-        tStart: number,
-        tEnd: number,
-        x: number,
-        y: number,
-        w: number,
-        h: number,
-      ) => { yMin: number; yMax: number };
-    })._channels;
-
-    const ch = channels[0]!;
+    // Compute shared Y range to test auto-range
     const vp = (panel as unknown as {
-      _buildViewport: (
-        ch: unknown,
+      _computeSharedYRange: (
         tStart: number,
         tEnd: number,
-        x: number,
-        y: number,
-        w: number,
-        h: number,
       ) => { yMin: number; yMax: number };
-    })._buildViewport(ch, 0, 1, 0, 0, 800, 400);
+    })._computeSharedYRange(0, 1);
 
     // Range should be [0-10%padding, 5+10%padding] = [-0.5, 5.5]
     expect(vp.yMin).toBeCloseTo(-0.5, 1);

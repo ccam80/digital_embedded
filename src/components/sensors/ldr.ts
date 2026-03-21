@@ -39,6 +39,7 @@ import {
 } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 
@@ -195,38 +196,76 @@ export class LDRCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 0.25, width: 1, height: 0.5 };
+    return {
+      x: this.position.x - 0.25,
+      y: this.position.y - 0.5,
+      width: 1.4375,
+      height: 1.375,
+    };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
 
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+    const hasVoltage = vPos !== undefined && vNeg !== undefined;
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Resistor body rectangle
-    ctx.drawRect(0.15, -0.2, 0.7, 0.4);
+    // Zigzag resistor body: bodyLen=32px=2gu > span=1gu → lead1=(0,0), lead2=(1,0)
+    const hs = 6 / 16; // 0.375 grid units perpendicular offset
+    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
+    for (let i = 0; i < 4; i++) {
+      pts.push({ x: ((1 + 4 * i) * 1) / 16, y: hs });
+      pts.push({ x: ((3 + 4 * i) * 1) / 16, y: -hs });
+    }
+    pts.push({ x: 1, y: 0 });
 
-    // Lead lines
-    ctx.drawLine(0, 0, 0.15, 0);
-    ctx.drawLine(0.85, 0, 1, 0);
+    // Zigzag gradient from pos→neg
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(0, 0, 1, 0, [
+        { offset: 0, color: signals!.voltageColor(vPos!) },
+        { offset: 1, color: signals!.voltageColor(vNeg!) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+    }
 
-    // Light arrows pointing at the component body
-    ctx.drawLine(0.3, -0.45, 0.5, -0.25);
-    ctx.drawLine(0.5, -0.45, 0.7, -0.25);
+    // Light arrows: diagonal lines from upper-left to lower-right — body decoration, stays COMPONENT
+    ctx.setColor("COMPONENT");
+    // Arrow direction: from aBase toward aTip
+    // len = 5*PX = 0.3125, wid = 3*PX = 0.1875
+    // Arrow 1 tip at (0.75, -0.5), shaft from (-0.25, 0.875) to base center
+    ctx.drawLine(-0.25, 0.875, 0.5, -0.25);
+    ctx.drawPolygon(
+      [
+        { x: 0.75, y: -0.5 },
+        { x: 0.41453, y: -0.35754 },
+        { x: 0.71783, y: -0.13696 },
+      ],
+      true,
+    );
 
-    // Arrowheads
-    ctx.drawLine(0.45, -0.3, 0.5, -0.25);
-    ctx.drawLine(0.5, -0.25, 0.55, -0.3);
-
-    ctx.drawLine(0.65, -0.3, 0.7, -0.25);
-    ctx.drawLine(0.7, -0.25, 0.75, -0.3);
+    // Arrow 2 tip at (1.1875, -0.5), shaft from (0.1875, 0.875) to base center
+    ctx.drawLine(0.1875, 0.875, 0.9375, -0.25);
+    ctx.drawPolygon(
+      [
+        { x: 1.1875, y: -0.5 },
+        { x: 0.85203, y: -0.35754 },
+        { x: 1.15533, y: -0.13696 },
+      ],
+      true,
+    );
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.5, 0.35, { horizontal: "center", vertical: "top" });
+      ctx.drawText(label, 0.5, 0.375, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

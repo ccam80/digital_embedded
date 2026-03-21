@@ -14,6 +14,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import { PinDirection, type Pin, type PinDeclaration, type Rotation } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -48,30 +49,45 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 1,
+      x: this.position.x,
       y: this.position.y - 1,
       width: 4,
       height: 2,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vPos = signals?.getPinVoltage("pos");
+    const vNeg = signals?.getPinVoltage("neg");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
-    // Circle body: radius 1, centered at (1, 0)
-    ctx.drawCircle(1, 0, 1, false);
-    // + label near positive terminal
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText("+", 0.3, 0, { horizontal: "center", vertical: "center" });
-    // - label near negative terminal
-    ctx.drawText("−", 1.7, 0, { horizontal: "center", vertical: "center" });
-    // Label above
-    const label = this._properties.getOrDefault<string>("label", "");
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.9 });
-      ctx.drawText(label, 1, -1.2, { horizontal: "center", vertical: "bottom" });
+
+    // Lead from pos pin to positive plate
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, 1.75, 0);
+
+    // Lead from neg pin to negative plate
+    if (vNeg !== undefined) {
+      ctx.setColor(signals!.voltageColor(vNeg));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.25, 0, 4, 0);
+
+    // Body (plates) stays COMPONENT color
+    ctx.setColor("COMPONENT");
+
+    // Positive plate (shorter, ±0.625 perpendicular) — at lead1
+    ctx.drawLine(1.75, 0.625, 1.75, -0.625);
+
+    // Negative plate (longer, ±1.0 perpendicular) — at lead2
+    ctx.drawLine(2.25, 1, 2.25, -1);
+
     ctx.restore();
   }
 
@@ -88,7 +104,7 @@ const DC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
     label: "pos",
     direction: PinDirection.INPUT,
-    position: { x: -2, y: 0 },
+    position: { x: 0, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,

@@ -18,6 +18,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalOutputPinModel,
   DigitalInputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 
 // ---------------------------------------------------------------------------
@@ -129,8 +130,7 @@ export class BridgeOutputAdapter implements AnalogElement {
     method: IntegrationMethod,
     voltages: Float64Array,
   ): void {
-    const nodeId = this._pinModel.nodeId;
-    const v = nodeId < voltages.length ? voltages[nodeId] : 0;
+    const v = readMnaVoltage(this._pinModel.nodeId, voltages);
     this._pinModel.updateCompanion(dt, method, v);
   }
 
@@ -218,8 +218,7 @@ export class BridgeInputAdapter implements AnalogElement {
     method: IntegrationMethod,
     voltages: Float64Array,
   ): void {
-    const nodeId = this._pinModel.nodeId;
-    const v = nodeId < voltages.length ? voltages[nodeId] : 0;
+    const v = readMnaVoltage(this._pinModel.nodeId, voltages);
     this._pinModel.updateCompanion(dt, method, v);
   }
 

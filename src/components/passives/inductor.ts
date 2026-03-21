@@ -8,8 +8,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -44,7 +44,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "B",
       defaultBitWidth: 1,
-      position: { x: 2, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -71,39 +71,66 @@ export class InductorElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    const r = 2 / (2 * 3); // segLen / (2 * loopCt) = 1/3
+    // Add tiny epsilon to height: sin(PI) ≈ 1.22e-16, not exactly 0,
+    // so arc endpoint y is ~4e-17 above 0; bbox must cover that.
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
-      width: 2,
-      height: 1,
+      y: this.position.y - r,
+      width: 4,
+      height: r + 1e-10,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const inductance = this._properties.getOrDefault<number>("inductance", 1e-3);
     const label = this._properties.getOrDefault<string>("label", "");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 0.4, 0);
-    ctx.drawLine(1.6, 0, 2, 0);
+    const vA = signals?.getPinVoltage("A");
+    const vB = signals?.getPinVoltage("B");
+    const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Four semicircular arcs (coil symbol)
-    const arcRadius = 0.25;
-    const spacing = 0.35;
-    for (let i = 0; i < 4; i++) {
-      const cx = 0.4 + i * spacing;
-      ctx.drawArc(cx, 0, arcRadius, Math.PI, 2 * Math.PI);
+    // Left lead — colored by pin A voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, 1, 0);
+
+    // Right lead — colored by pin B voltage
+    if (hasVoltage && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vB));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, 0, 4, 0);
+
+    // Coil body: 3 semicircular arcs from PI to 2*PI — gradient from vA to vB
+    const loopCt = 3;
+    const segLen = 2;
+    if (hasVoltage && ctx.setLinearGradient) {
+      ctx.setLinearGradient(1, 0, 3, 0, [
+        { offset: 0, color: signals!.voltageColor(vA) },
+        { offset: 1, color: signals!.voltageColor(vB) },
+      ]);
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    for (let loop = 0; loop < loopCt; loop++) {
+      const cx = 1 + (segLen * (loop + 0.5)) / loopCt;
+      const r = segLen / (2 * loopCt);
+      ctx.drawArc(cx, 0, r, Math.PI, 2 * Math.PI);
     }
 
     // Value label below body
     const displayLabel = label.length > 0 ? label : `${inductance * 1e3}mH`;
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(displayLabel, 1, 0.65, { horizontal: "center", vertical: "top" });
+    ctx.drawText(displayLabel, 2, 0.65, { horizontal: "center", vertical: "top" });
 
     ctx.restore();
   }
@@ -144,13 +171,14 @@ class AnalogInductorElement implements AnalogElement {
     const n1 = this.nodeIndices[1];
     const b = this.branchIndex;
 
-    // Conductance stamps (companion model) — 1-based node IDs, skip ground
-    if (n0 !== 0) solver.stamp(n0 - 1, n0 - 1, this.geq);
-    if (n1 !== 0) solver.stamp(n1 - 1, n1 - 1, this.geq);
-    if (n0 !== 0 && n1 !== 0) solver.stamp(n0 - 1, n1 - 1, -this.geq);
-    if (n1 !== 0 && n0 !== 0) solver.stamp(n1 - 1, n0 - 1, -this.geq);
+    // B sub-matrix: branch current incidence in node KCL equations.
+    // I_branch flows from n0 through the inductor to n1.
+    if (n0 !== 0) solver.stamp(n0 - 1, b, 1);
+    if (n1 !== 0) solver.stamp(n1 - 1, b, -1);
 
-    // Branch incidence row entries: V_branch = V_n0 - V_n1 - (geq * I_branch + ieq)
+    // C sub-matrix: branch equation  V_n0 - V_n1 - geq * I_branch = ieq
+    // Before first stampCompanion, geq=0 and ieq=0 → V_n0 - V_n1 = 0
+    // (short circuit — correct DC operating point for an inductor).
     if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
     if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
     solver.stamp(b, b, -this.geq);

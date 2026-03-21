@@ -23,6 +23,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 import {
   capacitorConductance,
@@ -132,8 +133,8 @@ export function createDriverAnalogElement(
     stampNonlinear(s: SparseSolver): void {
       solver = s;
       const v = cachedVoltages;
-      const vIn = nodeIn < v.length ? v[nodeIn] : 0;
-      const vSel = nodeSel < v.length ? v[nodeSel] : 0;
+      const vIn = readMnaVoltage(nodeIn, v);
+      const vSel = readMnaVoltage(nodeSel, v);
 
       const inLevel = inputPin.readLogicLevel(vIn);
       if (inLevel !== undefined) latchedIn = inLevel;
@@ -161,12 +162,9 @@ export function createDriverAnalogElement(
     },
 
     updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      const vIn = nodeIn < voltages.length ? voltages[nodeIn] : 0;
-      const vSel = nodeSel < voltages.length ? voltages[nodeSel] : 0;
-      const vOut = nodeOut < voltages.length ? voltages[nodeOut] : 0;
-      inputPin.updateCompanion(dt, method, vIn);
-      selPin.updateCompanion(dt, method, vSel);
-      outputPin.updateCompanion(dt, method, vOut);
+      inputPin.updateCompanion(dt, method, readMnaVoltage(nodeIn, voltages));
+      selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
+      outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
     },
   };
 }
@@ -220,8 +218,8 @@ export function createDriverInvAnalogElement(
     stampNonlinear(s: SparseSolver): void {
       solver = s;
       const v = cachedVoltages;
-      const vIn = nodeIn < v.length ? v[nodeIn] : 0;
-      const vSel = nodeSel < v.length ? v[nodeSel] : 0;
+      const vIn = readMnaVoltage(nodeIn, v);
+      const vSel = readMnaVoltage(nodeSel, v);
 
       const inLevel = inputPin.readLogicLevel(vIn);
       if (inLevel !== undefined) latchedIn = inLevel;
@@ -250,12 +248,9 @@ export function createDriverInvAnalogElement(
     },
 
     updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      const vIn = nodeIn < voltages.length ? voltages[nodeIn] : 0;
-      const vSel = nodeSel < voltages.length ? voltages[nodeSel] : 0;
-      const vOut = nodeOut < voltages.length ? voltages[nodeOut] : 0;
-      inputPin.updateCompanion(dt, method, vIn);
-      selPin.updateCompanion(dt, method, vSel);
-      outputPin.updateCompanion(dt, method, vOut);
+      inputPin.updateCompanion(dt, method, readMnaVoltage(nodeIn, voltages));
+      selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
+      outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
     },
   };
 }
@@ -331,7 +326,7 @@ export function createSplitterAnalogElement(
       const v = cachedVoltages;
       for (let i = 0; i < numIn; i++) {
         const nodeId = inputPins[i].nodeId;
-        const voltage = nodeId < v.length ? v[nodeId] : 0;
+        const voltage = readMnaVoltage(nodeId, v);
         const level = inputPins[i].readLogicLevel(voltage);
         if (level !== undefined) latchedLevels[i] = level;
       }
@@ -356,12 +351,10 @@ export function createSplitterAnalogElement(
 
     updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
       for (const p of inputPins) {
-        const n = p.nodeId;
-        p.updateCompanion(dt, method, n < voltages.length ? voltages[n] : 0);
+        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
       }
       for (const p of outputPins) {
-        const n = p.nodeId;
-        p.updateCompanion(dt, method, n < voltages.length ? voltages[n] : 0);
+        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
       }
     },
   };

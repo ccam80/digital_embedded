@@ -293,6 +293,9 @@ export class PaletteUI {
     // Touch: pointerdown → track, move to disambiguate, up to place/cancel
     this._addTouchDragHandlers(item, def);
 
+    // Suppress browser context menu on palette items
+    item.addEventListener("contextmenu", (e) => e.preventDefault());
+
     return item;
   }
 

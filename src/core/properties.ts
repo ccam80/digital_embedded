@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 export const enum PropertyType {
   INT = 'INT',
+  FLOAT = 'FLOAT',
   STRING = 'STRING',
   ENUM = 'ENUM',
   BOOLEAN = 'BOOLEAN',
@@ -167,7 +168,7 @@ export function propertyBagToJson(bag: PropertyBag): SerializedPropertyBag {
  */
 export const PropertyDefinitionSchema = z.object({
   key: z.string(),
-  type: z.enum(['INT', 'STRING', 'ENUM', 'BOOLEAN', 'BIT_WIDTH', 'HEX_DATA', 'COLOR', 'LONG', 'FILE', 'ROTATION', 'INTFORMAT']),
+  type: z.enum(['INT', 'FLOAT', 'STRING', 'ENUM', 'BOOLEAN', 'BIT_WIDTH', 'HEX_DATA', 'COLOR', 'LONG', 'FILE', 'ROTATION', 'INTFORMAT']),
   label: z.string(),
   defaultValue: PropertyValueSchema,
   description: z.string().optional(),

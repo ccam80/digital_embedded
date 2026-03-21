@@ -22,6 +22,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -105,9 +106,9 @@ function createSchmittTriggerElement(
   const outModel = new DigitalOutputPinModel(outputSpec);
   const inModel  = new DigitalInputPinModel(inputSpec);
 
-  // DigitalOutputPinModel.init / DigitalInputPinModel.init expect 0-based indices
-  if (nOut > 0) outModel.init(nOut - 1, -1);
-  if (nIn  > 0) inModel.init(nIn - 1, 0);
+  // DigitalOutputPinModel.init / DigitalInputPinModel.init expect 1-based MNA node IDs
+  if (nOut > 0) outModel.init(nOut, -1);
+  if (nIn  > 0) inModel.init(nIn, 0);
 
   // Initial state: output low
   let _outputHigh = false;
@@ -227,26 +228,50 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y - 1, width: 4, height: 2 };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+    const dn = 4, ww = 1, hs = 1;
+    const lead1x   = 4 * (0.5 - ww / dn);
+    const tipX     = 4 * (0.5 + (ww - 5 * PX) / dn);
+    const pcircleX = 4 * (0.5 + (ww - 2 * PX) / dn);
+    const lead2x   = 4 * (0.5 + (ww + 2 * PX) / dn);
+    const bubbleR  = 3 * PX;
+
+    const vIn  = signals?.getPinVoltage("in");
+    const vOut = signals?.getPinVoltage("out");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Buffer-like triangle with hysteresis symbol inside
-    ctx.drawLine(0, -1, 0, 1);
-    ctx.drawLine(0, -1, 4, 0);
-    ctx.drawLine(0, 1, 4, 0);
-    // Inversion bubble at output
-    ctx.drawCircle(4.3, 0, 0.3);
-    // Hysteresis symbol (simplified S-curve indicator)
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("h", 2, 0, { horizontal: "center", vertical: "center" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -1.5, { horizontal: "center", vertical: "bottom" });
+    // Input lead
+    if (vIn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vIn));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, lead1x, 0);
+
+    // Output lead
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(lead2x, 0, 4, 0);
+
+    // Body — triangle, bubble, hysteresis symbol stay COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon([{ x: lead1x, y: -hs }, { x: tipX, y: 0 }, { x: lead1x, y: hs }], false);
+    ctx.drawCircle(pcircleX, 0, bubbleR, false);
+
+    const cx = (lead1x + tipX) / 2;
+    const hw = (tipX - lead1x) * 0.4;
+    const hh = hs * 0.3;
+    ctx.drawLine(cx - hw,  hh, cx - hw, -hh);
+    ctx.drawLine(cx - hw, -hh, cx,      -hh);
+    ctx.drawLine(cx,      -hh, cx,       hh);
+    ctx.drawLine(cx,       hh, cx + hw,  hh);
+
     ctx.restore();
   }
 
@@ -275,24 +300,47 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y - 1, width: 4, height: 2 };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+    const dn = 4, ww = 1, hs = 1;
+    const lead1x = 4 * (0.5 - ww / dn);
+    const tipX   = 4 * (0.5 + (ww - 5 * PX) / dn);
+    const lead2x  = 4 * (0.5 + (ww - 3 * PX) / dn);
+
+    const vIn  = signals?.getPinVoltage("in");
+    const vOut = signals?.getPinVoltage("out");
+
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Buffer triangle with hysteresis symbol
-    ctx.drawLine(0, -1, 0, 1);
-    ctx.drawLine(0, -1, 4, 0);
-    ctx.drawLine(0, 1, 4, 0);
-    // Hysteresis symbol
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("h", 2, 0, { horizontal: "center", vertical: "center" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -1.5, { horizontal: "center", vertical: "bottom" });
+    // Input lead
+    if (vIn !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vIn));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, 0, lead1x, 0);
+
+    // Output lead
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(lead2x, 0, 4, 0);
+
+    // Body — triangle and hysteresis symbol stay COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon([{ x: lead1x, y: -hs }, { x: tipX, y: 0 }, { x: lead1x, y: hs }], false);
+
+    const cx = (lead1x + tipX) / 2;
+    const hw = (tipX - lead1x) * 0.4;
+    const hh = hs * 0.3;
+    ctx.drawLine(cx - hw, hh,   cx - hw, -hh);
+    ctx.drawLine(cx - hw, -hh,  cx,      -hh);
+    ctx.drawLine(cx,      -hh,  cx,       hh);
+    ctx.drawLine(cx,       hh,  cx + hw,  hh);
+
     ctx.restore();
   }
 

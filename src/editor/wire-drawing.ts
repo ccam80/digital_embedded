@@ -149,8 +149,13 @@ export class WireDrawingMode {
       return;
     }
     const last = this._waypoints[this._waypoints.length - 1]!;
-    // The Manhattan corner is the turning point between the two segments
-    const corner = { x: this._cursor.x, y: last.y };
+    // The Manhattan corner matches the manhattanSegments routing direction
+    const dx = Math.abs(this._cursor.x - last.x);
+    const dy = Math.abs(this._cursor.y - last.y);
+    const verticalFirst = dy >= 2 && dy > dx;
+    const corner = verticalFirst
+      ? { x: last.x, y: this._cursor.y }
+      : { x: this._cursor.x, y: last.y };
     this._waypoints.push(corner);
     this._waypoints.push({ x: this._cursor.x, y: this._cursor.y });
   }
@@ -162,7 +167,7 @@ export class WireDrawingMode {
    *
    * Throws FacadeError if consistency check fails.
    */
-  completeToPin(element: CircuitElement, pin: Pin, circuit: Circuit): Wire[] {
+  completeToPin(element: CircuitElement, pin: Pin, circuit: Circuit, analogTypeIds?: ReadonlySet<string>): Wire[] {
     if (!this._active) {
       throw new Error("WireDrawingMode: cannot complete when not active");
     }
@@ -177,7 +182,7 @@ export class WireDrawingMode {
     const merged = mergeCollinearSegments(wires);
 
     // Consistency check
-    const error = checkWireConsistency(circuit, merged);
+    const error = checkWireConsistency(circuit, merged, analogTypeIds);
     if (error !== undefined) {
       throw error;
     }
@@ -204,7 +209,7 @@ export class WireDrawingMode {
    *
    * Throws FacadeError if consistency check fails.
    */
-  completeToPoint(endPos: Point, circuit: Circuit): Wire[] {
+  completeToPoint(endPos: Point, circuit: Circuit, analogTypeIds?: ReadonlySet<string>): Wire[] {
     if (!this._active) {
       throw new Error("WireDrawingMode: cannot complete when not active");
     }
@@ -213,7 +218,7 @@ export class WireDrawingMode {
     const wires = segments.map((seg) => new Wire(seg.start, seg.end));
     const merged = mergeCollinearSegments(wires);
 
-    const error = checkWireConsistency(circuit, merged);
+    const error = checkWireConsistency(circuit, merged, analogTypeIds);
     if (error !== undefined) {
       throw error;
     }
@@ -306,7 +311,9 @@ export class WireDrawingMode {
 /**
  * Compute Manhattan-routed segments from `from` to `to`.
  *
- * Routing strategy: horizontal first, then vertical.
+ * Routing strategy: if one axis has >= 2 grid units of displacement,
+ * route that axis first ("stay in the direction you started moving").
+ * Ties default to horizontal-first.
  * If the points share an axis, only one segment is needed.
  */
 export function manhattanSegments(from: Point, to: Point): PreviewSegment[] {
@@ -321,8 +328,13 @@ export function manhattanSegments(from: Point, to: Point): PreviewSegment[] {
     // Pure horizontal
     return [{ start: from, end: to }];
   }
-  // Two-segment Manhattan: horizontal first
-  const corner: Point = { x: to.x, y: from.y };
+  const dx = Math.abs(to.x - from.x);
+  const dy = Math.abs(to.y - from.y);
+  // If vertical displacement >= 2 and exceeds horizontal, go vertical-first
+  const verticalFirst = dy >= 2 && dy > dx;
+  const corner: Point = verticalFirst
+    ? { x: from.x, y: to.y }
+    : { x: to.x, y: from.y };
   return [
     { start: from, end: corner },
     { start: corner, end: to },

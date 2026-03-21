@@ -79,25 +79,27 @@ function buildDff(withReset = false): {
 }
 
 /**
- * Build a voltages Float64Array with 6 entries (0=ground, 1=clock, 2=D, 3=Q, 4=~Q, 5=reset).
+ * Build a voltages Float64Array for the DFF element.
+ * MNA node IDs are 1-based: clock=1, D=2, Q=3, ~Q=4, reset=5.
+ * readMnaVoltage(nodeId, v) reads v[nodeId-1], so:
+ *   v[0]=clock, v[1]=D, v[2]=Q, v[3]=~Q, v[4]=reset
  */
 function voltages(clock: number, d: number, q = 0, qBar = 0, reset = 0): Float64Array {
-  const v = new Float64Array(6);
-  v[0] = 0;
-  v[1] = clock;
-  v[2] = d;
-  v[3] = q;
-  v[4] = qBar;
-  v[5] = reset;
+  const v = new Float64Array(5);
+  v[0] = clock;  // MNA node 1 → v[0]
+  v[1] = d;      // MNA node 2 → v[1]
+  v[2] = q;      // MNA node 3 → v[2]
+  v[3] = qBar;   // MNA node 4 → v[3]
+  v[4] = reset;  // MNA node 5 → v[4]
   return v;
 }
 
 /**
  * Create a SparseSolver large enough for the test nodes.
- * We use 6 nodes (0-5) and no branch variables.
+ * We use 5 solver rows (MNA nodes 1-5 → solver indices 0-4).
  */
 function makeSolver(): SparseSolver {
-  return new SparseSolver(6, 0);
+  return new SparseSolver(5, 0);
 }
 
 // ---------------------------------------------------------------------------

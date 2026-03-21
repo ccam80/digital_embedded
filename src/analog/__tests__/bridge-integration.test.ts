@@ -116,11 +116,11 @@ describe("Integration", () => {
     const rIn  = makeResistor(N_VS_POS, N_INPUT, 1000);
     const rLoad = makeResistor(N_OUTPUT, 0, 10000);
 
-    // Bridge adapters use 0-based solver indices:
-    //   N_INPUT  (1-based=2) → 0-based index = 1
-    //   N_OUTPUT (1-based=3) → 0-based index = 2
-    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, 1);
-    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, 2);
+    // Bridge adapters use 1-based MNA node IDs (same as test-elements):
+    //   N_INPUT  = 2 → readMnaVoltage(2, v) reads v[1] = solver index 1
+    //   N_OUTPUT = 3 → readMnaVoltage(3, v) reads v[2] = solver index 2
+    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, N_INPUT);
+    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, N_OUTPUT);
     // Default state: outputAdapter is LOW (vOL=0V) = NOT(HIGH) ✓
 
     const compiledInner = makeMinimalCompiledInner(2);
@@ -174,8 +174,8 @@ describe("Integration", () => {
     const rIn   = makeResistor(N_VS_POS, N_INPUT, 1000);
     const rLoad = makeResistor(N_OUTPUT, 0, 10000);
 
-    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, 1);
-    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, 2);
+    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, N_INPUT);
+    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, N_OUTPUT);
     // NOT(LOW=0) = HIGH → pre-set output to HIGH
     outputAdapter.setLogicLevel(true);
 
@@ -218,9 +218,9 @@ describe("Integration", () => {
     // Expected: V_node = vOH × R_load / (rOut + R_load)
     //   = 3.3 × 10000 / (50 + 10000) ≈ 3.284V
 
-    // 0-based adapter node index 0 (nodeCount=1, matrixSize=1)
+    // MNA node 1 → solver index 0 (nodeCount=1, matrixSize=1)
     // makeResistor uses 1-based: makeResistor(1, 0, R) → solver index 0
-    const ADAPTER_NODE = 0; // 0-based for adapter
+    const ADAPTER_NODE = 1; // 1-based MNA node ID for adapter
     const R_LOAD = 10000;
 
     const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, ADAPTER_NODE);
@@ -252,7 +252,7 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    const vOut = result.nodeVoltages[ADAPTER_NODE]!;
+    const vOut = result.nodeVoltages[ADAPTER_NODE - 1]!;
     const expected = CMOS_3V3.vOH * R_LOAD / (CMOS_3V3.rOut + R_LOAD);
     expect(vOut).toBeCloseTo(expected, 1);
     expect(Math.abs(vOut - expected) / expected).toBeLessThan(0.005);
@@ -264,7 +264,7 @@ describe("Integration", () => {
     // τ = C_out × (rOut || R_load) ≈ 5pF × 50Ω ≈ 250ps.
     // Run 10ns transient (>> τ) — voltage should reach steady state.
 
-    const ADAPTER_NODE = 0;
+    const ADAPTER_NODE = 1; // 1-based MNA node ID
     const R_LOAD = 10000;
 
     const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, ADAPTER_NODE);
@@ -339,11 +339,11 @@ describe("Integration", () => {
     // After syncBeforeAnalogStep, output adapters should reflect this state.
     // DC OP confirms Q2 output node is HIGH, others are LOW.
 
-    const IN_ADAPTER_NODE  = 0; // 0-based solver index for clock input
-    const Q0_ADAPTER_NODE  = 1;
-    const Q1_ADAPTER_NODE  = 2;
-    const Q2_ADAPTER_NODE  = 3;
-    const Q3_ADAPTER_NODE  = 4;
+    const IN_ADAPTER_NODE  = 1; // 1-based MNA node ID for clock input
+    const Q0_ADAPTER_NODE  = 2;
+    const Q1_ADAPTER_NODE  = 3;
+    const Q2_ADAPTER_NODE  = 4;
+    const Q3_ADAPTER_NODE  = 5;
 
     const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, IN_ADAPTER_NODE);
     const q0Adapter     = makeBridgeOutputAdapter(CMOS_3V3, Q0_ADAPTER_NODE);
@@ -399,9 +399,9 @@ describe("Integration", () => {
     innerEngine.setSignalValue(4, BitVector.fromNumber(0, 1)); // Q3 = 0
 
     // Simulate a threshold crossing: input at 3.3V (above vIH=2.0V)
-    // Voltages array indexed by solver index (0-based)
+    // readMnaVoltage(nodeId, v) reads v[nodeId-1], so use nodeId-1 as index
     const voltages = new Float64Array(5);
-    voltages[IN_ADAPTER_NODE] = 3.3;
+    voltages[IN_ADAPTER_NODE - 1] = 3.3;
     coordinator.syncBeforeAnalogStep(voltages);
 
     // After sync, Q2 should be HIGH, others LOW
@@ -417,12 +417,12 @@ describe("Integration", () => {
 
     const expectedHigh = CMOS_3V3.vOH * 10000 / (CMOS_3V3.rOut + 10000);
 
-    // Q2 at solver index Q2_ADAPTER_NODE=3 → nodeVoltages[3]
-    const vQ2 = dcResult.nodeVoltages[Q2_ADAPTER_NODE]!;
+    // Q2 at MNA node Q2_ADAPTER_NODE=4 → solver index 3 → nodeVoltages[3]
+    const vQ2 = dcResult.nodeVoltages[Q2_ADAPTER_NODE - 1]!;
     expect(vQ2).toBeCloseTo(expectedHigh, 1);
 
-    // Q0 at solver index Q0_ADAPTER_NODE=1 → nodeVoltages[1]
-    const vQ0 = dcResult.nodeVoltages[Q0_ADAPTER_NODE]!;
+    // Q0 at MNA node Q0_ADAPTER_NODE=2 → solver index 1 → nodeVoltages[1]
+    const vQ0 = dcResult.nodeVoltages[Q0_ADAPTER_NODE - 1]!;
     expect(vQ0).toBeLessThan(0.1);
   });
 
@@ -449,11 +449,11 @@ describe("Integration", () => {
     const vs    = makeVoltageSource(N_VS_POS, 0, BRANCH_ABS, 3.3);
     const rLoad = makeResistor(N_OUT, 0, 10000);
 
-    // Bridge adapters (0-based solver indices):
-    //   input adapter at solver[0] (reads Vs = 3.3V)
-    //   output adapter at solver[1] (drives R_load)
-    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, 0);
-    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, 1);
+    // Bridge adapters use 1-based MNA node IDs:
+    //   input adapter at MNA node 1 → readMnaVoltage(1, v) reads v[0] = Vs = 3.3V
+    //   output adapter at MNA node 2 → drives solver[1] = R_load node
+    const inputAdapter  = makeBridgeInputAdapter(CMOS_3V3, N_VS_POS);
+    const outputAdapter = makeBridgeOutputAdapter(CMOS_3V3, N_OUT);
 
     const compiledInner = makeMinimalCompiledInner(2);
     const bridge: BridgeInstance = {

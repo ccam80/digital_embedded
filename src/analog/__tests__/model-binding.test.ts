@@ -56,7 +56,7 @@ describe("ModelBinding", () => {
     const d = diags.find((x) => x.code === "model-level-unsupported");
     expect(d).toBeDefined();
     expect(d!.summary).toContain("3");
-    expect(d!.severity).toBe("warning");
+    expect(d!.severity).toBe("error");
   });
 
   it("falls_back_to_default_when_no_model", () => {

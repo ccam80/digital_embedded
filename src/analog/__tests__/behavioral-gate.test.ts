@@ -143,20 +143,20 @@ function solve(
 /**
  * Build a 2-input BehavioralGateElement using direct pin models.
  *
- * nodeIds are 0-based solver indices. 0=ground is implicit.
- * Solver node 0 → circuit node 1 (input A)
- * Solver node 1 → circuit node 2 (input B)
- * Solver node 2 → circuit node 3 (output)
+ * MNA node IDs are 1-based (0 = ground is implicit/skipped).
+ * MNA node 1 → circuit node 1 (input A) → solver index 0
+ * MNA node 2 → circuit node 2 (input B) → solver index 1
+ * MNA node 3 → circuit node 3 (output)  → solver index 2
  */
 function make2InputGate(
   truthTable: (inputs: boolean[]) => boolean,
 ): BehavioralGateElement {
   const inA = new DigitalInputPinModel(CMOS_3V3);
-  inA.init(0, -1); // solver row 0 = circuit node 1
+  inA.init(1, -1); // MNA node 1 = circuit node 1
   const inB = new DigitalInputPinModel(CMOS_3V3);
-  inB.init(1, -1); // solver row 1 = circuit node 2
+  inB.init(2, -1); // MNA node 2 = circuit node 2
   const out = new DigitalOutputPinModel(CMOS_3V3);
-  out.init(2, -1); // solver row 2 = circuit node 3
+  out.init(3, -1); // MNA node 3 = circuit node 3
   return new BehavioralGateElement([inA, inB], out, truthTable);
 }
 
@@ -164,9 +164,9 @@ function make1InputGate(
   truthTable: (inputs: boolean[]) => boolean,
 ): BehavioralGateElement {
   const inp = new DigitalInputPinModel(CMOS_3V3);
-  inp.init(0, -1); // solver row 0 = circuit node 1
+  inp.init(1, -1); // MNA node 1 = circuit node 1
   const out = new DigitalOutputPinModel(CMOS_3V3);
-  out.init(1, -1); // solver row 1 = circuit node 2
+  out.init(2, -1); // MNA node 2 = circuit node 2
   return new BehavioralGateElement([inp], out, truthTable);
 }
 
@@ -361,20 +361,20 @@ describe("Loading", () => {
     //   Gate output at node 2
     //   rLoad from node 2 to ground
 
-    // Layout:
-    //   solver node 0 = circuit node 1 = input A
-    //   solver node 1 = circuit node 2 = output
-    //   solver node 2 = source node (VS pos terminal)
-    //   solver branch row 2 = VS A branch
-    // matrixSize = 3 (3 rows: 0,1,2)
+    // Layout (1-based MNA node IDs, 0=ground implicit):
+    //   MNA node 1 = input A  → solver index 0
+    //   MNA node 2 = output   → solver index 1
+    //   MNA node 3 = source node (VS pos terminal) → solver index 2
+    //   branch row 3 = VS branch
+    // matrixSize = 4 (3 node rows + 1 branch row)
 
     const inA = new DigitalInputPinModel(CMOS_3V3);
-    inA.init(0, -1);
+    inA.init(1, -1); // MNA node 1
     const out = new DigitalOutputPinModel(CMOS_3V3);
-    out.init(1, -1);
+    out.init(2, -1); // MNA node 2
     const gate = new BehavioralGateElement([inA], out, (inputs) => !inputs[0]);
 
-    // 3.3V ideal source at circuit node 3 (solver node 2, branch row 2)
+    // 3.3V ideal source at circuit node 3 (solver node 2, branch row 3)
     const vs = makeVoltageSource(3, 0, 3, VDD);
     // 1kΩ from circuit node 3 to circuit node 1
     const rSource = makeResistor(3, 1, 1000);
@@ -408,8 +408,8 @@ describe("Factory", () => {
   it("and_factory_returns_analog_element", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
-    // nodeIds: inputA=0, inputB=1, output=2
-    const element = factory([0, 1, 2], -1, props, () => 0);
+    // nodeIds: 1-based MNA node IDs
+    const element = factory([1, 2, 3], -1, props, () => 0);
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
@@ -424,7 +424,7 @@ describe("Factory", () => {
   it("not_factory_returns_1_input_element", () => {
     const factory = makeNotAnalogFactory();
     const props = new PropertyBag();
-    const element = factory([0, 1], -1, props, () => 0);
+    const element = factory([1, 2], -1, props, () => 0);
 
     expect(element).toBeDefined();
     expect(element.nodeIndices.length).toBe(2);
@@ -433,15 +433,15 @@ describe("Factory", () => {
   it("nand_factory_correct_truth_table", () => {
     const factory = makeNandAnalogFactory(2);
     const props = new PropertyBag();
-    const gate = factory([0, 1, 2], -1, props, () => 0) as BehavioralGateElement;
+    const gate = factory([1, 2, 3], -1, props, () => 0) as BehavioralGateElement;
 
     // Build a circuit, drive both inputs HIGH, expect LOW output
     const inA = new DigitalInputPinModel(CMOS_3V3);
-    inA.init(0, -1);
+    inA.init(1, -1);
     const inB = new DigitalInputPinModel(CMOS_3V3);
-    inB.init(1, -1);
+    inB.init(2, -1);
     const outPin = new DigitalOutputPinModel(CMOS_3V3);
-    outPin.init(2, -1);
+    outPin.init(3, -1);
     const nandGate = new BehavioralGateElement(
       [inA, inB],
       outPin,
@@ -464,7 +464,7 @@ describe("Factory", () => {
   it("or_factory_returns_analog_element", () => {
     const factory = makeOrAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([0, 1, 2], -1, props, () => 0);
+    const element = factory([1, 2, 3], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.nodeIndices.length).toBe(3);
   });
@@ -472,7 +472,7 @@ describe("Factory", () => {
   it("nor_factory_returns_analog_element", () => {
     const factory = makeNorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([0, 1, 2], -1, props, () => 0);
+    const element = factory([1, 2, 3], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.nodeIndices.length).toBe(3);
   });
@@ -480,7 +480,7 @@ describe("Factory", () => {
   it("xor_factory_returns_analog_element", () => {
     const factory = makeXorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([0, 1, 2], -1, props, () => 0);
+    const element = factory([1, 2, 3], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.nodeIndices.length).toBe(3);
   });

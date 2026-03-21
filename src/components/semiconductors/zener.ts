@@ -9,8 +9,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -171,40 +171,81 @@ export class ZenerElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.6,
+      y: this.position.y - 0.7,
       width: 4,
-      height: 1.2,
+      height: 1.4,
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
+
+    const vA = signals?.getPinVoltage("A");
+    const vK = signals?.getPinVoltage("K");
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines
-    ctx.drawLine(0, 0, 1.5, 0);
-    ctx.drawLine(2.5, 0, 4, 0);
+    // Geometry matching Falstad drawZenerDiode reference
+    // p1={x:0,y:0}, p2={x:4,y:0}, bodyLen=1, hs=0.5
+    const PX = 1 / 16;
+    const hs = 8 * PX; // 0.5
 
-    // Triangle body pointing right
+    // lead1/lead2 from calcLeads with bodyLen=1
+    const lead1 = { x: 1.5, y: 0 };
+    const lead2 = { x: 2.5, y: 0 };
+
+    // Anode lead
+    if (signals && vA !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vA));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, lead1.x, lead1.y);
+
+    // Cathode lead
+    if (signals && vK !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vK));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(lead2.x, lead2.y, 4, 0);
+
+    // Body (triangle, cathode bar, wings) stays COMPONENT color
+    ctx.setColor("COMPONENT");
+
+    // Filled diode triangle: lead1 → lead2 tip
     ctx.drawPolygon([
-      { x: 1.5, y: -0.5 },
-      { x: 1.5, y: 0.5 },
-      { x: 2.5, y: 0 },
+      { x: lead1.x, y: -hs },
+      { x: lead1.x, y: hs },
+      { x: lead2.x, y: 0 },
     ], true);
 
-    // Zener cathode bar with bent ends (Z-shape)
-    ctx.drawLine(2.5, -0.5, 2.5, 0.5);
-    // Bent ends characteristic of zener symbol
-    ctx.drawLine(2.5, -0.5, 2.8, -0.7);
-    ctx.drawLine(2.5, 0.5, 2.2, 0.7);
+    // Cathode bar: cath0/cath1 are perpendicular to lead1→lead2 at lead2
+    // direction is along y axis (perpendicular to horizontal wire)
+    const cath0 = { x: lead2.x, y: -hs };
+    const cath1 = { x: lead2.x, y: hs };
+    ctx.drawLine(cath0.x, cath0.y, cath1.x, cath1.y);
+
+    // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0→cath1
+    // interpPointSingle(a,b,f,g): point at fraction f along a→b, offset g perpendicular (along x for vertical bar)
+    // Perpendicular to cath0→cath1 (which is vertical) is horizontal
+    const wing0 = {
+      x: cath0.x + (cath1.x - cath0.x) * (-0.2) + (-hs),
+      y: cath0.y + (cath1.y - cath0.y) * (-0.2),
+    };
+    const wing1 = {
+      x: cath0.x + (cath1.x - cath0.x) * 1.2 + hs,
+      y: cath0.y + (cath1.y - cath0.y) * 1.2,
+    };
+    ctx.drawLine(cath0.x, cath0.y, wing0.x, wing0.y);
+    ctx.drawLine(cath1.x, cath1.y, wing1.x, wing1.y);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 2, -0.85, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, 2, -(hs + 0.25), { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

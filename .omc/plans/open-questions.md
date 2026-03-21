@@ -32,3 +32,11 @@
 - [ ] Should tutorials/index.json include a thumbnail/preview image path? — Cards would look better with a circuit screenshot. But generating thumbnails automatically requires headless rendering, which does not exist yet. Defer or plan separately.
 - [ ] What is the right behavior when tutorial_create is called with an outputDir outside tutorials/? — The index.json upsert assumes tutorials live under tutorials/. If someone writes to a different path, manifestPath will still point there but tutorials.html resolves relative to its own location. Need to decide: warn, error, or allow.
 - [ ] Should locked mode field restrictions be defined in the manifest itself or only via URL params? — Plan says URL params (`?mode=locked&editable=testData,instructions`). An alternative is a `lockedFields` array in the manifest. URL params are simpler and do not pollute the manifest schema.
+
+## analog-ui-integration - 2026-03-18
+
+- [ ] Exact analog component type names for PALETTE_DEFAULT_COMPONENTS — The plan lists likely names (DcVoltageSource, Resistor, etc.) but these must be verified against the registry at implementation time. Use `registry.getByCategory("SOURCES")` etc. to confirm.
+- [ ] AnalogScopePanel constructor expects AnalogEngine, not generic Engine — The viewer panel rebuild uses the generic `engine` variable. Need to verify whether a type assertion is safe or if AnalogScopePanel should accept the AnalogEngineInterface instead.
+- [ ] AnalogScopePanel.addChannel() API — The plan assumes `addChannel(name, netId)` but the exact method signature must be confirmed against `src/runtime/analog-scope-panel.ts`. The scope panel may use node indices rather than net IDs.
+- [ ] Analysis menu HTML structure — Need to verify whether the Analysis menu dropdown already exists in simulator.html or is built dynamically. The "AC Sweep..." item placement depends on this.
+- [ ] Monte Carlo UI scope — Plan defers Monte Carlo to a stub. Confirm this is acceptable or if a basic "run N iterations" dialog is expected in this work.

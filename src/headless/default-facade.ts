@@ -37,6 +37,9 @@ import { compileCircuit } from '../engine/compiler.js';
 import { compileAnalogCircuit } from '../analog/compiler.js';
 import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
+import { MNAEngine } from '../analog/analog-engine.js';
+import { detectEngineMode, partitionMixedCircuit } from '../engine/mixed-partition.js';
+import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/save.js';
 import { deserializeCircuit } from '../io/load.js';
 import { extractEmbeddedTestData } from './test-runner.js';
@@ -59,9 +62,11 @@ export interface StepOptions {
 export class DefaultSimulatorFacade implements SimulatorFacade {
   private readonly _builder: CircuitBuilder;
   private readonly _runner: SimulationRunner;
+  private readonly _loader: SimulationLoader;
   private readonly _registry: ComponentRegistry;
 
   // Active session state (reset on each compile())
+  private _circuit: Circuit | null = null;
   private _engine: DigitalEngine | (AnalogEngine & SimulationEngine) | null = null;
   private _clockManager: ClockManager | null = null;
   private _compiled: ConcreteCompiledCircuit | null = null;
@@ -72,6 +77,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._registry = registry;
     this._builder = new CircuitBuilder(registry);
     this._runner = new SimulationRunner(registry);
+    this._loader = new SimulationLoader(registry);
   }
 
   // =========================================================================
@@ -105,40 +111,65 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   compile(circuit: Circuit): SimulationEngine {
     this._disposeCurrentEngine();
 
+    this._circuit = null;
     this._compiled = null;
     this._compiledAnalog = null;
     this._clockManager = null;
     this._dcOpResult = null;
 
-    const isAnalog = circuit.metadata.engineType === 'analog';
+    // Resolve engine mode: "auto" detects from components present
+    let engineMode = circuit.metadata.engineType;
+    if (engineMode === 'auto') {
+      const detected = detectEngineMode(circuit, this._registry);
+      if (detected === 'mixed' || detected === 'analog') {
+        engineMode = 'analog'; // mixed uses the analog path with bridge partition
+      } else {
+        engineMode = 'digital';
+      }
+    }
 
-    if (isAnalog) {
-      const compiledAnalog = compileAnalogCircuit(circuit, this._registry);
+    if (engineMode === 'analog') {
+      // Check for mixed-mode: partition digital-only elements into a bridge
+      const detected = detectEngineMode(circuit, this._registry);
+      let compileInput: Circuit | import('../engine/flatten.js').FlattenResult;
+
+      if (detected === 'mixed') {
+        const { analogCircuit, partition } = partitionMixedCircuit(circuit, this._registry);
+        compileInput = {
+          circuit: analogCircuit,
+          crossEngineBoundaries: [],
+          mixedModePartitions: [partition],
+        };
+      } else {
+        compileInput = circuit;
+      }
+
+      const compiledAnalog = compileAnalogCircuit(compileInput, this._registry);
       this._compiledAnalog = compiledAnalog;
 
-      const analogEngine = compiledAnalog as unknown as AnalogEngine & SimulationEngine;
-      this._engine = analogEngine;
+      const analogEngine = new MNAEngine();
+      analogEngine.init(compiledAnalog);
+      this._engine = analogEngine as unknown as AnalogEngine & SimulationEngine;
 
       try {
         this._dcOpResult = analogEngine.dcOperatingPoint();
       } catch {
-        // Convergence failure — engine is still usable for transient simulation.
+        // intentionally empty
       }
 
-      return analogEngine;
+      this._circuit = circuit;
+      return analogEngine as unknown as SimulationEngine;
     }
 
-    // Digital path: compile directly to get ConcreteCompiledCircuit
-    const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
-    this._compiled = compiled;
-
-    const engine = new DigitalEngine('level');
-    engine.init(compiled);
+    // Digital path: compile via runner so the engine is registered in the
+    // runner's WeakMap for label resolution in runTests().
+    const engine = this._runner.compile(circuit) as DigitalEngine;
     this._engine = engine;
 
-    // Also register in the runner's WeakMap so that runTests() can do label
-    // resolution. The runner.compile() call is used only for test execution.
+    const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
+    this._compiled = compiled;
     this._clockManager = new ClockManager(compiled);
+    this._circuit = circuit;
 
     return engine;
   }
@@ -153,8 +184,6 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
    * For digital circuits, clocks are advanced before the step by default.
    * Pass { clockAdvance: false } to skip clock advancement (used by test
    * executors that drive clocks manually).
-   *
-   * Note: the opts parameter is facade-specific and not on SimulatorFacade.
    */
   step(engine: SimulationEngine, opts?: StepOptions): void {
     const advance = opts?.clockAdvance !== false;
@@ -252,7 +281,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Testing
   // =========================================================================
 
-  runTests(_engine: SimulationEngine, circuit: Circuit, testData?: string): TestResults {
+  runTests(engine: SimulationEngine, circuit: Circuit, testData?: string): TestResults {
     const resolvedData = testData ?? extractEmbeddedTestData(circuit);
 
     if (resolvedData === null || resolvedData.trim().length === 0) {
@@ -262,10 +291,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
 
     const parsed = parseTestData(resolvedData);
-    // Compile a fresh engine via the runner for test execution.
-    // This ensures the runner's WeakMap has the record for label resolution.
-    const testEngine = this._runner.compile(circuit);
-    return executeTests(this._runner, testEngine, circuit, parsed);
+    return executeTests(this._runner, engine, circuit, parsed);
   }
 
   // =========================================================================
@@ -309,6 +335,16 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return this._engine as SimulationEngine | null;
   }
 
+  /** Returns the last compiled circuit, or null if none compiled yet. */
+  getCircuit(): Circuit | null {
+    return this._circuit;
+  }
+
+  /** Returns the SimulationLoader instance. */
+  getLoader(): SimulationLoader {
+    return this._loader;
+  }
+
   /** Returns the ClockManager for the current digital session, or null. */
   getClockManager(): ClockManager | null {
     return this._clockManager;
@@ -335,6 +371,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
    */
   invalidate(): void {
     this._disposeCurrentEngine();
+    this._circuit = null;
     this._compiled = null;
     this._compiledAnalog = null;
     this._clockManager = null;

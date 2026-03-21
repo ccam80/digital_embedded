@@ -60,6 +60,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -221,40 +222,87 @@ export class OTAElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    const PX = 1 / 16;
+    const cr = 19 / 2 * PX;
+    const signOverhang = 2 * PX; // sign lines extend 2*PX left of x=0
     return {
-      x: this.position.x,
+      x: this.position.x - signOverhang,
       y: this.position.y - 3,
-      width: 4,
-      height: 6,
+      width: 3 + 2 * cr + signOverhang,
+      height: 5,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+    const cr = 19 / 2 * PX;
+
+    const vVp   = signals?.getPinVoltage("V+");
+    const vVm   = signals?.getPinVoltage("V-");
+    const vIabc = signals?.getPinVoltage("Iabc");
+    const vOutP = signals?.getPinVoltage("OUT+");
+    const vOutN = signals?.getPinVoltage("OUT-");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Triangle body: pointing right
-    ctx.drawLine(0, -2, 0, 2);
-    ctx.drawLine(0, -2, 4, 0);
-    ctx.drawLine(0, 2, 4, 0);
+    // Triangle body — stays COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawPolygon(
+      [{ x: 0, y: -2 }, { x: 3, y: 0 }, { x: 0, y: 2 }],
+      false,
+    );
 
-    // + and - labels at inputs
-    ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText("+", 0.5, -1, { horizontal: "left", vertical: "center" });
-    ctx.drawText("−", 0.5, 1, { horizontal: "left", vertical: "center" });
+    // Two output circles — body, stays COMPONENT
+    ctx.drawCircle(3 + cr, 0, cr, false);
+    ctx.drawCircle(3 + cr - (2 * cr - 8 * PX), 0, cr, false);
 
-    // Iabc label
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("Iabc", 2, -2.5, { horizontal: "center", vertical: "bottom" });
+    // +/- signs — body decoration, stays COMPONENT
+    const signX = 4 * PX;
+    const signSz = 6 * PX;
+    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
+    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
+    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
 
-    // Optional label
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -3.3, { horizontal: "center", vertical: "bottom" });
+    // Input lead V+
+    if (vVp !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vVp));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, 0.5, -1);
+
+    // Input lead V-
+    if (vVm !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vVm));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, 0.5, 1);
+
+    // Iabc bias lead
+    if (vIabc !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vIabc));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2, -3, 2, -2);
+
+    // OUT+ stub
+    if (vOutP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutP));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3 + 2 * cr, 0, 4, -1);
+
+    // OUT- stub
+    if (vOutN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3 + 2 * cr, 0, 4, 1);
 
     ctx.restore();
   }

@@ -345,6 +345,12 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
     if (entry.key === "customShape" && entry.value.type === "customShape") {
       metadata.customShape = convertCustomShapeData(entry.value.value);
     }
+    if (entry.key === "engineType" && entry.value.type === "string") {
+      const et = entry.value.value;
+      if (et === "analog" || et === "digital" || et === "auto") {
+        metadata.engineType = et;
+      }
+    }
   }
 
   return metadata;

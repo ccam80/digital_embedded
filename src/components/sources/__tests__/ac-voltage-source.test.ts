@@ -273,7 +273,7 @@ describe("Integration", () => {
       engine.step(dt);
 
       if (simTime > settleTime) {
-        const vcap = Math.abs(engine.getNodeVoltage(1)); // node2 = voltages[1]
+        const vcap = Math.abs(engine.getNodeVoltage(2)); // node2 = MNA node ID 2
         if (vcap > peakVcap) peakVcap = vcap;
       }
     }

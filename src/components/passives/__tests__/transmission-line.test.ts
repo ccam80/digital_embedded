@@ -194,13 +194,16 @@ describe("TLine", () => {
       const { solver, stamps } = makeStubSolver();
       el.stamp(solver);
 
-      // BDF-1 geq = L/dt. For the first segment's inductor (SegmentInductorElement):
+      // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
-      // These show up as diagonal stamps at the RL mid-node for segment 0.
-      const diagStamps = stamps.filter((s) => s.row === s.col && s.value > 0);
-      // Should contain geq = lSeg/dt ≈ 50 for each of the N inductors
+      // These show up as -geq on the branch diagonal (branch row = branch col).
       const expectedGeq = lSeg / dt; // 50
-      const matchingGeq = diagStamps.filter((s) => Math.abs(s.value - expectedGeq) < 0.01);
+      const branchDiags = stamps.filter(
+        (s) => s.row === s.col && s.row >= nodeCount && s.value < 0,
+      );
+      const matchingGeq = branchDiags.filter(
+        (s) => Math.abs(s.value + expectedGeq) < 0.01,
+      );
       expect(matchingGeq.length).toBeGreaterThan(0);
     });
   });
@@ -332,7 +335,7 @@ describe("TLine", () => {
       // At t ≈ 0.8τ, Port2 should still be at a small fraction of final value
       // (signal hasn't fully arrived yet — lumped model starts rising before τ
       // but should be below 50% at 0.8τ for N=20)
-      const vPort2Early = engine2.getNodeVoltage(1); // node2 → solver index 1
+      const vPort2Early = engine2.getNodeVoltage(2); // node2 → MNA node ID 2
 
       // Run to t ≈ 2τ (well past τ)
       while (engine2.simTime < 2 * tau && steps < 50000) {
@@ -343,7 +346,7 @@ describe("TLine", () => {
       expect(engine2.getState()).not.toBe(EngineState.ERROR);
 
       // At t ≈ 2τ, Port2 should have reached near its steady-state value (0.5V for matched load)
-      const vPort2Late = engine2.getNodeVoltage(1);
+      const vPort2Late = engine2.getNodeVoltage(2);
 
       // Port2 must be higher at t=2τ than at t=0.8τ (signal is propagating)
       expect(vPort2Late).toBeGreaterThan(vPort2Early);
@@ -426,7 +429,7 @@ describe("TLine", () => {
 
       // At steady state: V(port2) = Vs * R_load / (R_src + R_load) = 0.5V
       // (The transmission line is transparent at DC with no reflection)
-      const vPort2 = engine.getNodeVoltage(port2 - 1);
+      const vPort2 = engine.getNodeVoltage(port2);
       expect(vPort2).toBeGreaterThan(0.35);
       expect(vPort2).toBeLessThan(0.65);
     });
@@ -484,8 +487,8 @@ describe("TLine", () => {
         expect(eng.getState()).not.toBe(EngineState.ERROR);
       }
 
-      const vLossless = engLossless.getNodeVoltage(1); // Port2 = node2 → solver index 1
-      const vLossy = engLossy.getNodeVoltage(1);
+      const vLossless = engLossless.getNodeVoltage(2); // Port2 = node2 → MNA node ID 2
+      const vLossy = engLossy.getNodeVoltage(2);
 
       // Lossy line must deliver less power to Port2
       expect(vLossy).toBeLessThan(vLossless);
@@ -536,7 +539,7 @@ describe("TLine", () => {
           if (eng.getState() === EngineState.ERROR) break;
         }
 
-        return eng.getNodeVoltage(1); // Port2 = node2 → solver index 1
+        return eng.getNodeVoltage(2); // Port2 = node2 → MNA node ID 2
       }
 
       // At t = 1.5τ (well into the response), both should be rising.
@@ -614,7 +617,7 @@ describe("TLine", () => {
       // At steady state Port2 (open circuit) should be close to source voltage.
       // V_port1 = Vs * R_line / (R_src + R_line). For DC: lossless line is a
       // short → V_port1 = Vs * R_load / (R_src + R_load) ≈ 1V (R_load >> R_src).
-      const vPort2 = engine.getNodeVoltage(1); // node2 → solver index 1
+      const vPort2 = engine.getNodeVoltage(2); // node2 → MNA node ID 2
       // DC steady state: port2 ≈ 1V (open circuit, Vs=1V, R_src=50Ω, R_open=10MΩ)
       expect(vPort2).toBeGreaterThan(0.9);
     });

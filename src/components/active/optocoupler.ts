@@ -75,6 +75,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -251,42 +252,104 @@ export class OptocouplerElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const PX = 1 / 16;
+
+    const vAnode     = signals?.getPinVoltage("anode");
+    const vCathode   = signals?.getPinVoltage("cathode");
+    const vCollector = signals?.getPinVoltage("collector");
+    const vEmitter   = signals?.getPinVoltage("emitter");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Rectangular body
-    ctx.drawLine(0, -2, 4, -2);
-    ctx.drawLine(4, -2, 4, 2);
-    ctx.drawLine(4, 2, 0, 2);
-    ctx.drawLine(0, 2, 0, -2);
-
-    // Isolation barrier (dashed vertical line in the middle)
+    // Body: rectangle, isolation barrier, LED triangle/bar, light arrows, transistor body — all COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawRect(0, -2, 4, 4, false);
     ctx.drawLine(2, -2, 2, 2);
 
-    // LED symbol (triangle + bar) on left side
-    ctx.drawLine(0.5, -1.5, 0.5, -0.5);  // anode line
-    ctx.drawLine(0.5, -1.5, 1.5, -1);     // triangle top
-    ctx.drawLine(0.5, -0.5, 1.5, -1);     // triangle bottom
-    ctx.drawLine(1.5, -1.5, 1.5, -0.5);   // cathode bar
+    const ledHs = 8 * PX; // 0.5
+    const triTop  = { x: 0.5, y: -ledHs };
+    const triBtm  = { x: 0.5, y: ledHs };
+    const triTip  = { x: 1.5, y: 0 };
+    ctx.drawPolygon([triTop, triBtm, triTip], false);  // LED triangle
+    ctx.drawLine(triTip.x - ledHs, triTip.y + ledHs,
+                 triTip.x + ledHs, triTip.y - ledHs); // cathode bar
 
-    // Phototransistor symbol on right side
-    ctx.drawCircle(3, 0, 0.8);
-
-    // Labels
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("A", 0.3, -1, { horizontal: "left", vertical: "center" });
-    ctx.drawText("K", 0.3, 1, { horizontal: "left", vertical: "center" });
-    ctx.drawText("C", 3.5, -1, { horizontal: "left", vertical: "center" });
-    ctx.drawText("E", 3.5, 1, { horizontal: "left", vertical: "center" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.3, { horizontal: "center", vertical: "bottom" });
+    // Two light arrows
+    for (let i = 0; i < 2; i++) {
+      const ay = -0.2 + i * 0.4;
+      const aBase = { x: 1.7, y: ay };
+      const aTip = { x: 2.1, y: ay - 0.3 };
+      const dx = aTip.x - aBase.x;
+      const dy = aTip.y - aBase.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const al = 5 * PX;
+      const aw = 3 * PX;
+      const f = 1 - al / len;
+      const cx = aBase.x * (1 - f) + aTip.x * f;
+      const cy = aBase.y * (1 - f) + aTip.y * f;
+      const gx = (dy / len) * aw;
+      const gy = (-dx / len) * aw;
+      ctx.drawPolygon(
+        [{ x: aTip.x, y: aTip.y }, { x: cx + gx, y: cy + gy }, { x: cx - gx, y: cy - gy }],
+        true,
+      );
+      ctx.drawLine(aBase.x, aBase.y, aTip.x - 5 * PX * 0.7, aTip.y + 5 * PX * 0.7);
     }
+
+    // NPN phototransistor body: circle, base bar, base lead — all COMPONENT
+    ctx.drawCircle(3, 0, 0.7, false);
+    ctx.drawLine(2.75, -0.5, 2.75, 0.5);  // base bar
+    ctx.drawLine(2, 0, 2.75, 0);           // base lead (internal, no external pin)
+
+    // Emitter arrow (body decoration, stays COMPONENT)
+    const emDx = 4 - 2.75;
+    const emDy = 1 - 0.5;
+    const emLen = Math.sqrt(emDx * emDx + emDy * emDy);
+    const emAl = 8 * PX;
+    const emAw = 3 * PX;
+    const emF = 1 - emAl / emLen;
+    const emCx = 2.75 * (1 - emF) + 4 * emF;
+    const emCy = 0.5 * (1 - emF) + 1 * emF;
+    const emGx = (emDy / emLen) * emAw;
+    const emGy = (-emDx / emLen) * emAw;
+    ctx.drawPolygon(
+      [{ x: 4, y: 1 }, { x: emCx + emGx, y: emCy + emGy }, { x: emCx - emGx, y: emCy - emGy }],
+      true,
+    );
+
+    // anode lead
+    if (vAnode !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vAnode));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, -1, triTop.x, triTop.y);
+
+    // cathode lead
+    if (vCathode !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCathode));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, triBtm.x, triBtm.y);
+
+    // collector lead
+    if (vCollector !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCollector));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.75, -0.5, 4, -1);
+
+    // emitter lead
+    if (vEmitter !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vEmitter));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(2.75, 0.5, 4, 1);
 
     ctx.restore();
   }

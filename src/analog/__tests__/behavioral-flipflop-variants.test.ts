@@ -169,29 +169,31 @@ function buildRSLatch(): {
 }
 
 /**
- * Build a voltages array for 6 nodes (0-5).
+ * Build a voltages array for MNA nodes 1-5 (1-based).
+ * readMnaVoltage(nodeId, v) reads v[nodeId-1], so:
+ *   v[0]=node1, v[1]=node2, v[2]=node3, v[3]=node4, v[4]=node5
  */
 function v6(n1: number, n2: number, n3: number, n4: number, n5: number): Float64Array {
-  const arr = new Float64Array(6);
-  arr[0] = 0;
-  arr[1] = n1;
-  arr[2] = n2;
-  arr[3] = n3;
-  arr[4] = n4;
-  arr[5] = n5;
+  const arr = new Float64Array(5);
+  arr[0] = n1;
+  arr[1] = n2;
+  arr[2] = n3;
+  arr[3] = n4;
+  arr[4] = n5;
   return arr;
 }
 
 /**
- * Build a voltages array for 5 nodes (0-4).
+ * Build a voltages array for MNA nodes 1-4 (1-based).
+ * readMnaVoltage(nodeId, v) reads v[nodeId-1], so:
+ *   v[0]=node1, v[1]=node2, v[2]=node3, v[3]=node4
  */
 function v5(n1: number, n2: number, n3: number, n4: number): Float64Array {
-  const arr = new Float64Array(5);
-  arr[0] = 0;
-  arr[1] = n1;
-  arr[2] = n2;
-  arr[3] = n3;
-  arr[4] = n4;
+  const arr = new Float64Array(4);
+  arr[0] = n1;
+  arr[1] = n2;
+  arr[2] = n3;
+  arr[3] = n4;
   return arr;
 }
 
@@ -205,7 +207,7 @@ function applyJKRisingEdge(
   j: number,
   k: number,
 ): number {
-  const solver = makeSolver(6);
+  const solver = makeSolver(5);
   solver.beginAssembly();
   element.stamp(solver);
   element.stampNonlinear(solver);
@@ -244,7 +246,7 @@ describe("JK", () => {
   it("toggle_when_both_high", () => {
     // J=1, K=1 on rising clock edge → Q toggles
     const { element, qPin, qBarPin } = buildJK();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -276,7 +278,7 @@ describe("JK", () => {
   it("set_when_j_high", () => {
     // J=1, K=0, rising clock → Q=1
     const { element, qPin } = buildJK();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -295,7 +297,7 @@ describe("JK", () => {
     // First set Q=1 via J=1, K=0 edge
     // Then J=0, K=1 on next rising edge → Q=0
     const { element, qPin } = buildJK();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -329,7 +331,7 @@ describe("RS", () => {
   it("set_and_reset", () => {
     // S=1, R=0 on rising edge → Q=1; then S=0, R=1 → Q=0
     const { element, qPin } = buildRS();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -358,7 +360,7 @@ describe("RS", () => {
     // First set Q=1, then apply S=1, R=1 on rising edge
     // Q must remain 1 (hold previous value)
     const { element, qPin } = buildRS();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -393,7 +395,7 @@ describe("T", () => {
   it("toggles_on_t_high", () => {
     // T=1 on each rising clock edge → Q toggles each time
     const { element, qPin } = buildT();
-    const solver = makeSolver(5);
+    const solver = makeSolver(4);
 
     solver.beginAssembly();
     element.stamp(solver);
@@ -468,7 +470,7 @@ describe("RS_FF", () => {
     //   code: 'rs-flipflop-both-set'
     //   severity: 'warning'
     const { element } = buildRS();
-    const solver = makeSolver(6);
+    const solver = makeSolver(5);
 
     solver.beginAssembly();
     element.stamp(solver);

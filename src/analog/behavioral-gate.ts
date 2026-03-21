@@ -21,6 +21,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 
 // ---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ export class BehavioralGateElement implements AnalogElement {
 
     for (let i = 0; i < this._inputs.length; i++) {
       const nodeId = this._inputs[i].nodeId;
-      const voltage = nodeId < v.length ? v[nodeId] : 0;
+      const voltage = readMnaVoltage(nodeId, v);
       const level = this._inputs[i].readLogicLevel(voltage);
       if (level !== undefined) {
         this._latchedLevels[i] = level;
@@ -195,12 +196,10 @@ export class BehavioralGateElement implements AnalogElement {
     voltages: Float64Array,
   ): void {
     for (const inp of this._inputs) {
-      const nodeId = inp.nodeId;
-      const v = nodeId < voltages.length ? voltages[nodeId] : 0;
+      const v = readMnaVoltage(inp.nodeId, voltages);
       inp.updateCompanion(dt, method, v);
     }
-    const outId = this._output.nodeId;
-    const vOut = outId < voltages.length ? voltages[outId] : 0;
+    const vOut = readMnaVoltage(this._output.nodeId, voltages);
     this._output.updateCompanion(dt, method, vOut);
   }
 }

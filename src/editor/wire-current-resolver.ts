@@ -1,34 +1,67 @@
 /**
- * WireCurrentResolver — Kirchhoff's Current Law resolver for wire segments.
+ * WireCurrentResolver — derives per-wire current magnitudes from MNA results.
  *
- * Derives per-wire-segment currents from component currents using KCL.
- * Runs once per render frame in the editor layer.
+ * Builds a wire endpoint graph per MNA node, identifies element terminal
+ * positions via pinWorldPosition, and propagates currents through the tree
+ * using BFS + bottom-up subtree-sum computation. Each wire's current equals
+ * the signed subtree injection sum of its child vertex (positive = start→end).
  *
- * Core insight: every wire belongs to exactly one net (node). Each net is
- * a junction connecting one or more component terminals. The current
- * through a wire equals the current flowing through its net cross-section.
- *
- * Algorithm:
- *   1. Build node→wires and element→terminal-nodes maps.
- *   2. For each element, assign its current to the wires on its two
- *      terminal nets. At a simple series node (one element per side),
- *      this is direct. At branching junctions, KCL distributes current.
- *   3. A wire not in wireToNodeId is disconnected: current = 0.
+ * For wire graphs that contain cycles (rare — parallel wires within a node),
+ * returns 0 for those wires since the per-wire split is physically
+ * indeterminate without resistance.
  */
 
 import type { Wire, Circuit } from "@/core/circuit";
 import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import type { AnalogElement } from "@/analog/element";
+import type { CircuitElement } from "@/core/element";
+import { pinWorldPosition } from "@/core/pin";
 
 // ---------------------------------------------------------------------------
 // WireCurrentResult
 // ---------------------------------------------------------------------------
 
 export interface WireCurrentResult {
-  /** Absolute current magnitude in amperes. */
+  /** Current magnitude in amperes (always >= 0). */
   current: number;
-  /** Unit vector indicating conventional current flow direction. */
+  /** Unit vector along the wire (start → end). */
   direction: [number, number];
+  /** +1 if current flows start→end, -1 if end→start, 0 if zero. */
+  flowSign: 1 | -1 | 0;
+}
+
+/** Current path through a component body (between its two pins). */
+export interface ComponentCurrentPath {
+  /** World position of pin 0. */
+  pin0: { x: number; y: number };
+  /** World position of pin 1. */
+  pin1: { x: number; y: number };
+  /** Current magnitude in amperes (>= 0). */
+  current: number;
+  /** +1 if current flows pin0→pin1, -1 if pin1→pin0, 0 if zero. */
+  flowSign: 1 | -1 | 0;
+}
+
+// ---------------------------------------------------------------------------
+// ResolvedAnalogCircuit — the fields the resolver needs from the compiled
+// circuit. ConcreteCompiledAnalogCircuit satisfies this.
+// ---------------------------------------------------------------------------
+
+export interface ResolvedAnalogCircuit {
+  readonly wireToNodeId: Map<Wire, number>;
+  readonly elements: readonly AnalogElement[];
+  readonly elementToCircuitElement: Map<number, CircuitElement>;
+  /** Compiler-resolved wire vertices for each element pin. When present,
+   *  the resolver uses these directly instead of re-computing pin positions. */
+  readonly elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function pointKey(p: { x: number; y: number }): string {
+  return `${p.x},${p.y}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,51 +70,31 @@ export interface WireCurrentResult {
 
 export class WireCurrentResolver {
   private _results: Map<Wire, WireCurrentResult> = new Map();
+  private _componentPaths: ComponentCurrentPath[] = [];
 
   /**
-   * Compute currents for all wire segments.
+   * Compute currents for all wire segments using tree-traced propagation.
    *
-   * For each non-ground terminal node N of each element Ei:
-   *   - There is exactly one element "driving" the wire group at N from the
-   *     Ei side. The wires at N carry |getElementCurrent(Ei)| on that side.
-   *
-   * At junction nodes where multiple elements share a net, each wire group
-   * leading away from the junction is associated with a distinct element.
-   * We assign each wire the current of the element whose terminal IS that
-   * wire's node and whose OTHER terminal is a different node.
-   *
-   * Implementation strategy:
-   *   Pass 1 — build a map: node → list of (elementIdx, otherNode) pairs.
-   *             Each entry represents one "branch" into the node.
-   *   Pass 2 — for each node, if all branches carry the same current
-   *             (series case), assign that current to every wire at the node.
-   *             For junctions, assign each branch's current to the wires
-   *             that connect toward that branch's otherNode side.
-   *
-   * Since wires carry no topology beyond their nodeId, we use a simple
-   * one-element-per-wire assignment: each wire at node N is assigned the
-   * current of one of the elements at N. For the most common topologies:
-   *   - Series: two elements at N, both with the same current → any wire = same I.
-   *   - Parallel branches: one element per branch, wire at branch node = that I.
-   *   - Junction node shared by source + two parallel R's: source wire gets I_total;
-   *     each R-wire gets its own I_R (resolved from its single-element node).
+   * For each MNA node, builds a wire endpoint graph, identifies element
+   * terminal injection points via pinWorldPosition, and propagates currents
+   * through the tree. Each wire's current = signed subtree injection sum of
+   * its child vertex (positive = start→end direction).
    */
-  resolve(engine: AnalogEngine, circuit: Circuit, compiled: CompiledAnalogCircuit): void {
+  resolve(engine: AnalogEngine, circuit: Circuit, compiled: ResolvedAnalogCircuit): void {
     this._results.clear();
+    this._componentPaths = [];
 
-    const wireToNodeId = compiled.wireToNodeId;
-    const elements = compiled.elements;
+    const { wireToNodeId, elements, elementToCircuitElement, elementPinVertices } = compiled;
 
     // ------------------------------------------------------------------
-    // Build node → wires map.
+    // Step 1: Build node → wires map.
     // ------------------------------------------------------------------
     const nodeToWires = new Map<number, Wire[]>();
 
     for (const wire of circuit.wires) {
       const nodeId = wireToNodeId.get(wire);
       if (nodeId === undefined) {
-        // Disconnected — no net assignment.
-        this._results.set(wire, { current: 0, direction: this._unitDir(wire) });
+        this._results.set(wire, { current: 0, direction: this._unitDir(wire), flowSign: 0 });
         continue;
       }
       if (!nodeToWires.has(nodeId)) nodeToWires.set(nodeId, []);
@@ -89,121 +102,71 @@ export class WireCurrentResolver {
     }
 
     // ------------------------------------------------------------------
-    // For each element, get its current and publish it to its terminal nodes.
+    // Step 2: Build point → current injection map from element terminals.
     //
-    // wireBestCurrent[wire]: the current assigned to this wire so far.
-    // We use a "last-write wins" policy for over-constrained wires, which
-    // is correct for well-formed circuits (each wire belongs to one net and
-    // is driven by one element on each side).
+    // For each 2-terminal element, record how much current each pin
+    // injects into the wire graph at the vertex where it connects.
+    // The vertex comes from elementPinVertices — the exact wire endpoint
+    // the compiler matched in resolveElementNodes. Elements without a
+    // compiler-provided vertex are skipped (their current won't appear
+    // in the wire graph).
     //
-    // Special case for junction nodes:
-    //   A junction node is one where more than one element terminal lands.
-    //   At such a node, multiple elements contribute current. The total
-    //   current flowing through the wire group must satisfy KCL.
-    //
-    //   Strategy: we accumulate contributions per node, then pick the
-    //   dominant element for each wire group at the junction.
+    // Convention: positive getElementCurrent(eIdx) means current flows
+    // from nodeIndices[0] through the element to nodeIndices[1].
+    //   At nodeIndices[0]: current LEAVES the node → injection = -I
+    //   At nodeIndices[1]: current ENTERS the node → injection = +I
     // ------------------------------------------------------------------
-
-    // nodeContribs[nodeId] = list of (elementIdx, signed contribution)
-    // "contribution" is the current this element injects INTO the node.
-    const nodeContribs = new Map<number, Array<{ eIdx: number; I: number }>>();
+    const pointInjections = new Map<string, number>();
 
     for (let eIdx = 0; eIdx < elements.length; eIdx++) {
-      const el = elements[eIdx];
+      const ae = elements[eIdx];
+      if (ae.nodeIndices.length !== 2) continue;
+
       const I = engine.getElementCurrent(eIdx);
+      const vertices = elementPinVertices?.get(eIdx);
+      if (!vertices) continue;
 
-      // Iterate original nodeIndices, using original position to determine sign.
-      for (let t = 0; t < el.nodeIndices.length; t++) {
-        const nodeId = el.nodeIndices[t];
-        if (nodeId <= 0) continue; // skip ground
-
-        // Convention: positive I flows from nodeIndices[0] to nodeIndices[1]
-        // THROUGH the element (inside it). At position 0, current flows
-        // FROM the node INTO the element (leaves the node, negative injection).
-        // At position 1+, current flows FROM the element INTO the node
-        // (enters the node, positive injection).
-        const injected = t === 0 ? -I : +I;
-
-        if (!nodeContribs.has(nodeId)) nodeContribs.set(nodeId, []);
-        nodeContribs.get(nodeId)!.push({ eIdx, I: injected });
+      for (let t = 0; t < 2; t++) {
+        const cv = vertices[t];
+        if (!cv) continue;
+        const injection = t === 0 ? -I : +I;
+        pointInjections.set(pointKey(cv), (pointInjections.get(pointKey(cv)) ?? 0) + injection);
       }
     }
 
     // ------------------------------------------------------------------
-    // Assign wire currents from node contributions.
-    //
-    // For each node N:
-    //   - All elements at N collectively inject/extract current.
-    //   - The magnitude of current THROUGH the wire group at N equals the
-    //     magnitude of current flowing in one direction across the node cut.
-    //   - For a series node (two elements, currents cancel in KCL):
-    //       |I| = |contrib from either element| (both are equal in series).
-    //   - For a source node (one element contributes full I):
-    //       |I| = |that element's I|.
-    //   - For a junction between source (I_total) and two branches (I1, I2):
-    //       At the junction node, source contributes I_total.
-    //       Each branch node (node 2 and node 3) has single-element terminals
-    //       (the R) — those are handled by the single-element node case.
-    //
-    // The current flowing "through" the wires at node N on any cross-section
-    // is the maximum of the absolute contributions, which equals the current
-    // of the dominant element (the one not being cancelled at that node).
-    //
-    // More precisely: at a series node, both elements contribute equal and
-    // opposite flows (one in, one out), so |I_wire| = |I_element|.
-    // At a junction, I_source flows in, I_R1 + I_R2 flow out.
-    // The wire on the source side carries I_source; each branch wire carries
-    // its I_Rx. Since wires at the junction node all share the same nodeId,
-    // we can't distinguish them in the nodeToWires map — they're all at the
-    // junction. We instead rely on the single-element nodes (R1's other node,
-    // R2's other node) to assign those branch wires.
-    //
-    // Algorithm:
-    //   1. For nodes with ONE contributing element: assign that element's |I|
-    //      to all wires at the node.
-    //   2. For nodes with TWO elements (series or junction):
-    //      assign the maximum |I| of the two elements to all wires at the
-    //      node (in series both are equal; at a junction the source side has
-    //      the sum, but the branch wires are better resolved from their
-    //      single-element nodes).
-    //   3. For nodes with >2 elements: assign the sum of inflowing currents
-    //      (KCL total) divided by wire count.
+    // Step 3: Assign currents to wires per node via tree propagation.
     // ------------------------------------------------------------------
-
-    const wireCurrentMap = new Map<Wire, number>();
-
-    for (const [nodeId, contribs] of nodeContribs) {
-      const wires = nodeToWires.get(nodeId) ?? [];
-      if (wires.length === 0) continue;
-
-      // Current flowing through this node's cross-section.
-      // For a well-formed circuit, KCL holds: sum(injected) = 0.
-      // The cross-section current = the magnitude of the positive (or
-      // negative) sum of contributions from one "side".
-      //
-      // We use: I_cross = sum of positive injections into the node
-      //                  (= sum of elements delivering current INTO the node).
-      let positiveSum = 0;
-      for (const { I } of contribs) {
-        if (I > 0) positiveSum += I;
-      }
-
-      // Assign positiveSum to all wires at this node.
-      // This is correct for series nodes (one element in, one out, positiveSum = I_series)
-      // and for junction SOURCE nodes (positiveSum = I_source_total).
-      for (const w of wires) {
-        wireCurrentMap.set(w, positiveSum);
+    for (const [_nodeId, wires] of nodeToWires) {
+      const assigned = this._traceTreeCurrents(wires, pointInjections);
+      for (const [wire, signedCurrent] of assigned) {
+        const mag = Math.abs(signedCurrent);
+        this._results.set(wire, {
+          current: mag,
+          direction: this._unitDir(wire),
+          flowSign: signedCurrent > 1e-15 ? 1 : signedCurrent < -1e-15 ? -1 : 0,
+        });
       }
     }
 
     // ------------------------------------------------------------------
-    // Commit results.
+    // Step 4: Build component-body current paths for 2-terminal elements.
     // ------------------------------------------------------------------
-    for (const wire of circuit.wires) {
-      if (this._results.has(wire)) continue; // already set (disconnected)
-      const current = wireCurrentMap.get(wire) ?? 0;
-      this._results.set(wire, { current, direction: this._unitDir(wire) });
+    this._componentPaths = [];
+    for (let eIdx = 0; eIdx < elements.length; eIdx++) {
+      const ae = elements[eIdx];
+      if (ae.nodeIndices.length !== 2) continue;
+      const I = engine.getElementCurrent(eIdx);
+      const ce = elementToCircuitElement.get(eIdx);
+      if (!ce) continue;
+      const pins = ce.getPins();
+      if (pins.length < 2) continue;
+      this._componentPaths.push({
+        pin0: pinWorldPosition(ce, pins[0]),
+        pin1: pinWorldPosition(ce, pins[1]),
+        current: Math.abs(I),
+        flowSign: I > 1e-15 ? 1 : I < -1e-15 ? -1 : 0,
+      });
     }
   }
 
@@ -212,9 +175,167 @@ export class WireCurrentResolver {
     return this._results.get(wire);
   }
 
+  /** Return current paths through component bodies (computed during resolve()). */
+  getComponentPaths(): readonly ComponentCurrentPath[] {
+    return this._componentPaths;
+  }
+
   /** Reset all computed currents. */
   clear(): void {
     this._results.clear();
+    this._componentPaths = [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tree-traced current assignment
+  // ---------------------------------------------------------------------------
+
+  /**
+   * For wires forming a tree within a single node, compute per-wire currents
+   * by propagating element terminal injections through the tree.
+   *
+   * Algorithm:
+   *   1. Build a graph of wire endpoints (vertices) connected by wires (edges).
+   *   2. Verify the graph is a connected tree (V = E + 1).
+   *   3. BFS from an arbitrary root to establish parent-child relationships.
+   *   4. Bottom-up: compute subtree injection sum at each vertex.
+   *   5. Each wire's signed current = childSum × (childIsEnd ? +1 : -1).
+   *      Positive = current flows start→end.
+   *
+   * Returns a map of signed currents for all wires. If the graph has cycles,
+   * wires get current 0.
+   */
+  private _traceTreeCurrents(
+    wires: Wire[],
+    pointInjections: Map<string, number>,
+  ): Map<Wire, number> {
+    const result = new Map<Wire, number>();
+    if (wires.length === 0) return result;
+
+    // Build adjacency: point → wire indices
+    const pointToWireIdx = new Map<string, number[]>();
+    const wireEndpoints: [string, string][] = [];
+
+    for (let i = 0; i < wires.length; i++) {
+      const w = wires[i];
+      const sk = pointKey(w.start);
+      const ek = pointKey(w.end);
+      wireEndpoints.push([sk, ek]);
+
+      // Handle zero-length wires (start === end)
+      if (sk === ek) {
+        if (!pointToWireIdx.has(sk)) pointToWireIdx.set(sk, []);
+        pointToWireIdx.get(sk)!.push(i);
+        continue;
+      }
+
+      if (!pointToWireIdx.has(sk)) pointToWireIdx.set(sk, []);
+      if (!pointToWireIdx.has(ek)) pointToWireIdx.set(ek, []);
+      pointToWireIdx.get(sk)!.push(i);
+      pointToWireIdx.get(ek)!.push(i);
+    }
+
+    const vertices = [...pointToWireIdx.keys()];
+    const V = vertices.length;
+    const E = wires.length;
+
+    // Single zero-length wire: V=1, E≥1. Use injection at that point (signed).
+    if (V === 1 && E >= 1) {
+      const pk = vertices[0];
+      const inj = pointInjections.get(pk) ?? 0;
+      for (const w of wires) result.set(w, inj); // signed, but direction meaningless
+      return result;
+    }
+
+    // A connected tree has V = E + 1. If not, the graph has cycles — set all to 0.
+    if (V !== E + 1) {
+      for (const w of wires) result.set(w, 0);
+      return result;
+    }
+
+    // BFS from root to establish parent-child relationships.
+    const visited = new Set<string>();
+    const parentVertex = new Map<string, string | null>();
+    const parentWireIdx = new Map<string, number>();
+    const bfsOrder: string[] = [];
+    const queue: string[] = [];
+
+    const root = vertices[0];
+    visited.add(root);
+    parentVertex.set(root, null);
+    queue.push(root);
+
+    while (queue.length > 0) {
+      const v = queue.shift()!;
+      bfsOrder.push(v);
+
+      const adjWires = pointToWireIdx.get(v) ?? [];
+      for (const wi of adjWires) {
+        const [s, e] = wireEndpoints[wi];
+        const neighbor = s === v ? e : s;
+        if (neighbor === v) continue; // self-loop (zero-length wire)
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          parentVertex.set(neighbor, v);
+          parentWireIdx.set(neighbor, wi);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    // Check connectivity
+    if (visited.size !== V) {
+      for (const w of wires) result.set(w, 0);
+      return result;
+    }
+
+    // Compute subtree injection sums (bottom-up).
+    const subtreeSum = new Map<string, number>();
+    for (const v of vertices) {
+      subtreeSum.set(v, pointInjections.get(v) ?? 0);
+    }
+
+    // Process in reverse BFS order (children before parents).
+    for (let i = bfsOrder.length - 1; i >= 0; i--) {
+      const v = bfsOrder[i];
+      const p = parentVertex.get(v);
+      if (p !== null && p !== undefined) {
+        subtreeSum.set(p, subtreeSum.get(p)! + subtreeSum.get(v)!);
+      }
+    }
+
+    // Each wire's signed current (positive = flows start→end):
+    //
+    // By KCL, every node in a closed circuit has zero net injection
+    // (total ≈ 0). The current through each wire equals the subtree
+    // injection sum of its child vertex: I_wire = -childSum.
+    //
+    // If total is NOT near zero, injections are missing (pin-wire
+    // misalignment bug) — the snap-to-vertex logic in Step 2 should
+    // prevent this. We don't paper over it with heuristics.
+    //
+    // If child vertex is at wire.end: parent→child = start→end → positive.
+    // If child vertex is at wire.start: parent→child = end→start → negative.
+    for (const v of vertices) {
+      const p = parentVertex.get(v);
+      if (p === null || p === undefined) continue; // root has no parent wire
+      const wi = parentWireIdx.get(v)!;
+      const childSum = subtreeSum.get(v)!;
+
+      // Current flowing parent→child = -childSum (from child subtree KCL).
+      const signedParentToChild = -childSum;
+
+      // Determine if child vertex v is at wire.end or wire.start
+      const [, ek] = wireEndpoints[wi];
+      const childIsEnd = ek === v;
+
+      // positive signedParentToChild means current flows parent→child.
+      // If child is wire.end: parent→child = start→end → positive flow sign.
+      // If child is wire.start: parent→child = end→start → negative flow sign.
+      result.set(wires[wi], (childIsEnd ? 1 : -1) * signedParentToChild);
+    }
+
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -229,4 +350,5 @@ export class WireCurrentResolver {
     if (len < 1e-12) return [1, 0];
     return [dx / len, dy / len];
   }
+
 }

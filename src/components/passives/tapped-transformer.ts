@@ -30,8 +30,8 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -113,56 +113,93 @@ export class TappedTransformerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Geometry: primary at x=0 y:[-1,1], secondary at x=4 y:[-1.5,1.5]
+    // Arcs extend ±6*PX from winding x positions
     return {
       x: this.position.x,
-      y: this.position.y - 2,
+      y: this.position.y - 1.5,
       width: 4,
-      height: 4,
+      height: 3,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
-    const n = this._properties.getOrDefault<number>("turnsRatio", 2.0);
-
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Primary coil arcs (left side)
-    const arcR = 0.3;
-    for (let i = 0; i < 3; i++) {
-      ctx.drawArc(0.4 + i * 0.6, -0.5, arcR, Math.PI, 2 * Math.PI);
+    // Falstad TappedTransformerElm:
+    // P1(0,-1), P2(0,1), S1(4,-1.5), CT(4,0), S2(4,1.5)
+    const PX = 1 / 16;
+
+    // Primary: ce and cd along P1→P2 (dn=2)
+    const priDn = 2;
+    const priCe = 0.5 - 12 * PX / priDn;
+    const priCd = 0.5 - 2 * PX / priDn;
+
+    const priCoil1Y = -1 + priCe * 2;
+    const priCoil2Y = -1 + (1 - priCe) * 2;
+    const priCore1Y = -1 + priCd * 2;
+    const priCore2Y = -1 + (1 - priCd) * 2;
+
+    // Secondary upper half: S1(4,-1.5) → CT(4,0), dn=1.5
+    const upDn = 1.5;
+    const upCe = 0.5 - 12 * PX / upDn;
+    const upCd = 0.5 - 2 * PX / upDn;
+    const upCoil1Y = -1.5 + upCe * 1.5;
+    const upCoil2Y = -1.5 + (1 - upCe) * 1.5;
+    const upCore1Y = -1.5 + upCd * 1.5;
+
+    // Secondary lower half: CT(4,0) → S2(4,1.5), dn=1.5
+    const lowCe = upCe;
+    const lowCd = upCd;
+    const lowCoil1Y = 0 + lowCe * 1.5;
+    const lowCoil2Y = 0 + (1 - lowCe) * 1.5;
+    const lowCore2Y = 0 + (1 - lowCd) * 1.5;
+
+    // Lead lines
+    ctx.drawLine(0, -1, 0, priCoil1Y);
+    ctx.drawLine(0, 1, 0, priCoil2Y);
+    ctx.drawLine(4, -1.5, 4, upCoil1Y);
+    ctx.drawLine(4, 0, 4, upCoil2Y);   // CT to upper coil end
+    ctx.drawLine(4, 0, 4, lowCoil1Y);  // CT to lower coil start
+    ctx.drawLine(4, 1.5, 4, lowCoil2Y);
+
+    // Primary coil arcs (facing +x toward center)
+    const priLen = priCoil2Y - priCoil1Y;
+    const priLoopCt = Math.ceil((priLen / PX) / 11);
+    const priHs = 6 * PX;
+    for (let loop = 0; loop < priLoopCt; loop++) {
+      const t = (loop + 0.5) / priLoopCt;
+      const cy = priCoil1Y + priLen * t;
+      const r = priLen / (2 * priLoopCt);
+      ctx.drawArc(0 + priHs, cy, r, Math.PI / 2, 3 * Math.PI / 2);
     }
 
-    // Secondary upper half coil arcs
-    for (let i = 0; i < 2; i++) {
-      ctx.drawArc(2.4 + i * 0.6, -1.0, arcR, 0, Math.PI);
+    // Secondary upper half arcs (facing -x toward center)
+    const upLen = upCoil2Y - upCoil1Y;
+    const upLoopCt = Math.ceil((upLen / PX) / 11);
+    const secHs = 6 * PX;
+    for (let loop = 0; loop < upLoopCt; loop++) {
+      const t = (loop + 0.5) / upLoopCt;
+      const cy = upCoil1Y + upLen * t;
+      const r = upLen / (2 * upLoopCt);
+      ctx.drawArc(4 - secHs, cy, r, -Math.PI / 2, Math.PI / 2);
     }
 
-    // Secondary lower half coil arcs
-    for (let i = 0; i < 2; i++) {
-      ctx.drawArc(2.4 + i * 0.6, 0.5, arcR, 0, Math.PI);
+    // Secondary lower half arcs
+    const lowLen = lowCoil2Y - lowCoil1Y;
+    const lowLoopCt = Math.ceil((lowLen / PX) / 11);
+    for (let loop = 0; loop < lowLoopCt; loop++) {
+      const t = (loop + 0.5) / lowLoopCt;
+      const cy = lowCoil1Y + lowLen * t;
+      const r = lowLen / (2 * lowLoopCt);
+      ctx.drawArc(4 - secHs, cy, r, -Math.PI / 2, Math.PI / 2);
     }
 
     // Core lines
-    ctx.drawLine(1.9, -1.5, 1.9, 1.5);
-    ctx.drawLine(2.1, -1.5, 2.1, 1.5);
-
-    // Center tap line
-    ctx.drawLine(3.0, 0, 4, 0);
-
-    // Lead lines
-    ctx.drawLine(0, -1, 0.4, -1);
-    ctx.drawLine(0, 1, 0.4, 1);
-    ctx.drawLine(3.2, -1.5, 4, -1.5);
-    ctx.drawLine(3.2, 1.5, 4, 1.5);
-
-    // Label
-    const displayLabel = label.length > 0 ? label : `${n}:1CT`;
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(displayLabel, 2, 1.8, { horizontal: "center", vertical: "top" });
+    ctx.drawLine(0 + 2 * PX, priCore1Y, 0 + 2 * PX, priCore2Y);
+    ctx.drawLine(4 - 2 * PX, upCore1Y, 4 - 2 * PX, lowCore2Y);
 
     ctx.restore();
   }

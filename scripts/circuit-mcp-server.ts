@@ -15,15 +15,11 @@ import { readFile, writeFile, readdir, mkdir } from "fs/promises";
 import { dirname, resolve as resolvePath } from "path";
 import { createDefaultRegistry } from "../src/components/register-all.js";
 import { DefaultSimulatorFacade } from "../src/headless/default-facade.js";
-import { SimulationRunner } from "../src/headless/runner.js";
-import { detectInputCount } from "../src/testing/detect-input-count.js";
 import type { Circuit } from "../src/core/circuit.js";
 import type { Diagnostic, ComponentDescriptor, NetDescriptor, PinDescriptor, Netlist } from "../src/headless/netlist-types.js";
 import type { ComponentDefinition } from "../src/core/registry.js";
 import { PropertyBag } from "../src/core/properties.js";
 import type { CircuitSpec, PatchOp } from "../src/headless/netlist-types.js";
-import { executeTests } from "../src/testing/executor.js";
-import { parseTestData } from "../src/testing/parser.js";
 import { extractEmbeddedTestData } from "../src/headless/test-runner.js";
 import { serializeCircuitToDig } from "../src/io/dig-serializer.js";
 import { loadWithSubcircuits } from "../src/io/subcircuit-loader.js";
@@ -54,14 +50,13 @@ function getCircuit(handle: string): Circuit {
 }
 
 // ---------------------------------------------------------------------------
-// Registry + facade + runner (initialized once)
+// Registry + facade (initialized once)
 // ---------------------------------------------------------------------------
 
 const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
 const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
 const registry = createDefaultRegistry(pinMap74xx);
 const facade = new DefaultSimulatorFacade(registry);
-const runner = new SimulationRunner(registry);
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -780,10 +775,8 @@ server.registerTool(
       if (resolvedData === null || resolvedData.trim().length === 0) {
         throw new Error("No test data available: circuit contains no Testcase components and no external test data was provided.");
       }
-      const inputCount = detectInputCount(circuit, registry, resolvedData);
-      const parsed = parseTestData(resolvedData, inputCount);
-      const testEngine = runner.compile(circuit);
-      const results = executeTests(runner, testEngine, circuit, parsed);
+      const engine = facade.compile(circuit);
+      const results = facade.runTests(engine, circuit, resolvedData);
 
       const lines: string[] = [
         `Test Results:`,
@@ -1112,10 +1105,8 @@ server.registerTool(
           // Verify test vectors against goal circuit
           if (step.testData) {
             try {
-              const goalInputCount = detectInputCount(goalCircuit, registry, step.testData);
-              const parsed = parseTestData(step.testData, goalInputCount);
-              const testEngine = runner.compile(goalCircuit);
-              const results = executeTests(runner, testEngine, goalCircuit, parsed);
+              const testEngine = facade.compile(goalCircuit);
+              const results = facade.runTests(testEngine, goalCircuit, step.testData);
               if (results.failed > 0) {
                 lines.push(`  WARNING: ${results.failed}/${results.total} test vectors fail against goal circuit!`);
                 for (const v of results.vectors) {
@@ -1245,6 +1236,9 @@ server.registerTool(
       const circuitA = getCircuit(handleA);
       const circuitB = getCircuit(handleB);
 
+      // Two independent facade instances are required here because both engines
+      // must remain alive simultaneously — each combo iteration steps both and
+      // compares outputs before moving to the next combination.
       const facadeA = new DefaultSimulatorFacade(registry);
       const facadeB = new DefaultSimulatorFacade(registry);
       const engineA = facadeA.compile(circuitA);

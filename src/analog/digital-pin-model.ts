@@ -23,6 +23,15 @@ import {
   capacitorHistoryCurrent,
 } from "./integration.js";
 
+/**
+ * Read voltage for an MNA node from the solver solution vector.
+ * MNA node 0 is ground (always 0 V); non-ground nodes are stored
+ * at solver index nodeId - 1.
+ */
+export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
+  return nodeId > 0 && nodeId - 1 < voltages.length ? voltages[nodeId - 1] : 0;
+}
+
 // ---------------------------------------------------------------------------
 // DigitalOutputPinModel
 // ---------------------------------------------------------------------------
@@ -94,12 +103,14 @@ export class DigitalOutputPinModel {
    */
   stamp(solver: SparseSolver): void {
     const node = this._nodeId;
+    if (node <= 0) return;
+    const idx = node - 1;
     if (this._hiZ) {
-      solver.stamp(node, node, 1 / this._spec.rHiZ);
+      solver.stamp(idx, idx, 1 / this._spec.rHiZ);
     } else {
       const gOut = 1 / this._spec.rOut;
-      solver.stamp(node, node, gOut);
-      solver.stampRHS(node, this._targetVoltage * gOut);
+      solver.stamp(idx, idx, gOut);
+      solver.stampRHS(idx, this._targetVoltage * gOut);
     }
   }
 
@@ -115,6 +126,8 @@ export class DigitalOutputPinModel {
     method: IntegrationMethod,
   ): void {
     const node = this._nodeId;
+    if (node <= 0) return;
+    const idx = node - 1;
     const C = this._spec.cOut;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
@@ -125,8 +138,8 @@ export class DigitalOutputPinModel {
       0,
       this._prevCurrent,
     );
-    solver.stamp(node, node, geq);
-    solver.stampRHS(node, -ieq);
+    solver.stamp(idx, idx, geq);
+    solver.stampRHS(idx, -ieq);
   }
 
   /**
@@ -215,7 +228,8 @@ export class DigitalInputPinModel {
    */
   stamp(solver: SparseSolver): void {
     const node = this._nodeId;
-    solver.stamp(node, node, 1 / this._spec.rIn);
+    if (node <= 0) return;
+    solver.stamp(node - 1, node - 1, 1 / this._spec.rIn);
   }
 
   /**
@@ -229,6 +243,8 @@ export class DigitalInputPinModel {
     method: IntegrationMethod,
   ): void {
     const node = this._nodeId;
+    if (node <= 0) return;
+    const idx = node - 1;
     const C = this._spec.cIn;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
@@ -239,8 +255,8 @@ export class DigitalInputPinModel {
       0,
       this._prevCurrent,
     );
-    solver.stamp(node, node, geq);
-    solver.stampRHS(node, -ieq);
+    solver.stamp(idx, idx, geq);
+    solver.stampRHS(idx, -ieq);
   }
 
   /**

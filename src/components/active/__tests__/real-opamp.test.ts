@@ -524,9 +524,8 @@ describe("CurrentLimit", () => {
 
     const vOut = result.nodeVoltages[nOut - 1];
     // With high open-loop gain and feedback, the output drives through R_out.
-    // Current limiting is not implemented as an explicit nonlinear clamp in this model;
-    // R_out (75Ω) provides passive output impedance. With 10Ω load and V_in=10V,
-    // the feedback loop drives V_out close to V_in. Verify output is within rails.
+    // The RealOpAmp model clamps output current to ±I_max in its stampNonlinear
+    // method when saturated. With 10Ω load and V_in=10V, verify output is within rails.
     const vRailPos = 15 - 1.5; // V_supply - V_sat
     expect(Math.abs(vOut)).toBeLessThanOrEqual(vRailPos + 0.1);
   });

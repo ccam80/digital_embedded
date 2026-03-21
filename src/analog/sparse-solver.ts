@@ -312,6 +312,7 @@ export class SparseSolver {
     for (let j = 0; j < n; j++) {
       for (let p = this._cscColPtr[j]; p < this._cscColPtr[j + 1]; p++) {
         const i = this._cscRowIdx[p];
+        if (i < 0 || i >= n) continue; // skip out-of-range indices (defensive)
         if (i !== j) { adj[j].add(i); adj[i].add(j); }
       }
     }

@@ -22,6 +22,7 @@ import type { MNAEngine } from "./analog-engine.js";
 import type { BridgeInstance } from "./bridge-instance.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
+import { readMnaVoltage } from "./digital-pin-model.js";
 
 // ---------------------------------------------------------------------------
 // Per-bridge internal state
@@ -112,7 +113,7 @@ export class MixedSignalCoordinator {
         const adapter = bridge.inputAdapters[i]!;
         const netId = bridge.inputPinNetIds[i]!;
         const nodeId = adapter.inputNodeId;
-        const voltage = nodeId < voltages.length ? voltages[nodeId] : 0;
+        const voltage = readMnaVoltage(nodeId, voltages);
         const level = adapter.readLogicLevel(voltage);
 
         // Track consecutive indeterminate timesteps and emit diagnostic after N=10
@@ -199,7 +200,7 @@ export class MixedSignalCoordinator {
         const adapter = bridge.inputAdapters[i]!;
         const nodeId = adapter.inputNodeId;
         const prevVoltage = state.prevInputVoltages[i] ?? 0;
-        const currVoltage = nodeId < voltages.length ? voltages[nodeId] : 0;
+        const currVoltage = readMnaVoltage(nodeId, voltages);
 
         const prevLevel = adapter.readLogicLevel(prevVoltage);
         const currLevel = adapter.readLogicLevel(currVoltage);
@@ -239,7 +240,7 @@ export class MixedSignalCoordinator {
           const adapter = bridge.inputAdapters[i]!;
           const netId = bridge.inputPinNetIds[i]!;
           const nodeId = adapter.inputNodeId;
-          const voltage = nodeId < voltages.length ? voltages[nodeId] : 0;
+          const voltage = readMnaVoltage(nodeId, voltages);
           const level = adapter.readLogicLevel(voltage);
           const bit = level !== undefined ? level : state.prevInputBits[i] ?? false;
           state.prevInputBits[i] = bit;

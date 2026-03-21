@@ -45,6 +45,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -246,35 +247,58 @@ export class CCCSElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 2,
+      y: this.position.y - 1,
       width: 4,
-      height: 4,
+      height: 2,
     };
   }
 
-  draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vSenseP = signals?.getPinVoltage("sense+");
+    const vSenseN = signals?.getPinVoltage("sense-");
+    const vOutP   = signals?.getPinVoltage("out+");
+    const vOutN   = signals?.getPinVoltage("out-");
 
     ctx.save();
-    ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Circle body
-    ctx.drawCircle(2, 0, 1.5);
+    // Body — rect and port lines stay COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(1, -1, 1, 1);
+    ctx.drawRect(1, -1, 2, 2, false);
+    ctx.drawLine(3, -1, 3, 1);
 
-    // Arrow indicating current source
-    ctx.drawLine(2, -1, 2, 1);
-    ctx.drawLine(2, -0.5, 1.5, 0);
-    ctx.drawLine(2, -0.5, 2.5, 0);
-
-    // Sense port label
-    ctx.setFont({ family: "sans-serif", size: 0.5 });
-    ctx.drawText("I-ctrl", 0.5, 0, { horizontal: "center", vertical: "center" });
-
-    if (label.length > 0) {
-      ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -2.3, { horizontal: "center", vertical: "bottom" });
+    // sense+ lead
+    if (vSenseP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vSenseP));
+    } else {
+      ctx.setColor("COMPONENT");
     }
+    ctx.drawLine(0, -1, 1, -1);
+
+    // sense- lead
+    if (vSenseN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vSenseN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, 1, 1);
+
+    // out+ lead
+    if (vOutP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutP));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, -1, 4, -1);
+
+    // out- lead
+    if (vOutN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, 1, 4, 1);
 
     ctx.restore();
   }

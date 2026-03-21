@@ -350,7 +350,7 @@
       white-space: nowrap;
     }
     .menubar-speed input {
-      width: 50px;
+      width: 60px;
       padding: 1px 3px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
@@ -432,6 +432,28 @@
     #viewer-resize-handle.viewer-open {
       display: block;
     }
+    /* ---- Analog slider panel ---- */
+    #slider-panel {
+      flex-shrink: 0;
+      background: var(--panel-bg);
+      border-top: 1px solid var(--panel-border);
+      padding: 4px 0;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    #slider-panel:empty { display: none !important; }
+    #slider-panel .slider-row {
+      font-size: 12px;
+      color: var(--fg);
+    }
+    #slider-panel .slider-label {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+    #slider-panel .slider-value {
+      font-family: monospace;
+      font-size: 11px;
+    }
     /* ---- Bottom viewer panel ---- */
     #viewer-panel {
       display: none;
@@ -488,12 +510,17 @@
       overflow: auto;
       position: relative;
     }
-    #viewer-timing {
+    #viewer-timing-container {
       display: none;
       width: 100%;
       height: 100%;
     }
-    #viewer-timing.active { display: block; }
+    #viewer-timing-container.active { display: flex; }
+    #viewer-timing-container canvas {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+    }
     #viewer-values {
       display: none;
       width: 100%;
@@ -584,6 +611,61 @@
       background: var(--accent);
       color: #fff;
     }
+    /* ---- Unified context menu ---- */
+    .ctx-menu {
+      position: fixed;
+      list-style: none;
+      margin: 0;
+      padding: 4px 0;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 500;
+      min-width: 180px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .ctx-menu-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 12px;
+      cursor: pointer;
+      gap: 16px;
+    }
+    .ctx-menu-item:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+    .ctx-menu-item--disabled {
+      opacity: 0.4;
+      cursor: default;
+      pointer-events: none;
+    }
+    .ctx-menu-label {
+      white-space: nowrap;
+    }
+    .ctx-menu-shortcut {
+      font-size: 11px;
+      opacity: 0.5;
+      margin-left: auto;
+      font-family: monospace;
+    }
+    .ctx-menu-separator {
+      border-top: 1px solid var(--panel-border);
+      margin: 4px 0;
+      list-style: none;
+    }
+    .ctx-menu-header {
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.6;
+      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 2px;
+      font-family: monospace;
+    }
     /* ---- Prop popup ---- */
     .prop-popup {
       position: absolute;
@@ -594,6 +676,8 @@
       padding: 8px;
       min-width: 180px;
       max-width: 280px;
+      max-height: calc(100% - 16px);
+      overflow-y: auto;
       z-index: 100;
     }
     .prop-popup-header {
@@ -603,6 +687,8 @@
       padding: 2px 0 6px 0;
       border-bottom: 1px solid var(--panel-border);
       margin-bottom: 4px;
+      cursor: move;
+      user-select: none;
     }
     .prop-popup-title {
       font-weight: 600;
@@ -1603,6 +1689,7 @@
     .presentation-mode #property-panel,
     .presentation-mode #status-bar,
     .presentation-mode #palette-resize-handle,
+    .presentation-mode #slider-panel,
     .presentation-mode #viewer-panel,
     .presentation-mode #viewer-resize-handle {
       display: none !important;
@@ -1832,7 +1919,7 @@
           <div class="menu-action" id="btn-run-to-break">Run to Break</div>
           <div class="menu-action" id="btn-stop">Stop</div>
           <div class="menu-separator"></div>
-          <div class="menu-action" id="btn-menu-timing">Timing Diagram</div>
+          <div class="menu-action" id="btn-menu-timing">View Traces</div>
           <div class="menu-action" id="btn-menu-values">Values Table</div>
         </div>
       </div>
@@ -1843,6 +1930,8 @@
           <div class="menu-separator"></div>
           <div class="menu-action" id="btn-critical-path">Critical Path...</div>
           <div class="menu-action" id="btn-state-transition">State Transition Table...</div>
+          <div class="menu-separator"></div>
+          <div class="menu-action" id="btn-ac-sweep">AC Sweep...</div>
         </div>
       </div>
       <div class="menu-item" data-menu="tutorials">Tutorials
@@ -1893,6 +1982,31 @@
             <input id="setting-oscillation-limit" type="number" min="100" max="100000" step="100" value="1000" title="Number of feedback iterations before oscillation is detected." style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
             <div style="font-size:11px;opacity:0.5;margin-top:2px;">Feedback iterations before oscillation is detected. Range: 100–100000.</div>
           </div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;margin:16px 0 10px;">Logic Family</div>
+          <div class="prop-row">
+            <label class="prop-label" for="setting-logic-family">Logic Family Preset</label>
+            <select id="setting-logic-family" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;">
+              <option value="cmos-3v3">CMOS 3.3V</option>
+              <option value="cmos-5v">CMOS 5V</option>
+              <option value="ttl">TTL</option>
+            </select>
+            <div style="font-size:11px;opacity:0.5;margin-top:2px;">Voltage levels, thresholds, and impedances for digital components in analog simulation.</div>
+          </div>
+          <div id="logic-family-details" style="margin-top:6px;font-size:11px;opacity:0.7;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;"></div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;margin:16px 0 10px;">Current Visualization</div>
+          <div class="prop-row">
+            <label class="prop-label" for="setting-current-speed">Speed Scale</label>
+            <input id="setting-current-speed" type="number" min="0.1" max="100000" step="10" value="200" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            <div style="font-size:11px;opacity:0.5;margin-top:2px;">Dot speed multiplier. Higher values = faster dots. Typical: 50–5000.</div>
+          </div>
+          <div class="prop-row" style="margin-top:8px;">
+            <label class="prop-label" for="setting-current-scale">Scale Mode</label>
+            <select id="setting-current-scale" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;">
+              <option value="linear">Linear</option>
+              <option value="logarithmic">Logarithmic</option>
+            </select>
+            <div style="font-size:11px;opacity:0.5;margin-top:2px;">Linear: speed proportional to current. Logarithmic: small currents remain visible alongside large ones.</div>
+          </div>
         </div>
         <div class="test-dialog-footer">
           <button id="btn-settings-cancel">Cancel</button>
@@ -1922,15 +2036,16 @@
         <div id="property-content"></div>
       </div>
     </div>
+    <div id="slider-panel" style="display: none;"></div>
     <div id="viewer-resize-handle" class="resize-handle resize-handle--horizontal" title="Drag to resize viewer"></div>
     <div id="viewer-panel">
       <div class="viewer-tabs">
-        <button class="viewer-tab active" data-viewer="timing">Timing</button>
+        <button class="viewer-tab active" data-viewer="timing">Traces</button>
         <button class="viewer-tab" data-viewer="values">Values</button>
         <button class="viewer-tab-close" id="btn-viewer-close" title="Close">&times;</button>
       </div>
       <div class="viewer-content">
-        <canvas id="viewer-timing" class="active"></canvas>
+        <div id="viewer-timing-container" class="active" style="display:flex;flex:1;gap:2px;overflow:hidden;"></div>
         <div id="viewer-values"></div>
       </div>
     </div>
@@ -1951,6 +2066,41 @@
     </div>
     <span id="status-coords"></span>
     </div>
+  </div>
+  <!-- AC Sweep dialog -->
+  <div id="ac-sweep-dialog" class="scheme-dialog-overlay" style="display:none">
+    <div class="scheme-dialog" style="width:380px">
+      <div class="scheme-dialog-header">
+        <span>AC Sweep Analysis</span>
+        <button class="scheme-dialog-close" id="ac-sweep-close">&times;</button>
+      </div>
+      <div class="scheme-dialog-body" style="display:flex;flex-direction:column;gap:8px;padding:12px">
+        <label style="display:flex;flex-direction:column;gap:2px">Sweep Type
+          <select id="ac-sweep-type" style="padding:4px">
+            <option value="dec" selected>Decade</option>
+            <option value="oct">Octave</option>
+            <option value="lin">Linear</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:2px">Points per unit <input id="ac-sweep-points" type="number" value="50" min="2" max="10000" style="padding:4px" /></label>
+        <label style="display:flex;flex-direction:column;gap:2px">Start Frequency (Hz) <input id="ac-sweep-fstart" type="number" value="1" min="0.001" step="any" style="padding:4px" /></label>
+        <label style="display:flex;flex-direction:column;gap:2px">Stop Frequency (Hz) <input id="ac-sweep-fstop" type="number" value="1000000" min="0.001" step="any" style="padding:4px" /></label>
+        <label style="display:flex;flex-direction:column;gap:2px">AC Source Label <input id="ac-sweep-source" type="text" placeholder="e.g. Vs" style="padding:4px" /></label>
+        <label style="display:flex;flex-direction:column;gap:2px">Output Nodes (comma-separated) <input id="ac-sweep-outputs" type="text" placeholder="e.g. Vout" style="padding:4px" /></label>
+      </div>
+      <div class="scheme-dialog-footer">
+        <button id="ac-sweep-run" class="primary">Run</button>
+      </div>
+    </div>
+  </div>
+  <!-- Bode plot panel -->
+  <div id="bode-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:300px;background:#1a1a2e;z-index:50;border-top:1px solid #444">
+    <div style="display:flex;align-items:center;padding:4px 8px;background:#222;gap:8px">
+      <span style="color:#ccc;font-size:13px;font-weight:600">Bode Plot</span>
+      <span style="flex:1"></span>
+      <button id="bode-close" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer">&times;</button>
+    </div>
+    <canvas id="bode-canvas" style="width:100%;height:calc(100% - 28px)"></canvas>
   </div>
   <input id="file-input" type="file" accept=".dig,.dts,.json,.digj,.ctz" style="display:none" />
   <input id="folder-input" type="file" webkitdirectory style="display:none" />

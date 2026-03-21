@@ -82,6 +82,12 @@ export function makeResistor(
       G(solver, nodeB, nodeA, -G_val);
       G(solver, nodeB, nodeB, G_val);
     },
+
+    getCurrent(voltages: Float64Array): number {
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      return G_val * (vA - vB);
+    },
   };
 }
 
@@ -182,6 +188,10 @@ export function makeCurrentSource(
     stamp(solver: SparseSolver): void {
       RHS(solver, nodePos, current * scale);
       RHS(solver, nodeNeg, -(current * scale));
+    },
+
+    getCurrent(): number {
+      return current * scale;
     },
   };
 }
@@ -462,6 +472,70 @@ export function makeInductor(
       ieq = inductorHistoryCurrent(inductance, dt, method, iNow, 0, vNow);
 
       companionActive = true;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// makeAcVoltageSource
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a time-varying sinusoidal voltage source test element.
+ *
+ * Identical to `makeVoltageSource` except the RHS voltage is
+ *   V(t) = dcOffset + amplitude · sin(2π · frequency · t + phase)
+ *
+ * The caller supplies a `getTime` callback that returns the current
+ * simulation time in seconds. For MNAEngine integration, pass
+ * `() => timeRef.value` where `timeRef` is shared with the compiled circuit.
+ *
+ * @param nodePos   - Positive terminal node ID (0 = ground)
+ * @param nodeNeg   - Negative terminal node ID (0 = ground)
+ * @param branchIdx - 0-based absolute branch row index in the MNA matrix
+ * @param amplitude - Peak amplitude in volts
+ * @param frequency - Frequency in Hz
+ * @param phase     - Phase offset in radians (default 0)
+ * @param dcOffset  - DC offset in volts (default 0)
+ * @param getTime   - Callback returning current simulation time in seconds
+ * @returns An AnalogElement that stamps AC voltage source contributions
+ */
+export function makeAcVoltageSource(
+  nodePos: number,
+  nodeNeg: number,
+  branchIdx: number,
+  amplitude: number,
+  frequency: number,
+  phase: number,
+  dcOffset: number,
+  getTime: () => number,
+): AnalogElement {
+  let scale = 1;
+  return {
+    nodeIndices: [nodePos, nodeNeg],
+    branchIndex: branchIdx,
+    isNonlinear: false,
+    isReactive: false,
+    setSourceScale(factor: number): void {
+      scale = factor;
+    },
+    stamp(solver: SparseSolver): void {
+      const k = branchIdx;
+      const t = getTime();
+      const v =
+        (dcOffset + amplitude * Math.sin(2 * Math.PI * frequency * t + phase)) *
+        scale;
+
+      // B sub-matrix (node rows, branch column k)
+      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
+      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
+
+      // C sub-matrix (branch row k, node columns)
+      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
+      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+
+      // RHS voltage constraint
+      solver.stampRHS(k, v);
     },
   };
 }

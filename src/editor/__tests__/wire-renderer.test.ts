@@ -179,8 +179,8 @@ describe("AnalogVoltageColoring", () => {
     renderer.setColorScheme(darkColorScheme);
   });
 
-  it("positive_voltage_red", () => {
-    // 5V in range [-5, 5] → normalized=1.0 → should be WIRE_VOLTAGE_POS (reddish)
+  it("positive_voltage_green", () => {
+    // 5V in range [-5, 5] → normalized=1.0 → should be WIRE_VOLTAGE_POS (greenish)
     const wire = makeWire(0, 0, 10, 0);
     const access = makeAnalogAccess(wire, 5);
 
@@ -189,14 +189,14 @@ describe("AnalogVoltageColoring", () => {
     const rawCalls = ctx.callsOfKind("setRawColor");
     expect(rawCalls.length).toBeGreaterThanOrEqual(1);
     const [r, g, b] = parseRgb(rawCalls[0].css);
-    // Red channel must dominate over green for positive (reddish) color
-    expect(r).toBeGreaterThan(g);
+    // Green channel must dominate over red for positive (greenish) color
+    expect(g).toBeGreaterThan(r);
     // Suppress unused variable warning
     void b;
   });
 
-  it("negative_voltage_green", () => {
-    // -5V in range [-5, 5] → normalized=0.0 → should be WIRE_VOLTAGE_NEG (greenish)
+  it("negative_voltage_red", () => {
+    // -5V in range [-5, 5] → normalized=0.0 → should be WIRE_VOLTAGE_NEG (reddish)
     const wire = makeWire(0, 0, 10, 0);
     const access = makeAnalogAccess(wire, -5);
 
@@ -205,8 +205,8 @@ describe("AnalogVoltageColoring", () => {
     const rawCalls = ctx.callsOfKind("setRawColor");
     expect(rawCalls.length).toBeGreaterThanOrEqual(1);
     const [r, g] = parseRgb(rawCalls[0].css);
-    // Green channel must dominate over red for negative (greenish) color
-    expect(g).toBeGreaterThan(r);
+    // Red channel must dominate over green for negative (reddish) color
+    expect(r).toBeGreaterThan(g);
   });
 
   it("ground_voltage_gray", () => {

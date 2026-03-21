@@ -19,6 +19,7 @@ import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
+  readMnaVoltage,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -118,7 +119,7 @@ export class BehavioralMuxElement implements AnalogElement {
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = nodeId < v.length ? v[nodeId] : 0;
+      const voltage = readMnaVoltage(nodeId, v);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -132,7 +133,7 @@ export class BehavioralMuxElement implements AnalogElement {
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const inputPin = selectedGroup[bit];
       const inputNodeId = inputPin.nodeId;
-      const inputVoltage = inputNodeId < v.length ? v[inputNodeId] : 0;
+      const inputVoltage = readMnaVoltage(inputNodeId, v);
       const level = inputPin.readLogicLevel(inputVoltage);
       const outLevel = level ?? false;
       this._outPins[bit].setLogicLevel(outLevel);
@@ -159,18 +160,15 @@ export class BehavioralMuxElement implements AnalogElement {
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     for (const p of this._selPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
     for (const group of this._dataPins) {
       for (const p of group) {
-        const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-        p.updateCompanion(dt, method, v);
+        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
       }
     }
     for (const p of this._outPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 }
@@ -243,7 +241,7 @@ export class BehavioralDemuxElement implements AnalogElement {
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = nodeId < v.length ? v[nodeId] : 0;
+      const voltage = readMnaVoltage(nodeId, v);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -254,7 +252,7 @@ export class BehavioralDemuxElement implements AnalogElement {
 
     // Read input level
     const inNodeId = this._inPin.nodeId;
-    const inVoltage = inNodeId < v.length ? v[inNodeId] : 0;
+    const inVoltage = readMnaVoltage(inNodeId, v);
     const inLevel = this._inPin.readLogicLevel(inVoltage) ?? false;
 
     // Route: selected output gets input level, all others get LOW
@@ -281,14 +279,11 @@ export class BehavioralDemuxElement implements AnalogElement {
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     for (const p of this._selPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
-    const inV = this._inPin.nodeId < voltages.length ? voltages[this._inPin.nodeId] : 0;
-    this._inPin.updateCompanion(dt, method, inV);
+    this._inPin.updateCompanion(dt, method, readMnaVoltage(this._inPin.nodeId, voltages));
     for (const p of this._outPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 }
@@ -355,7 +350,7 @@ export class BehavioralDecoderElement implements AnalogElement {
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = nodeId < v.length ? v[nodeId] : 0;
+      const voltage = readMnaVoltage(nodeId, v);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -387,12 +382,10 @@ export class BehavioralDecoderElement implements AnalogElement {
 
   updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     for (const p of this._selPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
     for (const p of this._outPins) {
-      const v = p.nodeId < voltages.length ? voltages[p.nodeId] : 0;
-      p.updateCompanion(dt, method, v);
+      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 }

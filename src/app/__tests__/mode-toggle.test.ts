@@ -18,18 +18,18 @@ function makeRegistry(): ComponentRegistry {
 }
 
 // Simulate the toggle logic extracted from app-init.ts:
-// On toggle: set circuit.metadata.engineType, call palette.setEngineTypeFilter(newMode)
+// On toggle: cycle auto → digital → analog → auto
 function toggleMode(circuit: Circuit, palette: ComponentPalette): void {
   const current = circuit.metadata.engineType;
-  const next = current === 'digital' ? 'analog' : 'digital';
+  const next = current === 'auto' ? 'digital' : current === 'digital' ? 'analog' : 'auto';
   circuit.metadata = { ...circuit.metadata, engineType: next };
-  palette.setEngineTypeFilter(next === 'digital' ? null : 'analog');
+  palette.setEngineTypeFilter(next === 'analog' ? 'analog' : next === 'digital' ? 'digital' : 'auto');
 }
 
 // Simulate load-time setup: read engineType from loaded circuit and set palette filter
 function applyEngineTypeFromCircuit(circuit: Circuit, palette: ComponentPalette): void {
   const engineType = circuit.metadata.engineType;
-  palette.setEngineTypeFilter(engineType === 'analog' ? 'analog' : null);
+  palette.setEngineTypeFilter(engineType === 'analog' ? 'analog' : engineType === 'auto' ? 'auto' : null);
 }
 
 // ---------------------------------------------------------------------------
@@ -46,27 +46,35 @@ describe('ModeToggle', () => {
   });
 
   it('toggle_sets_metadata_engine_type', () => {
-    // Initial state is digital
+    // Initial state is auto
+    expect(circuit.metadata.engineType).toBe('auto');
+
+    // Toggle auto → digital
+    toggleMode(circuit, palette);
     expect(circuit.metadata.engineType).toBe('digital');
 
-    // Toggle to analog
+    // Toggle digital → analog
     toggleMode(circuit, palette);
     expect(circuit.metadata.engineType).toBe('analog');
 
-    // Toggle back to digital
+    // Toggle analog → auto
     toggleMode(circuit, palette);
-    expect(circuit.metadata.engineType).toBe('digital');
+    expect(circuit.metadata.engineType).toBe('auto');
   });
 
   it('toggle_updates_palette_filter', () => {
-    // Initial: digital mode → filter is null (show all digital components)
+    // Initial: auto mode → filter is null (show all components)
     expect(palette.getEngineTypeFilter()).toBeNull();
 
-    // Toggle to analog
+    // Toggle auto → digital
+    toggleMode(circuit, palette);
+    expect(palette.getEngineTypeFilter()).toBe('digital');
+
+    // Toggle digital → analog
     toggleMode(circuit, palette);
     expect(palette.getEngineTypeFilter()).toBe('analog');
 
-    // Toggle back to digital
+    // Toggle analog → auto
     toggleMode(circuit, palette);
     expect(palette.getEngineTypeFilter()).toBeNull();
   });

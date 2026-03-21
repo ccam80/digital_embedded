@@ -626,22 +626,32 @@ describe("ClockComponent", () => {
 
 describe("ConstComponent", () => {
   describe("execute", () => {
-    it("executeConst preserves the pre-initialised output value", () => {
-      const layout = makeLayoutNoInputs();
-      const state = new Uint32Array(1);
-      const highZs = new Uint32Array(state.length);
-      // Compiler pre-initialises the output net to the constant value
-      state[0] = 0xBEEF;
-      executeConst(0, state, highZs, layout);
-      // The value must not be cleared
-      expect(state[0]).toBe(0xBEEF);
-    });
-
-    it("executeConst with value 0 leaves output as 0", () => {
-      const layout = makeLayoutNoInputs();
+    it("executeConst writes the configured value to output", () => {
+      const wt = new Int32Array(64).map((_, i) => i);
+      const layout: ComponentLayout = {
+        inputCount: () => 0, inputOffset: () => 0,
+        outputCount: () => 1, outputOffset: () => 0,
+        stateOffset: () => 0, wiringTable: wt,
+        getProperty: (_i: number, key: string) => key === "value" ? 0xBEEF : undefined,
+      };
       const state = new Uint32Array(1);
       const highZs = new Uint32Array(state.length);
       state[0] = 0;
+      executeConst(0, state, highZs, layout);
+      expect(state[0]).toBe(0xBEEF);
+    });
+
+    it("executeConst with value 0 writes 0 to output", () => {
+      const wt = new Int32Array(64).map((_, i) => i);
+      const layout: ComponentLayout = {
+        inputCount: () => 0, inputOffset: () => 0,
+        outputCount: () => 1, outputOffset: () => 0,
+        stateOffset: () => 0, wiringTable: wt,
+        getProperty: (_i: number, key: string) => key === "value" ? 0 : undefined,
+      };
+      const state = new Uint32Array(1);
+      const highZs = new Uint32Array(state.length);
+      state[0] = 99;
       executeConst(0, state, highZs, layout);
       expect(state[0]).toBe(0);
     });

@@ -35,6 +35,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -176,7 +177,7 @@ export class ADCElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     const label = this._properties.getOrDefault<string>("label", "");
     const bits = this._bits;
 
@@ -259,15 +260,13 @@ function createADCElement(
     () => new DigitalOutputPinModel(OUTPUT_PIN_SPEC),
   );
 
-  // Initialise pin node IDs (MNA uses 0-based indices; models use 1-based nodeIds)
-  // DigitalInputPinModel.init(nodeId, groundNode) — conductance is stamped at nodeId-1
-  // DigitalOutputPinModel.init(nodeId, branchIdx) — Norton at nodeId-1
-  if (nVin > 0) vinPin.init(nVin - 1, -1);
-  if (nClk > 0) clkPin.init(nClk - 1, -1);
-  if (nEoc > 0) eocPin.init(nEoc - 1, -1);
+  // Initialise pin node IDs — init() takes 1-based MNA node IDs
+  if (nVin > 0) vinPin.init(nVin, -1);
+  if (nClk > 0) clkPin.init(nClk, -1);
+  if (nEoc > 0) eocPin.init(nEoc, -1);
   for (let i = 0; i < bits; i++) {
     const n = nDigital[i];
-    if (n > 0) digitalPins[i].init(n - 1, -1);
+    if (n > 0) digitalPins[i].init(n, -1);
   }
 
   // Solver cached from stamp() for use in stampCompanion()
