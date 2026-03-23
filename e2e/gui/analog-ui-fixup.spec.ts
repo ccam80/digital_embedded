@@ -8,6 +8,61 @@ import { test, expect } from '@playwright/test';
 import { SimulatorHarness } from '../fixtures/simulator-harness';
 
 // ---------------------------------------------------------------------------
+// RC circuit XML: AC Source 5V 100Hz → R 1kΩ → C 1µF → GND
+// ---------------------------------------------------------------------------
+
+const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry><string>romContent</string><romList><roms/></romList></entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>AcVoltageSource</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Vs</string></entry>
+        <entry><string>Amplitude</string><int>5</int></entry>
+        <entry><string>Frequency</string><int>100</int></entry>
+      </elementAttributes>
+      <pos x="140" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AnalogResistor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>R1</string></entry>
+        <entry><string>resistance</string><int>1000</int></entry>
+      </elementAttributes>
+      <pos x="300" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AnalogCapacitor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>C1</string></entry>
+        <entry><string>capacitance</string><double>1.0E-6</double></entry>
+      </elementAttributes>
+      <pos x="460" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes/>
+      <pos x="220" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes/>
+      <pos x="500" y="300"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="100" y="200"/><p2 x="300" y="200"/></wire>
+    <wire><p1 x="380" y="200"/><p2 x="460" y="200"/></wire>
+    <wire><p1 x="500" y="200"/><p2 x="500" y="300"/></wire>
+    <wire><p1 x="220" y="200"/><p2 x="220" y="300"/></wire>
+  </wires>
+</circuit>`;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -26,24 +81,21 @@ async function clickIframeButton(harness: SimulatorHarness, buttonId: string): P
   }, buttonId);
 }
 
-/** Build the standard analog RC circuit and compile it. */
+/** Load the RC circuit via postMessage and trigger compilation via a step click. */
 async function buildAndCompileRc(harness: SimulatorHarness): Promise<void> {
-  await bridgeEval(harness, 'bridge.buildAnalogRcCircuit()');
-  const compiled = await bridgeEval<boolean>(harness, 'bridge.compileCircuit()');
-  expect(compiled).toBe(true);
+  await harness.loadDigXml(ANALOG_RC_XML);
+  // Switch to analog mode if needed
+  await clickIframeButton(harness, 'btn-circuit-mode');
+  // Trigger compilation by stepping once
+  await clickIframeButton(harness, 'btn-step');
+  await harness.page.waitForTimeout(300);
 }
 
-/** Set the speed input value in the iframe. */
+/** Set the speed input value in the iframe using proper Playwright interaction. */
 async function setSpeed(harness: SimulatorHarness, speed: number): Promise<void> {
-  await harness.page.evaluate((s) => {
-    const iframe = document.getElementById('sim') as HTMLIFrameElement;
-    const doc = iframe.contentWindow!.document;
-    const input = doc.getElementById('speed-input') as HTMLInputElement;
-    if (input) {
-      input.value = String(s);
-      input.dispatchEvent(new Event('change'));
-    }
-  }, speed);
+  const speedInput = harness.iframe.locator('#speed-input');
+  await speedInput.fill(String(speed));
+  await speedInput.press('Tab');
 }
 
 // ---------------------------------------------------------------------------
@@ -190,11 +242,15 @@ test.describe('Analog UI fixes', () => {
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
 
-    // Build an analog RC circuit via the test bridge
-    await page.evaluate(() => {
-      const bridge = (window as any).__test;
-      bridge.buildAnalogRcCircuit();
-    });
+    // Load the RC circuit via postMessage
+    const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(500);
+
+    // Switch to analog mode
+    await page.locator('#btn-circuit-mode').click();
     await page.waitForTimeout(200);
 
     // Get C1 body center and canvas rect, then click on it with Playwright mouse

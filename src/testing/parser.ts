@@ -538,12 +538,26 @@ type Block = LoopBlock | RepeatBlock | RowBlock;
 // Main parse pass
 // ---------------------------------------------------------------------------
 
-function parseHeader(tok: Tokenizer): string[] {
+/**
+ * Parse the header line into signal names.
+ * Returns `{ names, separatorIndex }` where `separatorIndex` is the column
+ * index of the `|` separator (marks the boundary between inputs and outputs).
+ * If no `|` is present, `separatorIndex` is -1.
+ */
+function parseHeader(tok: Tokenizer): { names: string[]; separatorIndex: number } {
   const names: string[] = [];
+  let separatorIndex = -1;
   while (true) {
     const t = tok.nextHeaderIdent();
-    if (t.type === TK.EOL || t.type === TK.EOF) return names;
+    if (t.type === TK.EOL || t.type === TK.EOF) return { names, separatorIndex };
     if (t.type === TK.IDENT) {
+      if (t.text === '|') {
+        if (separatorIndex !== -1) {
+          throw new ParseError('Multiple "|" separators in header', t.line);
+        }
+        separatorIndex = names.length;
+        continue;
+      }
       if (names.includes(t.text)) {
         throw new ParseError(`Signal name '${t.text}' used twice`, t.line);
       }
@@ -753,7 +767,7 @@ export function parseTestData(text: string, inputCount?: number): ParsedTestData
   const tok = new Tokenizer(text);
   tok.skipEmptyLines();
 
-  const names = parseHeader(tok);
+  const { names, separatorIndex } = parseHeader(tok);
 
   if (names.length === 0) {
     throw new ParseError('Test data header is empty — no signal names found', 1);
@@ -763,8 +777,13 @@ export function parseTestData(text: string, inputCount?: number): ParsedTestData
   const blocks = parseRows(tok, columnCount, null);
   const expandedRows = expandBlocks(blocks, new Map());
 
-  // Split names into inputs/outputs
-  const splitAt = inputCount !== undefined ? inputCount : names.length;
+  // Split names into inputs/outputs.
+  // Priority: explicit inputCount > "|" separator > all-inputs fallback.
+  const splitAt = inputCount !== undefined
+    ? inputCount
+    : separatorIndex >= 0
+      ? separatorIndex
+      : names.length;
   const inputNames  = names.slice(0, splitAt);
   const outputNames = names.slice(splitAt);
 

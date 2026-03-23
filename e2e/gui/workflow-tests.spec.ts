@@ -14,6 +14,57 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry><string>romContent</string><romList><roms/></romList></entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>AcVoltageSource</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Vs</string></entry>
+        <entry><string>Amplitude</string><int>5</int></entry>
+        <entry><string>Frequency</string><int>100</int></entry>
+      </elementAttributes>
+      <pos x="140" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AnalogResistor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>R1</string></entry>
+        <entry><string>resistance</string><int>1000</int></entry>
+      </elementAttributes>
+      <pos x="300" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AnalogCapacitor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>C1</string></entry>
+        <entry><string>capacitance</string><double>1.0E-6</double></entry>
+      </elementAttributes>
+      <pos x="460" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes/>
+      <pos x="220" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes/>
+      <pos x="500" y="300"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="100" y="200"/><p2 x="300" y="200"/></wire>
+    <wire><p1 x="380" y="200"/><p2 x="460" y="200"/></wire>
+    <wire><p1 x="500" y="200"/><p2 x="500" y="300"/></wire>
+    <wire><p1 x="220" y="200"/><p2 x="220" y="300"/></wire>
+  </wires>
+</circuit>`;
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
@@ -221,7 +272,7 @@ test.describe('Workflow: property editing', () => {
     if (count > 0) {
       // Edit the label
       await textInputs.first().fill('MyInput');
-      await textInputs.first().dispatchEvent('change');
+      await textInputs.first().press('Tab');
       await page.waitForTimeout(200);
 
       // Verify label changed
@@ -253,7 +304,7 @@ test.describe('Workflow: property editing', () => {
 
     if (numCount > 0) {
       await numInputs.first().fill('8');
-      await numInputs.first().dispatchEvent('change');
+      await numInputs.first().press('Tab');
       await page.waitForTimeout(100);
 
       // No crash — panel still visible
@@ -371,7 +422,7 @@ test.describe('Workflow: speed control', () => {
   test('manual speed entry via text field', async ({ page }) => {
     const speedInput = page.locator('#speed-input');
     await speedInput.fill('5000');
-    await speedInput.dispatchEvent('change');
+    await speedInput.press('Tab');
     await page.waitForTimeout(100);
 
     expect(Number(await speedInput.inputValue())).toBe(5000);
@@ -473,14 +524,20 @@ test.describe('Workflow: analog simulation with sliders', () => {
   });
 
   test('build RC, run simulation, select capacitor, see slider', async ({ page }) => {
-    // Build analog RC circuit via bridge
+    // Load analog RC circuit via postMessage
+    const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(500);
+
     const built = await bridge<{ elementCount: number; wireCount: number }>(
-      page, 'bridge.buildAnalogRcCircuit()',
+      page, 'bridge.getCircuitInfo()',
     );
     expect(built.elementCount).toBe(5);
 
-    // Compile and run
-    expect(await bridge<boolean>(page, 'bridge.compileCircuit()')).toBe(true);
+    // Compile via step button, then run
+    await menuAction(page, 'btn-step');
     await menuAction(page, 'btn-run');
     await page.waitForTimeout(500);
 
@@ -501,8 +558,12 @@ test.describe('Workflow: analog simulation with sliders', () => {
   });
 
   test('slider panel lifecycle: created on run, disposed on stop', async ({ page }) => {
-    await bridge(page, 'bridge.buildAnalogRcCircuit()');
-    await bridge(page, 'bridge.compileCircuit()');
+    const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(500);
+    await menuAction(page, 'btn-step');
 
     // Before run: slider panel hidden
     await expect(page.locator('#slider-panel')).toBeHidden();
@@ -532,11 +593,16 @@ test.describe('Workflow: analog simulation with sliders', () => {
   });
 
   test('speed control affects analog simulation rate', async ({ page }) => {
+    const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
+
     // Slow run
-    await bridge(page, 'bridge.buildAnalogRcCircuit()');
-    await bridge(page, 'bridge.compileCircuit()');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(500);
+    await menuAction(page, 'btn-step');
     await page.locator('#speed-input').fill('1');
-    await page.locator('#speed-input').dispatchEvent('change');
+    await page.locator('#speed-input').press('Tab');
     await menuAction(page, 'btn-run');
     await page.waitForTimeout(500);
     const slowTime = await bridge<number>(
@@ -546,10 +612,13 @@ test.describe('Workflow: analog simulation with sliders', () => {
     await page.waitForTimeout(200);
 
     // Fast run
-    await bridge(page, 'bridge.buildAnalogRcCircuit()');
-    await bridge(page, 'bridge.compileCircuit()');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(500);
+    await menuAction(page, 'btn-step');
     await page.locator('#speed-input').fill('10000000');
-    await page.locator('#speed-input').dispatchEvent('change');
+    await page.locator('#speed-input').press('Tab');
     await menuAction(page, 'btn-run');
     await page.waitForTimeout(500);
     const fastTime = await bridge<number>(

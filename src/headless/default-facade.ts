@@ -220,10 +220,14 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   runToStable(engine: SimulationEngine, maxIterations = 1000, opts?: StepOptions): void {
     const netCount = this._compiled?.netCount ?? this._compiledAnalog?.netCount ?? 64;
 
+    // Default to no clock advancement during settling — clocks should only
+    // be driven explicitly by the caller (test executor, step button, etc.).
+    const settleOpts = opts ?? { clockAdvance: false };
+
     for (let iter = 0; iter < maxIterations; iter++) {
       const before = this._snapshotSignals(engine, netCount);
 
-      this.step(engine, opts);
+      this.step(engine, settleOpts);
 
       const after = this._snapshotSignals(engine, netCount);
 
@@ -306,7 +310,39 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
       );
     }
 
-    const parsed = parseTestData(resolvedData);
+    // Infer inputCount from the circuit's In/Clock elements when the test
+    // data doesn't contain an explicit "|" separator.  parseTestData will
+    // prefer an explicit inputCount over a "|" separator over all-inputs.
+    let inputCount: number | undefined;
+    if (!resolvedData.includes('|')) {
+      const inputLabels = new Set<string>();
+      for (const el of circuit.elements) {
+        if (el.typeId === 'In' || el.typeId === 'Clock') {
+          const label = el.getProperties().getOrDefault<string>('label', '');
+          if (label) inputLabels.add(label);
+        }
+      }
+      if (inputLabels.size > 0) {
+        // Parse the header line to count how many leading columns are inputs
+        const headerLine = resolvedData.split('\n').find(l => l.trim().length > 0 && !l.trim().startsWith('#'));
+        if (headerLine) {
+          const names = headerLine.trim().split(/\s+/);
+          let count = 0;
+          for (const name of names) {
+            if (inputLabels.has(name)) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          if (count > 0 && count < names.length) {
+            inputCount = count;
+          }
+        }
+      }
+    }
+
+    const parsed = parseTestData(resolvedData, inputCount);
     return executeTests(this._runner, engine, circuit, parsed);
   }
 

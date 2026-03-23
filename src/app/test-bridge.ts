@@ -11,12 +11,10 @@
  */
 
 import type { Circuit } from '../core/circuit.js';
-import { Wire } from '../core/circuit.js';
 import type { Viewport } from '../editor/viewport.js';
 import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
-import { PropertyBag } from '../core/properties.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
 
@@ -28,12 +26,14 @@ import { GRID_SPACING } from '../editor/coordinates.js';
 export interface AnalogTestContext {
   engine: AnalogEngine | null;
   compiled: { labelToNodeId: Map<string, number>; nodeCount: number } | null;
-  compileAndBind: (() => boolean) | null;
 }
 
 export interface TestBridge {
   /** Convert a world-space grid position to screen coordinates relative to the canvas. */
   worldToScreen(worldX: number, worldY: number): { x: number; y: number };
+
+  /** Convert screen coordinates back to the nearest grid position. */
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number };
 
   /** Get screen coordinates of a pin on an element (by element label and pin label). */
   getPinPosition(elementLabel: string, pinLabel: string): { x: number; y: number } | null;
@@ -79,23 +79,21 @@ export interface TestBridge {
     nodeCount: number;
   } | null;
 
-  /**
-   * Step the analog engine N times (default 1). Returns the final simTime.
-   * Returns null if no analog engine is active.
-   */
-  stepAnalog(count?: number): { simTime: number; steps: number } | null;
+  /** Get the exit direction unit vector for a pin (points away from component body). */
+  getPinExitDirection(elementLabel: string, pinLabel: string): { dx: number; dy: number } | null;
+
+  /** Get all element bounding boxes in grid (world) coordinates. */
+  getElementBoundingBoxes(): Array<{ x: number; y: number; w: number; h: number }>;
 
   /**
-   * Trigger circuit compilation and binding. Returns true on success.
+   * Get all existing wire segments and pin positions for routing obstacle avoidance.
+   * Wire segments are in grid (world) coordinates. Used by UICircuitBuilder to
+   * ensure new wire vertices/segments don't land on existing wires or pins.
    */
-  compileCircuit(): boolean;
-
-  /**
-   * Build an analog RC lowpass test circuit programmatically.
-   * AC Source (5V, 100Hz) → R (1kΩ) → C (1µF) → GND
-   * Sets engineType to "analog". Call compileCircuit() after this.
-   */
-  buildAnalogRcCircuit(): { elementCount: number; wireCount: number };
+  getRoutingObstacles(): {
+    wires: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+    pins: Array<{ x: number; y: number }>;
+  };
 }
 
 export function createTestBridge(
@@ -121,8 +119,16 @@ export function createTestBridge(
     return null;
   }
 
+  function screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    return {
+      x: Math.round((screenX - viewport.pan.x) / (viewport.zoom * GRID_SPACING)),
+      y: Math.round((screenY - viewport.pan.y) / (viewport.zoom * GRID_SPACING)),
+    };
+  }
+
   return {
     worldToScreen,
+    screenToWorld,
 
     getPinPosition(elementLabel: string, pinLabel: string) {
       const el = findElementByLabel(elementLabel);
@@ -203,93 +209,52 @@ export function createTestBridge(
         nodeVoltages[`node_${i}`] = eng.getNodeVoltage(i);
       }
 
-      // Expose engine internals for diagnostics (TS private = runtime accessible)
-      const engAny = eng as any;
       return {
         simTime: eng.simTime,
         nodeVoltages,
         nodeCount: comp.nodeCount,
-        _engineState: engAny._engineState,
-        _hasCompiled: engAny._compiled !== null && engAny._compiled !== undefined,
-        _matrixSize: engAny._compiled?.matrixSize ?? -1,
-        _elementCount: engAny._compiled?.elements?.length ?? -1,
       };
     },
 
-    stepAnalog(count = 1) {
-      const eng = analogCtx?.engine;
-      if (!eng) return null;
+    getPinExitDirection(elementLabel: string, pinLabel: string) {
+      const el = findElementByLabel(elementLabel);
+      if (!el) return null;
+      const pin = el.getPins().find(p => p.label === pinLabel);
+      if (!pin) return null;
+      const bb = el.getBoundingBox();
+      const wp = pinWorldPosition(el, pin);
+      const dL = Math.abs(wp.x - bb.x);
+      const dR = Math.abs(wp.x - (bb.x + bb.width));
+      const dT = Math.abs(wp.y - bb.y);
+      const dB = Math.abs(wp.y - (bb.y + bb.height));
+      const min = Math.min(dL, dR, dT, dB);
+      if (min === dL) return { dx: -1, dy: 0 };
+      if (min === dR) return { dx: 1, dy: 0 };
+      if (min === dT) return { dx: 0, dy: -1 };
+      if (min === dB) return { dx: 0, dy: 1 };
+      return { dx: 1, dy: 0 };
+    },
 
-      let steps = 0;
-      for (let i = 0; i < count; i++) {
-        eng.step();
-        steps++;
+    getElementBoundingBoxes() {
+      return circuit.elements.map(el => {
+        const bb = el.getBoundingBox();
+        return { x: bb.x, y: bb.y, w: bb.width, h: bb.height };
+      });
+    },
+
+    getRoutingObstacles() {
+      const wires = circuit.wires.map(w => ({
+        x1: w.start.x, y1: w.start.y,
+        x2: w.end.x, y2: w.end.y,
+      }));
+      const pins: Array<{ x: number; y: number }> = [];
+      for (const el of circuit.elements) {
+        for (const pin of el.getPins()) {
+          const wp = pinWorldPosition(el, pin);
+          pins.push({ x: wp.x, y: wp.y });
+        }
       }
-      return { simTime: eng.simTime, steps };
-    },
-
-    compileCircuit() {
-      if (!analogCtx?.compileAndBind) return false;
-      return analogCtx.compileAndBind();
-    },
-
-    buildAnalogRcCircuit() {
-      // Clear existing circuit
-      while (circuit.elements.length > 0) circuit.removeElement(circuit.elements[0]);
-      while (circuit.wires.length > 0) circuit.removeWire(circuit.wires[0]);
-
-      // Set engine type to analog
-      circuit.metadata = { ...circuit.metadata, engineType: 'analog' };
-
-      // Create elements via registry factories with explicit property values
-      const vsDef = registry.get('AcVoltageSource')!;
-      const rDef = registry.get('AnalogResistor')!;
-      const cDef = registry.get('AnalogCapacitor')!;
-      const gndDef = registry.get('Ground')!;
-
-      const vsProps = new PropertyBag(new Map<string, unknown>([
-        ['label', 'Vs'], ['amplitude', 5], ['frequency', 100],
-        ['phase', 0], ['dcOffset', 0], ['waveform', 'sine'],
-      ]).entries() as IterableIterator<[string, unknown]>);
-      const rProps = new PropertyBag(new Map<string, unknown>([
-        ['label', 'R1'], ['resistance', 1000],
-      ]).entries() as IterableIterator<[string, unknown]>);
-      const cProps = new PropertyBag(new Map<string, unknown>([
-        ['label', 'C1'], ['capacitance', 1e-6],
-      ]).entries() as IterableIterator<[string, unknown]>);
-      const gndProps = new PropertyBag(new Map<string, unknown>().entries() as IterableIterator<[string, unknown]>);
-
-      // AC source at grid (7,10): pos at (5,10), neg at (11,10)
-      const vsEl = vsDef.factory(vsProps);
-      vsEl.position = { x: 7, y: 10 };
-      circuit.addElement(vsEl);
-
-      // Resistor at grid (15,10): A at (15,10), B at (19,10)
-      const rEl = rDef.factory(rProps);
-      rEl.position = { x: 15, y: 10 };
-      circuit.addElement(rEl);
-
-      // Capacitor at grid (23,10): pos at (23,10), neg at (25,10)
-      const cEl = cDef.factory(cProps);
-      cEl.position = { x: 23, y: 10 };
-      circuit.addElement(cEl);
-
-      // Two grounds
-      const gnd1El = gndDef.factory(gndProps);
-      gnd1El.position = { x: 11, y: 15 };
-      circuit.addElement(gnd1El);
-
-      const gnd2El = gndDef.factory(new PropertyBag(new Map<string, unknown>().entries() as IterableIterator<[string, unknown]>));
-      gnd2El.position = { x: 25, y: 15 };
-      circuit.addElement(gnd2El);
-
-      // Wires connecting pins
-      circuit.addWire(new Wire({ x: 5, y: 10 }, { x: 15, y: 10 }));   // vs:pos → r:A
-      circuit.addWire(new Wire({ x: 19, y: 10 }, { x: 23, y: 10 }));  // r:B → c:pos
-      circuit.addWire(new Wire({ x: 25, y: 10 }, { x: 25, y: 15 }));  // c:neg → gnd2
-      circuit.addWire(new Wire({ x: 11, y: 10 }, { x: 11, y: 15 }));  // vs:neg → gnd1
-
-      return { elementCount: circuit.elements.length, wireCount: circuit.wires.length };
+      return { wires, pins };
     },
   };
 }

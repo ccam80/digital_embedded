@@ -67,7 +67,37 @@ export class TestRunner {
       );
     }
 
-    const parsed = parseTestData(resolvedData);
+    // Infer inputCount from the circuit's In/Clock elements when the test
+    // data doesn't contain an explicit "|" separator.
+    let inputCount: number | undefined;
+    if (!resolvedData.includes('|')) {
+      const inputLabels = new Set<string>();
+      for (const el of circuit.elements) {
+        if (el.typeId === 'In' || el.typeId === 'Clock') {
+          const label = el.getProperties().getOrDefault<string>('label', '');
+          if (label) inputLabels.add(label);
+        }
+      }
+      if (inputLabels.size > 0) {
+        const headerLine = resolvedData.split('\n').find(l => l.trim().length > 0 && !l.trim().startsWith('#'));
+        if (headerLine) {
+          const names = headerLine.trim().split(/\s+/);
+          let count = 0;
+          for (const name of names) {
+            if (inputLabels.has(name)) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          if (count > 0 && count < names.length) {
+            inputCount = count;
+          }
+        }
+      }
+    }
+
+    const parsed = parseTestData(resolvedData, inputCount);
     return executeTests(this._runner, engine, circuit, parsed);
   }
 }

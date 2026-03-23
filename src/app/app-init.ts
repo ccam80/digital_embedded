@@ -1450,8 +1450,8 @@ export function initApp(search?: string): void {
     // During simulation, don't open properties for togglable components
     if (isSimActive() && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
 
-    // Memory components: open hex editor
-    if (MEMORY_TYPES.has(elementHit.typeId)) {
+    // Memory components: open hex editor (only during simulation)
+    if (isSimActive() && MEMORY_TYPES.has(elementHit.typeId)) {
       void openMemoryEditor(elementHit);
       return;
     }
@@ -5408,15 +5408,16 @@ export function initApp(search?: string): void {
   // Test bridge — exposes coordinate queries for E2E tests
   // -------------------------------------------------------------------------
 
-  const analogTestCtx: AnalogTestContext = {
-    get engine() { return facade.getEngine() as unknown as import('../analog/analog-engine.js').MNAEngine | null; },
-    get compiled() { return facade.getCompiledAnalog(); },
-    compileAndBind: () => compileAndBind(),
-  };
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    const analogTestCtx: AnalogTestContext = {
+      get engine() { return facade.getEngine() as unknown as import('../analog/analog-engine.js').MNAEngine | null; },
+      get compiled() { return facade.getCompiledAnalog(); },
+    };
 
-  (window as unknown as Record<string, unknown>).__test = createTestBridge(
-    circuit, viewport, canvas, palette, registry, analogTestCtx,
-  );
+    (window as unknown as Record<string, unknown>).__test = createTestBridge(
+      circuit, viewport, canvas, palette, registry, analogTestCtx,
+    );
+  }
 
   postMessageAdapter.init();
 
