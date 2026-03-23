@@ -63,7 +63,7 @@ export class CapacitorElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogCapacitor", instanceId, position, rotation, mirror, props);
+    super("Capacitor", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -255,7 +255,7 @@ function capacitorCircuitFactory(props: PropertyBag): CapacitorElement {
 }
 
 export const CapacitorDefinition: ComponentDefinition = {
-  name: "AnalogCapacitor",
+  name: "Capacitor",
   typeId: -1,
   engineType: "analog",
   factory: capacitorCircuitFactory,

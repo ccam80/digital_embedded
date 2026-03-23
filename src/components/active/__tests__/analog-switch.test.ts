@@ -13,8 +13,8 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
-  AnalogSwitchSPSTDefinition,
-  AnalogSwitchSPDTDefinition,
+  SwitchSPSTDefinition,
+  SwitchSPDTDefinition,
 } from "../analog-switch.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../analog/sparse-solver.js";
@@ -56,7 +56,7 @@ function makeSPST(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return AnalogSwitchSPSTDefinition.analogFactory!(
+  return SwitchSPSTDefinition.analogFactory!(
     [nCtrl, nIn, nOut],
     -1,
     makeProps(overrides),
@@ -71,7 +71,7 @@ function makeSPDT(
   nNC: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return AnalogSwitchSPDTDefinition.analogFactory!(
+  return SwitchSPDTDefinition.analogFactory!(
     [nCtrl, nCom, nNO, nNC],
     -1,
     makeProps(overrides),

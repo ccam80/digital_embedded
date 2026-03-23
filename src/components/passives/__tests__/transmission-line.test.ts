@@ -630,8 +630,8 @@ describe("TLine", () => {
 
 describe("TransmissionLine", () => {
   describe("definition", () => {
-    it("has name 'AnalogTransmissionLine'", () => {
-      expect(TransmissionLineDefinition.name).toBe("AnalogTransmissionLine");
+    it("has name 'TransmissionLine'", () => {
+      expect(TransmissionLineDefinition.name).toBe("TransmissionLine");
     });
 
     it("has engineType 'analog'", () => {

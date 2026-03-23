@@ -2,7 +2,7 @@
  * Tests for mixed-mode circuit partitioning and compilation.
  *
  * Component engine types used in tests:
- *   - "AnalogResistor"  → engineType: "analog"
+ *   - "Resistor"  → engineType: "analog"
  *   - "DcVoltageSource" → engineType: "analog"
  *   - "Ground"          → engineType: "both"
  *   - "And"             → engineType: "both"
@@ -59,7 +59,7 @@ describe("detectEngineMode", () => {
   it("returns 'analog' for analog-only circuits", () => {
     const circuit = new Circuit({ engineType: "auto" });
     // AnalogResistor is engineType: "analog"
-    circuit.addElement(createElement(registry, "AnalogResistor", { x: 5, y: 5 }));
+    circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     // DcVoltageSource is engineType: "analog"
     circuit.addElement(createElement(registry, "DcVoltageSource", { x: 5, y: 10 }));
     expect(detectEngineMode(circuit, registry)).toBe("analog");
@@ -67,7 +67,7 @@ describe("detectEngineMode", () => {
 
   it("returns 'mixed' when both analog-only and digital-only components are present", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    circuit.addElement(createElement(registry, "AnalogResistor", { x: 5, y: 5 }));
+    circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     // Add has no engineType → defaults to "digital"
     circuit.addElement(createElement(registry, "Add", { x: 10, y: 5 }));
     expect(detectEngineMode(circuit, registry)).toBe("mixed");
@@ -82,7 +82,7 @@ describe("detectEngineMode", () => {
 
   it("returns 'analog' for mix of 'analog' and 'both'", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    circuit.addElement(createElement(registry, "AnalogResistor", { x: 5, y: 5 }));
+    circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     circuit.addElement(createElement(registry, "And", { x: 10, y: 5 }));
     // AnalogResistor is analog-only, And is "both" — no digital-only present
     expect(detectEngineMode(circuit, registry)).toBe("analog");
@@ -95,7 +95,7 @@ describe("detectEngineMode", () => {
 describe("partitionMixedCircuit", () => {
   it("separates digital-only elements into the inner circuit", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    const resistor = createElement(registry, "AnalogResistor", { x: 5, y: 5 });
+    const resistor = createElement(registry, "Resistor", { x: 5, y: 5 });
     const adder = createElement(registry, "Add", { x: 15, y: 5 });
     circuit.addElement(resistor);
     circuit.addElement(adder);
@@ -113,7 +113,7 @@ describe("partitionMixedCircuit", () => {
     const circuit = new Circuit({ engineType: "auto" });
     const andGate = createElement(registry, "And", { x: 5, y: 5 });
     const adder = createElement(registry, "Add", { x: 15, y: 5 });
-    const resistor = createElement(registry, "AnalogResistor", { x: 0, y: 5 });
+    const resistor = createElement(registry, "Resistor", { x: 0, y: 5 });
     circuit.addElement(andGate);
     circuit.addElement(adder);
     circuit.addElement(resistor);
@@ -130,7 +130,7 @@ describe("partitionMixedCircuit", () => {
     const circuit = new Circuit({ engineType: "auto" });
 
     // AnalogResistor pins: A at {0,0}, B at {3,0} (relative)
-    const resistor = createElement(registry, "AnalogResistor", { x: 5, y: 5 });
+    const resistor = createElement(registry, "Resistor", { x: 5, y: 5 });
     // Add has input pins and output pin
     const adder = createElement(registry, "Add", { x: 15, y: 5 });
     circuit.addElement(resistor);
@@ -153,7 +153,7 @@ describe("partitionMixedCircuit", () => {
 
   it("sets analogCircuit engineType to 'analog'", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    circuit.addElement(createElement(registry, "AnalogResistor", { x: 5, y: 5 }));
+    circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     circuit.addElement(createElement(registry, "Add", { x: 15, y: 5 }));
 
     const { analogCircuit } = partitionMixedCircuit(circuit, registry);
@@ -162,7 +162,7 @@ describe("partitionMixedCircuit", () => {
 
   it("sets inner circuit engineType to 'digital'", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    circuit.addElement(createElement(registry, "AnalogResistor", { x: 5, y: 5 }));
+    circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     circuit.addElement(createElement(registry, "Add", { x: 15, y: 5 }));
 
     const { partition } = partitionMixedCircuit(circuit, registry);
@@ -171,7 +171,7 @@ describe("partitionMixedCircuit", () => {
 
   it("adds In/Out bridge elements to the inner circuit at cut points", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    const resistor = createElement(registry, "AnalogResistor", { x: 5, y: 5 });
+    const resistor = createElement(registry, "Resistor", { x: 5, y: 5 });
     const adder = createElement(registry, "Add", { x: 15, y: 5 });
     circuit.addElement(resistor);
     circuit.addElement(adder);
@@ -229,8 +229,8 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
     // Build manually: V1(pos) → R1(A)—(B) → GND, V1(neg) → GND
     const circuit = new Circuit({ engineType: "auto" });
     const v1 = createElement(registry, "DcVoltageSource", { x: 0, y: 5 }, { label: "V1", voltage: 5 });
-    const r1 = createElement(registry, "AnalogResistor", { x: 10, y: 5 }, { label: "R1", resistance: 1000 });
-    const gnd = createElement(registry, "AnalogGround", { x: 10, y: 10 });
+    const r1 = createElement(registry, "Resistor", { x: 10, y: 5 }, { label: "R1", resistance: 1000 });
+    const gnd = createElement(registry, "Ground", { x: 10, y: 10 });
     circuit.addElement(v1);
     circuit.addElement(r1);
     circuit.addElement(gnd);

@@ -191,7 +191,7 @@ export function expandTransistorModel(
   // Step 3: Validate that non-interface elements have analogFactory (are analog leaf components)
   for (const el of subcircuit.elements) {
     if (interfaceElementIds.has(el.instanceId)) continue;
-    if (el.typeId === "Ground" || el.typeId === "ground") continue;
+    if (el.typeId === "Ground") continue;
 
     if (!getAnalogFactory(el.typeId)) {
       diagnostics.push(
@@ -217,7 +217,7 @@ export function expandTransistorModel(
 
   for (const el of subcircuit.elements) {
     if (interfaceElementIds.has(el.instanceId)) continue;
-    if (el.typeId === "Ground" || el.typeId === "ground") continue;
+    if (el.typeId === "Ground") continue;
 
     // Resolve pin nodes in subcircuit space, then remap to outer MNA node IDs
     const subPinNodes = resolveAllElementNodes(el, subWireToNodeId, subcircuit);

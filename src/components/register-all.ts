@@ -76,7 +76,7 @@ import { AddDefinition } from "./arithmetic/add.js";
 import { SubDefinition } from "./arithmetic/sub.js";
 import { MulDefinition } from "./arithmetic/mul.js";
 import { DivDefinition } from "./arithmetic/div.js";
-import { ComparatorDefinition } from "./arithmetic/comparator.js";
+import { MagnitudeComparatorDefinition } from "./arithmetic/comparator.js";
 import { NegDefinition } from "./arithmetic/neg.js";
 import { BitExtenderDefinition } from "./arithmetic/bit-extender.js";
 import { BarrelShifterDefinition } from "./arithmetic/barrel-shifter.js";
@@ -113,7 +113,7 @@ import { SwitchDefinition } from "./switching/switch.js";
 import { SwitchDTDefinition } from "./switching/switch-dt.js";
 
 // PLD
-import { DiodeDefinition, DiodeForwardDefinition, DiodeBackwardDefinition } from "./pld/diode.js";
+import { PldDiodeDefinition, PldDiodeForwardDefinition, PldDiodeBackwardDefinition } from "./pld/diode.js";
 import { PullUpDefinition } from "./pld/pull-up.js";
 import { PullDownDefinition } from "./pld/pull-down.js";
 
@@ -144,8 +144,8 @@ import { MemristorDefinition } from "./passives/memristor.js";
 import { PolarizedCapDefinition } from "./passives/polarized-cap.js";
 import { TransmissionLineDefinition } from "./passives/transmission-line.js";
 
-// Analog semiconductors
-import { DiodeDefinition as AnalogDiodeDefinition } from "./semiconductors/diode.js";
+// Semiconductors
+import { DiodeDefinition } from "./semiconductors/diode.js";
 import { ZenerDiodeDefinition } from "./semiconductors/zener.js";
 import { NpnBjtDefinition } from "./semiconductors/bjt.js";
 import { PnpBjtDefinition } from "./semiconductors/bjt.js";
@@ -161,14 +161,13 @@ import { VaractorDefinition } from "./semiconductors/varactor.js";
 import { TriodeDefinition } from "./semiconductors/triode.js";
 
 // Analog sources
-import { AnalogGroundDefinition } from "./sources/ground.js";
 import { DcVoltageSourceDefinition } from "./sources/dc-voltage-source.js";
 import { CurrentSourceDefinition } from "./sources/current-source.js";
 import { AcVoltageSourceDefinition } from "./sources/ac-voltage-source.js";
 import { VariableRailDefinition } from "./sources/variable-rail.js";
 
 // Analog active
-import { AnalogComparatorDefinition } from "./active/comparator.js";
+import { VoltageComparatorDefinition } from "./active/comparator.js";
 import { Timer555Definition } from "./active/timer-555.js";
 import { RealOpAmpDefinition } from "./active/real-opamp.js";
 import { OTADefinition } from "./active/ota.js";
@@ -182,8 +181,8 @@ import { CCVSDefinition } from "./active/ccvs.js";
 import { CCCSDefinition } from "./active/cccs.js";
 import { SchmittInvertingDefinition } from "./active/schmitt-trigger.js";
 import { SchmittNonInvertingDefinition } from "./active/schmitt-trigger.js";
-import { AnalogSwitchSPSTDefinition } from "./active/analog-switch.js";
-import { AnalogSwitchSPDTDefinition } from "./active/analog-switch.js";
+import { SwitchSPSTDefinition } from "./active/analog-switch.js";
+import { SwitchSPDTDefinition } from "./active/analog-switch.js";
 
 // Sensors (analog, registered under PASSIVES category)
 import { LDRDefinition } from "./sensors/ldr.js";
@@ -279,7 +278,8 @@ export function createDefaultRegistry(
   registry.register(SubDefinition);
   registry.register(MulDefinition);
   registry.register(DivDefinition);
-  registry.register(ComparatorDefinition);
+  registry.register(MagnitudeComparatorDefinition);
+  registry.registerAlias("Comparator", "MagnitudeComparator");
   registry.register(NegDefinition);
   registry.register(BitExtenderDefinition);
   registry.register(BarrelShifterDefinition);
@@ -318,9 +318,12 @@ export function createDefaultRegistry(
   registry.registerAlias("PlainSwitchDT", "SwitchDT");
 
   // PLD
-  registry.register(DiodeDefinition);
-  registry.register(DiodeForwardDefinition);
-  registry.register(DiodeBackwardDefinition);
+  registry.register(PldDiodeDefinition);
+  registry.registerAlias("Diode", "PldDiode");
+  registry.register(PldDiodeForwardDefinition);
+  registry.registerAlias("DiodeForward", "PldDiodeForward");
+  registry.register(PldDiodeBackwardDefinition);
+  registry.registerAlias("DiodeBackward", "PldDiodeBackward");
   registry.register(PullUpDefinition);
   registry.register(PullDownDefinition);
 
@@ -340,20 +343,27 @@ export function createDefaultRegistry(
 
   // Analog passives
   registry.register(ResistorDefinition);
+  registry.registerAlias("AnalogResistor", "Resistor");
   registry.register(CapacitorDefinition);
+  registry.registerAlias("AnalogCapacitor", "Capacitor");
   registry.register(InductorDefinition);
+  registry.registerAlias("AnalogInductor", "Inductor");
 
   registry.register(PotentiometerDefinition);
+  registry.registerAlias("AnalogPotentiometer", "Potentiometer");
   registry.register(TransformerDefinition);
   registry.register(TappedTransformerDefinition);
   registry.register(CrystalDefinition);
   registry.register(MemristorDefinition);
   registry.register(PolarizedCapDefinition);
   registry.register(TransmissionLineDefinition);
+  registry.registerAlias("AnalogTransmissionLine", "TransmissionLine");
 
-  // Analog semiconductors
-  registry.register(AnalogDiodeDefinition);
+  // Semiconductors
+  registry.register(DiodeDefinition);
+  registry.registerAlias("AnalogDiode", "Diode");
   registry.register(ZenerDiodeDefinition);
+  registry.registerAlias("AnalogZener", "ZenerDiode");
   registry.register(NpnBjtDefinition);
   registry.register(PnpBjtDefinition);
   registry.register(NmosfetDefinition);
@@ -368,14 +378,15 @@ export function createDefaultRegistry(
   registry.register(TriodeDefinition);
 
   // Analog sources
-  registry.register(AnalogGroundDefinition);
+  registry.registerAlias("AnalogGround", "Ground");
   registry.register(DcVoltageSourceDefinition);
   registry.register(CurrentSourceDefinition);
   registry.register(AcVoltageSourceDefinition);
   registry.register(VariableRailDefinition);
 
   // Analog active
-  registry.register(AnalogComparatorDefinition);
+  registry.register(VoltageComparatorDefinition);
+  registry.registerAlias("AnalogComparator", "VoltageComparator");
   registry.register(Timer555Definition);
   registry.register(RealOpAmpDefinition);
   registry.register(OTADefinition);
@@ -389,8 +400,10 @@ export function createDefaultRegistry(
   registry.register(CCCSDefinition);
   registry.register(SchmittInvertingDefinition);
   registry.register(SchmittNonInvertingDefinition);
-  registry.register(AnalogSwitchSPSTDefinition);
-  registry.register(AnalogSwitchSPDTDefinition);
+  registry.register(SwitchSPSTDefinition);
+  registry.registerAlias("AnalogSwitchSPST", "SwitchSPST");
+  registry.register(SwitchSPDTDefinition);
+  registry.registerAlias("AnalogSwitchSPDT", "SwitchSPDT");
 
   // Sensors (analog)
   registry.register(LDRDefinition);

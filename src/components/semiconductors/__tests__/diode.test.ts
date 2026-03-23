@@ -219,7 +219,7 @@ describe("Diode", () => {
   });
 
   it("definition_has_correct_fields", () => {
-    expect(DiodeDefinition.name).toBe("AnalogDiode");
+    expect(DiodeDefinition.name).toBe("Diode");
     expect(DiodeDefinition.engineType).toBe("analog");
     expect(DiodeDefinition.analogDeviceType).toBe("D");
     expect(DiodeDefinition.analogFactory).toBeDefined();

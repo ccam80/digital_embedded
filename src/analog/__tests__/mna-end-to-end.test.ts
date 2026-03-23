@@ -40,7 +40,7 @@ import {
 // Import real component definitions
 import { ResistorDefinition } from "../../components/passives/resistor.js";
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { GroundDefinition } from "../../components/io/ground.js";
 import { CapacitorDefinition } from "../../components/passives/capacitor.js";
 import { DiodeDefinition } from "../../components/semiconductors/diode.js";
 import { NmosfetDefinition, PmosfetDefinition } from "../../components/semiconductors/mosfet.js";
@@ -100,7 +100,7 @@ function makeElement(
 
 function buildAnalogRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
-  registry.register(AnalogGroundDefinition);
+  registry.register(GroundDefinition);
   registry.register(ResistorDefinition);
   registry.register(DcVoltageSourceDefinition);
   registry.register(CapacitorDefinition);
@@ -154,11 +154,11 @@ describe("End-to-end: full pipeline", () => {
       [{ x: 10, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
-    const r1 = makeElement("AnalogResistor", "r1",
+    const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
     );
-    const r2 = makeElement("AnalogResistor", "r2",
+    const r2 = makeElement("Resistor", "r2",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
     );
@@ -204,11 +204,11 @@ describe("End-to-end: full pipeline", () => {
       [{ x: 10, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
-    const r = makeElement("AnalogResistor", "r1",
+    const r = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
     );
-    const diode = makeElement("AnalogDiode", "d1",
+    const diode = makeElement("Diode", "d1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
     );
     const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
@@ -580,7 +580,7 @@ describe("MOSFET through compiler", () => {
   // Shared registry builder that includes MOSFET definitions
   function buildMosfetRegistry(): ComponentRegistry {
     const registry = new ComponentRegistry();
-    registry.register(AnalogGroundDefinition);
+    registry.register(GroundDefinition);
     registry.register(ResistorDefinition);
     registry.register(DcVoltageSourceDefinition);
     registry.register(NmosfetDefinition);
@@ -609,7 +609,7 @@ describe("MOSFET through compiler", () => {
       [{ x: 10, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
-    const rd = makeElement("AnalogResistor", "rd1",
+    const rd = makeElement("Resistor", "rd1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 10000]]),
     );
@@ -682,7 +682,7 @@ describe("MOSFET through compiler", () => {
       [{ x: 10, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
-    const rd = makeElement("AnalogResistor", "rd1",
+    const rd = makeElement("Resistor", "rd1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 100000]]),
     );
@@ -756,7 +756,7 @@ describe("MOSFET through compiler", () => {
       [{ x: 10, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
-    const rd = makeElement("AnalogResistor", "rd1",
+    const rd = makeElement("Resistor", "rd1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 10000]]),
     );

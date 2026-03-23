@@ -181,7 +181,7 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
   // Step 3: identify ground group
   // -------------------------------------------------------------------------
   const groundElements = circuit.elements.filter(
-    (el) => el.typeId === "Ground" || el.typeId === "ground" || el.typeId === "AnalogGround",
+    (el) => el.typeId === "Ground",
   );
 
   let groundRoots = new Set<number>();

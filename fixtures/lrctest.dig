@@ -11,13 +11,13 @@
   </attributes>
   <visualElements>
     <visualElement>
-      <elementName>AnalogResistor</elementName>
+      <elementName>Resistor</elementName>
       <elementAttributes>
       </elementAttributes>
       <pos x="280" y="120"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogCapacitor</elementName>
+      <elementName>Capacitor</elementName>
       <elementAttributes>
         <entry>
           <string>rotation</string>
@@ -27,7 +27,7 @@
       <pos x="220" y="260"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogInductor</elementName>
+      <elementName>Inductor</elementName>
       <elementAttributes>
         <entry>
           <string>rotation</string>

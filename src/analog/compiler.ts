@@ -385,7 +385,7 @@ export function compileAnalogCircuit(
     }
 
     // Ground elements do not need an analog factory — they are structural.
-    if (el.typeId === "Ground" || el.typeId === "ground" || el.typeId === "AnalogGround") {
+    if (el.typeId === "Ground") {
       elementMeta.push({
         el,
         branchIdx: -1,
@@ -511,7 +511,7 @@ export function compileAnalogCircuit(
     const { el } = meta;
 
     // Ground elements: skip factory, just record for topology
-    if (el.typeId === "Ground" || el.typeId === "ground" || el.typeId === "AnalogGround") {
+    if (el.typeId === "Ground") {
       continue;
     }
 
@@ -948,7 +948,7 @@ export function compileAnalogCircuit(
   const hasGroundDiag = nodeMap.diagnostics.some((d) => d.code === "no-ground");
   if (!hasGroundDiag) {
     const hasGround = circuit.elements.some(
-      (el) => el.typeId === "Ground" || el.typeId === "ground" || el.typeId === "AnalogGround",
+      (el) => el.typeId === "Ground",
     );
     if (!hasGround) {
       diagnostics.push(

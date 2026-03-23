@@ -143,7 +143,7 @@ describe("Zener", () => {
   });
 
   it("definition_has_correct_fields", () => {
-    expect(ZenerDiodeDefinition.name).toBe("AnalogZener");
+    expect(ZenerDiodeDefinition.name).toBe("ZenerDiode");
     expect(ZenerDiodeDefinition.engineType).toBe("analog");
     expect(ZenerDiodeDefinition.analogDeviceType).toBe("D");
     expect(ZenerDiodeDefinition.analogFactory).toBeDefined();

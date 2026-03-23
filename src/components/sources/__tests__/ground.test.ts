@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { AnalogGroundDefinition, AnalogGroundElement } from "../ground.js";
+import { GroundDefinition } from "../../io/ground.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import type { SparseSolver } from "../../../analog/sparse-solver.js";
@@ -26,7 +26,7 @@ function makeMockSolver() {
 describe("Ground", () => {
   it("stamp_is_noop", () => {
     const props = new PropertyBag();
-    const element = AnalogGroundDefinition.analogFactory!(
+    const element = GroundDefinition.analogFactory!(
       [3],
       -1,
       props,
@@ -40,25 +40,25 @@ describe("Ground", () => {
     expect((solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it("pin_layout_single_input", () => {
-    const pinLayout = AnalogGroundDefinition.pinLayout;
+  it("pin_layout_single_output", () => {
+    const pinLayout = GroundDefinition.pinLayout;
 
     expect(pinLayout).toHaveLength(1);
-    expect(pinLayout[0].direction).toBe(PinDirection.INPUT);
-    expect(pinLayout[0].label).toBe("gnd");
+    expect(pinLayout[0].direction).toBe(PinDirection.OUTPUT);
+    expect(pinLayout[0].label).toBe("out");
   });
 
-  it("definition_has_engine_type_analog", () => {
-    expect(AnalogGroundDefinition.engineType).toBe("analog");
+  it("definition_has_engine_type_both", () => {
+    expect(GroundDefinition.engineType).toBe("both");
   });
 
   it("definition_has_analog_factory", () => {
-    expect(AnalogGroundDefinition.analogFactory).toBeDefined();
+    expect(GroundDefinition.analogFactory).toBeDefined();
   });
 
   it("element_is_not_nonlinear_and_not_reactive", () => {
     const props = new PropertyBag();
-    const element = AnalogGroundDefinition.analogFactory!(
+    const element = GroundDefinition.analogFactory!(
       [0],
       -1,
       props,
@@ -71,7 +71,7 @@ describe("Ground", () => {
 
   it("element_branch_index_is_minus_one", () => {
     const props = new PropertyBag();
-    const element = AnalogGroundDefinition.analogFactory!(
+    const element = GroundDefinition.analogFactory!(
       [2],
       -1,
       props,
@@ -83,7 +83,7 @@ describe("Ground", () => {
 
   it("element_node_indices_matches_input", () => {
     const props = new PropertyBag();
-    const element = AnalogGroundDefinition.analogFactory!(
+    const element = GroundDefinition.analogFactory!(
       [5],
       -1,
       props,

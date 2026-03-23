@@ -15,6 +15,13 @@ import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
 import { PinDirection } from "@/core/pin";
 
+/** Human-friendly labels for simulation mode dropdown. */
+const SIMULATION_MODE_LABELS: Record<string, string> = {
+  "logical": "Digital",
+  "analog-pins": "Analog (at pins)",
+  "analog-internals": "Analog (full)",
+};
+
 // ---------------------------------------------------------------------------
 // Change callback type
 // ---------------------------------------------------------------------------
@@ -164,7 +171,7 @@ export class PropertyPanel {
     for (const mode of modes) {
       const option = document.createElement("option");
       option.value = mode;
-      option.textContent = mode;
+      option.textContent = SIMULATION_MODE_LABELS[mode] ?? mode;
       if (mode === current) {
         (option as unknown as { selected: boolean }).selected = true;
       }
@@ -183,7 +190,7 @@ export class PropertyPanel {
       }
     });
 
-    const row = this._buildRow("Simulation Mode", select as unknown as HTMLElement);
+    const row = this._buildRow("Mode", select as unknown as HTMLElement);
     this._container.appendChild(row);
     this._inputs.set("simulationMode", {
       element: select as unknown as HTMLElement,

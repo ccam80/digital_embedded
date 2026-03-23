@@ -161,7 +161,7 @@ export class ZenerElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogZener", instanceId, position, rotation, mirror, props);
+    super("ZenerDiode", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -332,7 +332,7 @@ function zenerCircuitFactory(props: PropertyBag): ZenerElement {
 }
 
 export const ZenerDiodeDefinition: ComponentDefinition = {
-  name: "AnalogZener",
+  name: "ZenerDiode",
   typeId: -1,
   engineType: "analog",
   factory: zenerCircuitFactory,

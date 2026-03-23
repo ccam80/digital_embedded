@@ -43,7 +43,7 @@ import { XNOrDefinition } from "../../components/gates/xnor.js";
 
 // Import components needed for building test circuits
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { GroundDefinition } from "../../components/io/ground.js";
 import { NmosfetDefinition, PmosfetDefinition } from "../../components/semiconductors/mosfet.js";
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ function w(circuit: Circuit, x1: number, y1: number, x2: number, y2: number): vo
 
 function buildRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
-  registry.register(AnalogGroundDefinition);
+  registry.register(GroundDefinition);
   registry.register(DcVoltageSourceDefinition);
   registry.register(NmosfetDefinition);
   registry.register(PmosfetDefinition);

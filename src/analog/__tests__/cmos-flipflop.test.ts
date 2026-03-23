@@ -38,7 +38,7 @@ import { EngineState } from "../../core/engine-interface.js";
 import { registerCmosDFlipflop } from "../transistor-models/cmos-flipflop.js";
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
 import { AcVoltageSourceDefinition } from "../../components/sources/ac-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { GroundDefinition } from "../../components/io/ground.js";
 import { NmosfetDefinition, PmosfetDefinition } from "../../components/semiconductors/mosfet.js";
 import { DDefinition } from "../../components/flipflops/d.js";
 
@@ -115,7 +115,7 @@ function w(circuit: Circuit, x1: number, y1: number, x2: number, y2: number): vo
 
 function buildRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
-  registry.register(AnalogGroundDefinition);
+  registry.register(GroundDefinition);
   registry.register(DcVoltageSourceDefinition);
   registry.register(AcVoltageSourceDefinition);
   registry.register(NmosfetDefinition);

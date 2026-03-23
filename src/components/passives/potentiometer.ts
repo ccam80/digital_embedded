@@ -134,7 +134,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogPotentiometer", instanceId, position, rotation, mirror, props);
+    super("Potentiometer", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -341,7 +341,7 @@ function potentiometerCircuitFactory(props: PropertyBag): PotentiometerElement {
 }
 
 export const PotentiometerDefinition: ComponentDefinition = {
-  name: "AnalogPotentiometer",
+  name: "Potentiometer",
   typeId: -1,
   engineType: "analog",
   factory: potentiometerCircuitFactory,

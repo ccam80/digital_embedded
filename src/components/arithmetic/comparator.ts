@@ -51,7 +51,7 @@ export class ComparatorElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("Comparator", instanceId, position, rotation, mirror, props);
+    super("MagnitudeComparator", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -79,7 +79,7 @@ export class ComparatorElement extends AbstractCircuitElement {
   }
 
   getHelpText(): string {
-    return "Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less). Supports signed and unsigned modes.";
+    return "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less). Supports signed and unsigned modes.";
   }
 }
 
@@ -144,8 +144,8 @@ const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 
-export const ComparatorDefinition: ComponentDefinition = {
-  name: "Comparator",
+export const MagnitudeComparatorDefinition: ComponentDefinition = {
+  name: "MagnitudeComparator",
   typeId: -1,
   factory: (props) => new ComparatorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
   executeFn: executeComparator,
@@ -153,6 +153,6 @@ export const ComparatorDefinition: ComponentDefinition = {
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
+  helpText: "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
   defaultDelay: 10,
 };

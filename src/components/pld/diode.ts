@@ -262,7 +262,7 @@ export class DiodeElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("Diode", instanceId, position, rotation, mirror, props);
+    super("PldDiode", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -321,7 +321,7 @@ export class DiodeForwardElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("DiodeForward", instanceId, position, rotation, mirror, props);
+    super("PldDiodeForward", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -377,7 +377,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("DiodeBackward", instanceId, position, rotation, mirror, props);
+    super("PldDiodeBackward", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -558,8 +558,8 @@ function diodeBackwardFactory(props: PropertyBag): DiodeBackwardElement {
 // ComponentDefinitions
 // ---------------------------------------------------------------------------
 
-export const DiodeDefinition: ComponentDefinition = {
-  name: "Diode",
+export const PldDiodeDefinition: ComponentDefinition = {
+  name: "PldDiode",
   typeId: -1,
   factory: diodeFactory,
   executeFn: executeDiode,
@@ -574,8 +574,8 @@ export const DiodeDefinition: ComponentDefinition = {
   defaultDelay: 0,
 };
 
-export const DiodeForwardDefinition: ComponentDefinition = {
-  name: "DiodeForward",
+export const PldDiodeForwardDefinition: ComponentDefinition = {
+  name: "PldDiodeForward",
   typeId: -1,
   factory: diodeForwardFactory,
   executeFn: executeDiodeForward,
@@ -590,8 +590,8 @@ export const DiodeForwardDefinition: ComponentDefinition = {
   defaultDelay: 0,
 };
 
-export const DiodeBackwardDefinition: ComponentDefinition = {
-  name: "DiodeBackward",
+export const PldDiodeBackwardDefinition: ComponentDefinition = {
+  name: "PldDiodeBackward",
   typeId: -1,
   factory: diodeBackwardFactory,
   executeFn: executeDiodeBackward,

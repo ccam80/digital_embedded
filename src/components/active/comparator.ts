@@ -91,7 +91,7 @@ export class ComparatorElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogComparator", instanceId, position, rotation, mirror, props);
+    super("VoltageComparator", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -161,7 +161,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 
   getHelpText(): string {
     return (
-      "Analog Comparator — 3-terminal element (in+, in-, out). " +
+      "Voltage Comparator — 3-terminal element (in+, in-, out). " +
       "Output switches based on whether V+ > V- with optional hysteresis. " +
       "Open-collector output requires external pull-up; push-pull drives directly."
     );
@@ -367,11 +367,11 @@ const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// AnalogComparatorDefinition
+// VoltageComparatorDefinition
 // ---------------------------------------------------------------------------
 
-export const AnalogComparatorDefinition: ComponentDefinition = {
-  name: "AnalogComparator",
+export const VoltageComparatorDefinition: ComponentDefinition = {
+  name: "VoltageComparator",
   typeId: -1,
   engineType: "analog",
   category: ComponentCategory.ACTIVE,
@@ -382,7 +382,7 @@ export const AnalogComparatorDefinition: ComponentDefinition = {
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Analog Comparator — 3-terminal (in+, in-, out). " +
+    "Voltage Comparator — 3-terminal (in+, in-, out). " +
     "Switches output based on V+ vs V-. Open-collector output requires external pull-up. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 

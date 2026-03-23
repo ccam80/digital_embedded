@@ -45,7 +45,6 @@ import { CapacitorDefinition } from "../../components/passives/capacitor.js";
 import { InductorDefinition } from "../../components/passives/inductor.js";
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
 import { AcVoltageSourceDefinition } from "../../components/sources/ac-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
 import { GroundDefinition } from "../../components/io/ground.js";
 import { XOrDefinition } from "../../components/gates/xor.js";
 
@@ -118,7 +117,7 @@ function makeElement(
 
 function buildBehavioralRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
-  registry.register(AnalogGroundDefinition);
+  registry.register(GroundDefinition);
   registry.register(ResistorDefinition);
   registry.register(DcVoltageSourceDefinition);
   registry.register(XOrDefinition);
@@ -272,7 +271,7 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   );
 
   // Series resistor on In_1 path (x=10 → x=20)
-  const rDrive = makeElement("AnalogResistor", "r_drive",
+  const rDrive = makeElement("Resistor", "r_drive",
     [{ x: 10, y: 0 }, { x: 20, y: 0 }],
     new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
   );
@@ -299,13 +298,13 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   );
 
   // Load resistor (x=40 → x=50)
-  const rLoad = makeElement("AnalogResistor", "r_load",
+  const rLoad = makeElement("Resistor", "r_load",
     [{ x: 40, y: 0 }, { x: 50, y: 0 }],
     new Map<string, PropertyValue>([["resistance", R_LOAD]]),
   );
 
   // Ground at x=50
-  const gnd = makeElement("AnalogGround", "gnd1", [{ x: 50, y: 0 }]);
+  const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
 
   circuit.addElement(vs1);
   circuit.addElement(vs2);
@@ -675,9 +674,8 @@ describe("lrcxor fixture — simplified vs digital consistency", () => {
 /**
  * Build a registry that can load lrcxor.dig.
  *
- * The fixture uses: AnalogResistor, AnalogCapacitor, AnalogInductor,
- * AcVoltageSource, Ground (digital io Ground → treated as analog GND by
- * the dig-loader), and XOr.
+ * The fixture uses: Resistor, Capacitor, Inductor,
+ * AcVoltageSource, Ground (unified dual-engine), and XOr.
  * The digital bridge path also requires In and Out stubs.
  */
 function buildFixtureRegistry(): ComponentRegistry {
@@ -687,8 +685,7 @@ function buildFixtureRegistry(): ComponentRegistry {
   registry.register(CapacitorDefinition);
   registry.register(InductorDefinition);
   registry.register(AcVoltageSourceDefinition);
-  registry.register(AnalogGroundDefinition);
-  // The fixture uses elementName "Ground" (digital io Ground)
+  // Ground is unified — use canonical GroundDefinition from io/ground
   registry.register(GroundDefinition);
   // The XOR gate (engineType: "both")
   registry.register(XOrDefinition);
@@ -944,7 +941,7 @@ describe("bridge error paths", () => {
       [{ x: 10, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["voltage", V_HIGH]]),
     );
-    const rDrive = makeElement("AnalogResistor", "r_drive",
+    const rDrive = makeElement("Resistor", "r_drive",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
     );
@@ -957,11 +954,11 @@ describe("bridge error paths", () => {
       ],
       new Map<string, PropertyValue>([["simulationMode", "logical"]]),
     );
-    const rLoad = makeElement("AnalogResistor", "r_load",
+    const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_LOAD]]),
     );
-    const gnd = makeElement("AnalogGround", "gnd1", [{ x: 50, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
 
     circuit.addElement(vs1);
     circuit.addElement(rDrive);
@@ -1003,7 +1000,7 @@ describe("bridge error paths", () => {
       [{ x: 30, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["voltage", V_LOW]]),
     );
-    const rDrive = makeElement("AnalogResistor", "r_drive",
+    const rDrive = makeElement("Resistor", "r_drive",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
     );
@@ -1015,11 +1012,11 @@ describe("bridge error paths", () => {
       ],
       new Map<string, PropertyValue>([["simulationMode", "logical"]]),
     );
-    const rLoad = makeElement("AnalogResistor", "r_load",
+    const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_LOAD]]),
     );
-    const gnd = makeElement("AnalogGround", "gnd1", [{ x: 50, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
 
     circuit.addElement(vs1);
     circuit.addElement(vs2);

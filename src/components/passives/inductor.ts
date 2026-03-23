@@ -63,7 +63,7 @@ export class InductorElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogInductor", instanceId, position, rotation, mirror, props);
+    super("Inductor", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -259,7 +259,7 @@ function inductorCircuitFactory(props: PropertyBag): InductorElement {
 }
 
 export const InductorDefinition: ComponentDefinition = {
-  name: "AnalogInductor",
+  name: "Inductor",
   typeId: -1,
   engineType: "analog",
   factory: inductorCircuitFactory,

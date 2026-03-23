@@ -34,7 +34,7 @@ import type { SerializedElement } from "../../core/element.js";
 import { compileAnalogCircuit } from "../compiler.js";
 import { ResistorDefinition } from "../../components/passives/resistor.js";
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { GroundDefinition } from "../../components/io/ground.js";
 import { ProbeDefinition } from "../../components/io/probe.js";
 
 // ---------------------------------------------------------------------------
@@ -533,7 +533,7 @@ describe("runner_integration", () => {
     //   node_gnd (x=30): R2.B, Vs.neg, GND
 
     const registry = new ComponentRegistry();
-    registry.register(AnalogGroundDefinition);
+    registry.register(GroundDefinition);
     registry.register(ResistorDefinition);
     registry.register(DcVoltageSourceDefinition);
     registry.register(ProbeDefinition);
@@ -546,12 +546,12 @@ describe("runner_integration", () => {
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     // R1: 1kΩ from node_top (10,0) to node_mid (20,0)
-    const r1 = makeAnalogElement("AnalogResistor", "r1",
+    const r1 = makeAnalogElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
     );
     // R2: 1kΩ from node_mid (20,0) to node_gnd (30,0)
-    const r2 = makeAnalogElement("AnalogResistor", "r2",
+    const r2 = makeAnalogElement("Resistor", "r2",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
     );

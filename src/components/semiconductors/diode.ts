@@ -246,7 +246,7 @@ export class DiodeElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogDiode", instanceId, position, rotation, mirror, props);
+    super("Diode", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -389,7 +389,7 @@ function diodeCircuitFactory(props: PropertyBag): DiodeElement {
 }
 
 export const DiodeDefinition: ComponentDefinition = {
-  name: "AnalogDiode",
+  name: "Diode",
   typeId: -1,
   engineType: "analog",
   factory: diodeCircuitFactory,

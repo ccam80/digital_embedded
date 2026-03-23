@@ -99,10 +99,10 @@ const R4700_B64 =
 describe("CTZ", () => {
   it("parses_simple_rc_circuit", async () => {
     const registry = makeRegistry(
-      "AnalogResistor",
-      "AnalogCapacitor",
+      "Resistor",
+      "Capacitor",
       "DcVoltageSource",
-      "AnalogGround",
+      "Ground",
     );
     const diagnostics: Diagnostic[] = [];
     const url = `https://www.falstad.com/circuit/circuitjs.html#${RC_CIRCUIT_B64}`;
@@ -112,10 +112,10 @@ describe("CTZ", () => {
     expect(circuit.elements).toHaveLength(4);
 
     const typeIds = circuit.elements.map((e) => e.typeId);
-    expect(typeIds).toContain("AnalogResistor");
-    expect(typeIds).toContain("AnalogCapacitor");
+    expect(typeIds).toContain("Resistor");
+    expect(typeIds).toContain("Capacitor");
     expect(typeIds).toContain("DcVoltageSource");
-    expect(typeIds).toContain("AnalogGround");
+    expect(typeIds).toContain("Ground");
 
     // No unsupported-component diagnostics
     const unsupported = diagnostics.filter(
@@ -129,10 +129,10 @@ describe("CTZ", () => {
   // -------------------------------------------------------------------------
 
   it("maps_component_types", () => {
-    expect(CTZ_TYPE_MAP["r"]).toBe("AnalogResistor");
-    expect(CTZ_TYPE_MAP["c"]).toBe("AnalogCapacitor");
-    expect(CTZ_TYPE_MAP["l"]).toBe("AnalogInductor");
-    expect(CTZ_TYPE_MAP["d"]).toBe("AnalogDiode");
+    expect(CTZ_TYPE_MAP["r"]).toBe("Resistor");
+    expect(CTZ_TYPE_MAP["c"]).toBe("Capacitor");
+    expect(CTZ_TYPE_MAP["l"]).toBe("Inductor");
+    expect(CTZ_TYPE_MAP["d"]).toBe("Diode");
   });
 
   // -------------------------------------------------------------------------
@@ -146,7 +146,7 @@ describe("CTZ", () => {
       "xyz_unknown 100 100 200 100 0",
     ].join("\n");
 
-    const registry = makeRegistry("AnalogResistor");
+    const registry = makeRegistry("Resistor");
     const diagnostics: Diagnostic[] = [];
     const circuit = parseCtzCircuitFromText(ctzText, registry, diagnostics);
 
@@ -170,10 +170,10 @@ describe("CTZ", () => {
 
   it("decompresses_url", async () => {
     const registry = makeRegistry(
-      "AnalogResistor",
-      "AnalogCapacitor",
+      "Resistor",
+      "Capacitor",
       "DcVoltageSource",
-      "AnalogGround",
+      "Ground",
     );
     const url = `https://www.falstad.com/circuit/circuitjs.html#${RC_CIRCUIT_B64}`;
     // parseCtzUrl must succeed and return a Circuit with elements — this
@@ -187,14 +187,14 @@ describe("CTZ", () => {
   // -------------------------------------------------------------------------
 
   it("preserves_component_values", async () => {
-    const registry = makeRegistry("AnalogResistor");
+    const registry = makeRegistry("Resistor");
     const diagnostics: Diagnostic[] = [];
     const url = `https://www.falstad.com/circuit/circuitjs.html#${R4700_B64}`;
     const circuit = await parseCtzUrl(url, registry, diagnostics);
 
     expect(circuit.elements).toHaveLength(1);
     const el = circuit.elements[0];
-    expect(el.typeId).toBe("AnalogResistor");
+    expect(el.typeId).toBe("Resistor");
 
     // The resistor value 4700 must be preserved as the 'resistance' property
     const resistance = el.getProperties().getOrDefault<number>("resistance", -1);

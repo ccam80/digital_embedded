@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import { NegElement, executeNeg, NegDefinition, NEG_ATTRIBUTE_MAPPINGS } from "../neg.js";
-import { ComparatorElement, makeExecuteComparator, ComparatorDefinition, COMPARATOR_ATTRIBUTE_MAPPINGS } from "../comparator.js";
+import { ComparatorElement, makeExecuteComparator, MagnitudeComparatorDefinition, COMPARATOR_ATTRIBUTE_MAPPINGS } from "../comparator.js";
 import { BarrelShifterElement, makeExecuteBarrelShifter, BarrelShifterDefinition, BARREL_SHIFTER_ATTRIBUTE_MAPPINGS } from "../barrel-shifter.js";
 import { BitCountElement, executebitCount, BitCountDefinition, BIT_COUNT_ATTRIBUTE_MAPPINGS } from "../bit-count.js";
 import { BitExtenderElement, makeExecuteBitExtender, BitExtenderDefinition, BIT_EXTENDER_ATTRIBUTE_MAPPINGS } from "../bit-extender.js";
@@ -371,11 +371,11 @@ describe("Comparator", () => {
   });
 
   describe("definitionComplete", () => {
-    it("ComparatorDefinition name is 'Comparator'", () => { expect(ComparatorDefinition.name).toBe("Comparator"); });
-    it("category is ARITHMETIC", () => { expect(ComparatorDefinition.category).toBe(ComponentCategory.ARITHMETIC); });
+    it("MagnitudeComparatorDefinition name is 'MagnitudeComparator'", () => { expect(MagnitudeComparatorDefinition.name).toBe("MagnitudeComparator"); });
+    it("category is ARITHMETIC", () => { expect(MagnitudeComparatorDefinition.category).toBe(ComponentCategory.ARITHMETIC); });
     it("can be registered", () => {
       const r = new ComponentRegistry();
-      expect(() => r.register(ComparatorDefinition)).not.toThrow();
+      expect(() => r.register(MagnitudeComparatorDefinition)).not.toThrow();
     });
   });
 });

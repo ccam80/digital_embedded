@@ -163,8 +163,8 @@ describe("Inductor", () => {
   });
 
   describe("definition", () => {
-    it("InductorDefinition name is 'AnalogInductor'", () => {
-      expect(InductorDefinition.name).toBe("AnalogInductor");
+    it("InductorDefinition name is 'Inductor'", () => {
+      expect(InductorDefinition.name).toBe("Inductor");
     });
 
     it("InductorDefinition engineType is 'analog'", () => {

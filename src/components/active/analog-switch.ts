@@ -83,10 +83,10 @@ function stampConductance(
 }
 
 // ---------------------------------------------------------------------------
-// createAnalogSwitchSPSTElement — AnalogElement factory (SPST)
+// createSwitchSPSTElement — AnalogElement factory (SPST)
 // ---------------------------------------------------------------------------
 
-function createAnalogSwitchSPSTElement(
+function createSwitchSPSTElement(
   nodeIds: number[],
   props: PropertyBag,
 ): AnalogElement {
@@ -129,10 +129,10 @@ function createAnalogSwitchSPSTElement(
 }
 
 // ---------------------------------------------------------------------------
-// createAnalogSwitchSPDTElement — AnalogElement factory (SPDT)
+// createSwitchSPDTElement — AnalogElement factory (SPDT)
 // ---------------------------------------------------------------------------
 
-function createAnalogSwitchSPDTElement(
+function createSwitchSPDTElement(
   nodeIds: number[],
   props: PropertyBag,
 ): AnalogElement {
@@ -250,7 +250,7 @@ function buildSPDTPinDeclarations(): PinDeclaration[] {
 // CircuitElement classes
 // ---------------------------------------------------------------------------
 
-export class AnalogSwitchSPSTElement extends AbstractCircuitElement {
+export class SwitchSPSTElement extends AbstractCircuitElement {
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -258,7 +258,7 @@ export class AnalogSwitchSPSTElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogSwitchSPST", instanceId, position, rotation, mirror, props);
+    super("SwitchSPST", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -314,7 +314,7 @@ export class AnalogSwitchSPSTElement extends AbstractCircuitElement {
   }
 }
 
-export class AnalogSwitchSPDTElement extends AbstractCircuitElement {
+export class SwitchSPDTElement extends AbstractCircuitElement {
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -322,7 +322,7 @@ export class AnalogSwitchSPDTElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogSwitchSPDT", instanceId, position, rotation, mirror, props);
+    super("SwitchSPDT", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -448,8 +448,8 @@ const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ComponentDefinitions
 // ---------------------------------------------------------------------------
 
-export const AnalogSwitchSPSTDefinition: ComponentDefinition = {
-  name: "AnalogSwitchSPST",
+export const SwitchSPSTDefinition: ComponentDefinition = {
+  name: "SwitchSPST",
   typeId: -1,
   engineType: "analog",
   category: ComponentCategory.ACTIVE,
@@ -463,8 +463,8 @@ export const AnalogSwitchSPSTDefinition: ComponentDefinition = {
     "Analog Switch (SPST) — three-terminal (ctrl, in, out). " +
     "Voltage-controlled resistance using tanh transition for NR-friendly behavior.",
 
-  factory(props: PropertyBag): AnalogSwitchSPSTElement {
-    return new AnalogSwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  factory(props: PropertyBag): SwitchSPSTElement {
+    return new SwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
   analogFactory(
@@ -472,12 +472,12 @@ export const AnalogSwitchSPSTDefinition: ComponentDefinition = {
     _branchIdx: number,
     props: PropertyBag,
   ): AnalogElement {
-    return createAnalogSwitchSPSTElement(nodeIds, props);
+    return createSwitchSPSTElement(nodeIds, props);
   },
 };
 
-export const AnalogSwitchSPDTDefinition: ComponentDefinition = {
-  name: "AnalogSwitchSPDT",
+export const SwitchSPDTDefinition: ComponentDefinition = {
+  name: "SwitchSPDT",
   typeId: -1,
   engineType: "analog",
   category: ComponentCategory.ACTIVE,
@@ -491,8 +491,8 @@ export const AnalogSwitchSPDTDefinition: ComponentDefinition = {
     "Analog Switch (SPDT) — four-terminal (ctrl, com, no, nc). " +
     "COM-NO closes and COM-NC opens as control voltage rises through threshold.",
 
-  factory(props: PropertyBag): AnalogSwitchSPDTElement {
-    return new AnalogSwitchSPDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  factory(props: PropertyBag): SwitchSPDTElement {
+    return new SwitchSPDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
   analogFactory(
@@ -500,6 +500,6 @@ export const AnalogSwitchSPDTDefinition: ComponentDefinition = {
     _branchIdx: number,
     props: PropertyBag,
   ): AnalogElement {
-    return createAnalogSwitchSPDTElement(nodeIds, props);
+    return createSwitchSPDTElement(nodeIds, props);
   },
 };

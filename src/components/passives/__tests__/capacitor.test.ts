@@ -151,8 +151,8 @@ describe("Capacitor", () => {
   });
 
   describe("definition", () => {
-    it("CapacitorDefinition name is 'AnalogCapacitor'", () => {
-      expect(CapacitorDefinition.name).toBe("AnalogCapacitor");
+    it("CapacitorDefinition name is 'Capacitor'", () => {
+      expect(CapacitorDefinition.name).toBe("Capacitor");
     });
 
     it("CapacitorDefinition engineType is 'analog'", () => {

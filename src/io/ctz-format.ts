@@ -58,21 +58,21 @@ export interface CtzComponent {
  */
 export const CTZ_TYPE_MAP: Record<string, string> = {
   // Passives
-  r: "AnalogResistor",
-  c: "AnalogCapacitor",
-  l: "AnalogInductor",
+  r: "Resistor",
+  c: "Capacitor",
+  l: "Inductor",
 
   // Sources
   v: "DcVoltageSource",
   a: "AcVoltageSource",
   i: "CurrentSource",
-  g: "AnalogGround",
+  g: "Ground",
 
   // Semiconductors
-  d: "AnalogDiode",
-  dz: "AnalogZener",
+  d: "Diode",
+  dz: "ZenerDiode",
   dt: "TunnelDiode",
-  dled: "AnalogDiode",
+  dled: "Diode",
 
   // Transistors — BJT
   t: "NpnBJT",
@@ -96,18 +96,18 @@ export const CTZ_TYPE_MAP: Record<string, string> = {
   o: "OpAmp",
 
   // Switches / relays
-  s: "AnalogSwitchSPST",
-  spdt: "AnalogSwitchSPDT",
+  s: "SwitchSPST",
+  spdt: "SwitchSPDT",
 
   // Passive specialty
   xf: "AnalogTransformer",
   m: "AnalogMutualInductor",
   cr: "AnalogCrystal",
-  pot: "AnalogPotentiometer",
+  pot: "Potentiometer",
   memr: "AnalogMemristor",
 
   // Comparator / schmitt
-  comp: "AnalogComparator",
+  comp: "VoltageComparator",
   tri: "SchmittNonInverting",
   sc: "SchmittInverting",
 
@@ -115,7 +115,7 @@ export const CTZ_TYPE_MAP: Record<string, string> = {
   "555": "Timer555",
 
   // Transmission line
-  tl: "AnalogTransmissionLine",
+  tl: "TransmissionLine",
 
   // Logic
   and: "And",

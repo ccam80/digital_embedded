@@ -19,9 +19,9 @@ import {
   executeDiode,
   executeDiodeForward,
   executeDiodeBackward,
-  DiodeDefinition,
-  DiodeForwardDefinition,
-  DiodeBackwardDefinition,
+  PldDiodeDefinition,
+  PldDiodeForwardDefinition,
+  PldDiodeBackwardDefinition,
   DIODE_ATTRIBUTE_MAPPINGS_EXPORT,
 } from "../diode.js";
 import {
@@ -170,8 +170,8 @@ describe("Diode", () => {
       }
     });
 
-    it("DiodeDefinition.pinLayout has 2 entries", () => {
-      expect(DiodeDefinition.pinLayout).toHaveLength(2);
+    it("PldDiodeDefinition.pinLayout has 2 entries", () => {
+      expect(PldDiodeDefinition.pinLayout).toHaveLength(2);
     });
   });
 
@@ -419,61 +419,61 @@ describe("Diode", () => {
   // -------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
-    it("DiodeDefinition has name='Diode'", () => {
-      expect(DiodeDefinition.name).toBe("Diode");
+    it("PldDiodeDefinition has name='PldDiode'", () => {
+      expect(PldDiodeDefinition.name).toBe("PldDiode");
     });
 
-    it("DiodeDefinition has typeId=-1", () => {
-      expect(DiodeDefinition.typeId).toBe(-1);
+    it("PldDiodeDefinition has typeId=-1", () => {
+      expect(PldDiodeDefinition.typeId).toBe(-1);
     });
 
-    it("DiodeDefinition has a factory function", () => {
-      expect(typeof DiodeDefinition.factory).toBe("function");
+    it("PldDiodeDefinition has a factory function", () => {
+      expect(typeof PldDiodeDefinition.factory).toBe("function");
     });
 
-    it("DiodeDefinition factory produces a DiodeElement", () => {
+    it("PldDiodeDefinition factory produces a DiodeElement", () => {
       const props = new PropertyBag();
       props.set("blown", false);
-      const el = DiodeDefinition.factory(props);
-      expect(el.typeId).toBe("Diode");
+      const el = PldDiodeDefinition.factory(props);
+      expect(el.typeId).toBe("PldDiode");
     });
 
-    it("DiodeDefinition has executeFn=executeDiode", () => {
-      expect(DiodeDefinition.executeFn).toBe(executeDiode);
+    it("PldDiodeDefinition has executeFn=executeDiode", () => {
+      expect(PldDiodeDefinition.executeFn).toBe(executeDiode);
     });
 
-    it("DiodeDefinition category is PLD", () => {
-      expect(DiodeDefinition.category).toBe(ComponentCategory.PLD);
+    it("PldDiodeDefinition category is PLD", () => {
+      expect(PldDiodeDefinition.category).toBe(ComponentCategory.PLD);
     });
 
-    it("DiodeDefinition has non-empty helpText", () => {
-      expect(typeof DiodeDefinition.helpText).toBe("string");
-      expect(typeof DiodeDefinition.helpText).toBe("string"); expect(DiodeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
+    it("PldDiodeDefinition has non-empty helpText", () => {
+      expect(typeof PldDiodeDefinition.helpText).toBe("string");
+      expect(typeof PldDiodeDefinition.helpText).toBe("string"); expect(PldDiodeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("DiodeDefinition has non-empty propertyDefs", () => {
-      expect(DiodeDefinition.propertyDefs.length).toBeGreaterThan(0);
+    it("PldDiodeDefinition has non-empty propertyDefs", () => {
+      expect(PldDiodeDefinition.propertyDefs.length).toBeGreaterThan(0);
     });
 
-    it("DiodeDefinition propertyDefs include 'blown'", () => {
-      const keys = DiodeDefinition.propertyDefs.map((d) => d.key);
+    it("PldDiodeDefinition propertyDefs include 'blown'", () => {
+      const keys = PldDiodeDefinition.propertyDefs.map((d) => d.key);
       expect(keys).toContain("blown");
     });
 
-    it("DiodeDefinition can be registered without throwing", () => {
+    it("PldDiodeDefinition can be registered without throwing", () => {
       const registry = new ComponentRegistry();
-      expect(() => registry.register(DiodeDefinition)).not.toThrow();
+      expect(() => registry.register(PldDiodeDefinition)).not.toThrow();
     });
 
-    it("After registration DiodeDefinition typeId is non-negative", () => {
+    it("After registration PldDiodeDefinition typeId is non-negative", () => {
       const registry = new ComponentRegistry();
-      registry.register(DiodeDefinition);
-      const registered = registry.get("Diode");
+      registry.register(PldDiodeDefinition);
+      const registered = registry.get("PldDiode");
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
 
-    it("DiodeDefinition defaultDelay is 0", () => {
-      expect(DiodeDefinition.defaultDelay).toBe(0);
+    it("PldDiodeDefinition defaultDelay is 0", () => {
+      expect(PldDiodeDefinition.defaultDelay).toBe(0);
     });
   });
 });
@@ -512,8 +512,8 @@ describe("DiodeForward", () => {
       expect(outPin!.direction).toBe(PinDirection.OUTPUT);
     });
 
-    it("DiodeForwardDefinition.pinLayout has 2 entries", () => {
-      expect(DiodeForwardDefinition.pinLayout).toHaveLength(2);
+    it("PldDiodeForwardDefinition.pinLayout has 2 entries", () => {
+      expect(PldDiodeForwardDefinition.pinLayout).toHaveLength(2);
     });
   });
 
@@ -626,12 +626,12 @@ describe("DiodeForward", () => {
 
   describe("attributeMapping", () => {
     it("blown=true maps to boolean true", () => {
-      const mapping = DiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "blown");
+      const mapping = PldDiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "blown");
       expect(mapping!.convert("true")).toBe(true);
     });
 
     it("Label maps to label property key", () => {
-      const mapping = DiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "Label");
+      const mapping = PldDiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "Label");
       expect(mapping!.propertyKey).toBe("label");
     });
   });
@@ -641,40 +641,40 @@ describe("DiodeForward", () => {
   // -------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
-    it("DiodeForwardDefinition has name='DiodeForward'", () => {
-      expect(DiodeForwardDefinition.name).toBe("DiodeForward");
+    it("PldDiodeForwardDefinition has name='PldDiodeForward'", () => {
+      expect(PldDiodeForwardDefinition.name).toBe("PldDiodeForward");
     });
 
-    it("DiodeForwardDefinition has typeId=-1", () => {
-      expect(DiodeForwardDefinition.typeId).toBe(-1);
+    it("PldDiodeForwardDefinition has typeId=-1", () => {
+      expect(PldDiodeForwardDefinition.typeId).toBe(-1);
     });
 
-    it("DiodeForwardDefinition executeFn is executeDiodeForward", () => {
-      expect(DiodeForwardDefinition.executeFn).toBe(executeDiodeForward);
+    it("PldDiodeForwardDefinition executeFn is executeDiodeForward", () => {
+      expect(PldDiodeForwardDefinition.executeFn).toBe(executeDiodeForward);
     });
 
-    it("DiodeForwardDefinition category is PLD", () => {
-      expect(DiodeForwardDefinition.category).toBe(ComponentCategory.PLD);
+    it("PldDiodeForwardDefinition category is PLD", () => {
+      expect(PldDiodeForwardDefinition.category).toBe(ComponentCategory.PLD);
     });
 
-    it("DiodeForwardDefinition factory produces a DiodeForwardElement", () => {
+    it("PldDiodeForwardDefinition factory produces a DiodeForwardElement", () => {
       const props = new PropertyBag();
       props.set("blown", false);
-      const el = DiodeForwardDefinition.factory(props);
-      expect(el.typeId).toBe("DiodeForward");
+      const el = PldDiodeForwardDefinition.factory(props);
+      expect(el.typeId).toBe("PldDiodeForward");
     });
 
-    it("DiodeForwardDefinition can be registered without throwing", () => {
+    it("PldDiodeForwardDefinition can be registered without throwing", () => {
       const registry = new ComponentRegistry();
-      expect(() => registry.register(DiodeForwardDefinition)).not.toThrow();
+      expect(() => registry.register(PldDiodeForwardDefinition)).not.toThrow();
     });
 
-    it("DiodeForwardDefinition has non-empty helpText", () => {
-      expect(typeof DiodeForwardDefinition.helpText).toBe("string"); expect(DiodeForwardDefinition.helpText.length).toBeGreaterThanOrEqual(3);
+    it("PldDiodeForwardDefinition has non-empty helpText", () => {
+      expect(typeof PldDiodeForwardDefinition.helpText).toBe("string"); expect(PldDiodeForwardDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("DiodeForwardDefinition defaultDelay is 0", () => {
-      expect(DiodeForwardDefinition.defaultDelay).toBe(0);
+    it("PldDiodeForwardDefinition defaultDelay is 0", () => {
+      expect(PldDiodeForwardDefinition.defaultDelay).toBe(0);
     });
   });
 });
@@ -701,8 +701,8 @@ describe("DiodeBackward", () => {
       expect(labels).toContain("out");
     });
 
-    it("DiodeBackwardDefinition.pinLayout has 2 entries", () => {
-      expect(DiodeBackwardDefinition.pinLayout).toHaveLength(2);
+    it("PldDiodeBackwardDefinition.pinLayout has 2 entries", () => {
+      expect(PldDiodeBackwardDefinition.pinLayout).toHaveLength(2);
     });
   });
 
@@ -833,36 +833,36 @@ describe("DiodeBackward", () => {
   // -------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
-    it("DiodeBackwardDefinition has name='DiodeBackward'", () => {
-      expect(DiodeBackwardDefinition.name).toBe("DiodeBackward");
+    it("PldDiodeBackwardDefinition has name='PldDiodeBackward'", () => {
+      expect(PldDiodeBackwardDefinition.name).toBe("PldDiodeBackward");
     });
 
-    it("DiodeBackwardDefinition has typeId=-1", () => {
-      expect(DiodeBackwardDefinition.typeId).toBe(-1);
+    it("PldDiodeBackwardDefinition has typeId=-1", () => {
+      expect(PldDiodeBackwardDefinition.typeId).toBe(-1);
     });
 
-    it("DiodeBackwardDefinition executeFn is executeDiodeBackward", () => {
-      expect(DiodeBackwardDefinition.executeFn).toBe(executeDiodeBackward);
+    it("PldDiodeBackwardDefinition executeFn is executeDiodeBackward", () => {
+      expect(PldDiodeBackwardDefinition.executeFn).toBe(executeDiodeBackward);
     });
 
-    it("DiodeBackwardDefinition category is PLD", () => {
-      expect(DiodeBackwardDefinition.category).toBe(ComponentCategory.PLD);
+    it("PldDiodeBackwardDefinition category is PLD", () => {
+      expect(PldDiodeBackwardDefinition.category).toBe(ComponentCategory.PLD);
     });
 
-    it("DiodeBackwardDefinition factory produces a DiodeBackwardElement", () => {
+    it("PldDiodeBackwardDefinition factory produces a DiodeBackwardElement", () => {
       const props = new PropertyBag();
       props.set("blown", false);
-      const el = DiodeBackwardDefinition.factory(props);
-      expect(el.typeId).toBe("DiodeBackward");
+      const el = PldDiodeBackwardDefinition.factory(props);
+      expect(el.typeId).toBe("PldDiodeBackward");
     });
 
-    it("DiodeBackwardDefinition can be registered without throwing", () => {
+    it("PldDiodeBackwardDefinition can be registered without throwing", () => {
       const registry = new ComponentRegistry();
-      expect(() => registry.register(DiodeBackwardDefinition)).not.toThrow();
+      expect(() => registry.register(PldDiodeBackwardDefinition)).not.toThrow();
     });
 
-    it("DiodeBackwardDefinition defaultDelay is 0", () => {
-      expect(DiodeBackwardDefinition.defaultDelay).toBe(0);
+    it("PldDiodeBackwardDefinition defaultDelay is 0", () => {
+      expect(PldDiodeBackwardDefinition.defaultDelay).toBe(0);
     });
   });
 });

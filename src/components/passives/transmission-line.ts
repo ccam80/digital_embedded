@@ -114,7 +114,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogTransmissionLine", instanceId, position, rotation, mirror, props);
+    super("TransmissionLine", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -608,7 +608,7 @@ function transmissionLineCircuitFactory(props: PropertyBag): TransmissionLineCir
 }
 
 export const TransmissionLineDefinition: ComponentDefinition = {
-  name: "AnalogTransmissionLine",
+  name: "TransmissionLine",
   typeId: -1,
   engineType: "analog",
   factory: transmissionLineCircuitFactory,

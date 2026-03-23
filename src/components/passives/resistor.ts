@@ -64,7 +64,7 @@ export class ResistorElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("AnalogResistor", instanceId, position, rotation, mirror, props);
+    super("Resistor", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
@@ -237,7 +237,7 @@ function resistorCircuitFactory(props: PropertyBag): ResistorElement {
 }
 
 export const ResistorDefinition: ComponentDefinition = {
-  name: "AnalogResistor",
+  name: "Resistor",
   typeId: -1,
   engineType: "analog",
   factory: resistorCircuitFactory,

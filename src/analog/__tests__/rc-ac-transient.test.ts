@@ -310,7 +310,7 @@ import { compileAnalogCircuit } from "../compiler.js";
 import { ResistorDefinition } from "../../components/passives/resistor.js";
 import { CapacitorDefinition } from "../../components/passives/capacitor.js";
 import { AcVoltageSourceDefinition } from "../../components/sources/ac-voltage-source.js";
-import { AnalogGroundDefinition } from "../../components/sources/ground.js";
+import { GroundDefinition } from "../../components/io/ground.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement factory (same pattern as mna-end-to-end.test.ts)
@@ -367,7 +367,7 @@ function addWire(circuit: Circuit, x1: number, y1: number, x2: number, y2: numbe
 
 function buildAnalogRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
-  registry.register(AnalogGroundDefinition);
+  registry.register(GroundDefinition);
   registry.register(ResistorDefinition);
   registry.register(CapacitorDefinition);
   registry.register(AcVoltageSourceDefinition);
@@ -386,11 +386,11 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
       ]),
     );
-    const r1 = makeElement("AnalogResistor", "r1",
+    const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
     );
-    const c1 = makeElement("AnalogCapacitor", "c1",
+    const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
     );
@@ -439,11 +439,11 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
       ]),
     );
-    const r1 = makeElement("AnalogResistor", "r1",
+    const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
     );
-    const c1 = makeElement("AnalogCapacitor", "c1",
+    const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
     );
@@ -519,14 +519,14 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["label", "Vs"],
       ]),
     );
-    const r1 = makeElement("AnalogResistor", "r1",
+    const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],  // A, B
       new Map<string, PropertyValue>([
         ["resistance", R],
         ["label", "R1"],
       ]),
     );
-    const c1 = makeElement("AnalogCapacitor", "c1",
+    const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],  // A, B
       new Map<string, PropertyValue>([
         ["capacitance", C],

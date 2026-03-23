@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { AnalogComparatorDefinition } from "../comparator.js";
+import { VoltageComparatorDefinition } from "../comparator.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
@@ -52,7 +52,7 @@ function makeComparator(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return AnalogComparatorDefinition.analogFactory!(
+  return VoltageComparatorDefinition.analogFactory!(
     [nInp, nInn, nOut],
     -1,
     makeProps(overrides),
