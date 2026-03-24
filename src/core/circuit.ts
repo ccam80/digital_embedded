@@ -176,6 +176,12 @@ export class Circuit {
   }
 
   addWire(wire: Wire): void {
+    if (wire.start.x === wire.end.x && wire.start.y === wire.end.y) {
+      // Zero-length wire — skip silently. These are degenerate artifacts
+      // from .dig loading, wire merging, or junction splitting that contribute
+      // nothing to circuit topology and can cause orphan MNA nodes.
+      return;
+    }
     this.wires.push(wire);
   }
 
@@ -184,6 +190,28 @@ export class Circuit {
     if (index !== -1) {
       this.wires.splice(index, 1);
     }
+  }
+
+  /**
+   * Remove all zero-length wires (start === end) from the circuit.
+   *
+   * Zero-length wires contribute nothing to electrical connectivity but can
+   * create orphan MNA nodes that cause singular matrices in analog simulation.
+   * Call this after loading external files, after wire splitting, or after
+   * element deletion to clean up degenerate artifacts.
+   *
+   * @returns The number of wires removed.
+   */
+  removeZeroLengthWires(): number {
+    let removed = 0;
+    for (let i = this.wires.length - 1; i >= 0; i--) {
+      const w = this.wires[i]!;
+      if (w.start.x === w.end.x && w.start.y === w.end.y) {
+        this.wires.splice(i, 1);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   /**

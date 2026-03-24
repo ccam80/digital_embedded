@@ -312,8 +312,8 @@ export function createNJfetElement(
   props: PropertyBag,
 ): NJfetAnalogElement {
   const nodeG = nodeIds[0]; // gate
-  const nodeD = nodeIds[1]; // drain
-  const nodeS = nodeIds[2]; // source
+  const nodeS = nodeIds[1]; // source
+  const nodeD = nodeIds[2]; // drain
 
   const p = resolveJfetParams(props, JFET_N_DEFAULTS);
   return new NJfetAnalogElement(nodeG, nodeD, nodeS, p);
@@ -341,9 +341,9 @@ export class NJfetElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
-      width: 3,
-      height: 3,
+      y: this.position.y - 1,
+      width: 4,
+      height: 2,
     };
   }
 
@@ -356,35 +356,26 @@ export class NJfetElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const PX = 1 / 16;
-
-    const chanX = 1.8;
-    const chanTop = -1.0;
-    const chanBot = 1.0;
-
-    // Body (channel line, gate bar rect, arrow) stays COMPONENT color
-    ctx.drawLine(chanX, chanTop, chanX, chanBot);
-
-    const barWidth = 3 * PX;
-    const gateBarTop = chanTop + 0.15;
-    const gateBarBot = chanBot - 0.15;
-    ctx.drawRect(
-      chanX - barWidth / 2,
-      gateBarTop,
-      barWidth,
-      gateBarBot - gateBarTop,
+    // Channel bar: fillPolygon from Falstad pixels (51,-16),(51,16),(54,16),(54,-16) ÷ 16
+    ctx.drawPolygon(
+      [
+        { x: 3.1875, y: -1 },
+        { x: 3.1875, y: 1 },
+        { x: 3.375, y: 1 },
+        { x: 3.375, y: -1 },
+      ],
       true,
     );
 
-    const arrowLen = 8 * PX;
-    const arrowWid = 3 * PX;
-    const barbF = 1 - arrowLen / chanX;
-    const barbX = chanX * barbF;
-    ctx.drawPolygon([
-      { x: chanX, y: 0 },
-      { x: barbX, y: -arrowWid },
-      { x: barbX, y: arrowWid },
-    ], true);
+    // Gate arrow: fillPolygon from Falstad pixels (50,0),(42,-3),(42,3) ÷ 16
+    ctx.drawPolygon(
+      [
+        { x: 3.125, y: 0 },
+        { x: 2.625, y: -0.1875 },
+        { x: 2.625, y: 0.1875 },
+      ],
+      true,
+    );
 
     // Gate lead
     if (signals && vG !== undefined) {
@@ -392,25 +383,25 @@ export class NJfetElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, chanX, 0);
+    ctx.drawLine(0, 0, 3.125, 0);
 
-    // Drain lead (top)
+    // Drain lead (top): Falstad (64,-16)→(64,-8)→(54,-8) ÷ 16
     if (signals && vD !== undefined) {
       ctx.setRawColor(signals.voltageColor(vD));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanTop, 3, chanTop);
-    ctx.drawLine(3, chanTop, 3, -1.5);
+    ctx.drawLine(4, -1, 4, -0.5);
+    ctx.drawLine(4, -0.5, 3.375, -0.5);
 
-    // Source lead (bottom)
+    // Source lead (bottom): Falstad (64,16)→(64,8)→(54,8) ÷ 16
     if (signals && vS !== undefined) {
       ctx.setRawColor(signals.voltageColor(vS));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanBot, 3, chanBot);
-    ctx.drawLine(3, chanBot, 3, 1.5);
+    ctx.drawLine(4, 1, 4, 0.5);
+    ctx.drawLine(4, 0.5, 3.375, 0.5);
 
     ctx.restore();
   }
@@ -439,18 +430,18 @@ function buildNJfetPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
-      direction: PinDirection.INPUT,
-      label: "D",
+      direction: PinDirection.OUTPUT,
+      label: "S",
       defaultBitWidth: 1,
-      position: { x: 3, y: -1.5 },
+      position: { x: 4, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
-      direction: PinDirection.OUTPUT,
-      label: "S",
+      direction: PinDirection.INPUT,
+      label: "D",
       defaultBitWidth: 1,
-      position: { x: 3, y: 1.5 },
+      position: { x: 4, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },

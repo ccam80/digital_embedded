@@ -1,0 +1,535 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774131114660,
+  "projectRoot": "C:\\local_working_projects\\digital_in_browser",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.58.2",
+        "category": "testing"
+      },
+      {
+        "name": "vite",
+        "version": "5.4.0",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "2.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "test:e2e": "playwright test",
+      "test:all": "vitest run && playwright test",
+      "lint": "eslint src",
+      "typecheck": "tsc --noEmit"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "lib",
+      "scripts",
+      "spec",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "circuits": {
+      "path": "circuits",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1774131114570,
+      "keyFiles": [
+        "and-gate.dig",
+        "half-adder.dig",
+        "shift-add-multiplier.dig",
+        "sr-latch.dig"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1774131114571,
+      "keyFiles": [
+        "main.js"
+      ]
+    },
+    "e2e": {
+      "path": "e2e",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774131114572,
+      "keyFiles": []
+    },
+    "fixtures": {
+      "path": "fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 9,
+      "lastAccessed": 1774131114611,
+      "keyFiles": [
+        "broken_chain.dig",
+        "chained_inverters.dig",
+        "dcswitchlrc.dig",
+        "falstad-shapes.json",
+        "java-shapes-errors.txt"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1774131114611,
+      "keyFiles": []
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774131114612,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 9,
+      "lastAccessed": 1774131114612,
+      "keyFiles": [
+        "circuit-cli.ts",
+        "circuit-mcp-server.ts",
+        "generate-all-components-fixture.ts",
+        "patch-analysis-dialog.cjs",
+        "pin-diagnostic.js"
+      ]
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 2,
+      "lastAccessed": 1774131114613,
+      "keyFiles": [
+        "analog-ui-fixup.md",
+        "facade-unification.md"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1774131114613,
+      "keyFiles": [
+        "main.ts"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774131114614,
+      "keyFiles": []
+    },
+    "tutorials": {
+      "path": "tutorials",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774131114615,
+      "keyFiles": [
+        "index.json"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 2,
+      "lastAccessed": 1774131114616,
+      "keyFiles": [
+        "memory-editor-DEA45Iu0.js",
+        "search-B4BtHZDg.js"
+      ]
+    },
+    "e2e\\fixtures": {
+      "path": "e2e\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 2,
+      "lastAccessed": 1774131114617,
+      "keyFiles": [
+        "harness.html",
+        "simulator-harness.ts"
+      ]
+    },
+    "src\\app": {
+      "path": "src\\app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1774131114619,
+      "keyFiles": [
+        "app-init.ts",
+        "test-bridge.ts",
+        "url-params.ts"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 3,
+      "lastAccessed": 1774131114619,
+      "keyFiles": [
+        "generic-shape.ts",
+        "library-74xx.ts",
+        "register-all.ts"
+      ]
+    },
+    "src\\fixtures": {
+      "path": "src\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1774131114620,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src\\app\\test-bridge.ts",
+      "accessCount": 18,
+      "lastAccessed": 1774142279266,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 8,
+      "lastAccessed": 1774138534910,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\palette-ui.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774134445252,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 5,
+      "lastAccessed": 1774138659917,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\__tests__\\default-facade.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774131387727,
+      "type": "file"
+    },
+    {
+      "path": "spec\\e2e-circuit-assembly-test-plan.md",
+      "accessCount": 4,
+      "lastAccessed": 1774142087397,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\analog-rc-circuit.spec.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774136283760,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\fixtures\\simulator-harness.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774136353118,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\runner.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774131450790,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\stress-test-regressions.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774131457008,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\workflow-tests.spec.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774132186073,
+      "type": "file"
+    },
+    {
+      "path": "playwright.config.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774132195629,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\fixtures\\harness.html",
+      "accessCount": 2,
+      "lastAccessed": 1774132217698,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\app-loads.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131286132,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\simulation-controls.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131286923,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\menu-actions.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131287096,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\analog-ui-fixup.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131287615,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\parity\\load-and-simulate.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131287820,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\parity\\error-handling.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131287907,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\parity\\headless-simulation.spec.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131287945,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\fence.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131295985,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\facade-types.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131296071,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\loader.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131296488,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131296583,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\registry.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131296649,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\register-all.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131324736,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\controls.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131325042,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\oscillation.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131325514,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\__tests__\\timing-wheel.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131327435,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\__tests__\\and.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131328064,
+      "type": "file"
+    },
+    {
+      "path": "src\\testing\\__tests__\\executor.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131357266,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\__tests__\\postmessage-adapter.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131357796,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131387828,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\io\\__tests__\\io.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131387969,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\wiring\\__tests__",
+      "accessCount": 1,
+      "lastAccessed": 1774131398019,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\wiring\\__tests__\\sim-control.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131404049,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\memory\\__tests__\\two-phase-memory.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131404122,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\switching\\__tests__\\switches.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131404176,
+      "type": "directory"
+    },
+    {
+      "path": "src\\engine\\__tests__\\mixed-partition.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131411397,
+      "type": "directory"
+    },
+    {
+      "path": "src\\testing\\__tests__\\batch-runner.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131419124,
+      "type": "directory"
+    },
+    {
+      "path": "src\\engine\\__tests__\\flatten-bridge.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131419674,
+      "type": "directory"
+    },
+    {
+      "path": "src\\testing\\__tests__\\run-all.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131419710,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\switching\\__tests__",
+      "accessCount": 1,
+      "lastAccessed": 1774131419797,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\switching\\__tests__\\relay.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131426376,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\switching\\__tests__\\fuse.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131435296,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\switching\\__tests__\\fets.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131435336,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\__tests__\\integration.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131450583,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\__tests__\\trace.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131450654,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\__tests__\\test-runner.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131450728,
+      "type": "directory"
+    },
+    {
+      "path": "src\\__tests__\\legacy-audit.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774131456472,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

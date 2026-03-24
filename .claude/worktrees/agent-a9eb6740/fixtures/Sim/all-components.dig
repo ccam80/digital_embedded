@@ -1,0 +1,1097 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry>
+      <string>romContent</string>
+      <romList>
+        <roms/>
+      </romList>
+    </entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>And</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Or</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Or</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Not</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>NAnd</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>NAnd</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>NOr</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>NOr</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>XOr</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>XOr</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>XNOr</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>XNOr</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>In</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Out</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Clock</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="0"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Const</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Ground</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>VDD</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>VDD</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>NotConnected</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>NotConnected</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>LED</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>LED</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PolarityAwareLED</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PolarityAwareLED</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>LightBulb</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>LightBulb</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RGBLED</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RGBLED</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Button</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Button</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ButtonLED</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ButtonLED</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DipSwitch</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>DipSwitch</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Probe</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Scope</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Scope</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ScopeTrigger</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>ScopeTrigger</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SevenSeg</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>SevenSeg</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SevenSegHex</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>SevenSegHex</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SixteenSeg</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>SixteenSeg</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>MIDI</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>MIDI</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RotEncoder</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RotEncoder</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>StepperMotorBipolar</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>StepperMotorBipolar</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>StepperMotorUnipolar</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>StepperMotorUnipolar</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PowerSupply</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PowerSupply</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>D_FF</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>D_FF</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>D_FF_AS</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>D_FF_AS</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>JK_FF</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>JK_FF</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>JK_FF_AS</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>JK_FF_AS</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RS_FF</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RS_FF</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RS_FF_AS</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RS_FF_AS</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>T_FF</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>T_FF</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Monoflop</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Monoflop</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="480"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Counter</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Counter</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>CounterPreset</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>CounterPreset</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Register</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Register</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RegisterFile</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RegisterFile</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ROM</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ROM</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ROMDualPort</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ROMDualPort</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>EEPROM</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>EEPROM</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>EEPROMDualPort</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>EEPROMDualPort</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>LookUpTable</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>LookUpTable</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ProgramCounter</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ProgramCounter</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>ProgramMemory</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ProgramMemory</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMSinglePort</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RAMSinglePort</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMSinglePortSel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RAMSinglePortSel</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMDualPort</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RAMDualPort</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMDualAccess</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RAMDualAccess</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RAMAsync</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RAMAsync</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BlockRAMDualPort</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>BlockRAMDualPort</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Add</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Add</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Sub</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Sub</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Mul</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Mul</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="800"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Div</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Div</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Comparator</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Comparator</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Neg</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Neg</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BitExtender</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>BitExtender</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BarrelShifter</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>BarrelShifter</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BitCount</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>BitCount</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PRNG</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PRNG</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Multiplexer</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Multiplexer</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Demultiplexer</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Demultiplexer</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Decoder</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Decoder</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="960"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BitSelector</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>BitSelector</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PriorityEncoder</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PriorityEncoder</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Splitter</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Splitter</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>BusSplitter</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>BusSplitter</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Driver</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Driver</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DriverInvSel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>DriverInvSel</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Delay</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Delay</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Stop</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Stop</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Break</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Break</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AsyncSeq</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>AsyncSeq</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="1120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Tunnel</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Reset</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Reset</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Relay</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Relay</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>RelayDT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>RelayDT</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>NFET</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>NFET</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PFET</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PFET</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>FGNFET</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>FGNFET</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>FGPFET</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>FGPFET</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>TransGate</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>TransGate</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Fuse</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Fuse</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="1280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Switch</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Switch</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SwitchDT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>SwitchDT</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PlainSwitch</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PlainSwitch</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PlainSwitchDT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PlainSwitchDT</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Diode</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Diode</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DiodeForward</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>DiodeForward</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DiodeBackward</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>DiodeBackward</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PullUp</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PullUp</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PullDown</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>PullDown</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1920" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Text</elementName>
+      <elementAttributes>
+        <entry>
+          <string>label</string>
+          <string>Text</string>
+        </entry>
+      </elementAttributes>
+      <pos x="2160" y="1440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Rectangle</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Rectangle</string>
+        </entry>
+      </elementAttributes>
+      <pos x="0" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Testcase</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Testcase</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>LedMatrix</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>LedMatrix</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>VGA</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>VGA</string>
+        </entry>
+      </elementAttributes>
+      <pos x="720" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>GraphicCard</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>GraphicCard</string>
+        </entry>
+      </elementAttributes>
+      <pos x="960" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Terminal</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Terminal</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1200" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Keyboard</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Keyboard</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1440" y="1600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Function</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Function</string>
+        </entry>
+      </elementAttributes>
+      <pos x="1680" y="1600"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+  </wires>
+  <measurementOrdering/>
+</circuit>

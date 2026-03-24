@@ -62,7 +62,9 @@ class VddElement extends AbstractCircuitElement {
   private readonly _pin: Pin;
 
   constructor(instanceId: string, pinWorldX: number, pinWorldY: number) {
-    super("VDD", instanceId, { x: pinWorldX, y: pinWorldY - 1 }, 0, false, new PropertyBag());
+    // Body placed 3 units above the target pin position so the pin (at offset
+    // y+1) lands 2 grid units above, producing a visible standoff wire.
+    super("VDD", instanceId, { x: pinWorldX, y: pinWorldY - 3 }, 0, false, new PropertyBag());
     this._pin = {
       direction: PinDirection.OUTPUT,
       position: { x: 0, y: 1 },
@@ -107,7 +109,9 @@ class GndElement extends AbstractCircuitElement {
   private readonly _pin: Pin;
 
   constructor(instanceId: string, pinWorldX: number, pinWorldY: number) {
-    super("GND", instanceId, { x: pinWorldX, y: pinWorldY + 1 }, 0, false, new PropertyBag());
+    // Body placed 3 units below the target pin position so the pin (at offset
+    // y-1) lands 2 grid units below, producing a visible standoff wire.
+    super("GND", instanceId, { x: pinWorldX, y: pinWorldY + 3 }, 0, false, new PropertyBag());
     this._pin = {
       direction: PinDirection.OUTPUT,
       position: { x: 0, y: -1 },

@@ -138,7 +138,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "in+",
+      label: "in-",
       defaultBitWidth: 1,
       position: { x: 0, y: -1 },
       isNegatable: false,
@@ -146,7 +146,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.INPUT,
-      label: "in-",
+      label: "in+",
       defaultBitWidth: 1,
       position: { x: 0, y: 1 },
       isNegatable: false,
@@ -219,24 +219,8 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    const triLeft = 0.5;
-    const triRight = 3.5;
-
-    // Input lead in+
-    if (vInp !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vInp));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, -1, triLeft, -1);
-
-    // Input lead in-
-    if (vInn !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vInn));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 1, triLeft, 1);
+    const triLeft = 0;
+    const triRight = 4;
 
     // Triangle body — stays COMPONENT color
     ctx.setColor("COMPONENT");
@@ -244,14 +228,6 @@ export class RealOpAmpElement extends AbstractCircuitElement {
       [{ x: triLeft, y: -2 }, { x: triRight, y: 0 }, { x: triLeft, y: 2 }],
       false,
     );
-
-    // Output lead
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(triRight, 0, 4, 0);
 
     // Supply rail stubs: Vcc+ stub
     if (vVccP !== undefined && ctx.setRawColor) {
@@ -271,13 +247,8 @@ export class RealOpAmpElement extends AbstractCircuitElement {
 
     // +/- signs — body decoration, stays COMPONENT color
     ctx.setColor("COMPONENT");
-    const signX = triLeft + 4 * PX;
-    const signSz = 6 * PX;
-    // + for in+ (top)
-    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
-    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
-    // - for in- (bottom)
-    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
+    ctx.drawText('-', 13 / 16, -18 / 16, { horizontal: "center", vertical: "middle" });
+    ctx.drawText('+', 13 / 16, 16 / 16, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
   }

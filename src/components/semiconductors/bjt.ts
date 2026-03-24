@@ -175,8 +175,8 @@ export function createBjtElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElement {
-  const nodeC = nodeIds[0]; // collector
-  const nodeB = nodeIds[1]; // base
+  const nodeB = nodeIds[0]; // base
+  const nodeC = nodeIds[1]; // collector
   const nodeE = nodeIds[2]; // emitter
 
   // Resolve model parameters
@@ -343,9 +343,9 @@ export class NpnBjtElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
-      width: 2.4,
-      height: 3,
+      y: this.position.y - 1,
+      width: 4.0,
+      height: 2.0,
     };
   }
 
@@ -358,9 +358,13 @@ export class NpnBjtElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Body (circle and vertical bar) stays COMPONENT color
-    ctx.drawCircle(1.2, 0, 1.2, false);
-    ctx.drawLine(1.0, -0.7, 1.0, 0.7);
+    // Vertical bar (filled polygon)
+    ctx.drawPolygon([
+      { x: 3, y: -1 },
+      { x: 3.1875, y: -1 },
+      { x: 3.1875, y: 1 },
+      { x: 3, y: 1 },
+    ], true);
 
     // Base lead
     if (signals && vB !== undefined) {
@@ -368,7 +372,7 @@ export class NpnBjtElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, 1.0, 0);
+    ctx.drawLine(0, 0, 3, 0);
 
     // Collector lead (from bar to collector pin)
     if (signals && vC !== undefined) {
@@ -376,7 +380,7 @@ export class NpnBjtElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(1.0, -0.7, 2, -1.5);
+    ctx.drawLine(3.1875, -0.375, 4, -1);
 
     // Emitter lead (from bar to emitter pin)
     if (signals && vE !== undefined) {
@@ -384,14 +388,14 @@ export class NpnBjtElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(1.0, 0.7, 2, 1.5);
+    ctx.drawLine(3.1875, 0.375, 4, 1);
 
-    // Arrow on emitter (pointing outward for NPN) — body stays COMPONENT
+    // Arrow on emitter (pointing outward for NPN)
     ctx.setColor("COMPONENT");
     ctx.drawPolygon([
-      { x: 2, y: 1.5 },
-      { x: 1.6682292076469702, y: 0.9144325628653415 },
-      { x: 1.3557707923530296, y: 1.3047674371346582 },
+      { x: 4, y: 1 },
+      { x: 3.75, y: 0.5 },
+      { x: 3.4375, y: 0.875 },
     ], true);
 
     ctx.restore();
@@ -424,9 +428,9 @@ export class PnpBjtElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
-      width: 2.4,
-      height: 3,
+      y: this.position.y - 1,
+      width: 4,
+      height: 2,
     };
   }
 
@@ -439,9 +443,13 @@ export class PnpBjtElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Body (circle and vertical bar) stays COMPONENT color
-    ctx.drawCircle(1.2, 0, 1.2, false);
-    ctx.drawLine(1.0, -0.7, 1.0, 0.7);
+    // Vertical bar (filled polygon)
+    ctx.drawPolygon([
+      { x: 3, y: -1 },
+      { x: 3.1875, y: -1 },
+      { x: 3.1875, y: 1 },
+      { x: 3, y: 1 },
+    ], true);
 
     // Base lead
     if (signals && vB !== undefined) {
@@ -449,30 +457,30 @@ export class PnpBjtElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, 1.0, 0);
+    ctx.drawLine(0, 0, 3, 0);
 
-    // Collector lead (from bar to collector pin)
+    // Lower branch to C pin at (4, 1)
     if (signals && vC !== undefined) {
       ctx.setRawColor(signals.voltageColor(vC));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(1.0, -0.7, 2, -1.5);
+    ctx.drawLine(3.1875, 0.375, 4, 1);
 
-    // Emitter lead (from bar to emitter pin)
+    // Upper branch to E pin at (4, -1)
     if (signals && vE !== undefined) {
       ctx.setRawColor(signals.voltageColor(vE));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(1.0, 0.7, 2, 1.5);
+    ctx.drawLine(3.1875, -0.375, 4, -1);
 
-    // Arrow on emitter pointing INWARD (PNP) — body stays COMPONENT
+    // Arrow on upper (E) branch pointing inward (PNP)
     ctx.setColor("COMPONENT");
     ctx.drawPolygon([
-      { x: 1.0, y: 0.7 },
-      { x: 1.3317707923530298, y: 1.2855674371346585 },
-      { x: 1.6442292076469704, y: 0.8952325628653418 },
+      { x: 3.3125, y: -0.3125 },
+      { x: 3.8125, y: -0.5 },
+      { x: 3.5, y: -0.875 },
     ], true);
 
     ctx.restore();
@@ -495,14 +503,6 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "C",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -1.5 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
       label: "B",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
@@ -510,10 +510,18 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
+      direction: PinDirection.INPUT,
+      label: "C",
+      defaultBitWidth: 1,
+      position: { x: 4, y: -1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
       direction: PinDirection.OUTPUT,
       label: "E",
       defaultBitWidth: 1,
-      position: { x: 2, y: 1.5 },
+      position: { x: 4, y: 1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -523,14 +531,6 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
 function buildPnpPinDeclarations(): PinDeclaration[] {
   return [
     {
-      direction: PinDirection.OUTPUT,
-      label: "C",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -1.5 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
       direction: PinDirection.INPUT,
       label: "B",
       defaultBitWidth: 1,
@@ -539,10 +539,18 @@ function buildPnpPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
+      direction: PinDirection.OUTPUT,
+      label: "C",
+      defaultBitWidth: 1,
+      position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
       direction: PinDirection.INPUT,
       label: "E",
       defaultBitWidth: 1,
-      position: { x: 2, y: 1.5 },
+      position: { x: 4, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },

@@ -29,6 +29,12 @@ export interface FalstadPinRef {
   y: number;
 }
 
+export interface FalstadTextRef {
+  text: string;
+  x: number; // grid coords (px × PX_TO_GRID)
+  y: number;
+}
+
 // ---------------------------------------------------------------------------
 // Drawing interface
 // ---------------------------------------------------------------------------
@@ -166,25 +172,25 @@ const PIN_LABELS: Record<string, string[]> = {
   VaractorDiode: ["A", "K"],
   Diac: ["A", "B"],
   NpnBJT: ["B", "C", "E"],
-  PnpBJT: ["B", "E", "C"],
+  PnpBJT: ["B", "C", "E"],
   NMOS: ["G", "S", "D"],
-  PMOS: ["G", "S", "D"],
+  PMOS: ["G", "D", "S"],
   NJFET: ["G", "S", "D"],
-  PJFET: ["G", "S", "D"],
+  PJFET: ["G", "D", "S"],
   SCR: ["A", "K", "G"],
-  Triac: ["MT1", "MT2", "G"],
+  Triac: ["MT2", "MT1", "G"],
   Triode: ["P", "G", "K"],
   // Sources
-  DcVoltageSource: ["pos", "neg"],
-  AcVoltageSource: ["pos", "neg"],
-  CurrentSource: ["pos", "neg"],
+  DcVoltageSource: ["neg", "pos"],
+  AcVoltageSource: ["neg", "pos"],
+  CurrentSource: ["neg", "pos"],
   Ground: ["gnd"],
   VariableRail: ["pos"],
   // Active
   OpAmp: ["in-", "in+", "out"],
   RealOpAmp: ["in-", "in+", "out", "Vcc+", "Vcc-"],
-  VoltageComparator: ["in+", "in-", "out"],
-  Timer555: ["VCC", "GND", "TRIG", "THR", "CTRL", "RST", "DIS", "OUT"],
+  VoltageComparator: ["in-", "in+", "out"],
+  Timer555: ["DIS", "TRIG", "THR", "VCC", "CTRL", "OUT", "RST", "GND"],
   OTA: ["V+", "V-", "Iabc", "OUT+", "OUT-"],
   Optocoupler: ["anode", "cathode", "collector", "emitter"],
   VCVS: ["ctrl+", "ctrl-", "out+", "out-"],
@@ -251,11 +257,13 @@ function replayDraw(ctx: RefDrawContext, call: DrawCall, g: number): void {
 
 let _refs: Map<string, (ctx: RefDrawContext) => void> | null = null;
 let _pins: Map<string, FalstadPinRef[]> | null = null;
+let _texts: Map<string, FalstadTextRef[]> | null = null;
 
 function ensureBuilt(): void {
   if (_refs) return;
   _refs = new Map();
   _pins = new Map();
+  _texts = new Map();
 
   const jsonPath = join(__dirname, "../../fixtures/falstad-shapes.json");
   const fixture: Record<string, ComponentData> = JSON.parse(
@@ -284,6 +292,18 @@ function ensureBuilt(): void {
         y: p.y * PX_TO_GRID,
       })),
     );
+
+    // Text calls
+    const textRefs: FalstadTextRef[] = comp.draws
+      .filter((d) => d.type === "text" && d.text !== undefined)
+      .map((d) => ({
+        text: d.text!,
+        x: (d.x ?? 0) * PX_TO_GRID,
+        y: (d.y ?? 0) * PX_TO_GRID,
+      }));
+    if (textRefs.length > 0) {
+      _texts.set(tsType, textRefs);
+    }
   }
 }
 
@@ -322,6 +342,21 @@ export const FALSTAD_PIN_POSITIONS: ReadonlyMap<string, FalstadPinRef[]> = {
     _pins!.forEach((v, k) => cb(v, k, this));
   },
   [Symbol.iterator]() { ensureBuilt(); return _pins![Symbol.iterator](); },
+};
+
+/** Map of TS type → text draw calls from Falstad reference (grid coords). */
+export const FALSTAD_TEXT_REFS: ReadonlyMap<string, FalstadTextRef[]> = {
+  get size() { ensureBuilt(); return _texts!.size; },
+  has(key: string) { ensureBuilt(); return _texts!.has(key); },
+  get(key: string) { ensureBuilt(); return _texts!.get(key); },
+  keys() { ensureBuilt(); return _texts!.keys(); },
+  values() { ensureBuilt(); return _texts!.values(); },
+  entries() { ensureBuilt(); return _texts!.entries(); },
+  forEach(cb: (value: FalstadTextRef[], key: string, map: ReadonlyMap<string, FalstadTextRef[]>) => void) {
+    ensureBuilt();
+    _texts!.forEach((v, k) => cb(v, k, this));
+  },
+  [Symbol.iterator]() { ensureBuilt(); return _texts![Symbol.iterator](); },
 };
 
 // ---------------------------------------------------------------------------
@@ -378,7 +413,6 @@ export const ALL_ANALOG_TYPES: readonly string[] = [
   "Resistor",
   "Capacitor",
   "Inductor",
-  "Fuse",
   "Potentiometer",
   "Transformer",
   "TappedTransformer",
@@ -387,7 +421,6 @@ export const ALL_ANALOG_TYPES: readonly string[] = [
   "PolarizedCap",
   "TransmissionLine",
   // Semiconductors
-  "Diode",
   "ZenerDiode",
   "NpnBJT",
   "PnpBJT",
@@ -402,7 +435,6 @@ export const ALL_ANALOG_TYPES: readonly string[] = [
   "VaractorDiode",
   "Triode",
   // Sources
-  "Ground",
   "DcVoltageSource",
   "CurrentSource",
   "AcVoltageSource",

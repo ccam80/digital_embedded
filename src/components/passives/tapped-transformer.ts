@@ -54,7 +54,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "P1",
       defaultBitWidth: 1,
-      position: { x: 0, y: -1 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -62,7 +62,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "P2",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -70,7 +70,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "S1",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1.5 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,7 +78,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "CT",
       defaultBitWidth: 1,
-      position: { x: 4, y: 0 },
+      position: { x: 4, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -86,7 +86,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "S2",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1.5 },
+      position: { x: 4, y: 4 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -113,13 +113,11 @@ export class TappedTransformerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Geometry: primary at x=0 y:[-1,1], secondary at x=4 y:[-1.5,1.5]
-    // Arcs extend ±6*PX from winding x positions
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
+      y: this.position.y,
       width: 4,
-      height: 3,
+      height: 4,
     };
   }
 
@@ -128,78 +126,31 @@ export class TappedTransformerElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Falstad TappedTransformerElm:
-    // P1(0,-1), P2(0,1), S1(4,-1.5), CT(4,0), S2(4,1.5)
-    const PX = 1 / 16;
+    // Lead lines: pin → coil edge
+    ctx.drawLine(0, 0, 1.25, 0);      // P1 lead
+    ctx.drawLine(0, 4, 1.25, 4);      // P2 lead
+    ctx.drawLine(4, 0, 2.75, 0);      // S1 lead
+    ctx.drawLine(4, 2, 2.75, 2);      // CT lead
+    ctx.drawLine(4, 4, 2.75, 4);      // S2 lead
 
-    // Primary: ce and cd along P1→P2 (dn=2)
-    const priDn = 2;
-    const priCe = 0.5 - 12 * PX / priDn;
-    const priCd = 0.5 - 2 * PX / priDn;
-
-    const priCoil1Y = -1 + priCe * 2;
-    const priCoil2Y = -1 + (1 - priCe) * 2;
-    const priCore1Y = -1 + priCd * 2;
-    const priCore2Y = -1 + (1 - priCd) * 2;
-
-    // Secondary upper half: S1(4,-1.5) → CT(4,0), dn=1.5
-    const upDn = 1.5;
-    const upCe = 0.5 - 12 * PX / upDn;
-    const upCd = 0.5 - 2 * PX / upDn;
-    const upCoil1Y = -1.5 + upCe * 1.5;
-    const upCoil2Y = -1.5 + (1 - upCe) * 1.5;
-    const upCore1Y = -1.5 + upCd * 1.5;
-
-    // Secondary lower half: CT(4,0) → S2(4,1.5), dn=1.5
-    const lowCe = upCe;
-    const lowCd = upCd;
-    const lowCoil1Y = 0 + lowCe * 1.5;
-    const lowCoil2Y = 0 + (1 - lowCe) * 1.5;
-    const lowCore2Y = 0 + (1 - lowCd) * 1.5;
-
-    // Lead lines
-    ctx.drawLine(0, -1, 0, priCoil1Y);
-    ctx.drawLine(0, 1, 0, priCoil2Y);
-    ctx.drawLine(4, -1.5, 4, upCoil1Y);
-    ctx.drawLine(4, 0, 4, upCoil2Y);   // CT to upper coil end
-    ctx.drawLine(4, 0, 4, lowCoil1Y);  // CT to lower coil start
-    ctx.drawLine(4, 1.5, 4, lowCoil2Y);
-
-    // Primary coil arcs (facing +x toward center)
-    const priLen = priCoil2Y - priCoil1Y;
-    const priLoopCt = Math.ceil((priLen / PX) / 11);
-    const priHs = 6 * PX;
-    for (let loop = 0; loop < priLoopCt; loop++) {
-      const t = (loop + 0.5) / priLoopCt;
-      const cy = priCoil1Y + priLen * t;
-      const r = priLen / (2 * priLoopCt);
-      ctx.drawArc(0 + priHs, cy, r, Math.PI / 2, 3 * Math.PI / 2);
+    // Primary coil: 6 right-facing arcs at x=1.25 (3π/2 to 5π/2) with vertical connectors
+    const arcR = 5.333 / 16;
+    for (let i = 0; i < 6; i++) {
+      const cy = (i * 2 + 1) * arcR;
+      ctx.drawArc(1.25, cy, arcR, 3 * Math.PI / 2, 5 * Math.PI / 2);
+      ctx.drawLine(1.25, i * 2 * arcR, 1.25, (i + 1) * 2 * arcR);
     }
 
-    // Secondary upper half arcs (facing -x toward center)
-    const upLen = upCoil2Y - upCoil1Y;
-    const upLoopCt = Math.ceil((upLen / PX) / 11);
-    const secHs = 6 * PX;
-    for (let loop = 0; loop < upLoopCt; loop++) {
-      const t = (loop + 0.5) / upLoopCt;
-      const cy = upCoil1Y + upLen * t;
-      const r = upLen / (2 * upLoopCt);
-      ctx.drawArc(4 - secHs, cy, r, -Math.PI / 2, Math.PI / 2);
+    // Secondary coil: 6 right-facing arcs at x=2.75 (3π/2 to 5π/2) with vertical connectors
+    for (let i = 0; i < 6; i++) {
+      const cy = (i * 2 + 1) * arcR;
+      ctx.drawArc(2.75, cy, arcR, 3 * Math.PI / 2, 5 * Math.PI / 2);
+      ctx.drawLine(2.75, i * 2 * arcR, 2.75, (i + 1) * 2 * arcR);
     }
 
-    // Secondary lower half arcs
-    const lowLen = lowCoil2Y - lowCoil1Y;
-    const lowLoopCt = Math.ceil((lowLen / PX) / 11);
-    for (let loop = 0; loop < lowLoopCt; loop++) {
-      const t = (loop + 0.5) / lowLoopCt;
-      const cy = lowCoil1Y + lowLen * t;
-      const r = lowLen / (2 * lowLoopCt);
-      ctx.drawArc(4 - secHs, cy, r, -Math.PI / 2, Math.PI / 2);
-    }
-
-    // Core lines
-    ctx.drawLine(0 + 2 * PX, priCore1Y, 0 + 2 * PX, priCore2Y);
-    ctx.drawLine(4 - 2 * PX, upCore1Y, 4 - 2 * PX, lowCore2Y);
+    // Core lines (iron core between coils)
+    ctx.drawLine(1.875, 0, 1.875, 4);
+    ctx.drawLine(2.125, 0, 2.125, 4);
 
     ctx.restore();
   }

@@ -219,6 +219,13 @@ export function initApp(search?: string): void {
   /** Analog simulation rate in sim-seconds per wall-second.  Default 1e-3. */
   let analogTargetRate = 1e-3;
 
+  /**
+   * World-space positions of diagnostic errors/warnings to highlight on the
+   * canvas. Populated by compileAndBind() when diagnostics carry
+   * involvedNodes; cleared on successful compile or circuit edit.
+   */
+  let diagnosticOverlays: Array<{ x: number; y: number; severity: 'error' | 'warning' }> = [];
+
   // Sync: any colorSchemeManager change updates renderers automatically
   colorSchemeManager.onChange(() => {
     const active = colorSchemeManager.getActive();
@@ -245,6 +252,34 @@ export function initApp(search?: string): void {
   function clearStatus(): void {
     statusMessage.textContent = 'Ready';
     statusBar.classList.remove('error');
+  }
+
+  /**
+   * Populate diagnosticOverlays from solver diagnostics that carry involvedNodes.
+   * Reverse-lookups wireToNodeId to find world-space positions for each node.
+   */
+  function populateDiagnosticOverlays(
+    diags: import('../core/analog-engine-interface.js').SolverDiagnostic[],
+    wireToNodeId: Map<Wire, number>,
+  ): void {
+    // Build reverse map: nodeId → first wire endpoint position (world coords)
+    const nodeIdToPosition = new Map<number, { x: number; y: number }>();
+    for (const [wire, nodeId] of wireToNodeId) {
+      if (!nodeIdToPosition.has(nodeId)) {
+        nodeIdToPosition.set(nodeId, { x: wire.start.x, y: wire.start.y });
+      }
+    }
+
+    for (const diag of diags) {
+      if (!diag.involvedNodes || diag.involvedNodes.length === 0) continue;
+      const severity = diag.severity === 'error' ? 'error' as const : 'warning' as const;
+      for (const nodeId of diag.involvedNodes) {
+        const pos = nodeIdToPosition.get(nodeId);
+        if (pos) {
+          diagnosticOverlays.push({ x: pos.x, y: pos.y, severity });
+        }
+      }
+    }
   }
 
   function formatDiagnostics(diagnostics: Diagnostic[]): string {
@@ -485,6 +520,9 @@ export function initApp(search?: string): void {
   }
 
   function compileAndBind(): boolean {
+    // Clear previous diagnostic overlays — each compile attempt starts fresh.
+    diagnosticOverlays = [];
+
     // Determine effective engine mode for UI branching
     let isAnalog = isAnalogOrMixed();
 
@@ -507,6 +545,8 @@ export function initApp(search?: string): void {
             const combined = friendlyMessages.join(' | ');
             console.error('Analog compilation diagnostics:', compileErrors);
             showStatus(`Analog circuit problem: ${combined}`, true);
+            populateDiagnosticOverlays(concreteAc.diagnostics, concreteAc.wireToNodeId);
+            scheduleRender();
             facade.invalidate();
             return false;
           }
@@ -514,6 +554,9 @@ export function initApp(search?: string): void {
           const compileWarnings = concreteAc.diagnostics.filter(d => d.severity === 'warning');
           if (compileWarnings.length > 0) {
             console.warn('Analog compilation warnings:', compileWarnings.map(d => d.summary));
+            // Show warning overlays even on successful compile
+            populateDiagnosticOverlays(compileWarnings, concreteAc.wireToNodeId);
+            scheduleRender();
           }
         }
 
@@ -744,6 +787,27 @@ export function initApp(search?: string): void {
       for (const dw of doglegs) {
         canvasRenderer.drawLine(dw.start.x, dw.start.y, dw.end.x, dw.end.y);
       }
+    }
+
+    // Render diagnostic overlays (error/warning location circles)
+    if (diagnosticOverlays.length > 0) {
+      ctx2d.save();
+      for (const overlay of diagnosticOverlays) {
+        const isError = overlay.severity === 'error';
+        ctx2d.fillStyle = isError
+          ? 'rgba(220, 38, 38, 0.25)'   // red for errors
+          : 'rgba(234, 179, 8, 0.25)';   // yellow for warnings
+        ctx2d.strokeStyle = isError
+          ? 'rgba(220, 38, 38, 0.8)'
+          : 'rgba(234, 179, 8, 0.8)';
+        ctx2d.lineWidth = 2 / gridScale;
+        const radius = 1.5; // grid units
+        ctx2d.beginPath();
+        ctx2d.arc(overlay.x, overlay.y, radius, 0, Math.PI * 2);
+        ctx2d.fill();
+        ctx2d.stroke();
+      }
+      ctx2d.restore();
     }
 
     canvasRenderer.setGridScale(1);
@@ -1656,13 +1720,37 @@ export function initApp(search?: string): void {
       }
 
       if (e.key === 'c' || e.key === 'C') {
+        const def = registry.get('Capacitor');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === '1') {
         const def = registry.get('Const');
         if (def) { placement.start(def); scheduleRender(); }
         return;
       }
 
       if (e.key === 'v' || e.key === 'V') {
+        const def = registry.get('VoltageSource');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === '+') {
         const def = registry.get('VDD');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === 'l' || e.key === 'L') {
+        const def = registry.get('Inductor');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
+
+      if (e.key === 't' || e.key === 'T') {
+        const def = registry.get('Tunnel');
         if (def) { placement.start(def); scheduleRender(); }
         return;
       }
@@ -1680,9 +1768,15 @@ export function initApp(search?: string): void {
         scheduleRender();
         return;
       }
+
+      if (e.key === 'R') {
+        const def = registry.get('Resistor');
+        if (def) { placement.start(def); scheduleRender(); }
+        return;
+      }
     }
 
-    if (e.key === 'r' || e.key === 'R') {
+    if (e.key === 'r') {
       if (placement.isActive()) {
         placement.rotate();
         scheduleRender();
@@ -1945,12 +2039,22 @@ export function initApp(search?: string): void {
       if (idx === undefined) return undefined;
       const analogEl = concreteCompiled.elements[idx];
       if (!analogEl) return undefined;
-      const pins = element.getPins();
-      const nodeIds = analogEl.nodeIndices;
-      // Build pin label → MNA node ID mapping (pins are in declaration order)
+      // Resolve pin label → MNA node ID by matching pin world positions
+      // against wireToNodeId. This is correct regardless of the order of
+      // nodeIndices (which may differ from pin declaration order, e.g.
+      // FET nodeIndices = [D,G,S] but pinLayout = [G,S,D]).
       const pinLabelToNodeId = new Map<string, number>();
-      for (let i = 0; i < pins.length && i < nodeIds.length; i++) {
-        pinLabelToNodeId.set(pins[i].label, nodeIds[i]);
+      for (const pin of element.getPins()) {
+        const wp = pinWorldPosition(element, pin);
+        for (const [wire, nodeId] of concreteCompiled.wireToNodeId) {
+          if (
+            (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
+            (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
+          ) {
+            pinLabelToNodeId.set(pin.label, nodeId);
+            break;
+          }
+        }
       }
       const tracker = analogVoltageTracker;
       const scheme = colorSchemeManager.getActive();
@@ -2011,7 +2115,9 @@ export function initApp(search?: string): void {
         analogEngine.step();
         if ((analogEngine as unknown as { getState(): EngineState }).getState() === EngineState.ERROR) {
           showStatus('Analog simulation error: solver failed to converge', true);
-          stopAnalogRenderLoop();
+          disposeAnalog();
+          compiledDirty = true;
+          scheduleRender();
           return;
         }
         while (analogEngine.simTime < simTimeGoal) {
@@ -2022,14 +2128,18 @@ export function initApp(search?: string): void {
           analogEngine.step();
           if ((analogEngine as unknown as { getState(): EngineState }).getState() === EngineState.ERROR) {
             showStatus('Analog simulation error: solver failed to converge', true);
-            stopAnalogRenderLoop();
+            disposeAnalog();
+            compiledDirty = true;
+            scheduleRender();
             return;
           }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         showStatus(`Analog simulation error: ${msg}`, true);
-        stopAnalogRenderLoop();
+        disposeAnalog();
+        compiledDirty = true;
+        scheduleRender();
         return;
       }
 
@@ -2839,15 +2949,25 @@ export function initApp(search?: string): void {
       const analogEl = ac.elements[elementIndex];
       if (!analogEl) return;
 
-      const nodeIds = analogEl.nodeIndices;
-      if (nodeIds.length === 0) return;
-
       if (items.length > 0) items.push(separator());
 
-      // Per-pin voltage traces
-      for (let i = 0; i < nodeIds.length && i < pins.length; i++) {
-        const pinLabel = pins[i].label;
-        const nodeId = nodeIds[i];
+      // Per-pin voltage traces — resolve node IDs by pin world position,
+      // not by indexing nodeIndices (which may differ in order from pins,
+      // e.g. FET nodeIndices = [D,G,S] but pins = [G,S,D]).
+      for (const pin of pins) {
+        const pinLabel = pin.label;
+        const wp = pinWorldPosition(element, pin);
+        let nodeId: number | undefined;
+        for (const [wire, nid] of ac.wireToNodeId) {
+          if (
+            (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
+            (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
+          ) {
+            nodeId = nid;
+            break;
+          }
+        }
+        if (nodeId === undefined) continue;
         items.push({
           label: `Trace Voltage: ${label}.${pinLabel}`,
           action: () => {
@@ -2859,6 +2979,8 @@ export function initApp(search?: string): void {
               watchedSignals.push({ name: `${label}.${pinLabel}`, netId: nodeId, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
             }
+            viewerPanel?.classList.add('open');
+            showViewerTab('timing');
           },
           enabled: true,
         });
@@ -2884,6 +3006,8 @@ export function initApp(search?: string): void {
               }
             }
           }
+          viewerPanel?.classList.add('open');
+          showViewerTab('timing');
         },
         enabled: true,
       });

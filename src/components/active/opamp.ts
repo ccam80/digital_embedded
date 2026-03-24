@@ -17,7 +17,7 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect, TextAnchor } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
@@ -40,7 +40,7 @@ function buildOpAmpPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "in+",
+      label: "in-",
       defaultBitWidth: 1,
       position: { x: 0, y: -1 },
       isNegatable: false,
@@ -48,7 +48,7 @@ function buildOpAmpPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.INPUT,
-      label: "in-",
+      label: "in+",
       defaultBitWidth: 1,
       position: { x: 0, y: 1 },
       isNegatable: false,
@@ -102,26 +102,31 @@ export class OpAmpElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Triangle body — stays COMPONENT color
+    // Matches Falstad 3-point polyline (6,-32)→(6,32)→(58,0) which draws only 2 segments
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0.5, -2, 0.5, 2);
-    ctx.drawLine(0.5, -2, 3.5, 0);
-    ctx.drawLine(0.5, 2, 3.5, 0);
+    ctx.drawLine(0.375, -2, 0.375, 2);
+    ctx.drawLine(0.375, 2, 3.625, 0);
 
-    // Input lead in+ colored by its pin voltage
+    // +/- labels inside triangle body
+    ctx.setColor("COMPONENT");
+    ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
+
+    // Input lead in+ colored by its pin voltage (in+ is at y:1)
     if (vInp !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vInp));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, -1, 0.5, -1);
+    ctx.drawLine(0, 1, 0.375, 1);
 
-    // Input lead in- colored by its pin voltage
+    // Input lead in- colored by its pin voltage (in- is at y:-1)
     if (vInn !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vInn));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 1, 0.5, 1);
+    ctx.drawLine(0, -1, 0.375, -1);
 
     // Output lead colored by its pin voltage
     if (vOut !== undefined && ctx.setRawColor) {
@@ -129,7 +134,7 @@ export class OpAmpElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3.5, 0, 4, 0);
+    ctx.drawLine(3.625, 0, 4, 0);
 
     ctx.restore();
   }

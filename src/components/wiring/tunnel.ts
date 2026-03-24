@@ -204,6 +204,7 @@ export const TunnelDefinition: ComponentDefinition = {
   typeId: -1,
   factory: tunnelFactory,
   executeFn: executeTunnel,
+  engineType: "both",
   pinLayout: buildTunnelPinDeclarations(1),
   propertyDefs: TUNNEL_PROPERTY_DEFS,
   attributeMap: TUNNEL_ATTRIBUTE_MAPPINGS,

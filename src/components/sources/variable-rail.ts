@@ -24,7 +24,7 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect, TextAnchor } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
@@ -59,26 +59,29 @@ export class VariableRailElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x - 2, y: this.position.y - 1, width: 4, height: 2 };
+    return { x: this.position.x, y: this.position.y - 1, width: 4, height: 2 };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const vPos = signals?.getPinVoltage("pos");
 
     ctx.save();
-    ctx.setLineWidth(1);
 
-    // Lead from pos pin to body
+    // Thick lead line from pin to body (Falstad: 0→47px = 0→2.9375 grid units)
     if (vPos !== undefined) {
       ctx.setColor(signals!.voltageColor(vPos));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(-2, 0, 0, 0);
+    ctx.setLineWidth(2);
+    ctx.drawLine(0, 0, 2.9375, 0);
 
-    // Circle body stays COMPONENT color
-    ctx.setColor("COMPONENT");
-    ctx.drawCircle(1, 0, 1, false);
+    // Voltage label at right side
+    ctx.setColor("TEXT");
+    ctx.setLineWidth(1);
+    const voltage = this.props.has("voltage") ? this.props.get<number>("voltage") : 5;
+    const label = `+${(voltage ?? 5).toFixed(1)}V`;
+    ctx.drawText(label, 4, 0, { horizontal: "left", vertical: "middle" } as TextAnchor);
 
     ctx.restore();
   }

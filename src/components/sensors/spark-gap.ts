@@ -224,7 +224,7 @@ function buildSparkGapPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "neg",
       defaultBitWidth: 1,
-      position: { x: 1, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -252,9 +252,9 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 0.25,
+      x: this.position.x,
       y: this.position.y - 0.5,
-      width: 1.5,
+      width: 4.0,
       height: 1.0,
     };
   }
@@ -270,17 +270,17 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
       [
-        { x: 0.25, y: 0 },
-        { x: -0.25, y: 0.5 },
-        { x: -0.25, y: -0.5 },
+        { x: 1.75, y: 0 },
+        { x: 1.25, y: -0.5 },
+        { x: 1.25, y: 0.5 },
       ],
       true,
     );
     ctx.drawPolygon(
       [
-        { x: 0.75, y: 0 },
-        { x: 1.25, y: -0.5 },
-        { x: 1.25, y: 0.5 },
+        { x: 2.25, y: 0 },
+        { x: 2.75, y: 0.5 },
+        { x: 2.75, y: -0.5 },
       ],
       true,
     );
@@ -291,7 +291,7 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, 0.25, 0);
+    ctx.drawLine(0, 0, 1.25, 0);
 
     // neg lead
     if (vNeg !== undefined && ctx.setRawColor) {
@@ -299,7 +299,7 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0.75, 0, 1, 0);
+    ctx.drawLine(2.75, 0, 4, 0);
 
     ctx.restore();
   }

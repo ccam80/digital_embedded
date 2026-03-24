@@ -62,7 +62,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "ctrl+",
       defaultBitWidth: 1,
-      position: { x: 0, y: -1 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -70,7 +70,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "ctrl-",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,7 +78,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out+",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1 },
+      position: { x: 6, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -86,7 +86,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out-",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1 },
+      position: { x: 6, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -227,9 +227,9 @@ export class VCCSElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1,
-      width: 4,
-      height: 2,
+      y: this.position.y,
+      width: 6,
+      height: 4,
     };
   }
 
@@ -244,9 +244,7 @@ export class VCCSElement extends AbstractCircuitElement {
 
     // Body — rect and port lines stay COMPONENT
     ctx.setColor("COMPONENT");
-    ctx.drawLine(1, -1, 1, 1);
-    ctx.drawRect(1, -1, 2, 2, false);
-    ctx.drawLine(3, -1, 3, 1);
+    ctx.drawRect(1, -2, 4, 4, false);
 
     // ctrl+ lead
     if (vCtrlP !== undefined && ctx.setRawColor) {
@@ -270,7 +268,7 @@ export class VCCSElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3, -1, 4, -1);
+    ctx.drawLine(6, -1, 5, -1);
 
     // out- lead
     if (vOutN !== undefined && ctx.setRawColor) {
@@ -278,7 +276,7 @@ export class VCCSElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3, 1, 4, 1);
+    ctx.drawLine(6, 1, 5, 1);
 
     ctx.restore();
   }

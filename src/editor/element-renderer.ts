@@ -202,9 +202,12 @@ export class ElementRenderer {
     }
     const result = new Set<CircuitElement>();
     for (const group of byPos.values()) {
-      if (group.length > 1) {
-        for (const el of group) result.add(el);
-      }
+      if (group.length < 2) continue;
+      // Don't flag groups where all but one element is a single-pin connector
+      // (Tunnel, Ground, VDD, etc.) — they're designed to sit pin-on-pin.
+      const multiPin = group.filter(el => el.getPins().length > 1);
+      if (multiPin.length <= 1) continue;
+      for (const el of multiPin) result.add(el);
     }
     return result;
   }

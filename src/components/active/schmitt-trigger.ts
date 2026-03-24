@@ -229,13 +229,18 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    // All coordinates derived from Falstad reference (px / 16 = grid units):
+    // Total span 64px = 4gu. Triangle: left x=1, tip x=2.6875, height ±1.
+    // Bubble: cx=2.875, r≈0.18375. Lead2 starts at 3.125.
+    // Hysteresis symbol (grid units): step from 1.25 to 1.8125 to 1.4375 to 2.0
     const PX = 1 / 16;
-    const dn = 4, ww = 1, hs = 1;
-    const lead1x   = 4 * (0.5 - ww / dn);
-    const tipX     = 4 * (0.5 + (ww - 5 * PX) / dn);
-    const pcircleX = 4 * (0.5 + (ww - 2 * PX) / dn);
-    const lead2x   = 4 * (0.5 + (ww + 2 * PX) / dn);
-    const bubbleR  = 3 * PX;
+
+    const triLeft  = 1.0;               // 16px
+    const triTip   = 43 * PX;           // 2.6875 gu
+    const triH     = 1.0;               // ±1 gu
+    const bubCx    = 46 * PX;           // 2.875 gu
+    const bubR     = 2.94 * PX;         // ~0.18375 gu
+    const lead2x   = 50 * PX;           // 3.125 gu
 
     const vIn  = signals?.getPinVoltage("in");
     const vOut = signals?.getPinVoltage("out");
@@ -243,15 +248,15 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead
+    // Input lead: 0 → triLeft
     if (vIn !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vIn));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, lead1x, 0);
+    ctx.drawLine(0, 0, triLeft, 0);
 
-    // Output lead
+    // Output lead: lead2x → 4
     if (vOut !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vOut));
     } else {
@@ -259,18 +264,26 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     }
     ctx.drawLine(lead2x, 0, 4, 0);
 
-    // Body — triangle, bubble, hysteresis symbol stay COMPONENT
+    // Body — triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    ctx.drawPolygon([{ x: lead1x, y: -hs }, { x: tipX, y: 0 }, { x: lead1x, y: hs }], false);
-    ctx.drawCircle(pcircleX, 0, bubbleR, false);
+    // Falstad polyline: (16,-16)→(16,16)→(43,0) — only 2 segments, no closing edge
+    ctx.drawLine(triLeft, -triH, triLeft, triH);
+    ctx.drawLine(triLeft,  triH, triTip,  0);
+    // Bubble (inverter circle) — drawn as arc to match Falstad rasterization
+    ctx.drawArc(bubCx, 0, bubR, 0, 2 * Math.PI);
 
-    const cx = (lead1x + tipX) / 2;
-    const hw = (tipX - lead1x) * 0.4;
-    const hh = hs * 0.3;
-    ctx.drawLine(cx - hw,  hh, cx - hw, -hh);
-    ctx.drawLine(cx - hw, -hh, cx,      -hh);
-    ctx.drawLine(cx,      -hh, cx,       hh);
-    ctx.drawLine(cx,       hh, cx + hw,  hh);
+    // Hysteresis symbol — matches Falstad polyline exactly:
+    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px → /16 for gu
+    const hx1 = 20 * PX;  // 1.25
+    const hx2 = 29 * PX;  // 1.8125
+    const hx3 = 32 * PX;  // 2.0
+    const hx4 = 23 * PX;  // 1.4375
+    const hy  =  3 * PX;  // 0.1875
+    ctx.drawLine(hx1, -hy, hx2, -hy);  // top horizontal
+    ctx.drawLine(hx2, -hy, hx2,  hy);  // right vertical
+    ctx.drawLine(hx2,  hy, hx3,  hy);  // bottom-right horizontal
+    ctx.drawLine(hx3,  hy, hx4,  hy);  // bottom connecting segment
+    ctx.drawLine(hx4,  hy, hx4, -hy);  // left vertical
 
     ctx.restore();
   }
@@ -301,11 +314,14 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    // All coordinates derived from Falstad reference (px / 16 = grid units):
+    // Total span 64px = 4gu. No bubble (non-inverting). Lead2 starts at 45px.
     const PX = 1 / 16;
-    const dn = 4, ww = 1, hs = 1;
-    const lead1x = 4 * (0.5 - ww / dn);
-    const tipX   = 4 * (0.5 + (ww - 5 * PX) / dn);
-    const lead2x  = 4 * (0.5 + (ww - 3 * PX) / dn);
+
+    const triLeft  = 1.0;               // 16px
+    const triTip   = 43 * PX;           // 2.6875 gu
+    const triH     = 1.0;               // ±1 gu
+    const lead2x   = 45 * PX;           // 2.8125 gu
 
     const vIn  = signals?.getPinVoltage("in");
     const vOut = signals?.getPinVoltage("out");
@@ -313,15 +329,15 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead
+    // Input lead: 0 → triLeft
     if (vIn !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vIn));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, lead1x, 0);
+    ctx.drawLine(0, 0, triLeft, 0);
 
-    // Output lead
+    // Output lead: lead2x → 4
     if (vOut !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vOut));
     } else {
@@ -329,17 +345,24 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     }
     ctx.drawLine(lead2x, 0, 4, 0);
 
-    // Body — triangle and hysteresis symbol stay COMPONENT
+    // Body — triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    ctx.drawPolygon([{ x: lead1x, y: -hs }, { x: tipX, y: 0 }, { x: lead1x, y: hs }], false);
+    // Falstad polyline: (16,-16)→(16,16)→(43,0) — only 2 segments, no closing edge
+    ctx.drawLine(triLeft, -triH, triLeft, triH);
+    ctx.drawLine(triLeft,  triH, triTip,  0);
 
-    const cx = (lead1x + tipX) / 2;
-    const hw = (tipX - lead1x) * 0.4;
-    const hh = hs * 0.3;
-    ctx.drawLine(cx - hw, hh,   cx - hw, -hh);
-    ctx.drawLine(cx - hw, -hh,  cx,      -hh);
-    ctx.drawLine(cx,      -hh,  cx,       hh);
-    ctx.drawLine(cx,       hh,  cx + hw,  hh);
+    // Hysteresis symbol — matches Falstad polyline exactly:
+    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px → /16 for gu
+    const hx1 = 20 * PX;  // 1.25
+    const hx2 = 29 * PX;  // 1.8125
+    const hx3 = 32 * PX;  // 2.0
+    const hx4 = 23 * PX;  // 1.4375
+    const hy  =  3 * PX;  // 0.1875
+    ctx.drawLine(hx1, -hy, hx2, -hy);  // top horizontal
+    ctx.drawLine(hx2, -hy, hx2,  hy);  // right vertical
+    ctx.drawLine(hx2,  hy, hx3,  hy);  // bottom-right horizontal
+    ctx.drawLine(hx3,  hy, hx4,  hy);  // bottom connecting segment
+    ctx.drawLine(hx4,  hy, hx4, -hy);  // left vertical
 
     ctx.restore();
   }

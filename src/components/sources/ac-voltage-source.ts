@@ -189,10 +189,16 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 1.0625, width: 4, height: 2.125 };
+    return { x: this.position.x, y: this.position.y - 1.04125, width: 4, height: 2.0825 };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    // All coordinates from Falstad reference (px / 16 = grid units):
+    // Leads: (0,0)→(15,0) and (49,0)→(64,0)
+    // Circle: cx=32, cy=0, r=16.66 → cx=2gu, r=1.04125gu
+    // Sine wave: 21 line segments from x=22..42 px
+    const PX = 1 / 16;
+
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");
 
@@ -200,24 +206,39 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Lead from pos pin to body
-    if (vPos !== undefined) {
-      ctx.setColor(signals!.voltageColor(vPos));
+    if (vPos !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vPos));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 0, 0.9375, 0);
+    ctx.drawLine(0, 0, 15 * PX, 0);
 
     // Lead from neg pin to body
-    if (vNeg !== undefined) {
-      ctx.setColor(signals!.voltageColor(vNeg));
+    if (vNeg !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vNeg));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3.0625, 0, 4, 0);
+    ctx.drawLine(49 * PX, 0, 4, 0);
 
-    // Circle body stays COMPONENT color
+    // Circle body and sine wave stay COMPONENT color
     ctx.setColor("COMPONENT");
-    ctx.drawCircle(2, 0, 1.0625, false);
+    ctx.drawCircle(2, 0, 16.66 * PX, false);
+
+    // Sine wave inside the circle — matches Falstad reference exactly
+    // 21 segments from x=22 to x=42 px, y values trace one full sine cycle
+    const sinePoints: [number, number][] = [
+      [22, 0], [23, -2], [24, -4], [25, -6], [26, -7],
+      [27, -7], [28, -7], [29, -6], [30, -4], [31, -2],
+      [32, 0], [33, 2], [34, 4], [35, 6], [36, 7],
+      [37, 7], [38, 7], [39, 6], [40, 4], [41, 2],
+      [42, 0],
+    ];
+    for (let i = 0; i < sinePoints.length - 1; i++) {
+      const [x1, y1] = sinePoints[i];
+      const [x2, y2] = sinePoints[i + 1];
+      ctx.drawLine(x1 * PX, y1 * PX, x2 * PX, y2 * PX);
+    }
 
     ctx.restore();
   }

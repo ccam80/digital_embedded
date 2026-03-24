@@ -420,6 +420,10 @@ export class CircuitBuilder {
       autoLayout(circuit, constraints.size > 0 ? { constraints } : undefined);
     }
 
+    // Clean up any degenerate zero-length wires produced by auto-layout or
+    // connection routing before returning the circuit.
+    circuit.removeZeroLengthWires();
+
     return circuit;
   }
 
@@ -687,6 +691,9 @@ export class CircuitBuilder {
     for (const [specId, element] of addedElements) {
       addedIds[specId] = element.instanceId;
     }
+
+    // Clean up any degenerate zero-length wires left by connect/disconnect ops.
+    targetCircuit.removeZeroLengthWires();
 
     // Validate the top-level circuit (not just the scoped subcircuit).
     return {

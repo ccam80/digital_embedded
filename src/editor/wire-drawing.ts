@@ -103,6 +103,12 @@ export class WireDrawingMode {
   private _waypoints: Point[] = [];
   /** Current cursor position (snapped). */
   private _cursor: Point = { x: 0, y: 0 };
+  /**
+   * Once the user moves >= 2 grid units in a direction from the last waypoint,
+   * lock that as the "first" axis for the current segment so routing doesn't
+   * flip-flop. Reset on new segment (waypoint / start).
+   */
+  private _lockedAxis: 'h' | 'v' | null = null;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -116,6 +122,7 @@ export class WireDrawingMode {
     const startPos = pinWorldPosition(element, pin);
     this._waypoints = [startPos];
     this._cursor = startPos;
+    this._lockedAxis = null;
     this._active = true;
   }
 
@@ -126,6 +133,7 @@ export class WireDrawingMode {
   startFromPoint(point: Point): void {
     this._waypoints = [{ ...point }];
     this._cursor = { ...point };
+    this._lockedAxis = null;
     this._active = true;
   }
 
@@ -138,6 +146,20 @@ export class WireDrawingMode {
       return;
     }
     this._cursor = snapToGrid(worldPoint, WIRE_GRID_SIZE);
+
+    // Lock the routing axis once the cursor moves >= 2 grids from the last
+    // waypoint in any direction.  Once locked, the axis stays until the next
+    // waypoint or new wire start.
+    if (this._lockedAxis === null && this._waypoints.length > 0) {
+      const last = this._waypoints[this._waypoints.length - 1]!;
+      const dx = Math.abs(this._cursor.x - last.x);
+      const dy = Math.abs(this._cursor.y - last.y);
+      if (dx >= 2 && dx > dy) {
+        this._lockedAxis = 'h';
+      } else if (dy >= 2 && dy > dx) {
+        this._lockedAxis = 'v';
+      }
+    }
   }
 
   /**
@@ -149,15 +171,13 @@ export class WireDrawingMode {
       return;
     }
     const last = this._waypoints[this._waypoints.length - 1]!;
-    // The Manhattan corner matches the manhattanSegments routing direction
-    const dx = Math.abs(this._cursor.x - last.x);
-    const dy = Math.abs(this._cursor.y - last.y);
-    const verticalFirst = dy >= 2 && dy > dx;
+    const verticalFirst = this._lockedAxis === 'v';
     const corner = verticalFirst
       ? { x: last.x, y: this._cursor.y }
       : { x: this._cursor.x, y: last.y };
     this._waypoints.push(corner);
     this._waypoints.push({ x: this._cursor.x, y: this._cursor.y });
+    this._lockedAxis = null; // reset for the next segment
   }
 
   /**
@@ -240,6 +260,7 @@ export class WireDrawingMode {
   cancel(): void {
     this._active = false;
     this._waypoints = [];
+    this._lockedAxis = null;
   }
 
   /** Returns true when wire-drawing mode is active. */
@@ -275,7 +296,7 @@ export class WireDrawingMode {
 
     // Current Manhattan preview from last waypoint to cursor
     const last = this._waypoints[this._waypoints.length - 1]!;
-    const preview = manhattanSegments(last, this._cursor);
+    const preview = manhattanSegments(last, this._cursor, this._lockedAxis);
     for (const seg of preview) {
       result.push(seg);
     }
@@ -299,7 +320,7 @@ export class WireDrawingMode {
     }
 
     const last = this._waypoints[this._waypoints.length - 1]!;
-    const finalSegments = manhattanSegments(last, endPos);
+    const finalSegments = manhattanSegments(last, endPos, this._lockedAxis);
     for (const seg of finalSegments) {
       result.push(seg);
     }
@@ -311,12 +332,18 @@ export class WireDrawingMode {
 /**
  * Compute Manhattan-routed segments from `from` to `to`.
  *
- * Routing strategy: if one axis has >= 2 grid units of displacement,
- * route that axis first ("stay in the direction you started moving").
- * Ties default to horizontal-first.
- * If the points share an axis, only one segment is needed.
+ * When `lockedAxis` is provided ('h' or 'v'), that axis is always routed
+ * first — this prevents the routing from flip-flopping once the user has
+ * committed to a direction (>= 2 grid units of movement).
+ *
+ * Without a locked axis, the heuristic picks the axis with more displacement
+ * (ties default to horizontal-first).
  */
-export function manhattanSegments(from: Point, to: Point): PreviewSegment[] {
+export function manhattanSegments(
+  from: Point,
+  to: Point,
+  lockedAxis?: 'h' | 'v' | null,
+): PreviewSegment[] {
   if (from.x === to.x && from.y === to.y) {
     return [];
   }
@@ -330,8 +357,12 @@ export function manhattanSegments(from: Point, to: Point): PreviewSegment[] {
   }
   const dx = Math.abs(to.x - from.x);
   const dy = Math.abs(to.y - from.y);
-  // If vertical displacement >= 2 and exceeds horizontal, go vertical-first
-  const verticalFirst = dy >= 2 && dy > dx;
+  // Honour locked axis; fall back to displacement heuristic
+  const verticalFirst = lockedAxis === 'v'
+    ? true
+    : lockedAxis === 'h'
+      ? false
+      : (dy >= 2 && dy > dx);
   const corner: Point = verticalFirst
     ? { x: from.x, y: to.y }
     : { x: to.x, y: from.y };

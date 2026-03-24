@@ -85,17 +85,33 @@ function buildTransmissionLinePinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "Port1",
+      label: "P1b",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "P2b",
+      defaultBitWidth: 1,
+      position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "P1a",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
-      direction: PinDirection.OUTPUT,
-      label: "Port2",
+      direction: PinDirection.INPUT,
+      label: "P2a",
       defaultBitWidth: 1,
-      position: { x: 6, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -122,11 +138,12 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Falstad: rect from (0,-1) to (6,0), pins at (0,0) and (6,0)
+    // Falstad: fillRect(0, 0, 66, 18) px → (0,0) to (4.125, 1.125) grid units
+    // Component spans from top rail (y=0) to bottom rail (y=1), x from 0 to 4
     return {
       x: this.position.x,
-      y: this.position.y - 1,
-      width: 6,
+      y: this.position.y,
+      width: 4,
       height: 1,
     };
   }
@@ -134,26 +151,30 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     ctx.save();
     ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
 
-    // Falstad TransLineElm: filled rect between two conductors + outline
-    // Top conductor at y=0 (pin level), bottom conductor at y=-1
-    // Left end x=0, right end x=6
+    // Falstad TransLineElm: ladder network symbol
+    // 4 zero-length thick dot lines at pin corners (fixture order: P1b, P2b, P1a, P2a)
+    ctx.setLineWidth(2);
+    ctx.drawLine(0, 1, 0, 1); // P1b
+    ctx.drawLine(4, 1, 4, 1); // P2b
+    ctx.drawLine(0, 0, 0, 0); // P1a
+    ctx.drawLine(4, 0, 4, 0); // P2a
 
-    // Filled rectangle between the two conductors
-    ctx.drawRect(0, -1, 6, 1, true);
+    // 32 iterations: thin vertical rung + thick horizontal top segment
+    const step = 2 / 16; // 0.125 grid units (2px ÷ 16)
+    for (let i = 0; i <= 31; i++) {
+      const x = i * step;
+      // Thin vertical rung from bottom rail to top rail
+      ctx.setLineWidth(1);
+      ctx.drawLine(x, 1, x, 0);
+      // Thick horizontal top conductor segment
+      ctx.setLineWidth(2);
+      ctx.drawLine(x, 0, x + step, 0);
+    }
 
-    // Top conductor line
-    ctx.drawLine(0, 0, 6, 0);
-
-    // Bottom conductor line
-    ctx.drawLine(0, -1, 6, -1);
-
-    // Left end cap
-    ctx.drawLine(0, 0, 0, -1);
-
-    // Right end cap
-    ctx.drawLine(6, 0, 6, -1);
+    // Thick bottom conductor (full width)
+    ctx.setLineWidth(2);
+    ctx.drawLine(0, 1, 4, 1);
 
     ctx.restore();
   }

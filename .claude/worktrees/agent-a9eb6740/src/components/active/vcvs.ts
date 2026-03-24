@@ -1,0 +1,365 @@
+/**
+ * Voltage-Controlled Voltage Source (VCVS) analog component.
+ *
+ * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
+ * out+ and out- are the output voltage source terminals.
+ *
+ * The output voltage equals an expression of the control voltage:
+ *   V_out = f(V_ctrl)  where  V_ctrl = V(ctrl+) - V(ctrl-)
+ *
+ * A linear shortcut is provided via the `gain` property: when `expression`
+ * is the default ("V(ctrl)"), the effective expression is `gain * V(ctrl)`.
+ *
+ * MNA formulation:
+ *   The VCVS introduces one branch variable (the output current) via a
+ *   dedicated branch row in the MNA matrix.
+ *
+ *   `stamp()` places the B/C incidence for the output port:
+ *     B[nOutP, k] += 1   C[k, nOutP] += 1
+ *     B[nOutN, k] -= 1   C[k, nOutN] -= 1
+ *
+ *   `stampNonlinear()` (via base class) evaluates f(Vctrl) and f'(Vctrl),
+ *   then `stampOutput()` stamps the Jacobian and NR-linearized RHS:
+ *     C[k, nCtrlP] -= f'(Vctrl)   (Jacobian)
+ *     C[k, nCtrlN] += f'(Vctrl)   (Jacobian)
+ *     RHS[k]        = f(Vctrl) - f'(Vctrl) * Vctrl
+ *
+ * The RHS formula `f(Vctrl0) - f'(Vctrl0) * Vctrl0` is the constant term
+ * after linearizing around the current operating point. Combined with the
+ * Jacobian entries, the branch equation becomes:
+ *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). ✓
+ */
+
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
+import type { PropertyDefinition } from "../../core/properties.js";
+import {
+  ComponentCategory,
+  noOpAnalogExecuteFn,
+  type AttributeMapping,
+  type ComponentDefinition,
+} from "../../core/registry.js";
+import type { AnalogElement } from "../../analog/element.js";
+import type { SparseSolver } from "../../analog/sparse-solver.js";
+import { parseExpression } from "../../analog/expression.js";
+import { differentiate, simplify } from "../../analog/expression-differentiate.js";
+import { ControlledSourceElement } from "../../analog/controlled-source-base.js";
+
+// ---------------------------------------------------------------------------
+// Pin layout
+// ---------------------------------------------------------------------------
+
+function buildVCVSPinDeclarations(): PinDeclaration[] {
+  return [
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl+",
+      defaultBitWidth: 1,
+      position: { x: 0, y: -1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl-",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "out+",
+      defaultBitWidth: 1,
+      position: { x: 4, y: -1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "out-",
+      defaultBitWidth: 1,
+      position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// VCVSAnalogElement
+// ---------------------------------------------------------------------------
+
+/**
+ * MNA analog element for a Voltage-Controlled Voltage Source.
+ *
+ * Node layout in nodeIds (from analogFactory):
+ *   [0] = nCtrlP  (ctrl+ node)
+ *   [1] = nCtrlN  (ctrl- node)
+ *   [2] = nOutP   (out+ node)
+ *   [3] = nOutN   (out- node)
+ *
+ * branchIdx: absolute 0-based row in the MNA matrix for the output branch.
+ */
+class VCVSAnalogElement extends ControlledSourceElement {
+  readonly nodeIndices: readonly number[];
+  readonly branchIndex: number;
+
+  private readonly _nCtrlP: number;
+  private readonly _nCtrlN: number;
+  private readonly _nOutP: number;
+  private readonly _nOutN: number;
+  private readonly _k: number; // branch row (absolute 0-based)
+
+  constructor(
+    nCtrlP: number,
+    nCtrlN: number,
+    nOutP: number,
+    nOutN: number,
+    branchIdx: number,
+    expressionStr: string,
+    gain: number,
+  ) {
+    // Build expression: if default "V(ctrl)", apply gain multiplier
+    const rawExpr = parseExpression(expressionStr === "V(ctrl)"
+      ? `${gain} * V(ctrl)`
+      : expressionStr);
+    const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+
+    super(rawExpr, deriv, "V(ctrl)", "voltage");
+
+    this._nCtrlP = nCtrlP;
+    this._nCtrlN = nCtrlN;
+    this._nOutP = nOutP;
+    this._nOutN = nOutN;
+    this._k = branchIdx;
+
+    this.nodeIndices = [nCtrlP, nCtrlN, nOutP, nOutN];
+    this.branchIndex = branchIdx;
+  }
+
+  /** Stamp the linear B/C incidence for the output voltage source branch. */
+  override stamp(solver: SparseSolver): void {
+    const k = this._k;
+    if (this._nOutP !== 0) {
+      solver.stamp(this._nOutP - 1, k, 1);   // B[nOutP, k]
+      solver.stamp(k, this._nOutP - 1, 1);   // C[k, nOutP]
+    }
+    if (this._nOutN !== 0) {
+      solver.stamp(this._nOutN - 1, k, -1);  // B[nOutN, k]
+      solver.stamp(k, this._nOutN - 1, -1);  // C[k, nOutN]
+    }
+  }
+
+  protected override _bindContext(voltages: Float64Array): void {
+    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP - 1] : 0;
+    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN - 1] : 0;
+    const vCtrl = vCtrlP - vCtrlN;
+
+    this._ctx.setNodeVoltage("ctrl", vCtrl);
+    this._ctrlValue = vCtrl;
+  }
+
+  /**
+   * Stamp the Jacobian and NR-linearized RHS for the output branch.
+   *
+   * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
+   *
+   * C sub-matrix Jacobian entries (control node columns in branch row k):
+   *   C[k, nCtrlP] -= f'   →  ∂(branch_eq)/∂V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'   →  ∂(branch_eq)/∂V_ctrlN = +f'
+   *
+   * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
+   */
+  override stampOutput(
+    solver: SparseSolver,
+    value: number,
+    derivative: number,
+    ctrlValue: number,
+  ): void {
+    const k = this._k;
+
+    // Jacobian: C[k, ctrl] entries
+    if (this._nCtrlP !== 0) {
+      solver.stamp(k, this._nCtrlP - 1, -derivative);
+    }
+    if (this._nCtrlN !== 0) {
+      solver.stamp(k, this._nCtrlN - 1, derivative);
+    }
+
+    // NR-linearized RHS: constant term after factoring out Jacobian
+    solver.stampRHS(k, value - derivative * ctrlValue);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VCVSElement — CircuitElement
+// ---------------------------------------------------------------------------
+
+export class VCVSElement extends AbstractCircuitElement {
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("VCVS", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(buildVCVSPinDeclarations(), []);
+  }
+
+  getBoundingBox(): Rect {
+    return {
+      x: this.position.x,
+      y: this.position.y - 1,
+      width: 4,
+      height: 2,
+    };
+  }
+
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vCtrlP = signals?.getPinVoltage("ctrl+");
+    const vCtrlN = signals?.getPinVoltage("ctrl-");
+    const vOutP  = signals?.getPinVoltage("out+");
+    const vOutN  = signals?.getPinVoltage("out-");
+
+    ctx.save();
+    ctx.setLineWidth(1);
+
+    // Body — rect and port lines stay COMPONENT
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(1, -1, 1, 1);
+    ctx.drawRect(1, -1, 2, 2, false);
+    ctx.drawLine(3, -1, 3, 1);
+
+    // ctrl+ lead
+    if (vCtrlP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrlP));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, -1, 1, -1);
+
+    // ctrl- lead
+    if (vCtrlN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrlN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 1, 1, 1);
+
+    // out+ lead
+    if (vOutP !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutP));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, -1, 4, -1);
+
+    // out- lead
+    if (vOutN !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOutN));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(3, 1, 4, 1);
+
+    ctx.restore();
+  }
+
+  getHelpText(): string {
+    return (
+      "Voltage-Controlled Voltage Source — 4-terminal element. " +
+      "Output voltage = expression(V_ctrl). " +
+      "Pins: ctrl+, ctrl- (control sense), out+, out- (output)."
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Property definitions
+// ---------------------------------------------------------------------------
+
+const VCVS_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "expression",
+    type: PropertyType.STRING,
+    label: "Transfer function",
+    defaultValue: "V(ctrl)",
+    description: "Expression defining output voltage as function of V(ctrl). Default: V(ctrl) (unity gain).",
+  },
+  {
+    key: "gain",
+    type: PropertyType.FLOAT,
+    label: "Gain (linear shortcut)",
+    defaultValue: 1.0,
+    description: "Linear voltage gain. Used when expression is the default 'V(ctrl)'. Default: 1.0.",
+  },
+  {
+    key: "label",
+    type: PropertyType.STRING,
+    label: "Label",
+    defaultValue: "",
+    description: "Optional display label.",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Attribute mappings
+// ---------------------------------------------------------------------------
+
+const VCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  { xmlName: "expression", propertyKey: "expression", convert: (v) => v },
+  { xmlName: "gain",       propertyKey: "gain",       convert: (v) => parseFloat(v) },
+  { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
+];
+
+// ---------------------------------------------------------------------------
+// VCVSDefinition
+// ---------------------------------------------------------------------------
+
+export const VCVSDefinition: ComponentDefinition = {
+  name: "VCVS",
+  typeId: -1,
+  engineType: "analog",
+  category: ComponentCategory.ACTIVE,
+  executeFn: noOpAnalogExecuteFn,
+
+  pinLayout: buildVCVSPinDeclarations(),
+  propertyDefs: VCVS_PROPERTY_DEFS,
+  attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
+
+  helpText:
+    "Voltage-Controlled Voltage Source — output voltage is an expression of " +
+    "the control port voltage V(ctrl+ - ctrl-).",
+
+  factory(props: PropertyBag): VCVSElement {
+    return new VCVSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  },
+
+  analogFactory(
+    nodeIds: number[],
+    branchIdx: number,
+    props: PropertyBag,
+  ): AnalogElement {
+    const expression = props.getOrDefault<string>("expression", "V(ctrl)");
+    const gain = props.getOrDefault<number>("gain", 1.0);
+    return new VCVSAnalogElement(
+      nodeIds[0], // ctrl+
+      nodeIds[1], // ctrl-
+      nodeIds[2], // out+
+      nodeIds[3], // out-
+      branchIdx,
+      expression,
+      gain,
+    );
+  },
+};

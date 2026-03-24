@@ -84,7 +84,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "V+",
       defaultBitWidth: 1,
-      position: { x: 0, y: -1 },
+      position: { x: 0, y: -2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -92,7 +92,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "V-",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -100,7 +100,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "Iabc",
       defaultBitWidth: 1,
-      position: { x: 2, y: -3 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -108,15 +108,15 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "OUT+",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1 },
+      position: { x: 4.875, y: -2 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "OUT-",
+      label: "OUT",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1 },
+      position: { x: 5.875, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -222,89 +222,67 @@ export class OTAElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const PX = 1 / 16;
-    const cr = 19 / 2 * PX;
-    const signOverhang = 2 * PX; // sign lines extend 2*PX left of x=0
+    // Leftmost extent: arrow triangles extend to x=-0.25
+    // Rightmost extent: OUT pin at x=5.875 + circle radius 0.55125 ≈ 6.42625
+    // Top: y=-3 (triangle apex at V+ lead), Bottom: y=3 (triangle apex at V- lead)
     return {
-      x: this.position.x - signOverhang,
+      x: this.position.x - 0.25,
       y: this.position.y - 3,
-      width: 3 + 2 * cr + signOverhang,
-      height: 5,
+      width: 5.875 + 0.55125 + 0.25,
+      height: 6,
     };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const PX = 1 / 16;
-    const cr = 19 / 2 * PX;
-
     const vVp   = signals?.getPinVoltage("V+");
     const vVm   = signals?.getPinVoltage("V-");
     const vIabc = signals?.getPinVoltage("Iabc");
     const vOutP = signals?.getPinVoltage("OUT+");
-    const vOutN = signals?.getPinVoltage("OUT-");
+    const vOut  = signals?.getPinVoltage("OUT");
 
     ctx.save();
     ctx.setLineWidth(1);
-
-    // Triangle body — stays COMPONENT
     ctx.setColor("COMPONENT");
+
+    // Triangle body — open polyline (not closed polygon)
     ctx.drawPolygon(
-      [{ x: 0, y: -2 }, { x: 3, y: 0 }, { x: 0, y: 2 }],
+      [{ x: 0, y: -3 }, { x: 0, y: 3 }, { x: 4, y: 0 }],
       false,
     );
 
-    // Two output circles — body, stays COMPONENT
-    ctx.drawCircle(3 + cr, 0, cr, false);
-    ctx.drawCircle(3 + cr - (2 * cr - 8 * PX), 0, cr, false);
+    // + arrow (filled triangle pointing up-right)
+    ctx.drawPolygon([
+      { x: 0, y: -1.3125 },
+      { x: -0.25, y: -0.8125 },
+      { x: 0.25, y: -0.8125 },
+    ], true);
 
-    // +/- signs — body decoration, stays COMPONENT
-    const signX = 4 * PX;
-    const signSz = 6 * PX;
-    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
-    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
-    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
+    // - arrow (filled triangle pointing down-right)
+    ctx.drawPolygon([
+      { x: 0, y: 1.3125 },
+      { x: 0.25, y: 0.8125 },
+      { x: -0.25, y: 0.8125 },
+    ], true);
 
-    // Input lead V+
-    if (vVp !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vVp));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, -1, 0.5, -1);
+    // Horizontal bar for + sign
+    ctx.drawLine(-0.25, -1.3125, 0.25, -1.3125);
 
-    // Input lead V-
-    if (vVm !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vVm));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 1, 0.5, 1);
+    // Horizontal bar for - sign
+    ctx.drawLine(0.25, 1.3125, -0.25, 1.3125);
 
-    // Iabc bias lead
-    if (vIabc !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vIabc));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2, -3, 2, -2);
+    // OUT+ pin lead: connects OUT+ pin at (4.875, -2) down to output circles area
+    ctx.drawLine(4.875, -2, 4.875, -0.5);
 
-    // OUT+ stub
-    if (vOutP !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOutP));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3 + 2 * cr, 0, 4, -1);
+    // Two output buffer circles
+    ctx.drawCircle(5.25, 0, 0.55125, false);
+    ctx.drawCircle(4.5625, 0, 0.55125, false);
 
-    // OUT- stub
-    if (vOutN !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOutN));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3 + 2 * cr, 0, 4, 1);
+    // Text labels
+    ctx.drawText("+", 0.5625, -2.125, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("-", 0.5625, 2.0, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
+    void vVp; void vVm; void vIabc; void vOutP; void vOut;
   }
 
   getHelpText(): string {
@@ -312,7 +290,7 @@ export class OTAElement extends AbstractCircuitElement {
       "Operational Transconductance Amplifier — voltage-in, current-out amplifier. " +
       "I_out = I_bias * tanh(V_diff / (2*V_T)). " +
       "Transconductance gm = I_bias / (2*V_T), up to gmMax. " +
-      "Pins: V+, V- (differential input), Iabc (bias current), OUT+, OUT- (output)."
+      "Pins: V+, V- (differential input), Iabc (bias current), OUT+, OUT (output)."
     );
   }
 }
@@ -373,7 +351,7 @@ export const OTADefinition: ComponentDefinition = {
   attributeMap: OTA_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Operational Transconductance Amplifier — 5-terminal element (V+, V-, Iabc, OUT+, OUT-). " +
+    "Operational Transconductance Amplifier — 5-terminal element (V+, V-, Iabc, OUT+, OUT). " +
     "Output current = I_bias * tanh(V_diff / (2*V_T)).",
 
   factory(props: PropertyBag): OTAElement {

@@ -171,9 +171,9 @@ export class ZenerElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.7,
+      y: this.position.y - 0.6875,
       width: 4,
-      height: 1.4,
+      height: 1.375,
     };
   }
 
@@ -231,13 +231,14 @@ export class ZenerElement extends AbstractCircuitElement {
     // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0→cath1
     // interpPointSingle(a,b,f,g): point at fraction f along a→b, offset g perpendicular (along x for vertical bar)
     // Perpendicular to cath0→cath1 (which is vertical) is horizontal
+    // Wing tips at ±11/16 = ±0.6875 grid units (from Falstad pixel coords ±11 at 16px/unit)
     const wing0 = {
-      x: cath0.x + (cath1.x - cath0.x) * (-0.2) + (-hs),
-      y: cath0.y + (cath1.y - cath0.y) * (-0.2),
+      x: cath0.x - hs,
+      y: -11 / 16,
     };
     const wing1 = {
-      x: cath0.x + (cath1.x - cath0.x) * 1.2 + hs,
-      y: cath0.y + (cath1.y - cath0.y) * 1.2,
+      x: cath1.x + hs,
+      y: 11 / 16,
     };
     ctx.drawLine(cath0.x, cath0.y, wing0.x, wing0.y);
     ctx.drawLine(cath1.x, cath1.y, wing1.x, wing1.y);

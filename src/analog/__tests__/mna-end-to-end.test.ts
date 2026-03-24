@@ -150,8 +150,9 @@ describe("End-to-end: full pipeline", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildAnalogRegistry();
 
+    // DcVoltageSource pin order: [neg, pos]
     const vs = makeElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     const r1 = makeElement("Resistor", "r1",
@@ -200,8 +201,9 @@ describe("End-to-end: full pipeline", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildAnalogRegistry();
 
+    // DcVoltageSource pin order: [neg, pos]
     const vs = makeElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     const r = makeElement("Resistor", "r1",
@@ -605,21 +607,22 @@ describe("MOSFET through compiler", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildMosfetRegistry();
 
+    // DcVoltageSource pin order: [neg, pos]
     const vdd = makeElement("DcVoltageSource", "vdd1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     const rd = makeElement("Resistor", "rd1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 10000]]),
     );
-    // NMOS: D=x20, G=x40, S=x30 (uses default W/L=1e-6/1e-6 → W/L=1)
+    // NMOS pin order: [G, S, D] — G=x40, S=x30, D=x20
     const nmos = makeElement("NMOS", "m1",
-      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 40, y: 0 }, { x: 30, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>(),
     );
     const vg = makeElement("DcVoltageSource", "vg1",
-      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0 }, { x: 40, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 2]]),
     );
     const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
@@ -678,21 +681,22 @@ describe("MOSFET through compiler", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildMosfetRegistry();
 
+    // DcVoltageSource pin order: [neg, pos]
     const vdd = makeElement("DcVoltageSource", "vdd1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     const rd = makeElement("Resistor", "rd1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 100000]]),
     );
-    // NMOS: D=x20, G=x40, S=x30 (default W/L=1)
+    // NMOS pin order: [G, S, D] — G=x40, S=x30, D=x20
     const nmos = makeElement("NMOS", "m1",
-      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 40, y: 0 }, { x: 30, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>(),
     );
     const vg = makeElement("DcVoltageSource", "vg1",
-      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0 }, { x: 40, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 3]]),
     );
     const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
@@ -752,21 +756,22 @@ describe("MOSFET through compiler", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildMosfetRegistry();
 
+    // DcVoltageSource pin order: [neg, pos]
     const vs = makeElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     const rd = makeElement("Resistor", "rd1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 10000]]),
     );
-    // PMOS: D=x20, G=x40, S=x10 (default W/L=1)
+    // PMOS pin order: [G, D, S] — G=x40, D=x20, S=x10
     const pmos = makeElement("PMOS", "m1",
-      [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 10, y: 0 }],
+      [{ x: 40, y: 0 }, { x: 20, y: 0 }, { x: 10, y: 0 }],
       new Map<string, PropertyValue>(),
     );
     const vg = makeElement("DcVoltageSource", "vg1",
-      [{ x: 40, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0 }, { x: 40, y: 0 }],
       new Map<string, PropertyValue>([["voltage", 3]]),
     );
     const gnd1 = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);

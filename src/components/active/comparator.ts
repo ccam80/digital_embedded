@@ -108,60 +108,58 @@ export class ComparatorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const PX = 1 / 16;
-
     const vInp = signals?.getPinVoltage("in+");
     const vInn = signals?.getPinVoltage("in-");
     const vOut = signals?.getPinVoltage("out");
 
     ctx.save();
-    ctx.setLineWidth(1);
 
-    // Triangle body — stays COMPONENT color
+    // Triangle body — stays COMPONENT color, thin line
+    ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
-      [{ x: 0.5, y: -2 }, { x: 3.5, y: 0 }, { x: 0.5, y: 2 }],
+      [{ x: 0.375, y: -2 }, { x: 0.375, y: 2 }, { x: 3.625, y: 0 }],
       false,
     );
 
-    // Input lead in+
+    // Input lead in+ (thick)
+    ctx.setLineWidth(3);
     if (vInp !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vInp));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, -1, 0.5, -1);
+    ctx.drawLine(0, -1, 0.375, -1);
 
-    // Input lead in-
+    // Input lead in- (thick)
     if (vInn !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vInn));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 1, 0.5, 1);
+    ctx.drawLine(0, 1, 0.375, 1);
 
-    // Output lead
+    // Output lead (thick)
     if (vOut !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vOut));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3.5, 0, 4, 0);
+    ctx.drawLine(3.625, 0, 4, 0);
 
-    // +/- signs — body decoration, stays COMPONENT color
+    // Text labels — body decoration, stays COMPONENT color
+    ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
-    const signX = 0.5 + 4 * PX;
-    const signSz = 6 * PX;
-    ctx.drawLine(signX - signSz, -1, signX + signSz, -1);
-    ctx.drawLine(signX, -1 - signSz, signX, -1 + signSz);
-    ctx.drawLine(signX - signSz, 1, signX + signSz, 1);
+    ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("≥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
   }
 
   getHelpText(): string {
     return (
-      "Voltage Comparator — 3-terminal element (in+, in-, out). " +
+      "Analog Comparator — 3-terminal element (in+, in-, out). " +
       "Output switches based on whether V+ > V- with optional hysteresis. " +
       "Open-collector output requires external pull-up; push-pull drives directly."
     );
@@ -367,7 +365,7 @@ const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// VoltageComparatorDefinition
+// AnalogComparatorDefinition
 // ---------------------------------------------------------------------------
 
 export const VoltageComparatorDefinition: ComponentDefinition = {
@@ -382,7 +380,7 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage Comparator — 3-terminal (in+, in-, out). " +
+    "Analog Comparator — 3-terminal (in+, in-, out). " +
     "Switches output based on V+ vs V-. Open-collector output requires external pull-up. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 

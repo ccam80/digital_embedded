@@ -319,7 +319,9 @@ export function createDefaultRegistry(
 
   // PLD
   registry.register(PldDiodeDefinition);
-  registry.registerAlias("Diode", "PldDiode");
+  // No alias "Diode"→"PldDiode": the semiconductor Diode (registered below)
+  // owns the canonical name "Diode".  Old .dig files that mean the PLD diode
+  // should use "PldDiode" explicitly.
   registry.register(PldDiodeForwardDefinition);
   registry.registerAlias("DiodeForward", "PldDiodeForward");
   registry.register(PldDiodeBackwardDefinition);

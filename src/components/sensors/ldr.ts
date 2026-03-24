@@ -169,7 +169,7 @@ function buildLDRPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "neg",
       defaultBitWidth: 1,
-      position: { x: 1, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -197,10 +197,10 @@ export class LDRCircuitElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 0.25,
-      y: this.position.y - 0.5,
-      width: 1.4375,
-      height: 1.375,
+      x: this.position.x,
+      y: this.position.y - 0.625,
+      width: 4,
+      height: 2.625,
     };
   }
 
@@ -214,18 +214,28 @@ export class LDRCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Zigzag resistor body: bodyLen=32px=2gu > span=1gu → lead1=(0,0), lead2=(1,0)
+    // Lead 1: (0,0)→(1,0); Zigzag body: (1,0)→(3,0); Lead 2: (3,0)→(4,0)
+    // Zigzag vertices derived from Falstad pixel coords (absolute px ÷ 16):
+    // absolute x = local_x + 16 (because Falstad draws with a +16px x-offset)
     const hs = 6 / 16; // 0.375 grid units perpendicular offset
-    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
-    for (let i = 0; i < 4; i++) {
-      pts.push({ x: ((1 + 4 * i) * 1) / 16, y: hs });
-      pts.push({ x: ((3 + 4 * i) * 1) / 16, y: -hs });
-    }
-    pts.push({ x: 1, y: 0 });
+    const pts: Array<{ x: number; y: number }> = [
+      { x: 0, y: 0 },   // lead1 start
+      { x: 1, y: 0 },   // lead1 end / zigzag start
+      { x: 1.125, y: hs },
+      { x: 1.375, y: -hs },
+      { x: 1.625, y: hs },
+      { x: 1.875, y: -hs },
+      { x: 2.125, y: hs },
+      { x: 2.375, y: -hs },
+      { x: 2.625, y: hs },
+      { x: 2.875, y: -hs },
+      { x: 3, y: 0 },   // zigzag end / lead2 start
+      { x: 4, y: 0 },   // lead2 end
+    ];
 
-    // Zigzag gradient from pos→neg
+    // Gradient spans full component width (pos→neg, 0→4)
     if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(0, 0, 1, 0, [
+      ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vPos!) },
         { offset: 1, color: signals!.voltageColor(vNeg!) },
       ]);
@@ -236,36 +246,24 @@ export class LDRCircuitElement extends AbstractCircuitElement {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
-    // Light arrows: diagonal lines from upper-left to lower-right — body decoration, stays COMPONENT
+    // Light arrows: shaft lines + two perpendicular bars (T-head arrowhead style)
+    // Coordinates from Falstad pixel reference ÷ 16
     ctx.setColor("COMPONENT");
-    // Arrow direction: from aBase toward aTip
-    // len = 5*PX = 0.3125, wid = 3*PX = 0.1875
-    // Arrow 1 tip at (0.75, -0.5), shaft from (-0.25, 0.875) to base center
-    ctx.drawLine(-0.25, 0.875, 0.5, -0.25);
-    ctx.drawPolygon(
-      [
-        { x: 0.75, y: -0.5 },
-        { x: 0.41453, y: -0.35754 },
-        { x: 0.71783, y: -0.13696 },
-      ],
-      true,
-    );
 
-    // Arrow 2 tip at (1.1875, -0.5), shaft from (0.1875, 0.875) to base center
-    ctx.drawLine(0.1875, 0.875, 0.9375, -0.25);
-    ctx.drawPolygon(
-      [
-        { x: 1.1875, y: -0.5 },
-        { x: 0.85203, y: -0.35754 },
-        { x: 1.15533, y: -0.13696 },
-      ],
-      true,
-    );
+    // Arrow 1: shaft (0.5,1.625)→(1.5,0.75), bar1 (1.125,0.75)→(1.5,0.75), bar2 (1.5,0.75)→(1.5,1.125)
+    ctx.drawLine(0.5, 1.625, 1.5, 0.75);
+    ctx.drawLine(1.125, 0.75, 1.5, 0.75);
+    ctx.drawLine(1.5, 0.75, 1.5, 1.125);
+
+    // Arrow 2: shaft (1.75,1.625)→(2.625,0.75), bar1 (2.25,0.75)→(2.625,0.75), bar2 (2.625,0.75)→(2.625,1.125)
+    ctx.drawLine(1.75, 1.625, 2.625, 0.75);
+    ctx.drawLine(2.25, 0.75, 2.625, 0.75);
+    ctx.drawLine(2.625, 0.75, 2.625, 1.125);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 0.5, 0.375, { horizontal: "center", vertical: "top" });
+      ctx.drawText(label, 2.6875, -0.5, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

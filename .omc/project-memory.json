@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774007841674,
+  "lastScanned": 1774232873996,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -80,7 +80,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774007841551,
+      "lastAccessed": 1774232873874,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -92,7 +92,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1774007841552,
+      "lastAccessed": 1774232873875,
       "keyFiles": [
         "main.js"
       ]
@@ -101,56 +101,57 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774007841553,
+      "lastAccessed": 1774232873876,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 7,
-      "lastAccessed": 1774007841618,
+      "fileCount": 9,
+      "lastAccessed": 1774232873876,
       "keyFiles": [
         "broken_chain.dig",
         "chained_inverters.dig",
+        "dcswitchlrc.dig",
         "falstad-shapes.json",
-        "java-shapes-errors.txt",
-        "java-shapes.json"
+        "java-shapes-errors.txt"
       ]
     },
     "lib": {
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774007841618,
+      "lastAccessed": 1774232873877,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774007841619,
+      "lastAccessed": 1774232873935,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 9,
-      "lastAccessed": 1774007841619,
+      "fileCount": 11,
+      "lastAccessed": 1774232873936,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
         "generate-all-components-fixture.ts",
-        "patch-analysis-dialog.cjs",
-        "pin-diagnostic.js"
+        "generate-spice-references.sh",
+        "measure-engine-references.ts"
       ]
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 2,
-      "lastAccessed": 1774007841620,
+      "fileCount": 3,
+      "lastAccessed": 1774232873936,
       "keyFiles": [
         "analog-ui-fixup.md",
+        "e2e-circuit-assembly-test-plan.md",
         "facade-unification.md"
       ]
     },
@@ -158,7 +159,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774007841621,
+      "lastAccessed": 1774232873937,
       "keyFiles": [
         "main.ts"
       ]
@@ -167,14 +168,14 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774007841622,
+      "lastAccessed": 1774232873937,
       "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774007841623,
+      "lastAccessed": 1774232873938,
       "keyFiles": [
         "index.json"
       ]
@@ -183,7 +184,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1774007841625,
+      "lastAccessed": 1774232873939,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js"
@@ -192,18 +193,19 @@
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 2,
-      "lastAccessed": 1774007841626,
+      "fileCount": 4,
+      "lastAccessed": 1774232873940,
       "keyFiles": [
         "harness.html",
-        "simulator-harness.ts"
+        "simulator-harness.ts",
+        "spice-reference-values.json"
       ]
     },
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 3,
-      "lastAccessed": 1774007841628,
+      "lastAccessed": 1774232873942,
       "keyFiles": [
         "app-init.ts",
         "test-bridge.ts",
@@ -214,7 +216,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 3,
-      "lastAccessed": 1774007841629,
+      "lastAccessed": 1774232873943,
       "keyFiles": [
         "generic-shape.ts",
         "library-74xx.ts",
@@ -225,309 +227,309 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774007841629,
+      "lastAccessed": 1774232873943,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 185,
-      "lastAccessed": 1774092954110,
-      "type": "directory"
+      "accessCount": 55,
+      "lastAccessed": 1774313250321,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\falstad-fixture-reference.ts",
+      "accessCount": 43,
+      "lastAccessed": 1774244015242,
+      "type": "file"
     },
     {
       "path": "src\\analog\\compiler.ts",
-      "accessCount": 125,
-      "lastAccessed": 1774092939836,
+      "accessCount": 40,
+      "lastAccessed": 1774313014545,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fixtures\\__tests__\\analog-shape-render-audit.test.ts",
+      "accessCount": 32,
+      "lastAccessed": 1774244209261,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 28,
+      "lastAccessed": 1774310131084,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774301589545,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 30,
-      "lastAccessed": 1774092076180,
+      "accessCount": 20,
+      "lastAccessed": 1774310186920,
       "type": "directory"
     },
     {
-      "path": "simulator.html",
-      "accessCount": 25,
-      "lastAccessed": 1774065853810,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\__tests__\\bridge-integration.test.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774063757158,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog",
-      "accessCount": 17,
-      "lastAccessed": 1774092754023,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\analog-engine.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774086321101,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\bridge-adapter.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774087008292,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\property-panel.ts",
+      "path": "src\\editor\\wire-drawing.ts",
       "accessCount": 15,
-      "lastAccessed": 1774092534106,
+      "lastAccessed": 1774235398050,
       "type": "file"
     },
     {
-      "path": "src\\analog\\__tests__\\behavioral-integration.test.ts",
+      "path": "src\\analog\\node-map.ts",
       "accessCount": 14,
-      "lastAccessed": 1774063714696,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-sequential.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774088669097,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-combinational.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774088678313,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\behavioral-remaining.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774089946709,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\behavioral-flipflop-variants.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774059811077,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\mixed-signal-coordinator.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774068993688,
-      "type": "file"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 10,
-      "lastAccessed": 1774088691162,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\behavioral-combinational.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774059680614,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-gate.test.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774060206438,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\digital-pin-model.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774087009193,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-flipflop.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774088658892,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-flipflop-variants.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774060483767,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774078967603,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\behavioral-sequential.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774059875342,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\digital-pin-model.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774060058276,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\__tests__\\bridge-adapter.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774060089734,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\behavioral-gate.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774087257069,
+      "lastAccessed": 1774308629168,
       "type": "file"
     },
     {
       "path": "",
+      "accessCount": 12,
+      "lastAccessed": 1774244141602,
+      "type": "directory"
+    },
+    {
+      "path": "src\\test-utils\\shape-rasterizer.ts",
+      "accessCount": 10,
+      "lastAccessed": 1774243610275,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\analog-shape-audit-hardening.md",
+      "accessCount": 9,
+      "lastAccessed": 1774235378601,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\auto-power.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774308682770,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\element-renderer.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774310196173,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774312885105,
+      "type": "file"
+    },
+    {
+      "path": "src/editor",
       "accessCount": 6,
-      "lastAccessed": 1774089749129,
+      "lastAccessed": 1774235197526,
       "type": "directory"
     },
     {
-      "path": "src\\analog\\__tests__\\bridge-diagnostics.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774060778115,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\mixed-signal-coordinator.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774060786451,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\wire-drawing.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774061858438,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\edit-operations.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774066071645,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\element.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774068992356,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\behavioral-flipflop.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774059707492,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-remaining.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774060538760,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\bridge-instance.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774064695322,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\sources\\ac-voltage-source.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774064726001,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774068942072,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\placement.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774008286380,
-      "type": "file"
-    },
-    {
-      "path": "fixtures\\lrcxor.dig",
-      "accessCount": 3,
-      "lastAccessed": 1774064689643,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\mna-assembler.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774066002276,
+      "path": "src\\core\\registry.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774235947904,
       "type": "directory"
     },
     {
-      "path": "src\\core\\analog-engine-interface.ts",
+      "path": "src/analog",
+      "accessCount": 5,
+      "lastAccessed": 1774235216259,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\analog-engine.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774301824119,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog",
+      "accessCount": 5,
+      "lastAccessed": 1774312793244,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fixtures\\__tests__\\shape-render-audit.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774233038884,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\mixed-partition.ts",
       "accessCount": 3,
-      "lastAccessed": 1774068950156,
-      "type": "file"
+      "lastAccessed": 1774233560629,
+      "type": "directory"
     },
     {
-      "path": "src\\components\\active\\schmitt-trigger.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774061126101,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\dac.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774061145274,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\adc.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774061151100,
+      "path": "src\\components\\wiring\\tunnel.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774235410956,
       "type": "file"
     },
     {
       "path": "src\\analog\\newton-raphson.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774301805676,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\dc-operating-point.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774301805848,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils",
       "accessCount": 2,
-      "lastAccessed": 1774065992973,
+      "lastAccessed": 1774233438507,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app",
+      "accessCount": 2,
+      "lastAccessed": 1774235175987,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\shortcuts.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774235221571,
+      "type": "file"
+    },
+    {
+      "path": "src/components",
+      "accessCount": 2,
+      "lastAccessed": 1774235303257,
+      "type": "directory"
+    },
+    {
+      "path": "src/components/register-all.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774235475696,
+      "type": "directory"
+    },
+    {
+      "path": "src\\engine\\net-trace.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774308648027,
+      "type": "file"
+    },
+    {
+      "path": "src\\fixtures\\__tests__\\shape-audit.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774233015067,
+      "type": "file"
+    },
+    {
+      "path": "src\\test-utils\\java-pin-reference.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774233031473,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 1,
+      "lastAccessed": 1774233471368,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fixtures\\__tests__\\analog-text-probe.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774234473178,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-drag.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235142884,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\__tests__\\wire-drawing.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235142952,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\__tests__\\shortcuts.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235145573,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette-ui.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235163419,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\hit-test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235177774,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\controls.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235182227,
       "type": "file"
     },
     {
       "path": "src\\integration\\editor-binding.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774089449778,
+      "accessCount": 1,
+      "lastAccessed": 1774235182861,
       "type": "file"
     },
     {
-      "path": "src\\core\\engine-interface.ts",
+      "path": "src/editor/element-renderer.ts",
       "accessCount": 1,
-      "lastAccessed": 1774008109428,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\sources",
-      "accessCount": 1,
-      "lastAccessed": 1774059118686,
+      "lastAccessed": 1774235186626,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+      "path": "src\\editor\\placement.ts",
       "accessCount": 1,
-      "lastAccessed": 1774061109016,
+      "lastAccessed": 1774235187146,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\comparator.ts",
+      "path": "src\\components\\pld\\diode.ts",
       "accessCount": 1,
-      "lastAccessed": 1774061162348,
+      "lastAccessed": 1774235234179,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235234627,
+      "type": "file"
+    },
+    {
+      "path": "src/components/pld/diode.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235251881,
+      "type": "directory"
+    },
+    {
+      "path": "src/analog/compiler.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235253859,
+      "type": "directory"
+    },
+    {
+      "path": "fixtures\\gdrv_buck.dig",
+      "accessCount": 1,
+      "lastAccessed": 1774235291853,
+      "type": "file"
+    },
+    {
+      "path": "src/core/registry.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774235318479,
       "type": "directory"
     }
   ],

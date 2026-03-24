@@ -102,6 +102,7 @@ export function loadDigCircuit(
   // connection.  Digital's Java editor always splits wires at junctions,
   // but hand-edited or externally-generated .dig files may not.
   circuit.splitWiresAtJunctions();
+  circuit.removeZeroLengthWires();
 
   propagateWireBitWidths(circuit);
 

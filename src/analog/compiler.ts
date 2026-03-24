@@ -145,15 +145,18 @@ function resolveElementNodes(
 // ---------------------------------------------------------------------------
 
 /**
- * Detect floating nodes: nodes that appear as terminals of only one element.
+ * Detect poorly-connected nodes by counting element terminals per node.
  *
- * A floating node has no current path (only one element connected to it).
- * This makes the MNA system unsolvable or ill-conditioned.
+ * Returns two lists:
+ * - `orphan`: nodes with **zero** element terminals — completely disconnected
+ *   from any component. These make the MNA matrix singular (error).
+ * - `floating`: nodes with exactly **one** element terminal — no current path.
+ *   These make the system ill-conditioned (warning).
  */
-function detectFloatingNodes(
+function detectWeakNodes(
   elements: Array<{ nodeIds: number[] }>,
   nodeCount: number,
-): number[] {
+): { orphan: number[]; floating: number[] } {
   // Count how many element terminals touch each node (excluding ground = 0).
   const terminalCount = new Array<number>(nodeCount + 1).fill(0);
   for (const el of elements) {
@@ -163,13 +166,16 @@ function detectFloatingNodes(
       }
     }
   }
+  const orphan: number[] = [];
   const floating: number[] = [];
   for (let n = 1; n <= nodeCount; n++) {
-    if (terminalCount[n] <= 1) {
+    if (terminalCount[n] === 0) {
+      orphan.push(n);
+    } else if (terminalCount[n] === 1) {
       floating.push(n);
     }
   }
-  return floating;
+  return { orphan, floating };
 }
 
 /**
@@ -384,8 +390,9 @@ export function compileAnalogCircuit(
       continue;
     }
 
-    // Ground elements do not need an analog factory — they are structural.
-    if (el.typeId === "Ground") {
+    // Ground and Tunnel elements do not need an analog factory — they are structural.
+    // Tunnel nets are merged by label in buildNodeMap(); no stamping needed.
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
       elementMeta.push({
         el,
         branchIdx: -1,
@@ -510,8 +517,8 @@ export function compileAnalogCircuit(
   for (const meta of elementMeta) {
     const { el } = meta;
 
-    // Ground elements: skip factory, just record for topology
-    if (el.typeId === "Ground") {
+    // Ground and Tunnel elements: skip factory, just record for topology
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
       continue;
     }
 
@@ -869,10 +876,40 @@ export function compileAnalogCircuit(
 
   // Step 6: Topology validation
 
-  // Check for floating nodes (only meaningful if we have external nodes)
+  // Check for orphan and floating nodes (only meaningful if we have external nodes)
   if (totalNodeCount > 0) {
-    const floatingNodes = detectFloatingNodes(topologyInfo, totalNodeCount);
-    for (const nodeId of floatingNodes) {
+    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
+
+    // Orphan nodes: zero element terminals — completely disconnected wire
+    // groups (e.g. degenerate zero-length wires). These make the MNA matrix
+    // singular and must block compilation.
+    for (const nodeId of weakNodes.orphan) {
+      diagnostics.push(
+        makeDiagnostic(
+          "orphan-node",
+          "error",
+          `Node ${nodeId} is orphan (no element terminals connected)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has no element terminals connected to it. ` +
+              `This typically results from a degenerate wire (zero-length or ` +
+              `disconnected from all components). The orphan node creates a ` +
+              `zero row in the MNA matrix, making it singular.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Remove the disconnected wire or wire fragment at this location.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+
+    // Floating nodes: one element terminal — no complete current path.
+    // Warning severity; the circuit may still converge with gmin stepping.
+    for (const nodeId of weakNodes.floating) {
       diagnostics.push(
         makeDiagnostic(
           "floating-node",

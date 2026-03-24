@@ -211,11 +211,11 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // hs=10*PX=0.625, zigzag spans y:[-0.625, 0.625], x:[0,2]
+    // hs=10*PX=0.625, zigzag spans y:[-0.625, 0.625], x:[0,4]
     return {
       x: this.position.x,
       y: this.position.y - 0.625,
-      width: 2,
+      width: 4,
       height: 1.25,
     };
   }
@@ -228,16 +228,15 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Falstad MemristorElm: calcLeads(32) on (0,0)→(2,0), bodyLen=2=distance
-    // lead1=(0,0), lead2=(2,0). hs=10*PX=0.625
-    // Lead wires are zero-length (lead endpoints = pin endpoints)
-    // 6 segments: each draws vertical spike then horizontal segment
-    // interpPointSingle on horizontal: (2*f, -g)
-    const hs = 10 / 16; // 0.625
-    const segments = 6;
+    // Falstad MemristorElm: total width 4 grid units (64px ÷ 16).
+    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px ÷ 16 = 3).
+    // Body spans x=1→3 (16px leads on each end), hs=10px÷16=0.625 grid units.
+    // Zigzag body: 4 full teeth, each 8px = 0.5 grid units wide.
+    // Segment x positions (px ÷ 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
+    // (body subdivided into 8 half-teeth of 5px = 0.3125 grid units)
 
     if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(0, 0, 2, 0, [
+      ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
         { offset: 1, color: signals!.voltageColor(vB) },
       ]);
@@ -245,22 +244,26 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
       ctx.setColor("COMPONENT");
     }
 
-    let ox = 0;
-    for (let i = 0; i <= segments; i++) {
-      const atEnd = i === segments;
-      const nx = atEnd ? 0 : (i & 1) === 0 ? 1 : -1;
+    // Lead A: (0,0) → (1,0)
+    ctx.drawLine(0, 0, 1, 0);
 
-      // Vertical line from hs*ox to hs*nx at position i/segments
-      const px = (i / segments) * 2;
-      ctx.drawLine(px, -(hs * ox), px, -(hs * nx));
+    // Zigzag body: x positions at 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
+    // y alternates: 0, -hs, +hs, -hs, +hs, -hs, +hs, 0
+    const hs = 10 / 16; // 0.625
+    const xs = [1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3];
+    const ys = [0, -hs, hs, -hs, hs, -hs, hs, 0];
 
-      if (!atEnd) {
-        // Horizontal line from hs*nx at i to hs*nx at i+1
-        const px2 = ((i + 1) / segments) * 2;
-        ctx.drawLine(px, -(hs * nx), px2, -(hs * nx));
+    for (let i = 0; i < xs.length; i++) {
+      // Vertical segment at xs[i]: from ys[i] to ys[i+1]
+      ctx.drawLine(xs[i], ys[i], xs[i], ys[i + 1]);
+      // Horizontal segment from xs[i] to xs[i+1] at ys[i+1]
+      if (i < xs.length - 1) {
+        ctx.drawLine(xs[i], ys[i + 1], xs[i + 1], ys[i + 1]);
       }
-      ox = nx;
     }
+
+    // Lead B: (3,0) → (4,0)
+    ctx.drawLine(3, 0, 4, 0);
 
     ctx.restore();
   }

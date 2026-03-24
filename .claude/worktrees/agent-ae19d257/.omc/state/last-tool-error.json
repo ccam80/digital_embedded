@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"/c/local_working_projects/digital_in_browser\\\" && npx vitest run src/fixtures/__tests__/analog-shape-render-audit.test.ts -t \\\"Timer555\\\" 2>&1\",\"timeout\":60000,\"description\":\"Run anal...",
+  "error": "Exit code 1\n\n\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90mC:/local_working_projects/digital_in_browser\u001b[39m\n\n \u001b[31m❯\u001b[39m src/fixtures/__tests__/analog-shape-render-audit.test.ts \u001b[2m(\u001b[22m\u001b[2m91 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m | \u001b[22m\u001b[33m89 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[90m 54\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m analog shape render audit — pixel comparison vs Falstad/CircuitJS1\u001b[2m > \u001b[22m'Timer555' shape comparison vs Falstad\u001b[90m 45\u001b[2mms\u001b[22m\u001b[31m\u001b[39m\n\u001b[31m     → Timer555...",
+  "timestamp": "2026-03-23T05:35:34.046Z",
+  "retry_count": 1
+}

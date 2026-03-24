@@ -276,9 +276,9 @@ export class ScrElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 0.5,
+      y: this.position.y - 2,
       width: 4,
-      height: 2,
+      height: 2.5,
     };
   }
 
@@ -315,14 +315,13 @@ export class ScrElement extends AbstractCircuitElement {
     }
     ctx.drawLine(2.5, 0, 4, 0);
 
-    // Gate lead
+    // Gate lead: diagonal from cathode bar to pin G at (3,1)
     if (signals && vG !== undefined) {
       ctx.setRawColor(signals.voltageColor(vG));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(2.5, 0, 2, 1.5);
-    ctx.drawLine(2, 1.5, 3, 1);
+    ctx.drawLine(2.5, 0, 3, 1);
 
     ctx.restore();
   }

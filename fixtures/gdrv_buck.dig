@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry>
+      <string>romContent</string>
+      <romList>
+        <roms/>
+      </romList>
+    </entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>NMOS</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+        <entry>
+          <string>_modelParams</string>
+          <string>{&quot;VTO&quot;:0.7,&quot;KP&quot;:0.00012,&quot;LAMBDA&quot;:0.02,&quot;PHI&quot;:0.6,&quot;GAMMA&quot;:0.37,&quot;CBD&quot;:0,&quot;CBS&quot;:0,&quot;CGDO&quot;:0,&quot;CGSO&quot;:0,&quot;W&quot;:0.000001,&quot;L&quot;:0.000001,&quot;TOX&quot;:1e-7,&quot;RD&quot;:0,&quot;RS&quot;:0,&quot;RG&quot;:0,&quot;RB&quot;:0,&quot;IS&quot;:1e-14,&quot;JS&quot;:0,&quot;PB&quot;:0.8,&quot;MJ&quot;:0.5,&quot;MJSW&quot;:0.33,&quot;CGBO&quot;:0,&quot;CJ&quot;:0,&quot;CJSW&quot;:0,&quot;NFS&quot;:0}</string>
+        </entry>
+      </elementAttributes>
+      <pos x="580" y="420"/>
+    </visualElement>
+    <visualElement>
+      <elementName>NpnBJT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>_modelParams</string>
+          <string>{&quot;IS&quot;:1e-16,&quot;BF&quot;:100,&quot;NF&quot;:1,&quot;BR&quot;:1,&quot;NR&quot;:1,&quot;ISE&quot;:0,&quot;ISC&quot;:0,&quot;VAF&quot;:null,&quot;VAR&quot;:null,&quot;IKF&quot;:null,&quot;IKR&quot;:null,&quot;RB&quot;:0,&quot;RC&quot;:0,&quot;RE&quot;:0,&quot;CJE&quot;:0,&quot;VJE&quot;:0.75,&quot;MJE&quot;:0.33,&quot;CJC&quot;:0,&quot;VJC&quot;:0.75,&quot;MJC&quot;:0.33,&quot;TF&quot;:0,&quot;TR&quot;:0,&quot;EG&quot;:1.11,&quot;XTI&quot;:3,&quot;XTB&quot;:0,&quot;KF&quot;:0}</string>
+        </entry>
+      </elementAttributes>
+      <pos x="160" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>PnpBJT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>_modelParams</string>
+          <string>{&quot;IS&quot;:1e-16,&quot;BF&quot;:100,&quot;NF&quot;:1,&quot;BR&quot;:1,&quot;NR&quot;:1,&quot;ISE&quot;:0,&quot;ISC&quot;:0,&quot;VAF&quot;:null,&quot;VAR&quot;:null,&quot;IKF&quot;:null,&quot;IKR&quot;:null,&quot;RB&quot;:0,&quot;RC&quot;:0,&quot;RE&quot;:0,&quot;CJE&quot;:0,&quot;VJE&quot;:0.75,&quot;MJE&quot;:0.33,&quot;CJC&quot;:0,&quot;VJC&quot;:0.75,&quot;MJC&quot;:0.33,&quot;TF&quot;:0,&quot;TR&quot;:0,&quot;EG&quot;:1.11,&quot;XTI&quot;:3,&quot;XTB&quot;:0,&quot;KF&quot;:0}</string>
+        </entry>
+      </elementAttributes>
+      <pos x="380" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="540"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="420" y="640"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="200" y="700"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DcVoltageSource</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="-40" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>10V</string>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>AcVoltageSource</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+        <entry>
+          <string>Amplitude</string>
+          <int>2</int>
+        </entry>
+      </elementAttributes>
+      <pos x="-100" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>DRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="-100" y="440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="2"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>DRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="80" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="920" y="440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="80" y="600"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="2"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>DRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="300" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="300" y="500"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Inductor</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="700" y="360"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Diode</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="660" y="440"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Capacitor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="3"/>
+        </entry>
+      </elementAttributes>
+      <pos x="820" y="360"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>NetName</string>
+          <string>NDRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="560"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>NetName</string>
+          <string>PDRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="460" y="540"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="2"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>10V</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="360"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Tunnel</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="3"/>
+        </entry>
+        <entry>
+          <string>NetName</string>
+          <string>NDRV</string>
+        </entry>
+      </elementAttributes>
+      <pos x="580" y="460"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="820" y="440"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire>
+      <p1 x="420" y="640"/>
+      <p2 x="420" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="380" y="700"/>
+      <p2 x="200" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="100" y="700"/>
+      <p2 x="-40" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="-40" y="700"/>
+      <p2 x="-100" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="-100" y="700"/>
+      <p2 x="-140" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="-40" y="600"/>
+      <p2 x="-40" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="630"/>
+      <p2 x="200" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="-40" y="440"/>
+      <p2 x="-40" y="460"/>
+    </wire>
+    <wire>
+      <p1 x="-40" y="460"/>
+      <p2 x="-40" y="520"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="460"/>
+      <p2 x="200" y="460"/>
+    </wire>
+    <wire>
+      <p1 x="140" y="440"/>
+      <p2 x="-40" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="-40" y="440"/>
+      <p2 x="-40" y="460"/>
+    </wire>
+    <wire>
+      <p1 x="420" y="440"/>
+      <p2 x="420" y="470"/>
+    </wire>
+    <wire>
+      <p1 x="380" y="440"/>
+      <p2 x="200" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="-100" y="600"/>
+      <p2 x="-100" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="-100" y="520"/>
+      <p2 x="-100" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="460"/>
+      <p2 x="200" y="460"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="460"/>
+      <p2 x="200" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="700"/>
+      <p2 x="160" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="570"/>
+      <p2 x="200" y="560"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="560"/>
+      <p2 x="200" y="540"/>
+    </wire>
+    <wire>
+      <p1 x="240" y="560"/>
+      <p2 x="200" y="560"/>
+    </wire>
+    <wire>
+      <p1 x="420" y="560"/>
+      <p2 x="420" y="540"/>
+    </wire>
+    <wire>
+      <p1 x="420" y="540"/>
+      <p2 x="420" y="530"/>
+    </wire>
+    <wire>
+      <p1 x="460" y="540"/>
+      <p2 x="420" y="540"/>
+    </wire>
+    <wire>
+      <p1 x="100" y="700"/>
+      <p2 x="160" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="140" y="440"/>
+      <p2 x="200" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="420" y="440"/>
+      <p2 x="380" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="380" y="700"/>
+      <p2 x="420" y="700"/>
+    </wire>
+    <wire>
+      <p1 x="480" y="360"/>
+      <p2 x="550" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="610" y="360"/>
+      <p2 x="700" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="780" y="360"/>
+      <p2 x="820" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="820" y="360"/>
+      <p2 x="900" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="900" y="360"/>
+      <p2 x="920" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="920" y="440"/>
+      <p2 x="740" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="740" y="440"/>
+      <p2 x="660" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="580" y="420"/>
+      <p2 x="580" y="460"/>
+    </wire>
+  </wires>
+  <measurementOrdering/>
+</circuit>

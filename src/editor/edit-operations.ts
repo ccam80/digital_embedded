@@ -194,6 +194,11 @@ export function deleteSelection(
   const elementIndices = elements.map((el) => circuit.elements.indexOf(el));
   const wireIndices = allWiresToDelete.map((w) => circuit.wires.indexOf(w));
 
+  // Zero-length wires orphaned by element deletion are captured at execute
+  // time and removed. Undo restores them (they were part of the original
+  // circuit state, even if degenerate).
+  let orphanedZeroLengthWires: Wire[] = [];
+
   return {
     description: "Delete",
     execute(): void {
@@ -203,8 +208,20 @@ export function deleteSelection(
       for (const wire of allWiresToDelete) {
         circuit.removeWire(wire);
       }
+      // After removing elements/wires, clean up any zero-length wires that
+      // were previously masked by a component pin at the same position.
+      orphanedZeroLengthWires = circuit.wires.filter(
+        (w) => w.start.x === w.end.x && w.start.y === w.end.y,
+      );
+      for (const w of orphanedZeroLengthWires) {
+        circuit.removeWire(w);
+      }
     },
     undo(): void {
+      // Re-insert zero-length wires first (they existed before deletion)
+      for (const w of orphanedZeroLengthWires) {
+        circuit.wires.push(w);
+      }
       // Re-insert at original indices (in reverse deletion order)
       for (let i = elements.length - 1; i >= 0; i--) {
         const idx = elementIndices[i]!;

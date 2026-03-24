@@ -105,17 +105,17 @@ function buildPotentiometerPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "W",
+      label: "B",
       defaultBitWidth: 1,
-      position: { x: 2, y: 1 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "B",
+      label: "W",
       defaultBitWidth: 1,
-      position: { x: 2, y: 0 },
+      position: { x: 2, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -142,11 +142,11 @@ export class PotentiometerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // post3 is at y = -offset = -1 (below axis), zigzag peak at y = +hs = +0.5
+    // Span is (0,0)→(4,0) gu. Zigzag peak at y=+0.5 gu, wiper pin at y=-1 gu.
     return {
       x: this.position.x,
       y: this.position.y - 1,
-      width: 2,
+      width: 4,
       height: 1.5,
     };
   }
@@ -156,14 +156,18 @@ export class PotentiometerElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Falstad PotElm: calcLeads(32px) on span (0,0)→(2,0), bodyLen=2gu=distance
-    // → lead1=(0,0), lead2=(2,0). hs=8*PX=0.5
+    // Falstad PotElm: total span (0,0)→(64,0) px = (0,0)→(4,0) gu.
+    // Lead wires: 0..16px and 48..64px = 0..1 gu and 3..4 gu.
+    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks ±8px = ±0.5 gu.
+    // Wiper pin W at (32,-16) px = (2,-1) gu.
     const PX = 1 / 16;
-    const hs = 8 * PX; // 0.5
+    const hs = 8 * PX; // 0.5 gu
 
-    // Lead wires (zero-length since lead endpoints = pin endpoints)
-    // Zigzag resistor body — 16 segments (non-euro PotElm)
-    // nx cycles: 0→1→0→-1→0→1→... per i&3 switch
+    // Lead wires
+    ctx.drawLine(0, 0, 1, 0);
+    ctx.drawLine(3, 0, 4, 0);
+
+    // Zigzag resistor body — 16 segments spanning x=1..3 gu
     const segments = 16;
     let ox = 0;
     for (let i = 0; i < segments; i++) {
@@ -173,40 +177,24 @@ export class PotentiometerElement extends AbstractCircuitElement {
         case 2: nx = -1; break;
         default: nx = 0; break;
       }
-      // interpPointSingle(lead1, lead2, f, g) along horizontal (0,0)→(2,0):
-      // result = (2*f, -g) since perpendicular to +x is -y
-      const fromX = (i / segments) * 2;
+      const fromX = 1 + (i / segments) * 2;
       const fromY = -(hs * ox);
-      const toX = ((i + 1) / segments) * 2;
+      const toX = 1 + ((i + 1) / segments) * 2;
       const toY = -(hs * nx);
       ctx.drawLine(fromX, fromY, toX, toY);
       ox = nx;
     }
 
-    // Wiper: position=0.5 → midpoint of body axis
-    // For horizontal (0,0)→(2,0), interpPointSingle perpendicular: y = -g
-    // corner2 = interpPoint(pA, pB, 0.5) = (1, 0)
-    // post3 = interpPointSingle(pA, pB, 0.5, offset=1) = (1, -1)
-    // arrowPoint = interpPointSingle(pA, pB, 0.5, 8*PX) = (1, -0.5)
-    const corner2X = 1;
-    const corner2Y = 0;
-    const post3X = 1;
-    const post3Y = -1;
-    const arrowPointX = 1;
-    const arrowPointY = -(8 * PX); // -0.5
+    // Wiper arrow (position=0.5, pin W at (2,-1) gu)
+    // Falstad: (32,-16)→(17,-16) px, (17,-16)→(17,-8) px, barbs (25,-16)→(17,-8) and (9,-16)→(17,-8)
+    const arrowX = 17 * PX;   // 17/16 gu
+    const arrowY = -8 * PX;   // -0.5 gu (arrowpoint)
+    const stemY = -1;          // -1 gu (wiper pin level)
 
-    // Wiper lines: post3 → corner2 → arrowPoint
-    ctx.drawLine(post3X, post3Y, corner2X, corner2Y);
-    ctx.drawLine(corner2X, corner2Y, arrowPointX, arrowPointY);
-
-    // Arrow barbs: interpPoint2(corner2, arrowPoint, f=(clen-8*PX)/clen, g=8*PX)
-    // clen = |offset| - 8*PX = 1 - 0.5 = 0.5
-    // f = (0.5 - 0.5)/0.5 = 0 → at corner2
-    // corner2→arrowPoint: dx=0, dy=-0.5, len=0.5
-    // gx = (dy/len)*g = (-1)*0.5 = -0.5, gy = (-dx/len)*g = 0
-    // arrow1 = (1-0.5, 0) = (0.5, 0), arrow2 = (1+0.5, 0) = (1.5, 0)
-    ctx.drawLine(0.5, 0, arrowPointX, arrowPointY);
-    ctx.drawLine(1.5, 0, arrowPointX, arrowPointY);
+    ctx.drawLine(2, stemY, arrowX, stemY);           // horizontal stem W→arrowbase
+    ctx.drawLine(arrowX, stemY, arrowX, arrowY);     // vertical to arrowpoint
+    ctx.drawLine(25 * PX, stemY, arrowX, arrowY);   // right barb
+    ctx.drawLine(9 * PX, stemY, arrowX, arrowY);    // left barb
 
     ctx.restore();
   }

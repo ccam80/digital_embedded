@@ -102,7 +102,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     return {
       x: this.position.x,
       y: this.position.y - 0.75,
-      width: 2,
+      width: 4,
       height: 1.5 + 1e-10,
     };
   }
@@ -118,7 +118,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     const hasVoltage = vPos !== undefined && vNeg !== undefined;
 
     const PX = 1 / 16;
-    const plateOffset = 12 * PX; // 0.75
+    const plateOffset = 28 * PX; // 1.75 — matches Falstad lead length (28px)
 
     // Left lead — colored by pos voltage
     if (hasVoltage && ctx.setRawColor) {
@@ -134,11 +134,11 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(2, 0, 2 - plateOffset, 0);
+    ctx.drawLine(4, 0, 4 - plateOffset, 0);
 
-    // Plate 1 — straight line (positive/anode plate): gradient pos→neg
+    // Plate 1 — straight line (positive/anode plate)
     if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(plateOffset, 0, 2 - plateOffset, 0, [
+      ctx.setLinearGradient(plateOffset, 0, 4 - plateOffset, 0, [
         { offset: 0, color: signals!.voltageColor(vPos) },
         { offset: 1, color: signals!.voltageColor(vNeg) },
       ]);
@@ -147,31 +147,41 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     }
     ctx.drawLine(plateOffset, -0.75, plateOffset, 0.75);
 
-    // Plate 2 — curved (8-point polyline approximation)
-    // Falstad: fwdOffset = 5*PX*(1 - sqrt(1 - q^2)) * 0.5
-    const plateHeight = 1.5; // 2 * plateOffset
+    // Plate 2 — curved (exact Falstad 7-segment polyline)
+    // Falstad pixel coords: (41,-12),(37,-9),(36,-5),(36,-2),(36,2),(36,5),(37,9),(41,12)
+    // Grid coords (÷16):   (2.5625,-0.75),(2.3125,-0.5625),(2.25,-0.3125),(2.25,-0.125),
+    //                      (2.25,0.125),(2.25,0.3125),(2.3125,0.5625),(2.5625,0.75)
     if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(plateOffset, 0, 2 - plateOffset, 0, [
+      ctx.setLinearGradient(plateOffset, 0, 4 - plateOffset, 0, [
         { offset: 0, color: signals!.voltageColor(vPos) },
         { offset: 1, color: signals!.voltageColor(vNeg) },
       ]);
     } else {
       ctx.setColor("COMPONENT");
     }
-    for (let i = 0; i < 7; i++) {
-      const q0 = (i - 3.5) / 3.5;
-      const q1 = (i + 1 - 3.5) / 3.5;
-      const fwd0 = 5 * PX * (1 - Math.sqrt(1 - q0 * q0)) * 0.5;
-      const fwd1 = 5 * PX * (1 - Math.sqrt(1 - q1 * q1)) * 0.5;
-      const y0 = -0.75 + (i / 7) * plateHeight;
-      const y1 = -0.75 + ((i + 1) / 7) * plateHeight;
-      ctx.drawLine(2 - plateOffset + fwd0, y0, 2 - plateOffset + fwd1, y1);
+    const curvedPts: [number, number][] = [
+      [2.5625, -0.75],
+      [2.3125, -0.5625],
+      [2.25, -0.3125],
+      [2.25, -0.125],
+      [2.25, 0.125],
+      [2.25, 0.3125],
+      [2.3125, 0.5625],
+      [2.5625, 0.75],
+    ];
+    for (let i = 0; i < curvedPts.length - 1; i++) {
+      ctx.drawLine(curvedPts[i][0], curvedPts[i][1], curvedPts[i + 1][0], curvedPts[i + 1][1]);
     }
+
+    // Polarity marker "+" at anode side
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText("+", 0.9375, 0.625, { horizontal: "center", vertical: "top" });
 
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });
-      ctx.drawText(label, 1, 0.8, { horizontal: "center", vertical: "top" });
+      ctx.drawText(label, 1.6875, -0.875, { horizontal: "center", vertical: "top" });
     }
 
     ctx.restore();

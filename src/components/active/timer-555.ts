@@ -43,30 +43,14 @@ import type { SparseSolver } from "../../analog/sparse-solver.js";
 // ---------------------------------------------------------------------------
 
 // Pin index → nodeIds[i] mapping:
-//   0: VCC      1: GND      2: TRIG     3: THR
-//   4: CTRL     5: RST      6: DIS      7: OUT
+//   0: DIS      1: TRIG     2: THR      3: VCC
+//   4: CTRL     5: OUT      6: RST      7: GND
 
 function buildTimer555PinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "VCC",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -4 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "GND",
-      defaultBitWidth: 1,
-      position: { x: 2, y: 4 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "TRIG",
+      label: "DIS",
       defaultBitWidth: 1,
       position: { x: 0, y: 2 },
       isNegatable: false,
@@ -74,9 +58,25 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.INPUT,
+      label: "TRIG",
+      defaultBitWidth: 1,
+      position: { x: 0, y: 6 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
       label: "THR",
       defaultBitWidth: 1,
-      position: { x: 0, y: 0 },
+      position: { x: 0, y: 8 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "VCC",
+      defaultBitWidth: 1,
+      position: { x: 4, y: -2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -84,23 +84,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "CTRL",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "RST",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -3 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "DIS",
-      defaultBitWidth: 1,
-      position: { x: 0, y: -1 },
+      position: { x: 4, y: 10 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -108,7 +92,23 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "OUT",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1 },
+      position: { x: 8, y: 4 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "RST",
+      defaultBitWidth: 1,
+      position: { x: 8, y: 2 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "GND",
+      defaultBitWidth: 1,
+      position: { x: 6, y: 10 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -137,9 +137,9 @@ export class Timer555Element extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 4,
-      width: 4,
-      height: 8,
+      y: this.position.y - 2,
+      width: 8,
+      height: 12,
     };
   }
 
@@ -156,73 +156,73 @@ export class Timer555Element extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // IC body rectangle — stays COMPONENT
+    // IC body rectangle: x=1, y=-1, width=6, height=10 (grid units)
     ctx.setColor("COMPONENT");
-    ctx.drawRect(0.5, -3.5, 3, 7, false);
+    ctx.drawRect(1, -1, 6, 10, false);
 
-    // DIS lead (west)
+    // DIS lead (west): pin tip (0,2) → body edge (1,2)
     if (vDis !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vDis));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, -1, 0.5, -1);
+    ctx.drawLine(0, 2, 1, 2);
 
-    // THR lead (west)
-    if (vThr !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vThr));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 0.5, 0);
-
-    // TRIG lead (west)
+    // TRIG lead (west): pin tip (0,6) → body edge (1,6)
     if (vTrig !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vTrig));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 2, 0.5, 2);
+    ctx.drawLine(0, 6, 1, 6);
 
-    // OUT lead (east)
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
+    // THR lead (west): pin tip (0,8) → body edge (1,8)
+    if (vThr !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vThr));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3.5, -1, 4, -1);
+    ctx.drawLine(0, 8, 1, 8);
 
-    // CTRL lead (east)
-    if (vCtrl !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCtrl));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.5, 1, 4, 1);
-
-    // VCC lead (north) — pin at (2,-4), body top at y=-3.5
+    // VCC lead (north): pin tip (4,-2) → body edge (4,-1)
     if (vVcc !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vVcc));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(2, -4, 2, -3.5);
+    ctx.drawLine(4, -2, 4, -1);
 
-    // RST lead (north) — pin at (2,-3), body top at y=-3.5
+    // CTRL lead (south): pin tip (4,10) → body edge (4,9)
+    if (vCtrl !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vCtrl));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(4, 10, 4, 9);
+
+    // OUT lead (east): pin tip (8,4) → body edge (7,4)
+    if (vOut !== undefined && ctx.setRawColor) {
+      ctx.setRawColor(signals!.voltageColor(vOut));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(8, 4, 7, 4);
+
+    // RST lead (east): pin tip (8,2) → body edge (7,2)
     if (vRst !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vRst));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(2, -3, 2, -3.5);
+    ctx.drawLine(8, 2, 7, 2);
 
-    // GND lead (south)
+    // GND lead (south): pin tip (6,10) → body edge (6,9)
     if (vGnd !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vGnd));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(2, 3.5, 2, 4);
+    ctx.drawLine(6, 10, 6, 9);
 
     ctx.restore();
   }
@@ -263,14 +263,14 @@ function createTimer555Element(
   const rDiv1       = 5000;   // VCC→CTRL divider arm (Ω)
   const rDiv2       = 10000;  // CTRL→GND divider arm (2×5kΩ combined, Ω)
 
-  const nVcc  = nodeIds[0];
-  const nGnd  = nodeIds[1];
-  const nTrig = nodeIds[2];
-  const nThr  = nodeIds[3];
+  const nDis  = nodeIds[0];
+  const nTrig = nodeIds[1];
+  const nThr  = nodeIds[2];
+  const nVcc  = nodeIds[3];
   const nCtrl = nodeIds[4];
-  const nRst  = nodeIds[5];
-  const nDis  = nodeIds[6];
-  const nOut  = nodeIds[7];
+  const nOut  = nodeIds[5];
+  const nRst  = nodeIds[6];
+  const nGnd  = nodeIds[7];
 
   // SR flip-flop output: true=SET(high output), false=RESET(low output)
   let _flipflopQ = false;
@@ -360,7 +360,7 @@ function createTimer555Element(
   }
 
   return {
-    nodeIndices: [nVcc, nGnd, nTrig, nThr, nCtrl, nRst, nDis, nOut],
+    nodeIndices: [nDis, nTrig, nThr, nVcc, nCtrl, nOut, nRst, nGnd],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,

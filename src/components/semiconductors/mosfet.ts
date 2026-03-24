@@ -543,9 +543,9 @@ export function createMosfetElement(
   _branchIdx: number,
   props: PropertyBag,
 ): MosfetAnalogElement {
-  const nodeD = nodeIds[0]; // drain
-  const nodeG = nodeIds[1]; // gate
-  const nodeS = nodeIds[2]; // source
+  const nodeG = nodeIds[0]; // gate
+  const nodeS = nodeIds[1]; // source
+  const nodeD = nodeIds[2]; // drain
   // Bulk node: use nodeIds[3] if provided (4-terminal), else treat bulk = source
   const nodeB = nodeIds.length >= 4 ? nodeIds[3] : nodeS;
 
@@ -588,9 +588,9 @@ export class NmosfetElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
-      width: 3,
-      height: 3,
+      y: this.position.y - 1.3125,
+      width: 4,
+      height: 2.625,
     };
   }
 
@@ -603,23 +603,31 @@ export class NmosfetElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const chanX = 2.0;
-    const chanTop = -1.2;
-    const chanBot = 1.2;
+    const chanX = 2.625;
+    const gateBarX = 2.25;
 
     // Body (channel segments, gate bar, body connection line, arrow) stays COMPONENT color
-    const segH = (chanBot - chanTop) / 6;
-    ctx.drawLine(chanX, chanTop, chanX, chanTop + segH);
-    ctx.drawLine(chanX, chanTop + 2 * segH, chanX, chanTop + 4 * segH);
-    ctx.drawLine(chanX, chanTop + 5 * segH, chanX, chanBot);
+    // Channel segments (with gap in middle for depletion-mode styling)
+    ctx.drawLine(chanX, 1, chanX, 0.6875);
+    ctx.drawLine(chanX, 0.3125, chanX, 0);
+    ctx.drawLine(chanX, 0, chanX, -0.3125);
+    ctx.drawLine(chanX, -0.6875, chanX, -1);
 
-    const gateBarX = 1.6;
-    ctx.drawLine(gateBarX, chanTop, gateBarX, chanBot);
-    ctx.drawLine(chanX, 0, 2.5, 0);
+    // Stub extensions at drain/source sides
+    ctx.drawLine(chanX, 1, chanX, 1.3125);
+    ctx.drawLine(chanX, -1, chanX, -1.3125);
+
+    // Gate bar
+    ctx.drawLine(gateBarX, -0.5, gateBarX, 0.5);
+
+    // Body connection line (channel to body node)
+    ctx.drawLine(chanX, 0, 2.625, 0);
+
+    // Arrow (pointing inward for N-channel)
     ctx.drawPolygon([
-      { x: 2, y: 0 },
-      { x: 2.1761691877498903, y: 0.5042507319664117 },
-      { x: 2.4642119213592, y: 0.2642119213592003 },
+      { x: 2.625, y: 0 },
+      { x: 3.375, y: 0.3125 },
+      { x: 3.375, y: -0.3125 },
     ], true);
 
     // Gate lead (horizontal from pin to gate bar)
@@ -630,23 +638,23 @@ export class NmosfetElement extends AbstractCircuitElement {
     }
     ctx.drawLine(0, 0, gateBarX, 0);
 
-    // Drain lead (horizontal stub from channel, then to drain pin)
+    // Drain lead (horizontal stub from channel to drain pin)
     if (signals && vD !== undefined) {
       ctx.setRawColor(signals.voltageColor(vD));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanTop, 3, chanTop);
-    ctx.drawLine(3, chanTop, 3, -1.5);
+    ctx.drawLine(4, -1, chanX, -1);
 
-    // Source lead (horizontal stub from channel, then to source pin)
+    // Source lead (horizontal stub + vertical to body + body horizontal)
     if (signals && vS !== undefined) {
       ctx.setRawColor(signals.voltageColor(vS));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanBot, 3, chanBot);
-    ctx.drawLine(3, chanBot, 3, 1.5);
+    ctx.drawLine(4, 1, chanX, 1);
+    ctx.drawLine(4, 1, 4, 0);
+    ctx.drawLine(4, 0, chanX, 0);
 
     ctx.restore();
   }
@@ -678,9 +686,9 @@ export class PmosfetElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 1.5,
-      width: 3,
-      height: 3,
+      y: this.position.y - 1.3125,
+      width: 4.0,
+      height: 2.625,
     };
   }
 
@@ -693,51 +701,64 @@ export class PmosfetElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const chanX = 2.0;
-    const chanTop = -1.2;
-    const chanBot = 1.2;
+    const chanX = 2.625;
+    const gateBarX = 2.25;
 
-    // Body (channel segments, gate bar, bubble, body line, arrow) stays COMPONENT color
-    const segH = (chanBot - chanTop) / 6;
-    ctx.drawLine(chanX, chanTop, chanX, chanTop + segH);
-    ctx.drawLine(chanX, chanTop + 2 * segH, chanX, chanTop + 4 * segH);
-    ctx.drawLine(chanX, chanTop + 5 * segH, chanX, chanBot);
-
-    const gateBarX = 1.6;
-    ctx.drawLine(gateBarX, chanTop, gateBarX, chanBot);
-    ctx.drawCircle(gateBarX - 0.1, 0, 0.1, false);
-    ctx.drawLine(chanX, 0, 2.5, 0);
-    ctx.drawPolygon([
-      { x: 3, y: 1.2 },
-      { x: 2.5358880786408, y: 0.9357880786408 },
-      { x: 2.8238308122501097, y: 0.6957492680335883 },
-    ], true);
-
-    // Gate lead (from pin to bubble, stopping before bubble)
-    if (signals && vG !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vG));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, gateBarX - 0.2, 0);
-
-    // Drain lead (horizontal stub from channel, then to drain pin)
+    // Line 1: D lead (signal D color)
     if (signals && vD !== undefined) {
       ctx.setRawColor(signals.voltageColor(vD));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanTop, 3, chanTop);
-    ctx.drawLine(3, chanTop, 3, -1.5);
+    ctx.drawLine(4, 1, chanX, 1);
 
-    // Source lead (horizontal stub from channel, then to source pin)
+    // Line 2: S stub horizontal (signal S color)
     if (signals && vS !== undefined) {
       ctx.setRawColor(signals.voltageColor(vS));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(chanX, chanBot, 3, chanBot);
-    ctx.drawLine(3, chanBot, 3, 1.5);
+    ctx.drawLine(4, -1, chanX, -1);
+
+    // Lines 3-6: channel segments (COMPONENT color)
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(chanX, 1, chanX, 0.6875);
+    ctx.drawLine(chanX, 0.3125, chanX, 0);
+    ctx.drawLine(chanX, 0, chanX, -0.3125);
+    ctx.drawLine(chanX, -0.6875, chanX, -1);
+
+    // Lines 7-8: extended stubs beyond D/S (COMPONENT color)
+    ctx.drawLine(chanX, 1, chanX, 1.3125);
+    ctx.drawLine(chanX, -1, chanX, -1.3125);
+
+    // Lines 9-10: S body vertical + horizontal (signal S color)
+    if (signals && vS !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vS));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(4, -1, 4, 0);
+    ctx.drawLine(4, 0, chanX, 0);
+
+    // Line 11: arrow (COMPONENT color)
+    ctx.setColor("COMPONENT");
+    ctx.fillPolygon([
+      { x: 4, y: 0 },
+      { x: 3.25, y: -0.3125 },
+      { x: 3.25, y: 0.3125 },
+    ]);
+
+    // Line 12: gate lead (signal G color)
+    if (signals && vG !== undefined) {
+      ctx.setRawColor(signals.voltageColor(vG));
+    } else {
+      ctx.setColor("COMPONENT");
+    }
+    ctx.drawLine(0, 0, gateBarX, 0);
+
+    // Line 13: gate bar (COMPONENT color)
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(gateBarX, -0.5, gateBarX, 0.5);
 
     ctx.restore();
   }
@@ -759,14 +780,6 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "D",
-      defaultBitWidth: 1,
-      position: { x: 3, y: -1.5 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
@@ -777,7 +790,15 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "S",
       defaultBitWidth: 1,
-      position: { x: 3, y: 1.5 },
+      position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "D",
+      defaultBitWidth: 1,
+      position: { x: 4, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -787,14 +808,6 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
 function buildPmosPinDeclarations(): PinDeclaration[] {
   return [
     {
-      direction: PinDirection.OUTPUT,
-      label: "D",
-      defaultBitWidth: 1,
-      position: { x: 3, y: -1.5 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
       direction: PinDirection.INPUT,
       label: "G",
       defaultBitWidth: 1,
@@ -803,10 +816,18 @@ function buildPmosPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
+      direction: PinDirection.OUTPUT,
+      label: "D",
+      defaultBitWidth: 1,
+      position: { x: 4.0, y: 1.0 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
       direction: PinDirection.INPUT,
       label: "S",
       defaultBitWidth: 1,
-      position: { x: 3, y: 1.5 },
+      position: { x: 4.0, y: -1.0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -922,5 +943,6 @@ export const PmosfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   analogDeviceType: "PMOS",
   analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(-1, nodeIds, branchIdx, props),
+    // PMOS pins are [G, D, S] but createMosfetElement expects [G, S, D]
+    createMosfetElement(-1, [nodeIds[0], nodeIds[2], nodeIds[1], ...nodeIds.slice(3)], branchIdx, props),
 };

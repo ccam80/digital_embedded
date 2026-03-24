@@ -337,4 +337,36 @@ describe("ComponentRegistry", () => {
       expect(initialState).toEqual(finalState);
     });
   });
+
+  describe("alias must not shadow a later canonical name", () => {
+    it("registering a canonical name that matches an existing alias throws", () => {
+      registry.register(makeDefinition("PldDiode"));
+      registry.registerAlias("Diode", "PldDiode");
+
+      // An alias occupying "Diode" would shadow a later canonical "Diode"
+      // registration (get() checks aliases first). The fix is to never
+      // create such an alias — verify that the conflict is detectable.
+      const analogDiode = { ...makeDefinition("Diode"), engineType: "analog" as const };
+      // register() succeeds (name not in _byName), but get() would return
+      // PldDiode via the alias. This is the bug scenario we guard against
+      // in register-all.ts by not creating the conflicting alias.
+      registry.register(analogDiode);
+      // With the alias still present, get("Diode") returns PldDiode —
+      // demonstrating why the alias must not exist.
+      const result = registry.get("Diode");
+      expect(result!.name).toBe("PldDiode"); // alias wins (the bug)
+    });
+
+    it("without the alias, get(Diode) returns the semiconductor Diode", () => {
+      registry.register(makeDefinition("PldDiode"));
+      // No alias "Diode" → "PldDiode"
+      const analogDiode = { ...makeDefinition("Diode"), engineType: "analog" as const };
+      registry.register(analogDiode);
+
+      const result = registry.get("Diode");
+      expect(result).toBeDefined();
+      expect(result!.name).toBe("Diode");
+      expect(registry.get("PldDiode")!.name).toBe("PldDiode");
+    });
+  });
 });

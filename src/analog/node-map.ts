@@ -238,6 +238,38 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
   }
 
   // -------------------------------------------------------------------------
+  // Step 3b: merge Tunnel components with the same label
+  //   Same-label Tunnels are electrically connected — merge their pin
+  //   positions into the same union-find group (mirrors digital traceNets).
+  // -------------------------------------------------------------------------
+  const tunnelsByLabel = new Map<string, number[]>();
+  for (const el of circuit.elements) {
+    if (el.typeId !== "Tunnel") continue;
+    const props = el.getProperties();
+    const netName = props.has("NetName") ? String(props.get("NetName")) : "";
+    if (netName.length === 0) continue;
+
+    // Resolve the Tunnel's single pin to a union-find ID
+    const pins = el.getPins();
+    if (pins.length === 0) continue;
+    const wp = pinWorldPosition(el, pins[0]!);
+    const id = pointToId.get(pointKey(wp));
+    if (id === undefined) continue;
+
+    let slots = tunnelsByLabel.get(netName);
+    if (slots === undefined) {
+      slots = [];
+      tunnelsByLabel.set(netName, slots);
+    }
+    slots.push(id);
+  }
+  for (const tunnelIds of tunnelsByLabel.values()) {
+    for (let m = 1; m < tunnelIds.length; m++) {
+      union(parent, rank, tunnelIds[0]!, tunnelIds[m]!);
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Step 4: assign MNA node IDs
   //   ground group(s) → 0
   //   all other groups → 1, 2, 3, …
@@ -250,8 +282,10 @@ export function buildNodeMap(circuit: Circuit): NodeMap {
     rootToNodeId.set(gr, 0);
   }
 
-  // Assign remaining roots in order of first encounter
-  for (let i = 0; i < total; i++) {
+  // Assign remaining roots in order of first encounter.
+  // Use parent.length (not `total`) because component pin positions added
+  // after wire endpoints may have created new union-find IDs beyond `total`.
+  for (let i = 0; i < parent.length; i++) {
     const root = find(parent, i);
     if (!rootToNodeId.has(root)) {
       rootToNodeId.set(root, nextNodeId++);

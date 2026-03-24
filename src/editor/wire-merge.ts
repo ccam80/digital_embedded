@@ -64,7 +64,11 @@ export function mergeCollinearSegments(wires: Wire[]): Wire[] {
     current = result;
   }
 
-  return current;
+  // Filter out any zero-length wires that may result from merging
+  // overlapping segments that collapse to a single point.
+  return current.filter(
+    (w) => w.start.x !== w.end.x || w.start.y !== w.end.y,
+  );
 }
 
 /**

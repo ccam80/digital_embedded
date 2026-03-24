@@ -63,17 +63,17 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead from pos pin to positive plate
-    if (vPos !== undefined) {
-      ctx.setColor(signals!.voltageColor(vPos));
+    // Lead from neg pin (x=0) to negative plate
+    if (vNeg !== undefined) {
+      ctx.setColor(signals!.voltageColor(vNeg));
     } else {
       ctx.setColor("COMPONENT");
     }
     ctx.drawLine(0, 0, 1.75, 0);
 
-    // Lead from neg pin to negative plate
-    if (vNeg !== undefined) {
-      ctx.setColor(signals!.voltageColor(vNeg));
+    // Lead from pos pin (x=4) to positive plate
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
     } else {
       ctx.setColor("COMPONENT");
     }
@@ -82,10 +82,10 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
     // Body (plates) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Positive plate (shorter, ±0.625 perpendicular) — at lead1
+    // Shorter plate at x=1.75
     ctx.drawLine(1.75, 0.625, 1.75, -0.625);
 
-    // Negative plate (longer, ±1.0 perpendicular) — at lead2
+    // Longer plate at x=2.25
     ctx.drawLine(2.25, 1, 2.25, -1);
 
     ctx.restore();
@@ -102,16 +102,16 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
 
 const DC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
-    label: "pos",
-    direction: PinDirection.INPUT,
+    label: "neg",
+    direction: PinDirection.OUTPUT,
     position: { x: 0, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,
   },
   {
-    label: "neg",
-    direction: PinDirection.OUTPUT,
+    label: "pos",
+    direction: PinDirection.INPUT,
     position: { x: 4, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
@@ -222,6 +222,6 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
     props: PropertyBag,
   ): AnalogElement {
     const voltage = (props.has("voltage") ? props.get<number>("voltage") : 5) ?? 5;
-    return makeDcVoltageSource(nodeIds[0], nodeIds[1], branchIdx, voltage);
+    return makeDcVoltageSource(nodeIds[1], nodeIds[0], branchIdx, voltage);
   },
 };

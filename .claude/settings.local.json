@@ -36,7 +36,8 @@
       "mcp__circuit-simulator__tutorial_create",
       "mcp__plugin_oh-my-claudecode_t__python_repl",
       "mcp__plugin_oh-my-claudecode_t__state_list_active",
-      "mcp__plugin_oh-my-claudecode_t__state_write"
+      "mcp__plugin_oh-my-claudecode_t__state_write",
+      "mcp__plugin_oh-my-claudecode_t__lsp_document_symbols"
     ]
   },
   "enableAllProjectMcpServers": true,

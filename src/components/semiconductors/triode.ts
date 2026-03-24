@@ -291,8 +291,8 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     return {
       x: this.position.x,
       y: this.position.y - 2,
-      width: 4,
-      height: 4.3,
+      width: 5.5,
+      height: 4.0,
     };
   }
 
@@ -301,82 +301,35 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const PX = 1 / 16;
+    // All coordinates in grid units (Falstad pixels ÷ 16)
+    // Reference: TriodeElm in fixtures/falstad-shapes.json
+    // Origin: G pin at (0, 0), point2 at (4, 0)
 
-    // Falstad TriodeElm reference geometry
-    // gridPin = point1 = (0, 0.3), point2 = (2, 0.3)
-    const gridPinX = 0;
-    const gridPinY = 0.3;
-    const point2X = 2;
-    const point2Y = 0.3;
-    const circler = 24 * PX; // 1.5 grid units
+    // Envelope circle: center (4, 0), r = 23.52/16 ≈ 1.47
+    ctx.drawCircle(4.0, 0.0, 23.52 / 16, false);
 
-    // Envelope circle at point2
-    ctx.drawCircle(point2X, point2Y, circler, false);
+    // Plate lead: (4, -2) → (4, -0.5)
+    ctx.drawLine(4.0, -2.0, 4.0, -0.5);
 
-    // Plate geometry
-    const nearw = 8 * PX;    // 0.5
-    const farw = 32 * PX;    // 2.0
-    const platew = 18 * PX;  // 1.125
+    // Plate bar: (2.875, -0.5) → (5.125, -0.5)
+    ctx.drawLine(2.875, -0.5, 5.125, -0.5);
 
-    // plate1 (inner) = point2 offset nearw upward = (2, -0.2)
-    const plate1X = point2X;
-    const plate1Y = point2Y - nearw;
-    // plate0 (outer) = point2 offset farw upward = (2, -1.7)
-    const plate0X = point2X;
-    const plate0Y = point2Y - farw;
+    // Grid lead: (0, 0) → (2.5, 0)
+    ctx.drawLine(0.0, 0.0, 2.5, 0.0);
 
-    // Plate lead: plate0 to plate1
-    ctx.drawLine(plate0X, plate0Y, plate1X, plate1Y);
+    // Grid dashes (3 segments)
+    ctx.drawLine(2.8125, 0.0, 3.1875, 0.0);
+    ctx.drawLine(3.8125, 0.0, 4.1875, 0.0);
+    ctx.drawLine(4.8125, 0.0, 5.1875, 0.0);
 
-    // Plate bar at plate1 ± platew in x
-    ctx.drawLine(plate1X - platew, plate1Y, plate1X + platew, plate1Y);
+    // Cathode vertical: (3, 2) → (3, 0.5)
+    ctx.drawLine(3.0, 2.0, 3.0, 0.5);
 
-    // Lead stub from plate0 to plate pin at (4, -2)
-    ctx.drawLine(plate0X, plate0Y, 4, -2);
+    // Cathode horizontal: (3, 0.5) → (5, 0.5)
+    ctx.drawLine(3.0, 0.5, 5.0, 0.5);
 
-    // Grid geometry
-    const dn = 2;
-    const grid1X = gridPinX + (point2X - gridPinX) * ((dn - circler) / dn); // 0.5
-    const grid1Y = gridPinY;
-
-    // Lead stub from grid pin at (0, 0) to grid start at (0, 0.3)
-    ctx.drawLine(0, 0, gridPinX, gridPinY);
-
-    // Grid lead from gridPin to grid1
-    ctx.drawLine(gridPinX, gridPinY, grid1X, grid1Y);
-
-    // 3 dashed grid segments
-    for (let i = 0; i < 3; i++) {
-      const fa = (i * 3 + 1) / 4.5;
-      const fb = (i * 3 + 2) / 4.5;
-      const gaX = grid1X + (point2X - grid1X) * fa;
-      const gbX = grid1X + (point2X - grid1X) * fb;
-      ctx.drawLine(gaX, gridPinY, gbX, gridPinY);
-    }
-
-    // Cathode geometry
-    // cath1 = (1, 0.8), cath2 = (3, 0.8)
-    const cath1X = 1;
-    const cath1Y = 0.8;
-    const cath2X = 3;
-    const cath2Y = 0.8;
-
-    // cath3 = (3, 0.9)
-    const cath3X = 3;
-    const cath3Y = 0.9;
-
-    // cath0 = (1, 2.3)
-    const cath0X = 1;
-    const cath0Y = 2.3;
-
-    // Draw cathode: cath0 → cath1, cath1 → cath2, cath2 → cath3
-    ctx.drawLine(cath0X, cath0Y, cath1X, cath1Y);
-    ctx.drawLine(cath1X, cath1Y, cath2X, cath2Y);
-    ctx.drawLine(cath2X, cath2Y, cath3X, cath3Y);
-
-    // Lead stub from cath0 to cathode pin at (4, 2)
-    ctx.drawLine(cath0X, cath0Y, 4, 2);
+    // Cathode stub: (5, 0.5) → (5, 0.625)
+    ctx.drawLine(5.0, 0.5, 5.0, 0.625);
 
     ctx.restore();
   }
@@ -416,7 +369,7 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "K",
       defaultBitWidth: 1,
-      position: { x: 4, y: 2 },
+      position: { x: 3, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },

@@ -112,6 +112,7 @@ export class InductorElement extends AbstractCircuitElement {
     // Coil body: 3 semicircular arcs from PI to 2*PI — gradient from vA to vB
     const loopCt = 3;
     const segLen = 2;
+    const r = segLen / (2 * loopCt); // arc radius = 1/3 grid unit
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(1, 0, 3, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
@@ -122,15 +123,14 @@ export class InductorElement extends AbstractCircuitElement {
     }
     for (let loop = 0; loop < loopCt; loop++) {
       const cx = 1 + (segLen * (loop + 0.5)) / loopCt;
-      const r = segLen / (2 * loopCt);
       ctx.drawArc(cx, 0, r, Math.PI, 2 * Math.PI);
     }
 
-    // Value label below body
+    // Value label above body (matching Falstad reference: pixel (27,-10) = grid (1.6875,-0.625))
     const displayLabel = label.length > 0 ? label : `${inductance * 1e3}mH`;
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
-    ctx.drawText(displayLabel, 2, 0.65, { horizontal: "center", vertical: "top" });
+    ctx.drawText(displayLabel, 1.6875, -0.625, { horizontal: "center", vertical: "bottom" });
 
     ctx.restore();
   }

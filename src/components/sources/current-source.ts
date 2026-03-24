@@ -45,32 +45,33 @@ export class CurrentSourceElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    // Circle center at x=2, r=11.76/16=0.735. Leads extend to x=0 and x=4.
     return {
       x: this.position.x,
-      y: this.position.y - 0.75,
+      y: this.position.y - 0.735,
       width: 4,
-      height: 1.5,
+      height: 1.47,
     };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");
+    const vPos = signals?.getPinVoltage("pos");
 
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead from pos pin to body
-    if (vPos !== undefined) {
-      ctx.setColor(signals!.voltageColor(vPos));
+    // Lead from neg pin (x=0) to body — thick
+    if (vNeg !== undefined) {
+      ctx.setColor(signals!.voltageColor(vNeg));
     } else {
       ctx.setColor("COMPONENT");
     }
     ctx.drawLine(0, 0, 1.1875, 0);
 
-    // Lead from neg pin to body
-    if (vNeg !== undefined) {
-      ctx.setColor(signals!.voltageColor(vNeg));
+    // Lead from pos pin (x=4) to body — thick
+    if (vPos !== undefined) {
+      ctx.setColor(signals!.voltageColor(vPos));
     } else {
       ctx.setColor("COMPONENT");
     }
@@ -79,17 +80,17 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     // Body (circle and arrow) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Circle at center
-    ctx.drawCircle(2, 0, 0.75, false);
+    // Circle at center (32/16=2, r=11.76/16=0.735)
+    ctx.drawCircle(2, 0, 0.735, false);
 
-    // Arrow shaft
-    ctx.drawLine(1.59375, 0, 2.1625, 0);
+    // Arrow shaft (25/16=1.5625 to 35/16=2.1875) — thick
+    ctx.drawLine(1.5625, 0, 2.1875, 0);
 
-    // Arrow head: calcArrow((2,0), (2.40625,0), 0.25, 0.25)
+    // Arrow head: points (38/16,0), (34/16,-4/16), (34/16,4/16)
     ctx.drawPolygon([
-      { x: 2.40625, y: 0 },
-      { x: 2.15625, y: 0.25 },
-      { x: 2.15625, y: -0.25 },
+      { x: 2.375, y: 0 },
+      { x: 2.125, y: -0.25 },
+      { x: 2.125, y: 0.25 },
     ], true);
 
     ctx.restore();

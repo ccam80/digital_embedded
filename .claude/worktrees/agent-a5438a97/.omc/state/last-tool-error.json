@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser/.claude/worktrees/agent-a5438a97\\\" && ls src/fixtures/__tests__/\",\"description\":\"List test files in fixtures __tests__ directory\"}",
+  "error": "Exit code 2\nls: cannot access 'src/fixtures/__tests__/': No such file or directory",
+  "timestamp": "2026-03-23T05:36:47.766Z",
+  "retry_count": 1
+}

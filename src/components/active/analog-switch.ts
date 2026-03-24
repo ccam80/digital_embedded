@@ -95,9 +95,9 @@ function createSwitchSPSTElement(
   const vTh  = props.getOrDefault<number>("threshold", 1.65);
   const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
 
-  const nCtrl = nodeIds[0]; // control terminal
-  const nIn   = nodeIds[1]; // signal in
-  const nOut  = nodeIds[2]; // signal out
+  const nIn   = nodeIds[0]; // signal in
+  const nOut  = nodeIds[1]; // signal out
+  const nCtrl = nodeIds[2]; // control terminal
 
   // Current operating-point resistance
   let currentR = rOff;
@@ -141,10 +141,10 @@ function createSwitchSPDTElement(
   const vTh  = props.getOrDefault<number>("threshold", 1.65);
   const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
 
-  const nCtrl = nodeIds[0]; // control terminal
-  const nCom  = nodeIds[1]; // common terminal
-  const nNO   = nodeIds[2]; // normally-open terminal
-  const nNC   = nodeIds[3]; // normally-closed terminal
+  const nCom  = nodeIds[0]; // common terminal
+  const nNO   = nodeIds[1]; // normally-open terminal
+  const nNC   = nodeIds[2]; // normally-closed terminal
+  const nCtrl = nodeIds[3]; // control terminal
 
   let rNO = rOff; // COM-NO resistance (closes when V_ctrl > V_th)
   let rNC = rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
@@ -184,14 +184,6 @@ function buildSPSTPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "ctrl",
-      defaultBitWidth: 1,
-      position: { x: 1, y: -2 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
-    {
-      direction: PinDirection.INPUT,
       label: "in",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
@@ -206,19 +198,19 @@ function buildSPSTPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
     },
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl",
+      defaultBitWidth: 1,
+      position: { x: 2, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
   ];
 }
 
 function buildSPDTPinDeclarations(): PinDeclaration[] {
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "ctrl",
-      defaultBitWidth: 1,
-      position: { x: 2, y: -2 },
-      isNegatable: false,
-      isClockCapable: false,
-    },
     {
       direction: PinDirection.INPUT,
       label: "com",
@@ -240,6 +232,14 @@ function buildSPDTPinDeclarations(): PinDeclaration[] {
       label: "nc",
       defaultBitWidth: 1,
       position: { x: 4, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "ctrl",
+      defaultBitWidth: 1,
+      position: { x: 2, y: -1 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -266,7 +266,7 @@ export class SwitchSPSTElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 2 };
+    return { x: this.position.x, y: this.position.y, width: 4, height: 1 };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
@@ -279,7 +279,7 @@ export class SwitchSPSTElement extends AbstractCircuitElement {
 
     // Blade — body, stays COMPONENT
     ctx.setColor("COMPONENT");
-    ctx.drawLine(1, 0, 3, -1);
+    ctx.drawLine(1, 0, 3, 0);
 
     // in lead
     if (vIn !== undefined && ctx.setRawColor) {
@@ -303,7 +303,7 @@ export class SwitchSPSTElement extends AbstractCircuitElement {
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(1, -2, 2, -1);
+    ctx.drawLine(2, 1, 2, 0.5);
 
     ctx.restore();
   }
@@ -330,7 +330,7 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 2, width: 4, height: 3 };
+    return { x: this.position.x, y: this.position.y - 1, width: 4, height: 2 };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
@@ -369,14 +369,6 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
       ctx.setColor("COMPONENT");
     }
     ctx.drawLine(3, 1, 4, 1);
-
-    // ctrl lead
-    if (vCtrl !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCtrl));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2, -2, 2, -1);
 
     ctx.restore();
   }

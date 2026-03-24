@@ -73,6 +73,7 @@ export type SolverDiagnosticCode =
   | "singular-matrix"
   | "voltage-source-loop"
   | "floating-node"
+  | "orphan-node"
   | "inductor-loop"
   | "no-ground"
   | "convergence-failed"

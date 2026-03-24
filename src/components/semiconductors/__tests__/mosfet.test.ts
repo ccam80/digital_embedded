@@ -68,7 +68,8 @@ function makeMockSolver() {
 // ---------------------------------------------------------------------------
 // Helper: create NMOS element driven to a specific operating point
 //
-// nodeD=1, nodeG=2, nodeS=3, (bulk=source=3)
+// nodeG=2, nodeS=3, nodeD=1, (bulk=source=3)
+// createMosfetElement pin order: [G, S, D]
 // Voltages in the MNA solution vector are indexed at node-1.
 // ---------------------------------------------------------------------------
 
@@ -78,7 +79,7 @@ function makeNmosAtVgs_Vds(
   modelParams: Record<string, number> = NMOS_DEFAULTS,
 ): AnalogElement {
   const propsObj = { _modelParams: modelParams };
-  const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+  const element = createMosfetElement(1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
 
   // Drive to operating point: vG=vgs+vS, vD=vds+vS, vS=0
   const voltages = new Float64Array(3);
@@ -243,26 +244,26 @@ describe("NMOS", () => {
 
   it("isNonlinear_true", () => {
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false_when_no_capacitances", () => {
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
     expect(element.isReactive).toBe(false);
   });
 
   it("isReactive_true_when_cbd_nonzero", () => {
     const paramsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
     const propsObj = { _modelParams: paramsWithCap };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
     expect(element.isReactive).toBe(true);
   });
 
   it("three_terminal_node_indices", () => {
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
     // nodeIndices includes D, G, S, and bulk (= S when not specified)
     expect(element.nodeIndices).toContain(1); // D
     expect(element.nodeIndices).toContain(2); // G
@@ -360,8 +361,9 @@ describe("PMOS", () => {
 
     // PMOS is on when Vgs < VTO (negative): use Vgs=-3V, Vds=-5V
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
+    // createMosfetElement pin order: [G, S, D]
     const propsObj = { _modelParams: PMOS_DEFAULTS };
-    const element = createMosfetElement(-1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(-1, [2, 3, 1], -1, propsObj as unknown as PropertyBag);
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
     // Vgs = 2-5 = -3V, Vds = 0-5 = -5V
@@ -507,10 +509,11 @@ describe("Integration", () => {
     // Rd=1kΩ: between node2 (Vdd) and node1 (drain)
     const rd = makeResistorElement(2, 1, 1000);
 
-    // NMOS: D=node1, G=node3, S=ground(0), W=10µ, L=1µ
+    // NMOS: G=node3, S=ground(0), D=node1, W=10µ, L=1µ
+    // createMosfetElement pin order: [G, S, D]
     const nmosParams = { ...MOSFET_NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = { _modelParams: nmosParams };
-    const nmos = createMosfetElement(1, [1, 3, 0], -1, propsObj as unknown as PropertyBag);
+    const nmos = createMosfetElement(1, [3, 0, 1], -1, propsObj as unknown as PropertyBag);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

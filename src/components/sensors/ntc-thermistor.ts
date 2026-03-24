@@ -269,7 +269,7 @@ function buildNTCPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "neg",
       defaultBitWidth: 1,
-      position: { x: 1, y: 0 },
+      position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -297,9 +297,9 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     return {
-      x: this.position.x - 0.375,
+      x: this.position.x,
       y: this.position.y - 0.75,
-      width: 1.375,
+      width: 4,
       height: 1.5,
     };
   }
@@ -314,18 +314,26 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Zigzag resistor body: bodyLen=32px=2gu > span=1gu → lead1=(0,0), lead2=(1,0)
-    const hs = 6 / 16; // 0.375 grid units perpendicular offset
-    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
-    for (let i = 0; i < 4; i++) {
-      pts.push({ x: ((1 + 4 * i) * 1) / 16, y: hs });
-      pts.push({ x: ((3 + 4 * i) * 1) / 16, y: -hs });
-    }
-    pts.push({ x: 1, y: 0 });
+    // Lead lines: (0,0)→(1,0) and (3,0)→(4,0)
+    // Zigzag body spanning x=1→x=3, ±0.375gu amplitude
+    const pts: Array<{ x: number; y: number }> = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1.125, y: 0.375 },
+      { x: 1.375, y: -0.375 },
+      { x: 1.625, y: 0.375 },
+      { x: 1.875, y: -0.375 },
+      { x: 2.125, y: 0.375 },
+      { x: 2.375, y: -0.375 },
+      { x: 2.625, y: 0.375 },
+      { x: 2.875, y: -0.375 },
+      { x: 3, y: 0 },
+      { x: 4, y: 0 },
+    ];
 
     // Zigzag gradient from pos→neg
     if (hasVoltage && ctx.setLinearGradient) {
-      ctx.setLinearGradient(0, 0, 1, 0, [
+      ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vPos!) },
         { offset: 1, color: signals!.voltageColor(vNeg!) },
       ]);
@@ -336,11 +344,10 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
-    // NTC hockey stick: horizontal segment then diagonal sweep — body decoration, stays COMPONENT
-    // From (-0.375, 0.75) → (0.375, 0.75) → (1.0, -0.75)
+    // NTC hockey stick: horizontal then diagonal — temperature indicator decoration
     ctx.setColor("COMPONENT");
-    ctx.drawLine(-0.375, 0.75, 0.375, 0.75);
-    ctx.drawLine(0.375, 0.75, 1.0, -0.75);
+    ctx.drawLine(0.625, 0.75, 1.375, 0.75);
+    ctx.drawLine(1.375, 0.75, 3, -0.75);
 
     if (label.length > 0) {
       ctx.setColor("TEXT");

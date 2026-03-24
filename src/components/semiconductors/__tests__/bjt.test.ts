@@ -77,7 +77,7 @@ function makeBjtAtOp(
 ): AnalogElement {
   const params = { ...NPN_DEFAULT_PARAMS, ...modelParams };
   const propsObj = { _modelParams: params };
-  const element = createBjtElement(polarity, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+  const element = createBjtElement(polarity, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
 
   // Drive to operating point iteratively using updateOperatingPoint.
   // nodeC=1, nodeB=2, nodeE=3 → voltages[0]=Vc, voltages[1]=Vb, voltages[2]=Ve
@@ -255,7 +255,7 @@ describe("NPN", () => {
   it("voltage_limiting_both_junctions", () => {
     // Start at a moderate Vbe operating point
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
 
     const voltages = new Float64Array(3);
     // Set initial operating point: Vbe ≈ 0.3V (B=0.3, E=0, C=5)
@@ -320,25 +320,25 @@ describe("NPN", () => {
 
   it("isNonlinear_true", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
     expect(element.isReactive).toBe(false);
   });
 
   it("nodeIndices_correct", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, [5, 3, 7], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(1, [3, 5, 7], -1, propsObj as unknown as PropertyBag);
     expect(element.nodeIndices).toEqual([5, 3, 7]);
   });
 
   it("branchIndex_minus_one", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
     expect(element.branchIndex).toBe(-1);
   });
 });
@@ -392,7 +392,7 @@ describe("PNP", () => {
 
   it("pnp_isNonlinear_true", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(-1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createBjtElement(-1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
     expect(element.isNonlinear).toBe(true);
   });
 });
@@ -434,16 +434,18 @@ describe("Definitions", () => {
 
   it("npn_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
+    // analogFactory receives [B, C, E] pin order; nodeIndices stores [C, B, E]
     const el = NpnBjtDefinition.analogFactory!([1, 2, 3], -1, propsObj, () => 0);
     expect(el.isNonlinear).toBe(true);
-    expect(el.nodeIndices).toEqual([1, 2, 3]);
+    expect(el.nodeIndices).toEqual([2, 1, 3]);
   });
 
   it("pnp_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
+    // analogFactory receives [B, C, E] pin order; nodeIndices stores [C, B, E]
     const el = PnpBjtDefinition.analogFactory!([1, 2, 3], -1, propsObj, () => 0);
     expect(el.isNonlinear).toBe(true);
-    expect(el.nodeIndices).toEqual([1, 2, 3]);
+    expect(el.nodeIndices).toEqual([2, 1, 3]);
   });
 });
 
@@ -491,7 +493,7 @@ describe("Integration", () => {
 
     // BJT: C=node1, B=node2, E=gnd(0)
     const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = createBjtElement(1, [1, 2, 0], -1, bjtProps as unknown as PropertyBag);
+    const bjt = createBjtElement(1, [2, 1, 0], -1, bjtProps as unknown as PropertyBag);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -553,9 +555,10 @@ describe("Integration", () => {
     const vcc = makeDcVoltageSource(2, 0, branchRowVcc, 5);
     const rc = makeResistor(2, 1, 1000);
 
-    // BJT: C=node1, B=gnd, E=gnd → base=0=ground, emitter=0=ground
+    // BJT: B=gnd, C=node1, E=gnd → base=0=ground, emitter=0=ground
+    // createBjtElement pin order: [B, C, E]
     const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = createBjtElement(1, [1, 0, 0], -1, bjtProps as unknown as PropertyBag);
+    const bjt = createBjtElement(1, [0, 1, 0], -1, bjtProps as unknown as PropertyBag);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

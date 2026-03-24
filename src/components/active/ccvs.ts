@@ -70,7 +70,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "sense+",
       defaultBitWidth: 1,
-      position: { x: 0, y: -1 },
+      position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -78,7 +78,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "sense-",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -86,7 +86,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out+",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1 },
+      position: { x: 6, y: 0 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -94,7 +94,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "out-",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1 },
+      position: { x: 6, y: 2 },
       isNegatable: false,
       isClockCapable: false,
     },
@@ -250,8 +250,8 @@ export class CCVSElement extends AbstractCircuitElement {
     return {
       x: this.position.x,
       y: this.position.y - 1,
-      width: 4,
-      height: 2,
+      width: 6,
+      height: 4,
     };
   }
 
@@ -264,43 +264,43 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — rect and port lines stay COMPONENT
+    // Body — open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
     ctx.setColor("COMPONENT");
-    ctx.drawLine(1, -1, 1, 1);
-    ctx.drawRect(1, -1, 2, 2, false);
-    ctx.drawLine(3, -1, 3, 1);
+    ctx.drawLine(1, -1, 5, -1);
+    ctx.drawLine(5, -1, 5, 3);
+    ctx.drawLine(5, 3, 1, 3);
 
-    // sense+ lead
+    // sense+ lead: x=0 to x=1, y=0
     if (vSenseP !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vSenseP));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, -1, 1, -1);
+    ctx.drawLine(0, 0, 1, 0);
 
-    // sense- lead
+    // sense- lead: x=0 to x=1, y=2
     if (vSenseN !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vSenseN));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(0, 1, 1, 1);
+    ctx.drawLine(0, 2, 1, 2);
 
-    // out+ lead
+    // out+ lead: x=5 to x=6, y=0
     if (vOutP !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vOutP));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3, -1, 4, -1);
+    ctx.drawLine(5, 0, 6, 0);
 
-    // out- lead
+    // out- lead: x=5 to x=6, y=2
     if (vOutN !== undefined && ctx.setRawColor) {
       ctx.setRawColor(signals!.voltageColor(vOutN));
     } else {
       ctx.setColor("COMPONENT");
     }
-    ctx.drawLine(3, 1, 4, 1);
+    ctx.drawLine(5, 2, 6, 2);
 
     ctx.restore();
   }

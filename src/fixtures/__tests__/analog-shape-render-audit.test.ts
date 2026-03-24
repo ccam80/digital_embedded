@@ -37,18 +37,29 @@ import {
   detectTextOverlaps,
   checkPinProximity,
   compareExtents,
+  extractTSTexts,
+  compareTexts,
 } from "@/test-utils/shape-rasterizer";
 import type {
   CompareResult,
   ExtentResult,
+  TextCompareResult,
 } from "@/test-utils/shape-rasterizer";
 import {
   FALSTAD_REFERENCES,
   FALSTAD_PIN_POSITIONS,
+  FALSTAD_TEXT_REFS,
   ALL_ANALOG_TYPES,
   falstadWorldPosition,
 } from "@/test-utils/falstad-fixture-reference";
 import type { FalstadPinRef } from "@/test-utils/falstad-fixture-reference";
+
+// ---------------------------------------------------------------------------
+// Thresholds
+// ---------------------------------------------------------------------------
+
+const DICE_THRESHOLD = 0.99;
+const EXTENT_THRESHOLD = 0;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,6 +96,7 @@ interface AnalogResult {
   pinPosDetails: string[];
   pinDetachedCount: number;
   pinDetachedDetails: string[];
+  textResult: TextCompareResult;
   error?: string;
 }
 
@@ -141,6 +153,7 @@ function errorResult(
     pinPosDetails: [],
     pinDetachedCount: 0,
     pinDetachedDetails: [],
+    textResult: { matched: [], missingInTS: [], extraInTS: [] },
     error,
   };
 }
@@ -280,6 +293,14 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
         (d) => `${d.label}:(${d.x},${d.y}) dist=${d.distance}`,
       );
 
+      // --- Text comparison ---
+      const falstadTexts = FALSTAD_TEXT_REFS.get(typeName) ?? [];
+      const tsTexts = extractTSTexts(tsCtx.calls);
+      const textResult = compareTexts(
+        falstadTexts.map((t) => ({ text: t.text, x: t.x, y: t.y, horizontal: "left" as const, vertical: "middle" as const })),
+        tsTexts,
+      );
+
       results.push({
         typeId: typeName,
         pixelDice: pixelResult.dice,
@@ -294,7 +315,36 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
         pinPosDetails,
         pinDetachedCount: proximity.detached.length,
         pinDetachedDetails,
+        textResult,
       });
+
+      // --- Per-component assertions ---
+      expect(pixelResult.dice, `${typeName} pixel Dice`).toBeGreaterThanOrEqual(DICE_THRESHOLD);
+      expect(extent.maxDelta, `${typeName} extent`).toBeLessThanOrEqual(EXTENT_THRESHOLD);
+      expect(bboxOverflow, `${typeName} bbox`).toBeLessThanOrEqual(0);
+      expect(overlapResult.overlaps.length, `${typeName} text overlap`).toBe(0);
+      if (pinCountDelta !== null) {
+        expect(pinCountDelta, `${typeName} pin count`).toBe(0);
+        if (pinCountDelta === 0) {
+          expect(pinPosMismatches, `${typeName} pin positions`).toBe(0);
+        }
+      }
+      expect(proximity.detached.length, `${typeName} detached pins`).toBe(0);
+
+      // --- Symbol text assertions ---
+      const SYMBOL_TEXT_REQUIRED: Record<string, string[]> = {
+        OpAmp: ["+", "-"],
+        RealOpAmp: ["+", "-"],
+        VoltageComparator: ["+", "-"],
+        OTA: ["+", "-"],
+      };
+      const required = SYMBOL_TEXT_REQUIRED[typeName];
+      if (required) {
+        for (const sym of required) {
+          const found = tsTexts.some((t) => t.text === sym);
+          expect(found, `${typeName} missing symbol text "${sym}"`).toBe(true);
+        }
+      }
     },
   );
 
@@ -376,7 +426,19 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
         pinPosDetails,
         pinDetachedCount: proximity.detached.length,
         pinDetachedDetails,
+        textResult: { matched: [], missingInTS: [], extraInTS: [] },
       });
+
+      // --- Per-component assertions (uncovered) ---
+      expect(bboxOverflow, `${typeName} bbox`).toBeLessThanOrEqual(0);
+      expect(overlapResult.overlaps.length, `${typeName} text overlap`).toBe(0);
+      if (pinCountDelta !== null) {
+        expect(pinCountDelta, `${typeName} pin count`).toBe(0);
+        if (pinCountDelta === 0) {
+          expect(pinPosMismatches, `${typeName} pin positions`).toBe(0);
+        }
+      }
+      expect(proximity.detached.length, `${typeName} detached pins`).toBe(0);
     },
   );
 
@@ -510,6 +572,12 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
           pinStr = "ok";
         }
 
+        // Text comparison string
+        const txtMissing = r.textResult.missingInTS.length;
+        const txtExtra = r.textResult.extraInTS.length;
+        const txtStr = isUncov ? "N/A" :
+          txtMissing === 0 && txtExtra === 0 ? "ok" : `-${txtMissing}/+${txtExtra}`;
+
         let details = isUncov ? "(no Falstad ref) " : "";
         if (r.pinPosDetails.length > 0) {
           details += `pins:[${r.pinPosDetails.join(",")}] `;
@@ -538,7 +606,7 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
             (r.textOverlaps === 0 ? "ok" : String(r.textOverlaps)).padEnd(
               6,
             ) +
-            (isUncov ? "N/A" : "ok").padEnd(8) +
+            txtStr.padEnd(8) +
             pinStr.padEnd(8) +
             details.trim(),
         );
@@ -649,113 +717,6 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
     console.log(`  0.6–0.8: ${buckets[3]}`);
     console.log(`  0.8–1.0: ${buckets[4]}`);
 
-    // -----------------------------------------------------------------------
-    // Assertions — all use expect.soft() for complete failure inventory
-    // -----------------------------------------------------------------------
-
-    // No factory/draw errors
-    expect.soft(
-      errors.length,
-      `Factory/draw errors:\n` +
-        errors.map((r) => `  ${r.typeId}: ${r.error}`).join("\n"),
-    ).toBe(0);
-
-    // BBox: no component should draw outside its bounding box at all
-    const bboxFails = valid.filter((r) => r.bboxOverflow > 0);
-    expect.soft(
-      bboxFails.length,
-      `BBox overflow > 0 (${bboxFails.length}):\n` +
-        bboxFails
-          .map(
-            (r) => `  ${r.typeId} (+${r.bboxOverflow.toFixed(2)})`,
-          )
-          .join("\n"),
-    ).toBe(0);
-
-    // Text overlaps: zero tolerance
-    const totalOverlaps = valid.reduce(
-      (sum, r) => sum + r.textOverlaps,
-      0,
-    );
-    expect.soft(
-      totalOverlaps,
-      `Text overlaps (${totalOverlaps} across ${overlapBad.length} components):\n` +
-        overlapBad
-          .map(
-            (r) =>
-              `  ${r.typeId}: ${r.textOverlapDetails.join(", ")}`,
-          )
-          .join("\n"),
-    ).toBe(0);
-
-    // Pin count: every component with a reference must have the right count
-    expect.soft(
-      pinCountBad.length,
-      `Pin count mismatch (${pinCountBad.length}):\n` +
-        pinCountBad
-          .map(
-            (r) =>
-              `  ${r.typeId} (Δ${r.pinCountDelta! > 0 ? "+" : ""}${r.pinCountDelta})`,
-          )
-          .join("\n"),
-    ).toBe(0);
-
-    // Pin positions: every pin must be at the right local coordinates
-    const totalPinMismatches = valid.reduce(
-      (sum, r) => sum + r.pinPosMismatches,
-      0,
-    );
-    expect.soft(
-      totalPinMismatches,
-      `Pin position mismatches (${totalPinMismatches} across ${pinPosBad.length} components):\n` +
-        pinPosBad
-          .map(
-            (r) =>
-              `  ${r.typeId}: ${r.pinPosDetails.join(", ")}`,
-          )
-          .join("\n"),
-    ).toBe(0);
-
-    // Pin proximity: every pin must touch the drawn body (distance ≤ 0.6 grid)
-    const totalDetached = valid.reduce(
-      (sum, r) => sum + r.pinDetachedCount,
-      0,
-    );
-    expect.soft(
-      totalDetached,
-      `Detached pins (${totalDetached} across ${detachedBad.length} components):\n` +
-        detachedBad
-          .map(
-            (r) =>
-              `  ${r.typeId}: ${r.pinDetachedDetails.join(", ")}`,
-          )
-          .join("\n"),
-    ).toBe(0);
-
-    // Dice ≥ 0.99: every covered component must near-perfectly match Falstad reference
-    const diceFails = covered.filter((r) => r.pixelDice < 0.99);
-    expect.soft(
-      diceFails.length,
-      `Dice < 0.99 (${diceFails.length}):\n` +
-        diceFails
-          .map((r) => `  ${r.typeId} (${r.pixelDice.toFixed(3)})`)
-          .join("\n"),
-    ).toBe(0);
-
-    // Extent: shape dimensions must match exactly (0 tolerance, covered only)
-    const extentFails = covered.filter(
-      (r) => r.extent && r.extent.maxDelta > 0,
-    );
-    expect.soft(
-      extentFails.length,
-      `Extent Δ > 0 (${extentFails.length}):\n` +
-        extentFails
-          .map(
-            (r) =>
-              `  ${r.typeId} (Δ${r.extent!.maxDelta.toFixed(2)})`,
-          )
-          .join("\n"),
-    ).toBe(0);
   });
 });
 
@@ -786,8 +747,6 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
     actual: { x: number; y: number };
   }
 
-  const mismatches: TransformMismatch[] = [];
-
   it.each(computeAllTypes())(
     "$typeName pin transforms",
     ({ typeName }) => {
@@ -807,6 +766,8 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
 
       const basePins = element.getPins();
       if (basePins.length !== refPins.length) return;
+
+      const componentMismatches: TransformMismatch[] = [];
 
       for (const rot of ROTATIONS) {
         for (const mir of MIRRORS) {
@@ -838,7 +799,7 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
               Math.round((tsWorld.y - expected.y) * 100) / 100;
 
             if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
-              mismatches.push({
+              componentMismatches.push({
                 typeId: typeName,
                 rotation: rot,
                 mirror: mir,
@@ -850,49 +811,11 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
           }
         }
       }
+
+      expect(
+        componentMismatches.length,
+        `${typeName} has ${componentMismatches.length} transform mismatches`,
+      ).toBe(0);
     },
   );
-
-  it("summary: zero pin transform mismatches", () => {
-    if (mismatches.length === 0) return;
-
-    // Group by typeId
-    const byType = new Map<string, TransformMismatch[]>();
-    for (const m of mismatches) {
-      if (!byType.has(m.typeId)) byType.set(m.typeId, []);
-      byType.get(m.typeId)!.push(m);
-    }
-
-    const lines: string[] = [];
-    lines.push(
-      `\n${mismatches.length} pin transform mismatch(es) across ${byType.size} component type(s):\n`,
-    );
-
-    for (const [typeId, ms] of [...byType.entries()].sort(
-      (a, b) => b[1].length - a[1].length,
-    )) {
-      // Deduplicate by pattern
-      const patterns = new Map<
-        string,
-        { count: number; example: TransformMismatch }
-      >();
-      for (const m of ms) {
-        const key = `rot=${m.rotation} mir=${m.mirror} pin=${m.pinLabel}`;
-        if (!patterns.has(key))
-          patterns.set(key, { count: 0, example: m });
-        patterns.get(key)!.count++;
-      }
-
-      lines.push(`  ${typeId} — ${ms.length} mismatch(es):`);
-      for (const [pattern, { count, example }] of patterns) {
-        lines.push(
-          `    ${pattern} (×${count}) — expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
-        );
-      }
-    }
-
-    console.log(lines.join("\n"));
-
-    expect(mismatches.length, lines.join("\n")).toBe(0);
-  });
 });

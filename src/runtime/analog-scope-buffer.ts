@@ -119,15 +119,26 @@ export class AnalogScopeBuffer {
     const span = tEnd - tStart;
     const bucketWidth = span / bucketCount;
 
+    // Snap bucket boundaries to multiples of bucketWidth so they don't
+    // shift as the view scrolls — eliminates discontinuous min/max jumps.
+    const alignedStart = Math.floor(tStart / bucketWidth) * bucketWidth;
+
+    // Track the last known value to fill empty buckets instead of
+    // defaulting to 0 (which causes spikes).
+    let lastMin = NaN;
+    let lastMax = NaN;
+
     for (let b = 0; b < bucketCount; b++) {
-      const bStart = tStart + b * bucketWidth;
+      const bStart = alignedStart + b * bucketWidth;
       const bEnd = bStart + bucketWidth;
       times[b] = bStart + bucketWidth * 0.5;
 
       const range = this.getSamplesInRange(bStart, bEnd);
       if (range.value.length === 0) {
-        mins[b] = 0;
-        maxs[b] = 0;
+        // Carry forward last known value; filled in a second pass if
+        // the first buckets are empty.
+        mins[b] = lastMin;
+        maxs[b] = lastMax;
         continue;
       }
 
@@ -140,6 +151,21 @@ export class AnalogScopeBuffer {
       }
       mins[b] = mn;
       maxs[b] = mx;
+      lastMin = mn;
+      lastMax = mx;
+    }
+
+    // Back-fill any leading empty buckets (before the first sample).
+    if (isNaN(mins[0])) {
+      // Find the first populated bucket.
+      let first = 0;
+      while (first < bucketCount && isNaN(mins[first])) first++;
+      const fillMin = first < bucketCount ? mins[first] : 0;
+      const fillMax = first < bucketCount ? maxs[first] : 0;
+      for (let b = 0; b < first; b++) {
+        mins[b] = fillMin;
+        maxs[b] = fillMax;
+      }
     }
 
     return { time: times, min: mins, max: maxs };
