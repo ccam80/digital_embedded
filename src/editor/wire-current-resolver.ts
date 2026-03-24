@@ -325,12 +325,7 @@ export class WireCurrentResolver {
       } else {
         // 2-terminal element (or fallback): single path pin0 → pin1
         if (cePins.length < 2) continue;
-        // Prefer getPinCurrents (covers all elements including nonlinear
-        // devices like diodes that have no getCurrent or branchIndex).
-        // Fall back to getElementCurrent for elements that only have
-        // getCurrent or branchIndex.
-        const pc = pinCurrents;
-        const I = (pc !== null && pc.length >= 1) ? pc[0] : engine.getElementCurrent(eIdx);
+        const I = pinCurrents[0];
         this._componentPaths.push({
           pin0: pinWorldPosition(ce, cePins[0]),
           pin1: pinWorldPosition(ce, cePins[1]),

@@ -897,6 +897,7 @@ export function compileAnalogCircuit(
     const core = def.analogFactory!(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
     const element: AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
+      allNodeIds: [...pinNodeIds, ...internalNodeIds],
     });
 
     const elementIndex = analogElements.length;
@@ -927,7 +928,7 @@ export function compileAnalogCircuit(
 
     // Record topology info for validation
     topologyInfo.push({
-      nodeIds: pinNodeIds,
+      nodeIds: [...pinNodeIds, ...internalNodeIds],
       isBranch: meta.branchIdx >= 0,
       // Infer typeHint from branchIdx being present; inductors also use branches
       // We distinguish by checking if the element is reactive with a branch

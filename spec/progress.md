@@ -77,3 +77,15 @@
 - **Files created**: none
 - **Files modified**: src/analog/analog-engine.ts (simplified getElementCurrent, getElementPinCurrents, getElementPower), src/core/analog-engine-interface.ts (updated getElementPinCurrents return type to number[]), src/editor/wire-current-resolver.ts (removed null check, removed fallback branch), src/editor/__tests__/wire-current-resolver.test.ts (updated mock to return [I, -I] instead of null)
 - **Tests**: 7402/7402 passing
+
+---
+## Wave 0.1 Summary (Phase 0)
+- **Status**: complete
+- **Tasks completed**: 6/6
+- **Rounds**: 2 (P0-1/P0-2 in round 1, P0-3/P0-4/P0-5 in round 2)
+
+---
+## Wave 1.1 Summary (Phase 1)
+- **Status**: complete
+- **Tasks completed**: 6/6
+- **Rounds**: 1

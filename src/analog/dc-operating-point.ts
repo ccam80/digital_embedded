@@ -336,7 +336,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
 function _inferNodeCount(elements: readonly AnalogElement[], matrixSize: number): number {
   let maxNode = 0;
   for (const el of elements) {
-    for (const n of (el.pinNodeIds ?? [])) {
+    for (const n of (el.allNodeIds ?? el.pinNodeIds ?? [])) {
       if (n > maxNode) maxNode = n;
     }
   }
