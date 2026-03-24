@@ -62,7 +62,8 @@ function makeOpAmp(opts: {
     ["rOut", rOut],
   ]);
   return OpAmpDefinition.analogFactory!(
-    [nInp, nInn, nOut, nVccP, nVccN],
+    new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
+    [],
     -1,
     props,
     () => 0,
@@ -201,13 +202,13 @@ describe("OpAmp", () => {
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
     const opampEl = OpAmpDefinition.analogFactory!(
-      [nInp, nInn, nOut, nVccP, nVccN], -1, props, () => 0,
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     );
 
     // 75Ω load on output
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
-      nodeIndices: [nOut, 0],
+      pinNodeIds: [nOut, 0],
       branchIndex: -1, isNonlinear: false, isReactive: false,
       stamp(solver: SparseSolver): void {
         solver.stamp(nOut - 1, nOut - 1, G_load);
@@ -244,7 +245,7 @@ describe("Integration", () => {
   function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
     const G = 1 / resistance;
     return {
-      nodeIndices: [nodeA, nodeB],
+      pinNodeIds: [nodeA, nodeB],
       branchIndex: -1, isNonlinear: false, isReactive: false,
       stamp(solver: SparseSolver): void {
         if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
@@ -275,7 +276,7 @@ describe("Integration", () => {
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
     const opampEl = OpAmpDefinition.analogFactory!(
-      [nInp, nInn, nOut, nVccP, nVccN], -1, props, () => 0,
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     );
 
     const rin = makeResistor(nVin, nInn, 1000);
@@ -315,7 +316,7 @@ describe("Integration", () => {
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
     // in- and out share nFeedback (voltage follower)
     const opampEl = OpAmpDefinition.analogFactory!(
-      [nInp, nFeedback, nFeedback, nVccP, nVccN], -1, props, () => 0,
+      new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
     );
 
     const vsVin  = makeDcVoltageSource(nInp,  0, brVin,  3.7);

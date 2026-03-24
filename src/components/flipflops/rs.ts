@@ -225,6 +225,10 @@ export const RSDefinition: ComponentDefinition = {
   propertyDefs: RS_FF_PROPERTY_DEFS,
   attributeMap: RS_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // sampleRS reads: inBase+0=S, inBase+1=C, inBase+2=R
+  // executeRS writes: outBase+0=Q, outBase+1=~Q
+  inputSchema: ["S", "C", "R"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "RS Flip-Flop — edge-triggered with S/R control inputs.\n" +
     "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +

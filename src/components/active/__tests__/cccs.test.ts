@@ -46,7 +46,13 @@ function makeCCCSElement(
     ["currentGain", gain],
     ["label", ""],
   ]).entries());
-  return CCCSDefinition.analogFactory!([nSenseP, nSenseN, nOutP, nOutN], senseBranchIdx, props);
+  return CCCSDefinition.analogFactory!(
+    new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
+    [],
+    senseBranchIdx,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

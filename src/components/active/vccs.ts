@@ -46,7 +46,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { parseExpression } from "../../analog/expression.js";
 import { differentiate, simplify } from "../../analog/expression-differentiate.js";
@@ -109,7 +109,6 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
  * No branch variable (Norton stamp only).
  */
 class VCCSAnalogElement extends ControlledSourceElement {
-  readonly nodeIndices: readonly number[];
   readonly branchIndex = -1;
 
   private readonly _nCtrlP: number;
@@ -138,7 +137,6 @@ class VCCSAnalogElement extends ControlledSourceElement {
     this._nOutP = nOutP;
     this._nOutN = nOutN;
 
-    this.nodeIndices = [nCtrlP, nCtrlN, nOutP, nOutN];
   }
 
   protected override _bindContext(voltages: Float64Array): void {
@@ -202,6 +200,19 @@ class VCCSAnalogElement extends ControlledSourceElement {
     if (this._nOutN !== 0) {
       solver.stampRHS(this._nOutN - 1, -iNR);
     }
+  }
+
+  /**
+   * Per-pin currents in pinLayout order: [ctrl+, ctrl-, out+, out-].
+   *
+   * The control port is an ideal voltage sensor (infinite impedance), so it
+   * draws zero current. The output current is f(V_ctrl) evaluated at the
+   * current operating point. Positive = current flowing INTO the pin.
+   * KCL: 0 + 0 + I_out - I_out = 0. ✓
+   */
+  getPinCurrents(_voltages: Float64Array): number[] {
+    const iOut = this._compiledExpr(this._ctx);
+    return [0, 0, iOut, -iOut];
   }
 }
 
@@ -352,17 +363,18 @@ export const VCCSDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const expression = props.getOrDefault<string>("expression", "V(ctrl)");
     const transconductance = props.getOrDefault<number>("transconductance", 0.001);
     return new VCCSAnalogElement(
-      nodeIds[0], // ctrl+
-      nodeIds[1], // ctrl-
-      nodeIds[2], // out+
-      nodeIds[3], // out-
+      pinNodes.get("ctrl+")!, // ctrl+
+      pinNodes.get("ctrl-")!, // ctrl-
+      pinNodes.get("out+")!,  // out+
+      pinNodes.get("out-")!,  // out-
       expression,
       transconductance,
     );

@@ -19,7 +19,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import { formatSI } from "../../editor/si-format.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import {
   capacitorConductance,
@@ -109,7 +110,7 @@ export class CapacitorElement extends AbstractCircuitElement {
     ctx.drawLine(2.25, -0.75, 2.25, 0.75);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : `${capacitance * 1e6}µF`;
+    const displayLabel = label.length > 0 ? label : formatSI(capacitance, "F");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 2, 1, { horizontal: "center", vertical: "top" });
@@ -142,8 +143,8 @@ function capStampRHS(solver: SparseSolver, row: number, val: number): void {
   }
 }
 
-class AnalogCapacitorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+class AnalogCapacitorElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -154,14 +155,13 @@ class AnalogCapacitorElement implements AnalogElement {
   private vPrev: number = 0;
   private vPrevPrev: number = 0;
 
-  constructor(nodeIndices: number[], capacitance: number) {
-    this.nodeIndices = nodeIndices;
+  constructor(capacitance: number) {
     this.C = capacitance;
   }
 
   stamp(solver: SparseSolver): void {
-    const n0 = this.nodeIndices[0];
-    const n1 = this.nodeIndices[1];
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
 
     capStampG(solver, n0, n0, this.geq);
     capStampG(solver, n0, n1, -this.geq);
@@ -173,16 +173,25 @@ class AnalogCapacitorElement implements AnalogElement {
   }
 
   getCurrent(voltages: Float64Array): number {
-    const n0 = this.nodeIndices[0];
-    const n1 = this.nodeIndices[1];
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
     return this.geq * (v0 - v1) + this.ieq;
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
+    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const I = this.geq * (v0 - v1) + this.ieq;
+    return [I, -I];
+  }
+
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const n0 = this.nodeIndices[0];
-    const n1 = this.nodeIndices[1];
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
     const vNow = v0 - v1;
@@ -199,12 +208,13 @@ class AnalogCapacitorElement implements AnalogElement {
 }
 
 function createCapacitorElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const C = props.getOrDefault<number>("capacitance", 1e-6);
-  return new AnalogCapacitorElement(nodeIds, C);
+  return new AnalogCapacitorElement(C);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +226,7 @@ const CAPACITOR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "capacitance",
     type: PropertyType.FLOAT,
     label: "Capacitance (F)",
+    unit: "F",
     defaultValue: 1e-6,
     min: 1e-15,
     description: "Capacitance in farads",

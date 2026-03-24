@@ -243,6 +243,10 @@ export const JKAsyncDefinition: ComponentDefinition = {
   propertyDefs: JK_FF_AS_PROPERTY_DEFS,
   attributeMap: JK_FF_AS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // executeJKAsync reads: inBase+0=Set, inBase+1=J, inBase+2=C, inBase+3=K, inBase+4=Clr
+  // writes: outBase+0=Q, outBase+1=~Q
+  inputSchema: ["Set", "J", "C", "K", "Clr"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "JK Flip-Flop with async Set/Clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +

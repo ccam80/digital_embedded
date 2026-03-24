@@ -228,6 +228,8 @@ export const DriverInvSelDefinition: ComponentDefinition = {
   propertyDefs: DRIVER_INV_PROPERTY_DEFS,
   attributeMap: DRIVER_INV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["in", "sel"],
+  outputSchema: ["out"],
   helpText:
     "DriverInvSel — tri-state buffer with active-low enable.\n" +
     "When sel=0 (active-low): output = input.\n" +

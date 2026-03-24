@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -117,12 +117,13 @@ function diacModel(
 // ---------------------------------------------------------------------------
 
 export function createDiacElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeA = nodeIds[0]; // terminal A
-  const nodeB = nodeIds[1]; // terminal B
+): AnalogElementCore {
+  const nodeA = pinNodes.get("A")!; // terminal A
+  const nodeB = pinNodes.get("B")!; // terminal B
 
   const vBreakover: number = props.getOrDefault<number>("vBreakover", 32);
   const vHold: number      = props.getOrDefault<number>("vHold",      28);
@@ -137,15 +138,16 @@ export function createDiacElement(
   let _v = 0;
   let _geq = 1.0 / rOff + GMIN;
   let _ieq = 0;
+  let _id = 0; // cached device current for getPinCurrents
 
   function recompute(v: number): void {
-    const { geq, ieq } = diacModel(v, vBreakover, vHold, rOn, rOff, sharpness);
+    const { i, geq, ieq } = diacModel(v, vBreakover, vHold, rOn, rOff, sharpness);
+    _id = i;
     _geq = geq;
     _ieq = ieq;
   }
 
   return {
-    nodeIndices: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -177,6 +179,13 @@ export function createDiacElement(
       const vBp = nodeB > 0 ? prevVoltages[nodeB - 1] : 0;
       // Converge when voltage change is < 10mV (tighter than default for snap region)
       return Math.abs((vA - vB) - (vAp - vBp)) <= 0.01;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinLayout order: [A (terminal 1), B (terminal 2)]
+      // Positive = current flowing INTO element at that pin.
+      // Current flows from A to B through the device: into A, out of B.
+      return [_id, -_id];
     },
   };
 }

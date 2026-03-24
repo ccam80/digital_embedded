@@ -43,7 +43,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -187,9 +187,9 @@ export class ComparatorElement extends AbstractCircuitElement {
  * Node IDs are 1-based; solver rows/cols are 0-based (nodeId - 1).
  */
 function createComparatorElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const hysteresis    = Math.max(props.getOrDefault<number>("hysteresis",    0),     0);
   const vos           = props.getOrDefault<number>("vos",           0.001);
   const rSat          = Math.max(props.getOrDefault<number>("rSat",          50),    1e-9);
@@ -201,9 +201,9 @@ function createComparatorElement(
   const G_sat = 1 / rSat;
   const G_off = 1 / R_OFF;
 
-  const nInp = nodeIds[0]; // V+ node (1-based)
-  const nInn = nodeIds[1]; // V- node (1-based)
-  const nOut = nodeIds[2]; // out node (1-based)
+  const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based)
+  const nInn = pinNodes.get("in-")!; // inverting input node (1-based)
+  const nOut = pinNodes.get("out")!; // output node (1-based)
 
   // Hysteresis state: true when output is active (open-collector sinking)
   let _outputActive = false;
@@ -228,7 +228,6 @@ function createComparatorElement(
   }
 
   return {
-    nodeIndices: [nInp, nInn, nOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -279,6 +278,35 @@ function createComparatorElement(
           _outputWeight = 1.0;
         }
       }
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Input pins: high-impedance load — implicit R_IN to ground
+      // Using a fixed 10 MΩ input impedance (matching behavioral digital model convention)
+      const R_IN = 1e7;
+      const vInp = readNode(voltages, nInp);
+      const vInn = readNode(voltages, nInn);
+      const iInp = nInp > 0 ? vInp / R_IN : 0;
+      const iInn = nInn > 0 ? vInn / R_IN : 0;
+
+      // Output pin: conductance _gEff from out to ground + optional Norton source
+      // Open-collector: I_out = V_out * G_eff (no Norton source; current sinks to ground)
+      // Push-pull: I_out = (V_out - V_target) * G_eff
+      const vOut = readNode(voltages, nOut);
+      let iOut = 0;
+      if (nOut > 0) {
+        if (outputType === "push-pull") {
+          const vTarget = _outputActive ? 0.0 : 3.3;
+          iOut = (vOut - vTarget) * _gEff;
+        } else {
+          // Open-collector: output conductance to ground only
+          iOut = vOut * _gEff;
+        }
+      }
+
+      // pinLayout order: in+, in-, out
+      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
+      return [iInp, iInn, iOut];
     },
 
     stampCompanion(dt: number, _method: IntegrationMethod, _voltages: Float64Array): void {
@@ -389,10 +417,11 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createComparatorElement(nodeIds, props);
+  ): AnalogElementCore {
+    return createComparatorElement(pinNodes, props);
   },
 };

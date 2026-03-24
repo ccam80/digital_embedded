@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -222,31 +222,34 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 // Analog probe factory and element
 // ---------------------------------------------------------------------------
 
-class AnalogProbeElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+class AnalogProbeElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
-
-  constructor(nodeIndices: number[]) {
-    this.nodeIndices = nodeIndices;
-  }
 
   stamp(_solver: SparseSolver): void {
   }
 
   getVoltage(voltages: Float64Array): number {
-    return voltages[this.nodeIndices[0]];
+    return voltages[this.pinNodeIds[0]];
+  }
+
+  getPinCurrents(_voltages: Float64Array): number[] {
+    // Probe stamps nothing — it is a pure voltage measurement with no loading.
+    // Return zero current for the single input pin.
+    return [0];
   }
 }
 
 function probeAnalogFactory(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   _props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
-  return new AnalogProbeElement(nodeIds);
+): AnalogElementCore {
+  return new AnalogProbeElement();
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +271,8 @@ export const ProbeDefinition: ComponentDefinition = {
   propertyDefs: PROBE_PROPERTY_DEFS,
   attributeMap: PROBE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["in"],
+  outputSchema: [],
   helpText:
     "Probe â€” measurement point.\n" +
     "Reads the connected signal and adds it to the signal/measurement list.\n" +

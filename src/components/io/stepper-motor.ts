@@ -320,6 +320,8 @@ export const StepperMotorBipolarDefinition: ComponentDefinition = {
   propertyDefs: STEPPER_MOTOR_PROPERTY_DEFS,
   attributeMap: STEPPER_MOTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["A+", "A-", "B+", "B-"],
+  outputSchema: ["S0", "S1"],
   helpText:
     "StepperMotorBipolar — bipolar stepper motor simulation.\n" +
     "4 coil inputs (A+, A-, B+, B-). Step position output tracks current step.\n" +
@@ -335,6 +337,8 @@ export const StepperMotorUnipolarDefinition: ComponentDefinition = {
   propertyDefs: STEPPER_MOTOR_PROPERTY_DEFS,
   attributeMap: STEPPER_MOTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["P0", "P1", "P2", "P3", "com"],
+  outputSchema: ["S0", "S1"],
   helpText:
     "StepperMotorUnipolar — unipolar stepper motor simulation.\n" +
     "4 coil inputs (A, B, C, D). Step position output tracks current step.\n" +

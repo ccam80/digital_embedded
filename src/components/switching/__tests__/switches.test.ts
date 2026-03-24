@@ -775,7 +775,8 @@ describe("AnalogSwitch", () => {
   it("closed_stamps_ron", () => {
     const props = makeSpstProps({ closed: true, Ron: 1 });
     const el = SwitchDefinition.analogFactory!(
-      [1, 2],
+      new Map([["A1", 1], ["B1", 2]]),
+      [],
       -1,
       props,
       () => 0,
@@ -793,7 +794,8 @@ describe("AnalogSwitch", () => {
   it("open_stamps_roff", () => {
     const props = makeSpstProps({ closed: false, Roff: 1e9 });
     const el = SwitchDefinition.analogFactory!(
-      [1, 2],
+      new Map([["A1", 1], ["B1", 2]]),
+      [],
       -1,
       props,
       () => 0,
@@ -810,7 +812,8 @@ describe("AnalogSwitch", () => {
   it("toggle_changes_conductance", () => {
     const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
     const el = SwitchDefinition.analogFactory!(
-      [1, 2],
+      new Map([["A1", 1], ["B1", 2]]),
+      [],
       -1,
       props,
       () => 0,
@@ -839,7 +842,8 @@ describe("AnalogSwitch", () => {
     props.set("Roff", 1e9);
 
     const el = SwitchDefinition.analogFactory!(
-      [1, 2],
+      new Map([["A1", 1], ["B1", 2]]),
+      [],
       -1,
       props,
       () => 0,
@@ -863,7 +867,8 @@ describe("AnalogSPDT", () => {
     props.set("Roff", 1e9);
 
     const el = SwitchDTDefinition.analogFactory!(
-      [1, 2, 3],
+      new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
+      [],
       -1,
       props,
       () => 0,
@@ -888,7 +893,8 @@ describe("AnalogSPDT", () => {
     props.set("Roff", 1e9);
 
     const el = SwitchDTDefinition.analogFactory!(
-      [1, 2, 3],
+      new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
+      [],
       -1,
       props,
       () => 0,
@@ -918,7 +924,8 @@ describe("Integration", () => {
 
     const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
     const swEl = SwitchDefinition.analogFactory!(
-      [1, 2],
+      new Map([["A1", 1], ["B1", 2]]),
+      [],
       -1,
       switchProps,
       () => 0,

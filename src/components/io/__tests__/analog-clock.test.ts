@@ -144,7 +144,7 @@ describe("AnalogClock", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
-    const el = ClockDefinition.analogFactory!([1, 0], 1, props, () => 0);
+    const el = ClockDefinition.analogFactory!(new Map([["out", 1]]), [], 1, props, () => 0);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(false);
     expect(el.isReactive).toBe(false);

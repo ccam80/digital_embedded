@@ -77,12 +77,12 @@ function makeCompiled(opts: {
   }
 
   const elementToCircuitElement = new Map<number, CircuitElement>();
-  const elements: { nodeIndices: number[] }[] = [];
+  const elements: { pinNodeIds: number[] }[] = [];
 
   if (opts.element !== undefined && opts.elementIndex !== undefined) {
     elementToCircuitElement.set(opts.elementIndex, opts.element);
     elements[opts.elementIndex] = {
-      nodeIndices: opts.elementNodeIndices ?? [1],
+      pinNodeIds: opts.elementNodeIndices ?? [1],
     };
   }
 

@@ -236,6 +236,9 @@ export const DecoderDefinition: ComponentDefinition = {
   propertyDefs: DECODER_PROPERTY_DEFS,
   attributeMap: DECODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // Schema for default selectorBits=1 (2 outputs); direction-filter order matches for all configs.
+  inputSchema: ["sel"],
+  outputSchema: ["out_0", "out_1"],
   helpText:
     "Decoder — N-bit input produces 2^N one-hot outputs.\n" +
     "Only output[input_value] is 1; all others are 0.",

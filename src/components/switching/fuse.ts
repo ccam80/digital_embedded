@@ -428,6 +428,8 @@ export const FuseDefinition: ComponentDefinition = {
   propertyDefs: FUSE_PROPERTY_DEFS,
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  inputSchema: [],
+  outputSchema: ["out1", "out2"],
   helpText:
     "Fuse — one-time irreversible switch with I²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +

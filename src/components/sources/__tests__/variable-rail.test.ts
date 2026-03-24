@@ -18,7 +18,7 @@ import { PropertyBag } from "../../../core/properties.js";
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -137,7 +137,8 @@ describe("VariableRail", () => {
     props.set("voltage", 7);
     props.set("resistance", 0.05);
     const el = VariableRailDefinition.analogFactory!(
-      [1, 0, 2],
+      new Map([["pos", 1]]),
+      [2],
       3,
       props,
       () => 0,

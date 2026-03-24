@@ -6,7 +6,7 @@
  * All other connected wire groups receive unique IDs starting at 1.
  *
  * The node map is used by the analog compiler to bind AnalogElement
- * nodeIndices to their correct MNA matrix rows/columns.
+ * pinNodeIds to their correct MNA matrix rows/columns.
  */
 
 import type { Circuit, Wire } from "../core/circuit.js";

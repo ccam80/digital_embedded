@@ -316,6 +316,9 @@ export const ScopeDefinition: ComponentDefinition = {
   propertyDefs: SCOPE_PROPERTY_DEFS,
   attributeMap: SCOPE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  // Schema for default channelCount=1; direction-filter order matches for all channelCounts.
+  inputSchema: ["clk"],
+  outputSchema: [],
   helpText:
     "Scope — multi-channel waveform recorder.\n" +
     "Records signal values over time. Waveform displayed in a floating panel.\n" +

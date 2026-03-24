@@ -307,13 +307,13 @@ export class NJfetAnalogElement extends AbstractFetElement {
 // ---------------------------------------------------------------------------
 
 export function createNJfetElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   _branchIdx: number,
   props: PropertyBag,
 ): NJfetAnalogElement {
-  const nodeG = nodeIds[0]; // gate
-  const nodeS = nodeIds[1]; // source
-  const nodeD = nodeIds[2]; // drain
+  const nodeG = pinNodes.get("G")!; // gate
+  const nodeS = pinNodes.get("S")!; // source
+  const nodeD = pinNodes.get("D")!; // drain
 
   const p = resolveJfetParams(props, JFET_N_DEFAULTS);
   return new NJfetAnalogElement(nodeG, nodeD, nodeS, p);
@@ -501,6 +501,6 @@ export const NJfetDefinition: ComponentDefinition = {
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   analogDeviceType: "NJFET",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createNJfetElement(nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+    createNJfetElement(pinNodes, branchIdx, props),
 };

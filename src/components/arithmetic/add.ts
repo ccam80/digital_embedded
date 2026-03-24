@@ -259,6 +259,8 @@ export const AddDefinition: ComponentDefinition = {
   propertyDefs: ADD_PROPERTY_DEFS,
   attributeMap: ADD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["a", "b", "c_i"],
+  outputSchema: ["s", "c_o"],
   helpText:
     "Add — N-bit adder with carry in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit carry in).\n" +

@@ -37,7 +37,13 @@ function makeCCVSElement(
     ["transresistance", rm],
     ["label", ""],
   ]).entries());
-  return CCVSDefinition.analogFactory!([nSenseP, nSenseN, nOutP, nOutN], senseBranchIdx, props);
+  return CCVSDefinition.analogFactory!(
+    new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
+    [],
+    senseBranchIdx,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

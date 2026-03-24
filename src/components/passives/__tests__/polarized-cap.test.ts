@@ -61,7 +61,7 @@ function makeCapElement(opts: {
 function makeResistorElement(nA: number, nB: number, resistance: number) {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nA, nB] as readonly number[],
+    pinNodeIds: [nA, nB] as readonly number[],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -244,7 +244,7 @@ describe("PolarizedCap", () => {
 
       // Simulate -5V across cap: V(pos)=0, V(neg)=5 → vDiff = -5V < -reverseMax
       const voltages = new Float64Array([0, 5]);
-      // nodeIndices = [1, 0, 2]: n_pos=1 → voltages[0]=0, n_neg=0 (ground)=0
+      // pinNodeIds = [1, 0, 2]: n_pos=1 → voltages[0]=0, n_neg=0 (ground)=0
       // Reuse the element with n_neg=ground but apply voltages as if n_pos=-5
       // Build a cap where node 1 = pos (solver idx 0) and ground = neg
       const capReverse = new AnalogPolarizedCapElement(
@@ -307,13 +307,13 @@ describe("PolarizedCap", () => {
     it("PolarizedCapDefinition isReactive", () => {
       const props = new PropertyBag();
       props.set("capacitance", 100e-6);
-      const el = PolarizedCapDefinition.analogFactory!([1, 0, 2], -1, props, () => 0);
+      const el = PolarizedCapDefinition.analogFactory!(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
     it("PolarizedCapDefinition isNonlinear", () => {
       const props = new PropertyBag();
-      const el = PolarizedCapDefinition.analogFactory!([1, 0, 2], -1, props, () => 0);
+      const el = PolarizedCapDefinition.analogFactory!(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isNonlinear).toBe(true);
     });
 

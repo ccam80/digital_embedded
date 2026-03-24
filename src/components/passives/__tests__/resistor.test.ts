@@ -31,7 +31,7 @@ function makeMockSolver() {
 describe("Resistor", () => {
   it("stamp_places_four_conductance_entries", () => {
     const props = new PropertyBag([["resistance", 1000]]);
-    const element = ResistorDefinition.analogFactory!([1, 2], -1, props, () => 0);
+    const element = ResistorDefinition.analogFactory!(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
     const solver = makeMockSolver();
 
     element.stamp(solver);
@@ -49,7 +49,7 @@ describe("Resistor", () => {
 
   it("resistance_from_props", () => {
     const props = new PropertyBag([["resistance", 470]]);
-    const element = ResistorDefinition.analogFactory!([1, 2], -1, props, () => 0);
+    const element = ResistorDefinition.analogFactory!(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
     const solver = makeMockSolver();
 
     element.stamp(solver);
@@ -64,7 +64,7 @@ describe("Resistor", () => {
 
   it("minimum_resistance_clamped", () => {
     const props = new PropertyBag([["resistance", 0]]);
-    const element = ResistorDefinition.analogFactory!([1, 2], -1, props, () => 0);
+    const element = ResistorDefinition.analogFactory!(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
     const solver = makeMockSolver();
 
     element.stamp(solver);
@@ -79,7 +79,7 @@ describe("Resistor", () => {
 
   it("is_not_nonlinear_and_not_reactive", () => {
     const props = new PropertyBag([["resistance", 1000]]);
-    const element = ResistorDefinition.analogFactory!([1, 2], -1, props, () => 0);
+    const element = ResistorDefinition.analogFactory!(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
 
     expect(element.isNonlinear).toBe(false);
     expect(element.isReactive).toBe(false);
@@ -87,7 +87,7 @@ describe("Resistor", () => {
 
   it("branch_index_is_minus_one", () => {
     const props = new PropertyBag([["resistance", 1000]]);
-    const element = ResistorDefinition.analogFactory!([1, 2], -1, props, () => 0);
+    const element = ResistorDefinition.analogFactory!(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
 
     expect(element.branchIndex).toBe(-1);
   });
@@ -100,7 +100,7 @@ describe("Resistor", () => {
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,

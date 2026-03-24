@@ -381,6 +381,9 @@ export const MidiDefinition: ComponentDefinition = {
   propertyDefs: MIDI_PROPERTY_DEFS,
   attributeMap: MIDI_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  // Schema for default progChangeEnable=false; direction-filter order matches for all configs.
+  inputSchema: ["N", "V", "OnOff", "en", "C"],
+  outputSchema: [],
   helpText:
     "MIDI — sends MIDI note-on/off and program-change messages via Web MIDI API.\n" +
     "Inputs: N (note, 7-bit), V (velocity, 7-bit), OnOff (1=on/0=off), en (enable), C (clock).\n" +

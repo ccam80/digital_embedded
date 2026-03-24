@@ -57,9 +57,9 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
 /**
  * Stub AnalogElement factory (for behavioral-mode tests).
  */
-function makeStubAnalogElement(nodeIds: number[]): AnalogElement {
+function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogElement {
   return {
-    nodeIndices: nodeIds,
+    pinNodeIds: [...pinNodes.values()],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -77,7 +77,7 @@ function makeStubAnalogElement(nodeIds: number[]): AnalogElement {
 //   - DigitalXor ("both", 2 inputs + 1 output — used as the test component)
 // ---------------------------------------------------------------------------
 
-function buildRegistry(analogFactory?: (nodeIds: number[], branchIdx: number, props: PropertyBag) => AnalogElement) {
+function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, internalNodeIds: readonly number[], branchIdx: number, props: PropertyBag, getTime: () => number) => AnalogElement) {
   const registry = new ComponentRegistry();
 
   registry.register({

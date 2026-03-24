@@ -295,6 +295,8 @@ export const ProgramCounterDefinition: ComponentDefinition = {
   propertyDefs: PROGRAM_COUNTER_PROPERTY_DEFS,
   attributeMap: PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  inputSchema: ["D", "en", "C", "ld"],
+  outputSchema: ["Q", "ovf"],
   helpText: "ProgramCounter — edge-triggered instruction pointer with jump support.",
   stateSlotCount: 2,
   defaultDelay: 10,

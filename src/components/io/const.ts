@@ -173,6 +173,8 @@ export const ConstDefinition: ComponentDefinition = {
   propertyDefs: CONST_PROPERTY_DEFS,
   attributeMap: CONST_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "Const — constant value source.\n" +
     "Outputs a fixed value on every simulation step.\n" +

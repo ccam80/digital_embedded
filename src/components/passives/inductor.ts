@@ -19,7 +19,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import { formatSI } from "../../editor/si-format.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import {
   inductorConductance,
@@ -127,7 +128,7 @@ export class InductorElement extends AbstractCircuitElement {
     }
 
     // Value label above body (matching Falstad reference: pixel (27,-10) = grid (1.6875,-0.625))
-    const displayLabel = label.length > 0 ? label : `${inductance * 1e3}mH`;
+    const displayLabel = label.length > 0 ? label : formatSI(inductance, "H");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 1.6875, -0.625, { horizontal: "center", vertical: "bottom" });
@@ -147,8 +148,8 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-class AnalogInductorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+class AnalogInductorElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -160,15 +161,14 @@ class AnalogInductorElement implements AnalogElement {
   private iPrevPrev: number = 0;
   private vPrev: number = 0;
 
-  constructor(nodeIndices: number[], branchIdx: number, inductance: number) {
-    this.nodeIndices = nodeIndices;
+  constructor(branchIdx: number, inductance: number) {
     this.branchIndex = branchIdx;
     this.L = inductance;
   }
 
   stamp(solver: SparseSolver): void {
-    const n0 = this.nodeIndices[0];
-    const n1 = this.nodeIndices[1];
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
 
     // B sub-matrix: branch current incidence in node KCL equations.
@@ -187,10 +187,15 @@ class AnalogInductorElement implements AnalogElement {
     solver.stampRHS(b, this.ieq);
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const I = voltages[this.branchIndex];
+    return [I, -I];
+  }
+
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.nodeIndices[0] > 0 ? voltages[this.nodeIndices[0] - 1] : 0;
-    const v1 = this.nodeIndices[1] > 0 ? voltages[this.nodeIndices[1] - 1] : 0;
+    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
+    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
 
     this.geq = inductorConductance(this.L, dt, method);
@@ -203,12 +208,13 @@ class AnalogInductorElement implements AnalogElement {
 }
 
 function createInductorElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const L = props.getOrDefault<number>("inductance", 1e-3);
-  return new AnalogInductorElement(nodeIds, branchIdx, L);
+  return new AnalogInductorElement(branchIdx, L);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +226,7 @@ const INDUCTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "inductance",
     type: PropertyType.FLOAT,
     label: "Inductance (H)",
+    unit: "H",
     defaultValue: 1e-3,
     min: 1e-12,
     description: "Inductance in henries",

@@ -213,6 +213,8 @@ export const InDefinition: ComponentDefinition = {
   propertyDefs: IN_PROPERTY_DEFS,
   attributeMap: IN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "In — interactive input component.\n" +
     "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +

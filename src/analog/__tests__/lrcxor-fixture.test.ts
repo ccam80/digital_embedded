@@ -258,15 +258,16 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   const v1 = in1High ? V_HIGH : V_LOW;
   const v2 = in2High ? V_HIGH : V_LOW;
 
-  // DC voltage source driving In_1 (pos=x=10, neg=x=50)
+  // DC voltage source driving In_1 (neg=x=50/GND, pos=x=10)
+  // DcVoltageSource pinLayout: neg at index 0, pos at index 1
   const vs1 = makeElement("DcVoltageSource", "vs1",
-    [{ x: 10, y: 0 }, { x: 50, y: 0 }],
+    [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
     new Map<string, PropertyValue>([["voltage", v1]]),
   );
 
-  // DC voltage source driving In_2 (pos=x=30, neg=x=50)
+  // DC voltage source driving In_2 (neg=x=50/GND, pos=x=30)
   const vs2 = makeElement("DcVoltageSource", "vs2",
-    [{ x: 30, y: 0 }, { x: 50, y: 0 }],
+    [{ x: 50, y: 0, label: "neg" }, { x: 30, y: 0, label: "pos" }],
     new Map<string, PropertyValue>([["voltage", v2]]),
   );
 
@@ -313,13 +314,17 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   circuit.addElement(rLoad);
   circuit.addElement(gnd);
 
-  // Add wires to form distinct nodes — one wire per unique x position
-  circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 })); // VS1 pos / R_drive A
-  circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 })); // R_drive B / XOR In_1
-  circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 })); // VS2 pos / XOR In_2
-  const outputWire = new Wire({ x: 40, y: 0 }, { x: 40, y: 0 }); // XOR out / R_load A
+  // Add short vertical stub wires to form distinct nodes — each wire has one
+  // endpoint at the node position (y=0) so component pins at that x connect.
+  // Self-loop wires (start===end) are silently dropped by Circuit.addWire, so
+  // we use (x,0)→(x,1) stubs instead. The outputWire reference is kept so
+  // tests can look up the output node ID from compiled.wireToNodeId.
+  circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 1 })); // VS1 pos / R_drive A
+  circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 1 })); // R_drive B / XOR In_1
+  circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 1 })); // VS2 pos / XOR In_2
+  const outputWire = new Wire({ x: 40, y: 0 }, { x: 40, y: 1 }); // XOR out / R_load A
   circuit.addWire(outputWire);
-  circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 0 })); // GND node
+  circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 1 })); // GND node
 
   return { circuit, registry, outputWire };
 }
@@ -936,9 +941,9 @@ describe("bridge error paths", () => {
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildDigitalRegistry();
 
-    // VS1 → R_drive → XOR In_1
+    // VS1 → R_drive → XOR In_1 (neg=GND at x=50, pos at x=10)
     const vs1 = makeElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", V_HIGH]]),
     );
     const rDrive = makeElement("Resistor", "r_drive",
@@ -967,10 +972,10 @@ describe("bridge error paths", () => {
     circuit.addElement(gnd);
 
     // Wires for x=10, x=20, x=40, x=50 — deliberately no wire at x=30
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
-    circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 0 }));
-    circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 1 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 1 }));
+    circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 1 }));
+    circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 1 }));
 
     // Should not throw — diagnostics collect the issue
     let compiled: ReturnType<typeof compileAnalogCircuit> | undefined;
@@ -993,11 +998,11 @@ describe("bridge error paths", () => {
 
     const vIndeterminate = 1.5; // between vIL=0.8 and vIH=2.0
     const vs1 = makeElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", vIndeterminate]]),
     );
     const vs2 = makeElement("DcVoltageSource", "vs2",
-      [{ x: 30, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 50, y: 0, label: "neg" }, { x: 30, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", V_LOW]]),
     );
     const rDrive = makeElement("Resistor", "r_drive",
@@ -1025,11 +1030,11 @@ describe("bridge error paths", () => {
     circuit.addElement(rLoad);
     circuit.addElement(gnd);
 
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
-    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
-    circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 0 }));
-    circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 1 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 1 }));
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 1 }));
+    circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 1 }));
+    circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 1 }));
 
     const compiled = compileAnalogCircuit(circuit, registry);
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");

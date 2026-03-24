@@ -26,7 +26,7 @@ import type { ExpressionContext } from "../expression-evaluate.js";
  * what was passed from `stampNonlinear`.
  */
 class TestControlledSource extends ControlledSourceElement {
-  readonly nodeIndices: readonly number[] = [1, 0];
+  readonly pinNodeIds: readonly number[] = [1, 0];
   readonly branchIndex = -1;
 
   lastValue = 0;

@@ -201,6 +201,8 @@ export const RectangleDefinition: ComponentDefinition = {
   propertyDefs: RECTANGLE_PROPERTY_DEFS,
   attributeMap: RECTANGLE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
+  inputSchema: [],
+  outputSchema: [],
   helpText:
     "Rectangle — visual grouping box on the canvas.\n" +
     "No simulation behavior. Used to group related circuit sections.\n" +

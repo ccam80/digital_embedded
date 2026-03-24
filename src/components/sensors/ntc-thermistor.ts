@@ -13,8 +13,8 @@
  *   Integrated with forward Euler each accepted timestep via updateState().
  *
  * MNA topology:
- *   nodeIndices[0] = n_pos
- *   nodeIndices[1] = n_neg
+ *   pinNodeIds[0] = n_pos
+ *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
  * Stamping:
@@ -23,7 +23,7 @@
  *   updateState     — integrates thermal ODE if selfHeating enabled
  */
 
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -90,8 +90,8 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 // NTCThermistorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-export class NTCThermistorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+export class NTCThermistorElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean;
@@ -110,7 +110,6 @@ export class NTCThermistorElement implements AnalogElement {
   private _temperature: number;
 
   /**
-   * @param nodeIndices         - [n_pos, n_neg]
    * @param r0                  - Resistance at T₀ in ohms
    * @param beta                - B-parameter in Kelvin
    * @param t0                  - Reference temperature in Kelvin
@@ -123,7 +122,6 @@ export class NTCThermistorElement implements AnalogElement {
    * @param shC                 - Steinhart-Hart C coefficient (optional)
    */
   constructor(
-    nodeIndices: number[],
     r0: number,
     beta: number,
     t0: number,
@@ -135,7 +133,6 @@ export class NTCThermistorElement implements AnalogElement {
     shB?: number,
     shC?: number,
   ) {
-    this.nodeIndices = nodeIndices;
     this._r0 = Math.max(r0, MIN_RESISTANCE);
     this._beta = beta;
     this._t0 = Math.max(t0, MIN_TEMPERATURE);
@@ -179,8 +176,8 @@ export class NTCThermistorElement implements AnalogElement {
   }
 
   stampNonlinear(solver: SparseSolver): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
 
     const G = 1 / this.resistance();
 
@@ -196,11 +193,21 @@ export class NTCThermistorElement implements AnalogElement {
     }
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
+    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const G = 1 / this.resistance();
+    const I = G * (vPos - vNeg);
+    return [I, -I];
+  }
+
   updateState(dt: number, voltages: Float64Array): void {
     if (!this._selfHeating) return;
 
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vDiff = vPos - vNeg;
@@ -221,11 +228,12 @@ export class NTCThermistorElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export function createNTCThermistorElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
+): AnalogElementCore {
   const r0 = props.getOrDefault<number>("r0", 10000);
   const beta = props.getOrDefault<number>("beta", 3950);
   const t0 = props.getOrDefault<number>("t0", 298.15);
@@ -237,7 +245,6 @@ export function createNTCThermistorElement(
   const shB = props.has("shB") ? props.getOrDefault<number>("shB", 0) : undefined;
   const shC = props.has("shC") ? props.getOrDefault<number>("shC", 0) : undefined;
   return new NTCThermistorElement(
-    nodeIds,
     r0,
     beta,
     t0,

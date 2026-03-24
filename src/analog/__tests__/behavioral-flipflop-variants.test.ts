@@ -222,7 +222,7 @@ function applyJKRisingEdge(
   element.stampNonlinear(solver);
 
   // The qPin is at nodeId=4, so read currentVoltage directly
-  return element.nodeIndices[3] === 4
+  return element.pinNodeIds[3] === 4
     ? (element as unknown as { _qPin: DigitalOutputPinModel })._qPin?.currentVoltage ?? V_LOW
     : V_LOW;
 }

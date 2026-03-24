@@ -15,6 +15,7 @@ import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
 import type { RenderContext } from "@/core/renderer-interface";
 import type { HitResult } from "@/editor/hit-test";
 import type { CircuitElement } from "@/core/element";
+import type { ResolvedPin } from "@/core/pin";
 import { formatSI } from "@/editor/si-format";
 import type { WireCurrentResolver } from "@/editor/wire-current-resolver";
 
@@ -202,17 +203,14 @@ export class AnalogTooltip {
       const analogEl = this._compiled.elements[eIdx];
       if (analogEl === undefined) return "";
       // For a pin hit, show the voltage at the pin's node.
-      // The pin's node is the first nodeIndex of the element
-      // that matches the pin label. As a practical approximation,
-      // use the pin's positional index within the element's nodeIndices.
+      // Look up the node ID by label via elementResolvedPins (compiled,
+      // always in pinLayout order) — avoids any ordering assumption.
       const pinLabel = hit.pin.label;
-      const pins = el.getPins();
-      let pinIdx = 0;
-      for (const p of pins) {
-        if (p.label === pinLabel) break;
-        pinIdx++;
-      }
-      const nodeId = analogEl.nodeIndices[pinIdx] ?? analogEl.nodeIndices[0];
+      const compiledAny = this._compiled as unknown as
+        { elementResolvedPins?: Map<number, ResolvedPin[]> };
+      const resolvedPins = compiledAny.elementResolvedPins?.get(eIdx);
+      const rp = resolvedPins?.find(p => p.label === pinLabel);
+      const nodeId = rp?.nodeId ?? analogEl.pinNodeIds[0];
       if (nodeId === undefined || nodeId <= 0) {
         return formatSI(0, "V");
       }

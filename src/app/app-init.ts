@@ -2028,7 +2028,7 @@ export function initApp(search?: string): void {
     wireRenderer.setVoltageTracker(analogVoltageTracker);
 
     // Build pin-voltage factory for element renderer.
-    // Maps each CircuitElement → its AnalogElement's nodeIndices → MNA voltages.
+    // Maps each CircuitElement → its AnalogElement's pinNodeIds → MNA voltages.
     const concreteCompiled = analogCompiled as ConcreteCompiledAnalogCircuit;
     const circuitElToIndex = new Map<import('../core/element.js').CircuitElement, number>();
     for (const [idx, ce] of concreteCompiled.elementToCircuitElement) {
@@ -2041,8 +2041,8 @@ export function initApp(search?: string): void {
       if (!analogEl) return undefined;
       // Resolve pin label → MNA node ID by matching pin world positions
       // against wireToNodeId. This is correct regardless of the order of
-      // nodeIndices (which may differ from pin declaration order, e.g.
-      // FET nodeIndices = [D,G,S] but pinLayout = [G,S,D]).
+      // pinNodeIds (which may differ from pin declaration order, e.g.
+      // FET pinNodeIds = [D,G,S] but pinLayout = [G,S,D]).
       const pinLabelToNodeId = new Map<string, number>();
       for (const pin of element.getPins()) {
         const wp = pinWorldPosition(element, pin);
@@ -2952,8 +2952,8 @@ export function initApp(search?: string): void {
       if (items.length > 0) items.push(separator());
 
       // Per-pin voltage traces — resolve node IDs by pin world position,
-      // not by indexing nodeIndices (which may differ in order from pins,
-      // e.g. FET nodeIndices = [D,G,S] but pins = [G,S,D]).
+      // not by indexing pinNodeIds (which may differ in order from pins,
+      // e.g. FET pinNodeIds = [D,G,S] but pins = [G,S,D]).
       for (const pin of pins) {
         const pinLabel = pin.label;
         const wp = pinWorldPosition(element, pin);
@@ -3139,7 +3139,7 @@ export function initApp(search?: string): void {
           for (let idx = 0; idx < ac.elements.length; idx++) {
             if (seen.has(idx)) continue;
             const analogEl = ac.elements[idx];
-            if (!analogEl.nodeIndices.includes(sig.netId)) continue;
+            if (!analogEl.pinNodeIds.includes(sig.netId)) continue;
             seen.add(idx);
             const ce = ac.elementToCircuitElement.get(idx);
             const elLabel = ce ? _elementLabel(ce) : `element${idx}`;
@@ -5388,28 +5388,6 @@ export function initApp(search?: string): void {
           instructionsPanel.innerHTML = renderMarkdownToHtml(markdown);
         }
       },
-      step() {
-        if (!compiledDirty) {
-          const eng = facade.getEngine();
-          if (eng) facade.step(eng);
-        }
-        scheduleRender();
-      },
-      setInput(label: string, value: number) {
-        const eng = facade.getEngine();
-        if (eng) facade.setInput(eng, label, value);
-      },
-      readOutput(label: string): number {
-        const eng = facade.getEngine();
-        if (!eng) throw new Error('No engine');
-        return facade.readOutput(eng, label);
-      },
-      readAllSignals(): Record<string, number> {
-        const eng = facade.getEngine();
-        if (!eng) return {};
-        return facade.readAllSignals(eng);
-      },
-      getFacade() { return facade; },
     },
   });
 

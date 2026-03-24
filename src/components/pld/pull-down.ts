@@ -197,6 +197,8 @@ export const PullDownDefinition: ComponentDefinition = {
   propertyDefs: PULL_DOWN_PROPERTY_DEFS,
   attributeMap: PULL_DOWN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "PullDown — pulls a floating net to logic 0.\n" +
     "Connects a resistor from GND to the output net.\n" +

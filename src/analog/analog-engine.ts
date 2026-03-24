@@ -337,12 +337,16 @@ export class MNAEngine implements AnalogEngine {
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
 
-    // Push history for BDF-2
+    // Push history for BDF-2 method switching heuristic.
+    // Tracks v[pin0] - v[pin1] as a representative voltage for oscillation
+    // detection. For 2-terminal reactive elements this is the terminal voltage.
+    // For multi-terminal reactive elements it's the voltage across the first
+    // two pinLayout pins — an approximation sufficient for method switching.
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
-      if (el.isReactive && el.nodeIndices.length >= 2) {
-        const nA = el.nodeIndices[0];
-        const nB = el.nodeIndices[1];
+      if (el.isReactive && (el.pinNodeIds?.length ?? 0) >= 2) {
+        const nA = el.pinNodeIds[0];
+        const nB = el.pinNodeIds[1];
         const vA = nA > 0 && nA - 1 < nodeCount ? this._voltages[nA - 1] : 0;
         const vB = nB > 0 && nB - 1 < nodeCount ? this._voltages[nB - 1] : 0;
         this._history.push(i, vA - vB);
@@ -567,6 +571,34 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /**
+   * Return per-pin currents for analog element `elementId`.
+   *
+   * For 2-terminal elements, derives [+I, -I] from getElementCurrent().
+   * For 3+ terminal elements, delegates to getPinCurrents() if available.
+   */
+  getElementPinCurrents(elementId: number): number[] | null {
+    if (!this._compiled) return null;
+    const el = this._compiled.elements[elementId];
+    if (!el) return null;
+
+    // If the element implements getPinCurrents, use it directly
+    if (el.getPinCurrents !== undefined) {
+      return el.getPinCurrents(this._voltages);
+    }
+
+    // For 2-terminal elements, derive from scalar getCurrent
+    if (el.pinNodeIds.length === 2) {
+      const I = this.getElementCurrent(elementId);
+      // Convention: positive I flows node[0] → node[1]
+      // Pin current "into element": +I enters at node[0], -I enters at node[1]
+      return [I, -I];
+    }
+
+    // No per-pin current information available
+    return null;
+  }
+
+  /**
    * Return the instantaneous power dissipated by analog element `elementId`.
    *
    * Computed as V_terminals × I_element.
@@ -576,15 +608,23 @@ export class MNAEngine implements AnalogEngine {
     const el = this._compiled.elements[elementId];
     if (!el) return 0;
 
-    const nA = el.nodeIndices[0] ?? 0;
-    const nB = el.nodeIndices[1] ?? 0;
+    // For multi-terminal elements, P = sum(V_i * I_into_i) across all pins.
+    // getPinCurrents returns current INTO element (positive = into) in
+    // pinLayout order matching pinNodeIds.
+    const pinCurrents = this.getElementPinCurrents(elementId);
+    if (pinCurrents !== null) {
+      let power = 0;
+      for (let i = 0; i < pinCurrents.length && i < el.pinNodeIds.length; i++) {
+        const v = this.getNodeVoltage(el.pinNodeIds[i]);
+        power += v * pinCurrents[i];
+      }
+      return power;
+    }
 
-    const vA = this.getNodeVoltage(nA);
-    const vB = this.getNodeVoltage(nB);
-    const vAB = vA - vB;
-
-    const current = this.getElementCurrent(elementId);
-    return vAB * current;
+    // Fallback for elements without per-pin currents: P = V_01 * I
+    const vA = this.getNodeVoltage(el.pinNodeIds[0] ?? 0);
+    const vB = this.getNodeVoltage(el.pinNodeIds[1] ?? 0);
+    return (vA - vB) * this.getElementCurrent(elementId);
   }
 
   // -------------------------------------------------------------------------

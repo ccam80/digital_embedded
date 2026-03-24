@@ -32,7 +32,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -87,17 +87,17 @@ function stampConductance(
 // ---------------------------------------------------------------------------
 
 function createSwitchSPSTElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
   const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
   const vTh  = props.getOrDefault<number>("threshold", 1.65);
   const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
 
-  const nIn   = nodeIds[0]; // signal in
-  const nOut  = nodeIds[1]; // signal out
-  const nCtrl = nodeIds[2]; // control terminal
+  const nIn   = pinNodes.get("in")!;   // signal in
+  const nOut  = pinNodes.get("out")!;  // signal out
+  const nCtrl = pinNodes.get("ctrl")!; // control terminal
 
   // Current operating-point resistance
   let currentR = rOff;
@@ -107,7 +107,6 @@ function createSwitchSPSTElement(
   }
 
   return {
-    nodeIndices: [nCtrl, nIn, nOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -125,6 +124,16 @@ function createSwitchSPSTElement(
       const vCtrl = readNode(voltages, nCtrl);
       currentR = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: in, out, ctrl.
+      // Conductance 1/currentR stamped between in and out; ctrl has no stamp.
+      const g = 1 / currentR;
+      const vIn  = readNode(voltages, nIn);
+      const vOut = readNode(voltages, nOut);
+      const iThrough = g * (vIn - vOut);
+      return [iThrough, -iThrough, 0];
+    },
   };
 }
 
@@ -133,18 +142,18 @@ function createSwitchSPSTElement(
 // ---------------------------------------------------------------------------
 
 function createSwitchSPDTElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
   const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
   const vTh  = props.getOrDefault<number>("threshold", 1.65);
   const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
 
-  const nCom  = nodeIds[0]; // common terminal
-  const nNO   = nodeIds[1]; // normally-open terminal
-  const nNC   = nodeIds[2]; // normally-closed terminal
-  const nCtrl = nodeIds[3]; // control terminal
+  const nCom  = pinNodes.get("com")!;  // common terminal
+  const nNO   = pinNodes.get("no")!;   // normally-open terminal
+  const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
+  const nCtrl = pinNodes.get("ctrl")!; // control terminal
 
   let rNO = rOff; // COM-NO resistance (closes when V_ctrl > V_th)
   let rNC = rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
@@ -154,7 +163,6 @@ function createSwitchSPDTElement(
   }
 
   return {
-    nodeIndices: [nCtrl, nCom, nNO, nNC],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -172,6 +180,17 @@ function createSwitchSPDTElement(
       const vCtrl = readNode(voltages, nCtrl);
       rNO = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
       rNC = switchResistance(vCtrl, vTh, rOn, rOff, k, true);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: com, no, nc, ctrl.
+      // Conductance 1/rNO between com/no, 1/rNC between com/nc; ctrl has no stamp.
+      const vCom = readNode(voltages, nCom);
+      const vNo  = readNode(voltages, nNO);
+      const vNc  = readNode(voltages, nNC);
+      const iNO = (1 / rNO) * (vCom - vNo);
+      const iNC = (1 / rNC) * (vCom - vNc);
+      return [iNO + iNC, -iNO, -iNC, 0];
     },
   };
 }
@@ -460,11 +479,12 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createSwitchSPSTElement(nodeIds, props);
+  ): AnalogElementCore {
+    return createSwitchSPSTElement(pinNodes, props);
   },
 };
 
@@ -488,10 +508,11 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createSwitchSPDTElement(nodeIds, props);
+  ): AnalogElementCore {
+    return createSwitchSPDTElement(pinNodes, props);
   },
 };

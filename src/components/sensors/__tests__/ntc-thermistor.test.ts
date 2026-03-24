@@ -35,8 +35,7 @@ function makeNTC(overrides: Partial<{
   shB: number;
   shC: number;
 }> = {}): NTCThermistorElement {
-  return new NTCThermistorElement(
-    [1, 2],
+  const el = new NTCThermistorElement(
     overrides.r0 ?? 10000,
     overrides.beta ?? 3950,
     overrides.t0 ?? 298.15,
@@ -48,6 +47,8 @@ function makeNTC(overrides: Partial<{
     overrides.shB,
     overrides.shC,
   );
+  Object.assign(el, { pinNodeIds: [1, 2] });
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +234,7 @@ describe("NTC", () => {
 
     it("analogFactory creates an NTCThermistorElement", () => {
       const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
-      const element = createNTCThermistorElement([1, 2], -1, props, () => 0);
+      const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(NTCThermistorElement);
       expect(element.isNonlinear).toBe(true);
     });

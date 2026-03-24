@@ -183,6 +183,16 @@ export class DigitalOutputPinModel {
   get isHiZ(): boolean {
     return this._hiZ;
   }
+
+  /** Output impedance in ohms. */
+  get rOut(): number {
+    return this._spec.rOut;
+  }
+
+  /** Hi-Z impedance in ohms. */
+  get rHiZ(): number {
+    return this._spec.rHiZ;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -298,5 +308,10 @@ export class DigitalInputPinModel {
   /** The node ID assigned by init(). */
   get nodeId(): number {
     return this._nodeId;
+  }
+
+  /** Input impedance in ohms. */
+  get rIn(): number {
+    return this._spec.rIn;
   }
 }

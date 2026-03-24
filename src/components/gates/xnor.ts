@@ -325,6 +325,9 @@ export const XNOrDefinition: ComponentDefinition = {
   propertyDefs: XNOR_PROPERTY_DEFS,
   attributeMap: XNOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
+  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
+  inputSchema: ["In_1", "In_2"],
+  outputSchema: ["out"],
   helpText:
     "XNOr gate — performs bitwise NOT(XOR) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

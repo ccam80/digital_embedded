@@ -288,6 +288,9 @@ export const RelayDTDefinition: ComponentDefinition = {
   propertyDefs: RELAY_DT_PROPERTY_DEFS,
   attributeMap: RELAY_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  // Schema for default poles=1; direction-filter order matches for all pole counts.
+  inputSchema: ["in1", "in2"],
+  outputSchema: ["A1", "B1", "C1"],
   helpText: "RelayDT (SPDT) — coil-controlled double-throw contact switch. C connects to T when energised, R when de-energised.",
   stateSlotCount: 1,
   defaultDelay: 0,

@@ -13,7 +13,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../core/properties.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
@@ -59,7 +59,7 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * The sel pin nodeId is treated as the first node; additional selector bit
  * nodes follow immediately.
  */
-export class BehavioralMuxElement implements AnalogElement {
+export class BehavioralMuxElement implements AnalogElementCore {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _dataPins: DigitalInputPinModel[][];
   private readonly _outPins: DigitalOutputPinModel[];
@@ -75,7 +75,7 @@ export class BehavioralMuxElement implements AnalogElement {
   /** Cached operating-point voltages. */
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -93,14 +93,6 @@ export class BehavioralMuxElement implements AnalogElement {
     this._outPins = outPins;
     this._inputCount = inputCount;
     this._bitWidth = bitWidth;
-
-    const indices: number[] = [];
-    for (const p of selPins) indices.push(p.nodeId);
-    for (const group of dataPins) {
-      for (const p of group) indices.push(p.nodeId);
-    }
-    for (const p of outPins) indices.push(p.nodeId);
-    this.nodeIndices = indices;
   }
 
   stamp(solver: SparseSolver): void {
@@ -171,6 +163,33 @@ export class BehavioralMuxElement implements AnalogElement {
       p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
+
+  /**
+   * Compute per-pin currents from the MNA solution vector.
+   *
+   * Order: selector pins, data input groups (flattened), output pins.
+   * Input pins: I = V_node / rIn
+   * Output pins: I = (V_node - V_target) / rOut
+   * The sum is nonzero — the residual is the implicit supply current.
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const result: number[] = [];
+    for (const p of this._selPins) {
+      const v = readMnaVoltage(p.nodeId, voltages);
+      result.push(v / p.rIn);
+    }
+    for (const group of this._dataPins) {
+      for (const p of group) {
+        const v = readMnaVoltage(p.nodeId, voltages);
+        result.push(v / p.rIn);
+      }
+    }
+    for (const p of this._outPins) {
+      const v = readMnaVoltage(p.nodeId, voltages);
+      result.push((v - p.currentVoltage) / p.rOut);
+    }
+    return result;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +207,7 @@ export class BehavioralMuxElement implements AnalogElement {
  * The selected output receives the input signal level; all other outputs
  * are driven LOW (vOL).
  */
-export class BehavioralDemuxElement implements AnalogElement {
+export class BehavioralDemuxElement implements AnalogElementCore {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _inPin: DigitalInputPinModel;
   private readonly _outPins: DigitalOutputPinModel[];
@@ -203,7 +222,7 @@ export class BehavioralDemuxElement implements AnalogElement {
   /** Cached operating-point voltages. */
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -219,12 +238,6 @@ export class BehavioralDemuxElement implements AnalogElement {
     this._inPin = inPin;
     this._outPins = outPins;
     this._outputCount = outputCount;
-
-    const indices: number[] = [];
-    for (const p of selPins) indices.push(p.nodeId);
-    indices.push(inPin.nodeId);
-    for (const p of outPins) indices.push(p.nodeId);
-    this.nodeIndices = indices;
   }
 
   stamp(solver: SparseSolver): void {
@@ -286,6 +299,29 @@ export class BehavioralDemuxElement implements AnalogElement {
       p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
+
+  /**
+   * Compute per-pin currents from the MNA solution vector.
+   *
+   * Order: selector pins, input pin, output pins.
+   * Input pins (sel, in): I = V_node / rIn
+   * Output pins: I = (V_node - V_target) / rOut
+   * The sum is nonzero — the residual is the implicit supply current.
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const result: number[] = [];
+    for (const p of this._selPins) {
+      const v = readMnaVoltage(p.nodeId, voltages);
+      result.push(v / p.rIn);
+    }
+    const vIn = readMnaVoltage(this._inPin.nodeId, voltages);
+    result.push(vIn / this._inPin.rIn);
+    for (const p of this._outPins) {
+      const v = readMnaVoltage(p.nodeId, voltages);
+      result.push((v - p.currentVoltage) / p.rOut);
+    }
+    return result;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +338,7 @@ export class BehavioralDemuxElement implements AnalogElement {
  * Exactly one output is driven HIGH (the one indexed by the selector value);
  * all others are driven LOW.
  */
-export class BehavioralDecoderElement implements AnalogElement {
+export class BehavioralDecoderElement implements AnalogElementCore {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
@@ -316,7 +352,7 @@ export class BehavioralDecoderElement implements AnalogElement {
   /** Cached operating-point voltages. */
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -330,11 +366,6 @@ export class BehavioralDecoderElement implements AnalogElement {
     this._selPins = selPins;
     this._outPins = outPins;
     this._outputCount = outputCount;
-
-    const indices: number[] = [];
-    for (const p of selPins) indices.push(p.nodeId);
-    for (const p of outPins) indices.push(p.nodeId);
-    this.nodeIndices = indices;
   }
 
   stamp(solver: SparseSolver): void {
@@ -388,6 +419,30 @@ export class BehavioralDecoderElement implements AnalogElement {
       p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
     }
   }
+
+  /**
+   * Per-pin currents in pinNodeIds (pinLayout) order:
+   *   [sel, out_0, out_1, ..., out_(N-1)]
+   *
+   * sel is an input: I = V_node / rIn (current into element).
+   * out_i are outputs: I = (V_node - V_target) / rOut (current into element).
+   * Sum is nonzero because behavioral outputs have an implicit supply.
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const result: number[] = [];
+    // sel pin (input) — all selPins share the same node; use first
+    const selPin = this._selPins[0];
+    if (selPin !== undefined) {
+      const vSel = readMnaVoltage(selPin.nodeId, voltages);
+      result.push(vSel / selPin.rIn);
+    }
+    // output pins
+    for (const p of this._outPins) {
+      const vNode = readMnaVoltage(p.nodeId, voltages);
+      result.push((vNode - p.currentVoltage) / p.rOut);
+    }
+    return result;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -411,51 +466,49 @@ function resolveSpec(
 /**
  * Returns an analogFactory for a multiplexer with the given selectorBits.
  *
- * nodeIds layout (matches buildMuxPinDeclarations with bitWidth=1):
- *   nodeIds[0]             = sel node
- *   nodeIds[1..inputCount] = in_0 .. in_(N-1) data input nodes
- *   nodeIds[inputCount+1]  = out node
+ * Pin layout matches buildMuxPinDeclarations:
+ *   "sel"              = selector input (multi-bit bus — one MNA node)
+ *   "in_0".."in_(N-1)" = data inputs (each multi-bit bus — one MNA node each)
+ *   "out"              = output (multi-bit bus — one MNA node)
  *
- * For selectorBits > 1 the sel pin is multi-bit. The MNA compiler assigns
- * one node per bit of a bus pin; for a selectorBits-wide selector pin the
- * compiler provides selectorBits consecutive node IDs starting at nodeIds[0].
- * Each data input also spans bitWidth nodes. This factory reads selectorBits
- * and bitWidth from props (defaults 1).
+ * All per-bit pin model arrays share the single bus node for their label.
  */
 export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const bitWidth = props.has("bitWidth") ? (props.get("bitWidth") as number) : 1;
     const inputCount = 1 << selectorBits;
 
-    // Build selector pin models (one per selector bit node)
+    // All selector bit pins share the single "sel" bus node
+    const selNodeId = pinNodes.get("sel") ?? 0;
+    const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const spec = resolveSpec(props, b === 0 ? "sel" : `sel_${b}`);
-      const pin = new DigitalInputPinModel(spec);
-      pin.init(nodeIds[b], 0);
+      const pin = new DigitalInputPinModel(selSpec);
+      pin.init(selNodeId, 0);
       selPins.push(pin);
     }
 
-    // Build data input pin models: inputCount groups, each bitWidth wide
-    let nodeIdx = selectorBits;
+    // Each data input group shares its own "in_i" bus node
     const dataPins: DigitalInputPinModel[][] = [];
     for (let i = 0; i < inputCount; i++) {
+      const inNodeId = pinNodes.get(`in_${i}`) ?? 0;
+      const spec = resolveSpec(props, `in_${i}`);
       const group: DigitalInputPinModel[] = [];
       for (let bit = 0; bit < bitWidth; bit++) {
-        const spec = resolveSpec(props, `in_${i}`);
         const pin = new DigitalInputPinModel(spec);
-        pin.init(nodeIds[nodeIdx++], 0);
+        pin.init(inNodeId, 0);
         group.push(pin);
       }
       dataPins.push(group);
     }
 
-    // Build output pin models (bitWidth wide)
+    // All output bit pins share the single "out" bus node
+    const outNodeId = pinNodes.get("out") ?? 0;
+    const outSpec = resolveSpec(props, "out");
     const outPins: DigitalOutputPinModel[] = [];
     for (let bit = 0; bit < bitWidth; bit++) {
-      const spec = resolveSpec(props, "out");
-      const pin = new DigitalOutputPinModel(spec);
-      pin.init(nodeIds[nodeIdx++], -1);
+      const pin = new DigitalOutputPinModel(outSpec);
+      pin.init(outNodeId, -1);
       outPins.push(pin);
     }
 
@@ -470,42 +523,40 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
 /**
  * Returns an analogFactory for a demultiplexer with the given selectorBits.
  *
- * nodeIds layout (matches buildDemuxPinDeclarations with bitWidth=1):
- *   nodeIds[0]                 = sel node
- *   nodeIds[1..outputCount]    = out_0 .. out_(N-1) output nodes
- *   nodeIds[outputCount+1]     = in data input node
+ * Pin layout matches buildDemuxPinDeclarations:
+ *   "sel"              = selector input (multi-bit bus — one MNA node)
+ *   "out_0".."out_(N-1)" = outputs (each 1-bit — one MNA node each)
+ *   "in"               = data input (multi-bit bus — one MNA node)
  *
- * The sel pin may be selectorBits-wide; the compiler provides one nodeId per
- * selector bit starting at nodeIds[0]. The in and out pins are bitWidth wide.
+ * All selector bit pins share the single "sel" bus node.
  */
 export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
-    const bitWidth = props.has("bitWidth") ? (props.get("bitWidth") as number) : 1;
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const outputCount = 1 << selectorBits;
 
-    // Selector pin models
+    // All selector bit pins share the single "sel" bus node
+    const selNodeId = pinNodes.get("sel") ?? 0;
+    const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const spec = resolveSpec(props, b === 0 ? "sel" : `sel_${b}`);
-      const pin = new DigitalInputPinModel(spec);
-      pin.init(nodeIds[b], 0);
+      const pin = new DigitalInputPinModel(selSpec);
+      pin.init(selNodeId, 0);
       selPins.push(pin);
     }
 
-    // Output pin models: outputCount groups, each bitWidth wide (but for bitWidth=1 just outputCount pins)
-    let nodeIdx = selectorBits;
+    // Each output pin has its own "out_i" node (1-bit pins)
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < outputCount; i++) {
       const spec = resolveSpec(props, `out_${i}`);
       const pin = new DigitalOutputPinModel(spec);
-      pin.init(nodeIds[nodeIdx++], -1);
+      pin.init(pinNodes.get(`out_${i}`) ?? 0, -1);
       outPins.push(pin);
     }
 
-    // Input pin model
+    // Input pin
     const inSpec = resolveSpec(props, "in");
     const inPin = new DigitalInputPinModel(inSpec);
-    inPin.init(nodeIds[nodeIdx], 0);
+    inPin.init(pinNodes.get("in") ?? 0, 0);
 
     return new BehavioralDemuxElement(selPins, inPin, outPins, outputCount);
   };
@@ -518,32 +569,33 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
 /**
  * Returns an analogFactory for a decoder with the given selectorBits.
  *
- * nodeIds layout (matches buildDecoderPinDeclarations):
- *   nodeIds[0]               = sel node (selectorBits-wide)
- *   nodeIds[selectorBits..selectorBits+outputCount-1] = out_0 .. out_(N-1)
+ * Pin layout matches buildDecoderPinDeclarations:
+ *   "sel"              = selector input (multi-bit bus — one MNA node)
+ *   "out_0".."out_(N-1)" = outputs (each 1-bit — one MNA node each)
  *
+ * All selector bit pins share the single "sel" bus node.
  * Decoder outputs are always 1-bit (no bitWidth property).
  */
 export function makeBehavioralDecoderAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const outputCount = 1 << selectorBits;
 
-    // Selector pin models (one per selector bit)
+    // All selector bit pins share the single "sel" bus node
+    const selNodeId = pinNodes.get("sel") ?? 0;
+    const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const spec = resolveSpec(props, b === 0 ? "sel" : `sel_${b}`);
-      const pin = new DigitalInputPinModel(spec);
-      pin.init(nodeIds[b], 0);
+      const pin = new DigitalInputPinModel(selSpec);
+      pin.init(selNodeId, 0);
       selPins.push(pin);
     }
 
-    // Output pin models
-    let nodeIdx = selectorBits;
+    // Each output pin has its own "out_i" node (1-bit pins)
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < outputCount; i++) {
       const spec = resolveSpec(props, `out_${i}`);
       const pin = new DigitalOutputPinModel(spec);
-      pin.init(nodeIds[nodeIdx++], -1);
+      pin.init(pinNodes.get(`out_${i}`) ?? 0, -1);
       outPins.push(pin);
     }
 

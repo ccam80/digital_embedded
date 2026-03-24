@@ -114,17 +114,19 @@ function wire(circuit: Circuit, x1: number, y1: number, x2: number, y2: number):
 // ---------------------------------------------------------------------------
 
 function makeNpnBjt(xC: number, xB: number, xE: number, yRow: number): CircuitElement {
+  // Pin order matches BJT pinLayout: [B, C, E] so nodeIds[0]=B, [1]=C, [2]=E
   return makeSubcircuitElement("NpnBJT", [
-    { x: xC, y: yRow, label: "C" },
     { x: xB, y: yRow, label: "B" },
+    { x: xC, y: yRow, label: "C" },
     { x: xE, y: yRow, label: "E" },
   ]);
 }
 
 function makePnpBjt(xC: number, xB: number, xE: number, yRow: number): CircuitElement {
+  // Pin order matches BJT pinLayout: [B, C, E] so nodeIds[0]=B, [1]=C, [2]=E
   return makeSubcircuitElement("PnpBJT", [
-    { x: xC, y: yRow, label: "C" },
     { x: xB, y: yRow, label: "B" },
+    { x: xC, y: yRow, label: "C" },
     { x: xE, y: yRow, label: "E" },
   ]);
 }

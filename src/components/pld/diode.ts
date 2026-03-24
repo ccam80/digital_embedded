@@ -567,6 +567,8 @@ export const PldDiodeDefinition: ComponentDefinition = {
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
+  inputSchema: ["out1", "out2"],
+  outputSchema: [],
   helpText:
     "Diode — bidirectional current-flow element for PLD wired-OR/AND arrays.\n" +
     "Use in conjunction with pull-up/pull-down resistors.\n" +
@@ -583,6 +585,8 @@ export const PldDiodeForwardDefinition: ComponentDefinition = {
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText:
     "DiodeForward — forward diode for wired-OR PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=high-Z. Requires pull-down on output net.\n" +
@@ -599,6 +603,8 @@ export const PldDiodeBackwardDefinition: ComponentDefinition = {
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText:
     "DiodeBackward — backward diode for wired-AND PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=0. Requires pull-up on output net.\n" +

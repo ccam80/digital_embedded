@@ -27,7 +27,8 @@ describe("Ground", () => {
   it("stamp_is_noop", () => {
     const props = new PropertyBag();
     const element = GroundDefinition.analogFactory!(
-      [3],
+      new Map([["out", 3]]),
+      [],
       -1,
       props,
       () => 0,
@@ -59,7 +60,8 @@ describe("Ground", () => {
   it("element_is_not_nonlinear_and_not_reactive", () => {
     const props = new PropertyBag();
     const element = GroundDefinition.analogFactory!(
-      [0],
+      new Map([["out", 0]]),
+      [],
       -1,
       props,
       () => 0,
@@ -72,7 +74,8 @@ describe("Ground", () => {
   it("element_branch_index_is_minus_one", () => {
     const props = new PropertyBag();
     const element = GroundDefinition.analogFactory!(
-      [2],
+      new Map([["out", 2]]),
+      [],
       -1,
       props,
       () => 0,
@@ -84,12 +87,14 @@ describe("Ground", () => {
   it("element_node_indices_matches_input", () => {
     const props = new PropertyBag();
     const element = GroundDefinition.analogFactory!(
-      [5],
+      new Map([["out", 5]]),
+      [],
       -1,
       props,
       () => 0,
     );
+    Object.assign(element, { pinNodeIds: [5] });
 
-    expect(element.nodeIndices).toEqual([5]);
+    expect(element.pinNodeIds).toEqual([5]);
   });
 });

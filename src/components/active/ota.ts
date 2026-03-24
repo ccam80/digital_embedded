@@ -71,7 +71,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -135,19 +135,19 @@ function createOTAElement(
   nOutN: number,
   gmMax: number,
   vt: number,
-): AnalogElement {
+): AnalogElementCore {
   const twoVt = 2 * vt;
 
   // Operating-point state
   let vDiff = 0;
   let iBias = 0;
+  let iOut = 0; // cached output current for getPinCurrents
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
 
   return {
-    nodeIndices: [nVp, nVm, nIabc, nOutP, nOutN],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -198,6 +198,24 @@ function createOTAElement(
       const vIabc = readNode(voltages, nIabc);
       // Bias current must be non-negative (OTA requires positive bias current)
       iBias = Math.max(0, vIabc);
+
+      // Cache output current for getPinCurrents
+      const x = vDiff / twoVt;
+      const xClamped = Math.max(-50, Math.min(50, x));
+      iOut = iBias * Math.tanh(xClamped);
+    },
+
+    /**
+     * Per-pin currents in pinLayout order: [V+, V-, Iabc, OUT+, OUT].
+     *
+     * V+, V-, Iabc are high-impedance inputs that draw no current from the
+     * OTA element itself. The output current iOut flows INTO OUT+ and OUT OF
+     * OUT (OUT-), satisfying KCL: 0 + 0 + 0 + iOut + (-iOut) = 0.
+     *
+     * Positive value = current flowing INTO the element at that pin.
+     */
+    getPinCurrents(_voltages: Float64Array): number[] {
+      return [0, 0, 0, iOut, -iOut];
     },
   };
 }
@@ -359,18 +377,19 @@ export const OTADefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const gmMax = props.getOrDefault<number>("gmMax", 0.01);
     const vt = props.getOrDefault<number>("vt", 0.026);
     return createOTAElement(
-      nodeIds[0], // V+
-      nodeIds[1], // V-
-      nodeIds[2], // Iabc
-      nodeIds[3], // OUT+
-      nodeIds[4], // OUT-
+      pinNodes.get("V+")!,   // V+
+      pinNodes.get("V-")!,   // V-
+      pinNodes.get("Iabc")!, // Iabc
+      pinNodes.get("OUT+")!, // OUT+
+      pinNodes.get("OUT")!,  // OUT (OUT-)
       gmMax,
       vt,
     );

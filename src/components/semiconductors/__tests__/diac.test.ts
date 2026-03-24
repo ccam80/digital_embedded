@@ -34,7 +34,7 @@ const DIAC_DEFAULTS = {
 function makeDiac(overrides: Partial<typeof DIAC_DEFAULTS> = {}): AnalogElement {
   const params = { ...DIAC_DEFAULTS, ...overrides };
   // nodeA=1, nodeB=2
-  return createDiacElement([1, 2], -1, new PropertyBag(Object.entries(params)));
+  return createDiacElement(new Map([["A", 1], ["B", 2]]), [], -1, new PropertyBag(Object.entries(params)));
 }
 
 /**
@@ -149,7 +149,8 @@ describe("Diac", () => {
     // when driven by V_BO voltage, then manually check triac triggers.
 
     const triac = createTriacElement(
-      [1, 2, 3],
+      new Map([["MT1", 1], ["MT2", 2], ["G", 3]]),
+      [],
       -1,
       new PropertyBag(Object.entries({ vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 })),
     );

@@ -219,6 +219,8 @@ export const BitSelectorDefinition: ComponentDefinition = {
   propertyDefs: BIT_SELECTOR_PROPERTY_DEFS,
   attributeMap: BIT_SELECTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["in", "sel"],
+  outputSchema: ["out"],
   helpText:
     "BitSelector — selects a single bit from a multi-bit input.\n" +
     "Output = (input >> selector) & 1.",

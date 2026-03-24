@@ -17,10 +17,11 @@
 
 import { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
+import type { AnalogElement } from "./element.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
 import { pinWorldPosition, PinDirection } from "../core/pin.js";
-import type { PinDeclaration } from "../core/pin.js";
+import type { PinDeclaration, ResolvedPin } from "../core/pin.js";
 import { PropertyBag } from "../core/properties.js";
 import { buildNodeMap } from "./node-map.js";
 import { makeDiagnostic } from "./diagnostics.js";
@@ -60,7 +61,7 @@ function makeVddSource(
   voltage: number,
 ): import("./element.js").AnalogElement {
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -502,6 +503,7 @@ export function compileAnalogCircuit(
   const analogElements: import("./element.js").AnalogElement[] = [];
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
+  const elementResolvedPins = new Map<number, ResolvedPin[]>();
 
   // Metadata for topology validation
   type ElementTopologyInfo = {
@@ -557,8 +559,19 @@ export function compileAnalogCircuit(
         }
 
         if (def.analogFactory !== undefined) {
-          // Resolve outer pin node IDs for this component
-          const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit, undefined, nodeMap.positionToNodeId);
+          // Resolve outer pin node IDs for this component (capture wire vertices)
+          const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
+            def.pinLayout.length,
+          ).fill(null);
+          const outerPinNodeIds = resolveElementNodes(el, nodeMap.wireToNodeId, circuit, outerPinVertices, nodeMap.positionToNodeId);
+
+          // Build nodeId → vertex lookup from the outer component's pins
+          const nodeIdToVertex = new Map<number, { x: number; y: number }>();
+          for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
+            const nid = outerPinNodeIds[pi];
+            const vtx = outerPinVertices[pi];
+            if (nid >= 0 && vtx) nodeIdToVertex.set(nid, vtx);
+          }
 
           // Ensure the shared VDD node and VDD voltage source are created once
           if (vddNodeId < 0) {
@@ -583,8 +596,36 @@ export function compileAnalogCircuit(
             const expElIdx = analogElements.length;
             analogElements.push(expEl);
             elementToCircuitElement.set(expElIdx, el);
+
+            // Map expansion sub-element pinNodeIds back to outer pin vertices
+            const subVerts: Array<{ x: number; y: number } | null> = [];
+            for (const nid of expEl.pinNodeIds) {
+              subVerts.push(nodeIdToVertex.get(nid) ?? null);
+            }
+            elementPinVertices.set(expElIdx, subVerts);
+
+            // Build minimal ResolvedPin[] for expansion sub-elements.
+            // Expansion elements have no pinLayout — use pinNodeIds positionally.
+            // wireVertex comes from the outer component's nodeId→vertex map.
+            {
+              const expResolvedPins: ResolvedPin[] = [];
+              for (let ni = 0; ni < expEl.pinNodeIds.length; ni++) {
+                const nid = expEl.pinNodeIds[ni];
+                const vtx = nodeIdToVertex.get(nid) ?? null;
+                expResolvedPins.push({
+                  label: `node${ni}`,
+                  direction: PinDirection.BIDIRECTIONAL,
+                  localPosition: { x: 0, y: 0 },
+                  worldPosition: vtx ?? { x: 0, y: 0 },
+                  wireVertex: vtx,
+                  nodeId: nid,
+                  bitWidth: 1,
+                });
+              }
+              elementResolvedPins.set(expElIdx, expResolvedPins);
+            }
             topologyInfo.push({
-              nodeIds: Array.from(expEl.nodeIndices),
+              nodeIds: Array.from(expEl.pinNodeIds),
               isBranch: expEl.branchIndex >= 0,
               typeHint: expEl.branchIndex >= 0
                 ? expEl.isReactive ? "inductor" : "voltage"
@@ -689,6 +730,7 @@ export function compileAnalogCircuit(
             outputAdapters.push(adapter);
             outputPinNetIds.push(innerNetId);
             analogElements.push(adapter);
+            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
           } else {
             // Analog drives digital (INPUT or BIDIRECTIONAL)
             const adapter = makeBridgeInputAdapter(spec, outerNodeId);
@@ -696,6 +738,7 @@ export function compileAnalogCircuit(
             inputAdapters.push(adapter);
             inputPinNetIds.push(innerNetId);
             analogElements.push(adapter);
+            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
           }
         }
 
@@ -759,11 +802,20 @@ export function compileAnalogCircuit(
       continue;
     }
 
-    // Build the full nodeIds array: external pin nodes + internal nodes
-    const nodeIds = [...pinNodeIds];
+    // Build pinNodes map: label -> MNA node ID (in pinLayout order)
+    const pinNodes = new Map<string, number>();
+    for (let pi = 0; pi < pinNodeIds.length; pi++) {
+      const label = pinLabels[pi];
+      if (label !== undefined) {
+        pinNodes.set(label, pinNodeIds[pi]);
+      }
+    }
+
+    // Build internalNodeIds array (factory's private allocation)
+    const internalNodeIds: number[] = [];
     if (meta.internalNodeCount > 0) {
       for (let i = 0; i < meta.internalNodeCount; i++) {
-        nodeIds.push(meta.internalNodeOffset + i);
+        internalNodeIds.push(meta.internalNodeOffset + i);
       }
     }
 
@@ -835,13 +887,38 @@ export function compileAnalogCircuit(
       props.set("_modelParams", resolvedModel.params as unknown as import("../core/properties.js").PropertyValue);
     }
 
-    // Call the analog factory
-    const element = def.analogFactory!(nodeIds, absoluteBranchIdx, props, getTime);
+    // Call the analog factory — returns AnalogElementCore (no pinNodeIds).
+    // Compiler is the SOLE place pinNodeIds is constructed — always pinLayout order.
+    const core = def.analogFactory!(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    const element: AnalogElement = Object.assign(core, {
+      pinNodeIds: pinNodeIds,
+    });
 
     const elementIndex = analogElements.length;
     analogElements.push(element);
     elementToCircuitElement.set(elementIndex, el);
     elementPinVertices.set(elementIndex, pinVertices);
+
+    // Build ResolvedPin[] in pinLayout order and store on compiled circuit.
+    {
+      const resolvedPins: ResolvedPin[] = [];
+      const elPins = el.getPins();
+      for (let pi = 0; pi < def.pinLayout.length; pi++) {
+        const decl = def.pinLayout[pi];
+        const pin = elPins[pi];
+        if (!decl || !pin) continue;
+        resolvedPins.push({
+          label: decl.label,
+          direction: decl.direction,
+          localPosition: pin.position,
+          worldPosition: pinWorldPosition(el, pin),
+          wireVertex: pinVertices[pi] ?? null,
+          nodeId: pinNodeIds[pi],
+          bitWidth: pin.bitWidth,
+        });
+      }
+      elementResolvedPins.set(elementIndex, resolvedPins);
+    }
 
     // Record topology info for validation
     topologyInfo.push({
@@ -1140,6 +1217,7 @@ export function compileAnalogCircuit(
     models,
     elementToCircuitElement,
     elementPinVertices,
+    elementResolvedPins,
     diagnostics,
     bridges,
     timeRef,
@@ -1254,6 +1332,12 @@ function synthesizeDigitalCircuit(
   const compDef = registry.get(el.typeId)!;
   const compEl = compDef.factory(innerProps);
   compEl.position = { x: 200, y: 0 };
+  // Assert rotation=0 — this is the one place where raw position + pin.position
+  // is valid because we control the element's transform. A non-zero rotation
+  // would make compPinWorld = element.position + pin.position incorrect.
+  if (compEl.rotation !== 0) {
+    throw new Error('synthesizeDigitalCircuit: component must have rotation=0');
+  }
   inner.addElement(compEl);
 
   // Determine pin world positions for the newly-placed component.

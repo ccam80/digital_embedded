@@ -12,6 +12,7 @@ import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./element.js";
 import type { BridgeInstance } from "./bridge-instance.js";
+import type { ResolvedPin } from "../core/pin.js";
 
 // ---------------------------------------------------------------------------
 // DeviceModel — placeholder for Phase 2 .MODEL support
@@ -82,6 +83,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  wire graph vertices without re-doing spatial matching. */
   readonly elementPinVertices: Map<number, Array<{ x: number; y: number } | null>>;
 
+  /** Maps element index to resolved pins in pinLayout order.
+   *  Replaces elementPinVertices — carries label, vertex, nodeId in one object.
+   *  During migration, coexists with elementPinVertices. */
+  readonly elementResolvedPins: Map<number, ResolvedPin[]>;
+
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
@@ -108,6 +114,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     models: Map<string, DeviceModel>;
     elementToCircuitElement: Map<number, CircuitElement>;
     elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
+    elementResolvedPins?: Map<number, ResolvedPin[]>;
     diagnostics?: SolverDiagnostic[];
     bridges?: BridgeInstance[];
     timeRef?: { value: number };
@@ -121,6 +128,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.models = params.models;
     this.elementToCircuitElement = params.elementToCircuitElement;
     this.elementPinVertices = params.elementPinVertices ?? new Map();
+    this.elementResolvedPins = params.elementResolvedPins ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.bridges = params.bridges ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };

@@ -36,7 +36,7 @@ const TRIAC_DEFAULTS = {
 function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElement {
   const params = { ...TRIAC_DEFAULTS, ...overrides };
   // nodeMT1=1, nodeMT2=2, nodeG=3
-  return createTriacElement([1, 2, 3], -1, new PropertyBag(Object.entries(params)));
+  return createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(params)));
 }
 
 /**

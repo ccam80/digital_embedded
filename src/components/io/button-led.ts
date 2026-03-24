@@ -241,6 +241,8 @@ export const ButtonLEDDefinition: ComponentDefinition = {
   propertyDefs: BUTTON_LED_PROPERTY_DEFS,
   attributeMap: BUTTON_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText:
     "ButtonLED — push button with integrated LED indicator.\n" +
     "The 'in' pin drives the LED; the 'out' pin is the button output.\n" +

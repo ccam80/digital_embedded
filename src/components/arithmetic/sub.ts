@@ -261,6 +261,8 @@ export const SubDefinition: ComponentDefinition = {
   propertyDefs: SUB_PROPERTY_DEFS,
   attributeMap: SUB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["a", "b", "c_i"],
+  outputSchema: ["s", "c_o"],
   helpText:
     "Sub — N-bit subtractor with borrow in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit borrow in).\n" +

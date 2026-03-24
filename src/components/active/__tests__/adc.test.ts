@@ -51,11 +51,16 @@ const N_EOC  = 4;
 // D0..D7 occupy nodes 5..12
 const N_D0   = 5;
 
-/** Build the nodeIds array in pin-declaration order for an 8-bit ADC. */
-function makeNodeIds(): number[] {
-  const ids = [N_VIN, N_CLK, N_VREF, N_GND, N_EOC];
-  for (let i = 0; i < BITS; i++) ids.push(N_D0 + i);
-  return ids;
+/** Build the pinNodes Map for an 8-bit ADC. */
+function makeNodeIds(): ReadonlyMap<string, number> {
+  const m = new Map<string, number>();
+  m.set("VIN",  N_VIN);
+  m.set("CLK",  N_CLK);
+  m.set("VREF", N_VREF);
+  m.set("GND",  N_GND);
+  m.set("EOC",  N_EOC);
+  for (let i = 0; i < BITS; i++) m.set(`D${i}`, N_D0 + i);
+  return m;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +76,7 @@ function makeVoltages(overrides: Partial<Record<string, number>> = {}): Float64A
   v[N_VREF - 1] = V_REF;  // default VREF = 5V
   for (const [key, value] of Object.entries(overrides)) {
     const nodeId = parseInt(key);
-    if (nodeId > 0 && nodeId <= MATRIX_SIZE) v[nodeId - 1] = value;
+    if (nodeId > 0 && nodeId <= MATRIX_SIZE && value !== undefined) v[nodeId - 1] = value;
   }
   return v;
 }
@@ -93,7 +98,7 @@ function makeAdc(props: Record<string, number | string> = {}): ADCElement {
   for (const [k, v] of Object.entries(props)) merged.set(k, v);
 
   const bag = new PropertyBag(Array.from(merged.entries()));
-  return ADCDefinition.analogFactory!(makeNodeIds(), -1, bag, () => 0) as ADCElement;
+  return ADCDefinition.analogFactory!(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
 }
 
 // ---------------------------------------------------------------------------

@@ -540,9 +540,10 @@ describe("runner_integration", () => {
 
     const circuit = new Circuit({ engineType: "analog" });
 
-    // Voltage source: pos at (10,0), neg at (30,0)
+    // Voltage source: neg at (30,0)/GND, pos at (10,0)
+    // DcVoltageSource pinLayout: neg at index 0, pos at index 1
     const vs = makeAnalogElement("DcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
+      [{ x: 30, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", 5]]),
     );
     // R1: 1kΩ from node_top (10,0) to node_mid (20,0)
@@ -569,9 +570,9 @@ describe("runner_integration", () => {
     circuit.addElement(gnd);
     circuit.addElement(probe);
 
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
-    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 1 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 1 }));
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 1 }));
 
     // Compile via compileAnalogCircuit (the full pipeline under test)
     const compiled = compileAnalogCircuit(circuit, registry);

@@ -71,12 +71,12 @@ function solveDac(
   const nBranches = BITS + 1;  // BITS digital input VSes + 1 VREF VS
   const matrixSize = nNodes + nBranches;
 
-  // Build nodeIds array for DAC: [D0..D7, VREF, OUT, GND]
-  const dacNodeIds: number[] = [];
-  for (let i = 0; i < BITS; i++) dacNodeIds.push(i + 1);  // D0=1, D1=2, ... D7=8
-  dacNodeIds.push(nVRefNode);   // VREF = node 9
-  dacNodeIds.push(nOutNode);    // OUT  = node 10
-  dacNodeIds.push(0);           // GND  = node 0 (MNA ground)
+  // Build pinNodes Map for DAC: D0..D7, VREF, OUT, GND
+  const dacPinNodes = new Map<string, number>();
+  for (let i = 0; i < BITS; i++) dacPinNodes.set(`D${i}`, i + 1);  // D0=1, D1=2, ... D7=8
+  dacPinNodes.set("VREF", nVRefNode);   // VREF = node 9
+  dacPinNodes.set("OUT",  nOutNode);    // OUT  = node 10
+  dacPinNodes.set("GND",  0);           // GND  = node 0 (MNA ground)
 
   const props = new PropertyBag([
     ["bits",  BITS],
@@ -85,7 +85,7 @@ function solveDac(
     ["rOut",  100],
   ]);
 
-  const dacEl = DACDefinition.analogFactory!(dacNodeIds, -1, props, () => 0);
+  const dacEl = DACDefinition.analogFactory!(dacPinNodes, [], -1, props, () => 0);
 
   // Digital input voltage sources: HIGH = vRef, LOW = 0
   const elements: AnalogElement[] = [dacEl];

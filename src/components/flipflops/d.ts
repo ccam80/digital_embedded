@@ -257,6 +257,10 @@ export const DDefinition: ComponentDefinition = {
   propertyDefs: D_FF_PROPERTY_DEFS,
   attributeMap: D_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // sampleFn reads: inBase+0=D, inBase+1=C
+  // executeD reads state slots (no input pins), writes outBase+0=Q, outBase+1=~Q
+  inputSchema: ["D", "C"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +

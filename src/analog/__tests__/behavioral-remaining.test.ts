@@ -104,7 +104,9 @@ describe("Driver", () => {
   it("tri_state_high", () => {
     const props = new PropertyBag();
     // nodeIds are 1-based MNA node IDs: nodeIn=1, nodeSel=2, nodeOut=3
-    const driver = createDriverAnalogElement([1, 2, 3], -1, props);
+    const driver = createDriverAnalogElement(
+      new Map([["in", 1], ["sel", 2], ["out", 3]]), [], -1, props,
+    );
 
     // Circuit node 1 (1-based) = solver row 0 = nodeIn; branch row 3
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);
@@ -136,7 +138,9 @@ describe("Driver", () => {
    */
   it("tri_state_hiz", () => {
     const props = new PropertyBag();
-    const driver = createDriverAnalogElement([1, 2, 3], -1, props);
+    const driver = createDriverAnalogElement(
+      new Map([["in", 1], ["sel", 2], ["out", 3]]), [], -1, props,
+    );
 
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);  // data input HIGH
     const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 → Hi-Z
@@ -181,7 +185,7 @@ describe("LED", () => {
     const props = new PropertyBag();
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const led = LedDefinition.analogFactory!([2, 0], -1, props);
+    const led = LedDefinition.analogFactory!(new Map([["in", 2]]), [], -1, props, () => 0);
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);
@@ -238,7 +242,10 @@ describe("SevenSeg", () => {
     const props = new PropertyBag();
 
     // 8 segment anodes: circuit nodes 1..8 (1-based)
-    const sevenSeg = createSevenSegAnalogElement([1, 2, 3, 4, 5, 6, 7, 8], -1, props);
+    const sevenSeg = createSevenSegAnalogElement(
+      new Map([["a", 1], ["b", 2], ["c", 3], ["d", 4], ["e", 5], ["f", 6], ["g", 7], ["dp", 8]]),
+      [], -1, props,
+    );
 
     // Digit "7": a=on, b=on, c=on, d=off, e=off, f=off, g=off, dp=off
     const segVoltages = [VDD, VDD, VDD, GND, GND, GND, GND, GND];
@@ -319,7 +326,10 @@ describe("Relay", () => {
     props.set("iPull", 20e-3);          // 20mA threshold
 
     // Relay pin nodeIds (1-based circuit node IDs: ground=0)
-    const relay = createRelayAnalogElement([1, 2, 3, 4], -1, props);
+    const relay = createRelayAnalogElement(
+      new Map([["in1", 1], ["in2", 2], ["A1", 3], ["B1", 4]]),
+      [], -1, props,
+    );
 
     // Coil driven by VS: 10V at node 1 (branch row 4), 0V at node 2 (branch row 5)
     const vsCoil1   = makeVoltageSource(1, 0, 4, 10.0);

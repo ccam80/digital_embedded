@@ -9,6 +9,7 @@ import type { CircuitElement } from "@/core/element";
 import type { PropertyDefinition, PropertyValue } from "@/core/properties";
 import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
+import { formatSI, parseSI } from "./si-format.js";
 import type { ComponentDefinition } from "@/core/registry";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
@@ -246,8 +247,11 @@ export class PropertyPanel {
     const outputFields: (keyof PinElectricalSpec)[] = ["rOut", "vOH", "vOL"];
     const inputFields: (keyof PinElectricalSpec)[] = ["rIn", "vIH", "vIL"];
     const fieldLabels: Record<string, string> = {
-      rOut: "Rout (Ω)", rIn: "Rin (Ω)", vOH: "V_OH (V)", vOL: "V_OL (V)",
-      vIH: "V_IH (V)", vIL: "V_IL (V)",
+      rOut: "Rout", rIn: "Rin", vOH: "V_OH", vOL: "V_OL",
+      vIH: "V_IH", vIL: "V_IL",
+    };
+    const fieldUnits: Record<string, string> = {
+      rOut: "Ω", rIn: "Ω", vOH: "V", vOL: "V", vIH: "V", vIL: "V",
     };
 
     for (const pin of pins) {
@@ -267,32 +271,50 @@ export class PropertyPanel {
       for (const field of fields) {
         const overrideVal = stored[pinLabel]?.[field];
         const resolvedVal = resolved[field as keyof typeof resolved] as number;
+        const unit = fieldUnits[field] ?? "";
 
         const row = document.createElement("div");
-        row.style.cssText = "display:flex;align-items:center;gap:6px;margin:2px 0;";
+        row.style.cssText = "display:flex;align-items:center;gap:4px;margin:2px 0;";
 
         const label = document.createElement("span");
-        label.style.cssText = "min-width:70px;opacity:0.7;";
+        label.style.cssText = "min-width:50px;opacity:0.7;";
         label.textContent = fieldLabels[field] ?? field;
 
         const input = document.createElement("input");
-        input.type = "number";
-        input.step = "any";
-        input.placeholder = String(resolvedVal);
-        input.value = overrideVal !== undefined ? String(overrideVal) : "";
-        input.style.cssText = "width:80px;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
+        input.type = "text";
+        input.placeholder = unit ? formatSI(resolvedVal, "", 3).trim() : String(resolvedVal);
+        input.value = overrideVal !== undefined
+          ? (unit ? formatSI(overrideVal, "", 3).trim() : String(overrideVal))
+          : "";
+        input.style.cssText = "width:70px;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
 
-        input.addEventListener("change", () => {
+        const unitSpan = document.createElement("span");
+        unitSpan.style.cssText = "opacity:0.5;font-size:11px;min-width:16px;";
+        unitSpan.textContent = unit;
+
+        input.addEventListener("focus", () => input.select());
+
+        const commitOverride = () => {
           const current: Record<string, PinElectricalSpec> = bag.has("_pinElectricalOverrides")
             ? JSON.parse(bag.get("_pinElectricalOverrides") as string)
             : {};
           if (!current[pinLabel]) current[pinLabel] = {};
-          const val = input.value.trim();
-          if (val === "") {
+          const raw = input.value.trim();
+          if (raw === "") {
             delete current[pinLabel]![field];
             if (Object.keys(current[pinLabel]!).length === 0) delete current[pinLabel];
+            input.value = "";
           } else {
-            current[pinLabel]![field] = parseFloat(val);
+            const parsed = unit ? parseSI(raw) : parseFloat(raw);
+            if (isNaN(parsed)) {
+              // Revert on bad input
+              input.value = overrideVal !== undefined
+                ? (unit ? formatSI(overrideVal, "", 3).trim() : String(overrideVal))
+                : "";
+              return;
+            }
+            current[pinLabel]![field] = parsed;
+            input.value = unit ? formatSI(parsed, "", 3).trim() : String(parsed);
           }
           const oldValue = bag.has("_pinElectricalOverrides") ? bag.get("_pinElectricalOverrides") : undefined;
           const newValue = Object.keys(current).length > 0 ? JSON.stringify(current) : undefined;
@@ -304,10 +326,16 @@ export class PropertyPanel {
           for (const cb of this._changeCallbacks) {
             cb("_pinElectricalOverrides", oldValue ?? "{}", newValue ?? "{}");
           }
+        };
+
+        input.addEventListener("blur", commitOverride);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); commitOverride(); input.blur(); }
         });
 
         row.appendChild(label);
         row.appendChild(input);
+        row.appendChild(unitSpan);
         pinDiv.appendChild(row);
       }
 

@@ -36,7 +36,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { DigitalInputPinModel } from "../../analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -197,17 +197,18 @@ function makeInputPinSpec(vRef: number): ResolvedPinElectrical {
 /**
  * Create the MNA element for an N-bit DAC.
  *
- * Node assignment in nodeIds array (all 1-based, 0 = ground):
- *   nodeIds[0..N-1] → digital input pins D0..D(N-1)
- *   nodeIds[N]      → VREF node
- *   nodeIds[N+1]    → OUT node
- *   nodeIds[N+2]    → GND node (may be 0 if tied to MNA ground)
+ * Pin nodes (from pinLayout order):
+ *   pinNodes.get("D0").."D(N-1)" → digital input pins
+ *   pinNodes.get("VREF")         → VREF node (1-based)
+ *   pinNodes.get("OUT")          → OUT node (1-based)
+ *   pinNodes.get("GND")          → GND node (may be 0 if tied to MNA ground)
  */
 function createDACElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const bits   = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const vRef   = props.getOrDefault<number>("vRef", 5.0);
   const mode   = props.getOrDefault<string>("mode", "unipolar");
@@ -216,17 +217,22 @@ function createDACElement(
 
   const maxCode = Math.pow(2, bits);
 
-  // Node indices from the nodeIds array
-  const nVref = nodeIds[bits];       // VREF node (1-based)
-  const nOut  = nodeIds[bits + 1];   // OUT node (1-based)
-  // GND node at nodeIds[bits+2] — not directly stamped (MNA ground handled implicitly)
+  // Node IDs from pinNodes map
+  const nVref = pinNodes.get("VREF") ?? 0; // VREF node (1-based)
+  const nOut  = pinNodes.get("OUT")  ?? 0; // OUT node (1-based)
+  // GND node — not directly stamped (MNA ground handled implicitly)
 
   // DigitalInputPinModel instances — one per bit
   const inputSpec = makeInputPinSpec(vRef);
   const inputModels: DigitalInputPinModel[] = [];
+  // Collect digital bit node IDs in order D0..D(N-1)
+  const nDigitalBits: number[] = [];
+  for (let i = 0; i < bits; i++) {
+    nDigitalBits.push(pinNodes.get(`D${i}`) ?? 0);
+  }
   for (let i = 0; i < bits; i++) {
     const model = new DigitalInputPinModel(inputSpec);
-    const nD = nodeIds[i];
+    const nD = nDigitalBits[i];
     if (nD > 0) {
       model.init(nD, 0);
     }
@@ -246,7 +252,7 @@ function createDACElement(
     // Build digital code from input pin threshold detection
     let code = 0;
     for (let i = 0; i < bits; i++) {
-      const nD = nodeIds[i];
+      const nD = nDigitalBits[i];
       const vD = readNode(voltages, nD);
       const logic = inputModels[i].readLogicLevel(vD);
       // Treat undefined (indeterminate) as LOW for DAC conversion
@@ -265,7 +271,6 @@ function createDACElement(
   }
 
   return {
-    nodeIndices: nodeIds,
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -277,7 +282,7 @@ function createDACElement(
       }
       // Stamp input loading for each digital input pin
       for (let i = 0; i < bits; i++) {
-        const nD = nodeIds[i];
+        const nD = nDigitalBits[i];
         if (nD > 0) {
           inputModels[i].stamp(solver);
         }
@@ -295,6 +300,32 @@ function createDACElement(
       _vOut = computeOutputVoltage(voltages);
     },
 
+    getPinCurrents(voltages: Float64Array): number[] {
+      const currents: number[] = [];
+
+      // D0..D(N-1): DigitalInputPinModel — loading conductance 1/rIn to ground
+      // I = V_pin / rIn  (positive = into element)
+      const rIn = inputSpec.rIn;
+      for (let i = 0; i < bits; i++) {
+        const v = readNode(voltages, nDigitalBits[i]);
+        currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
+      }
+
+      // VREF: passive — no conductance stamped, behavioral approximation → 0
+      currents.push(0);
+
+      // OUT: Norton equivalent — I = (V_out_node - V_target) / rOut
+      // Positive = current flowing into element (element sinking)
+      const vOut = readNode(voltages, nOut);
+      currents.push(nOut > 0 ? (vOut - _vOut) * G_out : 0);
+
+      // GND: passive — no conductance stamped, behavioral approximation → 0
+      currents.push(0);
+
+      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
+      return currents;
+    },
+
     stampCompanion(
       solver: SparseSolver,
       dt: number,
@@ -303,7 +334,7 @@ function createDACElement(
     ): void {
       // Stamp C_in companion model for each digital input
       for (let i = 0; i < bits; i++) {
-        const nD = nodeIds[i];
+        const nD = nDigitalBits[i];
         if (nD > 0) {
           const vD = readNode(voltages, nD);
           inputModels[i].stampCompanion(solver, dt, method);
@@ -402,10 +433,11 @@ export const DACDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createDACElement(nodeIds, branchIdx, props);
+  ): AnalogElementCore {
+    return createDACElement(pinNodes, internalNodeIds, branchIdx, props);
   },
 };

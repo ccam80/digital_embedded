@@ -43,7 +43,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
   }
 
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -69,7 +69,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
  */
 function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
@@ -94,7 +94,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
  */
 function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,

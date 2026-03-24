@@ -24,6 +24,7 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
+import { formatSI } from "../../editor/si-format.js";
 import type { RenderContext, Rect, TextAnchor } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
@@ -37,7 +38,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 
 // ---------------------------------------------------------------------------
 // VariableRailElement — CircuitElement implementation
@@ -80,7 +81,7 @@ export class VariableRailElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setLineWidth(1);
     const voltage = this.props.has("voltage") ? this.props.get<number>("voltage") : 5;
-    const label = `+${(voltage ?? 5).toFixed(1)}V`;
+    const label = formatSI(voltage ?? 5, "V");
     ctx.drawText(label, 4, 0, { horizontal: "left", vertical: "middle" } as TextAnchor);
 
     ctx.restore();
@@ -115,6 +116,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "voltage",
     type: PropertyType.INT,
     label: "Voltage (V)",
+    unit: "V",
     defaultValue: 5,
     description: "Output voltage in volts",
   },
@@ -122,6 +124,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "minVoltage",
     type: PropertyType.INT,
     label: "Min Voltage (V)",
+    unit: "V",
     defaultValue: 0,
     description: "Minimum slider voltage",
   },
@@ -129,6 +132,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "maxVoltage",
     type: PropertyType.INT,
     label: "Max Voltage (V)",
+    unit: "V",
     defaultValue: 30,
     description: "Maximum slider voltage",
   },
@@ -136,6 +140,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "resistance",
     type: PropertyType.INT,
     label: "Internal Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 0.01,
     description: "Internal series resistance (models source impedance)",
   },
@@ -183,7 +188,6 @@ export function makeVariableRailElement(
   const G = resistance > 0 ? 1 / resistance : 1e9;
 
   const element: VariableRailAnalogElement = {
-    nodeIndices: [nodePos, nodeNeg, nodeInt],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -196,6 +200,11 @@ export function makeVariableRailElement(
 
     setSourceScale(_factor: number): void {
       // Source stepping not needed for variable rail (it's meant for interactive use).
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Branch current = current delivered by the ideal voltage source (into pos terminal).
+      return [voltages[branchIdx]];
     },
 
     stamp(solver: SparseSolver): void {
@@ -244,17 +253,18 @@ export const VariableRailDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const voltage = props.getOrDefault<number>("voltage", 5);
     const resistance = props.getOrDefault<number>("resistance", 0.01);
-    // nodeIds[0] = positive terminal (single pin); neg terminal is ground (node 0)
-    // nodeIds[1] = internal node (allocated by compiler for internal resistance), if any
-    const nodePos = nodeIds[0];
+    // pos pin = positive terminal; neg terminal is ground (node 0)
+    // internalNodeIds[0] = internal node (allocated by compiler for internal resistance)
+    const nodePos = pinNodes.get("pos")!;
     const nodeNeg = 0;
-    const nodeInt = nodeIds[1] ?? nodeIds[0];
+    const nodeInt = internalNodeIds[0] ?? nodePos;
     return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
   },
 };

@@ -93,7 +93,7 @@ function makeNJfetAt(
   const nodeD = 2;
   const nodeS = sourceNode;
   const propsObj = { _modelParams: params };
-  const element = createNJfetElement([nodeG, nodeS, nodeD], -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
+  const element = createNJfetElement(new Map([["G", nodeG], ["S", nodeS], ["D", nodeD]]), -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
 
   // Build voltage vector: node1=G=vgs, node2=D=vds (with S at 0)
   const maxNode = Math.max(nodeG, nodeD, nodeS);
@@ -115,7 +115,7 @@ function makeNJfetAt(
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -140,7 +140,7 @@ describe("NJFET", () => {
     // With nodeG=1, nodeD=2, nodeS=0 (ground)
     // G=voltage[0]=-3V, D=voltage[1]=5V
     const propsObj = { _modelParams: NJFET_PARAMS };
-    const element = createNJfetElement([1, 0, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj as unknown as PropertyBag);
 
     const voltages = new Float64Array(2);
     voltages[0] = -3; // V(G) = -3V → Vgs = -3V
@@ -168,7 +168,7 @@ describe("NJFET", () => {
     //      = 1e-4/2 * 4 = 0.2mA
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = { _modelParams: params };
-    const element = createNJfetElement([1, 0, 2], -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(G) = 0V → Vgs = 0
@@ -197,7 +197,7 @@ describe("NJFET", () => {
     // I_DS = β*(Vgst*Vds - Vds²/2) = 1e-4*(2*0.5 - 0.25/2) = 1e-4*(1-0.125) = 0.0875mA
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = { _modelParams: params };
-    const element = createNJfetElement([1, 0, 2], -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj as unknown as PropertyBag) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0;   // Vgs = 0
@@ -266,7 +266,7 @@ describe("NJFET", () => {
 
     // Create element with forward-biased gate
     const propsObj = { _modelParams: NJFET_PARAMS };
-    const element = createNJfetElement([1, 0, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj as unknown as PropertyBag);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.7; // V(G) = 0.7V → Vgs = 0.7V
@@ -323,7 +323,7 @@ describe("PJFET", () => {
     // Vsg = 5 - 2 = 3V > |VTO| = 2V → device on
     // Vsd = 5 - 0 = 5V → saturation (Vsd > Vsg - Vp = 3 - 2 = 1V)
     const propsObj = { _modelParams: PJFET_PARAMS };
-    const element = createPJfetElement([1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), -1, propsObj as unknown as PropertyBag);
 
     // node1=G=2V, node2=D=0V, node3=S=5V
     const voltages = new Float64Array(3);
@@ -368,7 +368,7 @@ describe("NR", () => {
 
     // createNJfetElement pin order: [G, S, D]
     const propsObj = { _modelParams: NJFET_PARAMS };
-    const jfet = createNJfetElement([3, 0, 1], -1, propsObj as unknown as PropertyBag);
+    const jfet = createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), -1, propsObj as unknown as PropertyBag);
     const rd = makeResistorElement(2, 1, 10000); // Rd=10kΩ from Vdd to drain
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0); // Vdd=10V
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0); // Vg=0V

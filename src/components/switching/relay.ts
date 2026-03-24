@@ -302,6 +302,9 @@ export const RelayDefinition: ComponentDefinition = {
   propertyDefs: RELAY_PROPERTY_DEFS,
   attributeMap: RELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  // Schema for default poles=1; direction-filter order matches for all pole counts.
+  inputSchema: ["in1", "in2"],
+  outputSchema: ["A1", "B1"],
   helpText: "Relay (SPST) — coil-controlled single-pole single-throw contact switch.",
   stateSlotCount: 1,
   defaultDelay: 0,

@@ -76,7 +76,17 @@ function make555(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return Timer555Definition.analogFactory!(
-    [nodes.vcc, nodes.gnd, nodes.trig, nodes.thr, nodes.ctrl, nodes.rst, nodes.dis, nodes.out],
+    new Map([
+      ["DIS",  nodes.dis],
+      ["TRIG", nodes.trig],
+      ["THR",  nodes.thr],
+      ["VCC",  nodes.vcc],
+      ["CTRL", nodes.ctrl],
+      ["OUT",  nodes.out],
+      ["RST",  nodes.rst],
+      ["GND",  nodes.gnd],
+    ]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,
@@ -149,7 +159,7 @@ function buildHandCircuit(opts: {
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -677,7 +687,7 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
   // Mutable trigger voltage source
   let _trigVoltage = VCC; // starts HIGH (idle)
   const vsTrig: AnalogElement = {
-    nodeIndices: [nTrig, 0],
+    pinNodeIds: [nTrig, 0],
     branchIndex: brTrig,
     isNonlinear: false,
     isReactive: false,

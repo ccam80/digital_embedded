@@ -296,6 +296,8 @@ export const SevenSegDefinition: ComponentDefinition = {
   propertyDefs: SEVEN_SEG_PROPERTY_DEFS,
   attributeMap: SEVEN_SEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["a", "b", "c", "d", "e", "f", "g", "dp"],
+  outputSchema: [],
   helpText:
     "SevenSeg — direct-drive 7-segment display.\n" +
     "Inputs a–g control each segment independently. dp controls the decimal point.\n" +

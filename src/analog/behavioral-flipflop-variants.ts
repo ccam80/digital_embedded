@@ -17,7 +17,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../core/properties.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
@@ -58,7 +58,7 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  *   J=0, K=1 → reset (Q=0)
  *   J=1, K=1 → toggle (Q=~Q)
  */
-export class BehavioralJKFlipflopElement implements AnalogElement {
+export class BehavioralJKFlipflopElement implements AnalogElementCore {
   private readonly _jPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _kPin: DigitalInputPinModel;
@@ -73,7 +73,7 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -95,14 +95,6 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
     this._qBarPin = qBarPin;
     this._vIH = vIH;
     this._vIL = vIL;
-
-    this.nodeIndices = [
-      jPin.nodeId,
-      clockPin.nodeId,
-      kPin.nodeId,
-      qPin.nodeId,
-      qBarPin.nodeId,
-    ];
   }
 
   stamp(solver: SparseSolver): void {
@@ -170,6 +162,22 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: J, C, K, Q, ~Q
+    const vJ = readMnaVoltage(this._jPin.nodeId, voltages);
+    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const vK = readMnaVoltage(this._kPin.nodeId, voltages);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    return [
+      vJ / this._jPin.rIn,
+      vC / this._clockPin.rIn,
+      vK / this._kPin.rIn,
+      (vQ - this._qPin.currentVoltage) / this._qPin.rOut,
+      (vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut,
+    ];
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -188,7 +196,7 @@ export class BehavioralJKFlipflopElement implements AnalogElement {
  *   S=0, R=1 → reset (Q=0)
  *   S=1, R=1 → forbidden: hold previous value, emit rs-flipflop-both-set diagnostic
  */
-export class BehavioralRSFlipflopElement implements AnalogElement {
+export class BehavioralRSFlipflopElement implements AnalogElementCore {
   private readonly _sPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
@@ -206,7 +214,7 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
   /** Collected diagnostics — read by tests via getDiagnostics(). */
   private _diagnostics: SolverDiagnostic[] = [];
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -228,14 +236,6 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
     this._qBarPin = qBarPin;
     this._vIH = vIH;
     this._vIL = vIL;
-
-    this.nodeIndices = [
-      sPin.nodeId,
-      clockPin.nodeId,
-      rPin.nodeId,
-      qPin.nodeId,
-      qBarPin.nodeId,
-    ];
   }
 
   getDiagnostics(): SolverDiagnostic[] {
@@ -320,6 +320,22 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: S, C, R, Q, ~Q
+    const vS = readMnaVoltage(this._sPin.nodeId, voltages);
+    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const vR = readMnaVoltage(this._rPin.nodeId, voltages);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    return [
+      vS / this._sPin.rIn,
+      vC / this._clockPin.rIn,
+      vR / this._rPin.rIn,
+      (vQ - this._qPin.currentVoltage) / this._qPin.rOut,
+      (vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut,
+    ];
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -339,7 +355,7 @@ export class BehavioralRSFlipflopElement implements AnalogElement {
  * Without T enable input (withEnable=false):
  *   Toggle Q on every rising clock edge.
  */
-export class BehavioralTFlipflopElement implements AnalogElement {
+export class BehavioralTFlipflopElement implements AnalogElementCore {
   private readonly _tPin: DigitalInputPinModel | null;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -353,7 +369,7 @@ export class BehavioralTFlipflopElement implements AnalogElement {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -374,10 +390,6 @@ export class BehavioralTFlipflopElement implements AnalogElement {
     this._vIH = vIH;
     this._vIL = vIL;
 
-    const indices: number[] = [];
-    if (tPin !== null) indices.push(tPin.nodeId);
-    indices.push(clockPin.nodeId, qPin.nodeId, qBarPin.nodeId);
-    this.nodeIndices = indices;
   }
 
   stamp(solver: SparseSolver): void {
@@ -439,6 +451,20 @@ export class BehavioralTFlipflopElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: T (optional), C, Q, ~Q
+    const result: number[] = [];
+    if (this._tPin !== null) {
+      result.push(readMnaVoltage(this._tPin.nodeId, voltages) / this._tPin.rIn);
+    }
+    result.push(readMnaVoltage(this._clockPin.nodeId, voltages) / this._clockPin.rIn);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    result.push((vQ - this._qPin.currentVoltage) / this._qPin.rOut);
+    result.push((vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut);
+    return result;
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -455,7 +481,7 @@ export class BehavioralTFlipflopElement implements AnalogElement {
  * Async Set (active-high) overrides clock, forces Q=1.
  * Async Clr (active-high) overrides clock, forces Q=0.
  */
-export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
+export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
   private readonly _setPin: DigitalInputPinModel;
   private readonly _jPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
@@ -472,7 +498,7 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -499,15 +525,6 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
     this._vIH = vIH;
     this._vIL = vIL;
 
-    this.nodeIndices = [
-      setPin.nodeId,
-      jPin.nodeId,
-      clockPin.nodeId,
-      kPin.nodeId,
-      clrPin.nodeId,
-      qPin.nodeId,
-      qBarPin.nodeId,
-    ];
   }
 
   stamp(solver: SparseSolver): void {
@@ -591,6 +608,26 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: Set, J, C, K, Clr, Q, ~Q
+    const vSet = readMnaVoltage(this._setPin.nodeId, voltages);
+    const vJ = readMnaVoltage(this._jPin.nodeId, voltages);
+    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const vK = readMnaVoltage(this._kPin.nodeId, voltages);
+    const vClr = readMnaVoltage(this._clrPin.nodeId, voltages);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    return [
+      vSet / this._setPin.rIn,
+      vJ / this._jPin.rIn,
+      vC / this._clockPin.rIn,
+      vK / this._kPin.rIn,
+      vClr / this._clrPin.rIn,
+      (vQ - this._qPin.currentVoltage) / this._qPin.rOut,
+      (vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut,
+    ];
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -607,7 +644,7 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElement {
  * Responds immediately to S/R input levels on each accepted timestep.
  * S=1, R=1 → forbidden: hold previous, emit diagnostic
  */
-export class BehavioralRSAsyncLatchElement implements AnalogElement {
+export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
   private readonly _sPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -622,7 +659,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
 
   private _diagnostics: SolverDiagnostic[] = [];
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -643,12 +680,6 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
     this._vIH = vIH;
     this._vIL = vIL;
 
-    this.nodeIndices = [
-      sPin.nodeId,
-      rPin.nodeId,
-      qPin.nodeId,
-      qBarPin.nodeId,
-    ];
   }
 
   getDiagnostics(): SolverDiagnostic[] {
@@ -720,6 +751,20 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: S, R, Q, ~Q
+    const vS = readMnaVoltage(this._sPin.nodeId, voltages);
+    const vR = readMnaVoltage(this._rPin.nodeId, voltages);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    return [
+      vS / this._sPin.rIn,
+      vR / this._rPin.rIn,
+      (vQ - this._qPin.currentVoltage) / this._qPin.rOut,
+      (vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut,
+    ];
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -737,7 +782,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElement {
  * Async Set (active-high) forces Q=1 immediately.
  * Async Clr (active-high) forces Q=0 immediately.
  */
-export class BehavioralDAsyncFlipflopElement implements AnalogElement {
+export class BehavioralDAsyncFlipflopElement implements AnalogElementCore {
   private readonly _setPin: DigitalInputPinModel;
   private readonly _dPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
@@ -753,7 +798,7 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -778,14 +823,6 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
     this._vIH = vIH;
     this._vIL = vIL;
 
-    this.nodeIndices = [
-      setPin.nodeId,
-      dPin.nodeId,
-      clockPin.nodeId,
-      clrPin.nodeId,
-      qPin.nodeId,
-      qBarPin.nodeId,
-    ];
   }
 
   stamp(solver: SparseSolver): void {
@@ -857,6 +894,24 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElement {
     this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    // pinLayout order: Set, D, C, Clr, Q, ~Q
+    const vSet = readMnaVoltage(this._setPin.nodeId, voltages);
+    const vD = readMnaVoltage(this._dPin.nodeId, voltages);
+    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const vClr = readMnaVoltage(this._clrPin.nodeId, voltages);
+    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    return [
+      vSet / this._setPin.rIn,
+      vD / this._dPin.rIn,
+      vC / this._clockPin.rIn,
+      vClr / this._clrPin.rIn,
+      (vQ - this._qPin.currentVoltage) / this._qPin.rOut,
+      (vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut,
+    ];
+  }
+
   updateState(_dt: number, _voltages: Float64Array): void {
     // intentionally empty
   }
@@ -895,7 +950,7 @@ function makeOutputPin(spec: ResolvedPinElectrical, nodeId: number): DigitalOutp
  *   nodeIds[0]=J, nodeIds[1]=C, nodeIds[2]=K, nodeIds[3]=Q, nodeIds[4]=~Q
  */
 export function makeJKFlipflopAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const jSpec = pinSpecs?.["J"] ?? FALLBACK_SPEC;
     const cSpec = pinSpecs?.["C"] ?? FALLBACK_SPEC;
@@ -903,11 +958,11 @@ export function makeJKFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const jPin = makeInputPin(jSpec, nodeIds[0]);
-    const clockPin = makeInputPin(cSpec, nodeIds[1]);
-    const kPin = makeInputPin(kSpec, nodeIds[2]);
-    const qPin = makeOutputPin(qSpec, nodeIds[3]);
-    const qBarPin = makeOutputPin(qBarSpec, nodeIds[4]);
+    const jPin = makeInputPin(jSpec, pinNodes.get("J") ?? 0);
+    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+    const kPin = makeInputPin(kSpec, pinNodes.get("K") ?? 0);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
     return new BehavioralJKFlipflopElement(
       jPin, clockPin, kPin, qPin, qBarPin,
@@ -927,7 +982,7 @@ export function makeJKFlipflopAnalogFactory(): AnalogElementFactory {
  *   nodeIds[0]=S, nodeIds[1]=C, nodeIds[2]=R, nodeIds[3]=Q, nodeIds[4]=~Q
  */
 export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const sSpec = pinSpecs?.["S"] ?? FALLBACK_SPEC;
     const cSpec = pinSpecs?.["C"] ?? FALLBACK_SPEC;
@@ -935,11 +990,11 @@ export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const sPin = makeInputPin(sSpec, nodeIds[0]);
-    const clockPin = makeInputPin(cSpec, nodeIds[1]);
-    const rPin = makeInputPin(rSpec, nodeIds[2]);
-    const qPin = makeOutputPin(qSpec, nodeIds[3]);
-    const qBarPin = makeOutputPin(qBarSpec, nodeIds[4]);
+    const sPin = makeInputPin(sSpec, pinNodes.get("S") ?? 0);
+    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+    const rPin = makeInputPin(rSpec, pinNodes.get("R") ?? 0);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
     return new BehavioralRSFlipflopElement(
       sPin, clockPin, rPin, qPin, qBarPin,
@@ -962,7 +1017,7 @@ export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
  *   nodeIds[0]=C, nodeIds[1]=Q, nodeIds[2]=~Q
  */
 export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const withEnable = props.has("withEnable")
       ? (props.get("withEnable") as boolean)
@@ -974,10 +1029,10 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
       const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
       const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-      const tPin = makeInputPin(tSpec, nodeIds[0]);
-      const clockPin = makeInputPin(cSpec, nodeIds[1]);
-      const qPin = makeOutputPin(qSpec, nodeIds[2]);
-      const qBarPin = makeOutputPin(qBarSpec, nodeIds[3]);
+      const tPin = makeInputPin(tSpec, pinNodes.get("T") ?? 0);
+      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
       return new BehavioralTFlipflopElement(
         tPin, clockPin, qPin, qBarPin,
@@ -988,9 +1043,9 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
       const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
       const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-      const clockPin = makeInputPin(cSpec, nodeIds[0]);
-      const qPin = makeOutputPin(qSpec, nodeIds[1]);
-      const qBarPin = makeOutputPin(qBarSpec, nodeIds[2]);
+      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
       return new BehavioralTFlipflopElement(
         null, clockPin, qPin, qBarPin,
@@ -1012,7 +1067,7 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
  *   nodeIds[4]=Clr, nodeIds[5]=Q, nodeIds[6]=~Q
  */
 export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const setSpec = pinSpecs?.["Set"] ?? FALLBACK_SPEC;
     const jSpec = pinSpecs?.["J"] ?? FALLBACK_SPEC;
@@ -1022,13 +1077,13 @@ export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const setPin = makeInputPin(setSpec, nodeIds[0]);
-    const jPin = makeInputPin(jSpec, nodeIds[1]);
-    const clockPin = makeInputPin(cSpec, nodeIds[2]);
-    const kPin = makeInputPin(kSpec, nodeIds[3]);
-    const clrPin = makeInputPin(clrSpec, nodeIds[4]);
-    const qPin = makeOutputPin(qSpec, nodeIds[5]);
-    const qBarPin = makeOutputPin(qBarSpec, nodeIds[6]);
+    const setPin = makeInputPin(setSpec, pinNodes.get("Set") ?? 0);
+    const jPin = makeInputPin(jSpec, pinNodes.get("J") ?? 0);
+    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+    const kPin = makeInputPin(kSpec, pinNodes.get("K") ?? 0);
+    const clrPin = makeInputPin(clrSpec, pinNodes.get("Clr") ?? 0);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
     return new BehavioralJKAsyncFlipflopElement(
       setPin, jPin, clockPin, kPin, clrPin, qPin, qBarPin,
@@ -1048,17 +1103,17 @@ export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
  *   nodeIds[0]=S, nodeIds[1]=R, nodeIds[2]=Q, nodeIds[3]=~Q
  */
 export function makeRSAsyncLatchAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const sSpec = pinSpecs?.["S"] ?? FALLBACK_SPEC;
     const rSpec = pinSpecs?.["R"] ?? FALLBACK_SPEC;
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const sPin = makeInputPin(sSpec, nodeIds[0]);
-    const rPin = makeInputPin(rSpec, nodeIds[1]);
-    const qPin = makeOutputPin(qSpec, nodeIds[2]);
-    const qBarPin = makeOutputPin(qBarSpec, nodeIds[3]);
+    const sPin = makeInputPin(sSpec, pinNodes.get("S") ?? 0);
+    const rPin = makeInputPin(rSpec, pinNodes.get("R") ?? 0);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
     return new BehavioralRSAsyncLatchElement(
       sPin, rPin, qPin, qBarPin,
@@ -1079,7 +1134,7 @@ export function makeRSAsyncLatchAnalogFactory(): AnalogElementFactory {
  *   nodeIds[4]=Q, nodeIds[5]=~Q
  */
 export function makeDAsyncFlipflopAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const setSpec = pinSpecs?.["Set"] ?? FALLBACK_SPEC;
     const dSpec = pinSpecs?.["D"] ?? FALLBACK_SPEC;
@@ -1088,12 +1143,12 @@ export function makeDAsyncFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const setPin = makeInputPin(setSpec, nodeIds[0]);
-    const dPin = makeInputPin(dSpec, nodeIds[1]);
-    const clockPin = makeInputPin(cSpec, nodeIds[2]);
-    const clrPin = makeInputPin(clrSpec, nodeIds[3]);
-    const qPin = makeOutputPin(qSpec, nodeIds[4]);
-    const qBarPin = makeOutputPin(qBarSpec, nodeIds[5]);
+    const setPin = makeInputPin(setSpec, pinNodes.get("Set") ?? 0);
+    const dPin = makeInputPin(dSpec, pinNodes.get("D") ?? 0);
+    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
+    const clrPin = makeInputPin(clrSpec, pinNodes.get("Clr") ?? 0);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
     return new BehavioralDAsyncFlipflopElement(
       setPin, dPin, clockPin, clrPin, qPin, qBarPin,

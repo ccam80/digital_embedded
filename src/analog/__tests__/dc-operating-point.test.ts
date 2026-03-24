@@ -47,7 +47,7 @@ function makeScalableVoltageSource(
 ): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -75,7 +75,7 @@ function makeScalableCurrentSource(
 ): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,

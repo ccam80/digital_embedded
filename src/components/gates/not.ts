@@ -236,6 +236,8 @@ export const NotDefinition: ComponentDefinition = {
   propertyDefs: NOT_PROPERTY_DEFS,
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText:
     "Not gate — performs bitwise NOT (inversion) of the input.\n" +
     "Single input, configurable bit width (1–32).\n" +

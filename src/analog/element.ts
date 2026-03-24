@@ -45,20 +45,44 @@ export interface ComplexSparseSolver {
  *
  * Two-terminal passive elements (resistors, capacitors, inductors) connect
  * two nodes. Three-terminal (BJT base/emitter/collector) and four-terminal
- * (MOSFET gate/drain/source/bulk) elements carry more entries in nodeIndices.
+ * (MOSFET gate/drain/source/bulk) elements carry more entries in pinNodeIds.
  *
  * Elements that introduce extra MNA rows (voltage sources, inductors as
  * branch currents) set `branchIndex` to their assigned row offset above the
  * node block. All other elements set `branchIndex` to -1.
  */
+/**
+ * The return type of analogFactory — everything except pinNodeIds and allNodeIds.
+ * Factories return this; the compiler adds both fields from resolved pins and
+ * internal node IDs. This ensures both fields are set in exactly one place (the compiler).
+ */
+export type AnalogElementCore = Omit<AnalogElement, 'pinNodeIds' | 'allNodeIds'>;
+
 export interface AnalogElement {
   /**
-   * Node IDs this element connects to, in pin order.
+   * Pin node IDs in pinLayout order.
    *
+   * For elements created via the analog compiler, this array is in the same
+   * order as the component's pinLayout declaration. Index 0 corresponds to
+   * pinLayout[0], index 1 to pinLayout[1], etc.
+   *
+   * Set by the compiler from resolved pins — never by factory functions.
    * Length 2 for two-terminal elements, 3 for BJTs, 4 for MOSFETs.
    * Each entry is a non-negative integer; 0 is ground.
    */
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
+
+  /**
+   * All node IDs for this element: [...pinNodeIds, ...internalNodeIds].
+   *
+   * Pin nodes appear first in pinLayout order, followed by any internal
+   * nodes allocated by the factory (e.g. the intermediate node in a BJT
+   * Darlington expansion). Used by topology validators that must account
+   * for all nodes an element participates in.
+   *
+   * Set by the compiler — never by factory functions.
+   */
+  readonly allNodeIds: readonly number[];
 
   /**
    * Assigned branch-current row index for elements that introduce extra MNA
@@ -212,6 +236,23 @@ export interface AnalogElement {
    * @returns Current in amperes (positive = conventional flow from node[0] to node[1])
    */
   getCurrent?(voltages: Float64Array): number;
+
+  /**
+   * Compute per-pin currents for multi-terminal elements.
+   *
+   * Returns an array of currents in pinLayout order (same as pinNodeIds),
+   * one per visible pin. Positive means current flowing **into** the element.
+   * The array must satisfy KCL: the sum of all entries is zero.
+   *
+   * Two-terminal elements do not need to implement this — the engine falls
+   * back to `getCurrent()` which gives the single branch current. This method
+   * is primarily for 3+ terminal devices (FETs, BJTs, behavioral gates) where
+   * the per-pin current split cannot be derived from a single scalar.
+   *
+   * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
+   * @returns Array of per-pin currents in amperes, in pinLayout order, length === pinNodeIds.length
+   */
+  getPinCurrents?(voltages: Float64Array): number[];
 
   /**
    * Optional display label for diagnostic attribution.

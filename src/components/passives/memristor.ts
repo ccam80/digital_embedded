@@ -20,8 +20,8 @@
  * The engine calls updateState() each accepted timestep to integrate w.
  *
  * MNA topology:
- *   nodeIndices[0] = node_A  (positive terminal)
- *   nodeIndices[1] = node_B  (negative terminal)
+ *   pinNodeIds[0] = node_A  (positive terminal)
+ *   pinNodeIds[1] = node_B  (negative terminal)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -37,7 +37,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -60,8 +60,8 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // MemristorElement — AnalogElement implementation
 // ---------------------------------------------------------------------------
 
-export class MemristorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+export class MemristorElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -76,7 +76,6 @@ export class MemristorElement implements AnalogElement {
   private _w: number;
 
   constructor(
-    nodeIndices: number[],
     rOn: number,
     rOff: number,
     initialState: number,
@@ -84,7 +83,6 @@ export class MemristorElement implements AnalogElement {
     deviceLength: number,
     windowOrder: number,
   ) {
-    this.nodeIndices = nodeIndices;
     this.rOn = rOn;
     this.rOff = rOff;
     this._w = Math.max(0, Math.min(1, initialState));
@@ -119,8 +117,8 @@ export class MemristorElement implements AnalogElement {
   }
 
   stampNonlinear(solver: SparseSolver): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const G = this.conductance();
 
     stampG(solver, nA, nA, G);
@@ -149,9 +147,18 @@ export class MemristorElement implements AnalogElement {
    *
    * Current i = G(w) · V(t) flows through the element.
    */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const I = this.conductance() * (vA - vB);
+    return [I, -I];
+  }
+
   updateState(dt: number, voltages: Float64Array): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vB = nB > 0 ? voltages[nB - 1] : 0;
     const vAB = vA - vB;
@@ -282,10 +289,11 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function createMemristorElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const rOn = props.getOrDefault<number>("rOn", 100);
   const rOff = props.getOrDefault<number>("rOff", 16000);
   const initialState = props.getOrDefault<number>("initialState", 0.5);
@@ -293,7 +301,14 @@ export function createMemristorElement(
   const deviceLength = props.getOrDefault<number>("deviceLength", 10e-9);
   const windowOrder = props.getOrDefault<number>("windowOrder", 1);
 
-  return new MemristorElement(nodeIds, rOn, rOff, initialState, mobility, deviceLength, windowOrder);
+  return new MemristorElement(
+    rOn,
+    rOff,
+    initialState,
+    mobility,
+    deviceLength,
+    windowOrder,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +320,7 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "rOn",
     type: PropertyType.FLOAT,
     label: "R_on (Ω)",
+    unit: "Ω",
     defaultValue: 100,
     min: 1e-3,
     description: "Resistance of fully doped (on) state in ohms",
@@ -313,6 +329,7 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "rOff",
     type: PropertyType.FLOAT,
     label: "R_off (Ω)",
+    unit: "Ω",
     defaultValue: 16000,
     min: 1e-3,
     description: "Resistance of fully undoped (off) state in ohms",

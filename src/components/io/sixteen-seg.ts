@@ -296,6 +296,8 @@ export const SixteenSegDefinition: ComponentDefinition = {
   propertyDefs: SIXTEEN_SEG_PROPERTY_DEFS,
   attributeMap: SIXTEEN_SEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["led", "dp"],
+  outputSchema: [],
   helpText:
     "SixteenSeg — direct-drive 16-segment alphanumeric display.\n" +
     "16 independent segment inputs for full alphanumeric character display.\n" +

@@ -209,6 +209,8 @@ export const AsyncSeqDefinition: ComponentDefinition = {
   propertyDefs: ASYNC_SEQ_PROPERTY_DEFS,
   attributeMap: ASYNC_SEQ_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: [],
+  outputSchema: [],
   helpText:
     "AsyncSeq — marks circuit as asynchronous sequential (no explicit clock).\n" +
     "Propagation triggered by input changes only.",

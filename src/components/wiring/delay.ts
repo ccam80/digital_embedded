@@ -229,6 +229,8 @@ export const DelayDefinition: ComponentDefinition = {
   propertyDefs: DELAY_PROPERTY_DEFS,
   attributeMap: DELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText:
     "Delay — pass-through with configurable propagation delay.\n" +
     "In timed mode: output changes after delayTime gate-delay units.",

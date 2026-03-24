@@ -421,7 +421,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
 
     // Verify capacitor node assignment: one node should be ground (0)
     const capEl = compiled.elements.find(e => e.isReactive)!;
-    const capNodes = capEl.nodeIndices;
+    const capNodes = capEl.pinNodeIds;
     expect(capNodes).toHaveLength(2);
     // One node should be ground (0), the other should be non-zero
     const hasGround = capNodes[0] === 0 || capNodes[1] === 0;

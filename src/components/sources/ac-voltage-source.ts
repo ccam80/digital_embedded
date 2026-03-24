@@ -22,13 +22,14 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
+import { formatSI } from "../../editor/si-format.js";
 import {
   ComponentCategory,
   noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../analog/expression.js";
 import type { ExprNode } from "../../analog/expression.js";
@@ -240,6 +241,17 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
       ctx.drawLine(x1 * PX, y1 * PX, x2 * PX, y2 * PX);
     }
 
+    // Value label below body
+    const label = this._properties.getOrDefault<string>("label", "");
+    const amplitude = this._properties.getOrDefault<number>("amplitude", 5);
+    const frequency = this._properties.getOrDefault<number>("frequency", 1000);
+    const displayLabel = label.length > 0
+      ? label
+      : `${formatSI(amplitude, "V")} ${formatSI(frequency, "Hz")}`;
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.6 });
+    ctx.drawText(displayLabel, 2, 1.3, { horizontal: "center", vertical: "top" });
+
     ctx.restore();
   }
 
@@ -406,13 +418,14 @@ export interface AcVoltageSourceAnalogElement extends AnalogElement {
 }
 
 function createAcVoltageSourceElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
 ): AcVoltageSourceAnalogElement {
-  const nodePos = nodeIds[0];
-  const nodeNeg = nodeIds[1];
+  const nodePos = pinNodes.get("pos")!;
+  const nodeNeg = pinNodes.get("neg")!;
   const amplitude = props.getOrDefault<number>("amplitude", 5);
   const frequency = props.getOrDefault<number>("frequency", 1000);
   const phase = props.getOrDefault<number>("phase", 0);
@@ -443,7 +456,6 @@ function createAcVoltageSourceElement(
   }
 
   const element: AcVoltageSourceAnalogElement = {
-    nodeIndices: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -480,6 +492,16 @@ function createAcVoltageSourceElement(
 
       // RHS voltage constraint
       solver.stampRHS(k, v);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // MNA branch variable: voltages[branchIdx] = I flowing from nodeNeg
+      // through source to nodePos. Convention for getPinCurrents: positive =
+      // current from pin 0 → pin 1 through the element body (matching the
+      // engine's getElementCurrent fallback [I, -I] at t=0, t=1).
+      // Pin layout order: [pos, neg].
+      const I = voltages[branchIdx];
+      return [I, -I];
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {
@@ -526,11 +548,12 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
     getTime: () => number,
-  ): AnalogElement {
-    return createAcVoltageSourceElement(nodeIds, branchIdx, props, getTime);
+  ): AnalogElementCore {
+    return createAcVoltageSourceElement(pinNodes, internalNodeIds, branchIdx, props, getTime);
   },
 };

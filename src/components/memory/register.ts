@@ -235,6 +235,10 @@ export const RegisterDefinition: ComponentDefinition = {
   propertyDefs: REGISTER_PROPERTY_DEFS,
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  // sampleRegister/executeRegister read: inBase+0=D, inBase+1=C, inBase+2=en
+  // writes: outBase+0=Q
+  inputSchema: ["D", "C", "en"],
+  outputSchema: ["Q"],
   helpText:
     "Register — edge-triggered storage register with enable.\n" +
     "On rising clock edge: if en=1, captures D input into stored value.\n" +

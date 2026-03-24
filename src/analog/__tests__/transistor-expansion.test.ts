@@ -92,7 +92,7 @@ function makeElement(
 
 function makeMosfetAnalogElement(nodeIds: number[]): AnalogElement {
   return {
-    nodeIndices: [...nodeIds],
+    pinNodeIds: [...nodeIds],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -251,36 +251,36 @@ describe("Expansion", () => {
     expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
     expect(result.elements).toHaveLength(2);
 
-    // Every element's nodeIndices must reference only known nodes:
+    // Every element's pinNodeIds must reference only known nodes:
     // - outerInNode (gate)
     // - outerOutNode (drain)
     // - vddNodeId (PMOS source)
     // - gndNodeId / 0 (NMOS source)
     const knownNodes = new Set([outerInNode, outerOutNode, vddNodeId, gndNodeId]);
     for (const el of result.elements) {
-      for (const nodeId of el.nodeIndices) {
+      for (const nodeId of el.pinNodeIds) {
         expect(knownNodes).toContain(nodeId);
       }
     }
 
     // PMOS gate and NMOS gate must both connect to the outer input node
-    const gateNodes = result.elements.map((el) => el.nodeIndices[1]); // G is index 1 (D,G,S)
+    const gateNodes = result.elements.map((el) => el.pinNodeIds[1]); // G is index 1 (D,G,S)
     for (const gNode of gateNodes) {
       expect(gNode).toBe(outerInNode);
     }
 
     // PMOS drain and NMOS drain must both connect to the outer output node
-    const drainNodes = result.elements.map((el) => el.nodeIndices[0]); // D is index 0
+    const drainNodes = result.elements.map((el) => el.pinNodeIds[0]); // D is index 0
     for (const dNode of drainNodes) {
       expect(dNode).toBe(outerOutNode);
     }
 
     // PMOS source must be VDD
-    const pmosSource = result.elements[0].nodeIndices[2]; // S is index 2
+    const pmosSource = result.elements[0].pinNodeIds[2]; // S is index 2
     expect(pmosSource).toBe(vddNodeId);
 
     // NMOS source must be GND
-    const nmosSource = result.elements[1].nodeIndices[2];
+    const nmosSource = result.elements[1].pinNodeIds[2];
     expect(nmosSource).toBe(gndNodeId);
   });
 
@@ -318,7 +318,7 @@ describe("Expansion", () => {
       expect(id).toBeGreaterThan(outerNodeCount);
     }
 
-    // All element nodeIndices must not collide with outer nodes (other than the mapped interface ones)
+    // All element pinNodeIds must not collide with outer nodes (other than the mapped interface ones)
     // Interface nodes (1, 2, 5, 0) are expected — no new internal nodes for basic inverter
     expect(result.internalNodeCount).toBe(0); // CMOS inverter has no internal nodes
   });
@@ -423,7 +423,7 @@ describe("Expansion", () => {
 
     // Gate 1 must use outer nodes 1, 2, vddNodeId, 0 — not gate 2's nodes
     for (const el of result1.elements) {
-      for (const nodeId of el.nodeIndices) {
+      for (const nodeId of el.pinNodeIds) {
         expect([1, 2, vddNodeId, 0]).toContain(nodeId);
         // Must NOT contain gate 2's exclusive nodes (4, 5)
         expect(nodeId).not.toBe(4);
@@ -433,7 +433,7 @@ describe("Expansion", () => {
 
     // Gate 2 must use outer nodes 4, 5, vddNodeId, 0 — not gate 1's nodes
     for (const el of result2.elements) {
-      for (const nodeId of el.nodeIndices) {
+      for (const nodeId of el.pinNodeIds) {
         expect([4, 5, vddNodeId, 0]).toContain(nodeId);
         // Must NOT contain gate 1's exclusive nodes (1, 2)
         expect(nodeId).not.toBe(1);

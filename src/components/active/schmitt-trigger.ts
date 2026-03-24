@@ -33,7 +33,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { DigitalOutputPinModel, DigitalInputPinModel } from "../../analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -83,22 +83,22 @@ function buildInputSpec(props: PropertyBag): ResolvedPinElectrical {
 /**
  * Create the MNA element for a Schmitt trigger.
  *
- * @param nodeIds  - [nIn (1-based), nOut (1-based)]
- * @param props    - Component properties
+ * @param pinNodes  - map of pin label → MNA node ID (1-based)
+ * @param props     - Component properties
  * @param inverting - true → inverting (output opposes input sense)
  */
 function createSchmittTriggerElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   inverting: boolean,
-): AnalogElement {
+): AnalogElementCore {
   const vTH = props.getOrDefault<number>("vTH", 2.0);
   const vTL = props.getOrDefault<number>("vTL", 1.0);
   const vOH = props.getOrDefault<number>("vOH", 3.3);
   const vOL = props.getOrDefault<number>("vOL", 0.0);
 
-  const nIn  = nodeIds[0]; // input node (1-based, 0=ground)
-  const nOut = nodeIds[1]; // output node (1-based, 0=ground)
+  const nIn  = pinNodes.get("in")!;  // input node (1-based, 0=ground)
+  const nOut = pinNodes.get("out")!; // output node (1-based, 0=ground)
 
   const outputSpec = buildOutputSpec(props);
   const inputSpec  = buildInputSpec(props);
@@ -129,7 +129,6 @@ function createSchmittTriggerElement(
   updateOutputLevel();
 
   return {
-    nodeIndices: [nIn, nOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -158,6 +157,22 @@ function createSchmittTriggerElement(
         updateOutputLevel();
       }
       // Otherwise hold state — hysteresis
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Input pin: conductance 1/rIn from nIn to ground → I_in = V_in / rIn
+      const vIn = readNode(voltages, nIn);
+      const iIn = nIn > 0 ? vIn / outputSpec.rIn : 0;
+
+      // Output pin: Norton equivalent — I_out = (V_out - V_target) / rOut
+      // Positive = current flowing into element (element is sinking current)
+      const vOut = readNode(voltages, nOut);
+      const targetVoltage = outModel.currentVoltage;
+      const iOut = nOut > 0 ? (vOut - targetVoltage) / outputSpec.rOut : 0;
+
+      // pinLayout order: in, out
+      // Sum is nonzero — difference is implicit supply current (expected for behavioral model)
+      return [iIn, iOut];
     },
 
     stampCompanion(
@@ -460,11 +475,12 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createSchmittTriggerElement(nodeIds, props, true);
+  ): AnalogElementCore {
+    return createSchmittTriggerElement(pinNodes, props, true);
   },
 };
 
@@ -488,10 +504,11 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createSchmittTriggerElement(nodeIds, props, false);
+  ): AnalogElementCore {
+    return createSchmittTriggerElement(pinNodes, props, false);
   },
 };

@@ -96,6 +96,8 @@ export const NegDefinition: ComponentDefinition = {
   propertyDefs: NEG_PROPERTY_DEFS,
   attributeMap: NEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText: "Neg — two's complement negation. Output = -input, masked to bitWidth bits.",
   defaultDelay: 10,
 };

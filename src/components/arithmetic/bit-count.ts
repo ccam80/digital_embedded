@@ -118,6 +118,8 @@ export const BitCountDefinition: ComponentDefinition = {
   propertyDefs: BIT_COUNT_PROPERTY_DEFS,
   attributeMap: BIT_COUNT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText: "BitCount — counts the number of set (1) bits in the input (population count).",
   defaultDelay: 10,
 };

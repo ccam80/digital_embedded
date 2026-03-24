@@ -60,7 +60,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -314,9 +314,9 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   a first-order BDF-1 update of V_int each timestep with slew-rate clamping.
  */
 export function createRealOpAmpElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   // Extract parameters with defaults
   let aol       = Math.max(props.getOrDefault<number>("aol",       100000),  1);
   let gbw       = Math.max(props.getOrDefault<number>("gbw",       1e6),     1);
@@ -348,11 +348,11 @@ export function createRealOpAmpElement(
   // Single-pole rolloff time constant: τ = A_OL / (2π * GBW)
   const tau = aol / (2 * Math.PI * gbw);
 
-  const nInp  = nodeIds[0]; // in+
-  const nInn  = nodeIds[1]; // in-
-  const nOut  = nodeIds[2]; // out
-  const nVccP = nodeIds[3]; // Vcc+
-  const nVccN = nodeIds[4]; // Vcc-
+  const nInn  = pinNodes.get("in-")!;  // inverting input
+  const nInp  = pinNodes.get("in+")!;  // non-inverting input
+  const nOut  = pinNodes.get("out")!;  // output
+  const nVccP = pinNodes.get("Vcc+")!; // positive supply
+  const nVccN = pinNodes.get("Vcc-")!; // negative supply
 
   // Internal gain-stage state — not an MNA node.
   // Updated each NR iteration in updateOperatingPoint.
@@ -408,7 +408,6 @@ export function createRealOpAmpElement(
   }
 
   return {
-    nodeIndices: [nInp, nInn, nOut, nVccP, nVccN],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -588,6 +587,67 @@ export function createRealOpAmpElement(
         iOutLimited    = 0;
       }
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // pinLayout order: in-, in+, out, Vcc+, Vcc-
+      //
+      // Input resistance G_in is stamped between nInp and nInn.
+      // Current into element at each input terminal from the resistor:
+      //   I_resistor_at_nInn = (vInn - vInp) * G_in
+      //   I_resistor_at_nInp = (vInp - vInn) * G_in
+      // Bias currents: stampRHS injects -iBias into each node → element draws +iBias.
+      //
+      // Output (Norton equivalent, G_out stamped on diagonal to ground):
+      //   Normal/slewing:        Norton target = vInt → I_out = (vOut - vInt) * G_out
+      //   Saturated (no limit):  Norton target = outputClampLevel → I_out = (vOut - outputClampLevel) * G_out
+      //   Current limited:       RHS carries iOutLimited directly (injects INTO node)
+      //                          → element draws -iOutLimited; diagonal G_out drives to ground
+      //                          → I_out = vOut * G_out - iOutLimited
+      //
+      // Supply pins: by KCL the sum of all 5 pin currents must be zero.
+      // Total supply current = -(I_inn + I_inp + I_out).
+      // Split by output polarity: Vcc+ provides current when output sources,
+      // Vcc- sinks current when output sinks.
+
+      const iBiasScaled = iBias * scale;
+
+      // Input pin currents (resistor + bias)
+      const iInn = (nInn > 0 ? (vInn - vInp) * G_in : 0) + iBiasScaled;
+      const iInp = (nInp > 0 ? (vInp - vInn) * G_in : 0) + iBiasScaled;
+
+      // Output pin current (into element)
+      let iOut: number;
+      if (nOut <= 0) {
+        iOut = 0;
+      } else if (currentLimited) {
+        // G_out diagonal stamps V_out to ground effectively; RHS carries iOutLimited
+        // into node. Current into element = vOut * G_out - iOutLimited.
+        iOut = vOut * G_out - iOutLimited;
+      } else if (outputSaturated) {
+        iOut = (vOut - outputClampLevel) * G_out;
+      } else {
+        // Normal or slewing: Norton target = vInt
+        iOut = (vOut - vInt) * G_out;
+      }
+
+      // Supply currents: enforce KCL (sum of all pin currents = 0)
+      const iSupplyTotal = -(iInn + iInp + iOut);
+      // Vcc+ sources positive current (flows into Vcc+ pin when element draws from it)
+      // Vcc- sinks negative current. Split by sign of total supply demand.
+      let iVccP: number;
+      let iVccN: number;
+      if (iSupplyTotal >= 0) {
+        // Positive supply provides the current
+        iVccP = nVccP > 0 ? iSupplyTotal : 0;
+        iVccN = 0;
+      } else {
+        // Negative supply provides the current
+        iVccP = 0;
+        iVccN = nVccN > 0 ? iSupplyTotal : 0;
+      }
+
+      return [iInn, iInp, iOut, iVccP, iVccN];
+    },
   };
 }
 
@@ -744,10 +804,11 @@ export const RealOpAmpDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createRealOpAmpElement(nodeIds, props);
+  ): AnalogElementCore {
+    return createRealOpAmpElement(pinNodes, props);
   },
 };

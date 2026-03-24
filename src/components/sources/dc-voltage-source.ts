@@ -24,8 +24,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { formatSI } from "../../editor/si-format.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 
 // ---------------------------------------------------------------------------
 // DcVoltageSourceElement — CircuitElement implementation
@@ -57,6 +58,8 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const voltage = this._properties.getOrDefault<number>("voltage", 5);
+    const label = this._properties.getOrDefault<string>("label", "");
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");
 
@@ -87,6 +90,12 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
 
     // Longer plate at x=2.25
     ctx.drawLine(2.25, 1, 2.25, -1);
+
+    // Value label below body
+    const displayLabel = label.length > 0 ? label : formatSI(voltage, "V");
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(displayLabel, 2, 1.25, { horizontal: "center", vertical: "top" });
 
     ctx.restore();
   }
@@ -127,7 +136,8 @@ const DC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "voltage",
     type: PropertyType.INT,
-    label: "Voltage",
+    label: "Voltage (V)",
+    unit: "V",
     defaultValue: 5,
     description: "Source voltage in volts (V)",
   },
@@ -158,11 +168,10 @@ export function makeDcVoltageSource(
   nodeNeg: number,
   branchIdx: number,
   voltage: number,
-): AnalogElement {
+): AnalogElementCore {
   let scale = 1;
 
   return {
-    nodeIndices: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -184,6 +193,15 @@ export function makeDcVoltageSource(
 
       // RHS voltage constraint (scaled for source stepping)
       solver.stampRHS(k, voltage * scale);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Branch current I flows into nodePos (positive terminal).
+      // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
+      // Current into neg = +I (conventional current enters source at neg).
+      // Current into pos = -I (current leaves element at positive terminal).
+      const I = voltages[branchIdx];
+      return [I, -I];
     },
   };
 }
@@ -217,11 +235,12 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const voltage = (props.has("voltage") ? props.get<number>("voltage") : 5) ?? 5;
-    return makeDcVoltageSource(nodeIds[1], nodeIds[0], branchIdx, voltage);
+    return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
   },
 };

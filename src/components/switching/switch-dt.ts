@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -323,18 +323,19 @@ function stampConductanceSpdt(
   }
 }
 
-export interface SpdtAnalogElement extends AnalogElement {
+export interface SpdtAnalogElement extends AnalogElementCore {
   setClosed(closed: boolean): void;
 }
 
 function createSwitchDTAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): SpdtAnalogElement {
-  const nodeCommon = nodeIds[0];
-  const nodeB = nodeIds[1];
-  const nodeC = nodeIds[2];
+  const nodeCommon = pinNodes.get("A1")!;
+  const nodeB = pinNodes.get("B1")!;
+  const nodeC = pinNodes.get("C1")!;
   const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
   const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
   const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
@@ -343,7 +344,6 @@ function createSwitchDTAnalogElement(
   let effectivelyClosed = normallyClosed ? !closed : closed;
 
   return {
-    nodeIndices: [nodeCommon, nodeB, nodeC],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -363,6 +363,23 @@ function createSwitchDTAnalogElement(
     setClosed(c: boolean): void {
       closed = c;
       effectivelyClosed = normallyClosed ? !closed : closed;
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: A1 (common), B1, C1.
+      // When effectivelyClosed: A-B on (Gon), A-C off (Goff).
+      // When !effectivelyClosed: A-B off (Goff), A-C on (Gon).
+      // Positive = current into element at each terminal.
+      const Gon = 1 / ron;
+      const Goff = 1 / roff;
+      const GAB = effectivelyClosed ? Gon : Goff;
+      const GAC = effectivelyClosed ? Goff : Gon;
+      const vA = nodeCommon > 0 ? voltages[nodeCommon - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
+      const iAB = GAB * (vA - vB);
+      const iAC = GAC * (vA - vC);
+      return [iAB + iAC, -iAB, -iAC];
     },
   };
 }
@@ -391,6 +408,9 @@ export const SwitchDTDefinition: ComponentDefinition = {
   propertyDefs: SWITCH_DT_PROPERTY_DEFS,
   attributeMap: SWITCH_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  // Schema for default poles=1; direction-filter order matches for all pole counts.
+  inputSchema: [],
+  outputSchema: ["A1", "B1", "C1"],
   helpText:
     "Switch DT (SPDT) — a manually controlled single-pole double-throw switch.\n" +
     "Common terminal A connects to B when closed, to C when open.\n" +

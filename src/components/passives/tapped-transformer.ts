@@ -41,7 +41,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  * Uses three consecutive branch rows: branchIndex (primary), branchIndex+1
  * (secondary half-1), branchIndex+2 (secondary half-2).
  *
- * Node layout (nodeIndices array positions):
+ * Node layout (pinNodeIds array positions):
  *   [0] = P1 (primary+)    [1] = P2 (primary-)
  *   [2] = S1 (sec-half-1+) [3] = CT (center tap)
  *   [4] = S2 (sec-half-2-)
@@ -184,7 +184,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  * AnalogTransformerElement.
  */
 export class AnalogTappedTransformerElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -222,7 +222,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   private _prevV3: number = 0;
 
   constructor(
-    nodeIndices: number[],
+    pinNodeIds: number[],
     branch1: number,
     lPrimary: number,
     turnsRatio: number,
@@ -230,7 +230,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     rPri: number,
     rSec: number,
   ) {
-    this.nodeIndices = nodeIndices;
+    this.pinNodeIds = pinNodeIds;
     this.branchIndex = branch1;
     this._b2 = branch1 + 1;
     this._b3 = branch1 + 2;
@@ -249,7 +249,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   }
 
   stamp(solver: SparseSolver): void {
-    const [p1, p2, s1, ct, s2] = this.nodeIndices;
+    const [p1, p2, s1, ct, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._b2;
     const b3 = this._b3;
@@ -325,7 +325,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const [p1, p2, s1, ct, s2] = this.nodeIndices;
+    const [p1, p2, s1, ct, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._b2;
     const b3 = this._b3;
@@ -394,6 +394,16 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     this._prevV3 = v3Now;
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const i1 = voltages[this.branchIndex]; // primary: P1→P2
+    const i2 = voltages[this._b2];         // sec half-1: S1→CT
+    const i3 = voltages[this._b3];         // sec half-2: CT→S2
+    // pinLayout order: P1, P2, S1, CT, S2
+    // CT: i2 exits (−i2) and i3 enters (+i3) → net = i3 − i2
+    // Sum: i1 + (−i1) + i2 + (i3−i2) + (−i3) = 0 ✓
+    return [i1, -i1, i2, i3 - i2, -i3];
+  }
+
   /** Second branch index (secondary half-1 winding current). */
   get branch2(): number {
     return this._b2;
@@ -430,16 +440,25 @@ export class AnalogTappedTransformerElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 function createTappedTransformerElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const lPrimary = props.getOrDefault<number>("primaryInductance", 10e-3);
   const turnsRatio = props.getOrDefault<number>("turnsRatio", 2.0);
   const k = props.getOrDefault<number>("couplingCoefficient", 0.99);
   const rPri = props.getOrDefault<number>("primaryResistance", 0.0);
   const rSec = props.getOrDefault<number>("secondaryResistance", 0.0);
-  return new AnalogTappedTransformerElement(nodeIds, branchIdx, lPrimary, turnsRatio, k, rPri, rSec);
+  return new AnalogTappedTransformerElement(
+    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("CT")!, pinNodes.get("S2")!],
+    branchIdx,
+    lPrimary,
+    turnsRatio,
+    k,
+    rPri,
+    rSec,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +478,7 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "primaryInductance",
     type: PropertyType.FLOAT,
     label: "Primary Inductance (H)",
+    unit: "H",
     defaultValue: 10e-3,
     min: 1e-12,
     description: "Primary winding self-inductance in henries",
@@ -476,6 +496,7 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "primaryResistance",
     type: PropertyType.FLOAT,
     label: "Primary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 0.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -484,6 +505,7 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
     label: "Secondary Resistance per Half (Ω)",
+    unit: "Ω",
     defaultValue: 0.0,
     min: 0,
     description: "Each secondary half winding series resistance in ohms",

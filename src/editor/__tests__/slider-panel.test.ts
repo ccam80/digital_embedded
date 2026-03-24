@@ -285,7 +285,7 @@ describe("Integration", () => {
     // Track calls to setParam
     const setParamCalls: { key: string; value: number }[] = [];
     const mockElement = {
-      nodeIndices: [1, 0],
+      pinNodeIds: [1, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,

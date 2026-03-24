@@ -273,6 +273,10 @@ export const CounterDefinition: ComponentDefinition = {
   propertyDefs: COUNTER_PROPERTY_DEFS,
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  // sampleCounter/executeCounter read: inBase+0=en, inBase+1=C, inBase+2=clr
+  // writes: outBase+0=out, outBase+1=ovf
+  inputSchema: ["en", "C", "clr"],
+  outputSchema: ["out", "ovf"],
   helpText:
     "Counter — edge-triggered up counter.\n" +
     "On rising clock edge: if en=1, increments (wraps at maxValue); if clr=1, resets to 0.\n" +

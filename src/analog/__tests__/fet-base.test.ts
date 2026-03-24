@@ -72,7 +72,7 @@ function makeMockSolver() {
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -116,7 +116,8 @@ describe("Refactor", () => {
     const propsObj = { _modelParams: NMOS_10U_1U };
     const nmosElement = createMosfetElement(
       1,
-      [1, 3, 0], // D=node1, G=node3, S=ground
+      new Map([["G", 3], ["S", 0], ["D", 1]]), // G=node3, S=ground, D=node1
+      [],
       -1,
       propsObj as unknown as PropertyBag,
     );
@@ -165,7 +166,8 @@ describe("Refactor", () => {
     const propsObj = { _modelParams: PMOS_DEFAULTS };
     const pmosElement = createMosfetElement(
       -1,
-      [1, 3, 2], // D=node1, G=node3, S=node2(Vss)
+      new Map([["G", 3], ["S", 2], ["D", 1]]), // G=node3, S=node2(Vss), D=node1
+      [],
       -1,
       propsObj as unknown as PropertyBag,
     );
@@ -204,7 +206,7 @@ describe("Refactor", () => {
     // and its stampCompanion should update companion model state.
     const propsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
     const propsObj = { _modelParams: propsWithCap };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj as unknown as PropertyBag);
 
     expect(element.isReactive).toBe(true);
     expect(element.stampCompanion).toBeDefined();
@@ -237,12 +239,13 @@ describe("Refactor", () => {
     // nodeD=1, nodeG=2, nodeS=3 (source=ground would be node 0, but let's use node 3 for clarity)
     // Actually to match matrix addressing: use nodeS=0 (ground) so source row is skipped
 
-    // Use nodeD=1, nodeG=2, nodeS=0 (ground source) for cleaner test
+    // Use nodeG=2, nodeS=0 (ground source), nodeD=1 for cleaner test
+    // createMosfetElement expects [G, S, D]
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 0], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj as unknown as PropertyBag);
 
     // Drive to saturation: Vgs=3V (G=3V, S=0V), Vds=5V (D=5V, S=0V)
-    // matrixSize=2, voltages: index0=V(node1)=Vds=5V, index1=V(node2)=Vgs=3V
+    // matrixSize=2, voltages: index0=V(node1)=Vds=5V, index1=V(node2=G)=3V
     const voltages = new Float64Array(2);
     voltages[0] = 5; // V(node1=D) = 5V
     voltages[1] = 3; // V(node2=G) = 3V
@@ -292,33 +295,33 @@ describe("Refactor", () => {
 describe("AbstractFetElement", () => {
   it("createMosfetElement_returns_AbstractFetElement_instance", () => {
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element).toBeInstanceOf(AbstractFetElement);
   });
 
   it("pmos_is_AbstractFetElement_instance", () => {
     const propsObj = { _modelParams: PMOS_DEFAULTS };
-    const element = createMosfetElement(-1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element).toBeInstanceOf(AbstractFetElement);
   });
 
   it("nmos_polarity_sign_is_1", () => {
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj as unknown as PropertyBag);
     expect((element as AbstractFetElement).polaritySign).toBe(1);
   });
 
   it("pmos_polarity_sign_is_minus_1", () => {
     const propsObj = { _modelParams: PMOS_DEFAULTS };
-    const element = createMosfetElement(-1, [1, 2, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj as unknown as PropertyBag);
     expect((element as AbstractFetElement).polaritySign).toBe(-1);
   });
 
   it("gm_gds_stamped_at_correct_nodes", () => {
-    // nodeD=2, nodeG=1, nodeS=3; use these to check the stamp positions
-    // matrix indices: D-1=1, G-1=0, S-1=2
+    // nodeG=1, nodeS=3, nodeD=2; createMosfetElement expects [G, S, D]
+    // matrix indices: G-1=0, S-1=2, D-1=1
     const propsObj = { _modelParams: NMOS_DEFAULTS };
-    const element = createMosfetElement(1, [2, 1, 3], -1, propsObj as unknown as PropertyBag);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 3], ["D", 2]]), [], -1, propsObj as unknown as PropertyBag);
 
     const voltages = new Float64Array(3);
     voltages[0] = 3; // V(node1=G) = 3V

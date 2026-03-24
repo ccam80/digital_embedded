@@ -201,6 +201,8 @@ export const PowerSupplyDefinition: ComponentDefinition = {
   propertyDefs: POWER_SUPPLY_PROPERTY_DEFS,
   attributeMap: POWER_SUPPLY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["VDD", "GND"],
+  outputSchema: [],
   helpText:
     "PowerSupply — VCC/GND source enforcer for CMOS circuits.\n" +
     "VDD input must be connected to logic 1 (VCC).\n" +

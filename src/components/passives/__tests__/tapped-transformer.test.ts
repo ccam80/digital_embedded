@@ -34,7 +34,7 @@ import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor } from "../..
 // ---------------------------------------------------------------------------
 
 function makeTappedTransformer(opts: {
-  nodeIndices: number[];
+  pinNodeIds: number[];
   branch1: number;
   lPrimary?: number;
   turnsRatio?: number;
@@ -43,7 +43,7 @@ function makeTappedTransformer(opts: {
   rSec?: number;
 }): AnalogTappedTransformerElement {
   return new AnalogTappedTransformerElement(
-    opts.nodeIndices,
+    opts.pinNodeIds,
     opts.branch1,
     opts.lPrimary ?? 100e-3,
     opts.turnsRatio ?? 2.0,
@@ -93,9 +93,9 @@ describe("TappedTransformer", () => {
     const bTx3 = nodeCount + 3;
     const matrixSize = nodeCount + 4;
 
-    // nodeIndices: [p1, p2, s1, ct, s2]
+    // pinNodeIds: [p1, p2, s1, ct, s2]
     const tx = makeTappedTransformer({
-      nodeIndices: [1, 0, 2, 3, 4],
+      pinNodeIds: [1, 0, 2, 3, 4],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -183,7 +183,7 @@ describe("TappedTransformer", () => {
     const matrixSize = nodeCount + 4;
 
     const tx = makeTappedTransformer({
-      nodeIndices: [1, 0, 2, 3, 4],
+      pinNodeIds: [1, 0, 2, 3, 4],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -270,7 +270,7 @@ describe("TappedTransformer", () => {
     const matrixSize = nodeCount + 4;
 
     const tx = makeTappedTransformer({
-      nodeIndices: [1, 0, 2, 3, 4],
+      pinNodeIds: [1, 0, 2, 3, 4],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -386,7 +386,8 @@ describe("TappedTransformerDefinition", () => {
     props.set("secondaryResistance", 0);
 
     const el = TappedTransformerDefinition.analogFactory!(
-      [1, 0, 2, 3, 4],
+      new Map([["P1", 1], ["P2", 0], ["S1", 2], ["CT", 3], ["S2", 4]]),
+      [],
       10,
       props,
       () => 0,

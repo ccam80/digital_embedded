@@ -56,7 +56,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { parseExpression } from "../../analog/expression.js";
 import { differentiate, simplify } from "../../analog/expression-differentiate.js";
@@ -120,7 +120,6 @@ function buildCCCSPinDeclarations(): PinDeclaration[] {
  * No output branch variable (Norton stamp).
  */
 class CCCSAnalogElement extends ControlledSourceElement {
-  readonly nodeIndices: readonly number[];
   readonly branchIndex: number; // sense branch
 
   private readonly _nSenseP: number;
@@ -151,7 +150,6 @@ class CCCSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._senseBranch = senseBranchIdx;
 
-    this.nodeIndices = [nSenseP, nSenseN, nOutP, nOutN];
     this.branchIndex = senseBranchIdx;
   }
 
@@ -179,6 +177,33 @@ class CCCSAnalogElement extends ControlledSourceElement {
     const iSense = voltages[this._senseBranch];
     this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, voltages);
     this._ctrlValue = iSense;
+  }
+
+  /**
+   * Per-pin currents in pinLayout order: [sense+, sense-, out+, out-].
+   *
+   * Positive = current flowing INTO the element at that pin.
+   *
+   * Sense port: the 0V branch current I_sense flows into sense+ and out of
+   * sense-. voltages[senseBranch] is the branch current (into nSenseP).
+   *
+   * Output port: the controlled current f(I_sense) is injected INTO nOutP
+   * and extracted FROM nOutN. From the element's perspective this means
+   * I_out+ = -f(I_sense)  (current leaves nOutP, so element sinks it)
+   * I_out- = +f(I_sense)  (current enters nOutN via the source)
+   *
+   * KCL: I_senseP + I_senseN + I_outP + I_outN = 0 ✓
+   *   (iSense) + (-iSense) + (-fI) + (fI) = 0
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const iSense = voltages[this._senseBranch];
+    const fI = this._compiledExpr(this._ctx); // f(I_sense) at current operating point
+    return [
+      iSense,   // sense+: I_sense flows in
+      -iSense,  // sense-: I_sense flows out
+      -fI,      // out+: current is sourced into the net, so element gives it out
+      fI,       // out-: current is sunk from the net back into element
+    ];
   }
 
   /**
@@ -377,17 +402,18 @@ export const CCCSDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const expression = props.getOrDefault<string>("expression", "I(sense)");
     const currentGain = props.getOrDefault<number>("currentGain", 1.0);
     return new CCCSAnalogElement(
-      nodeIds[0], // sense+
-      nodeIds[1], // sense-
-      nodeIds[2], // out+
-      nodeIds[3], // out-
+      pinNodes.get("sense+")!, // sense+
+      pinNodes.get("sense-")!, // sense-
+      pinNodes.get("out+")!,   // out+
+      pinNodes.get("out-")!,   // out-
       branchIdx,
       expression,
       currentGain,

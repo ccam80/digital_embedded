@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 
@@ -66,13 +66,14 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // ---------------------------------------------------------------------------
 
 export function createScrElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeA = nodeIds[0]; // anode
-  const nodeK = nodeIds[1]; // cathode
-  const nodeG = nodeIds[2]; // gate
+): AnalogElementCore {
+  const nodeA = pinNodes.get("A")!; // anode
+  const nodeK = pinNodes.get("K")!; // cathode
+  const nodeG = pinNodes.get("G")!; // gate
 
   const vOn: number       = props.getOrDefault<number>("vOn",        1.5);
   const iH: number        = props.getOrDefault<number>("iH",         5e-3);
@@ -171,7 +172,6 @@ export function createScrElement(
   }
 
   return {
-    nodeIndices: [nodeA, nodeK, nodeG],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -241,6 +241,30 @@ export function createScrElement(
       const vKp = nodeK > 0 ? prevVoltages[nodeK - 1] : 0;
 
       return Math.abs((vA - vK) - (vAp - vKp)) <= 2 * nVt;
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // pinLayout order: [A(0), K(1), G(2)]
+      // Positive = current flowing INTO the element at that pin.
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+
+      // Anode-cathode path: Norton equivalent I = _geq * V_AK + _ieq
+      // Current into anode (into element at A): iAK flows from A to K through device
+      const iAK = _geq * (vA - vK) + _ieq;
+
+      // Gate-cathode path: Norton equivalent I = _gGateGeq * V_GK + _gGateIeq
+      // Current into gate (into element at G)
+      const iGK = _gGateGeq * (vG - vK) + _gGateIeq;
+
+      // KCL: I_A + I_K + I_G = 0 → I_K = -(I_A + I_G)
+      const iA = iAK;
+      const iG = iGK;
+      const iK = -(iA + iG);
+
+      // Return in pinLayout order [A, K, G]
+      return [iA, iK, iG];
     },
 
     get label(): string | undefined {

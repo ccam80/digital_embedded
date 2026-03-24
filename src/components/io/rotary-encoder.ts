@@ -214,6 +214,8 @@ export const RotaryEncoderDefinition: ComponentDefinition = {
   propertyDefs: ROTARY_ENCODER_PROPERTY_DEFS,
   attributeMap: ROTARY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["A", "B"],
   helpText:
     "RotEncoder — rotary encoder with quadrature output.\n" +
     "Outputs A and B follow a Gray-code quadrature sequence.\n" +

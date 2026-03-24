@@ -9,6 +9,7 @@
 
 import { PropertyType } from "@/core/properties";
 import type { PropertyDefinition, PropertyValue } from "@/core/properties";
+import { formatSI, parseSI } from "./si-format.js";
 
 // ---------------------------------------------------------------------------
 // PropertyInput interface
@@ -42,6 +43,9 @@ export function createInput(
     case PropertyType.FLOAT:
     case PropertyType.BIT_WIDTH:
     case PropertyType.LONG:
+      if (definition.unit && (definition.type === PropertyType.INT || definition.type === PropertyType.FLOAT)) {
+        return new UnitNumberInput(definition, currentValue);
+      }
       return new NumberInput(definition, currentValue);
 
     case PropertyType.STRING:
@@ -127,6 +131,115 @@ export class NumberInput implements PropertyInput {
 
   onChange(cb: (value: PropertyValue) => void): void {
     this._callbacks.push(cb);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// UnitNumberInput — for FLOAT/INT with SI unit (e.g. "Ω", "F", "H")
+// ---------------------------------------------------------------------------
+
+/**
+ * Text input that displays values with auto-scaled SI prefix (keeps the
+ * displayed number in 0.1–100 range) and accepts typed SI-prefixed values
+ * like "4.7k", "100n", "2.2u".
+ */
+export class UnitNumberInput implements PropertyInput {
+  element: HTMLElement;
+  private readonly _input: HTMLInputElement;
+  private readonly _unitLabel: HTMLSpanElement;
+  private readonly _unit: string;
+  private readonly _min?: number;
+  private readonly _max?: number;
+  private _value: number;
+  private _callbacks: Array<(v: PropertyValue) => void> = [];
+
+  constructor(definition: PropertyDefinition, initial: PropertyValue) {
+    this._unit = definition.unit!;
+    this._min = definition.min;
+    this._max = definition.max;
+    this._value = typeof initial === "number" ? initial : Number(initial);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "prop-input prop-unit-number";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";
+    wrapper.style.gap = "2px";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.style.flex = "1";
+    input.style.minWidth = "0";
+    input.value = this._formatDisplay(this._value);
+
+    const unitLabel = document.createElement("span");
+    unitLabel.className = "prop-unit-label";
+    unitLabel.style.opacity = "0.6";
+    unitLabel.style.fontSize = "11px";
+    unitLabel.style.minWidth = "24px";
+    unitLabel.textContent = this._unit;
+
+    // On focus: select all for easy overwrite
+    input.addEventListener("focus", () => {
+      input.select();
+    });
+
+    // On blur/enter: parse the text, clamp, update display
+    const commit = () => {
+      const parsed = parseSI(input.value);
+      if (isNaN(parsed)) {
+        // Revert to current value on bad input
+        input.value = this._formatDisplay(this._value);
+        return;
+      }
+      let clamped = parsed;
+      if (this._min !== undefined && clamped < this._min) clamped = this._min;
+      if (this._max !== undefined && clamped > this._max) clamped = this._max;
+
+      if (clamped !== this._value) {
+        this._value = clamped;
+        for (const cb of this._callbacks) cb(clamped);
+      }
+      input.value = this._formatDisplay(this._value);
+    };
+
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+        input.blur();
+      }
+    });
+
+    this._input = input;
+    this._unitLabel = unitLabel;
+    wrapper.appendChild(input);
+    wrapper.appendChild(unitLabel);
+    this.element = wrapper;
+  }
+
+  getValue(): PropertyValue {
+    return this._value;
+  }
+
+  setValue(v: PropertyValue): void {
+    this._value = typeof v === "number" ? v : Number(v);
+    this._input.value = this._formatDisplay(this._value);
+  }
+
+  onChange(cb: (value: PropertyValue) => void): void {
+    this._callbacks.push(cb);
+  }
+
+  /**
+   * Format a number for display: SI-prefixed with the number in 0.1–100.
+   * Uses formatSI but strips the unit (we show it separately in the label).
+   */
+  private _formatDisplay(value: number): string {
+    if (value === 0) return "0";
+    const formatted = formatSI(value, "", 3);
+    // formatSI returns e.g. "4.70 k" (with trailing space before empty unit)
+    return formatted.trim();
   }
 }
 

@@ -23,6 +23,63 @@ const SI_PREFIXES: { prefix: string; exponent: number }[] = [
 ];
 
 /**
+ * Map from prefix character to exponent for parsing.
+ * Accepts 'u' as alias for 'µ' (micro), and 'meg' for mega (SPICE convention).
+ */
+const PARSE_PREFIX_MAP: Record<string, number> = {
+  T: 12, G: 9, M: 6, k: 3, K: 3,
+  m: -3, u: -6, µ: -6, n: -9, p: -12, f: -15,
+};
+
+/**
+ * Parse a string with an optional SI prefix into a number.
+ *
+ * Accepts formats like "4.7k", "100n", "2.2u", "1.5µ", "10M", "47",
+ * "3.3 kΩ", "100 nF". The unit suffix (if any) is stripped. Whitespace
+ * between the number and prefix is tolerated.
+ *
+ * @param text - The string to parse.
+ * @returns The numeric value, or NaN if the string cannot be parsed.
+ *
+ * @example
+ * parseSI("4.7k")    → 4700
+ * parseSI("100nF")   → 1e-7
+ * parseSI("2.2 µF")  → 2.2e-6
+ * parseSI("2.2uF")   → 2.2e-6
+ * parseSI("1.5M")    → 1500000
+ * parseSI("47")       → 47
+ * parseSI("10meg")    → 10e6
+ */
+export function parseSI(text: string): number {
+  const s = text.trim();
+  if (s === "") return NaN;
+
+  // Try "meg" / "MEG" (SPICE-style mega) before single-char prefix parsing
+  const megMatch = s.match(/^([+-]?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\s*[mM][eE][gG]/);
+  if (megMatch) {
+    return parseFloat(megMatch[1]) * 1e6;
+  }
+
+  // General pattern: number, optional whitespace, optional SI prefix, optional unit chars
+  const match = s.match(
+    /^([+-]?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\s*([TGMkKmuµnpf])?\s*[A-Za-zΩ]*$/,
+  );
+  if (!match) {
+    // Fallback: try plain parseFloat for scientific notation etc.
+    const plain = parseFloat(s);
+    return plain;
+  }
+
+  const num = parseFloat(match[1]);
+  const prefix = match[2];
+  if (!prefix) return num;
+
+  const exp = PARSE_PREFIX_MAP[prefix];
+  if (exp === undefined) return num;
+  return num * Math.pow(10, exp);
+}
+
+/**
  * Format a number with the appropriate SI prefix and 3 significant figures.
  *
  * @param value - The numeric value to format (may be negative).

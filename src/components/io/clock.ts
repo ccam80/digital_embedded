@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { squareWaveBreakpoints } from "../sources/ac-voltage-source.js";
 
@@ -257,7 +257,6 @@ function createAnalogClockElement(
   const halfPeriod = period / 2;
 
   const element: AnalogClockElement = {
-    nodeIndices: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -318,6 +317,14 @@ export function makeAnalogClockElement(
       const v = halfPeriods % 2 === 0 ? vdd : 0;
       solver.stampRHS(k, v);
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout: [out] — positive terminal; negative terminal is implicit ground.
+      // Branch current I = voltages[branchIdx] flows from neg to pos through source.
+      // Current INTO element at out = -I (conventional: exits at positive terminal).
+      const I = voltages[branchIdx];
+      return [-I];
+    },
   };
 }
 
@@ -336,6 +343,8 @@ export const ClockDefinition: ComponentDefinition = {
   propertyDefs: CLOCK_PROPERTY_DEFS,
   attributeMap: CLOCK_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   requiresBranchRow: true,
   helpText:
     "Clock â€” periodic signal source.\n" +
@@ -344,15 +353,16 @@ export const ClockDefinition: ComponentDefinition = {
     "The signal value is managed by ClockManager and set externally.",
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-    getTime: () => number,
-  ): AnalogElement {
+    _getTime: () => number,
+  ): AnalogElementCore {
     const frequency = props.getOrDefault<number>("Frequency", 1);
     const vdd = props.getOrDefault<number>("vdd", 3.3);
-    const nodePos = nodeIds[0];
-    const nodeNeg = nodeIds[1] ?? 0;
+    const nodePos = pinNodes.get("out")!;
+    const nodeNeg = 0;
     return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
   },
 };

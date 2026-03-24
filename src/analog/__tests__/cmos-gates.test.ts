@@ -54,10 +54,10 @@ const modelRegistry = new TransistorModelRegistry();
 
 beforeAll(() => {
   registerAnalogFactory("NMOS", (nodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(1, nodeIds, branchIdx, props),
+    createMosfetElement(1, new Map([["D", nodeIds[0] ?? 0], ["G", nodeIds[1] ?? 0], ["S", nodeIds[2] ?? 0]]), [], branchIdx, props),
   );
   registerAnalogFactory("PMOS", (nodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(-1, nodeIds, branchIdx, props),
+    createMosfetElement(-1, new Map([["D", nodeIds[0] ?? 0], ["G", nodeIds[1] ?? 0], ["S", nodeIds[2] ?? 0]]), [], branchIdx, props),
   );
   registerAllCmosGateModels(modelRegistry);
 });
@@ -126,21 +126,26 @@ function buildRegistry(): ComponentRegistry {
   return registry;
 }
 
+// DcVoltageSourceDefinition pinLayout order: [neg, pos]
+// analogFactory: makeDcVoltageSource(nodeIds[1]=pos, nodeIds[0]=neg, ...)
 function voltSrc(circuit: Circuit, id: string, xPos: number, xNeg: number, y: number, voltage: number): void {
   circuit.addElement(makeElement("DcVoltageSource", id,
-    [{ x: xPos, y }, { x: xNeg, y }],
+    [{ x: xNeg, y }, { x: xPos, y }],
     new Map<string, PropertyValue>([["voltage", voltage]])));
 }
 
+// Pin order must match the component pinLayout order so the compiler maps nodes correctly.
+// PMOS pinLayout: [G, D, S] → PmosfetDefinition.analogFactory swaps D/S for createMosfetElement
+// NMOS pinLayout: [G, S, D] → NmosfetDefinition.analogFactory passes directly to createMosfetElement
 function pmos(circuit: Circuit, id: string, xD: number, xG: number, xS: number, yRow: number, w = 100e-6): void {
   circuit.addElement(makeElement("PMOS", id,
-    [{ x: xD, y: yRow, label: "D" }, { x: xG, y: yRow, label: "G" }, { x: xS, y: yRow, label: "S" }],
+    [{ x: xG, y: yRow, label: "G" }, { x: xD, y: yRow, label: "D" }, { x: xS, y: yRow, label: "S" }],
     new Map<string, PropertyValue>([["W", w]])));
 }
 
 function nmos(circuit: Circuit, id: string, xD: number, xG: number, xS: number, yRow: number, w = 50e-6): void {
   circuit.addElement(makeElement("NMOS", id,
-    [{ x: xD, y: yRow, label: "D" }, { x: xG, y: yRow, label: "G" }, { x: xS, y: yRow, label: "S" }],
+    [{ x: xG, y: yRow, label: "G" }, { x: xS, y: yRow, label: "S" }, { x: xD, y: yRow, label: "D" }],
     new Map<string, PropertyValue>([["W", w]])));
 }
 

@@ -55,6 +55,13 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
   return { solver, stamps, rhsStamps };
 }
 
+/** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
+function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
+  const el = CapacitorDefinition.analogFactory!(pinNodes, [], -1, props, () => 0);
+  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()) });
+  return el;
+}
+
 // ---------------------------------------------------------------------------
 // updateCompanion tests
 // ---------------------------------------------------------------------------
@@ -67,12 +74,7 @@ describe("Capacitor", () => {
 
       // Node IDs are 1-based (ground=0). Use [1, 2] so both are non-ground.
       // Solver indices: node1→idx0, node2→idx1
-      const analogElement = CapacitorDefinition.analogFactory!(
-        [1, 2],
-        -1,
-        props,
-        () => 0,
-      );
+      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       // voltages[0] = V(node1) = 5V, voltages[1] = V(node2) = 0V
       const voltages = new Float64Array([5, 0]);
@@ -93,12 +95,7 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.set("capacitance", 1e-6);
 
-      const analogElement = CapacitorDefinition.analogFactory!(
-        [1, 2],
-        -1,
-        props,
-        () => 0,
-      );
+      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
       analogElement.stampCompanion!(1e-6, "bdf1", voltages);
@@ -117,12 +114,7 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.set("capacitance", 1e-6);
 
-      const analogElement = CapacitorDefinition.analogFactory!(
-        [1, 2],
-        -1,
-        props,
-        () => 0,
-      );
+      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
       analogElement.stampCompanion!(1e-6, "bdf2", voltages);
@@ -139,12 +131,7 @@ describe("Capacitor", () => {
   describe("is_reactive_true", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
-      const analogElement = CapacitorDefinition.analogFactory!(
-        [1, 2],
-        -1,
-        props,
-        () => 0,
-      );
+      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       expect(analogElement.isReactive).toBe(true);
     });

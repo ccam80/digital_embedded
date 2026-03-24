@@ -15,7 +15,7 @@
 
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
-import { PinDirection } from '../core/pin.js';
+import { PinDirection, pinWorldPosition } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
 // CycleInfo — describes one detected cycle
@@ -76,7 +76,7 @@ export function detectCycles(circuit: Circuit): CycleInfo[] {
     if (isMemoryComponent(el)) continue;
 
     for (const pin of el.getPins()) {
-      const key = posKey(pin.position);
+      const key = posKey(pinWorldPosition(el, pin));
       if (pin.direction === PinDirection.OUTPUT) {
         netDrivers.set(key, el);
       } else if (pin.direction === PinDirection.INPUT) {
@@ -111,7 +111,7 @@ export function detectCycles(circuit: Circuit): CycleInfo[] {
 
     for (const pin of el.getPins()) {
       if (pin.direction === PinDirection.OUTPUT) {
-        const key = posKey(pin.position);
+        const key = posKey(pinWorldPosition(el, pin));
         const nid = netId.get(key);
         if (nid === undefined) continue;
 
@@ -177,7 +177,7 @@ function buildNetMap(
   // Register all pin positions as nodes
   for (const el of circuit.elements) {
     for (const pin of el.getPins()) {
-      find(posKey(pin.position));
+      find(posKey(pinWorldPosition(el, pin)));
     }
   }
 
@@ -213,7 +213,7 @@ function collectNetConsumers(
   for (const el of elements) {
     for (const pin of el.getPins()) {
       if (pin.direction === PinDirection.INPUT) {
-        const key = posKey(pin.position);
+        const key = posKey(pinWorldPosition(el, pin));
         if (netId.get(key) === nid) {
           result.push(el);
           break;

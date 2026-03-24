@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -113,18 +113,24 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 // ---------------------------------------------------------------------------
 
 function createGroundAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   _props: PropertyBag,
-): AnalogElement {
-  const n0 = nodeIds[0];
+): AnalogElementCore {
+  const n0 = pinNodes.get("out")!;
   return {
-    nodeIndices: [n0],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
     stamp(_solver: SparseSolver): void {
       // Ground constraint is handled by the compiler's node mapping.
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // Ground constraint is enforced by node mapping (pin node = MNA node 0).
+      // No current flows through the element stamp — return zero for the one pin.
+      return [0];
     },
   };
 }
@@ -177,6 +183,8 @@ export const GroundDefinition: ComponentDefinition = {
   propertyDefs: GROUND_PROPERTY_DEFS,
   attributeMap: GROUND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "Ground â€” outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
 };

@@ -18,7 +18,7 @@
  */
 
 import type { ComponentDefinition } from "../core/registry.js";
-import type { AnalogElement } from "./element.js";
+import type { AnalogElement, AnalogElementCore } from "./element.js";
 import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
 import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
@@ -227,7 +227,8 @@ export function expandTransistorModel(
     if (!factory) continue;
 
     const props = el.getProperties();
-    const analogEl = factory(remappedNodes, -1, props, () => 0);
+    const core = factory(remappedNodes, -1, props, () => 0);
+    const analogEl: AnalogElement = Object.assign(core, { pinNodeIds: remappedNodes });
     elements.push(analogEl);
   }
 
@@ -314,7 +315,7 @@ type AnalogFactory = (
   branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
-) => AnalogElement;
+) => AnalogElementCore;
 
 // Known analog component type IDs and their factories.
 // This map is populated by registerAnalogFactory() calls from component modules.

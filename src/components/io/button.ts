@@ -197,6 +197,8 @@ export const ButtonDefinition: ComponentDefinition = {
   propertyDefs: BUTTON_PROPERTY_DEFS,
   attributeMap: BUTTON_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "Button — momentary push button.\n" +
     "Output is high while the button is held down, low when released.\n" +

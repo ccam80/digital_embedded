@@ -41,7 +41,7 @@ function makeZenerAtVd(
       ...modelOverrides,
     },
   };
-  const element = createZenerElement([1, 2], -1, propsObj as unknown as PropertyBag);
+  const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
 
   // Drive to operating point
   const voltages = new Float64Array(2);
@@ -57,7 +57,7 @@ function makeZenerAtVd(
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -98,7 +98,7 @@ describe("Zener", () => {
 
     // Create element and drive to breakdown
     const propsObj = { _modelParams: { IS, N, BV, IBV } };
-    const el = createZenerElement([1, 0], -1, propsObj as unknown as PropertyBag);
+    const el = createZenerElement(new Map([["A", 1], ["K", 0]]), [], -1, propsObj as unknown as PropertyBag);
 
     // Verify the element is nonlinear
     expect(el.isNonlinear).toBe(true);
@@ -132,13 +132,13 @@ describe("Zener", () => {
 
   it("isNonlinear_true", () => {
     const propsObj = { _modelParams: { IS: 1e-14, N: 1, BV: 5.1 } };
-    const element = createZenerElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
     const propsObj = { _modelParams: { IS: 1e-14, N: 1, BV: 5.1 } };
-    const element = createZenerElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element.isReactive).toBe(false);
   });
 
@@ -182,7 +182,7 @@ describe("Integration", () => {
     // When node1 ≈ 5.1V, Vd = 0 - 5.1 = -5.1V (breakdown)
     // IBV=1e-3 gives sharp clamping at BV (SPICE default)
     const zenerProps = { _modelParams: { IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 } };
-    const z = createZenerElement([0, 1], -1, zenerProps as unknown as PropertyBag);
+    const z = createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps as unknown as PropertyBag);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

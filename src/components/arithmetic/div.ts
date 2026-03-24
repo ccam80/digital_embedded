@@ -278,6 +278,8 @@ export const DivDefinition: ComponentDefinition = {
   propertyDefs: DIV_PROPERTY_DEFS,
   attributeMap: DIV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["a", "b"],
+  outputSchema: ["q", "r"],
   helpText:
     "Div — N-bit divider with quotient and remainder.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +

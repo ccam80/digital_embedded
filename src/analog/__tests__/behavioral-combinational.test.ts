@@ -366,27 +366,36 @@ describe("Registration", () => {
 
   it("factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 2:1 mux (selectorBits=1): nodeIds = 1-based MNA node IDs
+    // 2:1 mux (selectorBits=1): pins "sel", "in_0", "in_1", "out"
     const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = factory([1, 2, 3, 4], -1, props, () => 0);
+    const element = factory(
+      new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]),
+      [], -1, props, () => 0,
+    );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });
 
   it("demux_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 1:2 demux (selectorBits=1): nodeIds = 1-based MNA node IDs
+    // 1:2 demux (selectorBits=1): pins "sel", "out_0", "out_1", "in"
     const factory = makeBehavioralDemuxAnalogFactory(1);
-    const element = factory([1, 2, 3, 4], -1, props, () => 0);
+    const element = factory(
+      new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]),
+      [], -1, props, () => 0,
+    );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });
 
   it("decoder_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag([]);
-    // 1-bit decoder (selectorBits=1): nodeIds = 1-based MNA node IDs
+    // 1-bit decoder (selectorBits=1): pins "sel", "out_0", "out_1"
     const factory = makeBehavioralDecoderAnalogFactory(1);
-    const element = factory([1, 2, 3], -1, props, () => 0);
+    const element = factory(
+      new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]),
+      [], -1, props, () => 0,
+    );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
   });

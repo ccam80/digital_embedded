@@ -146,14 +146,32 @@ export class CurrentFlowAnimator {
 
     // --- component bodies ---
     for (const path of this._resolver.getComponentPaths()) {
-      const dx = path.pin1.x - path.pin0.x;
-      const dy = path.pin1.y - path.pin0.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 1e-12) continue;
-
       const key = this._componentPathKey(path);
       const offset = this._componentOffsets.get(key) ?? 0;
-      this._renderDotsAlongSegment(ctx, path.pin0.x, path.pin0.y, dx, dy, len, offset);
+
+      // Build the sequence of points: pin0 → waypoints → pin1
+      const points: { x: number; y: number }[] = [path.pin0];
+      if (path.waypoints) {
+        for (const wp of path.waypoints) points.push(wp);
+      }
+      points.push(path.pin1);
+
+      // Render dots along each sub-segment. Treat the full polyline as one
+      // continuous segment by accumulating length so dot spacing is seamless
+      // across waypoints.
+      let segOffset = offset;
+      for (let i = 0; i < points.length - 1; i++) {
+        const dx = points[i + 1].x - points[i].x;
+        const dy = points[i + 1].y - points[i].y;
+        const segLen = Math.sqrt(dx * dx + dy * dy);
+        if (segLen < 1e-12) continue;
+        this._renderDotsAlongSegment(
+          ctx, points[i].x, points[i].y, dx, dy, segLen, segOffset,
+        );
+        // Advance offset by segment length so dots on the next segment
+        // continue seamlessly from where this segment's dots ended.
+        segOffset += segLen;
+      }
     }
 
     ctx.restore();

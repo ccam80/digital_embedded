@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 
@@ -66,13 +66,14 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // ---------------------------------------------------------------------------
 
 export function createTriacElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeMT1 = nodeIds[0]; // Main Terminal 1
-  const nodeMT2 = nodeIds[1]; // Main Terminal 2
-  const nodeG   = nodeIds[2]; // Gate
+): AnalogElementCore {
+  const nodeMT2 = pinNodes.get("MT2")!; // Main Terminal 2
+  const nodeMT1 = pinNodes.get("MT1")!; // Main Terminal 1
+  const nodeG   = pinNodes.get("G")!;   // Gate
 
   const vOn: number      = props.getOrDefault<number>("vOn",      1.5);
   const iH: number       = props.getOrDefault<number>("iH",       10e-3);
@@ -183,7 +184,6 @@ export function createTriacElement(
   }
 
   return {
-    nodeIndices: [nodeMT1, nodeMT2, nodeG],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -244,6 +244,30 @@ export function createTriacElement(
       const v1p = nodeMT1 > 0 ? prevVoltages[nodeMT1 - 1] : 0;
       const v2p = nodeMT2 > 0 ? prevVoltages[nodeMT2 - 1] : 0;
       return Math.abs((v2 - v1) - (v2p - v1p)) <= 2 * nVt;
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // pinLayout order: [MT2(0), MT1(1), G(2)]
+      // Positive = current flowing INTO the element at that pin.
+      const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
+      const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
+      const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
+
+      // Main path (MT2-MT1): Norton equivalent stamps _geq across MT2-MT1 with _ieq source.
+      // stampNonlinear: stampRHS(nodeMT2, -_ieq), stampRHS(nodeMT1, _ieq)
+      // Current from MT2 into element: I = _geq * (V_MT2 - V_MT1) + _ieq
+      const iMT = _geq * (v2 - v1) + _ieq;
+
+      // Gate-MT1 path: Norton equivalent _gGateGeq across G-MT1 with _gGateIeq source.
+      // Current from G into element: I = _gGateGeq * (V_G - V_MT1) + _gGateIeq
+      const iG = _gGateGeq * (vG - v1) + _gGateIeq;
+
+      // KCL: I_MT2 + I_MT1 + I_G = 0 → I_MT1 = -(I_MT2 + I_G)
+      const iMT2 = iMT;
+      const iMT1 = -(iMT2 + iG);
+
+      // Return in pinLayout order [MT2, MT1, G]
+      return [iMT2, iMT1, iG];
     },
   };
 }

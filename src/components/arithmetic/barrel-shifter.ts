@@ -230,6 +230,8 @@ export const BarrelShifterDefinition: ComponentDefinition = {
   propertyDefs: BARREL_SHIFTER_PROPERTY_DEFS,
   attributeMap: BARREL_SHIFTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["in", "shift"],
+  outputSchema: ["out"],
   helpText: "BarrelShifter — configurable shift/rotate. Modes: logical, rotate, arithmetic. Directions: left, right.",
   defaultDelay: 10,
 };

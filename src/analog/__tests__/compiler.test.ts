@@ -84,7 +84,7 @@ function makeElement(
 
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -94,7 +94,7 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
 
 function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -104,7 +104,7 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
 
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: true,
@@ -142,8 +142,9 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogVs"),
     engineType: "analog" as const,
     requiresBranchRow: true,
-    analogFactory(nodeIds, branchIdx, _props, _getTime) {
-      return makeTestVsElement(nodeIds[0] ?? 0, nodeIds[1] ?? 0, branchIdx);
+    analogFactory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
     },
   });
 
@@ -151,8 +152,9 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogR"),
     engineType: "analog" as const,
     requiresBranchRow: false,
-    analogFactory(nodeIds, _branchIdx, _props, _getTime) {
-      return makeTestResistorElement(nodeIds[0] ?? 0, nodeIds[1] ?? 0);
+    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
     },
   });
 
@@ -160,8 +162,9 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogL"),
     engineType: "analog" as const,
     requiresBranchRow: true,
-    analogFactory(nodeIds, branchIdx, _props, _getTime) {
-      return makeTestInductorElement(nodeIds[0] ?? 0, nodeIds[1] ?? 0, branchIdx);
+    analogFactory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
     },
   });
 
@@ -173,16 +176,18 @@ function buildTestRegistry(): ComponentRegistry {
   registry.register({
     ...makeBaseDef("In"),
     engineType: "analog" as const,
-    analogFactory(nodeIds, _branchIdx, _props, _getTime) {
-      return makeTestResistorElement(nodeIds[0] ?? 0, 0);
+    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      const [n0] = [...pinNodes.values()];
+      return makeTestResistorElement(n0 ?? 0, 0);
     },
   });
 
   registry.register({
     ...makeBaseDef("Out"),
     engineType: "analog" as const,
-    analogFactory(nodeIds, _branchIdx, _props, _getTime) {
-      return makeTestResistorElement(nodeIds[0] ?? 0, 0);
+    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      const [n0] = [...pinNodes.values()];
+      return makeTestResistorElement(n0 ?? 0, 0);
     },
   });
 
@@ -259,7 +264,7 @@ describe("AnalogCompiler", () => {
 
     // The voltage source element should have one terminal at ground (node 0)
     const vsElement = compiled.elements[0];
-    expect(vsElement.nodeIndices).toContain(0);
+    expect(vsElement.pinNodeIds).toContain(0);
   });
 
   it("maps_labels_to_nodes", () => {
@@ -380,8 +385,9 @@ describe("AnalogCompiler", () => {
     const registry = new ComponentRegistry();
 
     const factorySpy = vi.fn(
-      (nodeIds: number[], branchIdx: number, _props: PropertyBag, _getTime: () => number) => {
-        return makeTestVsElement(nodeIds[0] ?? 0, nodeIds[1] ?? 0, branchIdx);
+      (pinNodes: ReadonlyMap<string, number>, _internalNodeIds: readonly number[], branchIdx: number, _props: PropertyBag, _getTime: () => number) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
       },
     );
 
@@ -389,6 +395,10 @@ describe("AnalogCompiler", () => {
       ...makeBaseDef("SpyVs"),
       engineType: "analog" as const,
       requiresBranchRow: true,
+      pinLayout: [
+        { label: "pos", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+        { label: "neg", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      ],
       analogFactory: factorySpy,
     });
 
@@ -411,11 +421,12 @@ describe("AnalogCompiler", () => {
 
     expect(factorySpy).toHaveBeenCalledOnce();
 
-    const [nodeIds, branchIdx, , getTime] = factorySpy.mock.calls[0]!;
+    const [pinNodes, _internalNodeIds, branchIdx, , getTime] = factorySpy.mock.calls[0]!;
 
     // pos terminal should map to a non-ground node (>0); neg should be 0 (ground)
-    expect(nodeIds).toContain(0);
-    expect(nodeIds.some((n: number) => n > 0)).toBe(true);
+    const nodeValues = [...(pinNodes as ReadonlyMap<string, number>).values()];
+    expect(nodeValues).toContain(0);
+    expect(nodeValues.some((n: number) => n > 0)).toBe(true);
 
     // branchIdx is the absolute branch row: totalNodeCount + 0 = 1
     expect(branchIdx).toBeGreaterThanOrEqual(0);

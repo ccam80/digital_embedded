@@ -12,9 +12,9 @@
  *   pos ─── ESR ─── capNode ─── capacitor+leakage ─── neg
  *
  * Three MNA nodes are used:
- *   nodeIndices[0] = n_pos  (positive terminal / anode)
- *   nodeIndices[1] = n_neg  (negative terminal / cathode)
- *   nodeIndices[2] = n_cap  (internal node between ESR and capacitor body)
+ *   pinNodeIds[0] = n_pos  (positive terminal / anode)
+ *   pinNodeIds[1] = n_neg  (negative terminal / cathode)
+ *   pinNodeIds[2] = n_cap  (internal node between ESR and capacitor body)
  *
  * Linear elements stamped in stamp():
  *   - ESR conductance between n_pos and n_cap
@@ -40,7 +40,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import {
@@ -216,7 +216,7 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // ---------------------------------------------------------------------------
 
 export class AnalogPolarizedCapElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = true;
@@ -234,7 +234,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   private _reverseBiasDiagEmitted: boolean = false;
 
   /**
-   * @param nodeIndices    - [n_pos, n_neg, n_cap] — n_cap is the internal node
+   * @param pinNodeIds    - [n_pos, n_neg, n_cap] — n_cap is the internal node
    * @param capacitance    - Capacitance in farads
    * @param esr            - Equivalent series resistance in ohms
    * @param rLeak          - Leakage resistance in ohms (V_rated / I_leak)
@@ -242,14 +242,14 @@ export class AnalogPolarizedCapElement implements AnalogElement {
    * @param emitDiagnostic - Callback invoked when polarity violation is detected
    */
   constructor(
-    nodeIndices: number[],
+    pinNodeIds: number[],
     capacitance: number,
     esr: number,
     rLeak: number,
     reverseMax: number,
     emitDiagnostic?: (diag: SolverDiagnostic) => void,
   ) {
-    this.nodeIndices = nodeIndices;
+    this.pinNodeIds = pinNodeIds;
     this.C = capacitance;
     this.G_esr = 1 / Math.max(esr, MIN_RESISTANCE);
     this.G_leak = 1 / Math.max(rLeak, MIN_RESISTANCE);
@@ -258,9 +258,9 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   }
 
   stamp(solver: SparseSolver): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
-    const nCap = this.nodeIndices[2];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
+    const nCap = this.pinNodeIds[2];
 
     // ESR: conductance between n_pos and n_cap
     stampG(solver, nPos, nPos, this.G_esr);
@@ -291,8 +291,8 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   }
 
   updateOperatingPoint(voltages: Float64Array): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
 
     const vAnode = nPos > 0 ? voltages[nPos - 1] : 0;
     const vCathode = nNeg > 0 ? voltages[nNeg - 1] : 0;
@@ -322,9 +322,19 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     }
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nPos = this.pinNodeIds[0];
+    const nCap = this.pinNodeIds[2];
+    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+    const vCap = nCap > 0 ? voltages[nCap - 1] : 0;
+    // Current into pos pin = current through ESR flowing into the element
+    const I = this.G_esr * (vPos - vCap);
+    return [I, -I];
+  }
+
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const nCap = this.nodeIndices[2];
-    const nNeg = this.nodeIndices[1];
+    const nCap = this.pinNodeIds[2];
+    const nNeg = this.pinNodeIds[1];
 
     const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
@@ -345,10 +355,11 @@ export class AnalogPolarizedCapElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 function createPolarizedCapElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const C = props.getOrDefault<number>("capacitance", 100e-6);
   const esr = props.getOrDefault<number>("esr", 0.1);
   const voltageRating = props.getOrDefault<number>("voltageRating", 25);
@@ -357,7 +368,13 @@ function createPolarizedCapElement(
   const reverseMax = props.getOrDefault<number>("reverseMax", 1.0);
 
   // nodeIds = [n_pos, n_neg, n_cap_internal] — compiler provides the internal node
-  return new AnalogPolarizedCapElement(nodeIds, C, esr, rLeak, reverseMax);
+  return new AnalogPolarizedCapElement(
+    [pinNodes.get("pos")!, pinNodes.get("neg")!, internalNodeIds[0]],
+    C,
+    esr,
+    rLeak,
+    reverseMax,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +386,7 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "capacitance",
     type: PropertyType.FLOAT,
     label: "Capacitance (F)",
+    unit: "F",
     defaultValue: 100e-6,
     min: 1e-12,
     description: "Capacitance in farads",
@@ -377,6 +395,7 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "esr",
     type: PropertyType.FLOAT,
     label: "ESR (Ω)",
+    unit: "Ω",
     defaultValue: 0.1,
     min: 0,
     description: "Equivalent series resistance in ohms",
@@ -385,6 +404,7 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "leakageCurrent",
     type: PropertyType.FLOAT,
     label: "Leakage Current (A)",
+    unit: "A",
     defaultValue: 1e-6,
     min: 0,
     description: "DC leakage current at rated voltage",
@@ -393,6 +413,7 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "voltageRating",
     type: PropertyType.FLOAT,
     label: "Voltage Rating (V)",
+    unit: "V",
     defaultValue: 25,
     min: 1,
     description: "Maximum rated voltage",
@@ -401,6 +422,7 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "reverseMax",
     type: PropertyType.FLOAT,
     label: "Reverse Threshold (V)",
+    unit: "V",
     defaultValue: 1.0,
     min: 0,
     description: "Reverse voltage threshold that triggers a polarity warning",

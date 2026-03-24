@@ -243,19 +243,52 @@ export function compileCircuit(
 
   for (let i = 0; i < componentCount; i++) {
     const refs = allPinRefs[i]!;
-    const inputs: number[] = [];
-    const outputs: number[] = [];
-    for (let j = 0; j < refs.length; j++) {
-      const ref = refs[j]!;
-      const netId = slotToNetId(slotOf(i, j));
-      if (ref.pin.direction === PinDirection.OUTPUT || ref.pin.direction === PinDirection.BIDIRECTIONAL) {
-        outputs.push(netId);
-      } else {
-        inputs.push(netId);
+    const el = elements[i]!;
+    const def = registry.get(el.typeId)!;
+
+    if (def.inputSchema) {
+      // Schema-driven: build inputs in schema order by matching pin labels
+      const inputs: number[] = [];
+      for (const label of def.inputSchema) {
+        const refIdx = refs.findIndex(r => r.pin.label === label);
+        if (refIdx >= 0) {
+          inputs.push(slotToNetId(slotOf(i, refIdx)));
+        }
       }
+      componentInputNets.push(inputs);
+    } else {
+      // Fallback: existing behaviour — getPins() order filtered by direction
+      const inputs: number[] = [];
+      for (let j = 0; j < refs.length; j++) {
+        const ref = refs[j]!;
+        if (ref.pin.direction !== PinDirection.OUTPUT && ref.pin.direction !== PinDirection.BIDIRECTIONAL) {
+          inputs.push(slotToNetId(slotOf(i, j)));
+        }
+      }
+      componentInputNets.push(inputs);
     }
-    componentInputNets.push(inputs);
-    componentOutputNets.push(outputs);
+
+    if (def.outputSchema) {
+      // Schema-driven: build outputs in schema order by matching pin labels
+      const outputs: number[] = [];
+      for (const label of def.outputSchema) {
+        const refIdx = refs.findIndex(r => r.pin.label === label);
+        if (refIdx >= 0) {
+          outputs.push(slotToNetId(slotOf(i, refIdx)));
+        }
+      }
+      componentOutputNets.push(outputs);
+    } else {
+      // Fallback: existing behaviour — getPins() order filtered by direction
+      const outputs: number[] = [];
+      for (let j = 0; j < refs.length; j++) {
+        const ref = refs[j]!;
+        if (ref.pin.direction === PinDirection.OUTPUT || ref.pin.direction === PinDirection.BIDIRECTIONAL) {
+          outputs.push(slotToNetId(slotOf(i, j)));
+        }
+      }
+      componentOutputNets.push(outputs);
+    }
   }
 
   // Build flat wiring arrays.

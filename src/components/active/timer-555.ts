@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -253,9 +253,9 @@ export class Timer555Element extends AbstractCircuitElement {
  * Discharge (stampNonlinear): R_sat or R_hiZ between DIS and GND.
  */
 function createTimer555Element(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const vDrop      = props.getOrDefault<number>("vDrop", 1.5);
   const rDischarge  = Math.max(props.getOrDefault<number>("rDischarge", 10), 1e-3);
   const rOut        = 10;     // output drive resistance (Ω)
@@ -263,14 +263,14 @@ function createTimer555Element(
   const rDiv1       = 5000;   // VCC→CTRL divider arm (Ω)
   const rDiv2       = 10000;  // CTRL→GND divider arm (2×5kΩ combined, Ω)
 
-  const nDis  = nodeIds[0];
-  const nTrig = nodeIds[1];
-  const nThr  = nodeIds[2];
-  const nVcc  = nodeIds[3];
-  const nCtrl = nodeIds[4];
-  const nOut  = nodeIds[5];
-  const nRst  = nodeIds[6];
-  const nGnd  = nodeIds[7];
+  const nDis  = pinNodes.get("DIS")!;
+  const nTrig = pinNodes.get("TRIG")!;
+  const nThr  = pinNodes.get("THR")!;
+  const nVcc  = pinNodes.get("VCC")!;
+  const nCtrl = pinNodes.get("CTRL")!;
+  const nOut  = pinNodes.get("OUT")!;
+  const nRst  = pinNodes.get("RST")!;
+  const nGnd  = pinNodes.get("GND")!;
 
   // SR flip-flop output: true=SET(high output), false=RESET(low output)
   let _flipflopQ = false;
@@ -360,7 +360,6 @@ function createTimer555Element(
   }
 
   return {
-    nodeIndices: [nDis, nTrig, nThr, nVcc, nCtrl, nOut, nRst, nGnd],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -396,6 +395,71 @@ function createTimer555Element(
       // Called once per accepted timestep: now safe to advance state.
       updateVoltageCache(voltages);
       advanceFlipflop(voltages);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
+      // (indices 0–7 matching buildTimer555PinDeclarations())
+      //
+      // Convention: positive = current flowing INTO the element at that pin.
+      //
+      // Stamped constitutive equations (read from stamp() / stampNonlinear()):
+      //   Voltage divider:  rDiv1 between VCC↔CTRL, rDiv2 between CTRL↔GND
+      //   Output Norton:    conductance rOut between OUT↔GND, Norton current vOutTarget/rOut into OUT
+      //   Discharge:        conductance r_dis between DIS↔GND (rDischarge when Q=0, rHiZ when Q=1)
+      //
+      // TRIG, THR, RST are pure voltage sense inputs — no current is stamped at these pins.
+      //
+      // KCL: sum of all 8 pin currents = 0 (VCC and GND carry the balance).
+
+      const vVcc  = readNode(voltages, nVcc);
+      const vGnd  = readNode(voltages, nGnd);
+      const vCtrl = readNode(voltages, nCtrl);
+      const vOut  = readNode(voltages, nOut);
+      const vDis  = readNode(voltages, nDis);
+
+      const gDiv1 = 1 / rDiv1;
+      const gDiv2 = 1 / rDiv2;
+      const gOut  = 1 / rOut;
+      const rDis  = _flipflopQ ? rHiZ : rDischarge;
+      const gDis  = 1 / rDis;
+
+      // Output Norton target (matches stampNonlinear logic)
+      const vOutTarget = _flipflopQ ? _vOH : _vOL;
+
+      // Current into element at each pin from its stamped conductance(s).
+      // For a resistor A↔B: I_into_element_at_A = G*(V_A - V_B)
+      //                      I_into_element_at_B = G*(V_B - V_A)
+      // For Norton at OUT↔GND: element injects iNorton=vTarget*gOut INTO OUT (sourcing).
+      //   → current into element at OUT  = G_out*(V_out - V_gnd) - vTarget*G_out
+      //   → current into element at GND (Norton contribution) = G_out*(V_gnd - V_out) + vTarget*G_out
+      //     (the Norton source pulls vTarget*G_out OUT of the element at GND, so INTO element = +vTarget*G_out... wait: Norton injects into OUT from RHS; GND gets -iNorton on RHS, meaning element takes vTarget*G_out from GND node: INTO element at GND = -(−vTarget*G_out) = ... )
+      //
+      // Careful re GND Norton term:
+      //   stampRHS(nPos-1, +iNorton) → element sources iNorton INTO the OUT node (element supplies this)
+      //   stampRHS(nNeg-1, -iNorton) → element sinks iNorton FROM the GND node (element takes this)
+      // So: current element draws FROM GND due to Norton = +iNorton = vTarget*G_out
+      //     i.e. current INTO element at GND (Norton part) = +vTarget*G_out
+      //     current INTO element at OUT (Norton part) = -iNorton = -vTarget*G_out
+      //       (the element supplies current to OUT, so it receives negative current at OUT from circuit)
+      //
+      // Net INTO element at OUT  = G_out*(V_out - V_gnd) - vTarget*G_out
+      // Net INTO element at GND  = G_div2*(V_gnd - V_ctrl) + G_dis*(V_gnd - V_dis)
+      //                          + G_out*(V_gnd - V_out) + vTarget*G_out
+
+      const iDis  = gDis * (vDis  - vGnd);
+      const iTrig = 0;
+      const iThr  = 0;
+      const iVcc  = gDiv1 * (vVcc  - vCtrl);
+      const iCtrl = gDiv1 * (vCtrl - vVcc) + gDiv2 * (vCtrl - vGnd);
+      const iOut  = gOut  * (vOut  - vGnd)  - vOutTarget * gOut;
+      const iRst  = 0;
+      const iGnd  = gDiv2 * (vGnd  - vCtrl)
+                  + gDis  * (vGnd  - vDis)
+                  + gOut  * (vGnd  - vOut)  + vOutTarget * gOut;
+
+      // Return in pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
+      return [iDis, iTrig, iThr, iVcc, iCtrl, iOut, iRst, iGnd];
     },
   };
 }
@@ -475,10 +539,11 @@ export const Timer555Definition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createTimer555Element(nodeIds, props);
+  ): AnalogElementCore {
+    return createTimer555Element(pinNodes, props);
   },
 };

@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 import { BJT_NPN_DEFAULTS, BJT_PNP_DEFAULTS } from "../../analog/model-defaults.js";
@@ -171,13 +171,13 @@ function computeBjtOp(
 
 export function createBjtElement(
   polarity: 1 | -1,
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeB = nodeIds[0]; // base
-  const nodeC = nodeIds[1]; // collector
-  const nodeE = nodeIds[2]; // emitter
+): AnalogElementCore {
+  const nodeB = pinNodes.get("B")!; // base
+  const nodeC = pinNodes.get("C")!; // collector
+  const nodeE = pinNodes.get("E")!; // emitter
 
   // Resolve model parameters
   const modelParams =
@@ -210,7 +210,6 @@ export function createBjtElement(
   );
 
   return {
-    nodeIndices: [nodeC, nodeB, nodeE],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -317,6 +316,15 @@ export function createBjtElement(
         Math.abs(vbeNew - vbePrev) <= 2 * nfVt &&
         Math.abs(vbcNew - vbcPrev) <= 2 * nrVt
       );
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinNodeIds order: [nodeB, nodeC, nodeE] (pinLayout order: [B, C, E])
+      // Positive = current flowing INTO element at that pin.
+      const ic = polarity * op.ic;
+      const ib = polarity * op.ib;
+      const ie = -(ic + ib); // KCL: ib + ic + ie = 0
+      return [ib, ic, ie];
     },
   };
 }
@@ -622,8 +630,8 @@ export const NpnBjtDefinition: ComponentDefinition = {
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   analogDeviceType: "NPN",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(1, nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+    createBjtElement(1, pinNodes, branchIdx, props),
 };
 
 export const PnpBjtDefinition: ComponentDefinition = {
@@ -641,6 +649,6 @@ export const PnpBjtDefinition: ComponentDefinition = {
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   analogDeviceType: "PNP",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(-1, nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+    createBjtElement(-1, pinNodes, branchIdx, props),
 };

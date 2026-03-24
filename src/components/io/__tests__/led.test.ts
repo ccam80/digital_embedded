@@ -716,7 +716,7 @@ describe("RGBLED", () => {
 function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -757,7 +757,7 @@ describe("AnalogLED", () => {
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    const element = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+    const element = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(false);
   });
@@ -779,7 +779,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    const led = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+    const led = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -812,7 +812,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    const led = LedDefinition.analogFactory!([1, 0], -1, props, () => 0);
+    const led = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

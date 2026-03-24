@@ -226,6 +226,8 @@ export const OutDefinition: ComponentDefinition = {
   propertyDefs: OUT_PROPERTY_DEFS,
   attributeMap: OUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["in"],
+  outputSchema: [],
   helpText:
     "Out — output display component.\n" +
     "Shows the current value of the connected signal.\n" +

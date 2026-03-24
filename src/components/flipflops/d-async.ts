@@ -287,6 +287,10 @@ export const DAsyncDefinition: ComponentDefinition = {
   propertyDefs: D_FF_AS_PROPERTY_DEFS,
   attributeMap: D_FF_AS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // executeDAsync reads: inBase+0=Set, inBase+1=D, inBase+2=C, inBase+3=Clr
+  // writes: outBase+0=Q, outBase+1=~Q
+  inputSchema: ["Set", "D", "C", "Clr"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "D Flip-Flop with async Set/Clear — edge-triggered with async preset/clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +

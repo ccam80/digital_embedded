@@ -52,7 +52,12 @@ function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogE
     }
   }
   const props = new PropertyBag(entries);
-  return createRealOpAmpElement([1, 2, 3, 4, 5], props);
+  const pinNodes = new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]);
+  const el = createRealOpAmpElement(pinNodes, props);
+  // Inject pinNodeIds in pinLayout order: [in-, in+, out, Vcc+, Vcc-] → [2, 1, 3, 4, 5]
+  const pinLayout = RealOpAmpDefinition.pinLayout;
+  Object.assign(el, { pinNodeIds: pinLayout.map(p => pinNodes.get(p.label) ?? 0) });
+  return el as AnalogElement;
 }
 
 /**
@@ -61,7 +66,7 @@ function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogE
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -82,7 +87,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, voltage: number): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchRow,
     isNonlinear: false,
     isReactive: false,
@@ -175,7 +180,7 @@ describe("DCGain", () => {
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
 
-    const opamp = createRealOpAmpElement([nInp, nInn, nOut, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -219,7 +224,7 @@ describe("DCGain", () => {
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
-    const opamp = createRealOpAmpElement([nInp, nFeedback, nFeedback, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -271,7 +276,7 @@ describe("Bandwidth", () => {
     expect(tauFromFp).toBeCloseTo(tauExpected, 8);
 
     // Verify the element creates successfully with the right params
-    const el = createRealOpAmpElement([1, 2, 3, 4, 5], new PropertyBag([
+    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), new PropertyBag([
       ["aol", aol], ["gbw", gbw], ["slewRate", 0.5e6],
       ["vos", 0], ["iBias", 0], ["rIn", 1e12],
       ["rOut", 75], ["iMax", 25e-3], ["vSatPos", 1.5], ["vSatNeg", 1.5],
@@ -296,7 +301,7 @@ describe("Bandwidth", () => {
     expect(bwCl * aCl).toBeCloseTo(gbw, 0);
 
     // Verify the element is created with correct GBW
-    const el = createRealOpAmpElement([1, 2, 3, 4, 5], new PropertyBag([
+    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), new PropertyBag([
       ["aol", 100000], ["gbw", gbw], ["slewRate", 0.5e6],
       ["vos", 0], ["iBias", 0], ["rIn", 1e12],
       ["rOut", 75], ["iMax", 25e-3], ["vSatPos", 1.5], ["vSatNeg", 1.5],
@@ -326,7 +331,7 @@ describe("SlewRate", () => {
 
     const slewRate = 0.5e6; // V/s
 
-    const opamp = createRealOpAmpElement([nInp, nFeedback, nFeedback, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", slewRate],
@@ -375,7 +380,7 @@ describe("SlewRate", () => {
     const slewRate = 0.5e6;
     const dt = 1e-6;
 
-    const opamp = createRealOpAmpElement([nInp, nFeedback, nFeedback, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", slewRate],
@@ -441,7 +446,7 @@ describe("Offset", () => {
 
     const vos = 1e-3; // 1 mV
 
-    const opamp = createRealOpAmpElement([nInp, nInn, nOut, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -496,7 +501,7 @@ describe("CurrentLimit", () => {
 
     const iMax = 25e-3;
 
-    const opamp = createRealOpAmpElement([nInp, nOut, nOut, nVccP, nVccN], new PropertyBag([
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nOut], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -560,7 +565,7 @@ describe("RealOpAmp", () => {
       ["vSatPos",  1.5],
       ["vSatNeg",  1.5],
     ]);
-    const el = createRealOpAmpElement([1, 2, 3, 4, 5], props);
+    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), props);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(true);
     expect(el.isReactive).toBe(true);
@@ -570,7 +575,7 @@ describe("RealOpAmp", () => {
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
-    const opamp = createRealOpAmpElement([nInp, nFeedback, nFeedback, nVccP, nVccN], props);
+    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), props);
     const elements: AnalogElement[] = [
       opamp,
       makeDcSource(nInp,  0, brVin,   3.0),
@@ -591,7 +596,8 @@ describe("RealOpAmp", () => {
     expect(el.isNonlinear).toBe(true);
     expect(el.isReactive).toBe(true);
     expect(el.branchIndex).toBe(-1);
-    expect(el.nodeIndices).toEqual([1, 2, 3, 4, 5]);
+    // pinLayout order: ["in-", "in+", "out", "Vcc+", "Vcc-"] → [in-=2, in+=1, out=3, Vcc+=4, Vcc-=5]
+    expect(el.pinNodeIds).toEqual([2, 1, 3, 4, 5]);
   });
 
   it("component_definition_has_correct_engine_type", () => {

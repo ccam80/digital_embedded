@@ -302,6 +302,8 @@ export const TerminalDefinition: ComponentDefinition = {
   propertyDefs: TERMINAL_PROPERTY_DEFS,
   attributeMap: TERMINAL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.TERMINAL,
+  inputSchema: ["D", "C", "en"],
+  outputSchema: [],
   helpText:
     "Terminal — serial text terminal with keyboard input.\n" +
     "din (8-bit): character code to display.\n" +

@@ -109,7 +109,8 @@ describe("DcVoltageSource", () => {
   it("default_voltage_from_analog_factory", () => {
     const props = new PropertyBag();
     const el = DcVoltageSourceDefinition.analogFactory!(
-      [1, 0],
+      new Map([["pos", 1], ["neg", 0]]),
+      [],
       2,
       props,
       () => 0,

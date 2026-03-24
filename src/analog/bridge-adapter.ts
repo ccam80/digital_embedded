@@ -44,7 +44,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   /** Cached solver reference for stampCompanion. */
   private _solver: SparseSolver | null = null;
 
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -57,7 +57,7 @@ export class BridgeOutputAdapter implements AnalogElement {
    */
   constructor(pinModel: DigitalOutputPinModel) {
     this._pinModel = pinModel;
-    this.nodeIndices = [pinModel.nodeId];
+    this.pinNodeIds = [pinModel.nodeId];
   }
 
   /**
@@ -142,6 +142,33 @@ export class BridgeOutputAdapter implements AnalogElement {
     // Intentionally empty — logic level is owned by the coordinator.
   }
 
+  /**
+   * Per-pin current for the single output node.
+   *
+   * The Norton equivalent stamps conductance gOut = 1/rOut and a current
+   * source V_target * gOut into the node. At convergence:
+   *   I_into_node = (V_node - V_target) * gOut
+   *
+   * Positive = current flowing INTO the element (element is sinking current
+   * from the net). Sum is nonzero — the difference flows through the implicit
+   * internal supply. This is expected for a bounded output driver.
+   *
+   * Hi-Z mode: no target voltage, only conductance 1/rHiZ to ground.
+   *   I = V_node / rHiZ
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nodeId = this._pinModel.nodeId;
+    const vNode = nodeId > 0 ? voltages[nodeId - 1] : 0;
+    let i: number;
+    if (this._pinModel.isHiZ) {
+      i = vNode / this._pinModel.rHiZ;
+    } else {
+      const gOut = 1 / this._pinModel.rOut;
+      i = (vNode - this._pinModel.currentVoltage) * gOut;
+    }
+    return [i];
+  }
+
   /** MNA node ID for this output pin. The coordinator reads voltage here. */
   get outputNodeId(): number {
     return this._pinModel.nodeId;
@@ -169,7 +196,7 @@ export class BridgeInputAdapter implements AnalogElement {
   /** Cached solver reference for stampCompanion. */
   private _solver: SparseSolver | null = null;
 
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: false = false;
   readonly isReactive: true = true;
@@ -182,7 +209,7 @@ export class BridgeInputAdapter implements AnalogElement {
    */
   constructor(pinModel: DigitalInputPinModel) {
     this._pinModel = pinModel;
-    this.nodeIndices = [pinModel.nodeId];
+    this.pinNodeIds = [pinModel.nodeId];
   }
 
   /**
@@ -233,6 +260,24 @@ export class BridgeInputAdapter implements AnalogElement {
    */
   readLogicLevel(voltage: number): boolean | undefined {
     return this._pinModel.readLogicLevel(voltage);
+  }
+
+  /**
+   * Per-pin current for the single input node.
+   *
+   * The input loading stamps conductance 1/rIn from the node to ground.
+   * At convergence:
+   *   I_into_element = V_node / rIn
+   *
+   * Positive = current flowing INTO the element (element sinks from the net).
+   * Sum is nonzero — the difference flows to implicit ground. Expected for
+   * a resistive load.
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nodeId = this._pinModel.nodeId;
+    const vNode = nodeId > 0 ? voltages[nodeId - 1] : 0;
+    const i = vNode / this._pinModel.rIn;
+    return [i];
   }
 
   /** MNA node ID for this input pin. The coordinator reads voltage here. */

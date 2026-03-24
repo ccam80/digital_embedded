@@ -798,10 +798,7 @@ export class CircuitBuilder {
     element: CircuitElement,
     pin: Pin
   ): { x: number; y: number } {
-    return {
-      x: element.position.x + pin.position.x,
-      y: element.position.y + pin.position.y,
-    };
+    return pinWorldPosition(element, pin);
   }
 
   /**

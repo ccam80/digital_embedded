@@ -9,7 +9,7 @@
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElement } from "../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../analog/element.js";
 import type { DeviceType } from "../analog/model-parser.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
@@ -158,6 +158,55 @@ export type ExecuteFunction = (
 export const noOpAnalogExecuteFn: ExecuteFunction = () => {};
 
 // ---------------------------------------------------------------------------
+// ComponentModels — structured simulation model container
+// ---------------------------------------------------------------------------
+
+/**
+ * Event-driven digital simulation model.
+ * Reads/writes bit vectors on discrete nets via executeFn.
+ */
+export interface DigitalModel {
+  executeFn: ExecuteFunction;
+  sampleFn?: ExecuteFunction;
+  stateSlotCount?: number | ((props: PropertyBag) => number);
+  defaultDelay?: number;
+  switchPins?: [number, number];
+  inputSchema?: string[];
+  outputSchema?: string[];
+}
+
+/**
+ * MNA analog simulation model.
+ * Stamps conductance/current into sparse matrix via factory.
+ */
+export interface AnalogModel {
+  factory: (
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
+    branchIdx: number,
+    props: PropertyBag,
+    getTime: () => number,
+  ) => AnalogElementCore;
+  requiresBranchRow?: boolean;
+  getInternalNodeCount?: (props: PropertyBag) => number;
+  deviceType?: DeviceType;
+  transistorModel?: string;
+  pinElectrical?: PinElectricalSpec;
+  pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+}
+
+/**
+ * Container for all simulation models a component type supports.
+ * A component may have a digital model, an analog model, or both.
+ */
+export interface ComponentModels {
+  /** Event-driven digital: reads/writes bit vectors on discrete nets. */
+  digital?: DigitalModel;
+  /** MNA analog: stamps conductance/current into sparse matrix. */
+  analog?: AnalogModel;
+}
+
+// ---------------------------------------------------------------------------
 // ComponentDefinition
 // ---------------------------------------------------------------------------
 
@@ -229,11 +278,12 @@ export interface ComponentDefinition {
    * Not set on digital-only components. Does not affect existing registrations.
    */
   analogFactory?: (
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
     getTime: () => number,
-  ) => AnalogElement;
+  ) => AnalogElementCore;
   /**
    * When `true`, the analog compiler assigns an MNA branch-current row index
    * to this component before calling `analogFactory`. Used by voltage sources
@@ -283,6 +333,18 @@ export interface ComponentDefinition {
    */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
   /**
+   * Structured simulation model container. Populated automatically by register()
+   * from the flat fields (executeFn, analogFactory, etc.) when not supplied
+   * directly. Callers may supply this directly for forward-compatible definitions.
+   */
+  models?: ComponentModels;
+  /**
+   * Default model key (e.g. "digital", "analog"). When omitted, the first key
+   * present in `models` is used. Hidden from the property panel when only one
+   * model is available.
+   */
+  defaultModel?: string;
+  /**
    * Available simulation modes for this component.
    *
    * The first entry is the default mode used when the user has not chosen one.
@@ -299,6 +361,80 @@ export interface ComponentDefinition {
    * Populated in Phase 4c; field added here for forward declaration.
    */
   transistorModel?: string;
+
+  /**
+   * Declares the label→position mapping for executeFn input access.
+   * inputSchema[k] is the pin label that executeFn reads at inBase + k.
+   * When present, the compiler uses this to build the wiring table
+   * instead of relying on getPins() iteration order filtered by direction.
+   * Symmetric gates (AND, OR) can omit this — the compiler falls back
+   * to the current getPins()-order behaviour for backwards compatibility.
+   */
+  inputSchema?: string[];
+
+  /**
+   * Same as inputSchema but for output pins.
+   * outputSchema[k] is the pin label that executeFn writes at outBase + k.
+   */
+  outputSchema?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// _ensureModels — shim flat fields into models object at registration time
+// ---------------------------------------------------------------------------
+
+/**
+ * Populates `def.models` from flat fields when the caller did not supply it.
+ * Analog-only components use noOpAnalogExecuteFn as their executeFn placeholder;
+ * these must NOT produce a digital model entry.
+ */
+function _ensureModels(def: ComponentDefinition): ComponentDefinition {
+  if (def.models !== undefined) return def;
+
+  const models: ComponentModels = {};
+
+  if (def.executeFn !== noOpAnalogExecuteFn) {
+    const digital: DigitalModel = { executeFn: def.executeFn };
+    if (def.sampleFn !== undefined) digital.sampleFn = def.sampleFn;
+    if (def.stateSlotCount !== undefined) digital.stateSlotCount = def.stateSlotCount;
+    if (def.defaultDelay !== undefined) digital.defaultDelay = def.defaultDelay;
+    if (def.switchPins !== undefined) digital.switchPins = def.switchPins;
+    if (def.inputSchema !== undefined) digital.inputSchema = def.inputSchema;
+    if (def.outputSchema !== undefined) digital.outputSchema = def.outputSchema;
+    models.digital = digital;
+  }
+
+  if (def.analogFactory !== undefined) {
+    const analog: AnalogModel = { factory: def.analogFactory };
+    if (def.requiresBranchRow !== undefined) analog.requiresBranchRow = def.requiresBranchRow;
+    if (def.getInternalNodeCount !== undefined) analog.getInternalNodeCount = def.getInternalNodeCount;
+    if (def.analogDeviceType !== undefined) analog.deviceType = def.analogDeviceType;
+    if (def.transistorModel !== undefined) analog.transistorModel = def.transistorModel;
+    if (def.pinElectrical !== undefined) analog.pinElectrical = def.pinElectrical;
+    if (def.pinElectricalOverrides !== undefined) analog.pinElectricalOverrides = def.pinElectricalOverrides;
+    models.analog = analog;
+  }
+
+  return { ...def, models };
+}
+
+// ---------------------------------------------------------------------------
+// ComponentModels utility functions
+// ---------------------------------------------------------------------------
+
+/** Returns true if the component definition has a digital simulation model. */
+export function hasDigitalModel(def: ComponentDefinition): boolean {
+  return def.models?.digital !== undefined;
+}
+
+/** Returns true if the component definition has an analog simulation model. */
+export function hasAnalogModel(def: ComponentDefinition): boolean {
+  return def.models?.analog !== undefined;
+}
+
+/** Returns the list of model keys available on this component definition. */
+export function availableModels(def: ComponentDefinition): string[] {
+  return def.models ? Object.keys(def.models) : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +467,8 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is already registered`);
     }
 
-    const assigned: ComponentDefinition = { ...def, typeId: this._nextTypeId++ };
+    const withModels = _ensureModels(def);
+    const assigned: ComponentDefinition = { ...withModels, typeId: this._nextTypeId++ };
 
     this._byName.set(assigned.name, assigned);
 
@@ -437,11 +574,12 @@ export class ComponentRegistry {
     return this._byCategory.get(category) ?? [];
   }
 
-  /** Return all definitions matching the given engine type, in registration order. */
+  /** Return all definitions that have a simulation model for the given engine type. */
   getByEngineType(engineType: "digital" | "analog"): ComponentDefinition[] {
     return Array.from(this._byName.values()).filter((d) => {
-      const et = d.engineType ?? "digital";
-      return et === engineType || et === "both";
+      if (engineType === "digital") return hasDigitalModel(d);
+      if (engineType === "analog") return hasAnalogModel(d);
+      return false;
     });
   }
 

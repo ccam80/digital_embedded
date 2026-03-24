@@ -139,6 +139,8 @@ export const BitExtenderDefinition: ComponentDefinition = {
   propertyDefs: BIT_EXTENDER_PROPERTY_DEFS,
   attributeMap: BIT_EXTENDER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["in"],
+  outputSchema: ["out"],
   helpText: "BitExtender — sign-extends the input from inputBits to outputBits.",
   defaultDelay: 10,
 };

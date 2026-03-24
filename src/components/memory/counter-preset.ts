@@ -358,6 +358,10 @@ export const CounterPresetDefinition: ComponentDefinition = {
   propertyDefs: COUNTER_PRESET_PROPERTY_DEFS,
   attributeMap: COUNTER_PRESET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  // executeCounterPreset reads: inBase+0=en, inBase+1=C, inBase+2=dir, inBase+3=in, inBase+4=ld, inBase+5=clr
+  // writes: outBase+0=out, outBase+1=ovf
+  inputSchema: ["en", "C", "dir", "in", "ld", "clr"],
+  outputSchema: ["out", "ovf"],
   helpText:
     "CounterPreset — edge-triggered up/down counter with preset load.\n" +
     "dir=0: counts up; dir=1: counts down. clr clears to 0, ld loads from 'in'.\n" +

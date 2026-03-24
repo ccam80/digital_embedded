@@ -368,11 +368,13 @@ describe("Probe", () => {
       };
 
       const analogElement = ProbeDefinition.analogFactory!(
-        [3],
+        new Map([["in", 3]]),
+        [],
         -1,
         props,
         () => 0,
       );
+      Object.assign(analogElement, { pinNodeIds: [3] });
 
       analogElement.stamp(mockSolver);
 
@@ -382,11 +384,13 @@ describe("Probe", () => {
     it("reads_node_voltage returns voltage at node index", () => {
       const props = new PropertyBag();
       const analogElement = ProbeDefinition.analogFactory!(
-        [3],
+        new Map([["in", 3]]),
+        [],
         -1,
         props,
         () => 0,
       );
+      Object.assign(analogElement, { pinNodeIds: [3] });
 
       const voltages = new Float64Array(5);
       voltages[3] = 4.72;
@@ -416,13 +420,15 @@ describe("Probe", () => {
     it("analogFactory returns AnalogElement with correct properties", () => {
       const props = new PropertyBag();
       const analogElement = ProbeDefinition.analogFactory!(
-        [5],
+        new Map([["in", 5]]),
+        [],
         -1,
         props,
         () => 0,
       );
+      Object.assign(analogElement, { pinNodeIds: [5] });
 
-      expect(analogElement.nodeIndices).toEqual([5]);
+      expect(analogElement.pinNodeIds).toEqual([5]);
       expect(analogElement.branchIndex).toBe(-1);
       expect(analogElement.isNonlinear).toBe(false);
       expect(analogElement.isReactive).toBe(false);

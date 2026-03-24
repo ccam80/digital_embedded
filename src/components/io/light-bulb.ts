@@ -181,6 +181,8 @@ export const LightBulbDefinition: ComponentDefinition = {
   propertyDefs: LIGHT_BULB_PROPERTY_DEFS,
   attributeMap: LIGHT_BULB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["A", "B"],
+  outputSchema: [],
   helpText:
     "LightBulb — incandescent bulb indicator.\n" +
     "Rendered as a circle with filament cross. On when input is non-zero.\n" +

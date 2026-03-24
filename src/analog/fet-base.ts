@@ -16,7 +16,7 @@
  *   Norton current = ids - gm*vgs_op - gds*vds_op
  */
 
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { SparseSolver } from "./sparse-solver.js";
 import {
   capacitorConductance,
@@ -66,8 +66,8 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
  * Subclasses must implement the device-physics methods and set polaritySign.
  * The stamping loop in stampNonlinear and updateOperatingPoint is shared.
  */
-export abstract class AbstractFetElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+export abstract class AbstractFetElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: boolean;
@@ -103,13 +103,10 @@ export abstract class AbstractFetElement implements AnalogElement {
   private _vgdPrev: number = NaN;
   private _capFirstCall: boolean = true;
 
-  constructor(gateNode: number, drainNode: number, sourceNode: number, extraNodes?: number[]) {
+  constructor(gateNode: number, drainNode: number, sourceNode: number, _extraNodes?: number[]) {
     this.gateNode = gateNode;
     this.drainNode = drainNode;
     this.sourceNode = sourceNode;
-    this.nodeIndices = extraNodes
-      ? [drainNode, gateNode, sourceNode, ...extraNodes]
-      : [drainNode, gateNode, sourceNode];
 
     // isReactive is set after construction based on whether capacitances are present.
     // Subclasses set this via _initReactive().
@@ -210,6 +207,37 @@ export abstract class AbstractFetElement implements AnalogElement {
     this._ids = this.computeIds(this._vgs, this._vds);
     this._gm = this.computeGm(this._vgs, this._vds);
     this._gds = this.computeGds(this._vgs, this._vds);
+  }
+
+  /**
+   * Per-pin currents: [I_gate, I_drain, I_source].
+   *
+   * Positive = current flowing **into** the element at that pin.
+   * For the DC/resistive model the gate current is zero; all current
+   * flows drain → source. Companion capacitor currents are stamped as
+   * separate conductance entries and are already captured by the MNA
+   * solution at each node.
+   *
+   * pinNodeIds order: [gate, drain, source, ...extraNodes]
+   */
+  getPinCurrents(_voltages: Float64Array): number[] {
+    // Drain-source current with polarity and source-stepping scale.
+    // Positive _ids = current flows D→S for N-channel (polaritySign = +1).
+    const ids = this.polaritySign * this._ids * this._sourceScale;
+
+    // When _swapped, the internal "drain" and "source" roles are reversed
+    // relative to the physical pins.
+    const iGate = 0;                              // gate draws no DC current
+    const iDrain = this._swapped ? -ids : ids;   // into drain
+    const iSource = -iDrain;                      // KCL: sum = 0
+
+    // Match pinNodeIds order: [gate, drain, source, ...extra]
+    const result = [iGate, iDrain, iSource];
+    // Pad any extra nodes (e.g. bulk in 4-terminal MOSFETs) with zero
+    for (let i = 3; i < this.pinNodeIds.length; i++) {
+      result.push(0);
+    }
+    return result;
   }
 
   checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {

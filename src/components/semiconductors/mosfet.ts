@@ -349,7 +349,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     nodeB: number,
     p: MosfetParams,
   ) {
-    // Pass nodeB as extra node so nodeIndices = [D, G, S, B] (bulk always included)
+    // Pass nodeB as extra node so pinNodeIds = [D, G, S, B] (bulk always included)
     super(nodeG, nodeD, nodeS, [nodeB]);
     this.polaritySign = polarity;
     this._p = p;
@@ -539,15 +539,16 @@ class MosfetAnalogElement extends AbstractFetElement {
 
 export function createMosfetElement(
   polarity: 1 | -1,
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): MosfetAnalogElement {
-  const nodeG = nodeIds[0]; // gate
-  const nodeS = nodeIds[1]; // source
-  const nodeD = nodeIds[2]; // drain
-  // Bulk node: use nodeIds[3] if provided (4-terminal), else treat bulk = source
-  const nodeB = nodeIds.length >= 4 ? nodeIds[3] : nodeS;
+  const nodeG = pinNodes.get("G")!; // gate
+  const nodeS = pinNodes.get("S")!; // source
+  const nodeD = pinNodes.get("D")!; // drain
+  // Bulk node: use internalNodeIds[0] if provided (4-terminal body), else treat bulk = source
+  const nodeB = internalNodeIds.length >= 1 ? internalNodeIds[0] : nodeS;
 
   const defaults = polarity === 1 ? MOSFET_NMOS_DEFAULTS : MOSFET_PMOS_DEFAULTS;
 
@@ -923,8 +924,8 @@ export const NmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   analogDeviceType: "NMOS",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(1, nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+    createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
 };
 
 export const PmosfetDefinition: ComponentDefinition = {
@@ -942,7 +943,6 @@ export const PmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   analogDeviceType: "PMOS",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    // PMOS pins are [G, D, S] but createMosfetElement expects [G, S, D]
-    createMosfetElement(-1, [nodeIds[0], nodeIds[2], nodeIds[1], ...nodeIds.slice(3)], branchIdx, props),
+  analogFactory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+    createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
 };

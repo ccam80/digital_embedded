@@ -206,6 +206,8 @@ export const SevenSegHexDefinition: ComponentDefinition = {
   propertyDefs: SEVEN_SEG_HEX_PROPERTY_DEFS,
   attributeMap: SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["d", "dp"],
+  outputSchema: [],
   helpText:
     "SevenSegHex — 7-segment display with internal hex decoder.\n" +
     "4-bit input selects which hex digit (0–F) to display.\n" +

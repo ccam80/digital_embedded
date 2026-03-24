@@ -29,12 +29,20 @@ import { PropertyBag } from "../../core/properties.js";
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
+  // nodeIds order matches BJT pinLayout: [B, C, E]
   registerAnalogFactory("NpnBJT", (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(1, nodeIds, branchIdx, props));
+    createBjtElement(1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
   registerAnalogFactory("PnpBJT", (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(-1, nodeIds, branchIdx, props));
-  // Use the analogFactory from ResistorDefinition to avoid importing the non-exported function
-  registerAnalogFactory("Resistor", ResistorDefinition.analogFactory!);
+    createBjtElement(-1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
+  // Adapter: AnalogFactory (old nodeIds[]) → createResistorElement (new Map signature)
+  registerAnalogFactory("Resistor", (nodeIds, _branchIdx, props, _getTime) =>
+    ResistorDefinition.analogFactory!(
+      new Map([["A", nodeIds[0] ?? 0], ["B", nodeIds[1] ?? 0]]),
+      [],
+      _branchIdx,
+      props,
+      _getTime,
+    ));
 });
 
 // ---------------------------------------------------------------------------
@@ -151,15 +159,17 @@ describe("NPN", () => {
       // The internal node connects Q1's emitter to Q2's base
       // Verify by checking that two BJT elements share this internal node
       const bjts = result.elements.filter(
-        (el) => el.nodeIndices.length === 3,
+        (el) => el.pinNodeIds.length === 3,
       );
       expect(bjts.length).toBe(2);
 
-      // Q1 emitter node (index 2) should equal Q2 base node (index 1)
+      // Q1 emitter node (index 2) should equal Q2 base node (index 0),
+      // because pinNodeIds = [nodeB, nodeC, nodeE] and the internal node
+      // connects Q1's emitter (E=index 2) to Q2's base (B=index 0).
       const q1 = bjts[0];
       const q2 = bjts[1];
-      const q1Emitter = q1.nodeIndices[2];
-      const q2Base = q2.nodeIndices[1];
+      const q1Emitter = q1.pinNodeIds[2];
+      const q2Base = q2.pinNodeIds[0];
       expect(q1Emitter).toBe(q2Base);
     });
 
@@ -232,8 +242,8 @@ describe("PNP", () => {
       expect(pnpResult.elements).toHaveLength(3);
 
       // The BJT elements should exist in both
-      const npnBjts = npnResult.elements.filter((el) => el.nodeIndices.length === 3);
-      const pnpBjts = pnpResult.elements.filter((el) => el.nodeIndices.length === 3);
+      const npnBjts = npnResult.elements.filter((el) => el.pinNodeIds.length === 3);
+      const pnpBjts = pnpResult.elements.filter((el) => el.pinNodeIds.length === 3);
       expect(npnBjts.length).toBe(2);
       expect(pnpBjts.length).toBe(2);
     });

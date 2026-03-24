@@ -106,8 +106,8 @@ function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinitio
     category: ComponentCategory.MISC,
     helpText: typeId,
     engineType: "analog",
-    analogFactory: (nodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
-      nodeIndices: nodeIds,
+    analogFactory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+      pinNodeIds: [...pinNodes.values()],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,

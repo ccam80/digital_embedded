@@ -546,7 +546,10 @@ describe("Integration", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
     // nodeIds: 1-based MNA node IDs
-    const andGate = factory([1, 2, 3], -1, props, () => 0);
+    const andGate = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
 
     const vsA = makeVoltageSource(1, 0, 3, 3.3);
     const vsB = makeVoltageSource(2, 0, 4, 3.3);
@@ -584,7 +587,10 @@ describe("Integration", () => {
     // nodeIds: [D=1, C=2, Q=3, ~Q=4] (1-based MNA node IDs)
     const factory = makeDFlipflopAnalogFactory();
     const props = new PropertyBag();
-    const dff = factory([1, 2, 3, 4], -1, props, () => 0);
+    const dff = factory(
+      new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]),
+      [], -1, props, () => 0,
+    );
 
     // Load resistors on Q and ~Q for stable voltage nodes
     const rLoadQ = makeResistor(3, 0, LOAD_R);

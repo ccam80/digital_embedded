@@ -44,7 +44,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { parseExpression } from "../../analog/expression.js";
 import { differentiate, simplify } from "../../analog/expression-differentiate.js";
@@ -107,7 +107,6 @@ function buildVCVSPinDeclarations(): PinDeclaration[] {
  * branchIdx: absolute 0-based row in the MNA matrix for the output branch.
  */
 class VCVSAnalogElement extends ControlledSourceElement {
-  readonly nodeIndices: readonly number[];
   readonly branchIndex: number;
 
   private readonly _nCtrlP: number;
@@ -139,7 +138,6 @@ class VCVSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._k = branchIdx;
 
-    this.nodeIndices = [nCtrlP, nCtrlN, nOutP, nOutN];
     this.branchIndex = branchIdx;
   }
 
@@ -194,6 +192,19 @@ class VCVSAnalogElement extends ControlledSourceElement {
 
     // NR-linearized RHS: constant term after factoring out Jacobian
     solver.stampRHS(k, value - derivative * ctrlValue);
+  }
+
+  /**
+   * Per-pin currents in pinLayout order: [ctrl+, ctrl-, out+, out-].
+   *
+   * The control port is an ideal voltage sensor (infinite impedance), so it
+   * draws zero current. The output port current is the branch variable at row
+   * `_k` in the MNA solution vector. Positive = current flowing INTO the pin.
+   * KCL: 0 + 0 + I_out - I_out = 0. ✓
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const iOut = voltages[this._k];
+    return [0, 0, iOut, -iOut];
   }
 }
 
@@ -346,17 +357,18 @@ export const VCVSDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const expression = props.getOrDefault<string>("expression", "V(ctrl)");
     const gain = props.getOrDefault<number>("gain", 1.0);
     return new VCVSAnalogElement(
-      nodeIds[0], // ctrl+
-      nodeIds[1], // ctrl-
-      nodeIds[2], // out+
-      nodeIds[3], // out-
+      pinNodes.get("ctrl+")!, // ctrl+
+      pinNodes.get("ctrl-")!, // ctrl-
+      pinNodes.get("out+")!,  // out+
+      pinNodes.get("out-")!,  // out-
       branchIdx,
       expression,
       gain,

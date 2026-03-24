@@ -72,7 +72,7 @@ export function makeResistor(
 ): AnalogElement {
   const G_val = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -126,7 +126,7 @@ export function makeVoltageSource(
 ): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -178,7 +178,7 @@ export function makeCurrentSource(
 ): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -239,7 +239,7 @@ export function makeDiode(
   let ieq = 0;   // Norton equivalent current offset
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
+    pinNodeIds: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -343,7 +343,7 @@ export function makeCapacitor(
   let firstCall = true;
 
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
@@ -428,7 +428,7 @@ export function makeInductor(
   let companionActive = false;
 
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: true,
@@ -512,7 +512,7 @@ export function makeAcVoltageSource(
 ): AnalogElement {
   let scale = 1;
   return {
-    nodeIndices: [nodePos, nodeNeg],
+    pinNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,

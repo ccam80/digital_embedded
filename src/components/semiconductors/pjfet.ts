@@ -203,13 +203,13 @@ function resolveJfetParams(props: PropertyBag, defaults: Record<string, number>)
 }
 
 export function createPJfetElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   _branchIdx: number,
   props: PropertyBag,
 ): PJfetAnalogElement {
-  const nodeG = nodeIds[0]; // gate
-  const nodeD = nodeIds[1]; // drain
-  const nodeS = nodeIds[2]; // source
+  const nodeG = pinNodes.get("G")!; // gate
+  const nodeD = pinNodes.get("D")!; // drain
+  const nodeS = pinNodes.get("S")!; // source
 
   const p = resolveJfetParams(props, JFET_P_DEFAULTS);
   return new PJfetAnalogElement(nodeG, nodeD, nodeS, p);
@@ -396,6 +396,6 @@ export const PJfetDefinition: ComponentDefinition = {
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   analogDeviceType: "PJFET",
-  analogFactory: (nodeIds, branchIdx, props, _getTime) =>
-    createPJfetElement(nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+    createPJfetElement(pinNodes, branchIdx, props),
 };

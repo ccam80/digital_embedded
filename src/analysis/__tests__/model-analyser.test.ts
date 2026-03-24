@@ -461,7 +461,7 @@ describe('ModelAnalyser', () => {
     const facade = buildFacade(registry);
     const { circuit } = buildCyclicCircuit();
 
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/did not stabilize/i);
+    expect(() => analyseCircuit(facade, circuit)).toThrow(/combinational feedback/i);
   });
 
   it('multiBit — 2 single-bit inputs, 2 single-bit outputs → 4 rows (2^2 combinations)', () => {

@@ -219,6 +219,8 @@ export const ResetDefinition: ComponentDefinition = {
   propertyDefs: RESET_PROPERTY_DEFS,
   attributeMap: RESET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: [],
+  outputSchema: ["Reset"],
   helpText:
     "Reset — output held in reset state during init, then released.\n" +
     "Used to reset sequential circuits to a known state at startup.",

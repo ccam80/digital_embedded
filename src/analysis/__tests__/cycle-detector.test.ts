@@ -94,19 +94,20 @@ describe('CycleDetector', () => {
   it('selfLoop — output wired to own input → cycle detected', () => {
     // A NOT gate with its output wired back to its own input.
     //
-    // NOT: input at (4,0), output at (8,0)
-    // Wire: (8,0) → (4,0)  [output feeds back to input]
+    // NOT at origin: input pin offset (0,0) → world (0,0)
+    //                output pin offset (4,0) → world (4,0)
+    // Wire: (4,0) → (0,0)  [output feeds back to input]
 
     const circuit = new Circuit();
 
-    const notGate = new StubElement('NOT', 'not1', { x: 4, y: 0 }, [
-      makePin('in', PinDirection.INPUT, 4, 0),
-      makePin('out', PinDirection.OUTPUT, 8, 0),
+    const notGate = new StubElement('NOT', 'not1', { x: 0, y: 0 }, [
+      makePin('in', PinDirection.INPUT, 0, 0),
+      makePin('out', PinDirection.OUTPUT, 4, 0),
     ]);
 
     circuit.elements.push(notGate);
-    // Feedback wire: output (8,0) → input (4,0)
-    circuit.wires.push(new Wire({ x: 8, y: 0 }, { x: 4, y: 0 }));
+    // Feedback wire: output world(4,0) → input world(0,0)
+    circuit.wires.push(new Wire({ x: 4, y: 0 }, { x: 0, y: 0 }));
 
     const cycles = detectCycles(circuit);
     expect(cycles.length).toBeGreaterThan(0);

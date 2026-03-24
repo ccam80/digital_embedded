@@ -58,7 +58,8 @@ describe("Potentiometer", () => {
       props.set("position", 0.5);
 
       const analogElement = PotentiometerDefinition.analogFactory!(
-        [1, 2, 3],
+        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        [],
         -1,
         props,
         () => 0,
@@ -86,7 +87,8 @@ describe("Potentiometer", () => {
       props.set("position", 0);
 
       const analogElement = PotentiometerDefinition.analogFactory!(
-        [1, 2, 3],
+        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        [],
         -1,
         props,
         () => 0,
@@ -112,7 +114,8 @@ describe("Potentiometer", () => {
       props.set("position", 1);
 
       const analogElement = PotentiometerDefinition.analogFactory!(
-        [1, 2, 3],
+        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        [],
         -1,
         props,
         () => 0,
@@ -155,11 +158,11 @@ describe("Potentiometer", () => {
   });
 
   describe("pinLayout", () => {
-    it("PotentiometerDefinition.pinLayout has 3 entries (A, W, B)", () => {
+    it("PotentiometerDefinition.pinLayout has 3 entries (A, B, W)", () => {
       expect(PotentiometerDefinition.pinLayout).toHaveLength(3);
       expect(PotentiometerDefinition.pinLayout[0].label).toBe("A");
-      expect(PotentiometerDefinition.pinLayout[1].label).toBe("W");
-      expect(PotentiometerDefinition.pinLayout[2].label).toBe("B");
+      expect(PotentiometerDefinition.pinLayout[1].label).toBe("B");
+      expect(PotentiometerDefinition.pinLayout[2].label).toBe("W");
     });
   });
 

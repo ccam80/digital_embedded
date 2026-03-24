@@ -152,6 +152,8 @@ export const TextDefinition: ComponentDefinition = {
   propertyDefs: TEXT_PROPERTY_DEFS,
   attributeMap: TEXT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
+  inputSchema: [],
+  outputSchema: [],
   helpText:
     "Text — visual annotation label on the canvas.\n" +
     "No simulation behavior. Used for documentation and labelling.\n" +

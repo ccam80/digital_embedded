@@ -11,9 +11,9 @@
  *   I_G = (V_GK / R_GI)   (resistive grid current for positive grid drive)
  *
  * The triode is a three-terminal device:
- *   nodeIndices[0] = node_P  (plate / anode)
- *   nodeIndices[1] = node_G  (grid)
- *   nodeIndices[2] = node_K  (cathode)
+ *   pinNodeIds[0] = node_P  (plate / anode)
+ *   pinNodeIds[1] = node_G  (grid)
+ *   pinNodeIds[2] = node_K  (cathode)
  *
  * The linearised Koren model stamps:
  *   - Plate transconductance: gm = dI_P/dV_GK
@@ -39,7 +39,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -155,13 +155,14 @@ function computeTriodeOp(
 // ---------------------------------------------------------------------------
 
 export function createTriodeElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeP = nodeIds[0]; // plate
-  const nodeG = nodeIds[1]; // grid
-  const nodeK = nodeIds[2]; // cathode
+): AnalogElementCore {
+  const nodeP = pinNodes.get("P")!; // plate
+  const nodeG = pinNodes.get("G")!; // grid
+  const nodeK = pinNodes.get("K")!; // cathode
 
   const mu = props.getOrDefault<number>("mu", 100);
   const kp = props.getOrDefault<number>("kp", 600);
@@ -176,7 +177,6 @@ export function createTriodeElement(
   let op = computeTriodeOp(vgk, vpk, mu, kp, kvb, kg1, ex, rGI);
 
   return {
-    nodeIndices: [nodeP, nodeG, nodeK],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -250,6 +250,28 @@ export function createTriodeElement(
       vpk = vpkNew;
 
       op = computeTriodeOp(vgk, vpk, mu, kp, kvb, kg1, ex, rGI);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
+      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+
+      const { ip, ig, gm, gp, ggi, vgk: vgkOp, vpk: vpkOp } = op;
+
+      // Plate current: I_P = ip + gp*(V_PK - vpkOp) + gm*(V_GK - vgkOp)
+      // Positive = flowing into the plate (from external circuit into element)
+      const iPlate = ip + gp * ((vP - vK) - vpkOp) + gm * ((vG - vK) - vgkOp);
+
+      // Grid current: I_G = ig + ggi*(V_GK - vgkOp)
+      // Positive = flowing into the grid
+      const iGrid = ig + ggi * ((vG - vK) - vgkOp);
+
+      // Cathode current: KCL — all three must sum to zero
+      const iCathode = -(iPlate + iGrid);
+
+      // pinLayout order: P, G, K
+      return [iPlate, iGrid, iCathode];
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -474,5 +496,5 @@ export const TriodeDefinition: ComponentDefinition = {
     "Triode vacuum tube — Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
     "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
-  analogFactory: (nodeIds, branchIdx, props) => createTriodeElement(nodeIds, branchIdx, props),
+  analogFactory: (pinNodes, internalNodeIds, branchIdx, props) => createTriodeElement(pinNodes, internalNodeIds, branchIdx, props),
 };

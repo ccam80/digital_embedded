@@ -57,7 +57,8 @@ function makeSPST(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return SwitchSPSTDefinition.analogFactory!(
-    [nCtrl, nIn, nOut],
+    new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,
@@ -72,7 +73,8 @@ function makeSPDT(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return SwitchSPDTDefinition.analogFactory!(
-    [nCtrl, nCom, nNO, nNC],
+    new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,
@@ -201,7 +203,7 @@ describe("SPST", () => {
 
     // R_load = 1000 Ω from nOut to ground
     const rLoad: AnalogElement = {
-      nodeIndices: [nOut, 0],
+      pinNodeIds: [nOut, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
@@ -240,7 +242,7 @@ describe("SPST", () => {
     const sw = makeSPST(nCtrl, nIn, nOut, { rOn: 10, rOff: 1e9, transitionSharpness: 20 });
 
     const rLoad: AnalogElement = {
-      nodeIndices: [nOut, 0],
+      pinNodeIds: [nOut, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,

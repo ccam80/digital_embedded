@@ -241,9 +241,12 @@ describe("Counter", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
 
-    // nodeIds: [en=1, C=2, clr=3, out0=4, out1=5, out2=6, out3=7, ovf=8]
+    // pinNodes: en=1, C=2, clr=3, out=4 (all out-bit pins share same bus node), ovf=8
     const factory = makeBehavioralCounterAnalogFactory();
-    const element = factory([1, 2, 3, 4, 5, 6, 7, 8], -1, props, () => 0) as BehavioralCounterElement;
+    const element = factory(
+      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 8]]),
+      [], -1, props, () => 0,
+    ) as BehavioralCounterElement;
 
     const solver = new SparseSolver(nodeCount, 0);
     solver.beginAssembly();
@@ -403,13 +406,17 @@ describe("Registration", () => {
       get: (k: string) => k === "bitWidth" ? 4 : undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
-    // nodeIds: [en=1, C=2, clr=3, out0=4, out1=5, out2=6, out3=7, ovf=8]
-    const element = factory([1, 2, 3, 4, 5, 6, 7, 8], -1, props, () => 0);
+    // pinNodes: en=1, C=2, clr=3, out=4 (bus node), ovf=5
+    const element = factory(
+      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5] });
     expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.nodeIndices.length).toBeGreaterThanOrEqual(8);
+    expect(element.pinNodeIds.length).toBeGreaterThanOrEqual(5);
   });
 
   it("register_analog_factory_returns_analog_element", () => {
@@ -419,13 +426,16 @@ describe("Registration", () => {
       get: (k: string) => k === "bitWidth" ? 8 : undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
-    // nodeIds: [D0..D7=1..8, C=9, en=10, Q0..Q7=11..18]
-    const nodeIds = Array.from({ length: 19 }, (_, i) => i);
-    const element = factory(nodeIds, -1, props, () => 0);
+    // pinNodes: D=1 (bus), C=2, en=3, Q=4 (bus)
+    const element = factory(
+      new Map([["D", 1], ["C", 2], ["en", 3], ["Q", 4]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3, 4] });
     expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.nodeIndices.length).toBeGreaterThanOrEqual(18);
+    expect(element.pinNodeIds.length).toBeGreaterThanOrEqual(4);
   });
 });

@@ -290,8 +290,8 @@ function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinitio
     category: ComponentCategory.MISC,
     helpText: typeId,
     engineType: "analog",
-    analogFactory: (nodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
-      nodeIndices: nodeIds,
+    analogFactory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+      pinNodeIds: [...pinNodes.values()],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
@@ -417,8 +417,9 @@ describe("bridge-impedance-mismatch", () => {
     outerCircuit.addElement(subcircuitEl);
 
     // Wires: ground node at (0,0), bridge input node at (10,0)
-    outerCircuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
-    outerCircuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    // Use non-zero-length stubs — Circuit.addWire drops self-loop (zero-length) wires.
+    outerCircuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
+    outerCircuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 1 }));
 
     // Registry: Ground, HighZResistor (analog), In (digital)
     const registry = new ComponentRegistry();

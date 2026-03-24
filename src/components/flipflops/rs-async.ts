@@ -209,6 +209,10 @@ export const RSAsyncDefinition: ComponentDefinition = {
   propertyDefs: RS_FF_AS_PROPERTY_DEFS,
   attributeMap: RS_FF_AS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // executeRSAsync reads: inBase+0=S, inBase+1=R
+  // writes: outBase+0=Q, outBase+1=~Q
+  inputSchema: ["S", "R"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "RS Flip-Flop Async — level-sensitive SR latch (no clock).\n" +
     "S=1, R=0 → Q=1; S=0, R=1 → Q=0; S=0, R=0 → hold; S=1, R=1 → forbidden (Q=~Q=0).\n" +

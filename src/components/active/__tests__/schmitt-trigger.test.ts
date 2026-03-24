@@ -58,7 +58,8 @@ function makeSchmittInverting(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return SchmittInvertingDefinition.analogFactory!(
-    [nIn, nOut],
+    new Map([["in", nIn], ["out", nOut]]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,
@@ -71,7 +72,8 @@ function makeSchmittNonInverting(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return SchmittNonInvertingDefinition.analogFactory!(
-    [nIn, nOut],
+    new Map([["in", nIn], ["out", nOut]]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,

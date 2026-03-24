@@ -13,7 +13,7 @@
  */
 
 import type { Circuit } from '../core/circuit.js';
-import { PinDirection } from '../core/pin.js';
+import { PinDirection, pinWorldPosition } from '../core/pin.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { ComponentCategory } from '../core/registry.js';
 
@@ -167,7 +167,8 @@ function computeCircuitDepth(circuit: Circuit, registry: ComponentRegistry): num
 
   for (const el of circuit.elements) {
     for (const pin of el.getPins()) {
-      const k = ptKey(el.position.x + pin.position.x, el.position.y + pin.position.y);
+      const wp = pinWorldPosition(el, pin);
+      const k = ptKey(wp.x, wp.y);
       if (pin.direction === PinDirection.OUTPUT) {
         let list = outputPinMap.get(k);
         if (!list) { list = []; outputPinMap.set(k, list); }

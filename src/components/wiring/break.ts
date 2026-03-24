@@ -205,6 +205,8 @@ export const BreakDefinition: ComponentDefinition = {
   propertyDefs: BREAK_PROPERTY_DEFS,
   attributeMap: BREAK_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["brk"],
+  outputSchema: [],
   helpText:
     "Break — halts simulation when input goes high.\n" +
     "Used for run-to-breakpoint debugging.",

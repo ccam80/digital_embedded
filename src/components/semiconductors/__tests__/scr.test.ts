@@ -43,13 +43,13 @@ const SCR_DEFAULTS = {
 function makeScrElement(overrides: Partial<typeof SCR_DEFAULTS> = {}): AnalogElement {
   const params = { ...SCR_DEFAULTS, ...overrides };
   // nodeA=1, nodeK=2, nodeG=3
-  return createScrElement([1, 2, 3], -1, new PropertyBag(Object.entries(params)));
+  return createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(params)));
 }
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -106,7 +106,7 @@ describe("SCR", () => {
     //   branchRow index = 2 (third row, after 2 node rows)
 
     const matrixSize = 3; // node1, node2, branch
-    const scr = createScrElement([1, 0, 0], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
+    const scr = createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
     const vs = makeDcVoltageSource(2, 0, 2, 50);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
 
@@ -145,7 +145,7 @@ describe("SCR", () => {
     // → α₂ → ALPHA_MAX = 0.95; α₁+α₂ = 0.5+0.95 = 1.45 > 0.95 → triggers.
 
     // nodeA=1, nodeK=2, nodeG=3
-    const scr = createScrElement([1, 2, 3], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
+    const scr = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
 
     // Drive to operating point: 50V anode, 0V cathode, 0.65V gate
     const voltages = new Float64Array(3);

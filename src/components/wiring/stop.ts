@@ -172,6 +172,8 @@ export const StopDefinition: ComponentDefinition = {
   propertyDefs: STOP_PROPERTY_DEFS,
   attributeMap: STOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["stop"],
+  outputSchema: [],
   helpText:
     "Stop — terminates simulation entirely when input goes high.\n" +
     "Unlike Break, Stop closes the model rather than pausing.",

@@ -21,7 +21,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 import { DIODE_DEFAULTS } from "../../analog/model-defaults.js";
@@ -57,12 +57,13 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // ---------------------------------------------------------------------------
 
 export function createZenerElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeAnode = nodeIds[0];
-  const nodeCathode = nodeIds[1];
+): AnalogElementCore {
+  const nodeAnode = pinNodes.get("A")!;
+  const nodeCathode = pinNodes.get("K")!;
 
   // Resolve model parameters from _modelParams (injected by compiler) or defaults
   const modelParams =
@@ -81,9 +82,9 @@ export function createZenerElement(
   let vd = 0;
   let geq = GMIN;
   let ieq = 0;
+  let _id = 0; // cached junction current for getPinCurrents
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -121,6 +122,7 @@ export function createZenerElement(
         const expArg = Math.min(vd / nVt, 700);
         const expVal = Math.exp(expArg);
         const id = IS * (expVal - 1);
+        _id = id;
         geq = (IS * expVal) / nVt + GMIN;
         ieq = id - geq * vd;
       } else {
@@ -129,6 +131,7 @@ export function createZenerElement(
         const bdExpArg = Math.min(-(vd + BV) / nVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
         const id = -IBV * bdExpVal;
+        _id = id;
         // geq = |dId/dVd| = IBV * exp(-(Vd+BV)/nVt) / nVt
         geq = (IBV * bdExpVal) / nVt + GMIN;
         ieq = id - geq * vd;
@@ -145,6 +148,12 @@ export function createZenerElement(
       const vdPrevVal = vaPrev - vcPrev;
 
       return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinLayout order: [A (anode), K (cathode)]
+      // Positive = current flowing INTO element at that pin.
+      return [_id, -_id];
     },
   };
 }

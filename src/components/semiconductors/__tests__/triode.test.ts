@@ -57,7 +57,7 @@ function makeProps(overrides: Partial<{
 function computeIp(vpk: number, vgk: number, props?: PropertyBag): number {
   const p = props ?? makeProps();
   // nodeP=1, nodeG=2, nodeK=0(ground)
-  const elem = createTriodeElement([1, 2, 0], -1, p);
+  const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
 
   // Build a voltage vector that produces the desired vpk, vgk
   // V_PK = V_P - V_K = voltages[0] - 0 = voltages[0]
@@ -207,7 +207,7 @@ describe("Triode", () => {
       const expectedIg = 1.0 / RGI;
 
       // Use createTriodeElement and stamp to extract grid current
-      const elem = createTriodeElement([1, 2, 0], -1, p);
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
       const voltages = new Float64Array(3);
       voltages[0] = 100; // V_P
       voltages[1] = 1.0; // V_G (V_GK = 1V since K=ground)
@@ -241,7 +241,7 @@ describe("Triode", () => {
 
     it("grid conductance 1/R_GI is active when V_GK > 0", () => {
       const p = makeProps();
-      const elem = createTriodeElement([1, 2, 0], -1, p);
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
       const voltages = new Float64Array(3);
       voltages[0] = 100;
       voltages[1] = 1.0; // V_GK = 1V > 0
@@ -260,7 +260,7 @@ describe("Triode", () => {
     it("NR loop converges in ≤ 10 iterations at V_PK=200V, V_GK=-2V", () => {
       const p = makeProps();
       // nodeP=1, nodeG=2, nodeK=0(ground)
-      const elem = createTriodeElement([1, 2, 0], -1, p);
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
 
       const targetVpk = 200;
       const targetVgk = -2;
@@ -333,10 +333,11 @@ describe("Triode", () => {
 
     it("analogFactory creates a triode element with isNonlinear=true", () => {
       const props = makeProps();
-      const elem = createTriodeElement([1, 2, 0], -1, props);
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, props);
+      Object.assign(elem, { pinNodeIds: [1, 2, 0] });
       expect(elem.isNonlinear).toBe(true);
       expect(elem.isReactive).toBe(false);
-      expect(elem.nodeIndices).toEqual([1, 2, 0]);
+      expect(elem.pinNodeIds).toEqual([1, 2, 0]);
     });
   });
 });

@@ -280,6 +280,9 @@ export const TDefinition: ComponentDefinition = {
   propertyDefs: T_FF_PROPERTY_DEFS,
   attributeMap: T_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  // Schema for default withEnable=true (T_FF_PINS_WITH_ENABLE); direction-filter order matches for withEnable=false.
+  inputSchema: ["T", "C"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "T Flip-Flop — toggles Q on rising clock edge.\n" +
     "With T input: toggles only when T=1.\n" +

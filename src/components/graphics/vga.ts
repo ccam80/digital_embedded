@@ -401,6 +401,8 @@ export const VGADefinition: ComponentDefinition = {
   propertyDefs: VGA_PROPERTY_DEFS,
   attributeMap: VGA_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.GRAPHICS,
+  inputSchema: ["R", "G", "B", "H", "V", "C"],
+  outputSchema: [],
   helpText:
     "VGA — VGA-resolution pixel display.\n" +
     "Inputs: R, G, B (color channels), H (HSync), V (VSync), C (pixel clock).\n" +

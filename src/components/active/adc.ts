@@ -46,7 +46,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import {
   DigitalInputPinModel,
@@ -216,22 +216,22 @@ export class ADCElement extends AbstractCircuitElement {
 /**
  * Create the MNA analog element for an N-bit ADC.
  *
- * Node assignment (pin-declaration order):
- *   nodeIds[0] = VIN  (analog input, DigitalInputPinModel for loading)
- *   nodeIds[1] = CLK  (clock input, DigitalInputPinModel for loading)
- *   nodeIds[2] = VREF (reference voltage, read directly)
- *   nodeIds[3] = GND  (ground reference, read directly)
- *   nodeIds[4] = EOC  (end-of-conversion output, DigitalOutputPinModel)
- *   nodeIds[5..5+N-1] = D0..D(N-1) digital outputs, DigitalOutputPinModel
+ * Pin nodes (from pinLayout order):
+ *   pinNodes.get("VIN")  = analog input (DigitalInputPinModel for loading)
+ *   pinNodes.get("CLK")  = clock input (DigitalInputPinModel for loading)
+ *   pinNodes.get("VREF") = reference voltage (read directly)
+ *   pinNodes.get("GND")  = ground reference (read directly)
+ *   pinNodes.get("EOC")  = end-of-conversion output (DigitalOutputPinModel)
+ *   pinNodes.get("D0").."D(N-1)" = digital output bits, DigitalOutputPinModel
  *
- * Note: nodeIds use 1-based IDs; 0 = ground. Access voltages as
- *   voltages[nodeId - 1] for nodeId > 0, or 0 for nodeId == 0 (ground).
+ * Note: node IDs are 1-based; 0 = MNA ground.
  */
 function createADCElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const vRefProp = props.getOrDefault<number>("vRef", 5.0);
   const mode = props.getOrDefault<string>("mode", "unipolar") as "unipolar" | "bipolar";
@@ -241,15 +241,15 @@ function createADCElement(
 
   const maxCode = (1 << bits) - 1;
 
-  const nVin = nodeIds[0];
-  const nClk = nodeIds[1];
-  const nVref = nodeIds[2];
-  const nGnd = nodeIds[3];
-  const nEoc = nodeIds[4];
+  const nVin  = pinNodes.get("VIN")  ?? 0;
+  const nClk  = pinNodes.get("CLK")  ?? 0;
+  const nVref = pinNodes.get("VREF") ?? 0;
+  const nGnd  = pinNodes.get("GND")  ?? 0;
+  const nEoc  = pinNodes.get("EOC")  ?? 0;
 
   const nDigital: number[] = [];
   for (let i = 0; i < bits; i++) {
-    nDigital.push(nodeIds[5 + i]);
+    nDigital.push(pinNodes.get(`D${i}`) ?? 0);
   }
 
   // Build pin models
@@ -312,14 +312,7 @@ function createADCElement(
     return Math.min(maxCode, Math.max(0, Math.floor(normalised * (1 << bits))));
   }
 
-  function allNodeIndices(): readonly number[] {
-    return [nVin, nClk, nVref, nGnd, nEoc, ...nDigital];
-  }
-
   return {
-    get nodeIndices(): readonly number[] {
-      return allNodeIndices();
-    },
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -361,6 +354,35 @@ function createADCElement(
       // set during updateCompanion (clock-edge detection). No re-evaluation
       // of the ADC conversion here — that only happens on accepted timesteps.
       void voltages;
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const rIn = INPUT_PIN_SPEC.rIn;
+      const rOut = OUTPUT_PIN_SPEC.rOut;
+
+      // VIN: DigitalInputPinModel — loading conductance 1/rIn to ground
+      const iVin = nVin > 0 ? readVoltage(voltages, nVin) / rIn : 0;
+
+      // CLK: DigitalInputPinModel — loading conductance 1/rIn to ground
+      const iClk = nClk > 0 ? readVoltage(voltages, nClk) / rIn : 0;
+
+      // VREF: passive — no conductance stamped, behavioral approximation → 0
+      // GND: passive — no conductance stamped, behavioral approximation → 0
+
+      // EOC: DigitalOutputPinModel — I = (V_eoc - V_target) / rOut
+      const vEoc = readVoltage(voltages, nEoc);
+      const iEoc = nEoc > 0 ? (vEoc - eocPin.currentVoltage) / rOut : 0;
+
+      // D0..D(N-1): DigitalOutputPinModel — I = (V_d - V_target) / rOut
+      const currents: number[] = [iVin, iClk, 0, 0, iEoc];
+      for (let i = 0; i < bits; i++) {
+        const n = nDigital[i];
+        const vD = readVoltage(voltages, n);
+        currents.push(n > 0 ? (vD - digitalPins[i].currentVoltage) / rOut : 0);
+      }
+
+      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
+      return currents;
     },
 
     updateState(dt: number, voltages: Float64Array): void {
@@ -411,7 +433,7 @@ function createADCElement(
     get eocActive(): boolean {
       return eocActive;
     },
-  } as AnalogElement & { latchedCode: number; eocActive: boolean };
+  } as AnalogElementCore & { latchedCode: number; eocActive: boolean };
 }
 
 // ---------------------------------------------------------------------------
@@ -499,10 +521,11 @@ export const ADCDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createADCElement(nodeIds, branchIdx, props);
+  ): AnalogElementCore {
+    return createADCElement(pinNodes, internalNodeIds, branchIdx, props);
   },
 };

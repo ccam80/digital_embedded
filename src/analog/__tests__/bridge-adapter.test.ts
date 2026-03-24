@@ -162,8 +162,8 @@ describe("OutputAdapter", () => {
     expect(adapter.outputNodeId).toBe(NODE);
   });
 
-  it("nodeIndices_contains_output_node", () => {
-    expect(adapter.nodeIndices).toContain(NODE);
+  it("pinNodeIds_contains_output_node", () => {
+    expect(adapter.pinNodeIds).toContain(NODE);
   });
 
   it("branchIndex_is_minus_one", () => {
@@ -228,8 +228,8 @@ describe("InputAdapter", () => {
     expect(adapter.inputNodeId).toBe(NODE);
   });
 
-  it("nodeIndices_contains_input_node", () => {
-    expect(adapter.nodeIndices).toContain(NODE);
+  it("pinNodeIds_contains_input_node", () => {
+    expect(adapter.pinNodeIds).toContain(NODE);
   });
 
   it("branchIndex_is_minus_one", () => {

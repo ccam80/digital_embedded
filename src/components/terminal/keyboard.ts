@@ -284,6 +284,8 @@ export const KeyboardDefinition: ComponentDefinition = {
   propertyDefs: KEYBOARD_PROPERTY_DEFS,
   attributeMap: KEYBOARD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.TERMINAL,
+  inputSchema: ["C", "en"],
+  outputSchema: ["D", "av"],
   helpText:
     "Keyboard — keyboard input source.\n" +
     "rd (1-bit): rising edge dequeues the front key from the queue.\n" +

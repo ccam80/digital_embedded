@@ -3,12 +3,18 @@ import {
   ComponentRegistry,
   ComponentCategory,
   noOpAnalogExecuteFn,
+  hasDigitalModel,
+  hasAnalogModel,
+  availableModels,
 } from "../registry.js";
 import type {
   ComponentDefinition,
   AttributeMapping,
   ComponentLayout,
   ExecuteFunction,
+  DigitalModel,
+  AnalogModel,
+  ComponentModels,
 } from "../registry.js";
 import { PropertyBag } from "../properties.js";
 import type { CircuitElement, SerializedElement } from "../element.js";
@@ -292,9 +298,12 @@ describe("ComponentRegistry", () => {
       expect(result[0].name).toBe("TestPassive");
     });
 
-    it("engine_type_both_appears_in_digital_and_analog", () => {
-      const def = makeDefinition("SharedComponent");
-      def.engineType = "both";
+    it("component_with_both_models_appears_in_digital_and_analog", () => {
+      const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
+      const def: ComponentDefinition = {
+        ...makeDefinition("SharedComponent"),
+        analogFactory: stubAnalogFactory,
+      };
       registry.register(def);
 
       const digital = registry.getByEngineType("digital");
@@ -305,8 +314,12 @@ describe("ComponentRegistry", () => {
     });
 
     it("pure_analog_excluded_from_digital", () => {
-      const def = makeDefinition("PureAnalog");
-      def.engineType = "analog";
+      const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
+      const def: ComponentDefinition = {
+        ...makeDefinition("PureAnalog"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+      };
       registry.register(def);
 
       const digital = registry.getByEngineType("digital");
@@ -335,6 +348,169 @@ describe("ComponentRegistry", () => {
 
       const finalState = Array.from(state);
       expect(initialState).toEqual(finalState);
+    });
+  });
+
+  describe("ComponentModels types and utilities (P1-1 through P1-5)", () => {
+    const stubAnalogFactory = () =>
+      ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
+
+    it("hasDigitalModel returns true when models.digital is defined", () => {
+      const def = makeDefinition("DigOnly");
+      registry.register(def);
+      const stored = registry.get("DigOnly")!;
+      expect(hasDigitalModel(stored)).toBe(true);
+    });
+
+    it("hasDigitalModel returns false for pure-analog component", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("PureA"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const stored = registry.get("PureA")!;
+      expect(hasDigitalModel(stored)).toBe(false);
+    });
+
+    it("hasAnalogModel returns true when analogFactory is present", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("WithAnalog"),
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const stored = registry.get("WithAnalog")!;
+      expect(hasAnalogModel(stored)).toBe(true);
+    });
+
+    it("hasAnalogModel returns false for digital-only component", () => {
+      const def = makeDefinition("DigOnly2");
+      registry.register(def);
+      const stored = registry.get("DigOnly2")!;
+      expect(hasAnalogModel(stored)).toBe(false);
+    });
+
+    it("availableModels returns ['digital'] for digital-only component", () => {
+      const def = makeDefinition("JustDigital");
+      registry.register(def);
+      const stored = registry.get("JustDigital")!;
+      expect(availableModels(stored)).toEqual(["digital"]);
+    });
+
+    it("availableModels returns ['analog'] for pure-analog component", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("JustAnalog"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const stored = registry.get("JustAnalog")!;
+      expect(availableModels(stored)).toEqual(["analog"]);
+    });
+
+    it("availableModels returns both keys for dual-model component", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("DualModel"),
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const stored = registry.get("DualModel")!;
+      const models = availableModels(stored);
+      expect(models).toContain("digital");
+      expect(models).toContain("analog");
+      expect(models).toHaveLength(2);
+    });
+
+    it("models field is populated after register() from flat fields", () => {
+      const def = makeDefinition("AutoPop");
+      registry.register(def);
+      const stored = registry.get("AutoPop")!;
+      expect(stored.models).toBeDefined();
+      expect(stored.models!.digital).toBeDefined();
+      expect(stored.models!.digital!.executeFn).toBe(noopExecuteFn);
+    });
+
+    it("models.digital captures sampleFn when provided", () => {
+      const sampleFn: ExecuteFunction = () => {};
+      const def: ComponentDefinition = { ...makeDefinition("WithSample"), sampleFn };
+      registry.register(def);
+      const stored = registry.get("WithSample")!;
+      expect(stored.models!.digital!.sampleFn).toBe(sampleFn);
+    });
+
+    it("models.digital captures stateSlotCount when provided", () => {
+      const def: ComponentDefinition = { ...makeDefinition("WithState"), stateSlotCount: 3 };
+      registry.register(def);
+      const stored = registry.get("WithState")!;
+      expect(stored.models!.digital!.stateSlotCount).toBe(3);
+    });
+
+    it("models.digital captures switchPins when provided", () => {
+      const def: ComponentDefinition = { ...makeDefinition("Switch"), switchPins: [0, 1] };
+      registry.register(def);
+      const stored = registry.get("Switch")!;
+      expect(stored.models!.digital!.switchPins).toEqual([0, 1]);
+    });
+
+    it("models.analog captures requiresBranchRow when provided", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("VSource"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+        requiresBranchRow: true,
+      };
+      registry.register(def);
+      const stored = registry.get("VSource")!;
+      expect(stored.models!.analog!.requiresBranchRow).toBe(true);
+    });
+
+    it("register() does not overwrite explicitly supplied models", () => {
+      const customModels: ComponentModels = {
+        digital: { executeFn: noopExecuteFn },
+      };
+      const def: ComponentDefinition = { ...makeDefinition("ExplicitModels"), models: customModels };
+      registry.register(def);
+      const stored = registry.get("ExplicitModels")!;
+      expect(stored.models).toBe(customModels);
+    });
+
+    it("defaultModel is preserved through register()", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("WithDefault"),
+        analogFactory: stubAnalogFactory,
+        defaultModel: "digital",
+      };
+      registry.register(def);
+      const stored = registry.get("WithDefault")!;
+      expect(stored.defaultModel).toBe("digital");
+    });
+
+    it("getByEngineType digital returns components with digital model", () => {
+      registry.register(makeDefinition("Gate1"));
+      registry.register(makeDefinition("Gate2"));
+      const def: ComponentDefinition = {
+        ...makeDefinition("PureAnalogOnly"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const digital = registry.getByEngineType("digital");
+      expect(digital.map((d) => d.name)).toContain("Gate1");
+      expect(digital.map((d) => d.name)).toContain("Gate2");
+      expect(digital.map((d) => d.name)).not.toContain("PureAnalogOnly");
+    });
+
+    it("getByEngineType analog returns components with analog model", () => {
+      registry.register(makeDefinition("DigOnlyGate"));
+      const def: ComponentDefinition = {
+        ...makeDefinition("AnalogPassive"),
+        executeFn: noOpAnalogExecuteFn,
+        analogFactory: stubAnalogFactory,
+      };
+      registry.register(def);
+      const analog = registry.getByEngineType("analog");
+      expect(analog.map((d) => d.name)).toContain("AnalogPassive");
+      expect(analog.map((d) => d.name)).not.toContain("DigOnlyGate");
     });
   });
 

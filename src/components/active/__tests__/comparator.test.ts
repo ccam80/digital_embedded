@@ -53,7 +53,8 @@ function makeComparator(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return VoltageComparatorDefinition.analogFactory!(
-    [nInp, nInn, nOut],
+    new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
+    [],
     -1,
     makeProps(overrides),
     () => 0,

@@ -20,7 +20,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement } from "./element.js";
+import type { AnalogElement, AnalogElementCore } from "./element.js";
 import type { ExprNode } from "./expression.js";
 import { compileExpression } from "./expression-evaluate.js";
 import type { ExpressionContext } from "./expression-evaluate.js";
@@ -70,7 +70,7 @@ export class MutableExpressionContext implements ExpressionContext {
  * Abstract base for expression-driven controlled sources.
  *
  * Concrete subclasses supply:
- *   - `nodeIndices` and `branchIndex`
+ *   - `pinNodeIds` and `branchIndex`
  *   - `stamp(solver)` for linear topology entries (overrides no-op default)
  *   - `_bindContext(voltages)` to populate ctx with the relevant control values
  *   - `stampOutput(solver, value, derivative, ctrlValue)` for the output stamp
@@ -80,8 +80,8 @@ export class MutableExpressionContext implements ExpressionContext {
  * I_sense for current-controlled). Subclasses use it to compute the correct
  * NR linearized RHS: `value - derivative * ctrlValue`.
  */
-export abstract class ControlledSourceElement implements AnalogElement {
-  abstract readonly nodeIndices: readonly number[];
+export abstract class ControlledSourceElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   abstract readonly branchIndex: number;
 
   readonly isNonlinear = true as const;

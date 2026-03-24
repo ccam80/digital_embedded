@@ -248,6 +248,8 @@ export const MonoflopDefinition: ComponentDefinition = {
   propertyDefs: MONOFLOP_PROPERTY_DEFS,
   attributeMap: MONOFLOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
+  inputSchema: ["C", "R"],
+  outputSchema: ["Q", "~Q"],
   helpText:
     "Monoflop — monostable multivibrator.\n" +
     "On rising edge of C: Q goes high for timerDelay clock cycles, then returns low.\n" +

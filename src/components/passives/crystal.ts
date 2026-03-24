@@ -12,10 +12,10 @@
  *   Parallel resonance: f_p ≈ f_s · √(1 + C_s / C_0)   (slightly above f_s)
  *
  * MNA topology (1-based node indices, 0 = ground):
- *   nodeIndices[0] = n_A      external terminal A
- *   nodeIndices[1] = n_B      external terminal B
- *   nodeIndices[2] = n1       junction between R_s and L_s
- *   nodeIndices[3] = n2       junction between L_s and C_s
+ *   pinNodeIds[0] = n_A      external terminal A
+ *   pinNodeIds[1] = n_B      external terminal B
+ *   pinNodeIds[2] = n1       junction between R_s and L_s
+ *   pinNodeIds[3] = n2       junction between L_s and C_s
  *   branchIndex               branch current row for L_s
  *
  * Elements stamped:
@@ -42,7 +42,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import { formatSI } from "../../editor/si-format.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import {
   capacitorConductance,
@@ -168,7 +169,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     ctx.drawLine(1.3, -0.3, 1.3, 0.3);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : `${freq >= 1e6 ? (freq / 1e6).toFixed(3) + 'MHz' : (freq / 1e3).toFixed(3) + 'kHz'}`;
+    const displayLabel = label.length > 0 ? label : formatSI(freq, "Hz");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 1, 0.65, { horizontal: "center", vertical: "top" });
@@ -205,7 +206,7 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 // ---------------------------------------------------------------------------
 
 export class AnalogCrystalElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -233,7 +234,7 @@ export class AnalogCrystalElement implements AnalogElement {
   private vPrevC0: number = 0;
 
   /**
-   * @param nodeIndices - [n_A, n_B, n1, n2] where n1 and n2 are internal nodes
+   * @param pinNodeIds - [n_A, n_B, n1, n2] where n1 and n2 are internal nodes
    * @param branchIndex - Absolute MNA row index for L_s branch current
    * @param Rs          - Series (motional) resistance in ohms
    * @param Ls          - Motional inductance in henries
@@ -241,14 +242,14 @@ export class AnalogCrystalElement implements AnalogElement {
    * @param C0          - Shunt electrode capacitance in farads
    */
   constructor(
-    nodeIndices: number[],
+    pinNodeIds: number[],
     branchIndex: number,
     Rs: number,
     Ls: number,
     Cs: number,
     C0: number,
   ) {
-    this.nodeIndices = nodeIndices;
+    this.pinNodeIds = pinNodeIds;
     this.branchIndex = branchIndex;
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
@@ -257,10 +258,10 @@ export class AnalogCrystalElement implements AnalogElement {
   }
 
   stamp(solver: SparseSolver): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
-    const n1 = this.nodeIndices[2];
-    const n2 = this.nodeIndices[3];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const n1 = this.pinNodeIds[2];
+    const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
 
     // R_s: conductance between n_A and n1
@@ -297,11 +298,31 @@ export class AnalogCrystalElement implements AnalogElement {
     stampRHS(solver, nB, this.ieqC0);
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const n1 = this.pinNodeIds[2];
+
+    // Current through the series R_s (from pin A into the motional arm):
+    // I_Rs = G_s * (V_A - V_n1). By KCL at n1 this equals the L_s branch current.
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    const vN1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const iMotional = this.G_s * (vA - vN1);
+
+    // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const iShunt = this.geqC0 * (vA - vB) + this.ieqC0;
+
+    // Total current into pin A = motional arm current + shunt current
+    const I = iMotional + iShunt;
+    return [I, -I];
+  }
+
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
-    const n1 = this.nodeIndices[2];
-    const n2 = this.nodeIndices[3];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const n1 = this.pinNodeIds[2];
+    const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
 
     // L_s companion model — uses branch current row
@@ -337,10 +358,11 @@ export class AnalogCrystalElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export function createCrystalElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const freq = props.getOrDefault<number>("frequency", 32768);
   const Q = props.getOrDefault<number>("qualityFactor", 50000);
   const Cs = props.getOrDefault<number>("motionalCapacitance", 12.5e-15);
@@ -350,7 +372,14 @@ export function createCrystalElement(
   const Rs = crystalSeriesResistance(freq, Ls, Q);
 
   // nodeIds = [n_A, n_B, n1_internal, n2_internal]
-  return new AnalogCrystalElement(nodeIds, branchIdx, Rs, Ls, Cs, C0);
+  return new AnalogCrystalElement(
+    [pinNodes.get("A")!, pinNodes.get("B")!, internalNodeIds[0], internalNodeIds[1]],
+    branchIdx,
+    Rs,
+    Ls,
+    Cs,
+    C0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -362,6 +391,7 @@ const CRYSTAL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "frequency",
     type: PropertyType.FLOAT,
     label: "Frequency (Hz)",
+    unit: "Hz",
     defaultValue: 32768,
     min: 1,
     description: "Series resonant frequency in hertz",
@@ -378,6 +408,7 @@ const CRYSTAL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "motionalCapacitance",
     type: PropertyType.FLOAT,
     label: "Motional Capacitance C_s (F)",
+    unit: "F",
     defaultValue: 12.5e-15,
     min: 1e-18,
     description: "Series motional capacitance in farads",
@@ -386,6 +417,7 @@ const CRYSTAL_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "shuntCapacitance",
     type: PropertyType.FLOAT,
     label: "Shunt Capacitance C_0 (F)",
+    unit: "F",
     defaultValue: 3e-12,
     min: 1e-18,
     description: "Parallel electrode capacitance in farads",

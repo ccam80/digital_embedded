@@ -306,6 +306,8 @@ export const RegisterFileDefinition: ComponentDefinition = {
   propertyDefs: REGISTER_FILE_PROPERTY_DEFS,
   attributeMap: REGISTER_FILE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  inputSchema: ["Din", "we", "Rw", "C", "Ra", "Rb"],
+  outputSchema: ["Da", "Db"],
   helpText:
     "RegisterFile — register file with 2 read ports and 1 write port.\n" +
     "On rising clock edge: if we=1, writes Din to register[Rw].\n" +

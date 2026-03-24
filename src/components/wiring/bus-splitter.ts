@@ -285,6 +285,9 @@ export const BusSplitterDefinition: ComponentDefinition = {
   propertyDefs: BUS_SPLITTER_PROPERTY_DEFS,
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // Schema for default bitWidth=1; direction-filter order matches for all configs.
+  inputSchema: ["OE"],
+  outputSchema: ["D", "D0"],
   helpText:
     "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
     "Splits a common bus into individual bit lines gated by OE.",

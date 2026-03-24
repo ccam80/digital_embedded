@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -313,17 +313,18 @@ function stampConductanceSpst(
   }
 }
 
-export interface SpstAnalogElement extends AnalogElement {
+export interface SpstAnalogElement extends AnalogElementCore {
   setClosed(closed: boolean): void;
 }
 
 function createSwitchAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): SpstAnalogElement {
-  const nodeA = nodeIds[0];
-  const nodeB = nodeIds[1];
+  const nodeA = pinNodes.get("A1")!;
+  const nodeB = pinNodes.get("B1")!;
   const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
   const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
   const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
@@ -332,7 +333,6 @@ function createSwitchAnalogElement(
   let effectivelyClosed = normallyClosed ? !closed : closed;
 
   return {
-    nodeIndices: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -345,6 +345,16 @@ function createSwitchAnalogElement(
     setClosed(c: boolean): void {
       closed = c;
       effectivelyClosed = normallyClosed ? !closed : closed;
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: A1, B1.
+      // I = G * (V_A - V_B); positive = current into element at A1.
+      const G = effectivelyClosed ? 1 / ron : 1 / roff;
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const I = G * (vA - vB);
+      return [I, -I];
     },
   };
 }
@@ -373,6 +383,9 @@ export const SwitchDefinition: ComponentDefinition = {
   propertyDefs: SWITCH_PROPERTY_DEFS,
   attributeMap: SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  // Schema for default poles=1; direction-filter order matches for all pole counts.
+  inputSchema: [],
+  outputSchema: ["A1", "B1"],
   helpText:
     "Switch (SPST) — a manually controlled single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +

@@ -295,6 +295,9 @@ export const MuxDefinition: ComponentDefinition = {
   propertyDefs: MUX_PROPERTY_DEFS,
   attributeMap: MUX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // Schema for default selectorBits=1 (2 data inputs); direction-filter order matches for all configs.
+  inputSchema: ["sel", "in_0", "in_1"],
+  outputSchema: ["out"],
   helpText:
     "Multiplexer — selects one of N inputs based on selector bits.\n" +
     "Output = input[selector]. N = 2^selectorBits.",

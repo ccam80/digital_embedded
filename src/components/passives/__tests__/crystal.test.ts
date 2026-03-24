@@ -83,7 +83,7 @@ function makeCrystalElement(opts: {
   const { freqHz, Q, Cs, C0 } = opts;
   const Ls = crystalMotionalInductance(freqHz, Cs);
   const Rs = crystalSeriesResistance(freqHz, Ls, Q);
-  // nodeIndices: [nA=1, nB=0(gnd), n1=2, n2=3], branchIndex=3 (solver row 3)
+  // pinNodeIds: [nA=1, nB=0(gnd), n1=2, n2=3], branchIndex=3 (solver row 3)
   return new AnalogCrystalElement([1, 0, 2, 3], 3, Rs, Ls, Cs, C0);
 }
 
@@ -230,14 +230,14 @@ describe("Crystal", () => {
       props.set("motionalCapacitance", Cs);
       props.set("shuntCapacitance", C0);
 
-      const crystal = createCrystalElement([1, 0, 2, 3], 3, props);
+      const crystal = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props);
       const vs = makeDcVoltageSource(1, 0, 4, 1.0);
 
       // 1GΩ gmin shunts on all non-ground nodes (1,2,3) to prevent floating nodes
       // at DC where all capacitors have geq=0.
       const G_bleed = 1e-9; // 1nS = 1GΩ
       const gminShunts = {
-        nodeIndices: [1, 2, 3] as readonly number[],
+        pinNodeIds: [1, 2, 3] as readonly number[],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,
@@ -360,7 +360,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.analogFactory!([1, 0, 2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.analogFactory!(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -370,7 +370,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.analogFactory!([1, 0, 2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.analogFactory!(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 

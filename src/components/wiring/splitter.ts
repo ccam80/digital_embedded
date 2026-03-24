@@ -498,6 +498,10 @@ export const SplitterDefinition: ComponentDefinition = {
   propertyDefs: SPLITTER_PROPERTY_DEFS,
   attributeMap: SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // Schema for default config (input "4,4" → ports "0-3","4-7"; output "8" → port "0-7").
+  // Direction-filter order matches for all configurations.
+  inputSchema: ["0-3", "4-7"],
+  outputSchema: ["0-7"],
   helpText:
     "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
     "Configure Input Splitting for the left pins and Output Splitting for the right pins.\n" +

@@ -36,7 +36,13 @@ function makeVCVSElement(
     ["gain", gain],
     ["label", ""],
   ]).entries());
-  return VCVSDefinition.analogFactory!([nCtrlP, nCtrlN, nOutP, nOutN], branchIdx, props);
+  return VCVSDefinition.analogFactory!(
+    new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
+    [],
+    branchIdx,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

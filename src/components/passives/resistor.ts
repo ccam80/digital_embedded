@@ -18,7 +18,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import { formatSI } from "../../editor/si-format.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : `${resistance}Ω`;
+    const displayLabel = label.length > 0 ? label : formatSI(resistance, "Ω");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
     ctx.drawText(displayLabel, 2, 0.75, { horizontal: "center", vertical: "top" });
@@ -158,18 +159,18 @@ function stampG(solver: SparseSolver, row: number, col: number, val: number): vo
 }
 
 function createResistorElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const rawR = props.getOrDefault<number>("resistance", 1000);
   const R = Math.max(rawR, MIN_RESISTANCE);
   const G = 1 / R;
-  const n0 = nodeIds[0];
-  const n1 = nodeIds[1];
+  const n0 = pinNodes.get("A")!;
+  const n1 = pinNodes.get("B")!;
 
   return {
-    nodeIndices: [n0, n1],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -186,6 +187,13 @@ function createResistorElement(
       const vB = n1 > 0 ? voltages[n1 - 1] : 0;
       return G * (vA - vB);
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const vA = n0 > 0 ? voltages[n0 - 1] : 0;
+      const vB = n1 > 0 ? voltages[n1 - 1] : 0;
+      const I = G * (vA - vB);
+      return [I, -I];
+    },
   };
 }
 
@@ -198,6 +206,7 @@ const RESISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "resistance",
     type: PropertyType.INT,
     label: "Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 1000,
     min: 1e-9,
     description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.",

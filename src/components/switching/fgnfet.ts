@@ -247,6 +247,8 @@ export const FGNFETDefinition: ComponentDefinition = {
   propertyDefs: FGNFET_PROPERTY_DEFS,
   attributeMap: FGNFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  inputSchema: ["G"],
+  outputSchema: ["D", "S"],
   helpText: "FGNFET — N-channel floating-gate MOSFET. Programmed (blown) gate permanently disables conduction.",
   stateSlotCount: 2,
   defaultDelay: 0,

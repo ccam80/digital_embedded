@@ -291,6 +291,8 @@ export const ProgramMemoryDefinition: ComponentDefinition = {
   propertyDefs: PROGRAM_MEMORY_PROPERTY_DEFS,
   attributeMap: PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  inputSchema: ["A", "ld", "C"],
+  outputSchema: ["D"],
   helpText: "ProgramMemory — ROM with address auto-increment for CPU instruction fetch.",
   stateSlotCount: 2,
   defaultDelay: 10,

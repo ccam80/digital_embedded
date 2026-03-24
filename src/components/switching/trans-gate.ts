@@ -237,6 +237,8 @@ export const TransGateDefinition: ComponentDefinition = {
   propertyDefs: TRANS_GATE_PROPERTY_DEFS,
   attributeMap: TRANS_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  inputSchema: ["p1", "p2"],
+  outputSchema: ["out1", "out2"],
   helpText: "TransGate — CMOS transmission gate. S=1, ~S=0 → A and B connected.",
   stateSlotCount: 1,
   defaultDelay: 0,

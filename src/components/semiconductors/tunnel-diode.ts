@@ -30,7 +30,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -124,12 +124,13 @@ export function tunnelDiodeIV(
 // ---------------------------------------------------------------------------
 
 export function createTunnelDiodeElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeAnode   = nodeIds[0];
-  const nodeCathode = nodeIds[1];
+): AnalogElementCore {
+  const nodeAnode   = pinNodes.get("A")!;
+  const nodeCathode = pinNodes.get("K")!;
 
   const ip: number = props.getOrDefault<number>("ip", 5e-3);
   const vp: number = props.getOrDefault<number>("vp", 0.08);
@@ -140,9 +141,11 @@ export function createTunnelDiodeElement(
   let _vd = 0;
   let _geq = GMIN;
   let _ieq = 0;
+  let _id = 0; // cached junction current for getPinCurrents
 
   function recompute(v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, ip, vp, iv, vv);
+    _id = i;
     _geq = dIdV; // dI/dV is the conductance (can be negative in NDR)
     _ieq = i - _geq * v;
   }
@@ -152,7 +155,6 @@ export function createTunnelDiodeElement(
   }
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -207,6 +209,12 @@ export function createTunnelDiodeElement(
       // Tighter tolerance in NDR region
       const tol = isInNdrRegion(_vd) ? NDR_VSTEP_MAX * 0.01 : 2 * VT;
       return dvd <= tol;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinLayout order: [A (anode), K (cathode)]
+      // Positive = current flowing INTO element at that pin.
+      return [_id, -_id];
     },
   };
 }

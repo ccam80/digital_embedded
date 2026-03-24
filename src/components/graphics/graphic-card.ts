@@ -454,6 +454,8 @@ export const GraphicCardDefinition: ComponentDefinition = {
   propertyDefs: GRAPHIC_CARD_PROPERTY_DEFS,
   attributeMap: GRAPHIC_CARD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.GRAPHICS,
+  inputSchema: ["A", "str", "C", "ld", "B"],
+  outputSchema: ["D"],
   helpText:
     "GraphicCard — memory-mapped graphics framebuffer with double buffering.\n" +
     "Inputs: A (address), str (store strobe), C (clock), ld (load/read), B (bank select), D (data in).\n" +

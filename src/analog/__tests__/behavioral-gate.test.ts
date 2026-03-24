@@ -408,8 +408,12 @@ describe("Factory", () => {
   it("and_factory_returns_analog_element", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
-    // nodeIds: 1-based MNA node IDs
-    const element = factory([1, 2, 3], -1, props, () => 0);
+    // pinNodes: "In_1"=1, "In_2"=2, "out"=3
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3] });
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
@@ -418,22 +422,29 @@ describe("Factory", () => {
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.nodeIndices.length).toBe(3);
+    expect(element.pinNodeIds.length).toBe(3);
   });
 
   it("not_factory_returns_1_input_element", () => {
     const factory = makeNotAnalogFactory();
     const props = new PropertyBag();
-    const element = factory([1, 2], -1, props, () => 0);
+    const element = factory(
+      new Map([["In_1", 1], ["out", 2]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2] });
 
     expect(element).toBeDefined();
-    expect(element.nodeIndices.length).toBe(2);
+    expect(element.pinNodeIds.length).toBe(2);
   });
 
   it("nand_factory_correct_truth_table", () => {
     const factory = makeNandAnalogFactory(2);
     const props = new PropertyBag();
-    const gate = factory([1, 2, 3], -1, props, () => 0) as BehavioralGateElement;
+    const gate = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    ) as BehavioralGateElement;
 
     // Build a circuit, drive both inputs HIGH, expect LOW output
     const inA = new DigitalInputPinModel(CMOS_3V3);
@@ -464,24 +475,36 @@ describe("Factory", () => {
   it("or_factory_returns_analog_element", () => {
     const factory = makeOrAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([1, 2, 3], -1, props, () => 0);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
-    expect(element.nodeIndices.length).toBe(3);
+    expect(element.pinNodeIds.length).toBe(3);
   });
 
   it("nor_factory_returns_analog_element", () => {
     const factory = makeNorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([1, 2, 3], -1, props, () => 0);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
-    expect(element.nodeIndices.length).toBe(3);
+    expect(element.pinNodeIds.length).toBe(3);
   });
 
   it("xor_factory_returns_analog_element", () => {
     const factory = makeXorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory([1, 2, 3], -1, props, () => 0);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
-    expect(element.nodeIndices.length).toBe(3);
+    expect(element.pinNodeIds.length).toBe(3);
   });
 });

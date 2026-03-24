@@ -13,7 +13,7 @@
 
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
-import { PinDirection } from "@/core/pin";
+import { PinDirection, pinWorldPosition } from "@/core/pin";
 import { Circuit, Wire } from "@/core/circuit";
 import type { EditCommand } from "@/editor/undo-redo";
 import { AbstractCircuitElement } from "@/core/element";
@@ -171,8 +171,7 @@ export function findUnconnectedPowerPins(circuit: Circuit): UnconnectedPowerPin[
       if (!isPowerPin(pin)) {
         continue;
       }
-      const worldX = element.position.x + pin.position.x;
-      const worldY = element.position.y + pin.position.y;
+      const { x: worldX, y: worldY } = pinWorldPosition(element, pin);
       if (!isPinConnected(circuit, worldX, worldY)) {
         results.push({ element, pin });
       }
@@ -210,8 +209,7 @@ export function autoConnectPower(circuit: Circuit): EditCommand {
       const unconnected = findUnconnectedPowerPins(circuit);
 
       for (const { element, pin } of unconnected) {
-        const worldX = element.position.x + pin.position.x;
-        const worldY = element.position.y + pin.position.y;
+        const { x: worldX, y: worldY } = pinWorldPosition(element, pin);
 
         let supply: CircuitElement;
         let supplyPinX: number;
@@ -220,13 +218,11 @@ export function autoConnectPower(circuit: Circuit): EditCommand {
         if (pin.label === "VDD") {
           const el = new VddElement(nextSupplyId(), worldX, worldY);
           supply = el;
-          supplyPinX = el.position.x + el.getPins()[0]!.position.x;
-          supplyPinY = el.position.y + el.getPins()[0]!.position.y;
+          ({ x: supplyPinX, y: supplyPinY } = pinWorldPosition(el, el.getPins()[0]!));
         } else {
           const el = new GndElement(nextSupplyId(), worldX, worldY);
           supply = el;
-          supplyPinX = el.position.x + el.getPins()[0]!.position.x;
-          supplyPinY = el.position.y + el.getPins()[0]!.position.y;
+          ({ x: supplyPinX, y: supplyPinY } = pinWorldPosition(el, el.getPins()[0]!));
         }
 
         circuit.addElement(supply);

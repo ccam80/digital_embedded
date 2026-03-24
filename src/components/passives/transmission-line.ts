@@ -50,7 +50,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import {
   capacitorConductance,
@@ -192,7 +192,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 class SegmentResistorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -200,15 +200,15 @@ class SegmentResistorElement implements AnalogElement {
   private readonly G: number;
 
   constructor(nA: number, nB: number, resistance: number) {
-    this.nodeIndices = [nA, nB];
+    this.pinNodeIds = [nA, nB];
     this.G = resistance > 0 ? 1 / resistance : SHORT_CIRCUIT_CONDUCTANCE;
   }
 
   stamp(solver: SparseSolver): void {
-    stampG(solver, this.nodeIndices[0], this.nodeIndices[0], this.G);
-    stampG(solver, this.nodeIndices[0], this.nodeIndices[1], -this.G);
-    stampG(solver, this.nodeIndices[1], this.nodeIndices[0], -this.G);
-    stampG(solver, this.nodeIndices[1], this.nodeIndices[1], this.G);
+    stampG(solver, this.pinNodeIds[0], this.pinNodeIds[0], this.G);
+    stampG(solver, this.pinNodeIds[0], this.pinNodeIds[1], -this.G);
+    stampG(solver, this.pinNodeIds[1], this.pinNodeIds[0], -this.G);
+    stampG(solver, this.pinNodeIds[1], this.pinNodeIds[1], this.G);
   }
 }
 
@@ -217,7 +217,7 @@ class SegmentResistorElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 class SegmentShuntConductanceElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -225,12 +225,12 @@ class SegmentShuntConductanceElement implements AnalogElement {
   private readonly G: number;
 
   constructor(node: number, G: number) {
-    this.nodeIndices = [node, 0];
+    this.pinNodeIds = [node, 0];
     this.G = Math.max(G, MIN_CONDUCTANCE);
   }
 
   stamp(solver: SparseSolver): void {
-    stampG(solver, this.nodeIndices[0], this.nodeIndices[0], this.G);
+    stampG(solver, this.pinNodeIds[0], this.pinNodeIds[0], this.G);
   }
 }
 
@@ -252,7 +252,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 class SegmentInductorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -264,14 +264,14 @@ class SegmentInductorElement implements AnalogElement {
   private companionActive: boolean = false;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
-    this.nodeIndices = [nA, nB];
+    this.pinNodeIds = [nA, nB];
     this.branchIndex = branchIdx;
     this.L = inductance;
   }
 
   stamp(solver: SparseSolver): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
 
     // B sub-matrix: I_b flows into nA, out of nB (KCL at both nodes).
@@ -288,8 +288,8 @@ class SegmentInductorElement implements AnalogElement {
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.nodeIndices[0] > 0 ? voltages[this.nodeIndices[0] - 1] : 0;
-    const v1 = this.nodeIndices[1] > 0 ? voltages[this.nodeIndices[1] - 1] : 0;
+    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
+    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
 
     this.geq = inductorConductance(this.L, dt, method);
@@ -308,7 +308,7 @@ class SegmentInductorElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 class SegmentCapacitorElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -319,12 +319,12 @@ class SegmentCapacitorElement implements AnalogElement {
   private vPrev: number = 0;
 
   constructor(node: number, capacitance: number) {
-    this.nodeIndices = [node, 0];
+    this.pinNodeIds = [node, 0];
     this.C = capacitance;
   }
 
   stamp(solver: SparseSolver): void {
-    const n0 = this.nodeIndices[0];
+    const n0 = this.pinNodeIds[0];
     if (n0 !== 0) {
       solver.stamp(n0 - 1, n0 - 1, this.geq);
       solver.stampRHS(n0 - 1, -this.ieq);
@@ -332,7 +332,7 @@ class SegmentCapacitorElement implements AnalogElement {
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const n0 = this.nodeIndices[0];
+    const n0 = this.pinNodeIds[0];
     const vNow = n0 > 0 ? voltages[n0 - 1] : 0;
     const iNow = this.geq * vNow + this.ieq;
 
@@ -353,7 +353,7 @@ class SegmentCapacitorElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 class CombinedRLElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -366,15 +366,15 @@ class CombinedRLElement implements AnalogElement {
   private companionActive: boolean = false;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
-    this.nodeIndices = [nA, nB];
+    this.pinNodeIds = [nA, nB];
     this.branchIndex = branchIdx;
     this.R = resistance;
     this.L = inductance;
   }
 
   stamp(solver: SparseSolver): void {
-    const nA = this.nodeIndices[0];
-    const nB = this.nodeIndices[1];
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
 
     // B sub-matrix: I_b flows into nA, out of nB.
@@ -391,8 +391,8 @@ class CombinedRLElement implements AnalogElement {
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.nodeIndices[0] > 0 ? voltages[this.nodeIndices[0] - 1] : 0;
-    const v1 = this.nodeIndices[1] > 0 ? voltages[this.nodeIndices[1] - 1] : 0;
+    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
+    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
 
     this.geqL = inductorConductance(this.L, dt, method);
@@ -407,12 +407,16 @@ class CombinedRLElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export class TransmissionLineElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
 
   private readonly _subElements: AnalogElement[];
+  /** Branch index of the last segment's CombinedRL element. */
+  private readonly _lastBranchIdx: number;
+  /** Branch index of the first segment's inductor (= firstBranchIdx). */
+  private readonly _firstBranchIdx: number;
 
   constructor(
     nodeIds: number[],
@@ -423,7 +427,7 @@ export class TransmissionLineElement implements AnalogElement {
     length: number,
     segments: number,
   ) {
-    this.nodeIndices = nodeIds;
+    this.pinNodeIds = nodeIds;
     this.branchIndex = firstBranchIdx;
 
     const N = segments;
@@ -487,6 +491,10 @@ export class TransmissionLineElement implements AnalogElement {
         );
       }
     }
+
+    // Branch indices for getPinCurrents.
+    this._firstBranchIdx = firstBranchIdx;
+    this._lastBranchIdx = firstBranchIdx + N - 1;
   }
 
   stamp(solver: SparseSolver): void {
@@ -502,6 +510,35 @@ export class TransmissionLineElement implements AnalogElement {
       }
     }
   }
+
+  /**
+   * Per-pin currents for the 4 external pins in pinLayout order:
+   *   [0] P1b — Port1 high side
+   *   [1] P2b — Port2 high side
+   *   [2] P1a — Port1 return (ground side)
+   *   [3] P2a — Port2 return (ground side)
+   *
+   * Current into Port1 = branch current of first segment's inductor (rlMid0 → junction0).
+   * The series R and L in segment 0 are in series, so I_R = I_L = I_firstBranch.
+   * This holds for both lossless (R=0) and lossy cases.
+   *
+   * Current into Port2 = -I_lastBranch: the last CombinedRL branch current flows
+   * from the last junction INTO Port2 (nA→nB), so it exits the element externally
+   * at Port2 → negative from the element's perspective.
+   *
+   * P1a and P2a are the ground-return pins: they carry the equal-and-opposite
+   * return current relative to their corresponding high-side pin.
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    // First segment inductor branch current = current entering Port1 from external.
+    const iPort1 = voltages[this._firstBranchIdx];
+
+    // Last CombinedRL branch flows from last junction → Port2 (exits externally).
+    const iPort2 = -voltages[this._lastBranchIdx];
+
+    // Return pins carry equal-and-opposite ground return current.
+    return [iPort1, iPort2, -iPort1, -iPort2];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,16 +546,22 @@ export class TransmissionLineElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 function createTransmissionLineElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const z0 = props.getOrDefault<number>("impedance", 50);
   const delay = props.getOrDefault<number>("delay", 1e-9);
   const lossDb = props.getOrDefault<number>("lossPerMeter", 0);
   const length = props.getOrDefault<number>("length", 1.0);
   const segments = props.getOrDefault<number>("segments", 10);
 
+  const nodeIds = [
+    pinNodes.get("P1b")!,
+    pinNodes.get("P2b")!,
+    ...internalNodeIds,
+  ];
   return new TransmissionLineElement(nodeIds, branchIdx, z0, delay, lossDb, length, segments);
 }
 
@@ -539,6 +582,7 @@ const TRANSMISSION_LINE_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "delay",
     type: PropertyType.FLOAT,
     label: "Propagation Delay (s)",
+    unit: "s",
     defaultValue: 1e-9,
     min: 1e-15,
     description: "Total one-way propagation delay in seconds",

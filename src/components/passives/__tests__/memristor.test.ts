@@ -33,8 +33,7 @@ function makeMemristor(overrides: Partial<{
   deviceLength: number;
   windowOrder: number;
 }> = {}): MemristorElement {
-  return new MemristorElement(
-    [1, 2],
+  const el = new MemristorElement(
     overrides.rOn ?? R_ON,
     overrides.rOff ?? R_OFF,
     overrides.initialState ?? INITIAL_W,
@@ -42,6 +41,8 @@ function makeMemristor(overrides: Partial<{
     overrides.deviceLength ?? DEVICE_LENGTH,
     overrides.windowOrder ?? WINDOW_ORDER,
   );
+  Object.assign(el, { pinNodeIds: [1, 2] });
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +303,7 @@ describe("Memristor", () => {
     it("analogFactory creates a MemristorElement", () => {
       const propsMap = new Map<string, import("../../../core/properties.js").PropertyValue>();
       const props = new PropertyBag(propsMap.entries());
-      const element = createMemristorElement([1, 2], -1, props);
+      const element = createMemristorElement(new Map([["A", 1], ["B", 2]]), [], -1, props);
       expect(element).toBeInstanceOf(MemristorElement);
       expect(element.isNonlinear).toBe(true);
       expect(element.isReactive).toBe(false);

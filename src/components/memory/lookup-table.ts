@@ -230,6 +230,9 @@ export const LookUpTableDefinition: ComponentDefinition = {
   propertyDefs: LUT_PROPERTY_DEFS,
   attributeMap: LUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
+  // Schema for default inputCount=2; direction-filter order matches for all inputCounts.
+  inputSchema: ["0", "1"],
+  outputSchema: ["out"],
   helpText: "LookUpTable — user-configurable combinational truth table. Output = table[input_address].",
   stateSlotCount: 0,
   defaultDelay: 10,

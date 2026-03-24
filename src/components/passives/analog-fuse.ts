@@ -25,8 +25,8 @@
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
  * MNA topology:
- *   nodeIndices[0] = n_pos  (positive terminal)
- *   nodeIndices[1] = n_neg  (negative terminal)
+ *   pinNodeIds[0] = n_pos  (positive terminal)
+ *   pinNodeIds[1] = n_neg  (negative terminal)
  *   branchIndex    = -1     (no branch current row)
  *
  * Stamping:
@@ -38,7 +38,7 @@
  *   Emits 'fuse-blown' (info) on the timestep when _blown first becomes true.
  */
 
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -74,7 +74,7 @@ function smoothResistance(
 // ---------------------------------------------------------------------------
 
 export class AnalogFuseElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -93,7 +93,7 @@ export class AnalogFuseElement implements AnalogElement {
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
-   * @param nodeIndices    - [n_pos, n_neg]
+   * @param pinNodeIds    - [n_pos, n_neg]
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
    * @param i2tRating      - I²t energy rating in A²·s
@@ -101,14 +101,14 @@ export class AnalogFuseElement implements AnalogElement {
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    */
   constructor(
-    nodeIndices: number[],
+    pinNodeIds: number[],
     rCold: number,
     rBlown: number,
     i2tRating: number,
     emitDiagnostic?: (diag: SolverDiagnostic) => void,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
-    this.nodeIndices = nodeIndices;
+    this.pinNodeIds = pinNodeIds;
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
@@ -121,8 +121,8 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   stampNonlinear(solver: SparseSolver): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
 
     const R = smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
     const G = 1 / Math.max(R, MIN_RESISTANCE);
@@ -140,16 +140,16 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   updateOperatingPoint(voltages: Float64Array): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     this._currentVoltage = vPos - vNeg;
   }
 
   updateState(dt: number, voltages: Float64Array): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vDiff = vPos - vNeg;
@@ -212,6 +212,20 @@ export class AnalogFuseElement implements AnalogElement {
   get currentResistance(): number {
     return smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    // No branch row — compute from constitutive equation: I = G_eff * (V_A - V_B).
+    // pinNodeIds[0] = n_pos (out1 pin, index 0 in pinLayout).
+    // pinNodeIds[1] = n_neg (out2 pin, index 1 in pinLayout).
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
+    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const R = smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
+    const G = 1 / Math.max(R, MIN_RESISTANCE);
+    const I = G * (vPos - vNeg);
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -219,16 +233,17 @@ export class AnalogFuseElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export function createAnalogFuseElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
+): AnalogElementCore {
   const rCold = props.getOrDefault<number>("rCold", 0.01);
   const rBlown = props.getOrDefault<number>("rBlown", 1e9);
   const i2tRating = props.getOrDefault<number>("i2tRating", 1e-4);
 
-  return new AnalogFuseElement(nodeIds, rCold, rBlown, i2tRating, undefined, (blown, thermalRatio) => {
+  return new AnalogFuseElement([pinNodes.get("out1")!, pinNodes.get("out2")!], rCold, rBlown, i2tRating, undefined, (blown, thermalRatio) => {
     props.set("_thermalRatio", thermalRatio);
     if (blown) {
       props.set("blown", true);

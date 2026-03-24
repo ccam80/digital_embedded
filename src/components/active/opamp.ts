@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -156,10 +156,10 @@ export class OpAmpElement extends AbstractCircuitElement {
 /**
  * Create the MNA analog element for an ideal op-amp.
  *
- * Node assignment (1-based, 0 = ground):
- *   nodeIds[0] = in+ (non-inverting input)
- *   nodeIds[1] = in- (inverting input)
- *   nodeIds[2] = out (output)
+ * Pin nodes (from pinLayout order: in-, in+, out):
+ *   pinNodes.get("in-") = inverting input node (1-based, 0=ground)
+ *   pinNodes.get("in+") = non-inverting input node
+ *   pinNodes.get("out") = output node
  *
  * Supply rails are fixed constants: +15 V and -15 V.
  *
@@ -171,17 +171,18 @@ export class OpAmpElement extends AbstractCircuitElement {
  * Solver indices are 0-based (nodeId - 1 for non-ground nodes).
  */
 function createOpAmpElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const gain = props.getOrDefault<number>("gain", 1e6);
   const rOut = Math.max(props.getOrDefault<number>("rOut", 75), 1e-9);
   const G_out = 1 / rOut;
 
-  const nInp = nodeIds[0]; // in+ node (1-based, 0=ground)
-  const nInn = nodeIds[1]; // in- node
-  const nOut = nodeIds[2]; // out node
+  const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based, 0=ground)
+  const nInn = pinNodes.get("in-")!; // inverting input node
+  const nOut = pinNodes.get("out")!; // output node
   // Operating-point state updated by updateOperatingPoint
   let vInp = 0;
   let vInn = 0;
@@ -199,7 +200,6 @@ function createOpAmpElement(
   }
 
   return {
-    nodeIndices: [nInp, nInn, nOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -258,6 +258,29 @@ function createOpAmpElement(
         saturated = false;
         vOutTarget = vOut;
       }
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Input pins: ideal op-amp — infinite input impedance, zero input current.
+      // No conductance is stamped at in+ or in- nodes, so I_in+ = I_in- = 0.
+
+      // Output pin: Norton equivalent — conductance G_out from nOut to ground.
+      //   Linear region:   vOutTarget = gain*(V_inp - V_inn)  (full open-loop target)
+      //   Saturated region: vOutTarget = rail voltage
+      // The element sources (vOutTarget - V_out)*G_out into the nOut node.
+      // Current INTO element at out = (V_out - vOutTarget) * G_out.
+      const vOut = readNode(voltages, nOut);
+      // In linear region vOutTarget was set to vOut (current operating point),
+      // but we need the ideal target to compute the current correctly.
+      // Reconstruct: in linear, target = gain * scale * (V_inp - V_inn).
+      const idealTarget = saturated
+        ? vOutTarget
+        : gain * scale * (vInp - vInn);
+      const iOut = nOut > 0 ? (vOut - idealTarget) * G_out : 0;
+
+      // pinLayout order: in-, in+, out
+      // Sum is nonzero — residual is implicit supply current (no explicit Vcc/Vee pins).
+      return [0, 0, iOut];
     },
   };
 }
@@ -326,10 +349,11 @@ export const OpAmpDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
-    return createOpAmpElement(nodeIds, branchIdx, props);
+  ): AnalogElementCore {
+    return createOpAmpElement(pinNodes, internalNodeIds, branchIdx, props);
   },
 };

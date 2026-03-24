@@ -20,7 +20,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 
@@ -160,13 +160,14 @@ const LED_GMIN = 1e-12;
 // ---------------------------------------------------------------------------
 
 function createLedAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeAnode = nodeIds[0];
+): AnalogElementCore {
+  const nodeAnode = pinNodes.get("in")!;
   // Single-pin LED: cathode is implicitly ground (node 0)
-  const nodeCathode = nodeIds[1] ?? 0;
+  const nodeCathode = 0;
 
   const color = props.getOrDefault<string>("color", "red").toLowerCase();
   const colorModel = LED_COLOR_MODELS[color] ?? LED_DEFAULT_MODEL;
@@ -178,9 +179,9 @@ function createLedAnalogElement(
   let vd = 0;
   let geq = LED_GMIN;
   let ieq = 0;
+  let _id = 0;
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -214,8 +215,15 @@ function createLedAnalogElement(
       const expArg = Math.min(vd / nVt, 700);
       const expVal = Math.exp(expArg);
       const id = IS * (expVal - 1);
+      _id = id;
       geq = (IS * expVal) / nVt + LED_GMIN;
       ieq = id - geq * vd;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinLayout order: [in (anode)]. Cathode is implicit ground.
+      // Positive = current flowing INTO element at that pin.
+      return [_id];
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -301,6 +309,8 @@ export const LedDefinition: ComponentDefinition = {
   propertyDefs: LED_PROPERTY_DEFS,
   attributeMap: LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["in"],
+  outputSchema: [],
   helpText:
     "LED — single-color light-emitting diode indicator.\n" +
     "Lights up (filled circle) when the input is non-zero.\n" +

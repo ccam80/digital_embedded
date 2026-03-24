@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { pnjlim } from "../../analog/newton-raphson.js";
 import {
@@ -95,12 +95,13 @@ export function computeVaractorCapacitance(
 // ---------------------------------------------------------------------------
 
 export function createVaractorElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeAnode   = nodeIds[0]; // anode (typically more negative in reverse bias)
-  const nodeCathode = nodeIds[1]; // cathode (typically more positive in reverse bias)
+): AnalogElementCore {
+  const nodeAnode   = pinNodes.get("A")!; // anode (typically more negative in reverse bias)
+  const nodeCathode = pinNodes.get("K")!; // cathode (typically more positive in reverse bias)
 
   const propsMap = props as unknown as Record<string, unknown>;
   const cjo: number = (propsMap["cjo"] as number) ?? 20e-12;
@@ -116,6 +117,7 @@ export function createVaractorElement(
   let _vd = 0; // junction voltage (positive = forward biased)
   let _geq = GMIN;
   let _ieq = 0;
+  let _id = 0; // cached junction current for getPinCurrents
 
   // Capacitance companion model state
   let _capGeq = 0;
@@ -124,7 +126,6 @@ export function createVaractorElement(
   let _capFirstCall = true;
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -169,6 +170,7 @@ export function createVaractorElement(
       const expArg = Math.min(_vd / nVt, 700);
       const expVal = Math.exp(expArg);
       const id = iS * (expVal - 1);
+      _id = id;
       _geq = (iS * expVal) / nVt + GMIN;
       _ieq = id - _geq * _vd;
     },

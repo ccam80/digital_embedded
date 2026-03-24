@@ -26,13 +26,14 @@ function makeSparkGap(overrides: Partial<{
   rOff: number;
   iHold: number;
 }> = {}): SparkGapElement {
-  return new SparkGapElement(
-    [1, 2],
+  const el = new SparkGapElement(
     overrides.vBreakdown ?? 1000,
     overrides.rOn ?? 5,
     overrides.rOff ?? 1e10,
     overrides.iHold ?? 0.01,
   );
+  Object.assign(el, { pinNodeIds: [1, 2] });
+  return el;
 }
 
 /** Apply a voltage to the gap by updating its operating point. */
@@ -264,7 +265,7 @@ describe("SparkGap", () => {
 
     it("analogFactory creates a SparkGapElement", () => {
       const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
-      const element = createSparkGapElement([1, 2], -1, props, () => 0);
+      const element = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(SparkGapElement);
       expect(element.isNonlinear).toBe(true);
       expect(element.isReactive).toBe(false);

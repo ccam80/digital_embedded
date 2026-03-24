@@ -100,7 +100,8 @@ describe("CurrentSource", () => {
   it("default_current_from_analog_factory", () => {
     const props = new PropertyBag();
     const el = CurrentSourceDefinition.analogFactory!(
-      [1, 2],
+      new Map([["pos", 1], ["neg", 2]]),
+      [],
       -1,
       props,
       () => 0,

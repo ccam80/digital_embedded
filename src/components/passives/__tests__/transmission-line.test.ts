@@ -120,7 +120,7 @@ describe("TLine", () => {
       // nodeCount = 2 + 2*(N-1) = 2 + 4 = 6. Branches start at index 6.
       const firstBranch = 6;
 
-      const el = TransmissionLineDefinition.analogFactory!(nodeIds, firstBranch, props, () => 0);
+      const el = TransmissionLineDefinition.analogFactory!(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       // Set up companion model (dt=1ns, BDF-1) before stamping so inductors are active
       const voltages = new Float64Array(6 + N);
@@ -184,7 +184,7 @@ describe("TLine", () => {
       const firstBranch = nodeCount;
 
       const el = TransmissionLineDefinition.analogFactory!(
-        nodeIds, firstBranch, props, () => 0,
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
       );
 
       const dt = 1e-9;
@@ -276,7 +276,7 @@ describe("TLine", () => {
       props.set("segments", N);
 
       const tlineEl = TransmissionLineDefinition.analogFactory!(
-        nodeIds, firstLBranch, props, () => 0,
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
       // Voltage source: 1V step on Port1 (node1 vs GND)
@@ -378,7 +378,7 @@ describe("TLine", () => {
       props.set("segments", N);
 
       const tlineEl = TransmissionLineDefinition.analogFactory!(
-        nodeIds, firstLBranch, props, () => 0,
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
       // Source with series resistance Z0 (Thevenin equivalent)
@@ -405,7 +405,7 @@ describe("TLine", () => {
       const rLoad = makeResistor(port2, 0, Z0);
 
       const tlineEl2 = TransmissionLineDefinition.analogFactory!(
-        nodeIds2, firstL2, props, () => 0,
+        new Map([["P1b", nodeIds2[0]], ["P2b", nodeIds2[1]], ["P1a", 0], ["P2a", 0]]), nodeIds2.slice(2), firstL2, props, () => 0,
       );
 
       const compiled = buildTLineCircuit({
@@ -456,7 +456,7 @@ describe("TLine", () => {
         props.set("segments", N);
 
         const tlineEl = TransmissionLineDefinition.analogFactory!(
-          nodeIds, firstLBranch, props, () => 0,
+          new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
         const rLoad = makeResistor(2, 0, Z0);
@@ -517,7 +517,7 @@ describe("TLine", () => {
         props.set("segments", N);
 
         const tlineEl = TransmissionLineDefinition.analogFactory!(
-          nodeIds, firstLBranch, props, () => 0,
+          new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
         const rLoad = makeResistor(2, 0, Z0);
@@ -584,7 +584,7 @@ describe("TLine", () => {
       props.set("segments", N);
 
       const tlineEl = TransmissionLineDefinition.analogFactory!(
-        nodeIds, firstLBranch, props, () => 0,
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
       const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
@@ -659,10 +659,12 @@ describe("TransmissionLine", () => {
       expect(() => registry.register(TransmissionLineDefinition)).not.toThrow();
     });
 
-    it("pin layout has 2 pins: Port1 and Port2", () => {
-      expect(TransmissionLineDefinition.pinLayout).toHaveLength(2);
-      expect(TransmissionLineDefinition.pinLayout[0].label).toBe("Port1");
-      expect(TransmissionLineDefinition.pinLayout[1].label).toBe("Port2");
+    it("pin layout has 4 pins: P1b, P2b, P1a, P2a", () => {
+      expect(TransmissionLineDefinition.pinLayout).toHaveLength(4);
+      expect(TransmissionLineDefinition.pinLayout[0].label).toBe("P1b");
+      expect(TransmissionLineDefinition.pinLayout[1].label).toBe("P2b");
+      expect(TransmissionLineDefinition.pinLayout[2].label).toBe("P1a");
+      expect(TransmissionLineDefinition.pinLayout[3].label).toBe("P2a");
     });
 
     it("has all required property definitions", () => {
@@ -699,7 +701,7 @@ describe("TransmissionLine", () => {
       const props = new PropertyBag();
       props.set("segments", 5);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.analogFactory!(nodeIds, 10, props, () => 0);
+      const el = TransmissionLineDefinition.analogFactory!(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -707,7 +709,7 @@ describe("TransmissionLine", () => {
       const props = new PropertyBag();
       props.set("segments", 5);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.analogFactory!(nodeIds, 10, props, () => 0);
+      const el = TransmissionLineDefinition.analogFactory!(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 
@@ -720,7 +722,7 @@ describe("TransmissionLine", () => {
       const internalCount = 2 * 2; // (N-1)*2 = 4
       const nodeCount = 2 + internalCount; // 6
       const firstBranch = nodeCount;
-      const el = TransmissionLineDefinition.analogFactory!(nodeIds, firstBranch, props, () => 0);
+      const el = TransmissionLineDefinition.analogFactory!(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       const voltages = new Float64Array(nodeCount + 3);
       el.stampCompanion!(1e-9, "bdf1", voltages);
@@ -734,7 +736,7 @@ describe("TransmissionLine", () => {
       const props = new PropertyBag();
       props.set("segments", 3);
       const nodeIds = buildNodeIds(1, 2, 3, 3);
-      const el = TransmissionLineDefinition.analogFactory!(nodeIds, 6, props, () => 0);
+      const el = TransmissionLineDefinition.analogFactory!(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
       expect(el.stampCompanion).toBeDefined();
     });
   });

@@ -153,6 +153,8 @@ export const MagnitudeComparatorDefinition: ComponentDefinition = {
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["a", "b"],
+  outputSchema: [">", "=", "<"],
   helpText: "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
   defaultDelay: 10,
 };

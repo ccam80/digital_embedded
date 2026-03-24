@@ -19,8 +19,8 @@
  * calibrated, i.e. when rLight == rDark).
  *
  * MNA topology:
- *   nodeIndices[0] = n_pos
- *   nodeIndices[1] = n_neg
+ *   pinNodeIds[0] = n_pos
+ *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
  * Stamping:
@@ -28,7 +28,7 @@
  *   stampNonlinear — stamps conductance 1/R(lux)
  */
 
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -53,8 +53,8 @@ const MIN_RESISTANCE = 1e-12;
 // LDRElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-export class LDRElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+export class LDRElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -67,20 +67,17 @@ export class LDRElement implements AnalogElement {
   private _lux: number;
 
   /**
-   * @param nodeIndices - [n_pos, n_neg]
-   * @param rDark       - Resistance in darkness (lux=0) in ohms
-   * @param luxRef      - Reference illumination level in lux
-   * @param gamma       - Power-law exponent (positive)
-   * @param lux         - Current illumination level in lux
+   * @param rDark  - Resistance in darkness (lux=0) in ohms
+   * @param luxRef - Reference illumination level in lux
+   * @param gamma  - Power-law exponent (positive)
+   * @param lux    - Current illumination level in lux
    */
   constructor(
-    nodeIndices: number[],
     rDark: number,
     luxRef: number,
     gamma: number,
     lux: number,
   ) {
-    this.nodeIndices = nodeIndices;
     this._rDark = Math.max(rDark, MIN_RESISTANCE);
     this._luxRef = Math.max(luxRef, 1e-12);
     this._gamma = gamma;
@@ -111,8 +108,8 @@ export class LDRElement implements AnalogElement {
   }
 
   stampNonlinear(solver: SparseSolver): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
 
     const G = 1 / this.resistance();
 
@@ -132,6 +129,19 @@ export class LDRElement implements AnalogElement {
     // No internal voltage-dependent state; resistance depends only on lux.
     void voltages;
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    // No branch row — compute from constitutive equation: I = G * (V_pos - V_neg).
+    // pinNodeIds[0] = n_pos (pos pin, index 0 in pinLayout).
+    // pinNodeIds[1] = n_neg (neg pin, index 1 in pinLayout).
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
+    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const G = 1 / this.resistance();
+    const I = G * (vPos - vNeg);
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,16 +149,17 @@ export class LDRElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export function createLDRElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
+): AnalogElementCore {
   const rDark = props.getOrDefault<number>("rDark", 1e6);
   const luxRef = props.getOrDefault<number>("luxRef", 100);
   const gamma = props.getOrDefault<number>("gamma", 0.7);
   const lux = props.getOrDefault<number>("lux", 500);
-  return new LDRElement(nodeIds, rDark, luxRef, gamma, lux);
+  return new LDRElement(rDark, luxRef, gamma, lux);
 }
 
 // ---------------------------------------------------------------------------

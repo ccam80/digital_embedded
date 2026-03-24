@@ -22,8 +22,8 @@
  *   State variable `_conducting` switches based on thresholds to avoid chattering.
  *
  * MNA topology:
- *   nodeIndices[0] = n_pos
- *   nodeIndices[1] = n_neg
+ *   pinNodeIds[0] = n_pos
+ *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
  * Stamping:
@@ -32,7 +32,7 @@
  *   updateOperatingPoint — tracks terminal voltage for resistance computation
  */
 
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -81,8 +81,8 @@ function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: nu
 // SparkGapElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-export class SparkGapElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+export class SparkGapElement implements AnalogElementCore {
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -99,20 +99,17 @@ export class SparkGapElement implements AnalogElement {
   private _vTerminal: number = 0;
 
   /**
-   * @param nodeIndices - [n_pos, n_neg]
    * @param vBreakdown  - Breakdown voltage in volts
    * @param rOn         - On-state resistance in ohms
    * @param rOff        - Off-state resistance in ohms
    * @param iHold       - Holding current in amps; below this the gap extinguishes
    */
   constructor(
-    nodeIndices: number[],
     vBreakdown: number,
     rOn: number,
     rOff: number,
     iHold: number,
   ) {
-    this.nodeIndices = nodeIndices;
     this._vBreakdown = Math.max(vBreakdown, 1e-6);
     this._rOn = Math.max(rOn, MIN_RESISTANCE);
     this._rOff = Math.max(rOff, 1);
@@ -150,8 +147,8 @@ export class SparkGapElement implements AnalogElement {
   }
 
   stampNonlinear(solver: SparseSolver): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
 
     const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
 
@@ -167,9 +164,19 @@ export class SparkGapElement implements AnalogElement {
     }
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
+    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
+    const I = G * (vPos - vNeg);
+    return [I, -I];
+  }
+
   updateOperatingPoint(voltages: Float64Array): void {
-    const nPos = this.nodeIndices[0];
-    const nNeg = this.nodeIndices[1];
+    const nPos = this.pinNodeIds[0];
+    const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     this._vTerminal = vPos - vNeg;
@@ -194,16 +201,17 @@ export class SparkGapElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 export function createSparkGapElement(
-  nodeIds: number[],
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
+): AnalogElementCore {
   const vBreakdown = props.getOrDefault<number>("vBreakdown", 1000);
   const rOn = props.getOrDefault<number>("rOn", 5);
   const rOff = props.getOrDefault<number>("rOff", 1e10);
   const iHold = props.getOrDefault<number>("iHold", 0.01);
-  return new SparkGapElement(nodeIds, vBreakdown, rOn, rOff, iHold);
+  return new SparkGapElement(vBreakdown, rOn, rOff, iHold);
 }
 
 // ---------------------------------------------------------------------------

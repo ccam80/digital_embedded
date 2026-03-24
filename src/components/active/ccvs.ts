@@ -54,7 +54,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { parseExpression } from "../../analog/expression.js";
 import { differentiate, simplify } from "../../analog/expression-differentiate.js";
@@ -118,7 +118,6 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
  * outBranchIdx = branchIdx + 1: absolute 0-based output branch row.
  */
 class CCVSAnalogElement extends ControlledSourceElement {
-  readonly nodeIndices: readonly number[];
   readonly branchIndex: number; // sense branch (used by AnalogElement interface)
 
   private readonly _nSenseP: number;
@@ -151,7 +150,6 @@ class CCVSAnalogElement extends ControlledSourceElement {
     this._senseBranch = senseBranchIdx;
     this._outBranch = senseBranchIdx + 1;
 
-    this.nodeIndices = [nSenseP, nSenseN, nOutP, nOutN];
     this.branchIndex = senseBranchIdx;
   }
 
@@ -224,6 +222,20 @@ class CCVSAnalogElement extends ControlledSourceElement {
 
     // NR-linearized RHS
     solver.stampRHS(ko, value - derivative * ctrlValue);
+  }
+
+  /**
+   * Per-pin currents in pinLayout order: [sense+, sense-, out+, out-].
+   *
+   * The sense port is a 0V voltage source whose branch variable holds the
+   * sensed current. The output port is a dependent voltage source whose
+   * branch variable holds the output current. Positive = current INTO the pin.
+   * KCL: I_senseP + I_senseN + I_outP + I_outN = I - I + J - J = 0. ✓
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const iSense = voltages[this._senseBranch];
+    const iOut   = voltages[this._outBranch];
+    return [iSense, -iSense, iOut, -iOut];
   }
 }
 
@@ -378,17 +390,18 @@ export const CCVSDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const expression = props.getOrDefault<string>("expression", "I(sense)");
     const transresistance = props.getOrDefault<number>("transresistance", 1000);
     return new CCVSAnalogElement(
-      nodeIds[0], // sense+
-      nodeIds[1], // sense-
-      nodeIds[2], // out+
-      nodeIds[3], // out-
+      pinNodes.get("sense+")!, // sense+
+      pinNodes.get("sense-")!, // sense-
+      pinNodes.get("out+")!,   // out+
+      pinNodes.get("out-")!,   // out-
       branchIdx,
       expression,
       transresistance,

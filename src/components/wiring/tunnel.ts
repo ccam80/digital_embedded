@@ -209,6 +209,8 @@ export const TunnelDefinition: ComponentDefinition = {
   propertyDefs: TUNNEL_PROPERTY_DEFS,
   attributeMap: TUNNEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  inputSchema: ["in"],
+  outputSchema: [],
   helpText:
     "Tunnel — named wire connection.\n" +
     "All Tunnels with the same label in a circuit are electrically connected.\n" +

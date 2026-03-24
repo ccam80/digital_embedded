@@ -253,6 +253,9 @@ export const PriorityEncoderDefinition: ComponentDefinition = {
   propertyDefs: PRIORITY_ENCODER_PROPERTY_DEFS,
   attributeMap: PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // Schema for default selectorBits=1 (2 inputs); direction-filter order matches for all configs.
+  inputSchema: ["in0", "in1"],
+  outputSchema: ["num", "any"],
   helpText:
     "PriorityEncoder — outputs the index of the highest-priority active input.\n" +
     "num: highest active input index. any: 1 if any input is active.",

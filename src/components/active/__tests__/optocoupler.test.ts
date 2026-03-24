@@ -44,7 +44,13 @@ function makeOptocouplerElement(
     ["bandwidth", 50000],
     ["label",    ""],
   ]).entries());
-  return OptocouplerDefinition.analogFactory!([nAnode, nCathode, nCollector, nEmitter], -1, props);
+  return OptocouplerDefinition.analogFactory!(
+    new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
+    [],
+    -1,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

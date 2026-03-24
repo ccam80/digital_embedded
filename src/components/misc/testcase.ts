@@ -263,6 +263,8 @@ export const TestcaseDefinition: ComponentDefinition = {
   propertyDefs: TESTCASE_PROPERTY_DEFS,
   attributeMap: TESTCASE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
+  inputSchema: [],
+  outputSchema: [],
   helpText:
     "Testcase — embedded truth table test element.\n" +
     "Contains test data (pin names + expected input/output rows).\n" +

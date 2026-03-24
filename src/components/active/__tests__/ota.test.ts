@@ -44,7 +44,13 @@ function makeOTAElement(
     ["vt", vt],
     ["label", ""],
   ]).entries());
-  return OTADefinition.analogFactory!([nVp, nVm, nIabc, nOutP, nOutN], -1, props);
+  return OTADefinition.analogFactory!(
+    new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
+    [],
+    -1,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

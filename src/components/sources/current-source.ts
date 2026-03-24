@@ -21,8 +21,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { formatSI } from "../../editor/si-format.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 
 // ---------------------------------------------------------------------------
 // CurrentSourceElement — CircuitElement implementation
@@ -55,6 +56,8 @@ export class CurrentSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const current = this._properties.getOrDefault<number>("current", 0.01);
+    const label = this._properties.getOrDefault<string>("label", "");
     const vNeg = signals?.getPinVoltage("neg");
     const vPos = signals?.getPinVoltage("pos");
 
@@ -92,6 +95,12 @@ export class CurrentSourceElement extends AbstractCircuitElement {
       { x: 2.125, y: -0.25 },
       { x: 2.125, y: 0.25 },
     ], true);
+
+    // Value label below body
+    const displayLabel = label.length > 0 ? label : formatSI(current, "A");
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
+    ctx.drawText(displayLabel, 2, 1, { horizontal: "center", vertical: "top" });
 
     ctx.restore();
   }
@@ -132,7 +141,8 @@ const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "current",
     type: PropertyType.INT,
-    label: "Current",
+    label: "Current (A)",
+    unit: "A",
     defaultValue: 0.01,
     description: "Source current in amperes (A)",
   },
@@ -162,11 +172,10 @@ export function makeCurrentSource(
   nodePos: number,
   nodeNeg: number,
   current: number,
-): AnalogElement {
+): AnalogElementCore {
   let scale = 1;
 
   return {
-    nodeIndices: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -179,6 +188,16 @@ export function makeCurrentSource(
       const I = current * scale;
       if (nodePos !== 0) solver.stampRHS(nodePos - 1, I);
       if (nodeNeg !== 0) solver.stampRHS(nodeNeg - 1, -I);
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // No branch row — current is defined by the stamp: I = current * scale.
+      // Pin layout order: [pos, neg] — pos is index 0, neg is index 1.
+      // Conventional current flows from neg through source to pos (arrow direction).
+      // Current into pos = -I (current exits element at pos into the circuit).
+      // Current into neg = +I (current enters element at neg from the circuit).
+      const I = current * scale;
+      return [-I, I];
     },
   };
 }
@@ -211,11 +230,12 @@ export const CurrentSourceDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const current = (props.has("current") ? props.get<number>("current") : 0.01) ?? 0.01;
-    return makeCurrentSource(nodeIds[0], nodeIds[1], current);
+    return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
   },
 };

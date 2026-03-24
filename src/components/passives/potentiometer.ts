@@ -21,7 +21,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 class AnalogPotentiometerElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -222,8 +222,8 @@ class AnalogPotentiometerElement implements AnalogElement {
   private G_top: number;
   private G_bottom: number;
 
-  constructor(nodeIndices: number[], resistance: number, position: number) {
-    this.nodeIndices = nodeIndices;
+  constructor(pinNodeIds: number[], resistance: number, position: number) {
+    this.pinNodeIds = pinNodeIds;
     this.R = resistance;
     this.position = Math.max(0, Math.min(1, position));
 
@@ -234,9 +234,9 @@ class AnalogPotentiometerElement implements AnalogElement {
   }
 
   stamp(solver: SparseSolver): void {
-    const n_A = this.nodeIndices[0]; // top
-    const n_W = this.nodeIndices[1]; // wiper
-    const n_B = this.nodeIndices[2]; // bottom
+    const n_A = this.pinNodeIds[0]; // top
+    const n_W = this.pinNodeIds[1]; // wiper
+    const n_B = this.pinNodeIds[2]; // bottom
 
     // Stamp helper: 1-based node IDs, skip ground (node 0), -1 for solver index
     const s = (r: number, c: number, v: number): void => {
@@ -255,16 +255,50 @@ class AnalogPotentiometerElement implements AnalogElement {
     s(n_W, n_B, -this.G_bottom);
     s(n_B, n_W, -this.G_bottom);
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    // Factory passes nodes as [A, B, W] matching pinLayout order [A(0), B(1), W(2)].
+    // Stamp variables: n_A=pinNodeIds[0] (A), n_W=pinNodeIds[1] (B pin node),
+    // n_B=pinNodeIds[2] (W pin node) — the stamp variable names are inverted from
+    // the constructor call, but the physics is consistent: top resistor between
+    // pinNodeIds[0] and pinNodeIds[1], bottom between pinNodeIds[1] and pinNodeIds[2].
+    //
+    // Treat as: segment-top = pinNodeIds[0]↔pinNodeIds[1], segment-bottom = pinNodeIds[1]↔pinNodeIds[2].
+    // pinLayout: [A, B, W] → must return [I_A, I_B, I_W].
+    const n0 = this.pinNodeIds[0]; // A pin
+    const n1 = this.pinNodeIds[1]; // middle node (stamp calls this n_W)
+    const n2 = this.pinNodeIds[2]; // far end (stamp calls this n_B)
+
+    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const v2 = n2 > 0 ? voltages[n2 - 1] : 0;
+
+    // Current into pin at n0 through top resistor: G_top * (V_n0 - V_n1)
+    const i0 = this.G_top * (v0 - v1);
+    // Current into pin at n2 through bottom resistor: G_bottom * (V_n2 - V_n1)
+    const i2 = this.G_bottom * (v2 - v1);
+    // KCL at middle node n1: i1 = -(i0 + i2)
+    const i1 = -(i0 + i2);
+
+    // Return in pinLayout order [A, B, W] = [pinNodeIds[0], pinNodeIds[1], pinNodeIds[2]]
+    // pinLayout[0]=A → i0, pinLayout[1]=B → i1 (middle), pinLayout[2]=W → i2
+    return [i0, i1, i2];
+  }
 }
 
 function createPotentiometerElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const R = props.getOrDefault<number>("resistance", 10000);
   const position = props.getOrDefault<number>("position", 0.5);
-  return new AnalogPotentiometerElement(nodeIds, R, position);
+  return new AnalogPotentiometerElement(
+    [pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!],
+    R,
+    position,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +310,7 @@ const POTENTIOMETER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "resistance",
     type: PropertyType.INT,
     label: "Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 10000,
     min: 1e-9,
     description: "Total resistance in ohms",

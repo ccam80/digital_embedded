@@ -15,7 +15,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../core/properties.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
@@ -38,16 +38,20 @@ export type GateTruthTable = (inputs: boolean[]) => boolean;
 /**
  * Factory function signature for analog element creation.
  *
- * Called by the analog compiler for each component instance. nodeIds contains
- * the MNA node IDs for each pin in pin-declaration order. branchIdx is -1 for
- * elements that do not require an extra MNA branch row.
+ * Called by the analog compiler for each component instance.
+ *   pinNodes       — label → MNA node ID map, one entry per pin in pinLayout order.
+ *   internalNodeIds — factory-private MNA node IDs (not pins); positional indexing
+ *                    within this array is acceptable because the factory both
+ *                    declared the count and consumes them.
+ *   branchIdx      — MNA branch-current row index (-1 if none).
  */
 export type AnalogElementFactory = (
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
-) => AnalogElement;
+) => AnalogElementCore;
 
 // ---------------------------------------------------------------------------
 // BehavioralGateElement
@@ -64,7 +68,7 @@ export type AnalogElementFactory = (
  *   updateOperatingPoint() — caches latest solution voltages for stampNonlinear
  *   updateCompanion()    — updates pin companion state after accepted timestep
  */
-export class BehavioralGateElement implements AnalogElement {
+export class BehavioralGateElement implements AnalogElementCore {
   private readonly _inputs: DigitalInputPinModel[];
   private readonly _output: DigitalOutputPinModel;
   private readonly _truthTable: GateTruthTable;
@@ -82,7 +86,7 @@ export class BehavioralGateElement implements AnalogElement {
   /** Cached solver reference — set on first stamp() call. */
   private _solver: SparseSolver | null = null;
 
-  readonly nodeIndices: readonly number[];
+  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -97,11 +101,6 @@ export class BehavioralGateElement implements AnalogElement {
     this._output = output;
     this._truthTable = truthTable;
     this._latchedLevels = new Array<boolean>(inputs.length).fill(false);
-
-    // nodeIndices: all input nodes in order, then output node
-    const indices: number[] = inputs.map((inp) => inp.nodeId);
-    indices.push(output.nodeId);
-    this.nodeIndices = indices;
   }
 
   /**
@@ -185,6 +184,26 @@ export class BehavioralGateElement implements AnalogElement {
   }
 
   /**
+   * Compute per-pin currents from the MNA solution vector.
+   *
+   * Input pins: I = V_node / rIn (current into element through loading conductance)
+   * Output pin: I = (V_node - V_target) / rOut (Norton equivalent current into element)
+   * The sum is nonzero — the residual is the implicit supply current.
+   *
+   * Returns one entry per pin in pinLayout order: [In_1, ..., In_N, out].
+   */
+  getPinCurrents(voltages: Float64Array): number[] {
+    const result: number[] = [];
+    for (const inp of this._inputs) {
+      const v = readMnaVoltage(inp.nodeId, voltages);
+      result.push(v / inp.rIn);
+    }
+    const vOut = readMnaVoltage(this._output.nodeId, voltages);
+    result.push((vOut - this._output.currentVoltage) / this._output.rOut);
+    return result;
+  }
+
+  /**
    * Update companion model state after an accepted timestep.
    *
    * Calls updateCompanion() on all input and output pin models using the
@@ -259,7 +278,7 @@ function notTruth(inputs: boolean[]): boolean {
  * 2) — used by multi-input gate factories where the count is instance-defined.
  */
 function buildGateElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
   inputCount: number,
   truthTable: GateTruthTable,
   props: PropertyBag,
@@ -291,13 +310,13 @@ function buildGateElement(
     const label = `In_${i + 1}`;
     const spec = pinSpecs?.[label] ?? fallback;
     const pin = new DigitalInputPinModel(spec);
-    pin.init(nodeIds[i], 0);
+    pin.init(pinNodes.get(label) ?? 0, 0);
     inputPins.push(pin);
   }
 
   const outSpec = pinSpecs?.["out"] ?? fallback;
   const outputPin = new DigitalOutputPinModel(outSpec);
-  outputPin.init(nodeIds[inputCount], -1);
+  outputPin.init(pinNodes.get("out") ?? 0, -1);
 
   return new BehavioralGateElement(inputPins, outputPin, truthTable);
 }
@@ -310,8 +329,8 @@ function buildGateElement(
  * Returns an analogFactory closure for NOT gates (always 1 input).
  */
 export function makeNotAnalogFactory(): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, 1, notTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, 1, notTruth, props);
 }
 
 /**
@@ -321,8 +340,8 @@ export function makeNotAnalogFactory(): AnalogElementFactory {
  * at instantiation time (supports variable-input-count gates in the registry).
  */
 export function makeAndAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, andTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, andTruth, props);
 }
 
 /**
@@ -331,32 +350,32 @@ export function makeAndAnalogFactory(inputCount: number): AnalogElementFactory {
 export function makeNandAnalogFactory(
   inputCount: number,
 ): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, nandTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, nandTruth, props);
 }
 
 /**
  * Returns an analogFactory closure for OR gates.
  */
 export function makeOrAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, orTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, orTruth, props);
 }
 
 /**
  * Returns an analogFactory closure for NOR gates.
  */
 export function makeNorAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, norTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, norTruth, props);
 }
 
 /**
  * Returns an analogFactory closure for XOR gates.
  */
 export function makeXorAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, xorTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, xorTruth, props);
 }
 
 /**
@@ -368,6 +387,6 @@ export function makeXorAnalogFactory(inputCount: number): AnalogElementFactory {
 export function makeXnorAnalogFactory(
   inputCount: number,
 ): AnalogElementFactory {
-  return (nodeIds, _branchIdx, props, _getTime) =>
-    buildGateElement(nodeIds, inputCount, xnorTruth, props);
+  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+    buildGateElement(pinNodes, inputCount, xnorTruth, props);
 }

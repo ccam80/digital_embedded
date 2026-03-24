@@ -36,7 +36,7 @@ const VARACTOR_DEFAULTS = {
 function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): AnalogElement {
   const params = { ...VARACTOR_DEFAULTS, ...overrides };
   // nodeAnode=1, nodeCathode=2
-  return createVaractorElement([1, 2], -1, params as unknown as PropertyBag);
+  return createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, params as unknown as PropertyBag);
 }
 
 /**

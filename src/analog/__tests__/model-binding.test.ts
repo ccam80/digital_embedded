@@ -205,12 +205,12 @@ describe("ModelBinding", () => {
     }
 
     // Spy factory that captures the _modelParams from props
-    const diodeFactory: AnalogElementFactory = (nodeIds, _branchIdx, props, _getTime) => {
+    const diodeFactory: AnalogElementFactory = (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
       capturedModelParams = props.has("_modelParams")
         ? (props.get("_modelParams") as unknown as Record<string, number>)
         : undefined;
       const stub: AnalogElement = {
-        nodeIndices: nodeIds,
+        pinNodeIds: [...pinNodes.values()],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,

@@ -37,7 +37,13 @@ function makeVCCSElement(
     ["transconductance", gm],
     ["label", ""],
   ]).entries());
-  return VCCSDefinition.analogFactory!([nCtrlP, nCtrlN, nOutP, nOutN], -1, props);
+  return VCCSDefinition.analogFactory!(
+    new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
+    [],
+    -1,
+    props,
+    () => 0,
+  );
 }
 
 function buildCircuit(opts: {

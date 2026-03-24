@@ -17,7 +17,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../core/properties.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
 import {
@@ -81,23 +81,24 @@ function stampRHS(solver: SparseSolver, n: number, val: number): void {
 // ---------------------------------------------------------------------------
 // Driver analog factory — tri-state buffer
 //
-// Pins (nodeIds order matches PinDeclaration order):
-//   nodeIds[0] = in (data input)
-//   nodeIds[1] = sel (enable)
-//   nodeIds[2] = out (output)
+// Pin labels (matching buildDriverPinDeclarations):
+//   "in"  = data input
+//   "sel" = enable
+//   "out" = output
 //
 // When sel > vIH: output = input logic level via DigitalOutputPinModel (driven)
 // When sel < vIL: output in Hi-Z mode (R_HiZ to ground)
 // ---------------------------------------------------------------------------
 
 export function createDriverAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeIn = nodeIds[0];
-  const nodeSel = nodeIds[1];
-  const nodeOut = nodeIds[2];
+): AnalogElementCore {
+  const nodeIn = pinNodes.get("in") ?? 0;
+  const nodeSel = pinNodes.get("sel") ?? 0;
+  const nodeOut = pinNodes.get("out") ?? 0;
 
   const inSpec = getPinSpec(props, "in");
   const selSpec = getPinSpec(props, "sel");
@@ -119,7 +120,6 @@ export function createDriverAnalogElement(
   let solver: SparseSolver | null = null;
 
   return {
-    nodeIndices: [nodeIn, nodeSel, nodeOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -166,6 +166,24 @@ export function createDriverAnalogElement(
       selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
       outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: in (input), sel (enable input), out (output)
+      // Input pins: I = V_node / rIn
+      // Output pin: I = (V_node - V_target) / rOut  (Hi-Z: V_node / rHiZ)
+      const vIn = readMnaVoltage(nodeIn, voltages);
+      const iIn = vIn / inputPin.rIn;
+
+      const vSel = readMnaVoltage(nodeSel, voltages);
+      const iSel = vSel / selPin.rIn;
+
+      const vOut = readMnaVoltage(nodeOut, voltages);
+      const iOut = outputPin.isHiZ
+        ? vOut / outputPin.rHiZ
+        : (vOut - outputPin.currentVoltage) / outputPin.rOut;
+
+      return [iIn, iSel, iOut];
+    },
   };
 }
 
@@ -173,16 +191,18 @@ export function createDriverAnalogElement(
 // DriverInvSel analog factory — inverting tri-state (active-low enable)
 //
 // Same as Driver but enable logic is inverted: sel=0 → driven, sel=1 → Hi-Z
+// Pin labels: "in", "sel", "out" (matching buildDriverPinDeclarations)
 // ---------------------------------------------------------------------------
 
 export function createDriverInvAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeIn = nodeIds[0];
-  const nodeSel = nodeIds[1];
-  const nodeOut = nodeIds[2];
+): AnalogElementCore {
+  const nodeIn = pinNodes.get("in") ?? 0;
+  const nodeSel = pinNodes.get("sel") ?? 0;
+  const nodeOut = pinNodes.get("out") ?? 0;
 
   const inSpec = getPinSpec(props, "in");
   const selSpec = getPinSpec(props, "sel");
@@ -204,7 +224,6 @@ export function createDriverInvAnalogElement(
   let solver: SparseSolver | null = null;
 
   return {
-    nodeIndices: [nodeIn, nodeSel, nodeOut],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -252,18 +271,33 @@ export function createDriverInvAnalogElement(
       selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
       outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: in (input), sel (enable input), out (output)
+      // Input pins: I = V_node / rIn
+      // Output pin: I = (V_node - V_target) / rOut  (Hi-Z: V_node / rHiZ)
+      const vIn = readMnaVoltage(nodeIn, voltages);
+      const iIn = vIn / inputPin.rIn;
+
+      const vSel = readMnaVoltage(nodeSel, voltages);
+      const iSel = vSel / selPin.rIn;
+
+      const vOut = readMnaVoltage(nodeOut, voltages);
+      const iOut = outputPin.isHiZ
+        ? vOut / outputPin.rHiZ
+        : (vOut - outputPin.currentVoltage) / outputPin.rOut;
+
+      return [iIn, iSel, iOut];
+    },
   };
 }
 
 // ---------------------------------------------------------------------------
 // Splitter analog factory — pass-through per bit
 //
-// Each input bit has an independent DigitalInputPinModel → DigitalOutputPinModel
-// pair. nodeIds order follows PinDeclaration order: inputs first, outputs after.
-//
-// For a splitter with N input ports and M output ports:
-//   nodeIds[0..N-1]     = input nodes
-//   nodeIds[N..N+M-1]   = output nodes
+// Pin labels are dynamic bit-range names from buildSplitterPinDeclarations
+// (e.g. "0", "4-7", "0,1"). Inputs come first in pinLayout order, outputs after.
+// The _inputCount/_outputCount props indicate how many of each there are.
 //
 // Each input voltage is threshold-detected and its level is driven on the
 // corresponding output. For mismatched port counts the min(N, M) pairs are
@@ -271,47 +305,51 @@ export function createDriverInvAnalogElement(
 // ---------------------------------------------------------------------------
 
 export function createSplitterAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const inputCountProp = props.has("_inputCount")
+): AnalogElementCore {
+  const numIn = props.has("_inputCount")
     ? (props.get("_inputCount") as number)
     : 1;
-  const outputCountProp = props.has("_outputCount")
+  const numOut = props.has("_outputCount")
     ? (props.get("_outputCount") as number)
     : 1;
 
-  const numIn = inputCountProp;
-  const numOut = outputCountProp;
-  const totalPins = numIn + numOut;
-  const actualNodeIds = nodeIds.slice(0, totalPins);
+  // Pin labels are ordered in pinLayout order: inputs first, outputs after.
+  // Extract node IDs in that order from pinNodes.
+  const allNodeIds = Array.from(pinNodes.values());
+  const allLabels = Array.from(pinNodes.keys());
 
   const inputPins: DigitalInputPinModel[] = [];
   const outputPins: DigitalOutputPinModel[] = [];
 
   for (let i = 0; i < numIn; i++) {
-    const spec = getPinSpec(props, `in${i}`);
+    const label = allLabels[i] ?? `in${i}`;
+    const spec = getPinSpec(props, label);
     const pin = new DigitalInputPinModel(spec);
-    pin.init(actualNodeIds[i] ?? 0, 0);
+    pin.init(allNodeIds[i] ?? 0, 0);
     inputPins.push(pin);
   }
 
   const latchedLevels: boolean[] = new Array(numIn).fill(false);
 
   for (let i = 0; i < numOut; i++) {
-    const spec = getPinSpec(props, `out${i}`);
+    const label = allLabels[numIn + i] ?? `out${i}`;
+    const spec = getPinSpec(props, label);
     const pin = new DigitalOutputPinModel(spec);
-    pin.init(actualNodeIds[numIn + i] ?? 0, -1);
+    pin.init(allNodeIds[numIn + i] ?? 0, -1);
     pin.setLogicLevel(false);
     outputPins.push(pin);
   }
+
+  const actualNodeIds = allNodeIds.slice(0, numIn + numOut);
 
   let cachedVoltages = new Float64Array(0);
   let solver: SparseSolver | null = null;
 
   return {
-    nodeIndices: actualNodeIds,
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
@@ -349,6 +387,19 @@ export function createSplitterAnalogElement(
       for (const p of outputPins) p.stampCompanion(solver, dt, method);
     },
 
+    getPinCurrents(voltages: Float64Array): number[] {
+      // pinLayout order: inputs first, outputs after
+      const result: number[] = [];
+      for (const p of inputPins) {
+        result.push(readMnaVoltage(p.nodeId, voltages) / p.rIn);
+      }
+      for (const p of outputPins) {
+        const v = readMnaVoltage(p.nodeId, voltages);
+        result.push((v - p.currentVoltage) / p.rOut);
+      }
+      return result;
+    },
+
     updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
       for (const p of inputPins) {
         p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
@@ -379,15 +430,19 @@ const LED_RON = 50;
 const LED_ROFF = 1e7;
 const LED_GMIN = 1e-12;
 
+type SegmentDiodeElement = AnalogElementCore & {
+  /** Current flowing into the anode pin at the accepted operating point. */
+  anodeCurrent(voltages: Float64Array): number;
+};
+
 function createSegmentDiodeElement(
   nodeAnode: number,
   nodeCathode: number,
-): AnalogElement {
+): SegmentDiodeElement {
   let geq = LED_GMIN;
   let ieq = 0;
 
   return {
-    nodeIndices: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -422,22 +477,31 @@ function createSegmentDiodeElement(
       const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       return Math.abs((va - vc) - (vaPrev - vcPrev)) <= 0.05;
     },
+
+    anodeCurrent(voltages: Float64Array): number {
+      // Current flowing into anode = geq*(Va - Vc) - ieq
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      return geq * (va - vc) - ieq;
+    },
   };
 }
 
 export function createSevenSegAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   _props: PropertyBag,
-): AnalogElement {
-  // 8 segment nodes: a=0, b=1, c=2, d=3, e=4, f=5, g=6, dp=7
-  // Each segment is a diode from nodeIds[i] to ground (node 0)
-  const segDiodes = nodeIds.slice(0, 8).map((n) =>
+): AnalogElementCore {
+  // 8 segment nodes: a, b, c, d, e, f, g, dp
+  // Each segment is a diode from the pin node to ground (node 0)
+  const segLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
+  const segNodes = segLabels.map((lbl) => pinNodes.get(lbl)!);
+  const segDiodes = segNodes.map((n) =>
     createSegmentDiodeElement(n, 0),
   );
 
   return {
-    nodeIndices: nodeIds.slice(0, 8),
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -456,6 +520,12 @@ export function createSevenSegAnalogElement(
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
       return segDiodes.every((d) => d.checkConvergence!(voltages, prevVoltages));
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // pinLayout order: a, b, c, d, e, f, g, dp
+      // Each segment pin: current into anode = geq*(Va - Vc) - ieq (Vc = ground = 0)
+      return segDiodes.map((d) => d.anodeCurrent(voltages));
     },
   };
 }
@@ -486,14 +556,15 @@ const RELAY_L_DEFAULT = 0.1; // 100mH
 const RELAY_I_PULL_DEFAULT = 20e-3; // 20mA
 
 export function createRelayAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeCoil1 = nodeIds[0]; // in1
-  const nodeCoil2 = nodeIds[1]; // in2
-  const nodeContactA = nodeIds[2]; // A1
-  const nodeContactB = nodeIds[3]; // B1
+): AnalogElementCore {
+  const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
+  const nodeCoil2 = pinNodes.get("in2")!; // coil terminal 2
+  const nodeContactA = pinNodes.get("A1")!; // contact A
+  const nodeContactB = pinNodes.get("B1")!; // contact B
 
   const rCoil = props.has("coilResistance")
     ? (props.get("coilResistance") as number)
@@ -528,7 +599,6 @@ export function createRelayAnalogElement(
   const branchRow = branchIdx; // MNA row for inductor branch current
 
   return {
-    nodeIndices: allNodes,
     branchIndex: branchRow,
     isNonlinear: true,
     isReactive: true,
@@ -587,6 +657,19 @@ export function createRelayAnalogElement(
       const energised = coilCurrentMag > iPull;
       contactClosed = normallyClosed ? !energised : energised;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: in1, in2, A1, B1 (Relay poles=1).
+      // Coil: 1/rCoil between coil1 and coil2.
+      // Contact: contactG() between A1 and B1.
+      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
+      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
+      const iCoil = (vCoil1 - vCoil2) / rCoil;
+      const vA = nodeContactA > 0 ? voltages[nodeContactA - 1] : 0;
+      const vB = nodeContactB > 0 ? voltages[nodeContactB - 1] : 0;
+      const iContact = contactG() * (vA - vB);
+      return [iCoil, -iCoil, iContact, -iContact];
+    },
   };
 }
 
@@ -602,15 +685,16 @@ export function createRelayAnalogElement(
 // ---------------------------------------------------------------------------
 
 export function createRelayDTAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeCoil1 = nodeIds[0];
-  const nodeCoil2 = nodeIds[1];
-  const nodeCommon = nodeIds[2]; // A1
-  const nodeThrow = nodeIds[3];  // B1 (normally open)
-  const nodeRest = nodeIds[4];   // C1 (normally closed)
+): AnalogElementCore {
+  const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
+  const nodeCoil2 = pinNodes.get("in2")!; // coil terminal 2
+  const nodeCommon = pinNodes.get("A1")!;  // common (A1)
+  const nodeThrow = pinNodes.get("B1")!;   // normally open (B1)
+  const nodeRest = pinNodes.get("C1")!;    // normally closed (C1)
 
   const rCoil = props.has("coilResistance")
     ? (props.get("coilResistance") as number)
@@ -636,7 +720,6 @@ export function createRelayDTAnalogElement(
   function gRest(): number { return energised ? 1 / RELAY_R_OFF : 1 / RELAY_R_ON; }
 
   return {
-    nodeIndices: [nodeCoil1, nodeCoil2, nodeCommon, nodeThrow, nodeRest],
     branchIndex: branchIdx,
     isNonlinear: true,
     isReactive: true,
@@ -679,6 +762,21 @@ export function createRelayDTAnalogElement(
       }
       energised = Math.abs(iL) > iPull;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: in1, in2, A1 (common), B1 (throw), C1 (rest).
+      // Coil: 1/rCoil between in1 and in2.
+      // Contacts: gThrow() between common/throw, gRest() between common/rest.
+      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
+      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
+      const iCoil = (vCoil1 - vCoil2) / rCoil;
+      const vCom = nodeCommon > 0 ? voltages[nodeCommon - 1] : 0;
+      const vThr = nodeThrow > 0 ? voltages[nodeThrow - 1] : 0;
+      const vRst = nodeRest > 0 ? voltages[nodeRest - 1] : 0;
+      const iThrow = gThrow() * (vCom - vThr);
+      const iRest = gRest() * (vCom - vRst);
+      return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
+    },
   };
 }
 
@@ -694,12 +792,13 @@ export function createRelayDTAnalogElement(
 // ---------------------------------------------------------------------------
 
 export function createButtonLEDAnalogElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
-  const nodeOut = nodeIds[0]; // button output
-  const nodeLedIn = nodeIds[1]; // LED anode
+): AnalogElementCore {
+  const nodeOut = pinNodes.get("out")!;  // button output
+  const nodeLedIn = pinNodes.get("in")!; // LED anode
 
   const outSpec = getPinSpec(props, "out");
   const outputPin = new DigitalOutputPinModel(outSpec);
@@ -709,7 +808,6 @@ export function createButtonLEDAnalogElement(
   const ledDiode = createSegmentDiodeElement(nodeLedIn, 0);
 
   return {
-    nodeIndices: [nodeOut, nodeLedIn],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -730,6 +828,18 @@ export function createButtonLEDAnalogElement(
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
       return ledDiode.checkConvergence!(voltages, prevVoltages);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin layout order: out (button output), in (LED anode).
+      // out: DigitalOutputPinModel current into element
+      // in:  LED diode anode current into element
+      const vOut = readMnaVoltage(nodeOut, voltages);
+      const iOut = outputPin.isHiZ
+        ? vOut / outputPin.rHiZ
+        : (vOut - outputPin.currentVoltage) / outputPin.rOut;
+      const iLed = (ledDiode as SegmentDiodeElement).anodeCurrent(voltages);
+      return [iOut, iLed];
     },
   };
 }

@@ -33,9 +33,9 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 }
 
 /** Minimal AnalogElement stub with stamp no-op. */
-function makeMockElement(nodeIndices: number[], branchIndex = -1): AnalogElement {
+function makeMockElement(pinNodeIds: number[], branchIndex = -1): AnalogElement {
   return {
-    nodeIndices,
+    pinNodeIds,
     branchIndex,
     stamp() {},
     isNonlinear: false,
@@ -99,6 +99,7 @@ function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
 function makeEngine(elementCurrents: number[]): AnalogEngine {
   return {
     getElementCurrent: (id: number) => elementCurrents[id] ?? 0,
+    getElementPinCurrents: () => null,
     getNodeVoltage: () => 0,
     getBranchCurrent: () => 0,
     getElementPower: () => 0,
@@ -904,7 +905,7 @@ describe("WireCurrentResolver — AC transient RLC", () => {
         compiled,
       );
 
-      // Element currents (convention: positive = from nodeIndices[0] to [1])
+      // Element currents (convention: positive = from pinNodeIds[0] to [1])
       const I_R = engine.getElementCurrent(1);   // resistor
       const I_C = engine.getElementCurrent(2);   // capacitor
       const I_L = engine.getElementCurrent(3);   // inductor
@@ -941,9 +942,9 @@ describe("WireCurrentResolver — AC transient RLC", () => {
       // KCL at node 2: I_R (entering via terminal 1) = I_C + I_L (leaving via terminal 0)
       // Signed: I_R - I_C - I_L should ≈ 0
       // But from getElementCurrent convention:
-      //   R: nodeIndices=[1,2], positive I_R flows 1→2, so I_R enters node 2
-      //   C: nodeIndices=[2,0], positive I_C flows 2→0, so I_C leaves node 2
-      //   L: nodeIndices=[2,0], positive I_L flows 2→0, so I_L leaves node 2
+      //   R: pinNodeIds=[1,2], positive I_R flows 1→2, so I_R enters node 2
+      //   C: pinNodeIds=[2,0], positive I_C flows 2→0, so I_C leaves node 2
+      //   L: pinNodeIds=[2,0], positive I_L flows 2→0, so I_L leaves node 2
       // KCL: I_R - I_C - I_L = 0
       const kclResidual = Math.abs(I_R - I_C - I_L) / maxI;
       if (kclResidual > maxKclError) maxKclError = kclResidual;
@@ -1205,7 +1206,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
     for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
       const ae = compiled.elements[eIdx];
-      if (ae.nodeIndices.length !== 2) continue;
+      if (ae.pinNodeIds.length !== 2) continue;
       const ce = compiled.elementToCircuitElement.get(eIdx);
       if (!ce) continue;
       const pins = ce.getPins();
@@ -1221,11 +1222,11 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         const nodeId = compiled.wireToNodeId.get(wire);
         if (nodeId === undefined) continue;
 
-        const matchA = (nodeId === ae.nodeIndices[0]) && (
+        const matchA = (nodeId === ae.pinNodeIds[0]) && (
           (Math.abs(wire.start.x - posA.x) < 1 && Math.abs(wire.start.y - posA.y) < 1) ||
           (Math.abs(wire.end.x - posA.x) < 1 && Math.abs(wire.end.y - posA.y) < 1)
         );
-        const matchB = (nodeId === ae.nodeIndices[1]) && (
+        const matchB = (nodeId === ae.pinNodeIds[1]) && (
           (Math.abs(wire.start.x - posB.x) < 1 && Math.abs(wire.start.y - posB.y) < 1) ||
           (Math.abs(wire.end.x - posB.x) < 1 && Math.abs(wire.end.y - posB.y) < 1)
         );
@@ -1261,8 +1262,8 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         const ae = compiled.elements[eIdx];
 
         for (const [pinWires, nodeIdx] of [
-          [pinAWires, ae.nodeIndices[0]] as const,
-          [pinBWires, ae.nodeIndices[1]] as const,
+          [pinAWires, ae.pinNodeIds[0]] as const,
+          [pinBWires, ae.pinNodeIds[1]] as const,
         ]) {
           if (pinWires.length === 0) continue;
 
@@ -1288,7 +1289,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       let pathIdx = 0;
       for (let eIdx = 0; eIdx < compiled.elements.length && pathIdx < paths.length; eIdx++) {
         const ae = compiled.elements[eIdx];
-        if (ae.nodeIndices.length !== 2) continue;
+        if (ae.pinNodeIds.length !== 2) continue;
         if (!compiled.elementToCircuitElement.get(eIdx)) continue;
 
         const I_elem = Math.abs(engine.getElementCurrent(eIdx));
@@ -1318,7 +1319,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     expect(finalPaths.length).toBeGreaterThan(0);
     for (let eIdx = 0, pIdx = 0; eIdx < compiled.elements.length && pIdx < finalPaths.length; eIdx++) {
       const ae = compiled.elements[eIdx];
-      if (ae.nodeIndices.length !== 2) continue;
+      if (ae.pinNodeIds.length !== 2) continue;
       if (!compiled.elementToCircuitElement.get(eIdx)) continue;
       const I_elem = Math.abs(engine.getElementCurrent(eIdx));
       if (I_elem > 1e-9) {
@@ -1430,7 +1431,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
       for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
         const ae = compiled.elements[eIdx];
-        if (ae.nodeIndices.length !== 2) continue;
+        if (ae.pinNodeIds.length !== 2) continue;
         const ce = compiled.elementToCircuitElement.get(eIdx);
         if (!ce) continue;
 
@@ -1446,8 +1447,8 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         if (!vA || !vB) { pathIdx++; continue; }
 
         // Find the wire at each pin's vertex
-        const wireA = findWireAtVertex(vA, ae.nodeIndices[0]);
-        const wireB = findWireAtVertex(vB, ae.nodeIndices[1]);
+        const wireA = findWireAtVertex(vA, ae.pinNodeIds[0]);
+        const wireB = findWireAtVertex(vB, ae.pinNodeIds[1]);
         if (!wireA || !wireB) { pathIdx++; continue; }
 
         const cA = resolver.getWireCurrent(wireA)?.current ?? 0;
@@ -1457,8 +1458,8 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         const bodyCurrent = pathIdx < paths.length ? paths[pathIdx].current : 0;
 
         // Determine if each pin is at a junction (multiple wires at vertex)
-        const isJunctionA = wireCountAtVertex(vA, ae.nodeIndices[0]) > 1;
-        const isJunctionB = wireCountAtVertex(vB, ae.nodeIndices[1]) > 1;
+        const isJunctionA = wireCountAtVertex(vA, ae.pinNodeIds[0]) > 1;
+        const isJunctionB = wireCountAtVertex(vB, ae.pinNodeIds[1]) > 1;
 
         // CHECK 1: For non-junction pins, wire current must match body current.
         // At a junction vertex the component's current splits across multiple

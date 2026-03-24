@@ -154,6 +154,8 @@ export const VddDefinition: ComponentDefinition = {
   propertyDefs: VDD_PROPERTY_DEFS,
   attributeMap: VDD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "VDD — always outputs logic 1 (all bits set).\n" +
     "Connects the net to the supply voltage in the simulation.\n" +

@@ -428,6 +428,9 @@ export const BooleanFunctionDefinition: ComponentDefinition = {
   propertyDefs: BOOLEAN_FUNCTION_PROPERTY_DEFS,
   attributeMap: BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
+  // Schema for default inputCount=2, outputCount=1; direction-filter order matches for all configs.
+  inputSchema: ["in0", "in1"],
+  outputSchema: ["out"],
   helpText:
     "Boolean Function — a user-defined combinational function expressed as a truth table.\n" +
     "inputCount sets the number of input variables (1–8).\n" +

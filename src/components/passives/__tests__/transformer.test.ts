@@ -118,7 +118,7 @@ function runTransientAC(
 // ---------------------------------------------------------------------------
 
 function makeTransformerElement(opts: {
-  nodeIndices: number[];
+  pinNodeIds: number[];
   branch1: number;
   lPrimary?: number;
   turnsRatio?: number;
@@ -127,7 +127,7 @@ function makeTransformerElement(opts: {
   rSec?: number;
 }): AnalogTransformerElement {
   return new AnalogTransformerElement(
-    opts.nodeIndices,
+    opts.pinNodeIds,
     opts.branch1,
     opts.lPrimary ?? 10e-3,
     opts.turnsRatio ?? 1.0,
@@ -159,7 +159,7 @@ describe("Transformer", () => {
      * matrixSize = nodeCount(2) + branchCount(3) = 5
      *
      * The transformer has:
-     *   nodeIndices = [1, 0, 2, 0]  (P1=1, P2=gnd, S1=2, S2=gnd)
+     *   pinNodeIds = [1, 0, 2, 0]  (P1=1, P2=gnd, S1=2, S2=gnd)
      *   branch1 = 3, branch2 = 4
      */
     const N = 10;
@@ -181,7 +181,7 @@ describe("Transformer", () => {
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({
-      nodeIndices: [1, 0, 2, 0],
+      pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -255,7 +255,7 @@ describe("Transformer", () => {
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({
-      nodeIndices: [1, 0, 2, 0],
+      pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -328,7 +328,7 @@ describe("Transformer", () => {
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({
-      nodeIndices: [1, 0, 2, 0],
+      pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -405,7 +405,7 @@ describe("Transformer", () => {
       const matrixSize = nodeCount + 3;
 
       const transformer = makeTransformerElement({
-        nodeIndices: [1, 0, 2, 0],
+        pinNodeIds: [1, 0, 2, 0],
         branch1: bTx1,
         lPrimary: Lp,
         turnsRatio: N,
@@ -477,7 +477,7 @@ describe("Transformer", () => {
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({
-      nodeIndices: [1, 0, 2, 0],
+      pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
@@ -529,7 +529,7 @@ describe("Transformer", () => {
 
     const rPri = 10.0;
     const transformer = makeTransformerElement({
-      nodeIndices: [1, 2, 3, 4],
+      pinNodeIds: [1, 2, 3, 4],
       branch1: 4, // absolute branch rows
       lPrimary: 10e-3,
       turnsRatio: 1,
@@ -599,7 +599,7 @@ describe("TransformerDefinition", () => {
     props.set("primaryResistance", 0);
     props.set("secondaryResistance", 0);
 
-    const el = TransformerDefinition.analogFactory!([1, 0, 2, 0], 5, props, () => 0) as AnalogTransformerElement;
+    const el = TransformerDefinition.analogFactory!(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
     expect(el.branchIndex).toBe(5);
     expect(el.branch2).toBe(6);
   });

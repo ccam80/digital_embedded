@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 import { CoupledInductorPair } from "../../analog/coupled-inductor.js";
 import type { CoupledInductorState } from "../../analog/coupled-inductor.js";
@@ -172,12 +172,12 @@ export class TransformerElement extends AbstractCircuitElement {
  * stampCompanion() and applies them in stamp() — identical to the pattern
  * used by AnalogInductorElement in inductor.ts.
  *
- * Node layout (nodeIndices array positions):
+ * Node layout (pinNodeIds array positions):
  *   [0] = P1 (primary+)   [1] = P2 (primary−)
  *   [2] = S1 (secondary+) [3] = S2 (secondary−)
  */
 export class AnalogTransformerElement implements AnalogElement {
-  readonly nodeIndices: readonly number[];
+  readonly pinNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -196,7 +196,7 @@ export class AnalogTransformerElement implements AnalogElement {
   private _hist2: number = 0;
 
   constructor(
-    nodeIndices: number[],
+    pinNodeIds: number[],
     branch1: number,
     lPrimary: number,
     turnsRatio: number,
@@ -204,7 +204,7 @@ export class AnalogTransformerElement implements AnalogElement {
     rPri: number,
     rSec: number,
   ) {
-    this.nodeIndices = nodeIndices;
+    this.pinNodeIds = pinNodeIds;
     this.branchIndex = branch1;
     this._branch2 = branch1 + 1;
     // turnsRatio = N_primary / N_secondary (e.g. 10 means 10:1 step-down)
@@ -217,7 +217,7 @@ export class AnalogTransformerElement implements AnalogElement {
   }
 
   stamp(solver: SparseSolver): void {
-    const [p1, p2, s1, s2] = this.nodeIndices;
+    const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
 
@@ -273,7 +273,7 @@ export class AnalogTransformerElement implements AnalogElement {
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const [p1, p2, s1, s2] = this.nodeIndices;
+    const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
 
@@ -325,6 +325,15 @@ export class AnalogTransformerElement implements AnalogElement {
     this._pair.updateState(dt, method, i1Now, i2Now, v1Now, v2Now, this._state);
   }
 
+  getPinCurrents(voltages: Float64Array): number[] {
+    const iPri = voltages[this.branchIndex];
+    const iSec = voltages[this._branch2];
+    // pinLayout order: P1, P2, S1, S2
+    // Primary current enters at P1 (+) and exits at P2 (-)
+    // Secondary current enters at S1 (+) and exits at S2 (-)
+    return [iPri, -iPri, iSec, -iSec];
+  }
+
   /** Second branch index (secondary winding current). */
   get branch2(): number {
     return this._branch2;
@@ -351,16 +360,25 @@ export class AnalogTransformerElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 function createTransformerElement(
-  nodeIds: number[],
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElement {
+): AnalogElementCore {
   const lPrimary = props.getOrDefault<number>("primaryInductance", 10e-3);
   const turnsRatio = props.getOrDefault<number>("turnsRatio", 1.0);
   const k = props.getOrDefault<number>("couplingCoefficient", 0.99);
   const rPri = props.getOrDefault<number>("primaryResistance", 1.0);
   const rSec = props.getOrDefault<number>("secondaryResistance", 1.0);
-  return new AnalogTransformerElement(nodeIds, branchIdx, lPrimary, turnsRatio, k, rPri, rSec);
+  return new AnalogTransformerElement(
+    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
+    branchIdx,
+    lPrimary,
+    turnsRatio,
+    k,
+    rPri,
+    rSec,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +398,7 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "primaryInductance",
     type: PropertyType.FLOAT,
     label: "Primary Inductance (H)",
+    unit: "H",
     defaultValue: 10e-3,
     min: 1e-12,
     description: "Primary winding self-inductance in henries",
@@ -397,6 +416,7 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "primaryResistance",
     type: PropertyType.FLOAT,
     label: "Primary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 1.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -405,6 +425,7 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
     label: "Secondary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 1.0,
     min: 0,
     description: "Secondary winding series resistance in ohms",

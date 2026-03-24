@@ -256,7 +256,7 @@ describe("AnalogFuseElement", () => {
       props.set("rBlown", 1e9);
       props.set("i2tRating", 0.001);
 
-      const el = createAnalogFuseElement([1, 0], -1, props, () => 0) as AnalogFuseElement;
+      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), [], -1, props, () => 0) as AnalogFuseElement;
 
       const voltages = new Float64Array(1);
       voltages[0] = 1.0;
@@ -312,7 +312,7 @@ describe("AnalogFuseElement", () => {
 
       const G_load = 1 / rLoad;
       const loadResistor = {
-        nodeIndices: [2, 0] as readonly number[],
+        pinNodeIds: [2, 0] as readonly number[],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,
@@ -370,7 +370,7 @@ describe("AnalogFuseElement", () => {
       props.set("rCold", 0.01);
       props.set("rBlown", 1e9);
       props.set("i2tRating", 1e-4);
-      const el = createAnalogFuseElement([1, 0], -1, props, () => 0);
+      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), [], -1, props, () => 0);
       expect(el).toBeInstanceOf(AnalogFuseElement);
       expect(el.isNonlinear).toBe(true);
       expect(el.isReactive).toBe(false);

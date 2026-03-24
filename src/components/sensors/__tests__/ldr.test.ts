@@ -25,13 +25,14 @@ function makeLDR(overrides: Partial<{
   gamma: number;
   lux: number;
 }> = {}): LDRElement {
-  return new LDRElement(
-    [1, 2],
+  const el = new LDRElement(
     overrides.rDark ?? 1e6,
     overrides.luxRef ?? 1000,
     overrides.gamma ?? 0.7,
     overrides.lux ?? 500,
   );
+  Object.assign(el, { pinNodeIds: [1, 2] });
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +179,7 @@ describe("LDR", () => {
 
     it("analogFactory creates an LDRElement", () => {
       const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
-      const element = createLDRElement([1, 2], -1, props, () => 0);
+      const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(LDRElement);
       expect(element.isNonlinear).toBe(true);
       expect(element.isReactive).toBe(false);

@@ -80,7 +80,7 @@ function makeElement(
 
 function makeStubElement(nodeIds: number[]): AnalogElement {
   return {
-    nodeIndices: nodeIds,
+    pinNodeIds: nodeIds,
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -138,7 +138,7 @@ function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): Compone
     engineType: "analog" as const,
   });
 
-  const andFactory = factorySpy ?? vi.fn((nodeIds: number[]) => makeStubElement(nodeIds));
+  const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
 
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
@@ -172,7 +172,7 @@ function buildAndGateCircuit(propsMap: Map<string, PropertyValue> = new Map()): 
   factorySpy: ReturnType<typeof vi.fn>;
 } {
   const circuit = new Circuit({ engineType: "analog" });
-  const factorySpy = vi.fn((nodeIds: number[]) => makeStubElement(nodeIds));
+  const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
   const registry = buildBehavioralRegistry(factorySpy);
 
   const andGate = makeElement("BehavioralAnd", "and1", [
@@ -214,7 +214,7 @@ describe("BehavioralCompilation", () => {
     compileAnalogCircuit(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
-    const [, , props] = factorySpy.mock.calls[0]!;
+    const [, , , props] = factorySpy.mock.calls[0]!;
     const propsTyped = props as PropertyBag;
 
     // _pinElectrical should be injected with CMOS 3.3V defaults
@@ -236,7 +236,7 @@ describe("BehavioralCompilation", () => {
       logicFamily: ttlFamily,
     });
 
-    const factorySpy = vi.fn((nodeIds: number[]) => makeStubElement(nodeIds));
+    const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
     const registry = buildBehavioralRegistry(factorySpy);
 
     const andGate = makeElement("BehavioralAnd", "and1", [
@@ -255,7 +255,7 @@ describe("BehavioralCompilation", () => {
     compileAnalogCircuit(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
-    const [, , props] = factorySpy.mock.calls[0]!;
+    const [, , , props] = factorySpy.mock.calls[0]!;
     const propsTyped = props as PropertyBag;
 
     const pinElec = propsTyped.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>;
@@ -301,7 +301,7 @@ describe("BehavioralCompilation", () => {
   it("pin_override_applied", () => {
     const circuit = new Circuit({ engineType: "analog" });
 
-    const factorySpy = vi.fn((nodeIds: number[]) => makeStubElement(nodeIds));
+    const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
     const registry = new ComponentRegistry();
 
     registry.register({
@@ -338,7 +338,7 @@ describe("BehavioralCompilation", () => {
     compileAnalogCircuit(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
-    const [, , props] = factorySpy.mock.calls[0]!;
+    const [, , , props] = factorySpy.mock.calls[0]!;
     const propsTyped = props as PropertyBag;
 
     const pinElec = propsTyped.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>;

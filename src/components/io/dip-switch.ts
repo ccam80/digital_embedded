@@ -241,6 +241,8 @@ export const DipSwitchDefinition: ComponentDefinition = {
   propertyDefs: DIP_SWITCH_PROPERTY_DEFS,
   attributeMap: DIP_SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "DipSwitch — multi-bit toggle switch array.\n" +
     "Each bit is independently toggled by clicking the corresponding switch position.\n" +

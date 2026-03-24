@@ -59,7 +59,7 @@ function makeDiodeAtVd(
   }
   // Build props with _modelParams directly
   const propsObj: Record<string, unknown> = { _modelParams: { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...modelOverrides } };
-  const element = createDiodeElement([1, 2], -1, propsObj as unknown as PropertyBag);
+  const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
 
   // Drive the element to the operating point by calling updateOperatingPoint
   // multiple times to converge the pnjlim limiting
@@ -138,7 +138,7 @@ describe("Diode", () => {
 
     // Start at vd = 0.3V
     const propsObj = { _modelParams: { IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 } };
-    const element = createDiodeElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.3;
@@ -172,7 +172,7 @@ describe("Diode", () => {
     const propsObj = {
       _modelParams: { IS: 1e-14, N: 1, CJO, VJ, M, TT: 0, FC },
     };
-    const element = createDiodeElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
 
     // isReactive should be true when CJO > 0
     expect(element.isReactive).toBe(true);
@@ -208,13 +208,13 @@ describe("Diode", () => {
 
   it("isNonlinear_true", () => {
     const propsObj = { _modelParams: { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 } };
-    const element = createDiodeElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false_when_cjo_zero", () => {
     const propsObj = { _modelParams: { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 } };
-    const element = createDiodeElement([1, 2], -1, propsObj as unknown as PropertyBag);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj as unknown as PropertyBag);
     expect(element.isReactive).toBe(false);
   });
 
@@ -233,7 +233,7 @@ describe("Diode", () => {
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    nodeIndices: [nodeA, nodeB],
+    pinNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -277,7 +277,7 @@ describe("Integration", () => {
 
     // Diode: anode=node1, cathode=ground(0)
     const diodeProps = { _modelParams: { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 } };
-    const d = createDiodeElement([1, 0], -1, diodeProps as unknown as PropertyBag);
+    const d = createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps as unknown as PropertyBag);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

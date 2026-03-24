@@ -56,6 +56,13 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
   return { solver, stamps, rhsStamps };
 }
 
+/** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
+function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
+  const el = InductorDefinition.analogFactory!(pinNodes, [], branchIdx, props, () => 0);
+  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()) });
+  return el;
+}
+
 // ---------------------------------------------------------------------------
 // stamps_branch_equation tests
 // ---------------------------------------------------------------------------
@@ -68,12 +75,7 @@ describe("Inductor", () => {
 
       // Use non-ground nodes [1, 2] with branchIdx=2 (absolute solver row)
       // Node 1 → solver idx 0, Node 2 → solver idx 1, branch → solver row 2
-      const analogElement = InductorDefinition.analogFactory!(
-        [1, 2],
-        2,
-        props,
-        () => 0,
-      );
+      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
@@ -101,12 +103,7 @@ describe("Inductor", () => {
       props.set("inductance", 0.01);
 
       // [1, 2] with branchIdx=2. Solver: node1→idx0, node2→idx1, branch→idx2
-      const analogElement = InductorDefinition.analogFactory!(
-        [1, 2],
-        2,
-        props,
-        () => 0,
-      );
+      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0A
       const voltages = new Float64Array([5, 0, 0]);
@@ -128,12 +125,7 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.set("inductance", 0.01);
 
-      const analogElement = InductorDefinition.analogFactory!(
-        [1, 2],
-        2,
-        props,
-        () => 0,
-      );
+      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       const voltages = new Float64Array([5, 0, 0]);
       analogElement.stampCompanion!(1e-4, "bdf1", voltages);
@@ -151,12 +143,7 @@ describe("Inductor", () => {
   describe("is_reactive_true", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
-      const analogElement = InductorDefinition.analogFactory!(
-        [1, 2],
-        2,
-        props,
-        () => 0,
-      );
+      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       expect(analogElement.isReactive).toBe(true);
     });

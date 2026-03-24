@@ -199,6 +199,8 @@ export const PullUpDefinition: ComponentDefinition = {
   propertyDefs: PULL_UP_PROPERTY_DEFS,
   attributeMap: PULL_UP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
+  inputSchema: [],
+  outputSchema: ["out"],
   helpText:
     "PullUp — pulls a floating net to logic 1.\n" +
     "Connects a resistor from VDD to the output net.\n" +

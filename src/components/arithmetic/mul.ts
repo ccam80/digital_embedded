@@ -261,6 +261,8 @@ export const MulDefinition: ComponentDefinition = {
   propertyDefs: MUL_PROPERTY_DEFS,
   attributeMap: MUL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
+  inputSchema: ["a", "b"],
+  outputSchema: ["mul"],
   helpText:
     "Mul — N-bit multiplier producing a 2N-bit product.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +

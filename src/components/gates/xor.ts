@@ -317,6 +317,9 @@ export const XOrDefinition: ComponentDefinition = {
   propertyDefs: XOR_PROPERTY_DEFS,
   attributeMap: XOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
+  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
+  inputSchema: ["In_1", "In_2"],
+  outputSchema: ["out"],
   helpText:
     "XOr gate — performs bitwise XOR of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

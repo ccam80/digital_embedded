@@ -86,7 +86,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../analog/element.js";
+import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
 import type { SparseSolver } from "../../analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ function createOptocouplerElement(
   ctr: number,
   vForward: number,
   rLed: number,
-): AnalogElement {
+): AnalogElementCore {
   const gOn = 1 / rLed;
 
   // Operating-point state
@@ -158,7 +158,6 @@ function createOptocouplerElement(
   }
 
   return {
-    nodeIndices: [nAnode, nCathode, nCollector, nEmitter],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -220,6 +219,19 @@ function createOptocouplerElement(
         gLed = G_OFF;
         iNR = 0;
       }
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      // Pin order: [anode, cathode, collector, emitter]
+      // LED current (into anode): I_LED = gLed * (V_A - V_K) - iNR
+      const vA = readNode(voltages, nAnode);
+      const vK = readNode(voltages, nCathode);
+      const iLed = gLed * (vA - vK) - iNR;
+      // Phototransistor: I_C = CTR * I_LED
+      // Norton source pushes iC0 out of collector → current INTO collector is -iC0
+      // Norton source pulls iC0 into emitter → current INTO emitter is +iC0
+      const iC = ctr * iLed;
+      return [iLed, -iLed, -iC, iC];
     },
   };
 }
@@ -454,18 +466,19 @@ export const OptocouplerDefinition: ComponentDefinition = {
   },
 
   analogFactory(
-    nodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
+    _internalNodeIds: readonly number[],
     _branchIdx: number,
     props: PropertyBag,
-  ): AnalogElement {
+  ): AnalogElementCore {
     const ctr      = props.getOrDefault<number>("ctr",      1.0);
     const vForward = props.getOrDefault<number>("vForward", 1.2);
     const rLed     = props.getOrDefault<number>("rLed",     10);
     return createOptocouplerElement(
-      nodeIds[0], // anode
-      nodeIds[1], // cathode
-      nodeIds[2], // collector
-      nodeIds[3], // emitter
+      pinNodes.get("anode")!,     // anode
+      pinNodes.get("cathode")!,   // cathode
+      pinNodes.get("collector")!, // collector
+      pinNodes.get("emitter")!,   // emitter
       ctr,
       vForward,
       rLed,

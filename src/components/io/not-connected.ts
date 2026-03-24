@@ -141,6 +141,8 @@ export const NotConnectedDefinition: ComponentDefinition = {
   propertyDefs: NOT_CONNECTED_PROPERTY_DEFS,
   attributeMap: NOT_CONNECTED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
+  inputSchema: ["nc"],
+  outputSchema: [],
   helpText:
     "NotConnected — marks an intentionally unconnected pin.\n" +
     "Attach this to a pin to suppress the unconnected-pin warning.\n" +

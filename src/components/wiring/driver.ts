@@ -273,6 +273,10 @@ export const DriverDefinition: ComponentDefinition = {
   propertyDefs: DRIVER_PROPERTY_DEFS,
   attributeMap: DRIVER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
+  // executeDriver reads: inBase+0=in, inBase+1=sel
+  // writes: outBase+0=out
+  inputSchema: ["in", "sel"],
+  outputSchema: ["out"],
   helpText:
     "Driver — tri-state buffer.\n" +
     "When sel=1: output = input.\n" +
