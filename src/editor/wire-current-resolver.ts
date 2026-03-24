@@ -70,25 +70,73 @@ function pointKey(p: { x: number; y: number }): string {
   return `${p.x},${p.y}`;
 }
 
+type Pt = { x: number; y: number };
+
 /**
- * Local-space body junction point for multi-pin components.
- * Returns the point where internal current paths converge (bar, channel, etc.)
- * so that animated dots follow the component's visible leads instead of
- * cutting diagonally through empty space.
+ * Per-pin local-space waypoints from each pin to the component's internal
+ * junction (bar, channel, etc.).  Waypoints are ordered pin → junction so
+ * that dots entering the component follow the visible lead geometry.
+ *
+ * Returns null for unknown types (falls back to straight-line paths).
  */
-function bodyJunctionLocal(typeId: string): { x: number; y: number } | null {
+function branchWaypoints(typeId: string): Pt[][] | null {
+  // Each inner array = waypoints for one pin (in pinLayout order).
+  // The last waypoint of every branch is the shared junction.
+  const ch = 2.625; // MOSFET channel x
   switch (typeId) {
-    case "NpnBJT":
-    case "PnpBJT":
-    case "NMOS":
-    case "PMOS":
-    case "NJFET":
-    case "PJFET":
-      return { x: 3, y: 0 };
-    case "SCR":
-    case "Triac":
-    case "Triode":
-      return { x: 2, y: 0 };
+    // BJTs — pin order: B, C, E.  Bar at x≈3.
+    case "NpnBJT": return [
+      [{ x: 3, y: 0 }],                           // B(0,0) → bar
+      [{ x: 3, y: -0.375 }],                      // C(4,-1) → bar
+      [{ x: 3, y: 0.375 }],                       // E(4,1) → bar
+    ];
+    case "PnpBJT": return [
+      [{ x: 3, y: 0 }],                           // B(0,0) → bar
+      [{ x: 3, y: 0.375 }],                       // C(4,1) → bar
+      [{ x: 3, y: -0.375 }],                      // E(4,-1) → bar
+    ];
+    // MOSFETs — pin order: G, S, D (NMOS) / G, D, S (PMOS).
+    // Rectangular leads: pin → elbow → channel.
+    case "NMOS": return [
+      [{ x: ch, y: 0 }],                          // G(0,0) → channel
+      [{ x: ch, y: 1 }],                          // S(4,1) → channel
+      [{ x: ch, y: -1 }],                         // D(4,-1) → channel
+    ];
+    case "PMOS": return [
+      [{ x: ch, y: 0 }],                          // G(0,0) → channel
+      [{ x: ch, y: 1 }],                          // D(4,1) → channel
+      [{ x: ch, y: -1 }],                         // S(4,-1) → channel
+    ];
+    // JFETs — pin order: G, S, D (NJFET) / G, D, S (PJFET).
+    // L-shaped leads: pin → elbow → channel.
+    case "NJFET": return [
+      [{ x: 3.375, y: 0 }],                       // G(0,0) → channel
+      [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],  // S(4,1) → elbow → channel
+      [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }], // D(4,-1) → elbow → channel
+    ];
+    case "PJFET": return [
+      [{ x: 3.375, y: 0 }],                       // G(0,0) → channel
+      [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],  // D(4,1) → elbow → channel
+      [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }], // S(4,-1) → elbow → channel
+    ];
+    // SCR — pin order: A, K, G
+    case "SCR": return [
+      [{ x: 2, y: 0 }],                           // A(0,0) → body
+      [{ x: 2, y: 0 }],                           // K(4,0) → body
+      [{ x: 3, y: 0.5 }],                         // G(3,1) → body
+    ];
+    // Triac — pin order: MT2, MT1, G
+    case "Triac": return [
+      [{ x: 2, y: 0 }],                           // MT2(0,0) → body
+      [{ x: 2, y: 0 }],                           // MT1(4,0) → body
+      [{ x: 4, y: -1 }],                          // G(4,-2) → body
+    ];
+    // Triode — pin order: P, G, K
+    case "Triode": return [
+      [{ x: 2, y: -1 }],                          // P(4,-2) → body
+      [{ x: 2, y: 0 }],                           // G(0,0) → body
+      [{ x: 2, y: 1 }],                           // K(3,2) → body
+    ];
     default:
       return null;
   }
@@ -160,24 +208,12 @@ export class WireCurrentResolver {
       if (!vertices) continue;
 
       const pinCurrents = engine.getElementPinCurrents(eIdx);
-      if (pinCurrents !== null) {
-        // Use per-pin currents (works for both 2-pin and N-pin elements)
-        for (let t = 0; t < pinCurrents.length; t++) {
-          const cv = vertices[t];
-          if (!cv) continue;
-          // pinCurrents[t] > 0 means current flows into element (out of node)
-          const injection = -pinCurrents[t];
-          pointInjections.set(pointKey(cv), (pointInjections.get(pointKey(cv)) ?? 0) + injection);
-        }
-      } else if (elements[eIdx].pinNodeIds.length === 2) {
-        // Fallback for 2-terminal elements without getPinCurrents
-        const I = engine.getElementCurrent(eIdx);
-        for (let t = 0; t < 2; t++) {
-          const cv = vertices[t];
-          if (!cv) continue;
-          const injection = t === 0 ? -I : +I;
-          pointInjections.set(pointKey(cv), (pointInjections.get(pointKey(cv)) ?? 0) + injection);
-        }
+      for (let t = 0; t < pinCurrents.length; t++) {
+        const cv = vertices[t];
+        if (!cv) continue;
+        // pinCurrents[t] > 0 means current flows into element (out of node)
+        const injection = -pinCurrents[t];
+        pointInjections.set(pointKey(cv), (pointInjections.get(pointKey(cv)) ?? 0) + injection);
       }
     }
 
@@ -231,9 +267,10 @@ export class WireCurrentResolver {
     // Step 4: Build component-body current paths.
     //
     // For 2-terminal elements: single path pin0 → pin1.
-    // For N-terminal elements: one path per source→sink pin pair, where
-    // "source" pins have current flowing in and "sink" pins have current
-    // flowing out. Current is distributed proportionally across pairs.
+    // For N-terminal elements: one branch path per pin (pin ↔ junction),
+    // with per-pin waypoints tracing the visible lead geometry. Branch
+    // paths have stable geometry across current transitions so animated
+    // dot offsets don't jump.
     // ------------------------------------------------------------------
     this._componentPaths = [];
     for (let eIdx = 0; eIdx < elements.length; eIdx++) {
@@ -243,79 +280,47 @@ export class WireCurrentResolver {
 
       const pinCurrents = engine.getElementPinCurrents(eIdx);
 
-      if (pinCurrents !== null && elements[eIdx].pinNodeIds.length > 2) {
-        // Multi-pin element: create paths from source pins to sink pins
+      if (pinCurrents.length > 2) {
+        // Multi-pin element: one path per pin branch (pin ↔ junction).
+        //
+        // Each branch has stable geometry regardless of current magnitude,
+        // so animated dot offsets persist smoothly across zero↔non-zero
+        // transitions.  Pin-specific waypoints trace the visible lead
+        // shape (rectangular MOSFET legs, diagonal BJT leads, etc.).
         if (cePins.length < 2) continue;
 
-        // Compute optional body junction waypoint so dots follow visible
-        // leads instead of cutting diagonally through empty space.
-        const jLocal = bodyJunctionLocal(ce.typeId);
-        const junctionWorld = jLocal
-          ? pinWorldPosition(ce, { position: jLocal })
-          : null;
-
-        // Collect source pins (current into element, pinCurrent > 0) and
-        // sink pins (current out of element, pinCurrent < 0).
-        // Prefer resolvedPins world positions (pinLayout order, computed once
-        // at compile time) over calling pinWorldPosition() again.
+        const bwp = branchWaypoints(ce.typeId);
         const step4ResolvedPins = elementResolvedPins?.get(eIdx);
-        const sources: { pos: { x: number; y: number }; current: number }[] = [];
-        const sinks: { pos: { x: number; y: number }; current: number }[] = [];
 
         for (let t = 0; t < Math.min(pinCurrents.length, cePins.length); t++) {
-          const pc = pinCurrents[t];
-          if (Math.abs(pc) < 1e-15) continue;
-          const pos = (step4ResolvedPins && step4ResolvedPins[t])
+          const pinPos = (step4ResolvedPins && step4ResolvedPins[t])
             ? step4ResolvedPins[t].worldPosition
             : pinWorldPosition(ce, cePins[t]);
-          if (pc > 0) {
-            sources.push({ pos, current: pc });
-          } else {
-            sinks.push({ pos, current: -pc }); // store as positive magnitude
+
+          const pc = pinCurrents[t];
+          const mag = Math.abs(pc);
+
+          // Build waypoints in world coords (pin → ... → junction).
+          const localWps = bwp ? bwp[t] : null;
+          let worldWps: Pt[] | undefined;
+          if (localWps && localWps.length > 0) {
+            worldWps = localWps.map(lp => pinWorldPosition(ce, { position: lp }));
           }
-        }
 
-        const totalSource = sources.reduce((s, e) => s + e.current, 0);
-        const totalSink = sinks.reduce((s, e) => s + e.current, 0);
-
-        if (totalSource < 1e-15 || totalSink < 1e-15) {
-          // All pin currents are zero — create a stationary fallback path
-          // from pin0 to the last pin so dots remain visible (matching
-          // the 2-terminal behaviour where zero-current shows static dots).
-          const p0 = (step4ResolvedPins && step4ResolvedPins[0])
-            ? step4ResolvedPins[0].worldPosition
-            : pinWorldPosition(ce, cePins[0]);
-          const pN = (step4ResolvedPins && step4ResolvedPins[cePins.length - 1])
-            ? step4ResolvedPins[cePins.length - 1].worldPosition
-            : pinWorldPosition(ce, cePins[cePins.length - 1]);
-          const fallbackPath: ComponentCurrentPath = {
-            pin0: p0,
-            pin1: pN,
-            current: 0,
-            flowSign: 0,
+          // pin0 = pin position, pin1 = innermost waypoint (junction end).
+          // flowSign: +1 = current flows pin→junction (into element),
+          //           -1 = junction→pin (out of element), 0 = static.
+          const path: ComponentCurrentPath = {
+            pin0: pinPos,
+            pin1: worldWps ? worldWps[worldWps.length - 1] : pinPos,
+            current: mag,
+            flowSign: pc > 1e-15 ? 1 : pc < -1e-15 ? -1 : 0,
           };
-          if (junctionWorld) fallbackPath.waypoints = [junctionWorld];
-          this._componentPaths.push(fallbackPath);
-          continue;
-        }
-
-        // For each source-sink pair, create a path with proportionally
-        // distributed current. For a FET with one source and one sink
-        // this produces exactly one path.
-        for (const src of sources) {
-          for (const snk of sinks) {
-            // Current through this pair = src.current * (snk.current / totalSink)
-            const pairCurrent = src.current * (snk.current / totalSink);
-            if (pairCurrent < 1e-15) continue;
-            const pairPath: ComponentCurrentPath = {
-              pin0: src.pos,
-              pin1: snk.pos,
-              current: pairCurrent,
-              flowSign: 1, // always source → sink direction
-            };
-            if (junctionWorld) pairPath.waypoints = [junctionWorld];
-            this._componentPaths.push(pairPath);
+          // Intermediate waypoints (excluding the last, which is pin1).
+          if (worldWps && worldWps.length > 1) {
+            path.waypoints = worldWps.slice(0, -1);
           }
+          this._componentPaths.push(path);
         }
       } else {
         // 2-terminal element (or fallback): single path pin0 → pin1

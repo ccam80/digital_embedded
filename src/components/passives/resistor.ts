@@ -182,12 +182,6 @@ function createResistorElement(
       stampG(solver, n1, n1, G);
     },
 
-    getCurrent(voltages: Float64Array): number {
-      const vA = n0 > 0 ? voltages[n0 - 1] : 0;
-      const vB = n1 > 0 ? voltages[n1 - 1] : 0;
-      return G * (vA - vB);
-    },
-
     getPinCurrents(voltages: Float64Array): number[] {
       const vA = n0 > 0 ? voltages[n0 - 1] : 0;
       const vB = n1 > 0 ? voltages[n1 - 1] : 0;

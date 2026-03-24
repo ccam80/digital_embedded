@@ -6,10 +6,10 @@
 |------|-------|------------|--------|
 | P0-1 | Rename nodeIndices → pinNodeIds, add allNodeIds | M | complete |
 | P0-2 | Update all consumers (getElementPower, getElementPinCurrents, detectWeakNodes, etc.) | M | complete |
-| P0-3 | Make getPinCurrents mandatory on AnalogElement | S | pending |
-| P0-4 | Remove getCurrent from AnalogElement interface | S | pending |
-| P0-5 | Remove engine fallback cascade (getElementPinCurrents and getElementPower) | M | pending |
-| P0-6 | Run full test suite, verify green | S | pending |
+| P0-3 | Make getPinCurrents mandatory on AnalogElement | S | complete |
+| P0-4 | Remove getCurrent from AnalogElement interface | S | complete |
+| P0-5 | Remove engine fallback cascade (getElementPinCurrents and getElementPower) | M | complete |
+| P0-6 | Run full test suite, verify green | S | complete |
 
 ## Phase 1: models bag on ComponentDefinition
 
@@ -56,3 +56,24 @@
 - **Files created**: none
 - **Files modified**: src/core/registry.ts, src/core/__tests__/registry.test.ts
 - **Tests**: 43/43 passing; full suite 7402/7402 passing (327 test files)
+
+## Task P0-3: Make getPinCurrents mandatory on AnalogElement
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/analog/element.ts
+- **Tests**: 7402/7402 passing
+
+## Task P0-4: Remove getCurrent from AnalogElement interface and implementations
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/analog/element.ts, src/components/passives/resistor.ts, src/components/passives/capacitor.ts, src/analog/test-elements.ts (removed getCurrent, added getPinCurrents), src/analog/controlled-source-base.ts (added abstract getPinCurrents), src/analog/behavioral-remaining.ts (added getPinCurrents to SegmentDiodeElement), src/components/semiconductors/varactor.ts (added getPinCurrents), src/components/passives/transmission-line.ts (added allNodeIds + getPinCurrents to all segment classes), src/components/io/clock.ts (added getPinCurrents to createAnalogClockElement), src/analog/dc-operating-point.ts (added allNodeIds + getPinCurrents to makeGminShunt), src/analog/compiler.ts (added allNodeIds + getPinCurrents to makeVddSource)
+- **Tests**: 7402/7402 passing
+
+## Task P0-5: Remove engine fallback cascade in getElementPinCurrents and getElementPower
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/analog/analog-engine.ts (simplified getElementCurrent, getElementPinCurrents, getElementPower), src/core/analog-engine-interface.ts (updated getElementPinCurrents return type to number[]), src/editor/wire-current-resolver.ts (removed null check, removed fallback branch), src/editor/__tests__/wire-current-resolver.test.ts (updated mock to return [I, -I] instead of null)
+- **Tests**: 7402/7402 passing

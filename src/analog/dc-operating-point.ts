@@ -58,6 +58,7 @@ export interface DcOpOptions {
 function makeGminShunt(nodeId: number, gmin: number): AnalogElement {
   return {
     pinNodeIds: [nodeId, 0],
+    allNodeIds: [nodeId, 0],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -65,6 +66,11 @@ function makeGminShunt(nodeId: number, gmin: number): AnalogElement {
       // Stamp conductance from nodeId to ground (node 0).
       // Solver uses 0-based indices; node IDs are 1-based (0 = ground).
       solver.stamp(nodeId - 1, nodeId - 1, gmin);
+    },
+    getPinCurrents(voltages: Float64Array): number[] {
+      const v = nodeId > 0 ? voltages[nodeId - 1] : 0;
+      const I = gmin * v;
+      return [I, -I];
     },
   };
 }

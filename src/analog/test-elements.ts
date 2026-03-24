@@ -83,10 +83,11 @@ export function makeResistor(
       G(solver, nodeB, nodeB, G_val);
     },
 
-    getCurrent(voltages: Float64Array): number {
+    getPinCurrents(voltages: Float64Array): number[] {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      return G_val * (vA - vB);
+      const I = G_val * (vA - vB);
+      return [I, -I];
     },
   };
 }
@@ -151,6 +152,11 @@ export function makeVoltageSource(
       // RHS entry for the voltage constraint (scaled by source stepping factor)
       solver.stampRHS(k, voltage * scale);
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const I = voltages[branchIdx];
+      return [I, -I];
+    },
   };
 }
 
@@ -190,8 +196,9 @@ export function makeCurrentSource(
       RHS(solver, nodeNeg, -(current * scale));
     },
 
-    getCurrent(): number {
-      return current * scale;
+    getPinCurrents(): number[] {
+      const I = current * scale;
+      return [I, -I];
     },
   };
 }
@@ -304,6 +311,13 @@ export function makeDiode(
       // Converged when junction voltage change is within tolerance
       return Math.abs(vdNew - vdPrev) <= 2 * nVt;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const I = geq * (va - vc) - ieq;
+      return [I, -I];
+    },
   };
 }
 
@@ -380,6 +394,13 @@ export function makeCapacitor(
 
       geq = capacitorConductance(capacitance, dt, method);
       ieq = capacitorHistoryCurrent(capacitance, dt, method, vNow, vPrevForFormula, iNow);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const I = geq * (vA - vB) + ieq;
+      return [I, -I];
     },
   };
 }
@@ -473,6 +494,11 @@ export function makeInductor(
 
       companionActive = true;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const I = voltages[branchIdx];
+      return [I, -I];
+    },
   };
 }
 
@@ -536,6 +562,11 @@ export function makeAcVoltageSource(
 
       // RHS voltage constraint
       solver.stampRHS(k, v);
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const I = voltages[branchIdx];
+      return [I, -I];
     },
   };
 }

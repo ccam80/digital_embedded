@@ -542,89 +542,38 @@ export class MNAEngine implements AnalogEngine {
   /**
    * Return the instantaneous current through analog element `elementId`.
    *
-   * For elements with a branch row (voltage sources, inductors), returns the
-   * branch current directly. For resistive elements, computes V/R from node
-   * voltages. For nonlinear elements, returns the Norton equivalent current
-   * at the current operating point.
+   * Returns the first pin current from getPinCurrents, which is the
+   * conventional current flowing into the element at its first pin.
    */
   getElementCurrent(elementId: number): number {
-    if (!this._compiled) return 0;
-    const el = this._compiled.elements[elementId];
+    const el = this._compiled?.elements[elementId];
     if (!el) return 0;
-
-    // If the element has a branch current row, read it directly from the
-    // solution vector. branchIndex is an absolute solver row index
-    // (already includes the nodeCount offset), so read directly.
-    if (el.branchIndex >= 0) {
-      if (el.branchIndex < this._voltages.length) {
-        return this._voltages[el.branchIndex];
-      }
-      return 0;
-    }
-
-    // Delegate to the element's getCurrent() if it implements it
-    if (el.getCurrent !== undefined) {
-      return el.getCurrent(this._voltages);
-    }
-
-    return 0;
+    return el.getPinCurrents(this._voltages)[0];
   }
 
   /**
    * Return per-pin currents for analog element `elementId`.
-   *
-   * For 2-terminal elements, derives [+I, -I] from getElementCurrent().
-   * For 3+ terminal elements, delegates to getPinCurrents() if available.
    */
-  getElementPinCurrents(elementId: number): number[] | null {
-    if (!this._compiled) return null;
-    const el = this._compiled.elements[elementId];
-    if (!el) return null;
-
-    // If the element implements getPinCurrents, use it directly
-    if (el.getPinCurrents !== undefined) {
-      return el.getPinCurrents(this._voltages);
-    }
-
-    // For 2-terminal elements, derive from scalar getCurrent
-    if (el.pinNodeIds.length === 2) {
-      const I = this.getElementCurrent(elementId);
-      // Convention: positive I flows node[0] → node[1]
-      // Pin current "into element": +I enters at node[0], -I enters at node[1]
-      return [I, -I];
-    }
-
-    // No per-pin current information available
-    return null;
+  getElementPinCurrents(elementId: number): number[] {
+    const el = this._compiled?.elements[elementId];
+    if (!el) return [];
+    return el.getPinCurrents(this._voltages);
   }
 
   /**
    * Return the instantaneous power dissipated by analog element `elementId`.
    *
-   * Computed as V_terminals × I_element.
+   * Computed as sum(V_pin_i × I_into_i) across all pins.
    */
   getElementPower(elementId: number): number {
-    if (!this._compiled) return 0;
-    const el = this._compiled.elements[elementId];
+    const el = this._compiled?.elements[elementId];
     if (!el) return 0;
-
-    // For multi-terminal elements, P = sum(V_i * I_into_i) across all pins.
-    // getPinCurrents returns current INTO element (positive = into) in
-    // pinLayout order matching pinNodeIds.
-    const pinCurrents = this.getElementPinCurrents(elementId);
-    if (pinCurrents !== null) {
-      let power = 0;
-      for (let i = 0; i < pinCurrents.length && i < el.pinNodeIds.length; i++) {
-        const v = this.getNodeVoltage(el.pinNodeIds[i]);
-        power += v * pinCurrents[i];
-      }
-      return power;
+    const currents = el.getPinCurrents(this._voltages);
+    let power = 0;
+    for (let i = 0; i < currents.length && i < el.pinNodeIds.length; i++) {
+      power += this.getNodeVoltage(el.pinNodeIds[i]) * currents[i];
     }
-
-    // Fallback for elements without per-pin currents: P = V_01 * I
-    const vA = this.getNodeVoltage(el.pinNodeIds[0] ?? 0);
-    const vB = this.getNodeVoltage(el.pinNodeIds[1] ?? 0);
-    return (vA - vB) * this.getElementCurrent(elementId);
+    return power;
   }
 
   // -------------------------------------------------------------------------

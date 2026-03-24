@@ -272,6 +272,15 @@ export interface AnalogEngine extends Engine {
   getElementCurrent(elementId: number): number;
 
   /**
+   * Return per-pin currents for analog element `elementId`.
+   *
+   * Returns an array of currents (one per pin in `pinNodeIds` order) where
+   * positive means current flowing **into** the element at that pin.
+   * The array satisfies KCL: the sum of all entries is zero.
+   */
+  getElementPinCurrents(elementId: number): number[];
+
+  /**
    * Return the instantaneous power dissipated by analog element `elementId`
    * in watts. Computed as V * I at the element terminals.
    */

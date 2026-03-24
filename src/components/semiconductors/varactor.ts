@@ -201,6 +201,16 @@ export function createVaractorElement(
       const vCp = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       return Math.abs((vA - vC) - (vAp - vCp)) <= 2 * nVt;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vd = vA - vC;
+      const iDiode = _id;
+      const iCap = _capGeq * vd + _capIeq;
+      const I = iDiode + iCap;
+      return [I, -I];
+    },
   };
 }
 

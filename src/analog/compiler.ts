@@ -62,6 +62,7 @@ function makeVddSource(
 ): import("./element.js").AnalogElement {
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -72,6 +73,10 @@ function makeVddSource(
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
       solver.stampRHS(k, voltage);
+    },
+    getPinCurrents(voltages: Float64Array): number[] {
+      const I = voltages[branchIdx];
+      return [I, -I];
     },
   };
 }

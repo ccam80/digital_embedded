@@ -225,34 +225,16 @@ export interface AnalogElement {
   readonly isReactive: boolean;
 
   /**
-   * Compute the current through this element from the MNA solution vector.
-   *
-   * Elements with `branchIndex >= 0` (voltage sources, inductors) have their
-   * current available directly from the solution vector. Elements without a
-   * branch row (resistors, capacitors, current sources) implement this method
-   * to compute current from node voltages (e.g. I = G × (V_A - V_B)).
-   *
-   * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
-   * @returns Current in amperes (positive = conventional flow from node[0] to node[1])
-   */
-  getCurrent?(voltages: Float64Array): number;
-
-  /**
-   * Compute per-pin currents for multi-terminal elements.
+   * Compute per-pin currents for this element.
    *
    * Returns an array of currents in pinLayout order (same as pinNodeIds),
    * one per visible pin. Positive means current flowing **into** the element.
    * The array must satisfy KCL: the sum of all entries is zero.
    *
-   * Two-terminal elements do not need to implement this — the engine falls
-   * back to `getCurrent()` which gives the single branch current. This method
-   * is primarily for 3+ terminal devices (FETs, BJTs, behavioral gates) where
-   * the per-pin current split cannot be derived from a single scalar.
-   *
    * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
    * @returns Array of per-pin currents in amperes, in pinLayout order, length === pinNodeIds.length
    */
-  getPinCurrents?(voltages: Float64Array): number[];
+  getPinCurrents(voltages: Float64Array): number[];
 
   /**
    * Optional display label for diagnostic attribution.

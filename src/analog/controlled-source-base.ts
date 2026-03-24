@@ -83,6 +83,7 @@ export class MutableExpressionContext implements ExpressionContext {
 export abstract class ControlledSourceElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   abstract readonly branchIndex: number;
+  abstract getPinCurrents(voltages: Float64Array): number[];
 
   readonly isNonlinear = true as const;
   readonly isReactive = false as const;

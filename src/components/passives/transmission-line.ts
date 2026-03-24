@@ -193,6 +193,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
 
 class SegmentResistorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -201,6 +202,7 @@ class SegmentResistorElement implements AnalogElement {
 
   constructor(nA: number, nB: number, resistance: number) {
     this.pinNodeIds = [nA, nB];
+    this.allNodeIds = [nA, nB];
     this.G = resistance > 0 ? 1 / resistance : SHORT_CIRCUIT_CONDUCTANCE;
   }
 
@@ -210,6 +212,15 @@ class SegmentResistorElement implements AnalogElement {
     stampG(solver, this.pinNodeIds[1], this.pinNodeIds[0], -this.G);
     stampG(solver, this.pinNodeIds[1], this.pinNodeIds[1], this.G);
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const I = this.G * (vA - vB);
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +229,7 @@ class SegmentResistorElement implements AnalogElement {
 
 class SegmentShuntConductanceElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -226,11 +238,19 @@ class SegmentShuntConductanceElement implements AnalogElement {
 
   constructor(node: number, G: number) {
     this.pinNodeIds = [node, 0];
+    this.allNodeIds = [node, 0];
     this.G = Math.max(G, MIN_CONDUCTANCE);
   }
 
   stamp(solver: SparseSolver): void {
     stampG(solver, this.pinNodeIds[0], this.pinNodeIds[0], this.G);
+  }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const n0 = this.pinNodeIds[0];
+    const v = n0 > 0 ? voltages[n0 - 1] : 0;
+    const I = this.G * v;
+    return [I, -I];
   }
 }
 
@@ -253,6 +273,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
 
 class SegmentInductorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -265,6 +286,7 @@ class SegmentInductorElement implements AnalogElement {
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
+    this.allNodeIds = [nA, nB];
     this.branchIndex = branchIdx;
     this.L = inductance;
   }
@@ -297,6 +319,11 @@ class SegmentInductorElement implements AnalogElement {
 
     this.iPrev = iNow;
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const I = voltages[this.branchIndex];
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +336,7 @@ class SegmentInductorElement implements AnalogElement {
 
 class SegmentCapacitorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -320,6 +348,7 @@ class SegmentCapacitorElement implements AnalogElement {
 
   constructor(node: number, capacitance: number) {
     this.pinNodeIds = [node, 0];
+    this.allNodeIds = [node, 0];
     this.C = capacitance;
   }
 
@@ -340,6 +369,13 @@ class SegmentCapacitorElement implements AnalogElement {
     this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);
     this.vPrev = vNow;
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const n0 = this.pinNodeIds[0];
+    const v = n0 > 0 ? voltages[n0 - 1] : 0;
+    const I = this.geq * v + this.ieq;
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +390,7 @@ class SegmentCapacitorElement implements AnalogElement {
 
 class CombinedRLElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -367,6 +404,7 @@ class CombinedRLElement implements AnalogElement {
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
+    this.allNodeIds = [nA, nB];
     this.branchIndex = branchIdx;
     this.R = resistance;
     this.L = inductance;
@@ -400,6 +438,11 @@ class CombinedRLElement implements AnalogElement {
 
     this.iPrev = iNow;
   }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const I = voltages[this.branchIndex];
+    return [I, -I];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -408,6 +451,7 @@ class CombinedRLElement implements AnalogElement {
 
 export class TransmissionLineElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -428,6 +472,7 @@ export class TransmissionLineElement implements AnalogElement {
     segments: number,
   ) {
     this.pinNodeIds = nodeIds;
+    this.allNodeIds = nodeIds;
     this.branchIndex = firstBranchIdx;
 
     const N = segments;

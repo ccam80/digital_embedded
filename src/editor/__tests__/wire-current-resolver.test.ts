@@ -99,7 +99,7 @@ function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
 function makeEngine(elementCurrents: number[]): AnalogEngine {
   return {
     getElementCurrent: (id: number) => elementCurrents[id] ?? 0,
-    getElementPinCurrents: () => null,
+    getElementPinCurrents: (id: number) => { const I = elementCurrents[id] ?? 0; return [I, -I]; },
     getNodeVoltage: () => 0,
     getBranchCurrent: () => 0,
     getElementPower: () => 0,

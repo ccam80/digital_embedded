@@ -484,6 +484,13 @@ function createSegmentDiodeElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       return geq * (va - vc) - ieq;
     },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const I = geq * (va - vc) - ieq;
+      return [I, -I];
+    },
   };
 }
 

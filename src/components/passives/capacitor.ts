@@ -172,14 +172,6 @@ class AnalogCapacitorElement implements AnalogElementCore {
     capStampRHS(solver, n1, this.ieq);
   }
 
-  getCurrent(voltages: Float64Array): number {
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
-    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    return this.geq * (v0 - v1) + this.ieq;
-  }
-
   getPinCurrents(voltages: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
