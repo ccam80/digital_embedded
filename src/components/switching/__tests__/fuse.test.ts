@@ -235,7 +235,7 @@ describe("Fuse — ComponentDefinition", () => {
   it("definitionComplete — FuseDefinition has all required fields", () => {
     expect(FuseDefinition.name).toBe("Fuse");
     expect(FuseDefinition.factory).toBeDefined();
-    expect(FuseDefinition.executeFn).toBeDefined();
+    expect(FuseDefinition.models!.digital!.executeFn).toBeDefined();
     expect(FuseDefinition.pinLayout).toBeDefined();
     expect(FuseDefinition.propertyDefs).toBeDefined();
     expect(FuseDefinition.attributeMap).toBeDefined();

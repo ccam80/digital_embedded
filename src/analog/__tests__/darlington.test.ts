@@ -264,12 +264,9 @@ describe("Registration", () => {
       expect(DarlingtonNpnDefinition.category).toBe(ComponentCategory.SEMICONDUCTORS);
     });
 
-    it("DarlingtonNPN has engineType analog", () => {
-      expect(DarlingtonNpnDefinition.engineType).toBe("analog");
-    });
-
-    it("DarlingtonNPN simulationModes includes analog", () => {
-      expect(DarlingtonNpnDefinition.simulationModes).toContain("analog-internals");
+    it("DarlingtonNPN has analog model only", () => {
+      expect(DarlingtonNpnDefinition.models?.analog).toBeDefined();
+      expect(DarlingtonNpnDefinition.models?.digital).toBeUndefined();
     });
 
     it("DarlingtonPNP has transistorModel set", () => {

@@ -17,6 +17,7 @@ import { exportGif } from '../export/gif.js';
 import { exportZip } from '../export/zip.js';
 
 import { createDefaultRegistry } from '../components/register-all.js';
+import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
 import { Circuit } from '../core/circuit.js';
 import { ComponentPalette } from '../editor/palette.js';
 import { PaletteUI } from '../editor/palette-ui.js';
@@ -364,8 +365,9 @@ export function initApp(search?: string): void {
       const allDefs = reg.getByCategory(catKey as any);
       // Filter by engine type (auto mode shows all)
       const defs = isAuto ? allDefs : allDefs.filter(d => {
-        const et = d.engineType ?? "digital";
-        return et === engineFilter || et === "both";
+        if (engineFilter === 'digital') return hasDigitalModel(d);
+        if (engineFilter === 'analog') return hasAnalogModel(d);
+        return false;
       });
       if (defs.length === 0) continue;
       const sub = document.createElement("div");

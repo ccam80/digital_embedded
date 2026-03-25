@@ -172,7 +172,7 @@ describe("NFET", () => {
     expect(NFETDefinition.attributeMap).toBeDefined();
     expect(NFETDefinition.category).toBe(ComponentCategory.SWITCHING);
     expect(NFETDefinition.helpText).toBeDefined();
-    expect(typeof NFETDefinition.models.digital!.defaultDelay).toBe("number");
+    expect(typeof NFETDefinition.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns NFETElement", () => {
@@ -279,7 +279,7 @@ describe("PFET", () => {
     expect(PFETDefinition.factory).toBeDefined();
     expect(PFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(PFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof PFETDefinition.models.digital!.defaultDelay).toBe("number");
+    expect(typeof PFETDefinition.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns PFETElement", () => {
@@ -448,7 +448,7 @@ describe("FGNFET", () => {
     expect(FGNFETDefinition.factory).toBeDefined();
     expect(FGNFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(FGNFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGNFETDefinition.models.digital!.defaultDelay).toBe("number");
+    expect(typeof FGNFETDefinition.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns FGNFETElement", () => {
@@ -573,7 +573,7 @@ describe("FGPFET", () => {
     expect(FGPFETDefinition.factory).toBeDefined();
     expect(FGPFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(FGPFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGPFETDefinition.models.digital!.defaultDelay).toBe("number");
+    expect(typeof FGPFETDefinition.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns FGPFETElement", () => {
@@ -751,7 +751,7 @@ describe("TransGate", () => {
   it("definitionComplete — TransGateDefinition has all required fields", () => {
     expect(TransGateDefinition.name).toBe("TransGate");
     expect(TransGateDefinition.factory).toBeDefined();
-    expect(TransGateDefinition.executeFn).toBeDefined();
+    expect(TransGateDefinition.models!.digital!.executeFn).toBeDefined();
     expect(TransGateDefinition.pinLayout).toBeDefined();
     expect(TransGateDefinition.propertyDefs).toBeDefined();
     expect(TransGateDefinition.attributeMap).toBeDefined();

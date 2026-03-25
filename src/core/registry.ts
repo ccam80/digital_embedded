@@ -1,7 +1,7 @@
 /**
  * Component registry — one registration shape per component type.
  *
- * Per Decision 4: ComponentDefinition bundles factory, executeFn, pinLayout,
+ * Per Decision 4: ComponentDefinition bundles factory, models, pinLayout,
  * propertyDefs, and attributeMap. Type IDs are auto-assigned at registration
  * time (incrementing counter). They are never serialized.
  */
@@ -9,7 +9,7 @@
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElement, AnalogElementCore } from "../analog/element.js";
+import type { AnalogElementCore } from "../analog/element.js";
 import type { DeviceType } from "../analog/model-parser.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
@@ -23,10 +23,7 @@ import type { PinElectricalSpec } from "./pin-electrical.js";
  * These keys are recognized by the property panel and simulation pipeline
  * and receive dedicated UI treatment beyond the generic property editor.
  */
-export const WELL_KNOWN_PROPERTY_KEYS = new Set<string>([
-  /** Simulation mode for components that support multiple backends. */
-  "simulationMode",
-]);
+export const WELL_KNOWN_PROPERTY_KEYS = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // ComponentCategory
@@ -152,8 +149,8 @@ export type ExecuteFunction = (
 ) => void;
 
 /**
- * No-op ExecuteFunction for pure-analog components.
- * Pure analog components have no digital simulation behavior.
+ * @deprecated No-op ExecuteFunction for legacy test code.
+ * Production analog-only components simply omit models.digital.
  */
 export const noOpAnalogExecuteFn: ExecuteFunction = () => {};
 
@@ -219,8 +216,6 @@ export interface ComponentModels {
 export interface ComponentDefinition {
   /** Type name matching the .dig elementName, e.g. "And", "FlipflopD". */
   name: string;
-  /** Engine type this component targets. Defaults to "digital" when omitted. */
-  engineType?: "digital" | "analog" | "both";
   /**
    * Numeric type ID auto-assigned by ComponentRegistry.register().
    * Not serialized. Used only at runtime for function-table dispatch.
@@ -229,14 +224,6 @@ export interface ComponentDefinition {
   typeId: number;
   /** Construct a CircuitElement for a placed instance from its properties. */
   factory: (props: PropertyBag) => CircuitElement;
-  /** Flat simulation function called by the engine's inner loop. */
-  executeFn?: ExecuteFunction;
-  /**
-   * Sequential components provide `sampleFn` to latch inputs on clock edges.
-   * Called before the combinational sweep. Combinational components leave
-   * this undefined.
-   */
-  sampleFn?: ExecuteFunction;
   /** Default pin layout for property panel and compiler. */
   pinLayout: PinDeclaration[];
   /** Property definitions for the property panel. */
@@ -248,35 +235,31 @@ export interface ComponentDefinition {
   /** Help text displayed to the user. */
   helpText: string;
   /**
-   * Number of persistent state slots this component type requires.
-   * Static number for most components; function of properties for components
-   * whose state size depends on configuration (RAM, register-file, EEPROM).
-   * Defaults to 0 (combinational, no state).
+   * Structured simulation model container. Production definitions supply this
+   * directly. Legacy/test definitions may omit it — the registry's _ensureModels
+   * shim populates it from flat fields (executeFn, analogFactory, etc.) at
+   * registration time.
    */
+  models?: ComponentModels;
+
+  // --- Legacy flat fields (deprecated — use models bag instead) ---
+  // These are accepted for backwards compatibility with test code.
+  // Production definitions should use models.digital / models.analog directly.
+  /** @deprecated Use models.digital.executeFn */
+  executeFn?: ExecuteFunction;
+  /** @deprecated Use models.digital.sampleFn */
+  sampleFn?: ExecuteFunction;
+  /** @deprecated Use models.digital.stateSlotCount */
   stateSlotCount?: number | ((props: PropertyBag) => number);
-  /**
-   * Default propagation delay in nanoseconds for timed simulation mode.
-   * Individual component instances can override via a "delay" property.
-   * Defaults to 10ns when not specified.
-   */
+  /** @deprecated Use models.digital.defaultDelay */
   defaultDelay?: number;
-  /**
-   * For switch components, identifies the two pin indices that form the
-   * switchable connection (e.g. drain/source for FETs, A/B for TransGate).
-   * Only switch components set this field.
-   */
+  /** @deprecated Use models.digital.switchPins */
   switchPins?: [number, number];
-  /**
-   * Factory for creating analog element instances during MNA compilation.
-   *
-   * Called by the analog compiler (Phase 1) for each component instance.
-   * `nodeIds` is the ordered list of MNA node IDs connected to this component's
-   * pins. `branchIdx` is the MNA branch-current row index (-1 if
-   * `requiresBranchRow` is false). `getTime` returns the current simulation
-   * time in seconds and is used by time-dependent sources.
-   *
-   * Not set on digital-only components. Does not affect existing registrations.
-   */
+  /** @deprecated Use models.digital.inputSchema */
+  inputSchema?: string[];
+  /** @deprecated Use models.digital.outputSchema */
+  outputSchema?: string[];
+  /** @deprecated Use models.analog.factory */
   analogFactory?: (
     pinNodes: ReadonlyMap<string, number>,
     internalNodeIds: readonly number[],
@@ -284,60 +267,18 @@ export interface ComponentDefinition {
     props: PropertyBag,
     getTime: () => number,
   ) => AnalogElementCore;
-  /**
-   * When `true`, the analog compiler assigns an MNA branch-current row index
-   * to this component before calling `analogFactory`. Used by voltage sources
-   * and inductors which require an extra row in the MNA matrix.
-   *
-   * Defaults to `false` when not set.
-   */
+  /** @deprecated Use models.analog.requiresBranchRow */
   requiresBranchRow?: boolean;
-  /**
-   * Returns the number of internal MNA nodes this component requires.
-   *
-   * Called by the analog compiler before matrix allocation so the total node
-   * count (and therefore matrix size) is known before any stamps are applied.
-   * Used by components with variable internal topology, such as transmission
-   * lines with configurable segment counts.
-   *
-   * Defaults to 0 when not implemented.
-   */
+  /** @deprecated Use models.analog.getInternalNodeCount */
   getInternalNodeCount?: (props: PropertyBag) => number;
-
-  /**
-   * SPICE device type for semiconductor components.
-   *
-   * When set, the analog compiler performs model binding: it looks up the
-   * model name from the component's `model` property (or falls back to the
-   * built-in default for this device type) and passes the resolved parameters
-   * to `analogFactory` in `props._modelParams`.
-   *
-   * Not set on non-semiconductor components (resistors, capacitors, etc.).
-   */
+  /** @deprecated Use models.analog.deviceType */
   analogDeviceType?: DeviceType;
-  /**
-   * Component-level electrical override applied to all pins of this component type.
-   *
-   * Fields present here take priority over the circuit-level logic family defaults
-   * but yield to per-pin overrides in pinElectricalOverrides. Most digital
-   * components omit this entirely and inherit from the circuit logic family.
-   */
+  /** @deprecated Use models.analog.pinElectrical */
   pinElectrical?: PinElectricalSpec;
-  /**
-   * Per-pin electrical overrides keyed by pin label (e.g. "Q", "out").
-   *
-   * Each entry overrides specific fields for that pin only, taking priority
-   * over both pinElectrical and the circuit-level logic family defaults.
-   * Used for pins with unusual drive characteristics (open-drain, Schmitt
-   * trigger inputs, high-current drivers).
-   */
+  /** @deprecated Use models.analog.pinElectricalOverrides */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
-  /**
-   * Structured simulation model container. Populated automatically by register()
-   * from the flat fields (executeFn, analogFactory, etc.) when not supplied
-   * directly. Callers may supply this directly for forward-compatible definitions.
-   */
-  models?: ComponentModels;
+  /** @deprecated Derived from models keys */
+  engineType?: "digital" | "analog" | "both";
   /**
    * Default model key (e.g. "digital", "analog"). When omitted, the first key
    * present in `models` is used. Hidden from the property panel when only one
@@ -361,22 +302,6 @@ export interface ComponentDefinition {
    * Populated in Phase 4c; field added here for forward declaration.
    */
   transistorModel?: string;
-
-  /**
-   * Declares the label→position mapping for executeFn input access.
-   * inputSchema[k] is the pin label that executeFn reads at inBase + k.
-   * When present, the compiler uses this to build the wiring table
-   * instead of relying on getPins() iteration order filtered by direction.
-   * Symmetric gates (AND, OR) can omit this — the compiler falls back
-   * to the current getPins()-order behaviour for backwards compatibility.
-   */
-  inputSchema?: string[];
-
-  /**
-   * Same as inputSchema but for output pins.
-   * outputSchema[k] is the pin label that executeFn writes at outBase + k.
-   */
-  outputSchema?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -384,31 +309,26 @@ export interface ComponentDefinition {
 // ---------------------------------------------------------------------------
 
 /**
- * Populates `def.models` from flat fields when the caller did not supply it.
- * Analog-only components use noOpAnalogExecuteFn as their executeFn placeholder;
- * these must NOT produce a digital model entry.
+ * Populates `def.models` from deprecated flat fields when the caller did not
+ * supply it. Keeps backwards compatibility for test code that creates inline
+ * definitions with flat fields.
  */
 function _ensureModels(def: ComponentDefinition): ComponentDefinition {
   if (def.models !== undefined) {
-    const hasAnalogFlatOverrides =
-      def.pinElectrical !== undefined ||
-      def.pinElectricalOverrides !== undefined ||
-      def.transistorModel !== undefined;
-    if (!hasAnalogFlatOverrides) return def;
-
-    const existingAnalog = def.models.analog;
-    if (existingAnalog === undefined) return def;
-
-    const patchedAnalog: AnalogModel = { ...existingAnalog };
-    if (def.pinElectrical !== undefined) patchedAnalog.pinElectrical = def.pinElectrical;
-    if (def.pinElectricalOverrides !== undefined) patchedAnalog.pinElectricalOverrides = def.pinElectricalOverrides;
-    if (def.transistorModel !== undefined) patchedAnalog.transistorModel = def.transistorModel;
-    return { ...def, models: { ...def.models, analog: patchedAnalog } };
+    // Already has models — but patch analog overrides from flat fields if present
+    if (def.models.analog && (def.pinElectrical || def.pinElectricalOverrides || def.transistorModel)) {
+      const patched = { ...def.models.analog };
+      if (def.pinElectrical && !patched.pinElectrical) patched.pinElectrical = def.pinElectrical;
+      if (def.pinElectricalOverrides && !patched.pinElectricalOverrides) patched.pinElectricalOverrides = def.pinElectricalOverrides;
+      if (def.transistorModel && !patched.transistorModel) patched.transistorModel = def.transistorModel;
+      return { ...def, models: { ...def.models, analog: patched } };
+    }
+    return def;
   }
 
   const models: ComponentModels = {};
 
-  if (def.executeFn !== undefined && def.executeFn !== noOpAnalogExecuteFn) {
+  if (def.executeFn) {
     const digital: DigitalModel = { executeFn: def.executeFn };
     if (def.sampleFn !== undefined) digital.sampleFn = def.sampleFn;
     if (def.stateSlotCount !== undefined) digital.stateSlotCount = def.stateSlotCount;

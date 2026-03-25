@@ -294,8 +294,8 @@ describe("Counter", () => {
   });
 
   it("CounterDefinition has sampleFn", () => {
-    expect(CounterDefinition.sampleFn).toBeDefined();
-    expect(CounterDefinition.sampleFn).toBe(sampleCounter);
+    expect(CounterDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(CounterDefinition.models?.digital?.sampleFn).toBe(sampleCounter);
   });
 });
 
@@ -327,8 +327,8 @@ describe("CounterPreset", () => {
   });
 
   it("CounterPresetDefinition has sampleFn", () => {
-    expect(CounterPresetDefinition.sampleFn).toBeDefined();
-    expect(CounterPresetDefinition.sampleFn).toBe(sampleCounterPreset);
+    expect(CounterPresetDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(CounterPresetDefinition.models?.digital?.sampleFn).toBe(sampleCounterPreset);
   });
 });
 
@@ -365,8 +365,8 @@ describe("ProgramCounter", () => {
   });
 
   it("ProgramCounterDefinition has sampleFn", () => {
-    expect(ProgramCounterDefinition.sampleFn).toBeDefined();
-    expect(ProgramCounterDefinition.sampleFn).toBe(sampleProgramCounter);
+    expect(ProgramCounterDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(ProgramCounterDefinition.models?.digital?.sampleFn).toBe(sampleProgramCounter);
   });
 });
 
@@ -414,8 +414,8 @@ describe("Register", () => {
   });
 
   it("RegisterDefinition has sampleFn", () => {
-    expect(RegisterDefinition.sampleFn).toBeDefined();
-    expect(RegisterDefinition.sampleFn).toBe(sampleRegister);
+    expect(RegisterDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(RegisterDefinition.models?.digital?.sampleFn).toBe(sampleRegister);
   });
 });
 
@@ -447,8 +447,8 @@ describe("RegisterFile", () => {
   });
 
   it("RegisterFileDefinition has sampleFn", () => {
-    expect(RegisterFileDefinition.sampleFn).toBeDefined();
-    expect(RegisterFileDefinition.sampleFn).toBe(sampleRegisterFile);
+    expect(RegisterFileDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(RegisterFileDefinition.models?.digital?.sampleFn).toBe(sampleRegisterFile);
   });
 });
 
@@ -477,8 +477,8 @@ describe("ProgramMemory", () => {
   });
 
   it("ProgramMemoryDefinition has sampleFn", () => {
-    expect(ProgramMemoryDefinition.sampleFn).toBeDefined();
-    expect(ProgramMemoryDefinition.sampleFn).toBe(sampleProgramMemory);
+    expect(ProgramMemoryDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(ProgramMemoryDefinition.models?.digital?.sampleFn).toBe(sampleProgramMemory);
   });
 });
 
@@ -556,31 +556,31 @@ describe("RAM", () => {
   });
 
   it("RAMSinglePort has sampleFn", () => {
-    expect(RAMSinglePortDefinition.sampleFn).toBeDefined();
-    expect(RAMSinglePortDefinition.sampleFn).toBe(sampleRAMSinglePort);
+    expect(RAMSinglePortDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(RAMSinglePortDefinition.models?.digital?.sampleFn).toBe(sampleRAMSinglePort);
   });
 
   it("RAMDualPort has sampleFn", () => {
-    expect(RAMDualPortDefinition.sampleFn).toBeDefined();
-    expect(RAMDualPortDefinition.sampleFn).toBe(sampleRAMDualPort);
+    expect(RAMDualPortDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(RAMDualPortDefinition.models?.digital?.sampleFn).toBe(sampleRAMDualPort);
   });
 
   it("RAMDualAccess has sampleFn", () => {
-    expect(RAMDualAccessDefinition.sampleFn).toBeDefined();
-    expect(RAMDualAccessDefinition.sampleFn).toBe(sampleRAMDualAccess);
+    expect(RAMDualAccessDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(RAMDualAccessDefinition.models?.digital?.sampleFn).toBe(sampleRAMDualAccess);
   });
 
   it("BlockRAMDualPort has sampleFn", () => {
-    expect(BlockRAMDualPortDefinition.sampleFn).toBeDefined();
-    expect(BlockRAMDualPortDefinition.sampleFn).toBe(sampleBlockRAMDualPort);
+    expect(BlockRAMDualPortDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(BlockRAMDualPortDefinition.models?.digital?.sampleFn).toBe(sampleBlockRAMDualPort);
   });
 
   it("RAMSinglePortSel has no sampleFn (combinational)", () => {
-    expect(RAMSinglePortSelDefinition.sampleFn).toBeUndefined();
+    expect(RAMSinglePortSelDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 
   it("RAMAsync has no sampleFn (combinational)", () => {
-    expect(RAMAsyncDefinition.sampleFn).toBeUndefined();
+    expect(RAMAsyncDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 });
 
@@ -648,13 +648,13 @@ describe("EEPROM", () => {
   });
 
   it("EEPROMDualPort has sampleFn", () => {
-    expect(EEPROMDualPortDefinition.sampleFn).toBeDefined();
-    expect(EEPROMDualPortDefinition.sampleFn).toBe(sampleEEPROMDualPort);
+    expect(EEPROMDualPortDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(EEPROMDualPortDefinition.models?.digital?.sampleFn).toBe(sampleEEPROMDualPort);
   });
 
   it("EEPROM has sampleFn", () => {
-    expect(EEPROMDefinition.sampleFn).toBeDefined();
-    expect(EEPROMDefinition.sampleFn).toBe(sampleEEPROM);
+    expect(EEPROMDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(EEPROMDefinition.models?.digital?.sampleFn).toBe(sampleEEPROM);
   });
 });
 
@@ -711,8 +711,8 @@ describe("PRNG", () => {
   });
 
   it("PRNGDefinition has sampleFn", () => {
-    expect(PRNGDefinition.sampleFn).toBeDefined();
-    expect(PRNGDefinition.sampleFn).toBe(samplePRNG);
+    expect(PRNGDefinition.models?.digital?.sampleFn).toBeDefined();
+    expect(PRNGDefinition.models?.digital?.sampleFn).toBe(samplePRNG);
   });
 });
 
@@ -722,7 +722,7 @@ describe("PRNG", () => {
 
 describe("ROM", () => {
   it("has_no_sampleFn", () => {
-    expect(ROMDefinition.sampleFn).toBeUndefined();
+    expect(ROMDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 });
 
@@ -732,6 +732,6 @@ describe("ROM", () => {
 
 describe("LookupTable", () => {
   it("has_no_sampleFn", () => {
-    expect(LookUpTableDefinition.sampleFn).toBeUndefined();
+    expect(LookUpTableDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 });

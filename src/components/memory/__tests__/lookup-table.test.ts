@@ -237,13 +237,13 @@ describe("LookUpTable", () => {
   it("definitionComplete — LookUpTableDefinition has all required fields", () => {
     expect(LookUpTableDefinition.name).toBe("LookUpTable");
     expect(LookUpTableDefinition.factory).toBeDefined();
-    expect(LookUpTableDefinition.executeFn).toBeDefined();
+    expect(LookUpTableDefinition.models!.digital!.executeFn).toBeDefined();
     expect(LookUpTableDefinition.pinLayout).toBeDefined();
     expect(LookUpTableDefinition.propertyDefs).toBeDefined();
     expect(LookUpTableDefinition.attributeMap).toBeDefined();
     expect(LookUpTableDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(LookUpTableDefinition.helpText).toBeDefined();
-    expect(typeof LookUpTableDefinition.defaultDelay).toBe("number");
+    expect(typeof LookUpTableDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns LookUpTableElement", () => {

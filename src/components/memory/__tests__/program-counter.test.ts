@@ -252,13 +252,13 @@ describe("ProgramCounter", () => {
   it("definitionComplete — ProgramCounterDefinition has all required fields", () => {
     expect(ProgramCounterDefinition.name).toBe("ProgramCounter");
     expect(ProgramCounterDefinition.factory).toBeDefined();
-    expect(ProgramCounterDefinition.executeFn).toBeDefined();
+    expect(ProgramCounterDefinition.models!.digital!.executeFn).toBeDefined();
     expect(ProgramCounterDefinition.pinLayout).toBeDefined();
     expect(ProgramCounterDefinition.propertyDefs).toBeDefined();
     expect(ProgramCounterDefinition.attributeMap).toBeDefined();
     expect(ProgramCounterDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(ProgramCounterDefinition.helpText).toBeDefined();
-    expect(typeof ProgramCounterDefinition.defaultDelay).toBe("number");
+    expect(typeof ProgramCounterDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns ProgramCounterElement", () => {

@@ -37,7 +37,7 @@ function stubDef(name: string): ComponentDefinition {
     name,
     typeId: -1,
     factory: (props) => new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-    executeFn: () => {},
+    models: { digital: { executeFn: () => {} } },
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
@@ -324,6 +324,6 @@ describe("subcircuit-loader", () => {
       stateOffset: () => 0,
       getProperty: () => undefined,
     };
-    expect(() => subADef!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
+    expect(() => subADef!.models!.digital!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
   });
 });

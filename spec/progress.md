@@ -154,3 +154,42 @@
   - src/components/library-74xx.ts
   - (plus 44 test files updated to use models.analog.factory, models.analog.deviceType, models.analog.requiresBranchRow, models.analog.getInternalNodeCount)
 - **Tests**: 477/477 passing (46 test files in P2-E scope); 31 other test files still failing (P2-B/C/D scope, not caused by P2-E)
+
+## Task batch-fix-test-files-A: Fix failing test files — Batch A
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/io/__tests__/button.test.ts
+  - src/components/io/__tests__/button-led.test.ts
+  - src/components/io/__tests__/dip-switch.test.ts
+  - src/components/io/__tests__/power-supply.test.ts
+  - src/components/io/__tests__/probe.test.ts
+  - src/components/io/__tests__/rotary-encoder-motor.test.ts
+  - src/components/io/__tests__/scope.test.ts
+  - src/components/memory/__tests__/eeprom.test.ts
+  - src/components/memory/__tests__/lookup-table.test.ts
+  - src/components/memory/__tests__/program-counter.test.ts
+  - src/components/memory/__tests__/program-memory.test.ts
+  - src/components/memory/__tests__/rom.test.ts
+  - src/components/memory/__tests__/two-phase-memory.test.ts
+  - src/analog/__tests__/behavioral-combinational.test.ts
+  - src/analog/__tests__/behavioral-sequential.test.ts
+- **Tests**: 934/934 passing
+
+## Task batch-b-fix: Fix Failing Test Files — Batch B
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/switching/__tests__/fuse.test.ts
+  - src/components/switching/__tests__/relay.test.ts
+  - src/components/switching/__tests__/fets.test.ts
+  - src/components/switching/__tests__/switches.test.ts
+  - src/analog/__tests__/digital-bridge-path.test.ts
+  - src/engine/__tests__/mixed-partition.test.ts (source file — fixed detectEngineMode and partitionMixedCircuit to use hasDigitalModel/hasAnalogModel instead of def.engineType)
+  - src/headless/__tests__/stress-test-regressions.test.ts
+  - src/io/__tests__/subcircuit-loader.test.ts
+  - src/engine/mixed-partition.ts (source fix required — def.engineType no longer set on Resistor/DcVoltageSource which use models directly)
+- **Tests**: 240/240 passing (all 8 targeted files)
+- **Notes**: The mixed-partition.ts source file was also modified because detectEngineMode used def.engineType which is not set on definitions that use models directly (e.g. Resistor). The src/io/__tests__/resolve-generics.test.ts and dig-parser.test.ts failures are pre-existing ENOENT failures caused by missing git submodule (ref/Digital not initialized) — unrelated to these changes.

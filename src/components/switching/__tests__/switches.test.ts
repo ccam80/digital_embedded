@@ -386,7 +386,7 @@ describe("Switch", () => {
     });
 
     it("SwitchDefinition executeFn is executeSwitch", () => {
-      expect(SwitchDefinition.executeFn).toBe(executeSwitch);
+      expect(SwitchDefinition.models!.digital!.executeFn).toBe(executeSwitch);
     });
 
     it("SwitchDefinition category is SWITCHING", () => {
@@ -412,11 +412,11 @@ describe("Switch", () => {
     });
 
     it("SwitchDefinition has stateSlotCount=1", () => {
-      expect(SwitchDefinition.stateSlotCount).toBe(1);
+      expect(SwitchDefinition.models!.digital!.stateSlotCount).toBe(1);
     });
 
     it("SwitchDefinition has switchPins=[0,1]", () => {
-      expect(SwitchDefinition.switchPins).toEqual([0, 1]);
+      expect(SwitchDefinition.models!.digital!.switchPins).toEqual([0, 1]);
     });
 
     it("SwitchDefinition can be registered without throwing", () => {
@@ -636,7 +636,7 @@ describe("SwitchDT", () => {
     });
 
     it("SwitchDTDefinition executeFn is executeSwitchDT", () => {
-      expect(SwitchDTDefinition.executeFn).toBe(executeSwitchDT);
+      expect(SwitchDTDefinition.models!.digital!.executeFn).toBe(executeSwitchDT);
     });
 
     it("SwitchDTDefinition category is SWITCHING", () => {
@@ -653,11 +653,11 @@ describe("SwitchDT", () => {
     });
 
     it("SwitchDTDefinition has stateSlotCount=1", () => {
-      expect(SwitchDTDefinition.stateSlotCount).toBe(1);
+      expect(SwitchDTDefinition.models!.digital!.stateSlotCount).toBe(1);
     });
 
     it("SwitchDTDefinition has switchPins=[0,1]", () => {
-      expect(SwitchDTDefinition.switchPins).toEqual([0, 1]);
+      expect(SwitchDTDefinition.models!.digital!.switchPins).toEqual([0, 1]);
     });
 
     it("SwitchDTDefinition can be registered without throwing", () => {
@@ -776,7 +776,7 @@ describe("AnalogSwitch", () => {
 
   it("closed_stamps_ron", () => {
     const props = makeSpstProps({ closed: true, Ron: 1 });
-    const el = SwitchDefinition.analogFactory!(
+    const el = SwitchDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -795,7 +795,7 @@ describe("AnalogSwitch", () => {
 
   it("open_stamps_roff", () => {
     const props = makeSpstProps({ closed: false, Roff: 1e9 });
-    const el = SwitchDefinition.analogFactory!(
+    const el = SwitchDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -813,7 +813,7 @@ describe("AnalogSwitch", () => {
 
   it("toggle_changes_conductance", () => {
     const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const el = SwitchDefinition.analogFactory!(
+    const el = SwitchDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -843,7 +843,7 @@ describe("AnalogSwitch", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDefinition.analogFactory!(
+    const el = SwitchDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -868,7 +868,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.analogFactory!(
+    const el = SwitchDTDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -894,7 +894,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.analogFactory!(
+    const el = SwitchDTDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -925,7 +925,7 @@ describe("Integration", () => {
     // Open switch: V across R ≈ 0V
 
     const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const swEl = SwitchDefinition.analogFactory!(
+    const swEl = SwitchDefinition.models!.analog!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,

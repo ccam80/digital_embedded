@@ -38,7 +38,6 @@ import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { TransistorModelRegistry } from "../transistor-model-registry.js";
@@ -291,11 +290,9 @@ export function registerDarlingtonModels(registry: TransistorModelRegistry): voi
 export const DarlingtonNpnDefinition: ComponentDefinition = {
   name: "DarlingtonNPN",
   typeId: -1,
-  engineType: "analog",
   factory: (_props) => {
     throw new Error("DarlingtonNPN uses transistor-level expansion; no circuit element factory needed");
   },
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildDarlingtonPinDeclarations(),
   propertyDefs: [],
   attributeMap: [],
@@ -304,18 +301,18 @@ export const DarlingtonNpnDefinition: ComponentDefinition = {
     "NPN Darlington transistor pair.\n" +
     "Two NPN BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
+  models: {
+    analog: { transistorModel: "DarlingtonNPN" } as any,
+  },
   transistorModel: "DarlingtonNPN",
-  simulationModes: ["analog-internals"],
 };
 
 export const DarlingtonPnpDefinition: ComponentDefinition = {
   name: "DarlingtonPNP",
   typeId: -1,
-  engineType: "analog",
   factory: (_props) => {
     throw new Error("DarlingtonPNP uses transistor-level expansion; no circuit element factory needed");
   },
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildDarlingtonPinDeclarations(),
   propertyDefs: [],
   attributeMap: [],
@@ -324,6 +321,8 @@ export const DarlingtonPnpDefinition: ComponentDefinition = {
     "PNP Darlington transistor pair.\n" +
     "Two PNP BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
+  models: {
+    analog: { transistorModel: "DarlingtonPNP" } as any,
+  },
   transistorModel: "DarlingtonPNP",
-  simulationModes: ["analog-internals"],
 };

@@ -220,7 +220,7 @@ describe("Relay", () => {
   it("definitionComplete — RelayDefinition has all required fields", () => {
     expect(RelayDefinition.name).toBe("Relay");
     expect(RelayDefinition.factory).toBeDefined();
-    expect(RelayDefinition.executeFn).toBeDefined();
+    expect(RelayDefinition.models!.digital!.executeFn).toBeDefined();
     expect(RelayDefinition.pinLayout).toBeDefined();
     expect(RelayDefinition.propertyDefs).toBeDefined();
     expect(RelayDefinition.attributeMap).toBeDefined();
@@ -367,7 +367,7 @@ describe("RelayDT", () => {
   it("definitionComplete — RelayDTDefinition has all required fields", () => {
     expect(RelayDTDefinition.name).toBe("RelayDT");
     expect(RelayDTDefinition.factory).toBeDefined();
-    expect(RelayDTDefinition.executeFn).toBeDefined();
+    expect(RelayDTDefinition.models!.digital!.executeFn).toBeDefined();
     expect(RelayDTDefinition.pinLayout).toBeDefined();
     expect(RelayDTDefinition.propertyDefs).toBeDefined();
     expect(RelayDTDefinition.attributeMap).toBeDefined();

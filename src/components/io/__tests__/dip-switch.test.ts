@@ -265,7 +265,7 @@ describe("DipSwitch", () => {
     });
 
     it("DipSwitchDefinition executeFn is executeDipSwitch", () => {
-      expect(DipSwitchDefinition.executeFn).toBe(executeDipSwitch);
+      expect(DipSwitchDefinition.models!.digital!.executeFn).toBe(executeDipSwitch);
     });
 
     it("DipSwitchDefinition category is IO", () => {

@@ -193,7 +193,7 @@ describe("Sequential component classification", () => {
     for (const name of syncFlipFlopNames) {
       const def = registry.get(name);
       expect(def, `${name} should be registered`).toBeDefined();
-      expect(def!.sampleFn, `${name} should have a sampleFn`).toBeDefined();
+      expect(def!.models?.digital?.sampleFn, `${name} should have a sampleFn`).toBeDefined();
     }
   });
 
@@ -204,7 +204,7 @@ describe("Sequential component classification", () => {
     for (const name of memoryNames) {
       const def = registry.get(name);
       expect(def, `${name} should be registered`).toBeDefined();
-      expect(def!.sampleFn, `${name} should have a sampleFn`).toBeDefined();
+      expect(def!.models?.digital?.sampleFn, `${name} should have a sampleFn`).toBeDefined();
     }
   });
 });

@@ -273,13 +273,13 @@ describe("ROM", () => {
   it("definitionComplete — ROMDefinition has all required fields", () => {
     expect(ROMDefinition.name).toBe("ROM");
     expect(ROMDefinition.factory).toBeDefined();
-    expect(ROMDefinition.executeFn).toBeDefined();
+    expect(ROMDefinition.models!.digital!.executeFn).toBeDefined();
     expect(ROMDefinition.pinLayout).toBeDefined();
     expect(ROMDefinition.propertyDefs).toBeDefined();
     expect(ROMDefinition.attributeMap).toBeDefined();
     expect(ROMDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(ROMDefinition.helpText).toBeDefined();
-    expect(typeof ROMDefinition.defaultDelay).toBe("number");
+    expect(typeof ROMDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("helpText — getHelpText returns non-empty string", () => {
@@ -459,13 +459,13 @@ describe("ROMDualPort", () => {
   it("definitionComplete — ROMDualPortDefinition has all required fields", () => {
     expect(ROMDualPortDefinition.name).toBe("ROMDualPort");
     expect(ROMDualPortDefinition.factory).toBeDefined();
-    expect(ROMDualPortDefinition.executeFn).toBeDefined();
+    expect(ROMDualPortDefinition.models!.digital!.executeFn).toBeDefined();
     expect(ROMDualPortDefinition.pinLayout).toBeDefined();
     expect(ROMDualPortDefinition.propertyDefs).toBeDefined();
     expect(ROMDualPortDefinition.attributeMap).toBeDefined();
     expect(ROMDualPortDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(ROMDualPortDefinition.helpText).toBeDefined();
-    expect(typeof ROMDualPortDefinition.defaultDelay).toBe("number");
+    expect(typeof ROMDualPortDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns ROMDualPortElement", () => {

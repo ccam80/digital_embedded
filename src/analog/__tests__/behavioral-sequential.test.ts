@@ -373,8 +373,8 @@ describe("Registration", () => {
   });
 
   it("counter_simulation_modes_include_digital_and_simplified", () => {
-    expect(CounterDefinition.simulationModes).toContain("logical");
-    expect(CounterDefinition.simulationModes).toContain("analog-pins");
+    expect(CounterDefinition.models?.digital).toBeDefined();
+    expect(CounterDefinition.models?.analog).toBeDefined();
   });
 
   it("counter_preset_has_analog_factory", () => {
@@ -398,8 +398,8 @@ describe("Registration", () => {
   });
 
   it("register_simulation_modes_include_digital_and_simplified", () => {
-    expect(RegisterDefinition.simulationModes).toContain("logical");
-    expect(RegisterDefinition.simulationModes).toContain("analog-pins");
+    expect(RegisterDefinition.models?.digital).toBeDefined();
+    expect(RegisterDefinition.models?.analog).toBeDefined();
   });
 
   it("counter_analog_factory_returns_analog_element", () => {

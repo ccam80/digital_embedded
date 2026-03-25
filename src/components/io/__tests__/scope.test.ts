@@ -284,7 +284,7 @@ describe("Scope", () => {
     });
 
     it("ScopeDefinition executeFn is executeScope", () => {
-      expect(ScopeDefinition.executeFn).toBe(executeScope);
+      expect(ScopeDefinition.models!.digital!.executeFn).toBe(executeScope);
     });
 
     it("ScopeDefinition category is IO", () => {
@@ -398,7 +398,7 @@ describe("ScopeTrigger", () => {
     });
 
     it("ScopeTriggerDefinition executeFn is executeScopeTrigger", () => {
-      expect(ScopeTriggerDefinition.executeFn).toBe(executeScopeTrigger);
+      expect(ScopeTriggerDefinition.models!.digital!.executeFn).toBe(executeScopeTrigger);
     });
 
     it("ScopeTriggerDefinition category is IO", () => {

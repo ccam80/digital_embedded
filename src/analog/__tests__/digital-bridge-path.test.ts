@@ -84,13 +84,12 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     name: "Ground",
     typeId: -1,
     factory: makeStubElFactory("Ground", () => []),
-    executeFn: noopExecuteFn as unknown as ExecuteFunction,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "",
-    engineType: "analog" as const,
+    models: { analog: { factory: () => ({ pinNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }) } },
   });
 
   // In: one OUTPUT pin at (0,0), label and bitWidth from props
@@ -161,14 +160,15 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
       { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "B",   bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out", bitWidth: 1, isNegated: false, isClock: false },
     ]),
-    executeFn: noopExecuteFn as unknown as ExecuteFunction,
     pinLayout: xorPinLayout,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    engineType: "both" as const,
-    analogFactory: analogFactory as unknown as import("../../core/registry.js").ComponentDefinition["analogFactory"],
+    models: {
+      digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction },
+      analog: { factory: (analogFactory ?? makeStubAnalogElement) as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+    },
   });
 
   return registry;

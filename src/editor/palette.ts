@@ -7,7 +7,7 @@
  */
 
 import type { ComponentDefinition } from "@/core/registry";
-import { ComponentCategory, ComponentRegistry } from "@/core/registry";
+import { ComponentCategory, ComponentRegistry, hasDigitalModel, hasAnalogModel } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // PaletteNode — one category tree node
@@ -220,8 +220,9 @@ export class ComponentPalette {
   private _applyEngineTypeFilter(defs: ComponentDefinition[]): ComponentDefinition[] {
     if (this._engineTypeFilter === null) return defs;
     return defs.filter((d) => {
-      const et = d.engineType ?? "digital";
-      return et === this._engineTypeFilter || et === "both";
+      if (this._engineTypeFilter === "digital") return hasDigitalModel(d);
+      if (this._engineTypeFilter === "analog") return hasAnalogModel(d);
+      return false;
     });
   }
 

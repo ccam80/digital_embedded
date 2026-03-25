@@ -302,13 +302,13 @@ describe("ProgramMemory", () => {
   it("definitionComplete — ProgramMemoryDefinition has all required fields", () => {
     expect(ProgramMemoryDefinition.name).toBe("ProgramMemory");
     expect(ProgramMemoryDefinition.factory).toBeDefined();
-    expect(ProgramMemoryDefinition.executeFn).toBeDefined();
+    expect(ProgramMemoryDefinition.models!.digital!.executeFn).toBeDefined();
     expect(ProgramMemoryDefinition.pinLayout).toBeDefined();
     expect(ProgramMemoryDefinition.propertyDefs).toBeDefined();
     expect(ProgramMemoryDefinition.attributeMap).toBeDefined();
     expect(ProgramMemoryDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(ProgramMemoryDefinition.helpText).toBeDefined();
-    expect(typeof ProgramMemoryDefinition.defaultDelay).toBe("number");
+    expect(typeof ProgramMemoryDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns ProgramMemoryElement", () => {

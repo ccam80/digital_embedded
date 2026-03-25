@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   ComponentRegistry,
   ComponentCategory,
-  noOpAnalogExecuteFn,
   hasDigitalModel,
   hasAnalogModel,
   availableModels,
@@ -82,7 +81,7 @@ function makeDefinition(
     name,
     typeId: -1,
     factory: (_props: PropertyBag) => makeMockElement(name, `${name}-instance`),
-    executeFn: noopExecuteFn,
+    models: { digital: { executeFn: noopExecuteFn } },
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
@@ -302,7 +301,7 @@ describe("ComponentRegistry", () => {
       const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
       const def: ComponentDefinition = {
         ...makeDefinition("SharedComponent"),
-        analogFactory: stubAnalogFactory,
+        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
 
@@ -317,8 +316,7 @@ describe("ComponentRegistry", () => {
       const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
       const def: ComponentDefinition = {
         ...makeDefinition("PureAnalog"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
+        models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
 
@@ -327,27 +325,6 @@ describe("ComponentRegistry", () => {
 
       expect(digital.map((d) => d.name)).not.toContain("PureAnalog");
       expect(analog.map((d) => d.name)).toContain("PureAnalog");
-    });
-
-    it("no_op_execute_fn_is_callable", () => {
-      const stubLayout: ComponentLayout = {
-        wiringTable: new Int32Array([]),
-        inputCount: () => 0,
-        inputOffset: () => 0,
-        outputCount: () => 0,
-        outputOffset: () => 0,
-        stateOffset: () => 0,
-        getProperty: () => undefined,
-      };
-
-      const state = new Uint32Array(4);
-      const highZs = new Uint32Array(4);
-      const initialState = Array.from(state);
-
-      noOpAnalogExecuteFn(0, state, highZs, stubLayout);
-
-      const finalState = Array.from(state);
-      expect(initialState).toEqual(finalState);
     });
   });
 
@@ -365,18 +342,17 @@ describe("ComponentRegistry", () => {
     it("hasDigitalModel returns false for pure-analog component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("PureA"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
+        models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const stored = registry.get("PureA")!;
       expect(hasDigitalModel(stored)).toBe(false);
     });
 
-    it("hasAnalogModel returns true when analogFactory is present", () => {
+    it("hasAnalogModel returns true when analog model is present", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("WithAnalog"),
-        analogFactory: stubAnalogFactory,
+        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const stored = registry.get("WithAnalog")!;
@@ -400,8 +376,7 @@ describe("ComponentRegistry", () => {
     it("availableModels returns ['analog'] for pure-analog component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("JustAnalog"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
+        models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const stored = registry.get("JustAnalog")!;
@@ -411,7 +386,7 @@ describe("ComponentRegistry", () => {
     it("availableModels returns both keys for dual-model component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("DualModel"),
-        analogFactory: stubAnalogFactory,
+        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const stored = registry.get("DualModel")!;
@@ -421,50 +396,57 @@ describe("ComponentRegistry", () => {
       expect(models).toHaveLength(2);
     });
 
-    it("models field is populated after register() from flat fields", () => {
+    it("models field is preserved through register()", () => {
       const def = makeDefinition("AutoPop");
       registry.register(def);
       const stored = registry.get("AutoPop")!;
       expect(stored.models).toBeDefined();
-      expect(stored.models!.digital).toBeDefined();
-      expect(stored.models!.digital!.executeFn).toBe(noopExecuteFn);
+      expect(stored.models.digital).toBeDefined();
+      expect(stored.models.digital!.executeFn).toBe(noopExecuteFn);
     });
 
-    it("models.digital captures sampleFn when provided", () => {
+    it("models.digital.sampleFn is preserved through register()", () => {
       const sampleFn: ExecuteFunction = () => {};
-      const def: ComponentDefinition = { ...makeDefinition("WithSample"), sampleFn };
+      const def: ComponentDefinition = {
+        ...makeDefinition("WithSample"),
+        models: { digital: { executeFn: noopExecuteFn, sampleFn } },
+      };
       registry.register(def);
       const stored = registry.get("WithSample")!;
-      expect(stored.models!.digital!.sampleFn).toBe(sampleFn);
+      expect(stored.models.digital!.sampleFn).toBe(sampleFn);
     });
 
-    it("models.digital captures stateSlotCount when provided", () => {
-      const def: ComponentDefinition = { ...makeDefinition("WithState"), stateSlotCount: 3 };
+    it("models.digital.stateSlotCount is preserved through register()", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("WithState"),
+        models: { digital: { executeFn: noopExecuteFn, stateSlotCount: 3 } },
+      };
       registry.register(def);
       const stored = registry.get("WithState")!;
-      expect(stored.models!.digital!.stateSlotCount).toBe(3);
+      expect(stored.models.digital!.stateSlotCount).toBe(3);
     });
 
-    it("models.digital captures switchPins when provided", () => {
-      const def: ComponentDefinition = { ...makeDefinition("Switch"), switchPins: [0, 1] };
+    it("models.digital.switchPins is preserved through register()", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Switch"),
+        models: { digital: { executeFn: noopExecuteFn, switchPins: [0, 1] } },
+      };
       registry.register(def);
       const stored = registry.get("Switch")!;
-      expect(stored.models!.digital!.switchPins).toEqual([0, 1]);
+      expect(stored.models.digital!.switchPins).toEqual([0, 1]);
     });
 
-    it("models.analog captures requiresBranchRow when provided", () => {
+    it("models.analog.requiresBranchRow is preserved through register()", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("VSource"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
-        requiresBranchRow: true,
+        models: { analog: { factory: stubAnalogFactory, requiresBranchRow: true } },
       };
       registry.register(def);
       const stored = registry.get("VSource")!;
-      expect(stored.models!.analog!.requiresBranchRow).toBe(true);
+      expect(stored.models.analog!.requiresBranchRow).toBe(true);
     });
 
-    it("register() does not overwrite explicitly supplied models", () => {
+    it("register() preserves explicitly supplied models", () => {
       const customModels: ComponentModels = {
         digital: { executeFn: noopExecuteFn },
       };
@@ -477,7 +459,7 @@ describe("ComponentRegistry", () => {
     it("defaultModel is preserved through register()", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("WithDefault"),
-        analogFactory: stubAnalogFactory,
+        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
         defaultModel: "digital",
       };
       registry.register(def);
@@ -490,8 +472,7 @@ describe("ComponentRegistry", () => {
       registry.register(makeDefinition("Gate2"));
       const def: ComponentDefinition = {
         ...makeDefinition("PureAnalogOnly"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
+        models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const digital = registry.getByEngineType("digital");
@@ -504,8 +485,7 @@ describe("ComponentRegistry", () => {
       registry.register(makeDefinition("DigOnlyGate"));
       const def: ComponentDefinition = {
         ...makeDefinition("AnalogPassive"),
-        executeFn: noOpAnalogExecuteFn,
-        analogFactory: stubAnalogFactory,
+        models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
       const analog = registry.getByEngineType("analog");

@@ -14,6 +14,7 @@
 import { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { hasDigitalModel, hasAnalogModel } from "../core/registry.js";
 import { pinWorldPosition } from "../core/pin.js";
 import { PinDirection } from "../core/pin.js";
 import { PropertyBag } from "../core/properties.js";
@@ -136,10 +137,11 @@ export function detectEngineMode(
 
     const def = registry.get(el.typeId);
     if (!def) continue;
-    const et = def.engineType ?? "digital";
-    if (et === "analog") hasAnalogOnly = true;
-    else if (et === "digital") hasDigitalOnly = true;
-    // "both" doesn't force either mode
+    const defHasAnalog = hasAnalogModel(def);
+    const defHasDigital = hasDigitalModel(def);
+    if (defHasAnalog && !defHasDigital) hasAnalogOnly = true;
+    else if (defHasDigital && !defHasAnalog) hasDigitalOnly = true;
+    // both models present doesn't force either mode
   }
 
   if (hasAnalogOnly && hasDigitalOnly) return "mixed";
@@ -199,8 +201,7 @@ export function partitionMixedCircuit(
       continue;
     }
 
-    const et = def.engineType ?? "digital";
-    if (et === "digital") {
+    if (hasDigitalModel(def) && !hasAnalogModel(def)) {
       digitalElements.add(el);
     } else {
       analogElements.add(el);

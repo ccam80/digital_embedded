@@ -256,7 +256,7 @@ describe("PowerSupply", () => {
     });
 
     it("PowerSupplyDefinition executeFn is executePowerSupply", () => {
-      expect(PowerSupplyDefinition.executeFn).toBe(executePowerSupply);
+      expect(PowerSupplyDefinition.models!.digital!.executeFn).toBe(executePowerSupply);
     });
 
     it("PowerSupplyDefinition category is IO", () => {

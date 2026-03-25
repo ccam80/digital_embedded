@@ -246,7 +246,7 @@ describe("Button", () => {
     });
 
     it("ButtonDefinition executeFn is executeButton", () => {
-      expect(ButtonDefinition.executeFn).toBe(executeButton);
+      expect(ButtonDefinition.models!.digital!.executeFn).toBe(executeButton);
     });
 
     it("ButtonDefinition category is IO", () => {

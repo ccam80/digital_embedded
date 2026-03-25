@@ -268,7 +268,7 @@ describe("ButtonLED", () => {
     });
 
     it("ButtonLEDDefinition executeFn is executeButtonLED", () => {
-      expect(ButtonLEDDefinition.executeFn).toBe(executeButtonLED);
+      expect(ButtonLEDDefinition.models!.digital!.executeFn).toBe(executeButtonLED);
     });
 
     it("ButtonLEDDefinition category is IO", () => {

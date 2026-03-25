@@ -328,7 +328,7 @@ describe("Probe", () => {
     });
 
     it("ProbeDefinition executeFn is executeProbe", () => {
-      expect(ProbeDefinition.executeFn).toBe(executeProbe);
+      expect(ProbeDefinition.models!.digital!.executeFn).toBe(executeProbe);
     });
 
     it("ProbeDefinition category is IO", () => {
@@ -367,7 +367,7 @@ describe("Probe", () => {
         solve: () => new Float64Array([]),
       };
 
-      const analogElement = ProbeDefinition.analogFactory!(
+      const analogElement = ProbeDefinition.models!.analog!.factory(
         new Map([["in", 3]]),
         [],
         -1,
@@ -383,7 +383,7 @@ describe("Probe", () => {
 
     it("reads_node_voltage returns voltage at node index", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.analogFactory!(
+      const analogElement = ProbeDefinition.models!.analog!.factory(
         new Map([["in", 3]]),
         [],
         -1,
@@ -400,7 +400,8 @@ describe("Probe", () => {
     });
 
     it("definition_has_engine_type_both", () => {
-      expect(ProbeDefinition.engineType).toBe("both");
+      expect(ProbeDefinition.models?.digital).toBeDefined();
+      expect(ProbeDefinition.models?.analog).toBeDefined();
     });
 
     it("appears_in_both_palettes", () => {
@@ -419,7 +420,7 @@ describe("Probe", () => {
 
     it("analogFactory returns AnalogElement with correct properties", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.analogFactory!(
+      const analogElement = ProbeDefinition.models!.analog!.factory(
         new Map([["in", 5]]),
         [],
         -1,

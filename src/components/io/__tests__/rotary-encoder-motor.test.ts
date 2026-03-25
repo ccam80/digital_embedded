@@ -248,7 +248,7 @@ describe("RotaryEncoder", () => {
     });
 
     it("RotaryEncoderDefinition executeFn is executeRotaryEncoder", () => {
-      expect(RotaryEncoderDefinition.executeFn).toBe(executeRotaryEncoder);
+      expect(RotaryEncoderDefinition.models!.digital!.executeFn).toBe(executeRotaryEncoder);
     });
 
     it("RotaryEncoderDefinition category is IO", () => {
@@ -385,7 +385,7 @@ describe("StepperMotorBipolar", () => {
     });
 
     it("StepperMotorBipolarDefinition executeFn is executeStepperMotorBipolar", () => {
-      expect(StepperMotorBipolarDefinition.executeFn).toBe(executeStepperMotorBipolar);
+      expect(StepperMotorBipolarDefinition.models!.digital!.executeFn).toBe(executeStepperMotorBipolar);
     });
 
     it("StepperMotorBipolarDefinition category is IO", () => {
@@ -498,7 +498,7 @@ describe("StepperMotorUnipolar", () => {
     });
 
     it("StepperMotorUnipolarDefinition executeFn is executeStepperMotorUnipolar", () => {
-      expect(StepperMotorUnipolarDefinition.executeFn).toBe(executeStepperMotorUnipolar);
+      expect(StepperMotorUnipolarDefinition.models!.digital!.executeFn).toBe(executeStepperMotorUnipolar);
     });
 
     it("StepperMotorUnipolarDefinition category is IO", () => {

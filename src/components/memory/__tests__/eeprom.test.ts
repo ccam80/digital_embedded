@@ -331,13 +331,13 @@ describe("EEPROM", () => {
   it("definitionComplete — EEPROMDefinition has all required fields", () => {
     expect(EEPROMDefinition.name).toBe("EEPROM");
     expect(EEPROMDefinition.factory).toBeDefined();
-    expect(EEPROMDefinition.executeFn).toBeDefined();
+    expect(EEPROMDefinition.models!.digital!.executeFn).toBeDefined();
     expect(EEPROMDefinition.pinLayout).toBeDefined();
     expect(EEPROMDefinition.propertyDefs).toBeDefined();
     expect(EEPROMDefinition.attributeMap).toBeDefined();
     expect(EEPROMDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(EEPROMDefinition.helpText).toBeDefined();
-    expect(typeof EEPROMDefinition.defaultDelay).toBe("number");
+    expect(typeof EEPROMDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("helpText — returns non-empty string", () => {
@@ -565,13 +565,13 @@ describe("EEPROMDualPort", () => {
   it("definitionComplete — EEPROMDualPortDefinition has all required fields", () => {
     expect(EEPROMDualPortDefinition.name).toBe("EEPROMDualPort");
     expect(EEPROMDualPortDefinition.factory).toBeDefined();
-    expect(EEPROMDualPortDefinition.executeFn).toBeDefined();
+    expect(EEPROMDualPortDefinition.models!.digital!.executeFn).toBeDefined();
     expect(EEPROMDualPortDefinition.pinLayout).toBeDefined();
     expect(EEPROMDualPortDefinition.propertyDefs).toBeDefined();
     expect(EEPROMDualPortDefinition.attributeMap).toBeDefined();
     expect(EEPROMDualPortDefinition.category).toBe(ComponentCategory.MEMORY);
     expect(EEPROMDualPortDefinition.helpText).toBeDefined();
-    expect(typeof EEPROMDualPortDefinition.defaultDelay).toBe("number");
+    expect(typeof EEPROMDualPortDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns EEPROMDualPortElement", () => {
