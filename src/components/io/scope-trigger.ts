@@ -219,15 +219,15 @@ export const ScopeTriggerDefinition: ComponentDefinition = {
   name: "ScopeTrigger",
   typeId: -1,
   factory: scopeTriggerFactory,
-  executeFn: executeScopeTrigger,
   pinLayout: buildScopeTriggerPinDeclarations(),
   propertyDefs: SCOPE_TRIGGER_PROPERTY_DEFS,
   attributeMap: SCOPE_TRIGGER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["T"],
-  outputSchema: [],
   helpText:
     "ScopeTrigger — trigger source for the Scope waveform display.\n" +
     "Detects edges on its input and signals the Scope to start recording.\n" +
     "triggerMode: 'rising', 'falling', or 'both'.",
+  models: {
+    digital: { executeFn: executeScopeTrigger, inputSchema: ["T"], outputSchema: [] },
+  },
 };

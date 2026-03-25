@@ -295,20 +295,24 @@ function relayFactory(props: PropertyBag): RelayElement {
 export const RelayDefinition: ComponentDefinition = {
   name: "Relay",
   typeId: -1,
-  engineType: "both",
   factory: relayFactory,
-  executeFn: executeRelay,
   pinLayout: buildRelayPins(1, 1),
   propertyDefs: RELAY_PROPERTY_DEFS,
   attributeMap: RELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  // Schema for default poles=1; direction-filter order matches for all pole counts.
-  inputSchema: ["in1", "in2"],
-  outputSchema: ["A1", "B1"],
   helpText: "Relay (SPST) — coil-controlled single-pole single-throw contact switch.",
-  stateSlotCount: 1,
   defaultDelay: 0,
-  switchPins: [2, 3],
-  analogFactory: createRelayAnalogElement,
-  simulationModes: ["analog-internals", "logical"],
+  models: {
+    digital: {
+      executeFn: executeRelay,
+      inputSchema: ["in1", "in2"],
+      outputSchema: ["A1", "B1"],
+      stateSlotCount: 1,
+      switchPins: [2, 3],
+    },
+    analog: {
+      factory: createRelayAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

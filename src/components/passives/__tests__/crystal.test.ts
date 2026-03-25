@@ -338,20 +338,20 @@ describe("Crystal", () => {
     });
 
     it("CrystalDefinition engineType is 'analog'", () => {
-      expect(CrystalDefinition.engineType).toBe("analog");
+      expect(CrystalDefinition.models?.analog).toBeDefined();
     });
 
     it("CrystalDefinition has analogFactory", () => {
-      expect(CrystalDefinition.analogFactory).toBeDefined();
+      expect(CrystalDefinition.models?.analog?.factory).toBeDefined();
     });
 
     it("CrystalDefinition requiresBranchRow is true", () => {
-      expect(CrystalDefinition.requiresBranchRow).toBe(true);
+      expect(CrystalDefinition.models?.analog?.requiresBranchRow).toBe(true);
     });
 
     it("CrystalDefinition getInternalNodeCount returns 2", () => {
       const props = new PropertyBag();
-      expect(CrystalDefinition.getInternalNodeCount!(props)).toBe(2);
+      expect(CrystalDefinition.models?.analog?.getInternalNodeCount!(props)).toBe(2);
     });
 
     it("CrystalDefinition isReactive", () => {
@@ -360,7 +360,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.analogFactory!(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.models!.analog!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -370,7 +370,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.analogFactory!(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.models!.analog!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 

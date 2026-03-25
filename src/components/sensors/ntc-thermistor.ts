@@ -468,9 +468,7 @@ function ntcCircuitFactory(props: PropertyBag): NTCThermistorCircuitElement {
 export const NTCThermistorDefinition: ComponentDefinition = {
   name: "NTCThermistor",
   typeId: -1,
-  engineType: "analog",
   factory: ntcCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildNTCPinDeclarations(),
   propertyDefs: NTC_PROPERTY_DEFS,
   attributeMap: NTC_ATTRIBUTE_MAPPINGS,
@@ -478,6 +476,5 @@ export const NTCThermistorDefinition: ComponentDefinition = {
   helpText:
     "NTC Thermistor — negative temperature coefficient resistor. " +
     "Resistance decreases exponentially with temperature (B-parameter model).",
-  analogFactory: createNTCThermistorElement,
-  requiresBranchRow: false,
+  models: { analog: { factory: createNTCThermistorElement } },
 };

@@ -40,7 +40,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -340,9 +339,7 @@ const VCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const VCVSDefinition: ComponentDefinition = {
   name: "VCVS",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildVCVSPinDeclarations(),
   propertyDefs: VCVS_PROPERTY_DEFS,
@@ -356,22 +353,27 @@ export const VCVSDefinition: ComponentDefinition = {
     return new VCVSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const expression = props.getOrDefault<string>("expression", "V(ctrl)");
-    const gain = props.getOrDefault<number>("gain", 1.0);
-    return new VCVSAnalogElement(
-      pinNodes.get("ctrl+")!, // ctrl+
-      pinNodes.get("ctrl-")!, // ctrl-
-      pinNodes.get("out+")!,  // out+
-      pinNodes.get("out-")!,  // out-
-      branchIdx,
-      expression,
-      gain,
-    );
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const expression = props.getOrDefault<string>("expression", "V(ctrl)");
+        const gain = props.getOrDefault<number>("gain", 1.0);
+        return new VCVSAnalogElement(
+          pinNodes.get("ctrl+")!, // ctrl+
+          pinNodes.get("ctrl-")!, // ctrl-
+          pinNodes.get("out+")!,  // out+
+          pinNodes.get("out-")!,  // out-
+          branchIdx,
+          expression,
+          gain,
+        );
+      },
+    },
   },
 };

@@ -256,16 +256,20 @@ export const SubDefinition: ComponentDefinition = {
   name: "Sub",
   typeId: -1,
   factory: subFactory,
-  executeFn: executeSub,
   pinLayout: buildSubPinDeclarations(1),
   propertyDefs: SUB_PROPERTY_DEFS,
   attributeMap: SUB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["a", "b", "c_i"],
-  outputSchema: ["s", "c_o"],
   helpText:
     "Sub — N-bit subtractor with borrow in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit borrow in).\n" +
     "Outputs: s (bitWidth-bit difference), c_o (1-bit borrow out).",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeSub,
+      inputSchema: ["a", "b", "c_i"],
+      outputSchema: ["s", "c_o"],
+      defaultDelay: 10,
+    },
+  },
 };

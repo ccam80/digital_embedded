@@ -273,18 +273,22 @@ export const DivDefinition: ComponentDefinition = {
   name: "Div",
   typeId: -1,
   factory: divFactory,
-  executeFn: executeDiv,
   pinLayout: buildDivPinDeclarations(1),
   propertyDefs: DIV_PROPERTY_DEFS,
   attributeMap: DIV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["a", "b"],
-  outputSchema: ["q", "r"],
   helpText:
     "Div — N-bit divider with quotient and remainder.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +
     "Outputs: q (quotient), r (remainder).\n" +
     "Division by zero is treated as division by 1.\n" +
     "Supports signed mode with optional positive-remainder adjustment.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeDiv,
+      inputSchema: ["a", "b"],
+      outputSchema: ["q", "r"],
+      defaultDelay: 10,
+    },
+  },
 };

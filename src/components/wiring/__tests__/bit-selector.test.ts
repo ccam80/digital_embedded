@@ -288,7 +288,7 @@ describe("BitSelector", () => {
     });
 
     it("BitSelectorDefinition has executeFn=executeBitSelector", () => {
-      expect(BitSelectorDefinition.executeFn).toBe(executeBitSelector);
+      expect(BitSelectorDefinition.models.digital!.executeFn).toBe(executeBitSelector);
     });
 
     it("BitSelectorDefinition has non-empty pinLayout", () => {

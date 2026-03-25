@@ -172,9 +172,9 @@ describe("Triac", () => {
 
   it("definition_has_correct_fields", () => {
     expect(TriacDefinition.name).toBe("Triac");
-    expect(TriacDefinition.engineType).toBe("analog");
-    expect(TriacDefinition.analogDeviceType).toBe("TRIAC");
-    expect(TriacDefinition.analogFactory).toBeDefined();
+    expect(TriacDefinition.models?.analog).toBeDefined();
+    expect(TriacDefinition.models?.analog?.deviceType).toBe("TRIAC");
+    expect(TriacDefinition.models?.analog?.factory).toBeDefined();
     expect(TriacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

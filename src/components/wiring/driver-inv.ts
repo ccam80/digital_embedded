@@ -221,19 +221,24 @@ function driverInvFactory(props: PropertyBag): DriverInvSelElement {
 export const DriverInvSelDefinition: ComponentDefinition = {
   name: "DriverInvSel",
   typeId: -1,
-  engineType: "both",
   factory: driverInvFactory,
-  executeFn: executeDriverInvSel,
   pinLayout: buildDriverInvPinDeclarations(1),
   propertyDefs: DRIVER_INV_PROPERTY_DEFS,
   attributeMap: DRIVER_INV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  inputSchema: ["in", "sel"],
-  outputSchema: ["out"],
   helpText:
     "DriverInvSel — tri-state buffer with active-low enable.\n" +
     "When sel=0 (active-low): output = input.\n" +
     "When sel=1: output is high-impedance (disconnected).",
-  analogFactory: createDriverInvAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
+  models: {
+    digital: {
+      executeFn: executeDriverInvSel,
+      inputSchema: ["in", "sel"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: createDriverInvAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

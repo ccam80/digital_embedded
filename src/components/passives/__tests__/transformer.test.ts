@@ -567,15 +567,15 @@ describe("TransformerDefinition", () => {
   });
 
   it("engineType is analog", () => {
-    expect(TransformerDefinition.engineType).toBe("analog");
+    expect(TransformerDefinition.models?.analog).toBeDefined();
   });
 
   it("has analogFactory", () => {
-    expect(TransformerDefinition.analogFactory).toBeDefined();
+    expect(TransformerDefinition.models?.analog?.factory).toBeDefined();
   });
 
   it("requiresBranchRow is true", () => {
-    expect(TransformerDefinition.requiresBranchRow).toBe(true);
+    expect(TransformerDefinition.models?.analog?.requiresBranchRow).toBe(true);
   });
 
   it("category is PASSIVES", () => {
@@ -599,7 +599,7 @@ describe("TransformerDefinition", () => {
     props.set("primaryResistance", 0);
     props.set("secondaryResistance", 0);
 
-    const el = TransformerDefinition.analogFactory!(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
+    const el = TransformerDefinition.models!.analog!.factory(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
     expect(el.branchIndex).toBe(5);
     expect(el.branch2).toBe(6);
   });

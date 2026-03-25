@@ -129,7 +129,7 @@ function createGroundAnalogElement(
 
     getPinCurrents(_voltages: Float64Array): number[] {
       // Ground constraint is enforced by node mapping (pin node = MNA node 0).
-      // No current flows through the element stamp — return zero for the one pin.
+      // No current flows through the element stamp ï¿½ return zero for the one pin.
       return [0];
     },
   };
@@ -174,17 +174,16 @@ function groundFactory(props: PropertyBag): GroundElement {
 export const GroundDefinition: ComponentDefinition = {
   name: "Ground",
   typeId: -1,
-  engineType: "both",
   factory: groundFactory,
-  executeFn: executeGround,
-  analogFactory: createGroundAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
   pinLayout: buildGroundPinDeclarations(1),
   propertyDefs: GROUND_PROPERTY_DEFS,
   attributeMap: GROUND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "Ground â€” outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
+  models: {
+    digital: { executeFn: executeGround, inputSchema: [], outputSchema: ["out"] },
+    analog: { factory: createGroundAnalogElement },
+  },
+  defaultModel: "digital",
 };

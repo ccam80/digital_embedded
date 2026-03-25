@@ -102,3 +102,55 @@
   - `src/engine/delay.ts` — updated `def.defaultDelay`→`def.models?.digital?.defaultDelay`
   - `src/analog/__tests__/analog-compiler.test.ts` — updated test setup to use `registry.update()` instead of direct object mutation, so `_ensureModels` is called and `models.analog.transistorModel` is set correctly
 - **Tests**: 7402/7402 passing
+
+## Task P2-E: Migrate switching/pld/misc/term/gfx + passives/semiconductors/sources/sensors/active/subcircuit/library-74xx
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/components/passives/resistor.ts
+  - src/components/passives/capacitor.ts
+  - src/components/passives/inductor.ts
+  - src/components/passives/polarized-cap.ts
+  - src/components/passives/potentiometer.ts
+  - src/components/passives/crystal.ts
+  - src/components/passives/memristor.ts
+  - src/components/passives/transformer.ts
+  - src/components/passives/tapped-transformer.ts
+  - src/components/passives/transmission-line.ts
+  - src/components/semiconductors/diode.ts
+  - src/components/semiconductors/zener.ts
+  - src/components/semiconductors/tunnel-diode.ts
+  - src/components/semiconductors/scr.ts
+  - src/components/semiconductors/triac.ts
+  - src/components/semiconductors/diac.ts
+  - src/components/semiconductors/bjt.ts
+  - src/components/semiconductors/mosfet.ts
+  - src/components/semiconductors/njfet.ts
+  - src/components/semiconductors/pjfet.ts
+  - src/components/semiconductors/triode.ts
+  - src/components/semiconductors/varactor.ts
+  - src/components/sources/dc-voltage-source.ts
+  - src/components/sources/ac-voltage-source.ts
+  - src/components/sources/current-source.ts
+  - src/components/sources/variable-rail.ts
+  - src/components/sensors/ldr.ts
+  - src/components/sensors/ntc-thermistor.ts
+  - src/components/sensors/spark-gap.ts
+  - src/components/active/opamp.ts
+  - src/components/active/real-opamp.ts
+  - src/components/active/ota.ts
+  - src/components/active/comparator.ts
+  - src/components/active/schmitt-trigger.ts
+  - src/components/active/vcvs.ts
+  - src/components/active/vccs.ts
+  - src/components/active/ccvs.ts
+  - src/components/active/cccs.ts
+  - src/components/active/dac.ts
+  - src/components/active/adc.ts
+  - src/components/active/timer-555.ts
+  - src/components/active/analog-switch.ts
+  - src/components/active/optocoupler.ts
+  - src/components/subcircuit/subcircuit.ts
+  - src/components/library-74xx.ts
+  - (plus 44 test files updated to use models.analog.factory, models.analog.deviceType, models.analog.requiresBranchRow, models.analog.getInternalNodeCount)
+- **Tests**: 477/477 passing (46 test files in P2-E scope); 31 other test files still failing (P2-B/C/D scope, not caused by P2-E)

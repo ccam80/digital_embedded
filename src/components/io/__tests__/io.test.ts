@@ -339,7 +339,7 @@ describe("InComponent", () => {
     });
 
     it("InDefinition executeFn is executeIn", () => {
-      expect(InDefinition.executeFn).toBe(executeIn);
+      expect(InDefinition.models.digital!.executeFn).toBe(executeIn);
     });
 
     it("InDefinition has non-empty pinLayout", () => {
@@ -488,7 +488,7 @@ describe("OutComponent", () => {
     });
 
     it("OutDefinition executeFn is executeOut", () => {
-      expect(OutDefinition.executeFn).toBe(executeOut);
+      expect(OutDefinition.models.digital!.executeFn).toBe(executeOut);
     });
 
     it("OutDefinition can be registered", () => {
@@ -600,7 +600,7 @@ describe("ClockComponent", () => {
     });
 
     it("ClockDefinition executeFn is executeClock", () => {
-      expect(ClockDefinition.executeFn).toBe(executeClock);
+      expect(ClockDefinition.models.digital!.executeFn).toBe(executeClock);
     });
 
     it("ClockDefinition category is IO", () => {
@@ -719,7 +719,7 @@ describe("ConstComponent", () => {
     });
 
     it("ConstDefinition executeFn is executeConst", () => {
-      expect(ConstDefinition.executeFn).toBe(executeConst);
+      expect(ConstDefinition.models.digital!.executeFn).toBe(executeConst);
     });
 
     it("ConstDefinition category is IO", () => {
@@ -793,7 +793,7 @@ describe("GroundComponent", () => {
     });
 
     it("GroundDefinition executeFn is executeGround", () => {
-      expect(GroundDefinition.executeFn).toBe(executeGround);
+      expect(GroundDefinition.models.digital!.executeFn).toBe(executeGround);
     });
 
     it("GroundDefinition category is IO", () => {
@@ -869,7 +869,7 @@ describe("VddComponent", () => {
     });
 
     it("VddDefinition executeFn is executeVdd", () => {
-      expect(VddDefinition.executeFn).toBe(executeVdd);
+      expect(VddDefinition.models.digital!.executeFn).toBe(executeVdd);
     });
 
     it("VddDefinition category is IO", () => {
@@ -949,7 +949,7 @@ describe("NotConnectedComponent", () => {
     });
 
     it("NotConnectedDefinition executeFn is executeNotConnected", () => {
-      expect(NotConnectedDefinition.executeFn).toBe(executeNotConnected);
+      expect(NotConnectedDefinition.models.digital!.executeFn).toBe(executeNotConnected);
     });
 
     it("NotConnectedDefinition category is IO", () => {

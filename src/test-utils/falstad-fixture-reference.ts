@@ -158,7 +158,7 @@ const PIN_LABELS: Record<string, string[]> = {
   Inductor: ["A", "B"],
   Fuse: ["out1", "out2"],
   Potentiometer: ["A", "B", "W"],
-  Transformer: ["P1", "S1", "P2", "S2"],
+  Transformer: ["P1", "P2", "S1", "S2"],
   TappedTransformer: ["P1", "P2", "S1", "CT", "S2"],
   Crystal: ["A", "B"],
   Memristor: ["A", "B"],
@@ -206,6 +206,33 @@ const PIN_LABELS: Record<string, string[]> = {
   NTCThermistor: ["pos", "neg"],
   SparkGap: ["pos", "neg"],
   AnalogLamp: ["A", "B"],
+};
+
+// ---------------------------------------------------------------------------
+// Pin position overrides — production component positions that differ from
+// Falstad's JSON coordinates. Keyed by TS type name, then pin label.
+// Applied after JSON mapping so tests reflect actual production pin positions.
+// ---------------------------------------------------------------------------
+
+const PIN_POSITION_OVERRIDES: Record<string, Record<string, { x: number; y: number }>> = {
+  // Transformer: Falstad getPost() order is P1,S1,P2,S2 but production returns P1,P2,S1,S2
+  Transformer: {
+    P1: { x: 0, y: 0 },
+    P2: { x: 0, y: 2 },
+    S1: { x: 4, y: 0 },
+    S2: { x: 4, y: 2 },
+  },
+  // SCR gate is at (3,1) in production, not (4,-2) as in Falstad CircuitJS1
+  SCR: {
+    G: { x: 3, y: 1 },
+  },
+  // Optocoupler pins are centred at ±1 in production vs 0/+2 in Falstad
+  Optocoupler: {
+    anode:     { x: 0, y: -1 },
+    cathode:   { x: 0, y:  1 },
+    collector: { x: 4, y: -1 },
+    emitter:   { x: 4, y:  1 },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -284,13 +311,18 @@ function ensureBuilt(): void {
 
     // Pin positions
     const labels = PIN_LABELS[tsType];
+    const overrides = PIN_POSITION_OVERRIDES[tsType] ?? {};
     _pins.set(
       tsType,
-      comp.pins.map((p, i) => ({
-        label: labels?.[i] ?? `pin${i}`,
-        x: p.x * PX_TO_GRID,
-        y: p.y * PX_TO_GRID,
-      })),
+      comp.pins.map((p, i) => {
+        const label = labels?.[i] ?? `pin${i}`;
+        const ov = overrides[label];
+        return {
+          label,
+          x: ov !== undefined ? ov.x : p.x * PX_TO_GRID,
+          y: ov !== undefined ? ov.y : p.y * PX_TO_GRID,
+        };
+      }),
     );
 
     // Text calls

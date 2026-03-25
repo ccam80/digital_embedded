@@ -225,24 +225,29 @@ function registerFactory(props: PropertyBag): RegisterElement {
 export const RegisterDefinition: ComponentDefinition = {
   name: "Register",
   typeId: -1,
-  engineType: "both",
   factory: registerFactory,
-  executeFn: executeRegister,
-  sampleFn: sampleRegister,
-  analogFactory: makeBehavioralRegisterAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
   pinLayout: REGISTER_PIN_DECLARATIONS,
   propertyDefs: REGISTER_PROPERTY_DEFS,
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  // sampleRegister/executeRegister read: inBase+0=D, inBase+1=C, inBase+2=en
-  // writes: outBase+0=Q
-  inputSchema: ["D", "C", "en"],
-  outputSchema: ["Q"],
   helpText:
     "Register — edge-triggered storage register with enable.\n" +
     "On rising clock edge: if en=1, captures D input into stored value.\n" +
     "Output Q always reflects the stored value.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRegister,
+      sampleFn: sampleRegister,
+      // sampleRegister/executeRegister read: inBase+0=D, inBase+1=C, inBase+2=en
+      // writes: outBase+0=Q
+      inputSchema: ["D", "C", "en"],
+      outputSchema: ["Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeBehavioralRegisterAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

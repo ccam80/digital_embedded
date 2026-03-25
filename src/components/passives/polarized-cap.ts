@@ -484,9 +484,7 @@ function polarizedCapCircuitFactory(props: PropertyBag): PolarizedCapElement {
 export const PolarizedCapDefinition: ComponentDefinition = {
   name: "PolarizedCap",
   typeId: -1,
-  engineType: "analog",
   factory: polarizedCapCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildPolarizedCapPinDeclarations(),
   propertyDefs: POLARIZED_CAP_PROPERTY_DEFS,
   attributeMap: POLARIZED_CAP_ATTRIBUTE_MAPPINGS,
@@ -494,6 +492,10 @@ export const PolarizedCapDefinition: ComponentDefinition = {
   helpText:
     "Polarized electrolytic capacitor — extends the standard capacitor with ESR,\n" +
     "leakage current, and reverse-bias polarity enforcement.",
-  analogFactory: createPolarizedCapElement,
-  getInternalNodeCount: () => 1,
+  models: {
+    analog: {
+      factory: createPolarizedCapElement,
+      getInternalNodeCount: () => 1,
+    },
+  },
 };

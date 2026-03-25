@@ -363,12 +363,13 @@ describe("Register", () => {
 
 describe("Registration", () => {
   it("counter_has_analog_factory", () => {
-    expect(CounterDefinition.analogFactory).toBeDefined();
-    expect(typeof CounterDefinition.analogFactory).toBe("function");
+    expect(CounterDefinition.models?.analog).toBeDefined();
+    expect(typeof CounterDefinition.models?.analog?.factory).toBe("function");
   });
 
   it("counter_engine_type_is_both", () => {
-    expect(CounterDefinition.engineType).toBe("both");
+    expect(CounterDefinition.models?.digital).toBeDefined();
+    expect(CounterDefinition.models?.analog).toBeDefined();
   });
 
   it("counter_simulation_modes_include_digital_and_simplified", () => {
@@ -377,21 +378,23 @@ describe("Registration", () => {
   });
 
   it("counter_preset_has_analog_factory", () => {
-    expect(CounterPresetDefinition.analogFactory).toBeDefined();
-    expect(typeof CounterPresetDefinition.analogFactory).toBe("function");
+    expect(CounterPresetDefinition.models?.analog).toBeDefined();
+    expect(typeof CounterPresetDefinition.models?.analog?.factory).toBe("function");
   });
 
   it("counter_preset_engine_type_is_both", () => {
-    expect(CounterPresetDefinition.engineType).toBe("both");
+    expect(CounterPresetDefinition.models?.digital).toBeDefined();
+    expect(CounterPresetDefinition.models?.analog).toBeDefined();
   });
 
   it("register_has_analog_factory", () => {
-    expect(RegisterDefinition.analogFactory).toBeDefined();
-    expect(typeof RegisterDefinition.analogFactory).toBe("function");
+    expect(RegisterDefinition.models?.analog).toBeDefined();
+    expect(typeof RegisterDefinition.models?.analog?.factory).toBe("function");
   });
 
   it("register_engine_type_is_both", () => {
-    expect(RegisterDefinition.engineType).toBe("both");
+    expect(RegisterDefinition.models?.digital).toBeDefined();
+    expect(RegisterDefinition.models?.analog).toBeDefined();
   });
 
   it("register_simulation_modes_include_digital_and_simplified", () => {
@@ -400,7 +403,7 @@ describe("Registration", () => {
   });
 
   it("counter_analog_factory_returns_analog_element", () => {
-    const factory = CounterDefinition.analogFactory!;
+    const factory = CounterDefinition.models!.analog!.factory;
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 4 : undefined,
@@ -420,7 +423,7 @@ describe("Registration", () => {
   });
 
   it("register_analog_factory_returns_analog_element", () => {
-    const factory = RegisterDefinition.analogFactory!;
+    const factory = RegisterDefinition.models!.analog!.factory;
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 8 : undefined,

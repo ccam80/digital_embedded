@@ -8,7 +8,8 @@
  * Browser-only: imports DOM-dependent modules.
  */
 
-import { parseUrlParams } from './url-params.js';
+import { parseUrlParams, loadModuleConfig, applyModuleConfig } from './url-params.js';
+import type { ModuleConfig } from './url-params.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
@@ -5523,22 +5524,51 @@ export function initApp(search?: string): void {
 
   postMessageAdapter.init();
 
-  if (params.file) {
+  // -------------------------------------------------------------------------
+  // Module config + auto-load
+  // -------------------------------------------------------------------------
+
+  async function autoLoadFile(): Promise<void> {
+    if (!params.file) return;
     const fileUrl = `${params.base}${params.file}`;
-    fetch(fileUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch: ${fileUrl}`);
-        return res.text();
-      })
-      .then(async (xml) => {
-        await loadCircuitFromXml(xml);
-        window.parent.postMessage({ type: 'digital-loaded' }, '*');
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
-      });
+    try {
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error(`Failed to fetch: ${fileUrl}`);
+      const xml = await res.text();
+      await loadCircuitFromXml(xml);
+      window.parent.postMessage({ type: 'digital-loaded' }, '*');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
+    }
   }
+
+  async function applyModuleAndLoad(): Promise<void> {
+    // Load module config if ?module= is set
+    if (params.module) {
+      const result = await loadModuleConfig(params.module, params.base);
+      if (result) {
+        const { config, moduleBase } = result;
+        applyModuleConfig(params, config, moduleBase);
+
+        // Re-apply palette if module config set one
+        if (params.palette) {
+          palette.setAllowlist(params.palette);
+          paletteUI.render();
+        }
+
+        // Store module config on window for tutorial pages to read
+        (window as unknown as Record<string, unknown>).__moduleConfig = config;
+        (window as unknown as Record<string, unknown>).__moduleBase = moduleBase;
+      } else {
+        console.warn(`Module config not found: modules/${params.module}/config.json`);
+      }
+    }
+
+    await autoLoadFile();
+  }
+
+  applyModuleAndLoad();
 }
 
 // ---------------------------------------------------------------------------

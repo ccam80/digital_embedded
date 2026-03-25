@@ -28,7 +28,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -462,9 +461,7 @@ const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const SwitchSPSTDefinition: ComponentDefinition = {
   name: "SwitchSPST",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildSPSTPinDeclarations(),
   propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
@@ -478,22 +475,24 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
     return new SwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createSwitchSPSTElement(pinNodes, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createSwitchSPSTElement(pinNodes, props);
+      },
+    },
   },
 };
 
 export const SwitchSPDTDefinition: ComponentDefinition = {
   name: "SwitchSPDT",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildSPDTPinDeclarations(),
   propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
@@ -507,12 +506,16 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
     return new SwitchSPDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createSwitchSPDTElement(pinNodes, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createSwitchSPDTElement(pinNodes, props);
+      },
+    },
   },
 };

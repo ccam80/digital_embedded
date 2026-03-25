@@ -67,7 +67,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -360,9 +359,7 @@ const OTA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const OTADefinition: ComponentDefinition = {
   name: "OTA",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildOTAPinDeclarations(),
   propertyDefs: OTA_PROPERTY_DEFS,
@@ -376,22 +373,26 @@ export const OTADefinition: ComponentDefinition = {
     return new OTAElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const gmMax = props.getOrDefault<number>("gmMax", 0.01);
-    const vt = props.getOrDefault<number>("vt", 0.026);
-    return createOTAElement(
-      pinNodes.get("V+")!,   // V+
-      pinNodes.get("V-")!,   // V-
-      pinNodes.get("Iabc")!, // Iabc
-      pinNodes.get("OUT+")!, // OUT+
-      pinNodes.get("OUT")!,  // OUT (OUT-)
-      gmMax,
-      vt,
-    );
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const gmMax = props.getOrDefault<number>("gmMax", 0.01);
+        const vt = props.getOrDefault<number>("vt", 0.026);
+        return createOTAElement(
+          pinNodes.get("V+")!,   // V+
+          pinNodes.get("V-")!,   // V-
+          pinNodes.get("Iabc")!, // Iabc
+          pinNodes.get("OUT+")!, // OUT+
+          pinNodes.get("OUT")!,  // OUT (OUT-)
+          gmMax,
+          vt,
+        );
+      },
+    },
   },
 };

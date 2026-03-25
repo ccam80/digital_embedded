@@ -99,16 +99,16 @@ describe("DcVoltageSource", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(DcVoltageSourceDefinition.requiresBranchRow).toBe(true);
+    expect(DcVoltageSourceDefinition.models?.analog?.requiresBranchRow).toBe(true);
   });
 
   it("definition_engine_type_analog", () => {
-    expect(DcVoltageSourceDefinition.engineType).toBe("analog");
+    expect(DcVoltageSourceDefinition.models?.analog).toBeDefined();
   });
 
   it("default_voltage_from_analog_factory", () => {
     const props = new PropertyBag();
-    const el = DcVoltageSourceDefinition.analogFactory!(
+    const el = DcVoltageSourceDefinition.models!.analog!.factory(
       new Map([["pos", 1], ["neg", 0]]),
       [],
       2,

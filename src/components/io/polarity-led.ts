@@ -216,15 +216,15 @@ export const PolarityLedDefinition: ComponentDefinition = {
   name: "PolarityAwareLED",
   typeId: -1,
   factory: polarityLedFactory,
-  executeFn: executePolarityLed,
   pinLayout: buildPolarityLedPinDeclarations(),
   propertyDefs: POLARITY_LED_PROPERTY_DEFS,
   attributeMap: POLARITY_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["A", "K"],
-  outputSchema: [],
   helpText:
     "PolarityAwareLED — LED that considers anode/cathode orientation.\n" +
     "Lights up when anode is high AND cathode is low (current flows anode→cathode).\n" +
     "Color is configurable.",
+  models: {
+    digital: { executeFn: executePolarityLed, inputSchema: ["A", "K"], outputSchema: [] },
+  },
 };

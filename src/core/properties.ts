@@ -43,6 +43,10 @@ export interface PropertyDefinition {
   min?: number;
   /** Inclusive maximum, used for INT and BIT_WIDTH. */
   max?: number;
+  /** SI base unit string (e.g. "Ω", "F", "H", "V", "A"). When set, the
+   *  property input displays with auto-scaled SI prefix and accepts prefixed
+   *  text entry (e.g. "4.7k", "100n", "2.2u"). */
+  unit?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,4 +179,5 @@ export const PropertyDefinitionSchema = z.object({
   enumValues: z.array(z.string()).optional(),
   min: z.number().optional(),
   max: z.number().optional(),
+  unit: z.string().optional(),
 });

@@ -58,7 +58,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const el = InductorDefinition.analogFactory!(pinNodes, [], branchIdx, props, () => 0);
+  const el = InductorDefinition.models!.analog!.factory(pinNodes, [], branchIdx, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -155,15 +155,15 @@ describe("Inductor", () => {
     });
 
     it("InductorDefinition engineType is 'analog'", () => {
-      expect(InductorDefinition.engineType).toBe("analog");
+      expect(InductorDefinition.models?.analog).toBeDefined();
     });
 
     it("InductorDefinition has analogFactory", () => {
-      expect(InductorDefinition.analogFactory).toBeDefined();
+      expect(InductorDefinition.models?.analog?.factory).toBeDefined();
     });
 
     it("InductorDefinition requiresBranchRow is true", () => {
-      expect(InductorDefinition.requiresBranchRow).toBe(true);
+      expect(InductorDefinition.models?.analog?.requiresBranchRow).toBe(true);
     });
 
     it("InductorDefinition category is PASSIVES", () => {

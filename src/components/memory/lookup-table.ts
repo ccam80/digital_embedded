@@ -225,15 +225,19 @@ export const LookUpTableDefinition: ComponentDefinition = {
   name: "LookUpTable",
   typeId: -1,
   factory: lutFactory,
-  executeFn: executeLookUpTable,
   pinLayout: buildLUTPins(2, 1),
   propertyDefs: LUT_PROPERTY_DEFS,
   attributeMap: LUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  // Schema for default inputCount=2; direction-filter order matches for all inputCounts.
-  inputSchema: ["0", "1"],
-  outputSchema: ["out"],
   helpText: "LookUpTable — user-configurable combinational truth table. Output = table[input_address].",
-  stateSlotCount: 0,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeLookUpTable,
+      // Schema for default inputCount=2; direction-filter order matches for all inputCounts.
+      inputSchema: ["0", "1"],
+      outputSchema: ["out"],
+      stateSlotCount: 0,
+      defaultDelay: 10,
+    },
+  },
 };

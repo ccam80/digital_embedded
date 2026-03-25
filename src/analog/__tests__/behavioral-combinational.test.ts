@@ -344,22 +344,25 @@ describe("Decoder", () => {
 
 describe("Registration", () => {
   it("mux_has_analog_factory", () => {
-    expect(MuxDefinition.engineType).toBe("both");
-    expect(typeof MuxDefinition.analogFactory).toBe("function");
+    expect(MuxDefinition.models?.digital).toBeDefined();
+    expect(MuxDefinition.models?.analog).toBeDefined();
+    expect(typeof MuxDefinition.models?.analog?.factory).toBe("function");
     expect(MuxDefinition.simulationModes).toContain("logical");
     expect(MuxDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("demux_has_analog_factory", () => {
-    expect(DemuxDefinition.engineType).toBe("both");
-    expect(typeof DemuxDefinition.analogFactory).toBe("function");
+    expect(DemuxDefinition.models?.digital).toBeDefined();
+    expect(DemuxDefinition.models?.analog).toBeDefined();
+    expect(typeof DemuxDefinition.models?.analog?.factory).toBe("function");
     expect(DemuxDefinition.simulationModes).toContain("logical");
     expect(DemuxDefinition.simulationModes).toContain("analog-pins");
   });
 
   it("decoder_has_analog_factory", () => {
-    expect(DecoderDefinition.engineType).toBe("both");
-    expect(typeof DecoderDefinition.analogFactory).toBe("function");
+    expect(DecoderDefinition.models?.digital).toBeDefined();
+    expect(DecoderDefinition.models?.analog).toBeDefined();
+    expect(typeof DecoderDefinition.models?.analog?.factory).toBe("function");
     expect(DecoderDefinition.simulationModes).toContain("logical");
     expect(DecoderDefinition.simulationModes).toContain("analog-pins");
   });

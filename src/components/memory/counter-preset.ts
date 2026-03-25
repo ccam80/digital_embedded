@@ -348,24 +348,29 @@ function counterPresetFactory(props: PropertyBag): CounterPresetElement {
 export const CounterPresetDefinition: ComponentDefinition = {
   name: "CounterPreset",
   typeId: -1,
-  engineType: "both",
   factory: counterPresetFactory,
-  executeFn: executeCounterPreset,
-  sampleFn: sampleCounterPreset,
-  analogFactory: makeBehavioralCounterPresetAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
   pinLayout: COUNTER_PRESET_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PRESET_PROPERTY_DEFS,
   attributeMap: COUNTER_PRESET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  // executeCounterPreset reads: inBase+0=en, inBase+1=C, inBase+2=dir, inBase+3=in, inBase+4=ld, inBase+5=clr
-  // writes: outBase+0=out, outBase+1=ovf
-  inputSchema: ["en", "C", "dir", "in", "ld", "clr"],
-  outputSchema: ["out", "ovf"],
   helpText:
     "CounterPreset — edge-triggered up/down counter with preset load.\n" +
     "dir=0: counts up; dir=1: counts down. clr clears to 0, ld loads from 'in'.\n" +
     "maxValue property sets the wrap-around value.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeCounterPreset,
+      sampleFn: sampleCounterPreset,
+      // executeCounterPreset reads: inBase+0=en, inBase+1=C, inBase+2=dir, inBase+3=in, inBase+4=ld, inBase+5=clr
+      // writes: outBase+0=out, outBase+1=ovf
+      inputSchema: ["en", "C", "dir", "in", "ld", "clr"],
+      outputSchema: ["out", "ovf"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeBehavioralCounterPresetAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

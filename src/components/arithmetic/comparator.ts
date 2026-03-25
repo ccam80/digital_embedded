@@ -148,13 +148,17 @@ export const MagnitudeComparatorDefinition: ComponentDefinition = {
   name: "MagnitudeComparator",
   typeId: -1,
   factory: (props) => new ComparatorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-  executeFn: executeComparator,
   pinLayout: buildComparatorPinDeclarations(1),
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["a", "b"],
-  outputSchema: [">", "=", "<"],
   helpText: "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeComparator,
+      inputSchema: ["a", "b"],
+      outputSchema: [">", "=", "<"],
+      defaultDelay: 10,
+    },
+  },
 };

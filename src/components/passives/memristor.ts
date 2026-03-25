@@ -33,7 +33,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -400,9 +399,7 @@ function memristorCircuitFactory(props: PropertyBag): MemristorCircuitElement {
 export const MemristorDefinition: ComponentDefinition = {
   name: "Memristor",
   typeId: -1,
-  engineType: "analog",
   factory: memristorCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildMemristorPinDeclarations(),
   propertyDefs: MEMRISTOR_PROPERTY_DEFS,
   attributeMap: MEMRISTOR_ATTRIBUTE_MAPPINGS,
@@ -410,7 +407,9 @@ export const MemristorDefinition: ComponentDefinition = {
   helpText:
     "Memristor — Joglekar window function model.\n" +
     "Resistance depends on charge history (state variable w, 0–1).",
-  analogFactory: createMemristorElement,
-  requiresBranchRow: false,
-  getInternalNodeCount: () => 0,
+  models: {
+    analog: {
+      factory: createMemristorElement,
+    },
+  },
 };

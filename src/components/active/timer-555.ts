@@ -31,7 +31,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -522,9 +521,7 @@ const TIMER555_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const Timer555Definition: ComponentDefinition = {
   name: "Timer555",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildTimer555PinDeclarations(),
   propertyDefs: TIMER555_PROPERTY_DEFS,
@@ -538,12 +535,16 @@ export const Timer555Definition: ComponentDefinition = {
     return new Timer555Element(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createTimer555Element(pinNodes, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createTimer555Element(pinNodes, props);
+      },
+    },
   },
 };

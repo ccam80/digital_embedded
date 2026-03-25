@@ -208,7 +208,7 @@ describe("Delay", () => {
     });
 
     it("DelayDefinition has executeFn=executeDelay", () => {
-      expect(DelayDefinition.executeFn).toBe(executeDelay);
+      expect(DelayDefinition.models.digital!.executeFn).toBe(executeDelay);
     });
 
     it("DelayDefinition category is WIRING", () => {
@@ -313,7 +313,7 @@ describe("Break", () => {
     });
 
     it("BreakDefinition has executeFn=executeBreak", () => {
-      expect(BreakDefinition.executeFn).toBe(executeBreak);
+      expect(BreakDefinition.models.digital!.executeFn).toBe(executeBreak);
     });
 
     it("BreakDefinition category is WIRING", () => {
@@ -391,7 +391,7 @@ describe("Stop", () => {
     });
 
     it("StopDefinition has executeFn=executeStop", () => {
-      expect(StopDefinition.executeFn).toBe(executeStop);
+      expect(StopDefinition.models.digital!.executeFn).toBe(executeStop);
     });
 
     it("StopDefinition category is WIRING", () => {
@@ -493,7 +493,7 @@ describe("Reset", () => {
     });
 
     it("ResetDefinition has executeFn=executeReset", () => {
-      expect(ResetDefinition.executeFn).toBe(executeReset);
+      expect(ResetDefinition.models.digital!.executeFn).toBe(executeReset);
     });
 
     it("ResetDefinition category is WIRING", () => {
@@ -619,7 +619,7 @@ describe("AsyncSeq", () => {
     });
 
     it("AsyncSeqDefinition has executeFn=executeAsyncSeq", () => {
-      expect(AsyncSeqDefinition.executeFn).toBe(executeAsyncSeq);
+      expect(AsyncSeqDefinition.models.digital!.executeFn).toBe(executeAsyncSeq);
     });
 
     it("AsyncSeqDefinition category is WIRING", () => {

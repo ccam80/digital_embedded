@@ -199,19 +199,18 @@ function sevenSegHexFactory(props: PropertyBag): SevenSegHexElement {
 export const SevenSegHexDefinition: ComponentDefinition = {
   name: "SevenSegHex",
   typeId: -1,
-  engineType: "both",
   factory: sevenSegHexFactory,
-  executeFn: executeSevenSegHex,
   pinLayout: buildSevenSegHexPinDeclarations(),
   propertyDefs: SEVEN_SEG_HEX_PROPERTY_DEFS,
   attributeMap: SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["d", "dp"],
-  outputSchema: [],
   helpText:
     "SevenSegHex — 7-segment display with internal hex decoder.\n" +
     "4-bit input selects which hex digit (0–F) to display.\n" +
     "commonCathode=true: common cathode configuration (active high).",
-  analogFactory: createSevenSegAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
+  models: {
+    digital: { executeFn: executeSevenSegHex, inputSchema: ["d", "dp"], outputSchema: [] },
+    analog: { factory: createSevenSegAnalogElement },
+  },
+  defaultModel: "digital",
 };

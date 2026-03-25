@@ -281,7 +281,7 @@ describe("Counter", () => {
     });
 
     it("CounterDefinition has executeFn=executeCounter", () => {
-      expect(CounterDefinition.executeFn).toBe(executeCounter);
+      expect(CounterDefinition.models.digital!.executeFn).toBe(executeCounter);
     });
 
     it("CounterDefinition propertyDefs include bitWidth", () => {
@@ -513,7 +513,7 @@ describe("CounterPreset", () => {
     });
 
     it("CounterPresetDefinition has executeFn=executeCounterPreset", () => {
-      expect(CounterPresetDefinition.executeFn).toBe(executeCounterPreset);
+      expect(CounterPresetDefinition.models.digital!.executeFn).toBe(executeCounterPreset);
     });
 
     it("CounterPresetDefinition propertyDefs include maxValue", () => {

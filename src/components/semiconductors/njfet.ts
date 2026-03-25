@@ -31,7 +31,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -489,9 +488,7 @@ function njfetCircuitFactory(props: PropertyBag): NJfetElement {
 export const NJfetDefinition: ComponentDefinition = {
   name: "NJFET",
   typeId: -1,
-  engineType: "analog",
   factory: njfetCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildNJfetPinDeclarations(),
   propertyDefs: JFET_PROPERTY_DEFS,
   attributeMap: NJFET_ATTRIBUTE_MAPPINGS,
@@ -500,7 +497,11 @@ export const NJfetDefinition: ComponentDefinition = {
     "N-channel JFET — Shichman-Hodges model with gate junction.\n" +
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
-  analogDeviceType: "NJFET",
-  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
-    createNJfetElement(pinNodes, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createNJfetElement(pinNodes, branchIdx, props),
+      deviceType: "NJFET",
+    },
+  },
 };

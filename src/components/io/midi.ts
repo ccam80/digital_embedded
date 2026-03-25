@@ -376,20 +376,19 @@ export const MidiDefinition: ComponentDefinition = {
   name: "MIDI",
   typeId: -1,
   factory: midiFactory,
-  executeFn: executeMidi,
   pinLayout: buildMidiPinDeclarations(false),
   propertyDefs: MIDI_PROPERTY_DEFS,
   attributeMap: MIDI_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  // Schema for default progChangeEnable=false; direction-filter order matches for all configs.
-  inputSchema: ["N", "V", "OnOff", "en", "C"],
-  outputSchema: [],
   helpText:
     "MIDI — sends MIDI note-on/off and program-change messages via Web MIDI API.\n" +
     "Inputs: N (note, 7-bit), V (velocity, 7-bit), OnOff (1=on/0=off), en (enable), C (clock).\n" +
     "Triggered on rising clock edge when en=1.\n" +
     "Graceful degradation: if Web MIDI is unavailable, no audio is produced but signals propagate normally.",
-  defaultDelay: 0,
+  models: {
+    // Schema for default progChangeEnable=false; direction-filter order matches for all configs.
+    digital: { executeFn: executeMidi, inputSchema: ["N", "V", "OnOff", "en", "C"], outputSchema: [], defaultDelay: 0 },
+  },
 };
 
 export { MidiOutputManager };

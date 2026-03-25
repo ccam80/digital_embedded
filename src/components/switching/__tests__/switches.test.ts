@@ -768,8 +768,10 @@ function makeSpstProps(overrides: {
 
 describe("AnalogSwitch", () => {
   it("definition_has_engine_type_both", () => {
-    expect(SwitchDefinition.engineType).toBe("both");
-    expect(SwitchDTDefinition.engineType).toBe("both");
+    expect(SwitchDefinition.models?.digital).toBeDefined();
+    expect(SwitchDefinition.models?.analog).toBeDefined();
+    expect(SwitchDTDefinition.models?.digital).toBeDefined();
+    expect(SwitchDTDefinition.models?.analog).toBeDefined();
   });
 
   it("closed_stamps_ron", () => {

@@ -24,7 +24,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -468,9 +467,7 @@ function triacCircuitFactory(props: PropertyBag): TriacElement {
 export const TriacDefinition: ComponentDefinition = {
   name: "Triac",
   typeId: -1,
-  engineType: "analog",
   factory: triacCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildTriacPinDeclarations(),
   propertyDefs: TRIAC_PROPERTY_DEFS,
   attributeMap: TRIAC_ATTRIBUTE_MAPPINGS,
@@ -479,6 +476,10 @@ export const TriacDefinition: ComponentDefinition = {
     "Triac — bidirectional thyristor.\n" +
     "Pins: MT1 (main terminal 1), MT2 (main terminal 2), G (gate).\n" +
     "Conducts in both directions when triggered. Turns off at current zero-crossing.",
-  analogDeviceType: "TRIAC",
-  analogFactory: createTriacElement,
+  models: {
+    analog: {
+      factory: createTriacElement,
+      deviceType: "TRIAC",
+    },
+  },
 };

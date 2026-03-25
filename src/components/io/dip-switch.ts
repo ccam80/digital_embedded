@@ -236,16 +236,16 @@ export const DipSwitchDefinition: ComponentDefinition = {
   name: "DipSwitch",
   typeId: -1,
   factory: dipSwitchFactory,
-  executeFn: executeDipSwitch,
   pinLayout: buildDipSwitchPinDeclarations(1),
   propertyDefs: DIP_SWITCH_PROPERTY_DEFS,
   attributeMap: DIP_SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "DipSwitch — multi-bit toggle switch array.\n" +
     "Each bit is independently toggled by clicking the corresponding switch position.\n" +
     "The bitCount property controls how many individual switches are shown.\n" +
     "Interactive: the engine sets each bit's value when the user clicks.",
+  models: {
+    digital: { executeFn: executeDipSwitch, inputSchema: [], outputSchema: ["out"] },
+  },
 };

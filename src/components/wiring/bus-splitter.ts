@@ -278,19 +278,24 @@ function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[
 export const BusSplitterDefinition: ComponentDefinition = {
   name: "BusSplitter",
   typeId: -1,
-  engineType: "both",
   factory: busSplitterFactory,
-  executeFn: executeBusSplitter,
   pinLayout: buildDefaultPinLayout(1, 1),
   propertyDefs: BUS_SPLITTER_PROPERTY_DEFS,
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  // Schema for default bitWidth=1; direction-filter order matches for all configs.
-  inputSchema: ["OE"],
-  outputSchema: ["D", "D0"],
   helpText:
     "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
     "Splits a common bus into individual bit lines gated by OE.",
-  analogFactory: createSplitterAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
+  models: {
+    digital: {
+      executeFn: executeBusSplitter,
+      // Schema for default bitWidth=1; direction-filter order matches for all configs.
+      inputSchema: ["OE"],
+      outputSchema: ["D", "D0"],
+    },
+    analog: {
+      factory: createSplitterAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

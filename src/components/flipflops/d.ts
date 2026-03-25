@@ -253,22 +253,35 @@ export const DDefinition: ComponentDefinition = {
   factory: dFactory,
   executeFn: executeD,
   sampleFn: sampleD,
+  stateSlotCount: 2,
+  defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeDFlipflopAnalogFactory(),
+  transistorModel: 'CmosDFlipflop',
+  simulationModes: ['logical', 'analog-pins', 'analog-internals'],
   pinLayout: D_FF_PIN_DECLARATIONS,
   propertyDefs: D_FF_PROPERTY_DEFS,
   attributeMap: D_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
-  // sampleFn reads: inBase+0=D, inBase+1=C
-  // executeD reads state slots (no input pins), writes outBase+0=Q, outBase+1=~Q
   inputSchema: ["D", "C"],
   outputSchema: ["Q", "~Q"],
   helpText:
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
-  engineType: "both",
-  analogFactory: makeDFlipflopAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins', 'analog-internals'],
-  transistorModel: 'CmosDFlipflop',
+  models: {
+    digital: {
+      executeFn: executeD,
+      sampleFn: sampleD,
+      inputSchema: ["D", "C"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeDFlipflopAnalogFactory(),
+      transistorModel: 'CmosDFlipflop',
+    },
+  },
+  defaultModel: "digital",
 };

@@ -277,7 +277,7 @@ describe("SevenSeg", () => {
     });
 
     it("SevenSegDefinition executeFn is executeSevenSeg", () => {
-      expect(SevenSegDefinition.executeFn).toBe(executeSevenSeg);
+      expect(SevenSegDefinition.models.digital!.executeFn).toBe(executeSevenSeg);
     });
 
     it("SevenSegDefinition category is IO", () => {
@@ -453,7 +453,7 @@ describe("SevenSegHex", () => {
     });
 
     it("SevenSegHexDefinition executeFn is executeSevenSegHex", () => {
-      expect(SevenSegHexDefinition.executeFn).toBe(executeSevenSegHex);
+      expect(SevenSegHexDefinition.models.digital!.executeFn).toBe(executeSevenSegHex);
     });
 
     it("SevenSegHexDefinition category is IO", () => {
@@ -610,7 +610,7 @@ describe("SixteenSeg", () => {
     });
 
     it("SixteenSegDefinition executeFn is executeSixteenSeg", () => {
-      expect(SixteenSegDefinition.executeFn).toBe(executeSixteenSeg);
+      expect(SixteenSegDefinition.models.digital!.executeFn).toBe(executeSixteenSeg);
     });
 
     it("SixteenSegDefinition category is IO", () => {

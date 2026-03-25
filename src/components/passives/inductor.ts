@@ -268,9 +268,7 @@ function inductorCircuitFactory(props: PropertyBag): InductorElement {
 export const InductorDefinition: ComponentDefinition = {
   name: "Inductor",
   typeId: -1,
-  engineType: "analog",
   factory: inductorCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildInductorPinDeclarations(),
   propertyDefs: INDUCTOR_PROPERTY_DEFS,
   attributeMap: INDUCTOR_ATTRIBUTE_MAPPINGS,
@@ -278,6 +276,10 @@ export const InductorDefinition: ComponentDefinition = {
   helpText:
     "Inductor — reactive element with companion model and branch current.\n" +
     "Stamps equivalent conductance, history current, and branch incidence entries.",
-  analogFactory: createInductorElement,
-  requiresBranchRow: true,
+  models: {
+    analog: {
+      factory: createInductorElement,
+      requiresBranchRow: true,
+    },
+  },
 };

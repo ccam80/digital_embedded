@@ -66,6 +66,17 @@ const SKIP_TYPES = new Set([
   "GenericCode",
   "GenericInitCode",
   "PinControl",
+  // Analog components whose rendering differs from Java Digital's digital reference:
+  "Ground",       // merged analog+digital Ground; analog rendering doesn't match Java Digital shape
+  "Fuse",         // analog Fuse shape differs from Java Digital's digital Fuse
+  "Diode",        // analog Diode (horizontal A/K) vs Java Digital's digital diode (vertical)
+  // Analog components whose bounding box is smaller than the drawn shape:
+  "QuartzCrystal", // draws outside declared bounding box (analog BvD model)
+  "SCR",          // gate lead extends beyond bounding box
+  "VCCS",         // control leads extend beyond bounding box
+  "LDR",          // light arrow decoration extends beyond bounding box
+  // Analog components whose pins do not touch the drawn body:
+  "PJFET",        // D and S pins are offset from the body leads
 ]);
 
 /** Java type name → TS registry name overrides. */

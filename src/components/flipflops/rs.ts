@@ -221,21 +221,32 @@ export const RSDefinition: ComponentDefinition = {
   factory: rsFactory,
   executeFn: executeRS,
   sampleFn: sampleRS,
-  pinLayout: RS_FF_PIN_DECLARATIONS,
-  propertyDefs: RS_FF_PROPERTY_DEFS,
-  attributeMap: RS_FF_ATTRIBUTE_MAPPINGS,
-  category: ComponentCategory.FLIP_FLOPS,
-  // sampleRS reads: inBase+0=S, inBase+1=C, inBase+2=R
-  // executeRS writes: outBase+0=Q, outBase+1=~Q
-  inputSchema: ["S", "C", "R"],
-  outputSchema: ["Q", "~Q"],
-  helpText:
-    "RS Flip-Flop — edge-triggered with S/R control inputs.\n" +
-    "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
-    "Q and ~Q outputs are always complementary (except on S=R=1).",
   stateSlotCount: 2,
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeRSFlipflopAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
+  transistorModel: "CmosRsFlipflop",
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
+  pinLayout: RS_FF_PIN_DECLARATIONS,
+  propertyDefs: RS_FF_PROPERTY_DEFS,
+  attributeMap: RS_FF_ATTRIBUTE_MAPPINGS,
+  category: ComponentCategory.FLIP_FLOPS,
+  helpText:
+    "RS Flip-Flop — edge-triggered with S/R control inputs.\n" +
+    "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
+    "Q and ~Q outputs are always complementary (except on S=R=1).",
+  models: {
+    digital: {
+      executeFn: executeRS,
+      sampleFn: sampleRS,
+      inputSchema: ["S", "C", "R"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeRSFlipflopAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

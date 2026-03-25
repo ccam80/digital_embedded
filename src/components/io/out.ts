@@ -221,15 +221,15 @@ export const OutDefinition: ComponentDefinition = {
   name: "Out",
   typeId: -1,
   factory: outFactory,
-  executeFn: executeOut,
   pinLayout: buildOutPinDeclarations(1),
   propertyDefs: OUT_PROPERTY_DEFS,
   attributeMap: OUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["in"],
-  outputSchema: [],
   helpText:
     "Out — output display component.\n" +
     "Shows the current value of the connected signal.\n" +
     "Configurable display radix: binary, decimal, hexadecimal, octal.",
+  models: {
+    digital: { executeFn: executeOut, inputSchema: ["in"], outputSchema: [] },
+  },
 };

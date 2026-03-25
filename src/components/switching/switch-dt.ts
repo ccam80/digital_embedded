@@ -401,24 +401,28 @@ function switchDTFactory(props: PropertyBag): SwitchDTElement {
 export const SwitchDTDefinition: ComponentDefinition = {
   name: "SwitchDT",
   typeId: -1,
-  engineType: "both",
   factory: switchDTFactory,
-  executeFn: executeSwitchDT,
   pinLayout: buildPinDeclarations(1, 1),
   propertyDefs: SWITCH_DT_PROPERTY_DEFS,
   attributeMap: SWITCH_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  // Schema for default poles=1; direction-filter order matches for all pole counts.
-  inputSchema: [],
-  outputSchema: ["A1", "B1", "C1"],
   helpText:
     "Switch DT (SPDT) — a manually controlled single-pole double-throw switch.\n" +
     "Common terminal A connects to B when closed, to C when open.\n" +
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
-  stateSlotCount: 1,
-  switchPins: [0, 1],
-  analogFactory: createSwitchDTAnalogElement,
-  simulationModes: ["analog-internals", "logical"],
+  models: {
+    digital: {
+      executeFn: executeSwitchDT,
+      inputSchema: [],
+      outputSchema: ["A1", "B1", "C1"],
+      stateSlotCount: 1,
+      switchPins: [0, 1],
+    },
+    analog: {
+      factory: createSwitchDTAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

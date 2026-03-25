@@ -56,7 +56,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -780,9 +779,7 @@ const REAL_OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const RealOpAmpDefinition: ComponentDefinition = {
   name: "RealOpAmp",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildRealOpAmpPinDeclarations(),
   propertyDefs: REAL_OPAMP_PROPERTY_DEFS,
@@ -803,12 +800,16 @@ export const RealOpAmpDefinition: ComponentDefinition = {
     );
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createRealOpAmpElement(pinNodes, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createRealOpAmpElement(pinNodes, props);
+      },
+    },
   },
 };

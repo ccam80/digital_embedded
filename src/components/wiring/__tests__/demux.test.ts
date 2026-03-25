@@ -284,7 +284,7 @@ describe("Demultiplexer", () => {
     });
 
     it("DemuxDefinition has executeFn=executeDemux", () => {
-      expect(DemuxDefinition.executeFn).toBe(executeDemux);
+      expect(DemuxDefinition.models.digital!.executeFn).toBe(executeDemux);
     });
 
     it("DemuxDefinition has non-empty pinLayout", () => {

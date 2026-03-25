@@ -75,7 +75,7 @@ function make555(
   nodes: { vcc: number; gnd: number; trig: number; thr: number; ctrl: number; rst: number; dis: number; out: number },
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return Timer555Definition.analogFactory!(
+  return Timer555Definition.models!.analog!.factory(
     new Map([
       ["DIS",  nodes.dis],
       ["TRIG", nodes.trig],

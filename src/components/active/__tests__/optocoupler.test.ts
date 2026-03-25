@@ -44,7 +44,7 @@ function makeOptocouplerElement(
     ["bandwidth", 50000],
     ["label",    ""],
   ]).entries());
-  return OptocouplerDefinition.analogFactory!(
+  return OptocouplerDefinition.models!.analog!.factory(
     new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
     [],
     -1,

@@ -271,7 +271,7 @@ describe("Driver", () => {
     });
 
     it("DriverDefinition executeFn is executeDriver", () => {
-      expect(DriverDefinition.executeFn).toBe(executeDriver);
+      expect(DriverDefinition.models.digital!.executeFn).toBe(executeDriver);
     });
 
     it("DriverDefinition category is WIRING", () => {
@@ -330,7 +330,7 @@ describe("DriverInvSel", () => {
     });
 
     it("DriverInvSelDefinition executeFn is executeDriverInvSel", () => {
-      expect(DriverInvSelDefinition.executeFn).toBe(executeDriverInvSel);
+      expect(DriverInvSelDefinition.models.digital!.executeFn).toBe(executeDriverInvSel);
     });
 
     it("DriverInvSelDefinition can be registered", () => {
@@ -523,7 +523,7 @@ describe("Splitter", () => {
     });
 
     it("SplitterDefinition executeFn is executeSplitter", () => {
-      expect(SplitterDefinition.executeFn).toBe(executeSplitter);
+      expect(SplitterDefinition.models.digital!.executeFn).toBe(executeSplitter);
     });
 
     it("SplitterDefinition category is WIRING", () => {
@@ -686,7 +686,7 @@ describe("BusSplitter", () => {
     });
 
     it("BusSplitterDefinition executeFn is executeBusSplitter", () => {
-      expect(BusSplitterDefinition.executeFn).toBe(executeBusSplitter);
+      expect(BusSplitterDefinition.models.digital!.executeFn).toBe(executeBusSplitter);
     });
 
     it("BusSplitterDefinition category is WIRING", () => {
@@ -796,7 +796,7 @@ describe("Tunnel", () => {
     });
 
     it("TunnelDefinition executeFn is executeTunnel", () => {
-      expect(TunnelDefinition.executeFn).toBe(executeTunnel);
+      expect(TunnelDefinition.models.digital!.executeFn).toBe(executeTunnel);
     });
 
     it("TunnelDefinition category is WIRING", () => {

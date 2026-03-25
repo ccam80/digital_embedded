@@ -299,17 +299,16 @@ function orFactory(props: PropertyBag): OrElement {
 export const OrDefinition: ComponentDefinition = {
   name: "Or",
   typeId: -1,
-  engineType: "both",
   factory: orFactory,
   executeFn: executeOr,
   analogFactory: makeOrAnalogFactory(0),
   transistorModel: "CmosOr2",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: OR_PROPERTY_DEFS,
   attributeMap: OR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
   inputSchema: ["In_1", "In_2"],
   outputSchema: ["out"],
   helpText:
@@ -317,4 +316,16 @@ export const OrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved) and IEC/DIN (rectangular with ≥1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  models: {
+    digital: {
+      executeFn: executeOr,
+      inputSchema: ["In_1", "In_2"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeOrAnalogFactory(0),
+      transistorModel: "CmosOr2",
+    },
+  },
+  defaultModel: "digital",
 };

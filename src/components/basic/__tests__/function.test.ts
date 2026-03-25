@@ -684,7 +684,7 @@ describe("BooleanFunctionDefinition", () => {
   });
 
   it("has executeFn=executeBooleanFunction", () => {
-    expect(BooleanFunctionDefinition.executeFn).toBe(executeBooleanFunction);
+    expect(BooleanFunctionDefinition.models.digital!.executeFn).toBe(executeBooleanFunction);
   });
 
   it("category is LOGIC", () => {
@@ -724,7 +724,7 @@ describe("BooleanFunctionDefinition", () => {
   });
 
   it("defaultDelay is 10", () => {
-    expect(BooleanFunctionDefinition.defaultDelay).toBe(10);
+    expect(BooleanFunctionDefinition.models.digital!.defaultDelay).toBe(10);
   });
 
   it("pinLayout has 3 entries for 2-input, 1-output default", () => {

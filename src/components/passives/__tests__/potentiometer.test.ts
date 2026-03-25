@@ -57,7 +57,7 @@ describe("Potentiometer", () => {
       props.set("resistance", 10000);
       props.set("position", 0.5);
 
-      const analogElement = PotentiometerDefinition.analogFactory!(
+      const analogElement = PotentiometerDefinition.models!.analog!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -86,7 +86,7 @@ describe("Potentiometer", () => {
       props.set("resistance", 10000);
       props.set("position", 0);
 
-      const analogElement = PotentiometerDefinition.analogFactory!(
+      const analogElement = PotentiometerDefinition.models!.analog!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -113,7 +113,7 @@ describe("Potentiometer", () => {
       props.set("resistance", 10000);
       props.set("position", 1);
 
-      const analogElement = PotentiometerDefinition.analogFactory!(
+      const analogElement = PotentiometerDefinition.models!.analog!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -140,11 +140,11 @@ describe("Potentiometer", () => {
     });
 
     it("PotentiometerDefinition engineType is 'analog'", () => {
-      expect(PotentiometerDefinition.engineType).toBe("analog");
+      expect(PotentiometerDefinition.models?.analog).toBeDefined();
     });
 
     it("PotentiometerDefinition has analogFactory", () => {
-      expect(PotentiometerDefinition.analogFactory).toBeDefined();
+      expect(PotentiometerDefinition.models?.analog?.factory).toBeDefined();
     });
 
     it("PotentiometerDefinition category is PASSIVES", () => {

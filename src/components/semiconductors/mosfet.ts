@@ -32,7 +32,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -912,9 +911,7 @@ function pmosCircuitFactory(props: PropertyBag): PmosfetElement {
 export const NmosfetDefinition: ComponentDefinition = {
   name: "NMOS",
   typeId: -1,
-  engineType: "analog",
   factory: nmosCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildNmosPinDeclarations(),
   propertyDefs: MOSFET_PROPERTY_DEFS,
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
@@ -923,17 +920,19 @@ export const NmosfetDefinition: ComponentDefinition = {
     "N-channel MOSFET — Level 2 model with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
-  analogDeviceType: "NMOS",
-  analogFactory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      deviceType: "NMOS",
+    },
+  },
 };
 
 export const PmosfetDefinition: ComponentDefinition = {
   name: "PMOS",
   typeId: -1,
-  engineType: "analog",
   factory: pmosCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildPmosPinDeclarations(),
   propertyDefs: MOSFET_PROPERTY_DEFS,
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
@@ -942,7 +941,11 @@ export const PmosfetDefinition: ComponentDefinition = {
     "P-channel MOSFET — Level 2 model with body effect and channel-length modulation (PMOS polarity).\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
-  analogDeviceType: "PMOS",
-  analogFactory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-    createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      deviceType: "PMOS",
+    },
+  },
 };

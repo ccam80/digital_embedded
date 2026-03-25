@@ -42,7 +42,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -504,9 +503,7 @@ const ADC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const ADCDefinition: ComponentDefinition = {
   name: "ADC",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildADCPinDeclarations(8),
   propertyDefs: ADC_PROPERTY_DEFS,
@@ -520,12 +517,16 @@ export const ADCDefinition: ComponentDefinition = {
     return new ADCElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createADCElement(pinNodes, internalNodeIds, branchIdx, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createADCElement(pinNodes, internalNodeIds, branchIdx, props);
+      },
+    },
   },
 };

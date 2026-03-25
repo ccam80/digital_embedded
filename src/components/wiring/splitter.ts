@@ -491,21 +491,26 @@ const _defaultOutputPorts = parsePorts("8");
 export const SplitterDefinition: ComponentDefinition = {
   name: "Splitter",
   typeId: -1,
-  engineType: "both",
   factory: splitterFactory,
-  executeFn: executeSplitter,
   pinLayout: buildSplitterPinDeclarations(_defaultInputPorts, _defaultOutputPorts, 1),
   propertyDefs: SPLITTER_PROPERTY_DEFS,
   attributeMap: SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  // Schema for default config (input "4,4" → ports "0-3","4-7"; output "8" → port "0-7").
-  // Direction-filter order matches for all configurations.
-  inputSchema: ["0-3", "4-7"],
-  outputSchema: ["0-7"],
   helpText:
     "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
     "Configure Input Splitting for the left pins and Output Splitting for the right pins.\n" +
     "Supports patterns like '4,4', '1*8', or '0-3'.",
-  analogFactory: createSplitterAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
+  models: {
+    digital: {
+      executeFn: executeSplitter,
+      // Schema for default config (input "4,4" → ports "0-3","4-7"; output "8" → port "0-7").
+      // Direction-filter order matches for all configurations.
+      inputSchema: ["0-3", "4-7"],
+      outputSchema: ["0-7"],
+    },
+    analog: {
+      factory: createSplitterAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

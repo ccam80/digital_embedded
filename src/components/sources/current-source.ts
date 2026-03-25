@@ -17,7 +17,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -209,9 +208,7 @@ export function makeCurrentSource(
 export const CurrentSourceDefinition: ComponentDefinition = {
   name: "CurrentSource",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.SOURCES,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: CURRENT_SOURCE_PIN_LAYOUT,
   propertyDefs: CURRENT_SOURCE_PROPERTY_DEFS,
@@ -229,13 +226,17 @@ export const CurrentSourceDefinition: ComponentDefinition = {
     );
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const current = (props.has("current") ? props.get<number>("current") : 0.01) ?? 0.01;
-    return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const current = (props.has("current") ? props.get<number>("current") : 0.01) ?? 0.01;
+        return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
+      },
+    },
   },
 };

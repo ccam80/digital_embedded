@@ -309,7 +309,7 @@ describe("Decoder", () => {
     });
 
     it("DecoderDefinition has executeFn=executeDecoder", () => {
-      expect(DecoderDefinition.executeFn).toBe(executeDecoder);
+      expect(DecoderDefinition.models.digital!.executeFn).toBe(executeDecoder);
     });
 
     it("DecoderDefinition has non-empty pinLayout", () => {

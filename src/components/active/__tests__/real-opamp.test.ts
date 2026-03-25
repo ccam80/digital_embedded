@@ -601,10 +601,10 @@ describe("RealOpAmp", () => {
   });
 
   it("component_definition_has_correct_engine_type", () => {
-    expect(RealOpAmpDefinition.engineType).toBe("analog");
+    expect(RealOpAmpDefinition.models?.analog).toBeDefined();
     expect(RealOpAmpDefinition.name).toBe("RealOpAmp");
     expect(RealOpAmpDefinition.pinLayout).toHaveLength(5);
-    expect(RealOpAmpDefinition.analogFactory).toBeDefined();
+    expect(RealOpAmpDefinition.models?.analog?.factory).toBeDefined();
     expect(RealOpAmpDefinition.factory).toBeDefined();
   });
 });

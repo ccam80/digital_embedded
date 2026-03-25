@@ -52,7 +52,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -383,9 +382,7 @@ const CCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const CCCSDefinition: ComponentDefinition = {
   name: "CCCS",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildCCCSPinDeclarations(),
   propertyDefs: CCCS_PROPERTY_DEFS,
@@ -395,28 +392,31 @@ export const CCCSDefinition: ComponentDefinition = {
     "Current-Controlled Current Source — output current is an expression of " +
     "the current through the sense port.",
 
-  requiresBranchRow: true,
-
   factory(props: PropertyBag): CCCSElement {
     return new CCCSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const expression = props.getOrDefault<string>("expression", "I(sense)");
-    const currentGain = props.getOrDefault<number>("currentGain", 1.0);
-    return new CCCSAnalogElement(
-      pinNodes.get("sense+")!, // sense+
-      pinNodes.get("sense-")!, // sense-
-      pinNodes.get("out+")!,   // out+
-      pinNodes.get("out-")!,   // out-
-      branchIdx,
-      expression,
-      currentGain,
-    );
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const expression = props.getOrDefault<string>("expression", "I(sense)");
+        const currentGain = props.getOrDefault<number>("currentGain", 1.0);
+        return new CCCSAnalogElement(
+          pinNodes.get("sense+")!, // sense+
+          pinNodes.get("sense-")!, // sense-
+          pinNodes.get("out+")!,   // out+
+          pinNodes.get("out-")!,   // out-
+          branchIdx,
+          expression,
+          currentGain,
+        );
+      },
+    },
   },
 };

@@ -258,7 +258,7 @@ describe("LED", () => {
     });
 
     it("LedDefinition executeFn is executeLed", () => {
-      expect(LedDefinition.executeFn).toBe(executeLed);
+      expect(LedDefinition.models.digital!.executeFn).toBe(executeLed);
     });
 
     it("LedDefinition category is IO", () => {
@@ -391,7 +391,7 @@ describe("PolarityAwareLED", () => {
     });
 
     it("PolarityLedDefinition executeFn is executePolarityLed", () => {
-      expect(PolarityLedDefinition.executeFn).toBe(executePolarityLed);
+      expect(PolarityLedDefinition.models.digital!.executeFn).toBe(executePolarityLed);
     });
 
     it("PolarityLedDefinition category is IO", () => {
@@ -518,7 +518,7 @@ describe("LightBulb", () => {
     });
 
     it("LightBulbDefinition executeFn is executeLightBulb", () => {
-      expect(LightBulbDefinition.executeFn).toBe(executeLightBulb);
+      expect(LightBulbDefinition.models.digital!.executeFn).toBe(executeLightBulb);
     });
 
     it("LightBulbDefinition category is IO", () => {
@@ -686,7 +686,7 @@ describe("RGBLED", () => {
     });
 
     it("RgbLedDefinition executeFn is executeRgbLed", () => {
-      expect(RgbLedDefinition.executeFn).toBe(executeRgbLed);
+      expect(RgbLedDefinition.models.digital!.executeFn).toBe(executeRgbLed);
     });
 
     it("RgbLedDefinition category is IO", () => {
@@ -733,7 +733,8 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
 
 describe("AnalogLED", () => {
   it("definition_has_engine_type_both", () => {
-    expect(LedDefinition.engineType).toBe("both");
+    expect(LedDefinition.models.digital).toBeDefined();
+    expect(LedDefinition.models.analog).toBeDefined();
   });
 
   it("digital_behavior_unchanged", () => {
@@ -751,13 +752,13 @@ describe("AnalogLED", () => {
   });
 
   it("analog_factory_defined", () => {
-    expect(LedDefinition.analogFactory).toBeDefined();
+    expect(LedDefinition.models.analog!.factory).toBeDefined();
   });
 
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    const element = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const element = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(false);
   });
@@ -779,7 +780,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    const led = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const led = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -812,7 +813,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    const led = LedDefinition.analogFactory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const led = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

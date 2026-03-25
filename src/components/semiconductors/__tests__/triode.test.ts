@@ -306,7 +306,7 @@ describe("Triode", () => {
 
   describe("definition", () => {
     it("TriodeDefinition has correct engine type", () => {
-      expect(TriodeDefinition.engineType).toBe("analog");
+      expect(TriodeDefinition.models?.analog).toBeDefined();
     });
 
     it("TriodeDefinition is in SEMICONDUCTORS category", () => {

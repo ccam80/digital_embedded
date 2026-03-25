@@ -24,7 +24,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -399,9 +398,7 @@ function diodeCircuitFactory(props: PropertyBag): DiodeElement {
 export const DiodeDefinition: ComponentDefinition = {
   name: "Diode",
   typeId: -1,
-  engineType: "analog",
   factory: diodeCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildDiodePinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
@@ -410,6 +407,10 @@ export const DiodeDefinition: ComponentDefinition = {
     "Diode — Shockley equation with NR linearization.\n" +
     "Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
-  analogDeviceType: "D",
-  analogFactory: createDiodeElement,
+  models: {
+    analog: {
+      factory: createDiodeElement,
+      deviceType: "D",
+    },
+  },
 };

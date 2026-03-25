@@ -221,21 +221,32 @@ export const JKDefinition: ComponentDefinition = {
   factory: jkFactory,
   executeFn: executeJK,
   sampleFn: sampleJK,
-  pinLayout: JK_FF_PIN_DECLARATIONS,
-  propertyDefs: JK_FF_PROPERTY_DEFS,
-  attributeMap: JK_FF_ATTRIBUTE_MAPPINGS,
-  category: ComponentCategory.FLIP_FLOPS,
-  // sampleJK reads: inBase+0=J, inBase+1=C, inBase+2=K
-  // executeJK writes: outBase+0=Q, outBase+1=~Q
-  inputSchema: ["J", "C", "K"],
-  outputSchema: ["Q", "~Q"],
-  helpText:
-    "JK Flip-Flop — edge-triggered with J/K control inputs.\n" +
-    "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.\n" +
-    "Q and ~Q outputs are always complementary.",
   stateSlotCount: 2,
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeJKFlipflopAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
+  transistorModel: "CmosJkFlipflop",
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
+  pinLayout: JK_FF_PIN_DECLARATIONS,
+  propertyDefs: JK_FF_PROPERTY_DEFS,
+  attributeMap: JK_FF_ATTRIBUTE_MAPPINGS,
+  category: ComponentCategory.FLIP_FLOPS,
+  helpText:
+    "JK Flip-Flop — edge-triggered with J/K control inputs.\n" +
+    "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.\n" +
+    "Q and ~Q outputs are always complementary.",
+  models: {
+    digital: {
+      executeFn: executeJK,
+      sampleFn: sampleJK,
+      inputSchema: ["J", "C", "K"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeJKFlipflopAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

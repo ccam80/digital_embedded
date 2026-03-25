@@ -176,15 +176,15 @@ export const LightBulbDefinition: ComponentDefinition = {
   name: "LightBulb",
   typeId: -1,
   factory: lightBulbFactory,
-  executeFn: executeLightBulb,
   pinLayout: buildLightBulbPinDeclarations(),
   propertyDefs: LIGHT_BULB_PROPERTY_DEFS,
   attributeMap: LIGHT_BULB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["A", "B"],
-  outputSchema: [],
   helpText:
     "LightBulb — incandescent bulb indicator.\n" +
     "Rendered as a circle with filament cross. On when input is non-zero.\n" +
     "Label is shown above the component.",
+  models: {
+    digital: { executeFn: executeLightBulb, inputSchema: ["A", "B"], outputSchema: [] },
+  },
 };

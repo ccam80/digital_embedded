@@ -36,7 +36,7 @@ beforeAll(() => {
     createBjtElement(-1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
   // Adapter: AnalogFactory (old nodeIds[]) → createResistorElement (new Map signature)
   registerAnalogFactory("Resistor", (nodeIds, _branchIdx, props, _getTime) =>
-    ResistorDefinition.analogFactory!(
+    ResistorDefinition.models!.analog!.factory(
       new Map([["A", nodeIds[0] ?? 0], ["B", nodeIds[1] ?? 0]]),
       [],
       _branchIdx,

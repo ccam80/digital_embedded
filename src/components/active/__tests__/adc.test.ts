@@ -98,7 +98,7 @@ function makeAdc(props: Record<string, number | string> = {}): ADCElement {
   for (const [k, v] of Object.entries(props)) merged.set(k, v);
 
   const bag = new PropertyBag(Array.from(merged.entries()));
-  return ADCDefinition.analogFactory!(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
+  return ADCDefinition.models!.analog!.factory(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
 }
 
 // ---------------------------------------------------------------------------

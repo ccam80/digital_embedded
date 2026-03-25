@@ -285,17 +285,16 @@ function nandFactory(props: PropertyBag): NAndElement {
 export const NAndDefinition: ComponentDefinition = {
   name: "NAnd",
   typeId: -1,
-  engineType: "both",
   factory: nandFactory,
   executeFn: executeNAnd,
   analogFactory: makeNandAnalogFactory(0),
   transistorModel: "CmosNand2",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NAND_PROPERTY_DEFS,
   attributeMap: NAND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
   inputSchema: ["In_1", "In_2"],
   outputSchema: ["out"],
   helpText:
@@ -303,4 +302,16 @@ export const NAndDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  models: {
+    digital: {
+      executeFn: executeNAnd,
+      inputSchema: ["In_1", "In_2"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeNandAnalogFactory(0),
+      transistorModel: "CmosNand2",
+    },
+  },
+  defaultModel: "digital",
 };

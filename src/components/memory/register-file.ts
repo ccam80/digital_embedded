@@ -300,18 +300,22 @@ export const RegisterFileDefinition: ComponentDefinition = {
   name: "RegisterFile",
   typeId: -1,
   factory: registerFileFactory,
-  executeFn: executeRegisterFile,
-  sampleFn: sampleRegisterFile,
   pinLayout: REGISTER_FILE_PIN_DECLARATIONS,
   propertyDefs: REGISTER_FILE_PROPERTY_DEFS,
   attributeMap: REGISTER_FILE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["Din", "we", "Rw", "C", "Ra", "Rb"],
-  outputSchema: ["Da", "Db"],
   helpText:
     "RegisterFile — register file with 2 read ports and 1 write port.\n" +
     "On rising clock edge: if we=1, writes Din to register[Rw].\n" +
     "Da = register[Ra] and Db = register[Rb] always (combinational reads).",
-  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 2))),
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRegisterFile,
+      sampleFn: sampleRegisterFile,
+      inputSchema: ["Din", "we", "Rw", "C", "Ra", "Rb"],
+      outputSchema: ["Da", "Db"],
+      stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 2))),
+      defaultDelay: 10,
+    },
+  },
 };

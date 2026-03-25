@@ -196,16 +196,16 @@ export const PowerSupplyDefinition: ComponentDefinition = {
   name: "PowerSupply",
   typeId: -1,
   factory: powerSupplyFactory,
-  executeFn: executePowerSupply,
   pinLayout: buildPowerSupplyPinDeclarations(),
   propertyDefs: POWER_SUPPLY_PROPERTY_DEFS,
   attributeMap: POWER_SUPPLY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["VDD", "GND"],
-  outputSchema: [],
   helpText:
     "PowerSupply — VCC/GND source enforcer for CMOS circuits.\n" +
     "VDD input must be connected to logic 1 (VCC).\n" +
     "GND input must be connected to logic 0 (ground).\n" +
     "The engine raises a simulation error if either connection is incorrect.",
+  models: {
+    digital: { executeFn: executePowerSupply, inputSchema: ["VDD", "GND"], outputSchema: [] },
+  },
 };

@@ -166,13 +166,13 @@ describe("NFET", () => {
   it("definitionComplete — NFETDefinition has all required fields", () => {
     expect(NFETDefinition.name).toBe("NFET");
     expect(NFETDefinition.factory).toBeDefined();
-    expect(NFETDefinition.executeFn).toBeDefined();
+    expect(NFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(NFETDefinition.pinLayout).toBeDefined();
     expect(NFETDefinition.propertyDefs).toBeDefined();
     expect(NFETDefinition.attributeMap).toBeDefined();
     expect(NFETDefinition.category).toBe(ComponentCategory.SWITCHING);
     expect(NFETDefinition.helpText).toBeDefined();
-    expect(typeof NFETDefinition.defaultDelay).toBe("number");
+    expect(typeof NFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns NFETElement", () => {
@@ -277,9 +277,9 @@ describe("PFET", () => {
   it("definitionComplete — PFETDefinition has all required fields", () => {
     expect(PFETDefinition.name).toBe("PFET");
     expect(PFETDefinition.factory).toBeDefined();
-    expect(PFETDefinition.executeFn).toBeDefined();
+    expect(PFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(PFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof PFETDefinition.defaultDelay).toBe("number");
+    expect(typeof PFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns PFETElement", () => {
@@ -446,9 +446,9 @@ describe("FGNFET", () => {
   it("definitionComplete — FGNFETDefinition has all required fields", () => {
     expect(FGNFETDefinition.name).toBe("FGNFET");
     expect(FGNFETDefinition.factory).toBeDefined();
-    expect(FGNFETDefinition.executeFn).toBeDefined();
+    expect(FGNFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(FGNFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGNFETDefinition.defaultDelay).toBe("number");
+    expect(typeof FGNFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns FGNFETElement", () => {
@@ -571,9 +571,9 @@ describe("FGPFET", () => {
   it("definitionComplete — FGPFETDefinition has all required fields", () => {
     expect(FGPFETDefinition.name).toBe("FGPFET");
     expect(FGPFETDefinition.factory).toBeDefined();
-    expect(FGPFETDefinition.executeFn).toBeDefined();
+    expect(FGPFETDefinition.models.digital!.executeFn).toBeDefined();
     expect(FGPFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGPFETDefinition.defaultDelay).toBe("number");
+    expect(typeof FGPFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns FGPFETElement", () => {

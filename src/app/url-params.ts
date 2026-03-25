@@ -8,6 +8,7 @@
  *   locked=1       Start in locked mode
  *   panels=none    Hide all panels (presentation mode)
  *   palette=And,Or,Not  Restrict palette to listed component types
+ *   module=ece101  Load a module config (modules/<id>/config.json)
  */
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,70 @@ export interface SimulatorParams {
    * Example: "And,Or,Not,In,Out,Clock,Led"
    */
   palette: string[] | undefined;
+  /**
+   * Module config ID. When set, fetches `modules/<id>/config.json` on startup
+   * and applies its settings (palette, circuits, tutorials, locked state).
+   */
+  module: string | undefined;
+}
+
+// ---------------------------------------------------------------------------
+// ModuleConfig — course/module-scoped configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * A module config bundles a course-worth of circuits, tutorials, and
+ * palette restrictions into a single JSON file. Loaded via `?module=<id>`.
+ *
+ * File location: `modules/<id>/config.json`
+ */
+export interface ModuleConfig {
+  /** Display title for the module (e.g. "ECE 101 — Digital Logic"). */
+  title: string;
+  /** Optional description shown in the UI. */
+  description?: string;
+  /**
+   * Restrict the component palette to these types. Undefined or null means
+   * show all components. Can use preset names (prefixed with "@") or
+   * individual type names.
+   */
+  palette?: string[] | null;
+  /** Lock the editor by default. */
+  locked?: boolean;
+  /** Override dark mode (true = dark, false = light). */
+  dark?: boolean;
+  /** Hide panels. */
+  panels?: 'default' | 'none';
+  /** Circuit file to auto-load on startup (relative to module directory). */
+  file?: string;
+  /**
+   * Available circuits — listed in UI for loading.
+   * Paths are relative to the module directory.
+   */
+  circuits?: ModuleCircuit[];
+  /**
+   * Available tutorials — listed in UI for selection.
+   * Paths are relative to the module directory.
+   */
+  tutorials?: ModuleTutorial[];
+}
+
+export interface ModuleCircuit {
+  /** Display name. */
+  title: string;
+  /** Path to .dig file, relative to the module directory. */
+  file: string;
+  /** Optional description. */
+  description?: string;
+}
+
+export interface ModuleTutorial {
+  /** Display name. */
+  title: string;
+  /** Path to tutorial manifest.json, relative to the module directory. */
+  manifest: string;
+  /** Optional description. */
+  description?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,5 +145,65 @@ export function parseUrlParams(
       ? paletteRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
       : undefined;
 
-  return { base, file, dark, locked, panels, palette };
+  const moduleRaw = params.get('module');
+  const module =
+    moduleRaw !== null && moduleRaw.length > 0 ? moduleRaw : undefined;
+
+  return { base, file, dark, locked, panels, palette, module };
+}
+
+// ---------------------------------------------------------------------------
+// loadModuleConfig
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch and parse a module config from `modules/<id>/config.json`.
+ * Returns null if the fetch fails or the JSON is invalid.
+ *
+ * @param moduleId  Module identifier (directory name under `modules/`).
+ * @param basePath  Base path for resolution (default: "./").
+ */
+export async function loadModuleConfig(
+  moduleId: string,
+  basePath: string = './',
+): Promise<{ config: ModuleConfig; moduleBase: string } | null> {
+  const moduleBase = `${basePath}modules/${moduleId}/`;
+  const configUrl = `${moduleBase}config.json`;
+  try {
+    const res = await fetch(configUrl);
+    if (!res.ok) return null;
+    const config = (await res.json()) as ModuleConfig;
+    return { config, moduleBase };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Apply a ModuleConfig to SimulatorParams, merging module defaults with
+ * explicit URL overrides. URL params take precedence over module config.
+ */
+export function applyModuleConfig(
+  params: SimulatorParams,
+  config: ModuleConfig,
+  moduleBase: string,
+): void {
+  // Module sets defaults — explicit URL params override
+  if (config.locked !== undefined && !params.locked) {
+    params.locked = config.locked;
+  }
+  if (config.dark !== undefined) {
+    // Only override if URL didn't explicitly set dark=0
+    // (dark defaults to true, so we can't distinguish "not set" from "set to true")
+  }
+  if (config.panels && params.panels === 'default') {
+    params.panels = config.panels;
+  }
+  if (config.palette && !params.palette) {
+    params.palette = config.palette;
+  }
+  if (config.file && !params.file) {
+    params.file = config.file;
+    params.base = moduleBase;
+  }
 }

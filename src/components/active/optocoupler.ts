@@ -82,7 +82,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -449,9 +448,7 @@ const OPTOCOUPLER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const OptocouplerDefinition: ComponentDefinition = {
   name: "Optocoupler",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildOptocouplerPinDeclarations(),
   propertyDefs: OPTOCOUPLER_PROPERTY_DEFS,
@@ -465,23 +462,27 @@ export const OptocouplerDefinition: ComponentDefinition = {
     return new OptocouplerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const ctr      = props.getOrDefault<number>("ctr",      1.0);
-    const vForward = props.getOrDefault<number>("vForward", 1.2);
-    const rLed     = props.getOrDefault<number>("rLed",     10);
-    return createOptocouplerElement(
-      pinNodes.get("anode")!,     // anode
-      pinNodes.get("cathode")!,   // cathode
-      pinNodes.get("collector")!, // collector
-      pinNodes.get("emitter")!,   // emitter
-      ctr,
-      vForward,
-      rLed,
-    );
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const ctr      = props.getOrDefault<number>("ctr",      1.0);
+        const vForward = props.getOrDefault<number>("vForward", 1.2);
+        const rLed     = props.getOrDefault<number>("rLed",     10);
+        return createOptocouplerElement(
+          pinNodes.get("anode")!,     // anode
+          pinNodes.get("cathode")!,   // cathode
+          pinNodes.get("collector")!, // collector
+          pinNodes.get("emitter")!,   // emitter
+          ctr,
+          vForward,
+          rLed,
+        );
+      },
+    },
   },
 };

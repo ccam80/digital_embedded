@@ -71,7 +71,7 @@ function makeAcElement(
   let simTime = time;
   const getTime = () => simTime;
 
-  const el = AcVoltageSourceDefinition.analogFactory!(
+  const el = AcVoltageSourceDefinition.models!.analog!.factory(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
     [],
     branchIdx,
@@ -235,7 +235,7 @@ describe("Integration", () => {
     let simTime = 0;
     const getTime = () => simTime;
 
-    const acSrc = AcVoltageSourceDefinition.analogFactory!(
+    const acSrc = AcVoltageSourceDefinition.models!.analog!.factory(
       new Map([["pos", 1], ["neg", 0]]),
       [],
       2,
@@ -304,7 +304,7 @@ function makeExprElement(
   props.set("expression", exprText);
 
   let simTime = time;
-  const el = AcVoltageSourceDefinition.analogFactory!(
+  const el = AcVoltageSourceDefinition.models!.analog!.factory(
     new Map([["pos", 1], ["neg", 0]]),
     [],
     2,

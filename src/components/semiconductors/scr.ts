@@ -24,7 +24,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -499,9 +498,7 @@ function scrCircuitFactory(props: PropertyBag): ScrElement {
 export const ScrDefinition: ComponentDefinition = {
   name: "SCR",
   typeId: -1,
-  engineType: "analog",
   factory: scrCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildScrPinDeclarations(),
   propertyDefs: SCR_PROPERTY_DEFS,
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
@@ -510,6 +507,10 @@ export const ScrDefinition: ComponentDefinition = {
     "SCR — Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
     "Triggers when gate current raises α₁+α₂ above 0.95. Latches until I_AK < I_hold.",
-  analogDeviceType: "SCR",
-  analogFactory: createScrElement,
+  models: {
+    analog: {
+      factory: createScrElement,
+      deviceType: "SCR",
+    },
+  },
 };

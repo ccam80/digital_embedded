@@ -36,7 +36,7 @@ function makeVCVSElement(
     ["gain", gain],
     ["label", ""],
   ]).entries());
-  return VCVSDefinition.analogFactory!(
+  return VCVSDefinition.models!.analog!.factory(
     new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
     [],
     branchIdx,

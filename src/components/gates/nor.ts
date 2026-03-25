@@ -307,17 +307,16 @@ function norFactory(props: PropertyBag): NOrElement {
 export const NOrDefinition: ComponentDefinition = {
   name: "NOr",
   typeId: -1,
-  engineType: "both",
   factory: norFactory,
   executeFn: executeNOr,
   analogFactory: makeNorAnalogFactory(0),
   transistorModel: "CmosNor2",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NOR_PROPERTY_DEFS,
   attributeMap: NOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
   inputSchema: ["In_1", "In_2"],
   outputSchema: ["out"],
   helpText:
@@ -325,4 +324,16 @@ export const NOrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with ≥1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  models: {
+    digital: {
+      executeFn: executeNOr,
+      inputSchema: ["In_1", "In_2"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeNorAnalogFactory(0),
+      transistorModel: "CmosNor2",
+    },
+  },
+  defaultModel: "digital",
 };

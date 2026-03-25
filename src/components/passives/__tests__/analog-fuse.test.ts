@@ -340,16 +340,16 @@ describe("AnalogFuseElement", () => {
 
   describe("unified FuseDefinition", () => {
     it("FuseDefinition engineType is 'both'", () => {
-      expect(FuseDefinition.engineType).toBe("both");
+      expect(FuseDefinition.models?.analog).toBeDefined();
     });
 
     it("FuseDefinition has analogFactory", () => {
-      expect(FuseDefinition.analogFactory).toBeDefined();
-      expect(typeof FuseDefinition.analogFactory).toBe("function");
+      expect(FuseDefinition.models?.analog?.factory).toBeDefined();
+      expect(typeof FuseDefinition.models?.analog?.factory).toBe("function");
     });
 
     it("FuseDefinition has switchPins for bus resolver", () => {
-      expect((FuseDefinition as any).switchPins).toEqual([0, 1]);
+      expect(FuseDefinition.models?.digital?.switchPins).toEqual([0, 1]);
     });
 
     it("FuseDefinition has analog properties (rCold, i2tRating)", () => {

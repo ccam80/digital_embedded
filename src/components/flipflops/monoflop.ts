@@ -244,16 +244,24 @@ export const MonoflopDefinition: ComponentDefinition = {
   factory: monoflopFactory,
   executeFn: executeMonoflop,
   sampleFn: sampleMonoflop,
+  stateSlotCount: 3,
+  defaultDelay: 10,
   pinLayout: MONOFLOP_PIN_DECLARATIONS,
   propertyDefs: MONOFLOP_PROPERTY_DEFS,
   attributeMap: MONOFLOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
-  inputSchema: ["C", "R"],
-  outputSchema: ["Q", "~Q"],
   helpText:
     "Monoflop — monostable multivibrator.\n" +
     "On rising edge of C: Q goes high for timerDelay clock cycles, then returns low.\n" +
     "R (reset) immediately forces Q=0 and cancels any active pulse.",
-  stateSlotCount: 3,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeMonoflop,
+      sampleFn: sampleMonoflop,
+      inputSchema: ["C", "R"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 3,
+      defaultDelay: 10,
+    },
+  },
 };

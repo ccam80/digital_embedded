@@ -8,6 +8,7 @@
 
 import type { Point } from "./renderer-interface.js";
 import type { Pin } from "./pin.js";
+import { pinWorldPosition } from "./pin.js";
 import type { CircuitElement } from "./element.js";
 import type { LogicFamilyConfig } from "./logic-family.js";
 
@@ -234,9 +235,8 @@ export class Circuit {
     }
     for (const el of this.elements) {
       for (const pin of el.getPins()) {
-        const wx = el.position.x + pin.position.x;
-        const wy = el.position.y + pin.position.y;
-        points.add(`${wx},${wy}`);
+        const wp = pinWorldPosition(el, pin);
+        points.add(`${wp.x},${wp.y}`);
       }
     }
 

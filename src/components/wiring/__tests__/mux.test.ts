@@ -315,7 +315,7 @@ describe("Multiplexer", () => {
     });
 
     it("MuxDefinition has executeFn=executeMux", () => {
-      expect(MuxDefinition.executeFn).toBe(executeMux);
+      expect(MuxDefinition.models.digital!.executeFn).toBe(executeMux);
     });
 
     it("MuxDefinition has a non-empty pinLayout", () => {

@@ -281,20 +281,24 @@ function relayDTFactory(props: PropertyBag): RelayDTElement {
 export const RelayDTDefinition: ComponentDefinition = {
   name: "RelayDT",
   typeId: -1,
-  engineType: "both",
   factory: relayDTFactory,
-  executeFn: executeRelayDT,
   pinLayout: buildRelayDTPins(1, 1),
   propertyDefs: RELAY_DT_PROPERTY_DEFS,
   attributeMap: RELAY_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  // Schema for default poles=1; direction-filter order matches for all pole counts.
-  inputSchema: ["in1", "in2"],
-  outputSchema: ["A1", "B1", "C1"],
   helpText: "RelayDT (SPDT) — coil-controlled double-throw contact switch. C connects to T when energised, R when de-energised.",
-  stateSlotCount: 1,
   defaultDelay: 0,
-  switchPins: [2, 3],
-  analogFactory: createRelayDTAnalogElement,
-  simulationModes: ["analog-internals", "logical"],
+  models: {
+    digital: {
+      executeFn: executeRelayDT,
+      inputSchema: ["in1", "in2"],
+      outputSchema: ["A1", "B1", "C1"],
+      stateSlotCount: 1,
+      switchPins: [2, 3],
+    },
+    analog: {
+      factory: createRelayDTAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

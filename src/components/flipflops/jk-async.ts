@@ -239,22 +239,31 @@ export const JKAsyncDefinition: ComponentDefinition = {
   typeId: -1,
   factory: jkAsyncFactory,
   executeFn: executeJKAsync,
+  stateSlotCount: 2,
+  defaultDelay: 10,
+  engineType: "both",
+  analogFactory: makeJKAsyncFlipflopAnalogFactory(),
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
   pinLayout: JK_FF_AS_PIN_DECLARATIONS,
   propertyDefs: JK_FF_AS_PROPERTY_DEFS,
   attributeMap: JK_FF_AS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
-  // executeJKAsync reads: inBase+0=Set, inBase+1=J, inBase+2=C, inBase+3=K, inBase+4=Clr
-  // writes: outBase+0=Q, outBase+1=~Q
-  inputSchema: ["Set", "J", "C", "K", "Clr"],
-  outputSchema: ["Q", "~Q"],
   helpText:
     "JK Flip-Flop with async Set/Clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
-  engineType: "both",
-  analogFactory: makeJKAsyncFlipflopAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
+  models: {
+    digital: {
+      executeFn: executeJKAsync,
+      inputSchema: ["Set", "J", "C", "K", "Clr"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeJKAsyncFlipflopAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

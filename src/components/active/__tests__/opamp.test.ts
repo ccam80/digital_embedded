@@ -61,7 +61,7 @@ function makeOpAmp(opts: {
     ["gain", gain],
     ["rOut", rOut],
   ]);
-  return OpAmpDefinition.analogFactory!(
+  return OpAmpDefinition.models!.analog!.factory(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
     [],
     -1,
@@ -201,7 +201,7 @@ describe("OpAmp", () => {
     const matrixSize = 9;
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = OpAmpDefinition.analogFactory!(
+    const opampEl = OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     );
 
@@ -275,7 +275,7 @@ describe("Integration", () => {
     const matrixSize = 10;
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = OpAmpDefinition.analogFactory!(
+    const opampEl = OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     );
 
@@ -315,7 +315,7 @@ describe("Integration", () => {
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
     // in- and out share nFeedback (voltage follower)
-    const opampEl = OpAmpDefinition.analogFactory!(
+    const opampEl = OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
     );
 

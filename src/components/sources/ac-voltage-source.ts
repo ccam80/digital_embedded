@@ -25,7 +25,6 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import { formatSI } from "../../editor/si-format.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -532,10 +531,7 @@ function createAcVoltageSourceElement(
 export const AcVoltageSourceDefinition: ComponentDefinition = {
   name: "AcVoltageSource",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.SOURCES,
-  executeFn: noOpAnalogExecuteFn,
-  requiresBranchRow: true,
 
   pinLayout: AC_VOLTAGE_SOURCE_PIN_LAYOUT,
   propertyDefs: AC_VOLTAGE_SOURCE_PROPERTY_DEFS,
@@ -547,13 +543,18 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
     return new AcVoltageSourceElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-    getTime: () => number,
-  ): AnalogElementCore {
-    return createAcVoltageSourceElement(pinNodes, internalNodeIds, branchIdx, props, getTime);
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+        getTime: () => number,
+      ): AnalogElementCore {
+        return createAcVoltageSourceElement(pinNodes, internalNodeIds, branchIdx, props, getTime);
+      },
+    },
   },
 };

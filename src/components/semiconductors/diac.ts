@@ -23,7 +23,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -383,9 +382,7 @@ function diacCircuitFactory(props: PropertyBag): DiacElement {
 export const DiacDefinition: ComponentDefinition = {
   name: "Diac",
   typeId: -1,
-  engineType: "analog",
   factory: diacCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildDiacPinDeclarations(),
   propertyDefs: DIAC_PROPERTY_DEFS,
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
@@ -394,6 +391,10 @@ export const DiacDefinition: ComponentDefinition = {
     "Diac — bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > V_breakover, then snaps to V_hold.",
-  analogDeviceType: "DIAC",
-  analogFactory: createDiacElement,
+  models: {
+    analog: {
+      factory: createDiacElement,
+      deviceType: "DIAC",
+    },
+  },
 };

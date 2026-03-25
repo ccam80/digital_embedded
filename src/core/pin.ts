@@ -44,6 +44,21 @@ export interface PinDeclaration {
 }
 
 /**
+ * A fully resolved pin — produced once per component instance during compilation.
+ * Carries identity, geometry, and electrical binding in a single object.
+ * The array of ResolvedPins is always in `pinLayout` order.
+ */
+export interface ResolvedPin {
+  readonly label: string;
+  readonly direction: PinDirection;
+  readonly localPosition: { x: number; y: number };
+  readonly worldPosition: { x: number; y: number };
+  readonly wireVertex: { x: number; y: number } | null;
+  readonly nodeId: number;
+  readonly bitWidth: number;
+}
+
+/**
  * Per-pin inversion configuration as stored in .dig files.
  * A set of pin labels whose inversion bubble is active.
  */
@@ -104,8 +119,8 @@ export type Rotation = 0 | 1 | 2 | 3;
  * Rotate a point by the given rotation around the origin.
  *
  * Digital's coordinate system has y increasing downward.
- * Quarter-turn clockwise maps (x, y) → (y, -x) in standard math,
- * but with y-down: (x, y) → (-y, x).
+ * Quarter-turn clockwise maps (x, y) → (-y, x) in standard math,
+ * but with y-down: (x, y) → (y, -x).
  * Applied four times returns to the original.
  *
  * Mapping for each rotation value:

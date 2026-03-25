@@ -46,7 +46,7 @@ function makeCCCSElement(
     ["currentGain", gain],
     ["label", ""],
   ]).entries());
-  return CCCSDefinition.analogFactory!(
+  return CCCSDefinition.models!.analog!.factory(
     new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
     [],
     senseBranchIdx,

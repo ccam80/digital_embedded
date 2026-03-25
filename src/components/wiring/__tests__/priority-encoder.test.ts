@@ -308,7 +308,7 @@ describe("PriorityEncoder", () => {
     });
 
     it("PriorityEncoderDefinition has executeFn=executePriorityEncoder", () => {
-      expect(PriorityEncoderDefinition.executeFn).toBe(executePriorityEncoder);
+      expect(PriorityEncoderDefinition.models.digital!.executeFn).toBe(executePriorityEncoder);
     });
 
     it("PriorityEncoderDefinition has non-empty pinLayout", () => {

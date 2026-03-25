@@ -376,24 +376,28 @@ function switchFactory(props: PropertyBag): SwitchElement {
 export const SwitchDefinition: ComponentDefinition = {
   name: "Switch",
   typeId: -1,
-  engineType: "both",
   factory: switchFactory,
-  executeFn: executeSwitch,
   pinLayout: buildPinDeclarations(1, 1),
   propertyDefs: SWITCH_PROPERTY_DEFS,
   attributeMap: SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  // Schema for default poles=1; direction-filter order matches for all pole counts.
-  inputSchema: [],
-  outputSchema: ["A1", "B1"],
   helpText:
     "Switch (SPST) — a manually controlled single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",
   defaultDelay: 0,
-  stateSlotCount: 1,
-  switchPins: [0, 1],
-  analogFactory: createSwitchAnalogElement,
-  simulationModes: ["analog-internals", "logical"],
+  models: {
+    digital: {
+      executeFn: executeSwitch,
+      inputSchema: [],
+      outputSchema: ["A1", "B1"],
+      stateSlotCount: 1,
+      switchPins: [0, 1],
+    },
+    analog: {
+      factory: createSwitchAnalogElement,
+    },
+  },
+  defaultModel: "digital",
 };

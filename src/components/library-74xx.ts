@@ -203,7 +203,6 @@ export function register74xxLibrary(
           `74xx component "${entry.name}" must be loaded from "${entry.file}" before placement.`,
         );
       },
-      executeFn: executeSubcircuit,
       pinLayout: pinMap?.get(entry.name) ?? [],
       propertyDefs: [
         {
@@ -223,6 +222,7 @@ export function register74xxLibrary(
       ],
       category: ComponentCategory.SEVENTY_FOUR_XX,
       helpText: `${entry.name}: ${entry.description}`,
+      models: { digital: { executeFn: executeSubcircuit } },
     };
 
     registry.register(componentDef);
@@ -278,12 +278,12 @@ export function register74xxSubcircuit(
         props,
         definition,
       ),
-    executeFn: executeSubcircuit,
     pinLayout: definition.pinLayout,
     propertyDefs,
     attributeMap,
     category: ComponentCategory.SEVENTY_FOUR_XX,
     helpText: `${name}: ${description}`,
+    models: { digital: { executeFn: executeSubcircuit } },
   };
 
   registry.registerOrUpdate(componentDef);

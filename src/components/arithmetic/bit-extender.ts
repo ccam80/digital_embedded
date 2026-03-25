@@ -134,13 +134,17 @@ export const BitExtenderDefinition: ComponentDefinition = {
   name: "BitExtender",
   typeId: -1,
   factory: (props) => new BitExtenderElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-  executeFn: executeBitExtender,
   pinLayout: buildBitExtenderPinDeclarations(4, 8),
   propertyDefs: BIT_EXTENDER_PROPERTY_DEFS,
   attributeMap: BIT_EXTENDER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText: "BitExtender — sign-extends the input from inputBits to outputBits.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeBitExtender,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+      defaultDelay: 10,
+    },
+  },
 };

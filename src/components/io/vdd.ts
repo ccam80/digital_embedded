@@ -149,15 +149,15 @@ export const VddDefinition: ComponentDefinition = {
   name: "VDD",
   typeId: -1,
   factory: vddFactory,
-  executeFn: executeVdd,
   pinLayout: buildVddPinDeclarations(1),
   propertyDefs: VDD_PROPERTY_DEFS,
   attributeMap: VDD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "VDD — always outputs logic 1 (all bits set).\n" +
     "Connects the net to the supply voltage in the simulation.\n" +
     "Configurable bit width.",
+  models: {
+    digital: { executeFn: executeVdd, inputSchema: [], outputSchema: ["out"] },
+  },
 };

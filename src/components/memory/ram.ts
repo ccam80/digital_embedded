@@ -329,17 +329,21 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
   name: "RAMSinglePort",
   typeId: -1,
   factory: ramSinglePortFactory,
-  executeFn: executeRAMSinglePort,
-  sampleFn: sampleRAMSinglePort,
   pinLayout: buildRAMSinglePortPins(4, 8),
   propertyDefs: RAM_SINGLE_PORT_PROPERTY_DEFS,
   attributeMap: RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "str", "C", "ld"],
-  outputSchema: ["D"],
   helpText: "RAMSinglePort — synchronous RAM with a single read/write port.",
-  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRAMSinglePort,
+      sampleFn: sampleRAMSinglePort,
+      inputSchema: ["A", "str", "C", "ld"],
+      outputSchema: ["D"],
+      stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -449,16 +453,20 @@ export const RAMSinglePortSelDefinition: ComponentDefinition = {
   name: "RAMSinglePortSel",
   typeId: -1,
   factory: ramSinglePortSelFactory,
-  executeFn: executeRAMSinglePortSel,
   pinLayout: buildRAMSinglePortSelPins(4, 8),
   propertyDefs: RAM_SINGLE_PORT_SEL_PROPERTY_DEFS,
   attributeMap: RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "CS", "WE", "OE"],
-  outputSchema: ["D"],
   helpText: "RAMSinglePortSel — combinational RAM with chip select (CS/WE/OE).",
-  stateSlotCount: 0,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRAMSinglePortSel,
+      inputSchema: ["A", "CS", "WE", "OE"],
+      outputSchema: ["D"],
+      stateSlotCount: 0,
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -580,17 +588,21 @@ export const RAMDualPortDefinition: ComponentDefinition = {
   name: "RAMDualPort",
   typeId: -1,
   factory: ramDualPortFactory,
-  executeFn: executeRAMDualPort,
-  sampleFn: sampleRAMDualPort,
   pinLayout: buildRAMDualPortPins(4, 8),
   propertyDefs: RAM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "Din", "str", "C", "ld"],
-  outputSchema: ["D"],
   helpText: "RAMDualPort — synchronous RAM with separate read/write address buses.",
-  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRAMDualPort,
+      sampleFn: sampleRAMDualPort,
+      inputSchema: ["A", "Din", "str", "C", "ld"],
+      outputSchema: ["D"],
+      stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -713,17 +725,21 @@ export const RAMDualAccessDefinition: ComponentDefinition = {
   name: "RAMDualAccess",
   typeId: -1,
   factory: ramDualAccessFactory,
-  executeFn: executeRAMDualAccess,
-  sampleFn: sampleRAMDualAccess,
   pinLayout: buildRAMDualAccessPins(4, 8),
   propertyDefs: RAM_DUAL_ACCESS_PROPERTY_DEFS,
   attributeMap: RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["str", "C", "ld", "1A", "1Din", "2A"],
-  outputSchema: ["1D", "2D"],
   helpText: "RAMDualAccess — RAM with two independent access ports (one sync, one async read).",
-  stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRAMDualAccess,
+      sampleFn: sampleRAMDualAccess,
+      inputSchema: ["str", "C", "ld", "1A", "1Din", "2A"],
+      outputSchema: ["1D", "2D"],
+      stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -818,16 +834,20 @@ export const RAMAsyncDefinition: ComponentDefinition = {
   name: "RAMAsync",
   typeId: -1,
   factory: ramAsyncFactory,
-  executeFn: executeRAMAsync,
   pinLayout: buildRAMAsyncPins(4, 8),
   propertyDefs: RAM_ASYNC_PROPERTY_DEFS,
   attributeMap: RAM_ASYNC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "D", "we"],
-  outputSchema: ["Q"],
   helpText: "RAMAsync — fully asynchronous RAM. Combinational read, write-enable driven write.",
-  stateSlotCount: 0,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeRAMAsync,
+      inputSchema: ["A", "D", "we"],
+      outputSchema: ["Q"],
+      stateSlotCount: 0,
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -942,15 +962,19 @@ export const BlockRAMDualPortDefinition: ComponentDefinition = {
   name: "BlockRAMDualPort",
   typeId: -1,
   factory: blockRAMDualPortFactory,
-  executeFn: executeBlockRAMDualPort,
-  sampleFn: sampleBlockRAMDualPort,
   pinLayout: buildBlockRAMDualPortPins(4, 8),
   propertyDefs: BLOCK_RAM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "Din", "str", "C"],
-  outputSchema: ["D"],
   helpText: "BlockRAMDualPort — synchronous read block RAM suitable for FPGA block RAM inference.",
-  stateSlotCount: (props) => 2 + (1 << (props.getOrDefault<number>("addrBits", 4))),
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeBlockRAMDualPort,
+      sampleFn: sampleBlockRAMDualPort,
+      inputSchema: ["A", "Din", "str", "C"],
+      outputSchema: ["D"],
+      stateSlotCount: (props) => 2 + (1 << (props.getOrDefault<number>("addrBits", 4))),
+      defaultDelay: 10,
+    },
+  },
 };

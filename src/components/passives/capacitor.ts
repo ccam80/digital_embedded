@@ -260,9 +260,7 @@ function capacitorCircuitFactory(props: PropertyBag): CapacitorElement {
 export const CapacitorDefinition: ComponentDefinition = {
   name: "Capacitor",
   typeId: -1,
-  engineType: "analog",
   factory: capacitorCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildCapacitorPinDeclarations(),
   propertyDefs: CAPACITOR_PROPERTY_DEFS,
   attributeMap: CAPACITOR_ATTRIBUTE_MAPPINGS,
@@ -270,5 +268,9 @@ export const CapacitorDefinition: ComponentDefinition = {
   helpText:
     "Capacitor — reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
-  analogFactory: createCapacitorElement,
+  models: {
+    analog: {
+      factory: createCapacitorElement,
+    },
+  },
 };

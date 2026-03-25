@@ -315,17 +315,16 @@ function xnorFactory(props: PropertyBag): XNOrElement {
 export const XNOrDefinition: ComponentDefinition = {
   name: "XNOr",
   typeId: -1,
-  engineType: "both",
   factory: xnorFactory,
   executeFn: executeXNOr,
   analogFactory: makeXnorAnalogFactory(0),
   transistorModel: "CmosXnor2",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XNOR_PROPERTY_DEFS,
   attributeMap: XNOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
   inputSchema: ["In_1", "In_2"],
   outputSchema: ["out"],
   helpText:
@@ -333,4 +332,16 @@ export const XNOrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with =1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  models: {
+    digital: {
+      executeFn: executeXNOr,
+      inputSchema: ["In_1", "In_2"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeXnorAnalogFactory(0),
+      transistorModel: "CmosXnor2",
+    },
+  },
+  defaultModel: "digital",
 };

@@ -209,15 +209,15 @@ export const RotaryEncoderDefinition: ComponentDefinition = {
   name: "RotEncoder",
   typeId: -1,
   factory: rotaryEncoderFactory,
-  executeFn: executeRotaryEncoder,
   pinLayout: buildRotaryEncoderPinDeclarations(),
   propertyDefs: ROTARY_ENCODER_PROPERTY_DEFS,
   attributeMap: ROTARY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["A", "B"],
   helpText:
     "RotEncoder — rotary encoder with quadrature output.\n" +
     "Outputs A and B follow a Gray-code quadrature sequence.\n" +
     "Interactive: user rotates the encoder by clicking CW or CCW.",
+  models: {
+    digital: { executeFn: executeRotaryEncoder, inputSchema: [], outputSchema: ["A", "B"] },
+  },
 };

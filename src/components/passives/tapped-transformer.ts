@@ -559,9 +559,7 @@ function tappedTransformerCircuitFactory(props: PropertyBag): TappedTransformerE
 export const TappedTransformerDefinition: ComponentDefinition = {
   name: "TappedTransformer",
   typeId: -1,
-  engineType: "analog",
   factory: tappedTransformerCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildTappedTransformerPinDeclarations(),
   propertyDefs: TAPPED_TRANSFORMER_PROPERTY_DEFS,
   attributeMap: TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS,
@@ -569,6 +567,10 @@ export const TappedTransformerDefinition: ComponentDefinition = {
   helpText:
     "Center-tapped three-winding transformer using 3×3 coupled inductor companion model.\n" +
     "Specify total turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
-  analogFactory: createTappedTransformerElement,
-  requiresBranchRow: true,
+  models: {
+    analog: {
+      factory: createTappedTransformerElement,
+      requiresBranchRow: true,
+    },
+  },
 };

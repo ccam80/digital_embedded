@@ -201,9 +201,10 @@ export function getJavaPinPositions(
 
     // --- Diodes ---
     case "Diode":
+      // Analog diode: anode (A) on left, cathode (K) on right (horizontal)
       return [
-        { label: "out1", x: 0, y: 0 },
-        { label: "out2", x: 0, y: -1 },
+        { label: "A", x: 0, y: 0 },
+        { label: "K", x: 4, y: 0 },
       ];
     case "DiodeBackward":
       return [

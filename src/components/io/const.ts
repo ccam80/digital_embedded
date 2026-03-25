@@ -168,15 +168,15 @@ export const ConstDefinition: ComponentDefinition = {
   name: "Const",
   typeId: -1,
   factory: constFactory,
-  executeFn: executeConst,
   pinLayout: buildConstPinDeclarations(1),
   propertyDefs: CONST_PROPERTY_DEFS,
   attributeMap: CONST_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "Const — constant value source.\n" +
     "Outputs a fixed value on every simulation step.\n" +
     "Configurable bit width and constant value.",
+  models: {
+    digital: { executeFn: executeConst, inputSchema: [], outputSchema: ["out"] },
+  },
 };

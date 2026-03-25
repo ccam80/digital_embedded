@@ -256,17 +256,21 @@ export const MulDefinition: ComponentDefinition = {
   name: "Mul",
   typeId: -1,
   factory: mulFactory,
-  executeFn: executeMul,
   pinLayout: buildMulPinDeclarations(1),
   propertyDefs: MUL_PROPERTY_DEFS,
   attributeMap: MUL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["a", "b"],
-  outputSchema: ["mul"],
   helpText:
     "Mul — N-bit multiplier producing a 2N-bit product.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +
     "Output: mul (2*bitWidth-bit product).\n" +
     "Supports signed and unsigned modes.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeMul,
+      inputSchema: ["a", "b"],
+      outputSchema: ["mul"],
+      defaultDelay: 10,
+    },
+  },
 };

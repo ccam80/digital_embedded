@@ -20,7 +20,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -213,10 +212,7 @@ export function makeDcVoltageSource(
 export const DcVoltageSourceDefinition: ComponentDefinition = {
   name: "DcVoltageSource",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.SOURCES,
-  executeFn: noOpAnalogExecuteFn,
-  requiresBranchRow: true,
 
   pinLayout: DC_VOLTAGE_SOURCE_PIN_LAYOUT,
   propertyDefs: DC_VOLTAGE_SOURCE_PROPERTY_DEFS,
@@ -234,13 +230,18 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
     );
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const voltage = (props.has("voltage") ? props.get<number>("voltage") : 5) ?? 5;
-    return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const voltage = (props.has("voltage") ? props.get<number>("voltage") : 5) ?? 5;
+        return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
+      },
+    },
   },
 };

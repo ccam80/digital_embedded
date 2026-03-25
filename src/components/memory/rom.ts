@@ -248,16 +248,20 @@ export const ROMDefinition: ComponentDefinition = {
   name: "ROM",
   typeId: -1,
   factory: romFactory,
-  executeFn: executeROM,
   pinLayout: buildROMPins(4, 8),
   propertyDefs: ROM_PROPERTY_DEFS,
   attributeMap: ROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "sel"],
-  outputSchema: ["D"],
   helpText: "ROM — read-only memory. If sel=1, output D = memory[A].",
-  stateSlotCount: 0,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeROM,
+      inputSchema: ["A", "sel"],
+      outputSchema: ["D"],
+      stateSlotCount: 0,
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -382,14 +386,18 @@ export const ROMDualPortDefinition: ComponentDefinition = {
   name: "ROMDualPort",
   typeId: -1,
   factory: romDualPortFactory,
-  executeFn: executeROMDualPort,
   pinLayout: buildROMDualPortPins(4, 8),
   propertyDefs: ROM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A1", "s1", "A2", "s2"],
-  outputSchema: ["D1", "D2"],
   helpText: "ROMDualPort — dual-port read-only memory with two independent read ports.",
-  stateSlotCount: 0,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeROMDualPort,
+      inputSchema: ["A1", "s1", "A2", "s2"],
+      outputSchema: ["D1", "D2"],
+      stateSlotCount: 0,
+      defaultDelay: 10,
+    },
+  },
 };

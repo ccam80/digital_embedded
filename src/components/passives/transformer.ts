@@ -479,9 +479,7 @@ function transformerCircuitFactory(props: PropertyBag): TransformerElement {
 export const TransformerDefinition: ComponentDefinition = {
   name: "Transformer",
   typeId: -1,
-  engineType: "analog",
   factory: transformerCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildTransformerPinDeclarations(),
   propertyDefs: TRANSFORMER_PROPERTY_DEFS,
   attributeMap: TRANSFORMER_ATTRIBUTE_MAPPINGS,
@@ -489,6 +487,10 @@ export const TransformerDefinition: ComponentDefinition = {
   helpText:
     "Two-winding transformer using coupled inductor companion model.\n" +
     "Specify turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
-  analogFactory: createTransformerElement,
-  requiresBranchRow: true,
+  models: {
+    analog: {
+      factory: createTransformerElement,
+      requiresBranchRow: true,
+    },
+  },
 };

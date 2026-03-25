@@ -25,7 +25,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -618,9 +617,7 @@ function pnpCircuitFactory(props: PropertyBag): PnpBjtElement {
 export const NpnBjtDefinition: ComponentDefinition = {
   name: "NpnBJT",
   typeId: -1,
-  engineType: "analog",
   factory: npnCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildNpnPinDeclarations(),
   propertyDefs: BJT_PROPERTY_DEFS,
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
@@ -629,17 +626,19 @@ export const NpnBjtDefinition: ComponentDefinition = {
     "NPN BJT — Gummel-Poon Level 2 bipolar junction transistor.\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
-  analogDeviceType: "NPN",
-  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(1, pinNodes, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(1, pinNodes, branchIdx, props),
+      deviceType: "NPN",
+    },
+  },
 };
 
 export const PnpBjtDefinition: ComponentDefinition = {
   name: "PnpBJT",
   typeId: -1,
-  engineType: "analog",
   factory: pnpCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildPnpPinDeclarations(),
   propertyDefs: BJT_PROPERTY_DEFS,
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
@@ -648,7 +647,11 @@ export const PnpBjtDefinition: ComponentDefinition = {
     "PNP BJT — Gummel-Poon Level 2 bipolar junction transistor (PNP polarity).\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
-  analogDeviceType: "PNP",
-  analogFactory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(-1, pinNodes, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(-1, pinNodes, branchIdx, props),
+      deviceType: "PNP",
+    },
+  },
 };

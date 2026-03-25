@@ -524,7 +524,6 @@ export function registerSubcircuit(
         props,
         definition,
       ),
-    executeFn: executeSubcircuit,
     pinLayout: definition.pinLayout,
     propertyDefs,
     attributeMap,
@@ -533,6 +532,7 @@ export function registerSubcircuit(
       `Subcircuit: ${name}\n` +
       `Pins: ${definition.pinLayout.length} interface pins derived from In/Out components.\n` +
       "This component is flattened into its constituent gates before simulation.",
+    models: { digital: { executeFn: executeSubcircuit } },
   };
 
   registry.registerOrUpdate(componentDef);

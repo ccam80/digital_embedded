@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__circuit_simulator__",
-      "Circuit-simulator"
+      "Circuit-simulator",
+      "Read"
     ]
   }
 }

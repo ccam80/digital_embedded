@@ -23,7 +23,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -391,9 +390,7 @@ function varactorCircuitFactory(props: PropertyBag): VaractorElement {
 export const VaractorDefinition: ComponentDefinition = {
   name: "VaractorDiode",
   typeId: -1,
-  engineType: "analog",
   factory: varactorCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildVaractorPinDeclarations(),
   propertyDefs: VARACTOR_PROPERTY_DEFS,
   attributeMap: VARACTOR_ATTRIBUTE_MAPPINGS,
@@ -402,6 +399,10 @@ export const VaractorDefinition: ComponentDefinition = {
     "Varactor Diode — voltage-controlled junction capacitance.\n" +
     "C_j(V_R) = CJO / (1 + V_R/VJ)^M\n" +
     "Used for voltage-controlled oscillators and tuned circuits.",
-  analogDeviceType: "D",
-  analogFactory: createVaractorElement,
+  models: {
+    analog: {
+      factory: createVaractorElement,
+      deviceType: "D",
+    },
+  },
 };

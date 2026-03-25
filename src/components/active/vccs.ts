@@ -42,7 +42,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -346,9 +345,7 @@ const VCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const VCCSDefinition: ComponentDefinition = {
   name: "VCCS",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildVCCSPinDeclarations(),
   propertyDefs: VCCS_PROPERTY_DEFS,
@@ -362,21 +359,25 @@ export const VCCSDefinition: ComponentDefinition = {
     return new VCCSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const expression = props.getOrDefault<string>("expression", "V(ctrl)");
-    const transconductance = props.getOrDefault<number>("transconductance", 0.001);
-    return new VCCSAnalogElement(
-      pinNodes.get("ctrl+")!, // ctrl+
-      pinNodes.get("ctrl-")!, // ctrl-
-      pinNodes.get("out+")!,  // out+
-      pinNodes.get("out-")!,  // out-
-      expression,
-      transconductance,
-    );
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const expression = props.getOrDefault<string>("expression", "V(ctrl)");
+        const transconductance = props.getOrDefault<number>("transconductance", 0.001);
+        return new VCCSAnalogElement(
+          pinNodes.get("ctrl+")!, // ctrl+
+          pinNodes.get("ctrl-")!, // ctrl-
+          pinNodes.get("out+")!,  // out+
+          pinNodes.get("out-")!,  // out-
+          expression,
+          transconductance,
+        );
+      },
+    },
   },
 };

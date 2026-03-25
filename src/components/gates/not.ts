@@ -226,12 +226,12 @@ function notFactory(props: PropertyBag): NotElement {
 export const NotDefinition: ComponentDefinition = {
   name: "Not",
   typeId: -1,
-  engineType: "both",
   factory: notFactory,
   executeFn: executeNot,
   analogFactory: makeNotAnalogFactory(),
   transistorModel: "CmosInverter",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(1, false),
   propertyDefs: NOT_PROPERTY_DEFS,
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,
@@ -242,4 +242,16 @@ export const NotDefinition: ComponentDefinition = {
     "Not gate — performs bitwise NOT (inversion) of the input.\n" +
     "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
+  models: {
+    digital: {
+      executeFn: executeNot,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeNotAnalogFactory(),
+      transistorModel: "CmosInverter",
+    },
+  },
+  defaultModel: "digital",
 };

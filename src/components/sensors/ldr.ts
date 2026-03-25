@@ -357,9 +357,7 @@ function ldrCircuitFactory(props: PropertyBag): LDRCircuitElement {
 export const LDRDefinition: ComponentDefinition = {
   name: "LDR",
   typeId: -1,
-  engineType: "analog",
   factory: ldrCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildLDRPinDeclarations(),
   propertyDefs: LDR_PROPERTY_DEFS,
   attributeMap: LDR_ATTRIBUTE_MAPPINGS,
@@ -367,6 +365,5 @@ export const LDRDefinition: ComponentDefinition = {
   helpText:
     "LDR (Light Dependent Resistor) — resistance varies with illumination. " +
     "Power-law model: R = R_dark × (lux / lux_ref)^(-γ).",
-  analogFactory: createLDRElement,
-  requiresBranchRow: false,
+  models: { analog: { factory: createLDRElement } },
 };

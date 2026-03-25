@@ -250,7 +250,7 @@ describe("SparkGap", () => {
 
   describe("definition", () => {
     it("SparkGapDefinition has engine type analog", () => {
-      expect(SparkGapDefinition.engineType).toBe("analog");
+      expect(SparkGapDefinition.models?.analog).toBeDefined();
     });
 
     it("SparkGapDefinition has correct category", () => {
@@ -272,7 +272,7 @@ describe("SparkGap", () => {
     });
 
     it("requiresBranchRow is false", () => {
-      expect(SparkGapDefinition.requiresBranchRow).toBeFalsy();
+      expect(SparkGapDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
     });
   });
 });

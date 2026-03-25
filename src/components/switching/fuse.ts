@@ -420,22 +420,27 @@ function fuseFactory(props: PropertyBag): FuseElement {
 export const FuseDefinition: ComponentDefinition = {
   name: "Fuse",
   typeId: -1,
-  engineType: "both",
-  simulationModes: ["analog-internals", "logical"],
   factory: fuseFactory,
-  executeFn: executeFuse,
   pinLayout: FUSE_PIN_DECLARATIONS,
   propertyDefs: FUSE_PROPERTY_DEFS,
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  inputSchema: [],
-  outputSchema: ["out1", "out2"],
   helpText:
     "Fuse — one-time irreversible switch with I²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +
     "Simplified: blows when accumulated I²t exceeds the rating.",
-  stateSlotCount: 1,
-  switchPins: [0, 1],
   defaultDelay: 0,
-  analogFactory: createAnalogFuseElement,
+  models: {
+    digital: {
+      executeFn: executeFuse,
+      inputSchema: [],
+      outputSchema: ["out1", "out2"],
+      stateSlotCount: 1,
+      switchPins: [0, 1],
+    },
+    analog: {
+      factory: createAnalogFuseElement,
+    },
+  },
+  defaultModel: "digital",
 };

@@ -311,17 +311,17 @@ export const ScopeDefinition: ComponentDefinition = {
   name: "Scope",
   typeId: -1,
   factory: scopeFactory,
-  executeFn: executeScope,
   pinLayout: buildScopePinDeclarations(1, 1),
   propertyDefs: SCOPE_PROPERTY_DEFS,
   attributeMap: SCOPE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  // Schema for default channelCount=1; direction-filter order matches for all channelCounts.
-  inputSchema: ["clk"],
-  outputSchema: [],
   helpText:
     "Scope — multi-channel waveform recorder.\n" +
     "Records signal values over time. Waveform displayed in a floating panel.\n" +
     "channelCount: number of input channels (1–8).\n" +
     "timeScale: horizontal time scale factor.",
+  models: {
+    // Schema for default channelCount=1; direction-filter order matches for all channelCounts.
+    digital: { executeFn: executeScope, inputSchema: ["clk"], outputSchema: [] },
+  },
 };

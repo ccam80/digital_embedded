@@ -164,7 +164,7 @@ describe("LDR", () => {
 
   describe("definition", () => {
     it("LDRDefinition has engine type analog", () => {
-      expect(LDRDefinition.engineType).toBe("analog");
+      expect(LDRDefinition.models?.analog).toBeDefined();
     });
 
     it("LDRDefinition has correct category", () => {
@@ -186,7 +186,7 @@ describe("LDR", () => {
     });
 
     it("requiresBranchRow is false", () => {
-      expect(LDRDefinition.requiresBranchRow).toBeFalsy();
+      expect(LDRDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
     });
   });
 });

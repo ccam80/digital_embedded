@@ -225,13 +225,17 @@ export const BarrelShifterDefinition: ComponentDefinition = {
   name: "BarrelShifter",
   typeId: -1,
   factory: (props) => new BarrelShifterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-  executeFn: executeBarrelShifter,
   pinLayout: buildBarrelShifterPinDeclarations(8, false),
   propertyDefs: BARREL_SHIFTER_PROPERTY_DEFS,
   attributeMap: BARREL_SHIFTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["in", "shift"],
-  outputSchema: ["out"],
   helpText: "BarrelShifter — configurable shift/rotate. Modes: logical, rotate, arithmetic. Directions: left, right.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeBarrelShifter,
+      inputSchema: ["in", "shift"],
+      outputSchema: ["out"],
+      defaultDelay: 10,
+    },
+  },
 };

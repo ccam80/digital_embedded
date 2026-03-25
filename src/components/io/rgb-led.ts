@@ -190,15 +190,15 @@ export const RgbLedDefinition: ComponentDefinition = {
   name: "RGBLED",
   typeId: -1,
   factory: rgbLedFactory,
-  executeFn: executeRgbLed,
   pinLayout: buildRgbLedPinDeclarations(),
   propertyDefs: RGB_LED_PROPERTY_DEFS,
   attributeMap: RGB_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["R", "G", "B"],
-  outputSchema: [],
   helpText:
     "RGBLED — three-color LED with independent R, G, B channel inputs.\n" +
     "Each channel is 1-bit: channel lights when input is non-zero.\n" +
     "All three channels active produces white light.",
+  models: {
+    digital: { executeFn: executeRgbLed, inputSchema: ["R", "G", "B"], outputSchema: [] },
+  },
 };

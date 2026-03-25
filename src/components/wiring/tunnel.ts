@@ -203,16 +203,19 @@ export const TunnelDefinition: ComponentDefinition = {
   name: "Tunnel",
   typeId: -1,
   factory: tunnelFactory,
-  executeFn: executeTunnel,
-  engineType: "both",
   pinLayout: buildTunnelPinDeclarations(1),
   propertyDefs: TUNNEL_PROPERTY_DEFS,
   attributeMap: TUNNEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  inputSchema: ["in"],
-  outputSchema: [],
   helpText:
     "Tunnel — named wire connection.\n" +
     "All Tunnels with the same label in a circuit are electrically connected.\n" +
     "The net resolver merges same-label nets during compilation.",
+  models: {
+    digital: {
+      executeFn: executeTunnel,
+      inputSchema: ["in"],
+      outputSchema: [],
+    },
+  },
 };

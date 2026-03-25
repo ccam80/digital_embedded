@@ -113,13 +113,17 @@ export const BitCountDefinition: ComponentDefinition = {
   name: "BitCount",
   typeId: -1,
   factory: (props) => new BitCountElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-  executeFn: executebitCount,
   pinLayout: buildBitCountPinDeclarations(8),
   propertyDefs: BIT_COUNT_PROPERTY_DEFS,
   attributeMap: BIT_COUNT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText: "BitCount — counts the number of set (1) bits in the input (population count).",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executebitCount,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+      defaultDelay: 10,
+    },
+  },
 };

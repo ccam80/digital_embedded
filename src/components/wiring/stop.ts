@@ -167,14 +167,18 @@ export const StopDefinition: ComponentDefinition = {
   name: "Stop",
   typeId: -1,
   factory: stopFactory,
-  executeFn: executeStop,
   pinLayout: buildStopPinDeclarations(),
   propertyDefs: STOP_PROPERTY_DEFS,
   attributeMap: STOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  inputSchema: ["stop"],
-  outputSchema: [],
   helpText:
     "Stop — terminates simulation entirely when input goes high.\n" +
     "Unlike Break, Stop closes the model rather than pausing.",
+  models: {
+    digital: {
+      executeFn: executeStop,
+      inputSchema: ["stop"],
+      outputSchema: [],
+    },
+  },
 };

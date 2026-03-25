@@ -263,24 +263,29 @@ function counterFactory(props: PropertyBag): CounterElement {
 export const CounterDefinition: ComponentDefinition = {
   name: "Counter",
   typeId: -1,
-  engineType: "both",
   factory: counterFactory,
-  executeFn: executeCounter,
-  sampleFn: sampleCounter,
-  analogFactory: makeBehavioralCounterAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
   pinLayout: COUNTER_PIN_DECLARATIONS,
   propertyDefs: COUNTER_PROPERTY_DEFS,
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  // sampleCounter/executeCounter read: inBase+0=en, inBase+1=C, inBase+2=clr
-  // writes: outBase+0=out, outBase+1=ovf
-  inputSchema: ["en", "C", "clr"],
-  outputSchema: ["out", "ovf"],
   helpText:
     "Counter — edge-triggered up counter.\n" +
     "On rising clock edge: if en=1, increments (wraps at maxValue); if clr=1, resets to 0.\n" +
     "ovf output is 1 when counter==maxValue and en=1.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeCounter,
+      sampleFn: sampleCounter,
+      // sampleCounter/executeCounter read: inBase+0=en, inBase+1=C, inBase+2=clr
+      // writes: outBase+0=out, outBase+1=ovf
+      inputSchema: ["en", "C", "clr"],
+      outputSchema: ["out", "ovf"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeBehavioralCounterAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

@@ -254,16 +254,20 @@ export const AddDefinition: ComponentDefinition = {
   name: "Add",
   typeId: -1,
   factory: addFactory,
-  executeFn: executeAdd,
   pinLayout: buildAddPinDeclarations(1),
   propertyDefs: ADD_PROPERTY_DEFS,
   attributeMap: ADD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["a", "b", "c_i"],
-  outputSchema: ["s", "c_o"],
   helpText:
     "Add — N-bit adder with carry in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit carry in).\n" +
     "Outputs: s (bitWidth-bit sum), c_o (1-bit carry out).",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeAdd,
+      inputSchema: ["a", "b", "c_i"],
+      outputSchema: ["s", "c_o"],
+      defaultDelay: 10,
+    },
+  },
 };

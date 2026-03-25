@@ -301,19 +301,18 @@ function ledFactory(props: PropertyBag): LedElement {
 export const LedDefinition: ComponentDefinition = {
   name: "LED",
   typeId: -1,
-  engineType: "both",
-  simulationModes: ["logical", "analog-pins"],
   factory: ledFactory,
-  executeFn: executeLed,
   pinLayout: buildLedPinDeclarations(),
   propertyDefs: LED_PROPERTY_DEFS,
   attributeMap: LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["in"],
-  outputSchema: [],
   helpText:
     "LED — single-color light-emitting diode indicator.\n" +
     "Lights up (filled circle) when the input is non-zero.\n" +
     "Color is configurable. Label is shown above the component.",
-  analogFactory: createLedAnalogElement,
+  models: {
+    digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
+    analog: { factory: createLedAnalogElement },
+  },
+  defaultModel: "digital",
 };

@@ -44,7 +44,7 @@ function makeOTAElement(
     ["vt", vt],
     ["label", ""],
   ]).entries());
-  return OTADefinition.analogFactory!(
+  return OTADefinition.models!.analog!.factory(
     new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
     [],
     -1,

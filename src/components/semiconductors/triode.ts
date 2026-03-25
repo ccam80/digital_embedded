@@ -35,7 +35,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -485,9 +484,7 @@ function triodeCircuitFactory(props: PropertyBag): TriodeCircuitElement {
 export const TriodeDefinition: ComponentDefinition = {
   name: "Triode",
   typeId: -1,
-  engineType: "analog",
   factory: triodeCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildTriodePinDeclarations(),
   propertyDefs: TRIODE_PROPERTY_DEFS,
   attributeMap: TRIODE_ATTRIBUTE_MAPPINGS,
@@ -496,5 +493,10 @@ export const TriodeDefinition: ComponentDefinition = {
     "Triode vacuum tube — Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
     "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
-  analogFactory: (pinNodes, internalNodeIds, branchIdx, props) => createTriodeElement(pinNodes, internalNodeIds, branchIdx, props),
+  models: {
+    analog: {
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createTriodeElement(pinNodes, internalNodeIds, branchIdx, props),
+    },
+  },
 };

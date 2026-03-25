@@ -14,7 +14,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -242,9 +241,7 @@ function resistorCircuitFactory(props: PropertyBag): ResistorElement {
 export const ResistorDefinition: ComponentDefinition = {
   name: "Resistor",
   typeId: -1,
-  engineType: "analog",
   factory: resistorCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildResistorPinDeclarations(),
   propertyDefs: RESISTOR_PROPERTY_DEFS,
   attributeMap: RESISTOR_ATTRIBUTE_MAPPINGS,
@@ -252,5 +249,9 @@ export const ResistorDefinition: ComponentDefinition = {
   helpText:
     "Resistor — stamps conductance G=1/R into the MNA matrix.\n" +
     "Minimum resistance is clamped to 1e-9 Ω.",
-  analogFactory: createResistorElement,
+  models: {
+    analog: {
+      factory: createResistorElement,
+    },
+  },
 };

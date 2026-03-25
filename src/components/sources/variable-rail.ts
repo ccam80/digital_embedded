@@ -33,7 +33,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -237,10 +236,7 @@ export function makeVariableRailElement(
 export const VariableRailDefinition: ComponentDefinition = {
   name: "VariableRail",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.SOURCES,
-  executeFn: noOpAnalogExecuteFn,
-  requiresBranchRow: true,
 
   pinLayout: VARIABLE_RAIL_PIN_LAYOUT,
   propertyDefs: VARIABLE_RAIL_PROPERTY_DEFS,
@@ -252,19 +248,22 @@ export const VariableRailDefinition: ComponentDefinition = {
     return new VariableRailElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const voltage = props.getOrDefault<number>("voltage", 5);
-    const resistance = props.getOrDefault<number>("resistance", 0.01);
-    // pos pin = positive terminal; neg terminal is ground (node 0)
-    // internalNodeIds[0] = internal node (allocated by compiler for internal resistance)
-    const nodePos = pinNodes.get("pos")!;
-    const nodeNeg = 0;
-    const nodeInt = internalNodeIds[0] ?? nodePos;
-    return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const voltage = props.getOrDefault<number>("voltage", 5);
+        const resistance = props.getOrDefault<number>("resistance", 0.01);
+        const nodePos = pinNodes.get("pos")!;
+        const nodeNeg = 0;
+        const nodeInt = internalNodeIds[0] ?? nodePos;
+        return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
+      },
+    },
   },
 };

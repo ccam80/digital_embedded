@@ -46,7 +46,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -720,9 +719,7 @@ function transmissionLineCircuitFactory(props: PropertyBag): TransmissionLineCir
 export const TransmissionLineDefinition: ComponentDefinition = {
   name: "TransmissionLine",
   typeId: -1,
-  engineType: "analog",
   factory: transmissionLineCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildTransmissionLinePinDeclarations(),
   propertyDefs: TRANSMISSION_LINE_PROPERTY_DEFS,
   attributeMap: TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
@@ -731,10 +728,14 @@ export const TransmissionLineDefinition: ComponentDefinition = {
     "Lossy Transmission Line — lumped RLCG model.\n" +
     "N cascaded segments with series RL and shunt GC. " +
     "Parameterised by Z\u2080, propagation delay, loss, and segment count.",
-  analogFactory: createTransmissionLineElement,
-  requiresBranchRow: true,
-  getInternalNodeCount: (props: PropertyBag): number => {
-    const N = props.getOrDefault<number>("segments", 10);
-    return (N - 1) * 2;
+  models: {
+    analog: {
+      factory: createTransmissionLineElement,
+      requiresBranchRow: true,
+      getInternalNodeCount: (props: PropertyBag): number => {
+        const N = props.getOrDefault<number>("segments", 10);
+        return (N - 1) * 2;
+      },
+    },
   },
 };

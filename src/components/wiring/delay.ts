@@ -224,14 +224,18 @@ export const DelayDefinition: ComponentDefinition = {
   name: "Delay",
   typeId: -1,
   factory: delayFactory,
-  executeFn: executeDelay,
   pinLayout: buildDelayPinDeclarations(1),
   propertyDefs: DELAY_PROPERTY_DEFS,
   attributeMap: DELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText:
     "Delay — pass-through with configurable propagation delay.\n" +
     "In timed mode: output changes after delayTime gate-delay units.",
+  models: {
+    digital: {
+      executeFn: executeDelay,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+    },
+  },
 };

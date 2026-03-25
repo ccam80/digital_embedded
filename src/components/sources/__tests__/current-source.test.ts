@@ -90,16 +90,16 @@ describe("CurrentSource", () => {
   });
 
   it("definition_engine_type_analog", () => {
-    expect(CurrentSourceDefinition.engineType).toBe("analog");
+    expect(CurrentSourceDefinition.models?.analog).toBeDefined();
   });
 
   it("definition_does_not_require_branch_row", () => {
-    expect(CurrentSourceDefinition.requiresBranchRow).toBeFalsy();
+    expect(CurrentSourceDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
   });
 
   it("default_current_from_analog_factory", () => {
     const props = new PropertyBag();
-    const el = CurrentSourceDefinition.analogFactory!(
+    const el = CurrentSourceDefinition.models!.analog!.factory(
       new Map([["pos", 1], ["neg", 2]]),
       [],
       -1,

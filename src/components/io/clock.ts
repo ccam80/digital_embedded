@@ -340,34 +340,34 @@ export function makeAnalogClockElement(
 export const ClockDefinition: ComponentDefinition = {
   name: "Clock",
   typeId: -1,
-  engineType: "both",
-  simulationModes: ["logical", "analog-pins"],
   factory: clockFactory,
-  executeFn: executeClock,
   pinLayout: buildClockPinDeclarations(),
   propertyDefs: CLOCK_PROPERTY_DEFS,
   attributeMap: CLOCK_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
-  requiresBranchRow: true,
   helpText:
     "Clock — periodic signal source.\n" +
     "Generates a square wave at the configured frequency.\n" +
     "In real-time mode the frequency corresponds to actual Hz. " +
     "The signal value is managed by ClockManager and set externally.",
-
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-    _getTime: () => number,
-  ): AnalogElementCore {
-    const frequency = props.getOrDefault<number>("Frequency", 1);
-    const vdd = props.getOrDefault<number>("vdd", 3.3);
-    const nodePos = pinNodes.get("out")!;
-    const nodeNeg = 0;
-    return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
+  models: {
+    digital: { executeFn: executeClock, inputSchema: [], outputSchema: ["out"] },
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+        _getTime: () => number,
+      ): AnalogElementCore {
+        const frequency = props.getOrDefault<number>("Frequency", 1);
+        const vdd = props.getOrDefault<number>("vdd", 3.3);
+        const nodePos = pinNodes.get("out")!;
+        const nodeNeg = 0;
+        return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
+      },
+    },
   },
+  defaultModel: "digital",
 };

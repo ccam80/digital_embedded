@@ -389,9 +389,7 @@ function sparkGapCircuitFactory(props: PropertyBag): SparkGapCircuitElement {
 export const SparkGapDefinition: ComponentDefinition = {
   name: "SparkGap",
   typeId: -1,
-  engineType: "analog",
   factory: sparkGapCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildSparkGapPinDeclarations(),
   propertyDefs: SPARK_GAP_PROPERTY_DEFS,
   attributeMap: SPARK_GAP_ATTRIBUTE_MAPPINGS,
@@ -399,6 +397,5 @@ export const SparkGapDefinition: ComponentDefinition = {
   helpText:
     "Spark Gap — voltage-triggered switch with hysteresis. " +
     "Fires at breakdown voltage; stays on until current drops below holding threshold.",
-  analogFactory: createSparkGapElement,
-  requiresBranchRow: false,
+  models: { analog: { factory: createSparkGapElement } },
 };

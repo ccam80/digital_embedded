@@ -274,17 +274,21 @@ export const EEPROMDefinition: ComponentDefinition = {
   name: "EEPROM",
   typeId: -1,
   factory: eepromFactory,
-  executeFn: executeEEPROM,
-  sampleFn: sampleEEPROM,
   pinLayout: buildEEPROMPins(4, 8),
   propertyDefs: EEPROM_PROPERTY_DEFS,
   attributeMap: EEPROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "CS", "WE", "OE", "Din"],
-  outputSchema: ["D"],
   helpText: "EEPROM — electrically-erasable ROM. WE-edge write, combinational read.",
-  stateSlotCount: 2,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeEEPROM,
+      sampleFn: sampleEEPROM,
+      inputSchema: ["A", "CS", "WE", "OE", "Din"],
+      outputSchema: ["D"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -425,15 +429,19 @@ export const EEPROMDualPortDefinition: ComponentDefinition = {
   name: "EEPROMDualPort",
   typeId: -1,
   factory: eepromDualPortFactory,
-  executeFn: executeEEPROMDualPort,
-  sampleFn: sampleEEPROMDualPort,
   pinLayout: buildEEPROMDualPortPins(4, 8),
   propertyDefs: EEPROM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  inputSchema: ["A", "Din", "str", "C", "ld"],
-  outputSchema: ["D"],
   helpText: "EEPROMDualPort — EEPROM with clock-synchronous write and combinational read.",
-  stateSlotCount: 1,
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeEEPROMDualPort,
+      sampleFn: sampleEEPROMDualPort,
+      inputSchema: ["A", "Din", "str", "C", "ld"],
+      outputSchema: ["D"],
+      stateSlotCount: 1,
+      defaultDelay: 10,
+    },
+  },
 };

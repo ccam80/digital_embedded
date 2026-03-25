@@ -284,7 +284,7 @@ describe("Memristor", () => {
 
   describe("definition", () => {
     it("MemristorDefinition has correct engine type and category", () => {
-      expect(MemristorDefinition.engineType).toBe("analog");
+      expect(MemristorDefinition.models?.analog).toBeDefined();
       expect(MemristorDefinition.category).toBe(ComponentCategory.PASSIVES);
     });
 
@@ -310,7 +310,7 @@ describe("Memristor", () => {
     });
 
     it("requiresBranchRow is false", () => {
-      expect(MemristorDefinition.requiresBranchRow).toBeFalsy();
+      expect(MemristorDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
     });
   });
 });

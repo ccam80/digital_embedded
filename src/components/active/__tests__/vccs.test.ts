@@ -37,7 +37,7 @@ function makeVCCSElement(
     ["transconductance", gm],
     ["label", ""],
   ]).entries());
-  return VCCSDefinition.analogFactory!(
+  return VCCSDefinition.models!.analog!.factory(
     new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
     [],
     -1,

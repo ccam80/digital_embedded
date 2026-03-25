@@ -279,7 +279,7 @@ describe("Register", () => {
     });
 
     it("RegisterDefinition has executeFn=executeRegister", () => {
-      expect(RegisterDefinition.executeFn).toBe(executeRegister);
+      expect(RegisterDefinition.models.digital!.executeFn).toBe(executeRegister);
     });
 
     it("RegisterDefinition propertyDefs include bitWidth", () => {
@@ -556,7 +556,7 @@ describe("RegisterFile", () => {
     });
 
     it("RegisterFileDefinition has executeFn=executeRegisterFile", () => {
-      expect(RegisterFileDefinition.executeFn).toBe(executeRegisterFile);
+      expect(RegisterFileDefinition.models.digital!.executeFn).toBe(executeRegisterFile);
     });
 
     it("RegisterFileDefinition propertyDefs include bitWidth and addrBits", () => {

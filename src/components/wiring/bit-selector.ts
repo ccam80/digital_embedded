@@ -214,14 +214,18 @@ export const BitSelectorDefinition: ComponentDefinition = {
   name: "BitSelector",
   typeId: -1,
   factory: bitSelectorFactory,
-  executeFn: executeBitSelector,
   pinLayout: buildBitSelectorPinDeclarations(3),
   propertyDefs: BIT_SELECTOR_PROPERTY_DEFS,
   attributeMap: BIT_SELECTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  inputSchema: ["in", "sel"],
-  outputSchema: ["out"],
   helpText:
     "BitSelector — selects a single bit from a multi-bit input.\n" +
     "Output = (input >> selector) & 1.",
+  models: {
+    digital: {
+      executeFn: executeBitSelector,
+      inputSchema: ["in", "sel"],
+      outputSchema: ["out"],
+    },
+  },
 };

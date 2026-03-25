@@ -397,9 +397,9 @@ describe("Registration", () => {
 
     const def = registry.get("NJFET");
     expect(def).toBeDefined();
-    expect(def!.engineType).toBe("analog");
+    expect(def!.models?.analog).toBeDefined();
     expect(def!.category).toBeDefined();
-    expect(def!.analogFactory).toBeDefined();
+    expect(def!.models?.analog?.factory).toBeDefined();
   });
 
   it("pjfet_registered", () => {
@@ -408,8 +408,8 @@ describe("Registration", () => {
 
     const def = registry.get("PJFET");
     expect(def).toBeDefined();
-    expect(def!.engineType).toBe("analog");
-    expect(def!.analogFactory).toBeDefined();
+    expect(def!.models?.analog).toBeDefined();
+    expect(def!.models?.analog?.factory).toBeDefined();
   });
 
   it("njfet_pin_layout_has_three_pins", () => {

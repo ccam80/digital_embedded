@@ -236,7 +236,7 @@ class AnalogProbeElement implements AnalogElementCore {
   }
 
   getPinCurrents(_voltages: Float64Array): number[] {
-    // Probe stamps nothing — it is a pure voltage measurement with no loading.
+    // Probe stamps nothing ï¿½ it is a pure voltage measurement with no loading.
     // Return zero current for the single input pin.
     return [0];
   }
@@ -263,20 +263,20 @@ function probeFactory(props: PropertyBag): ProbeElement {
 export const ProbeDefinition: ComponentDefinition = {
   name: "Probe",
   typeId: -1,
-  engineType: "both",
   factory: probeFactory,
-  executeFn: executeProbe,
-  analogFactory: probeAnalogFactory,
   pinLayout: buildProbePinDeclarations(1),
   propertyDefs: PROBE_PROPERTY_DEFS,
   attributeMap: PROBE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["in"],
-  outputSchema: [],
   helpText:
     "Probe â€” measurement point.\n" +
     "Reads the connected signal and adds it to the signal/measurement list.\n" +
     "probeMode controls what is displayed: VALUE (current value), UP (rising edge count),\n" +
     "DOWN (falling edge count), or BOTH (total edge count).\n" +
     "Display format is configurable: binary, decimal, hexadecimal, or octal.",
+  models: {
+    digital: { executeFn: executeProbe, inputSchema: ["in"], outputSchema: [] },
+    analog: { factory: probeAnalogFactory },
+  },
+  defaultModel: "digital",
 };

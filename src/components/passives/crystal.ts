@@ -474,9 +474,7 @@ function crystalCircuitFactory(props: PropertyBag): CrystalCircuitElement {
 export const CrystalDefinition: ComponentDefinition = {
   name: "QuartzCrystal",
   typeId: -1,
-  engineType: "analog",
   factory: crystalCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildCrystalPinDeclarations(),
   propertyDefs: CRYSTAL_PROPERTY_DEFS,
   attributeMap: CRYSTAL_ATTRIBUTE_MAPPINGS,
@@ -484,7 +482,11 @@ export const CrystalDefinition: ComponentDefinition = {
   helpText:
     "Quartz crystal — Butterworth-Van Dyke equivalent circuit model.\n" +
     "Series RLC motional arm in parallel with shunt electrode capacitance.",
-  analogFactory: createCrystalElement,
-  requiresBranchRow: true,
-  getInternalNodeCount: () => 2,
+  models: {
+    analog: {
+      factory: createCrystalElement,
+      requiresBranchRow: true,
+      getInternalNodeCount: () => 2,
+    },
+  },
 };

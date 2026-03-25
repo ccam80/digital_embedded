@@ -234,20 +234,19 @@ function buttonLEDFactory(props: PropertyBag): ButtonLEDElement {
 export const ButtonLEDDefinition: ComponentDefinition = {
   name: "ButtonLED",
   typeId: -1,
-  engineType: "both",
   factory: buttonLEDFactory,
-  executeFn: executeButtonLED,
   pinLayout: buildButtonLEDPinDeclarations(),
   propertyDefs: BUTTON_LED_PROPERTY_DEFS,
   attributeMap: BUTTON_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText:
     "ButtonLED — push button with integrated LED indicator.\n" +
     "The 'in' pin drives the LED; the 'out' pin is the button output.\n" +
     "Button behavior: output high while held, low when released (inverted if activeLow).\n" +
     "Interactive: the engine sets the output value on mouse-down/up events.",
-  analogFactory: createButtonLEDAnalogElement,
-  simulationModes: ["logical", "analog-pins"],
+  models: {
+    digital: { executeFn: executeButtonLED, inputSchema: ["in"], outputSchema: ["out"] },
+    analog: { factory: createButtonLEDAnalogElement },
+  },
+  defaultModel: "digital",
 };

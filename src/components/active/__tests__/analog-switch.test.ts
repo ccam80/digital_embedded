@@ -56,7 +56,7 @@ function makeSPST(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SwitchSPSTDefinition.analogFactory!(
+  return SwitchSPSTDefinition.models!.analog!.factory(
     new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
     [],
     -1,
@@ -72,7 +72,7 @@ function makeSPDT(
   nNC: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SwitchSPDTDefinition.analogFactory!(
+  return SwitchSPDTDefinition.models!.analog!.factory(
     new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
     [],
     -1,

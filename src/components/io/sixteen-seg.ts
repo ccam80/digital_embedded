@@ -291,15 +291,15 @@ export const SixteenSegDefinition: ComponentDefinition = {
   name: "SixteenSeg",
   typeId: -1,
   factory: sixteenSegFactory,
-  executeFn: executeSixteenSeg,
   pinLayout: buildSixteenSegPinDeclarations(),
   propertyDefs: SIXTEEN_SEG_PROPERTY_DEFS,
   attributeMap: SIXTEEN_SEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: ["led", "dp"],
-  outputSchema: [],
   helpText:
     "SixteenSeg — direct-drive 16-segment alphanumeric display.\n" +
     "16 independent segment inputs for full alphanumeric character display.\n" +
     "commonCathode=true: segments light when input=1.",
+  models: {
+    digital: { executeFn: executeSixteenSeg, inputSchema: ["led", "dp"], outputSchema: [] },
+  },
 };

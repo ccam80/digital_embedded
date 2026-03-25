@@ -85,7 +85,7 @@ function solveDac(
     ["rOut",  100],
   ]);
 
-  const dacEl = DACDefinition.analogFactory!(dacPinNodes, [], -1, props, () => 0);
+  const dacEl = DACDefinition.models!.analog!.factory(dacPinNodes, [], -1, props, () => 0);
 
   // Digital input voltage sources: HIGH = vRef, LOW = 0
   const elements: AnalogElement[] = [dacEl];

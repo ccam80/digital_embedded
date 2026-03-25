@@ -1,0 +1,25 @@
+{
+  "title": "ECE 101 — Introduction to Digital Logic",
+  "description": "First-year digital logic course. Covers combinational gates, adders, latches, and flip-flops.",
+  "palette": ["And", "Or", "Not", "NAnd", "NOr", "XOr", "In", "Out", "Clock", "Led", "FlipflopD", "FlipflopJK"],
+  "locked": false,
+  "circuits": [
+    {
+      "title": "AND Gate",
+      "file": "and-gate.dig",
+      "description": "Simple 2-input AND gate"
+    },
+    {
+      "title": "Half Adder",
+      "file": "half-adder.dig",
+      "description": "XOR + AND half adder"
+    }
+  ],
+  "tutorials": [
+    {
+      "title": "From SR Latch to D Flip-Flop",
+      "manifest": "sr-to-flipflop/manifest.json",
+      "description": "Build sequential logic from first principles"
+    }
+  ]
+}

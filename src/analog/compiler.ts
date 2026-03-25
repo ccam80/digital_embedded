@@ -417,8 +417,9 @@ export function compileAnalogCircuit(
     }
 
     // Reject digital-only components — emit diagnostic instead of throwing
-    const et = def.engineType ?? "digital";
-    if (et !== "analog" && et !== "both") {
+    const hasAnalog = def.models?.analog !== undefined;
+    const hasBoth = def.models?.digital !== undefined && hasAnalog;
+    if (!hasAnalog) {
       diagnostics.push(
         makeDiagnostic(
           "unsupported-component-in-analog",
@@ -426,8 +427,8 @@ export function compileAnalogCircuit(
           `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
           {
             explanation:
-              `Component "${el.typeId}" has engineType="${et}" with no analogFactory. ` +
-              `Only components with engineType "analog" or "both" (with analogFactory) ` +
+              `Component "${el.typeId}" has no analog model. ` +
+              `Only components with an analog model ` +
               `can be placed in analog circuits.`,
             suggestions: [
               {
@@ -449,7 +450,7 @@ export function compileAnalogCircuit(
 
     // Transistor-mode and digital-mode components are handled in Pass B —
     // skip branch/node allocation here.
-    if (et === "both") {
+    if (hasBoth) {
       const passAProps = el.getProperties();
       const passAMode = passAProps.has("simulationMode")
         ? (passAProps.get("simulationMode") as string)
@@ -533,15 +534,16 @@ export function compileAnalogCircuit(
     const props = el.getProperties();
 
     // Skip digital-only components (diagnostic already emitted in Pass A)
-    const elEngineType = def.engineType ?? "digital";
-    if (elEngineType !== "analog" && elEngineType !== "both") {
+    const hasAnalogModel = def.models?.analog !== undefined;
+    const hasBothModels = def.models?.digital !== undefined && hasAnalogModel;
+    if (!hasAnalogModel) {
       continue;
     }
 
     // Handle simulationMode property for "both" components.
     // The "logical" branch applies even when analogFactory is undefined
     // (the component will run as an inner digital engine, no analog stamping needed).
-    if (elEngineType === "both") {
+    if (hasBothModels) {
       const simulationMode = props.has("simulationMode")
         ? (props.get("simulationMode") as string)
         : (def.simulationModes?.[0] ?? "analog-pins");
@@ -847,7 +849,7 @@ export function compileAnalogCircuit(
     //   2. Definition per-pin     (def.pinElectricalOverrides)
     //   3. Definition component   (def.pinElectrical)
     //   4. Circuit logic family   (circuitFamily)
-    if (elEngineType === "both" && def.models?.analog?.factory !== undefined) {
+    if (hasBothModels && def.models?.analog?.factory !== undefined) {
       // Parse user overrides from the property panel (stored as JSON string)
       let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       if (props.has("_pinElectricalOverrides")) {
@@ -1260,8 +1262,7 @@ function detectHighSourceImpedance(
     if (!def) continue;
 
     // Only inspect analog or both elements
-    const et = def.engineType ?? "digital";
-    if (et !== "analog" && et !== "both") continue;
+    if (def.models?.analog === undefined) continue;
 
     // Check if any pin of this element is connected to targetNodeId
     const nodeIds = resolveElementNodes(el, wireToNodeId, outerCircuit);

@@ -29,7 +29,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -458,9 +457,7 @@ const SCHMITT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const SchmittInvertingDefinition: ComponentDefinition = {
   name: "SchmittInverting",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildSchmittPinDeclarations(),
   propertyDefs: SCHMITT_PROPERTY_DEFS,
@@ -474,22 +471,24 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
     return new SchmittInvertingElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createSchmittTriggerElement(pinNodes, props, true);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createSchmittTriggerElement(pinNodes, props, true);
+      },
+    },
   },
 };
 
 export const SchmittNonInvertingDefinition: ComponentDefinition = {
   name: "SchmittNonInverting",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildSchmittPinDeclarations(),
   propertyDefs: SCHMITT_PROPERTY_DEFS,
@@ -503,12 +502,16 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
     return new SchmittNonInvertingElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createSchmittTriggerElement(pinNodes, props, false);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createSchmittTriggerElement(pinNodes, props, false);
+      },
+    },
   },
 };

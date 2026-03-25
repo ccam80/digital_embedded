@@ -26,7 +26,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -397,9 +396,7 @@ function tunnelDiodeCircuitFactory(props: PropertyBag): TunnelDiodeElement {
 export const TunnelDiodeDefinition: ComponentDefinition = {
   name: "TunnelDiode",
   typeId: -1,
-  engineType: "analog",
   factory: tunnelDiodeCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildTunnelDiodePinDeclarations(),
   propertyDefs: TUNNEL_DIODE_PROPERTY_DEFS,
   attributeMap: TUNNEL_DIODE_ATTRIBUTE_MAPPINGS,
@@ -408,6 +405,10 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
     "Tunnel Diode — N-shaped I-V curve with negative differential resistance.\n" +
     "Peak current I_p at V_p, valley current I_v at V_v.\n" +
     "NDR region: V_p < V < V_v.",
-  analogDeviceType: "TUNNEL",
-  analogFactory: createTunnelDiodeElement,
+  models: {
+    analog: {
+      factory: createTunnelDiodeElement,
+      deviceType: "TUNNEL",
+    },
+  },
 };

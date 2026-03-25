@@ -205,21 +205,30 @@ export const RSAsyncDefinition: ComponentDefinition = {
   typeId: -1,
   factory: rsAsyncFactory,
   executeFn: executeRSAsync,
-  pinLayout: RS_FF_AS_PIN_DECLARATIONS,
-  propertyDefs: RS_FF_AS_PROPERTY_DEFS,
-  attributeMap: RS_FF_AS_ATTRIBUTE_MAPPINGS,
-  category: ComponentCategory.FLIP_FLOPS,
-  // executeRSAsync reads: inBase+0=S, inBase+1=R
-  // writes: outBase+0=Q, outBase+1=~Q
-  inputSchema: ["S", "R"],
-  outputSchema: ["Q", "~Q"],
-  helpText:
-    "RS Flip-Flop Async — level-sensitive SR latch (no clock).\n" +
-    "S=1, R=0 → Q=1; S=0, R=1 → Q=0; S=0, R=0 → hold; S=1, R=1 → forbidden (Q=~Q=0).\n" +
-    "Changes propagate immediately without a clock edge.",
   stateSlotCount: 2,
   defaultDelay: 10,
   engineType: "both",
   analogFactory: makeRSAsyncLatchAnalogFactory(),
-  simulationModes: ['logical', 'analog-pins'],
+  simulationModes: ["logical", "analog-pins", "analog-internals"],
+  pinLayout: RS_FF_AS_PIN_DECLARATIONS,
+  propertyDefs: RS_FF_AS_PROPERTY_DEFS,
+  attributeMap: RS_FF_AS_ATTRIBUTE_MAPPINGS,
+  category: ComponentCategory.FLIP_FLOPS,
+  helpText:
+    "RS Flip-Flop Async — level-sensitive SR latch (no clock).\n" +
+    "S=1, R=0 → Q=1; S=0, R=1 → Q=0; S=0, R=0 → hold; S=1, R=1 → forbidden (Q=~Q=0).\n" +
+    "Changes propagate immediately without a clock edge.",
+  models: {
+    digital: {
+      executeFn: executeRSAsync,
+      inputSchema: ["S", "R"],
+      outputSchema: ["Q", "~Q"],
+      stateSlotCount: 2,
+      defaultDelay: 10,
+    },
+    analog: {
+      factory: makeRSAsyncLatchAnalogFactory(),
+    },
+  },
+  defaultModel: "digital",
 };

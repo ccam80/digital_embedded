@@ -17,7 +17,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -344,9 +343,7 @@ function zenerCircuitFactory(props: PropertyBag): ZenerElement {
 export const ZenerDiodeDefinition: ComponentDefinition = {
   name: "ZenerDiode",
   typeId: -1,
-  engineType: "analog",
   factory: zenerCircuitFactory,
-  executeFn: noOpAnalogExecuteFn,
   pinLayout: buildZenerPinDeclarations(),
   propertyDefs: ZENER_PROPERTY_DEFS,
   attributeMap: ZENER_ATTRIBUTE_MAPPINGS,
@@ -355,6 +352,10 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Zener Diode — Shockley diode with reverse breakdown at BV.\n" +
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
-  analogDeviceType: "D",
-  analogFactory: createZenerElement,
+  models: {
+    analog: {
+      factory: createZenerElement,
+      deviceType: "D",
+    },
+  },
 };

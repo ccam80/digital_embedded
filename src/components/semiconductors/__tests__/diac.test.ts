@@ -190,9 +190,9 @@ describe("Diac", () => {
 
   it("definition_has_correct_fields", () => {
     expect(DiacDefinition.name).toBe("Diac");
-    expect(DiacDefinition.engineType).toBe("analog");
-    expect(DiacDefinition.analogDeviceType).toBe("DIAC");
-    expect(DiacDefinition.analogFactory).toBeDefined();
+    expect(DiacDefinition.models?.analog).toBeDefined();
+    expect(DiacDefinition.models?.analog?.deviceType).toBe("DIAC");
+    expect(DiacDefinition.models?.analog?.factory).toBeDefined();
     expect(DiacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

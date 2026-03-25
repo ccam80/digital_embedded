@@ -424,11 +424,11 @@ export const BooleanFunctionDefinition: ComponentDefinition = {
   typeId: -1,
   factory: booleanFunctionFactory,
   executeFn: executeBooleanFunction,
+  defaultDelay: 10,
   pinLayout: buildFunctionPinDeclarations(2, 1),
   propertyDefs: BOOLEAN_FUNCTION_PROPERTY_DEFS,
   attributeMap: BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default inputCount=2, outputCount=1; direction-filter order matches for all configs.
   inputSchema: ["in0", "in1"],
   outputSchema: ["out"],
   helpText:
@@ -436,5 +436,12 @@ export const BooleanFunctionDefinition: ComponentDefinition = {
     "inputCount sets the number of input variables (1–8).\n" +
     "outputCount sets the number of output bits.\n" +
     "Don't-care entries (-1) output 0 at simulation time.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeBooleanFunction,
+      inputSchema: ["in0", "in1"],
+      outputSchema: ["out"],
+      defaultDelay: 10,
+    },
+  },
 };

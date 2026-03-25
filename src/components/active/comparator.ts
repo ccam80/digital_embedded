@@ -39,7 +39,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -399,9 +398,7 @@ const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const VoltageComparatorDefinition: ComponentDefinition = {
   name: "VoltageComparator",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildComparatorPinDeclarations(),
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
@@ -416,12 +413,16 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
     return new ComparatorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    _branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    return createComparatorElement(pinNodes, props);
+  models: {
+    analog: {
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        _branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        return createComparatorElement(pinNodes, props);
+      },
+    },
   },
 };

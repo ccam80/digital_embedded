@@ -292,28 +292,28 @@ describe("PolarizedCap", () => {
     });
 
     it("PolarizedCapDefinition engineType is 'analog'", () => {
-      expect(PolarizedCapDefinition.engineType).toBe("analog");
+      expect(PolarizedCapDefinition.models?.analog).toBeDefined();
     });
 
     it("PolarizedCapDefinition has analogFactory", () => {
-      expect(PolarizedCapDefinition.analogFactory).toBeDefined();
+      expect(PolarizedCapDefinition.models?.analog?.factory).toBeDefined();
     });
 
     it("PolarizedCapDefinition getInternalNodeCount returns 1", () => {
       const props = new PropertyBag();
-      expect(PolarizedCapDefinition.getInternalNodeCount!(props)).toBe(1);
+      expect(PolarizedCapDefinition.models?.analog?.getInternalNodeCount!(props)).toBe(1);
     });
 
     it("PolarizedCapDefinition isReactive", () => {
       const props = new PropertyBag();
       props.set("capacitance", 100e-6);
-      const el = PolarizedCapDefinition.analogFactory!(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      const el = PolarizedCapDefinition.models!.analog!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
     it("PolarizedCapDefinition isNonlinear", () => {
       const props = new PropertyBag();
-      const el = PolarizedCapDefinition.analogFactory!(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      const el = PolarizedCapDefinition.models!.analog!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isNonlinear).toBe(true);
     });
 

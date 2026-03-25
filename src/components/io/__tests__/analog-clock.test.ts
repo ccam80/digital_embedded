@@ -126,25 +126,26 @@ describe("AnalogClock", () => {
 
   it("digital_mode_unchanged — ClockDefinition has executeFn and factory", () => {
     // Verify the digital clock behavior is preserved
-    expect(ClockDefinition.executeFn).toBeDefined();
+    expect(ClockDefinition.models.digital!.executeFn).toBeDefined();
     expect(ClockDefinition.factory).toBeDefined();
-    expect(typeof ClockDefinition.executeFn).toBe("function");
+    expect(typeof ClockDefinition.models.digital!.executeFn).toBe("function");
     expect(typeof ClockDefinition.factory).toBe("function");
   });
 
   it("engineType_is_both — clock appears in both digital and analog palettes", () => {
-    expect(ClockDefinition.engineType).toBe("both");
+    expect(ClockDefinition.models.digital).toBeDefined();
+    expect(ClockDefinition.models.analog).toBeDefined();
   });
 
   it("simulationModes_includes_logical — logical clock behavior preserved", () => {
-    expect(ClockDefinition.simulationModes).toContain("logical");
+    expect(ClockDefinition.models.digital).toBeDefined();
   });
 
   it("analogFactory_creates_element — factory produces a valid AnalogElement", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
-    const el = ClockDefinition.analogFactory!(new Map([["out", 1]]), [], 1, props, () => 0);
+    const el = ClockDefinition.models.analog!.factory!(new Map([["out", 1]]), [], 1, props, () => 0);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(false);
     expect(el.isReactive).toBe(false);

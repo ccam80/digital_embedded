@@ -125,18 +125,18 @@ describe("VariableRail", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(VariableRailDefinition.requiresBranchRow).toBe(true);
+    expect(VariableRailDefinition.models?.analog?.requiresBranchRow).toBe(true);
   });
 
   it("definition_engine_type_analog", () => {
-    expect(VariableRailDefinition.engineType).toBe("analog");
+    expect(VariableRailDefinition.models?.analog).toBeDefined();
   });
 
   it("analogFactory_creates_element", () => {
     const props = new PropertyBag();
     props.set("voltage", 7);
     props.set("resistance", 0.05);
-    const el = VariableRailDefinition.analogFactory!(
+    const el = VariableRailDefinition.models!.analog!.factory(
       new Map([["pos", 1]]),
       [2],
       3,

@@ -91,13 +91,17 @@ export const NegDefinition: ComponentDefinition = {
   name: "Neg",
   typeId: -1,
   factory: (props) => new NegElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-  executeFn: executeNeg,
   pinLayout: buildNegPinDeclarations(1),
   propertyDefs: NEG_PROPERTY_DEFS,
   attributeMap: NEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText: "Neg — two's complement negation. Output = -input, masked to bitWidth bits.",
-  defaultDelay: 10,
+  models: {
+    digital: {
+      executeFn: executeNeg,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+      defaultDelay: 10,
+    },
+  },
 };

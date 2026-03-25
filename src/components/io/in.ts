@@ -208,15 +208,15 @@ export const InDefinition: ComponentDefinition = {
   name: "In",
   typeId: -1,
   factory: inFactory,
-  executeFn: executeIn,
   pinLayout: buildInPinDeclarations(1),
   propertyDefs: IN_PROPERTY_DEFS,
   attributeMap: IN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "In — interactive input component.\n" +
     "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +
     "The executeFn is a pass-through; the signal value is set externally by user interaction.",
+  models: {
+    digital: { executeFn: executeIn, inputSchema: [], outputSchema: ["out"] },
+  },
 };

@@ -570,7 +570,7 @@ describe("MidiDefinition", () => {
   });
 
   it("has executeFn=executeMidi", () => {
-    expect(MidiDefinition.executeFn).toBe(executeMidi);
+    expect(MidiDefinition.models.digital!.executeFn).toBe(executeMidi);
   });
 
   it("category is IO", () => {
@@ -610,7 +610,7 @@ describe("MidiDefinition", () => {
   });
 
   it("defaultDelay is 0", () => {
-    expect(MidiDefinition.defaultDelay).toBe(0);
+    expect(MidiDefinition.models.digital!.defaultDelay).toBe(0);
   });
 
   it("pinLayout has 5 entries (standard, no progChange)", () => {

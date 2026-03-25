@@ -307,17 +307,16 @@ function xorFactory(props: PropertyBag): XOrElement {
 export const XOrDefinition: ComponentDefinition = {
   name: "XOr",
   typeId: -1,
-  engineType: "both",
   factory: xorFactory,
   executeFn: executeXOr,
   analogFactory: makeXorAnalogFactory(0),
   transistorModel: "CmosXor2",
   simulationModes: ["logical", "analog-pins", "analog-internals"],
+  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XOR_PROPERTY_DEFS,
   attributeMap: XOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  // Schema for default 2-input config; direction-filter order matches for all inputCounts.
   inputSchema: ["In_1", "In_2"],
   outputSchema: ["out"],
   helpText:
@@ -325,4 +324,16 @@ export const XOrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with extra line) and IEC/DIN (rectangular with =1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  models: {
+    digital: {
+      executeFn: executeXOr,
+      inputSchema: ["In_1", "In_2"],
+      outputSchema: ["out"],
+    },
+    analog: {
+      factory: makeXorAnalogFactory(0),
+      transistorModel: "CmosXor2",
+    },
+  },
+  defaultModel: "digital",
 };

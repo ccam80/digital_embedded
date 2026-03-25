@@ -410,8 +410,8 @@ describe("PMOS", () => {
   });
 
   it("pmos_definition_has_correct_device_type", () => {
-    expect(PmosfetDefinition.analogDeviceType).toBe("PMOS");
-    expect(PmosfetDefinition.engineType).toBe("analog");
+    expect(PmosfetDefinition.models?.analog?.deviceType).toBe("PMOS");
+    expect(PmosfetDefinition.models?.analog).toBeDefined();
   });
 });
 
@@ -451,9 +451,9 @@ describe("computeCapacitances", () => {
 describe("NmosfetDefinition", () => {
   it("has_correct_fields", () => {
     expect(NmosfetDefinition.name).toBe("NMOS");
-    expect(NmosfetDefinition.engineType).toBe("analog");
-    expect(NmosfetDefinition.analogDeviceType).toBe("NMOS");
-    expect(NmosfetDefinition.analogFactory).toBeDefined();
+    expect(NmosfetDefinition.models?.analog).toBeDefined();
+    expect(NmosfetDefinition.models?.analog?.deviceType).toBe("NMOS");
+    expect(NmosfetDefinition.models?.analog?.factory).toBeDefined();
   });
 
   it("pin_layout_has_three_pins", () => {

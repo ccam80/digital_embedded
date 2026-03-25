@@ -289,18 +289,23 @@ export const DemuxDefinition: ComponentDefinition = {
   name: "Demultiplexer",
   typeId: -1,
   factory: demuxFactory,
-  executeFn: executeDemux,
   pinLayout: buildDemuxPinDeclarations(1, 1),
   propertyDefs: DEMUX_PROPERTY_DEFS,
   attributeMap: DEMUX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
-  // Schema for default selectorBits=1 (2 outputs); direction-filter order matches for all configs.
-  inputSchema: ["sel", "in"],
-  outputSchema: ["out_0", "out_1"],
   helpText:
     "Demultiplexer — routes one input to one of N outputs based on selector.\n" +
     "Selected output = input, all others = 0. N = 2^selectorBits.",
-  engineType: "both",
-  analogFactory: makeBehavioralDemuxAnalogFactory(1),
-  simulationModes: ['logical', 'analog-pins'],
+  models: {
+    digital: {
+      executeFn: executeDemux,
+      // Schema for default selectorBits=1 (2 outputs); direction-filter order matches for all configs.
+      inputSchema: ["sel", "in"],
+      outputSchema: ["out_0", "out_1"],
+    },
+    analog: {
+      factory: makeBehavioralDemuxAnalogFactory(1),
+    },
+  },
+  defaultModel: "digital",
 };

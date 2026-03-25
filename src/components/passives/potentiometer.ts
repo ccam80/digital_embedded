@@ -366,9 +366,7 @@ function potentiometerCircuitFactory(props: PropertyBag): PotentiometerElement {
 export const PotentiometerDefinition: ComponentDefinition = {
   name: "Potentiometer",
   typeId: -1,
-  engineType: "analog",
   factory: potentiometerCircuitFactory,
-  executeFn: () => {},
   pinLayout: buildPotentiometerPinDeclarations(),
   propertyDefs: POTENTIOMETER_PROPERTY_DEFS,
   attributeMap: POTENTIOMETER_ATTRIBUTE_MAPPINGS,
@@ -376,5 +374,9 @@ export const PotentiometerDefinition: ComponentDefinition = {
   helpText:
     "Potentiometer — voltage divider with 3 terminals (A, wiper, B).\n" +
     "Position determines the voltage division between top and bottom resistances.",
-  analogFactory: createPotentiometerElement,
+  models: {
+    analog: {
+      factory: createPotentiometerElement,
+    },
+  },
 };

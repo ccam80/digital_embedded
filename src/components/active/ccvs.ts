@@ -50,7 +50,6 @@ import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
-  noOpAnalogExecuteFn,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -371,9 +370,7 @@ const CCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const CCVSDefinition: ComponentDefinition = {
   name: "CCVS",
   typeId: -1,
-  engineType: "analog",
   category: ComponentCategory.ACTIVE,
-  executeFn: noOpAnalogExecuteFn,
 
   pinLayout: buildCCVSPinDeclarations(),
   propertyDefs: CCVS_PROPERTY_DEFS,
@@ -383,28 +380,31 @@ export const CCVSDefinition: ComponentDefinition = {
     "Current-Controlled Voltage Source — output voltage is an expression of " +
     "the current through the sense port.",
 
-  requiresBranchRow: true,
-
   factory(props: PropertyBag): CCVSElement {
     return new CCVSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  analogFactory(
-    pinNodes: ReadonlyMap<string, number>,
-    _internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-  ): AnalogElementCore {
-    const expression = props.getOrDefault<string>("expression", "I(sense)");
-    const transresistance = props.getOrDefault<number>("transresistance", 1000);
-    return new CCVSAnalogElement(
-      pinNodes.get("sense+")!, // sense+
-      pinNodes.get("sense-")!, // sense-
-      pinNodes.get("out+")!,   // out+
-      pinNodes.get("out-")!,   // out-
-      branchIdx,
-      expression,
-      transresistance,
-    );
+  models: {
+    analog: {
+      requiresBranchRow: true,
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+      ): AnalogElementCore {
+        const expression = props.getOrDefault<string>("expression", "I(sense)");
+        const transresistance = props.getOrDefault<number>("transresistance", 1000);
+        return new CCVSAnalogElement(
+          pinNodes.get("sense+")!, // sense+
+          pinNodes.get("sense-")!, // sense-
+          pinNodes.get("out+")!,   // out+
+          pinNodes.get("out-")!,   // out-
+          branchIdx,
+          expression,
+          transresistance,
+        );
+      },
+    },
   },
 };
