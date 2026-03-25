@@ -36,10 +36,12 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 function makeMockElement(pinNodeIds: number[], branchIndex = -1): AnalogElement {
   return {
     pinNodeIds,
+    allNodeIds: pinNodeIds,
     branchIndex,
     stamp() {},
     isNonlinear: false,
     isReactive: false,
+    getPinCurrents() { return pinNodeIds.map(() => 0); },
   } as unknown as AnalogElement;
 }
 
@@ -1155,7 +1157,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { resolve } = await import("path");
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
-    const { compileAnalogCircuit } = await import("@/analog/compiler");
+    const { compileUnified } = await import("@/compile/compile");
     const { MNAEngine } = await import("@/analog/analog-engine");
     const { pinWorldPosition } = await import("@/core/pin");
 
@@ -1171,7 +1173,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     circuit.metadata = { ...circuit.metadata, engineType: "analog" };
 
     // Compile through real analog compiler
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     expect(compiled.elements.length).toBeGreaterThan(0);
 
     const engine = new MNAEngine();
@@ -1345,7 +1347,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { resolve } = await import("path");
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
-    const { compileAnalogCircuit } = await import("@/analog/compiler");
+    const { compileUnified } = await import("@/compile/compile");
     const { MNAEngine } = await import("@/analog/analog-engine");
 
     const xml = readFileSync(
@@ -1357,7 +1359,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const circuit = facade.loadDigXml(xml);
     circuit.metadata = { ...circuit.metadata, engineType: "analog" };
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const engine = new MNAEngine();
     engine.init(compiled);
     engine.dcOperatingPoint();

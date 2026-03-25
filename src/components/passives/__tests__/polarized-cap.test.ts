@@ -62,6 +62,7 @@ function makeResistorElement(nA: number, nB: number, resistance: number) {
   const G = 1 / resistance;
   return {
     pinNodeIds: [nA, nB] as readonly number[],
+    allNodeIds: [nA, nB] as readonly number[],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,

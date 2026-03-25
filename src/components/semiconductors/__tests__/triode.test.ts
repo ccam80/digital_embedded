@@ -334,7 +334,7 @@ describe("Triode", () => {
     it("analogFactory creates a triode element with isNonlinear=true", () => {
       const props = makeProps();
       const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, props);
-      Object.assign(elem, { pinNodeIds: [1, 2, 0] });
+      Object.assign(elem, { pinNodeIds: [1, 2, 0], allNodeIds: [1, 2, 0] });
       expect(elem.isNonlinear).toBe(true);
       expect(elem.isReactive).toBe(false);
       expect(elem.pinNodeIds).toEqual([1, 2, 0]);

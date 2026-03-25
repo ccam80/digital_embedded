@@ -2,7 +2,7 @@
  * CMOS gate transistor-level model tests (Phase 4c.2).
  *
  * Tests compile CMOS gate topologies directly through the full analog pipeline:
- *   compileAnalogCircuit(flat MOSFET circuit) → MNAEngine → DC operating point
+ *   compileUnified(flat MOSFET circuit) → MNAEngine → DC operating point
  *
  * Each test circuit is built as a flat circuit of NMOS/PMOS elements with
  * explicit voltage source inputs, no subcircuit expansion needed.
@@ -24,7 +24,7 @@ import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import { ComponentRegistry } from "../../core/registry.js";
 import type { PropertyValue } from "../../core/properties.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { TransistorModelRegistry } from "../transistor-model-registry.js";
 import { registerAllCmosGateModels } from "../transistor-models/cmos-gates.js";
@@ -159,12 +159,12 @@ function gnd(circuit: Circuit, xG: number): void {
 
 type SolveResult = {
   engine: MNAEngine;
-  compiled: ReturnType<typeof compileAnalogCircuit>;
+  compiled: NonNullable<ReturnType<typeof compileUnified>["analog"]>;
   converged: boolean;
 };
 
 function solveDc(circuit: Circuit, registry: ComponentRegistry): SolveResult {
-  const compiled = compileAnalogCircuit(circuit, registry);
+  const compiled = compileUnified(circuit, registry).analog!;
   const engine = new MNAEngine();
   engine.init(compiled);
   engine.configure({ maxIterations: 500, reltol: 1e-3, abstol: 1e-6 });
@@ -175,7 +175,7 @@ function solveDc(circuit: Circuit, registry: ComponentRegistry): SolveResult {
 // Get node voltage by finding any wire whose start or end has x ≈ targetX
 function getVoltageAtX(
   engine: MNAEngine,
-  compiled: ReturnType<typeof compileAnalogCircuit>,
+  compiled: NonNullable<ReturnType<typeof compileUnified>["analog"]>,
   targetX: number,
 ): number {
   for (const [wire, nodeId] of compiled.wireToNodeId) {
@@ -562,7 +562,7 @@ describe("CmosInverter", () => {
   it("short_circuit_current", () => {
     // At mid-transition (input = VDD/2): both PMOS and NMOS partially conducting
     const { circuit, registry } = buildInverter(VDD_HALF, VDD);
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -581,7 +581,7 @@ describe("CmosInverter", () => {
   it("transient_propagation_delay", () => {
     // Input at 0V → output HIGH. Confirm circuit is well-behaved in transient.
     const { circuit: c0, registry: r0, outX: o0 } = buildInverter(0, VDD);
-    const compiled0 = compileAnalogCircuit(c0, r0);
+    const compiled0 = compileUnified(c0, r0);
     const engine0 = new MNAEngine();
     engine0.init(compiled0);
     const dc0 = engine0.dcOperatingPoint();
@@ -590,7 +590,7 @@ describe("CmosInverter", () => {
 
     // Input at VDD → output LOW. Confirmed already by other tests.
     const { circuit: cV, registry: rV, outX: oV } = buildInverter(VDD, VDD);
-    const compiledV = compileAnalogCircuit(cV, rV);
+    const compiledV = compileUnified(cV, rV);
     const engineV = new MNAEngine();
     engineV.init(compiledV);
     const dcV = engineV.dcOperatingPoint();

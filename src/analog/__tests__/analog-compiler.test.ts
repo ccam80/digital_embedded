@@ -21,7 +21,7 @@ import { ComponentRegistry } from "../../core/registry.js";
 import type { ComponentCategory } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { LOGIC_FAMILY_PRESETS, defaultLogicFamily } from "../../core/logic-family.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 
@@ -203,7 +203,7 @@ describe("BehavioralCompilation", () => {
   it("compiles_and_gate_in_analog_circuit", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
     const { circuit, registry } = buildAndGateCircuit(propsMap);
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // AND gate compiled as one behavioral analog element; no errors
     expect(compiled.elements.length).toBe(1);
@@ -213,7 +213,7 @@ describe("BehavioralCompilation", () => {
   it("resolves_logic_family_defaults", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
     const [, , , props] = factorySpy.mock.calls[0]!;
@@ -254,7 +254,7 @@ describe("BehavioralCompilation", () => {
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
     const [, , , props] = factorySpy.mock.calls[0]!;
@@ -291,8 +291,8 @@ describe("BehavioralCompilation", () => {
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
     // Compiler should not throw — emits diagnostic instead
-    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+    const compiled = compileUnified(circuit, registry).analog!;
     const errorDiags = compiled.diagnostics.filter(
       (d) => d.code === "unsupported-component-in-analog",
     );
@@ -340,7 +340,7 @@ describe("BehavioralCompilation", () => {
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
     const [, , , props] = factorySpy.mock.calls[0]!;
@@ -367,14 +367,14 @@ describe("SimulationMode", () => {
     // property the compiler would NOT have taken the analog-pins path.
     const analogPinsProps = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
     const { circuit: c1, registry: r1, factorySpy: spy1 } = buildAndGateCircuit(analogPinsProps);
-    compileAnalogCircuit(c1, r1);
+    compileUnified(c1, r1);
     expect(spy1).toHaveBeenCalledOnce(); // explicit analog-pins → factory called
 
     // Without simulationMode set, default is 'logical' → factory NOT called
     const { circuit: c2, registry: r2, factorySpy: spy2 } = buildAndGateCircuit();
     // The logical path needs In/Out in the registry to synthesize a bridge;
     // with the stub registry it emits diagnostics but still doesn't call analogFactory.
-    compileAnalogCircuit(c2, r2);
+    compileUnified(c2, r2);
     expect(spy2).not.toHaveBeenCalled();
   });
 
@@ -382,7 +382,7 @@ describe("SimulationMode", () => {
     // simulationMode explicitly set to 'analog-pins' → compiles normally
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     expect(factorySpy).toHaveBeenCalledOnce();
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
@@ -482,7 +482,7 @@ describe("SimulationMode", () => {
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // analogFactory should NOT be called — bridge path bypasses it
     expect(factorySpy).not.toHaveBeenCalled();
@@ -513,7 +513,7 @@ describe("SimulationMode", () => {
       },
     });
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // Factory should NOT be called (component is skipped — no registry supplied)
     expect(factorySpy).not.toHaveBeenCalled();
@@ -530,7 +530,7 @@ describe("SimulationMode", () => {
     // Fuse/switch case: analog-internals but no transistorModel → use analogFactory
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-internals"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // Factory SHOULD be called — falls through to analogFactory path
     expect(factorySpy).toHaveBeenCalledOnce();

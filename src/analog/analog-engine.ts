@@ -344,7 +344,7 @@ export class MNAEngine implements AnalogEngine {
     // two pinLayout pins — an approximation sufficient for method switching.
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
-      if (el.isReactive && (el.pinNodeIds?.length ?? 0) >= 2) {
+      if (el.isReactive && el.pinNodeIds.length >= 2) {
         const nA = el.pinNodeIds[0];
         const nB = el.pinNodeIds[1];
         const vA = nA > 0 && nA - 1 < nodeCount ? this._voltages[nA - 1] : 0;

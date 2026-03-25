@@ -24,7 +24,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor } from "../test-elements.js";
+import { makeVoltageSource, makeResistor, withNodeIds } from "../test-elements.js";
 import {
   createDriverAnalogElement,
   createSevenSegAnalogElement,
@@ -115,7 +115,7 @@ describe("Driver", () => {
     // 10kΩ load on circuit node 3 (solver row 2 = nodeOut) to ground
     const rLoad = makeResistor(3, 0, LOAD_R);
 
-    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, driver];
+    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, withNodeIds(driver, [1, 2, 3])];
     const matrixSize = 5; // rows 0,1,2 (nodes) + rows 3,4 (VS branches)
 
     const result = solve(elements, matrixSize);
@@ -146,7 +146,7 @@ describe("Driver", () => {
     const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 → Hi-Z
     const rLoad = makeResistor(3, 0, LOAD_R);
 
-    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, driver];
+    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, withNodeIds(driver, [1, 2, 3])];
     const matrixSize = 5;
 
     const result = solve(elements, matrixSize);
@@ -192,7 +192,7 @@ describe("LED", () => {
     // 330Ω from circuit node 1 to circuit node 2 (LED anode)
     const rSeries = makeResistor(1, 2, 330);
 
-    const elements: AnalogElement[] = [vs, rSeries, led];
+    const elements: AnalogElement[] = [vs, rSeries, withNodeIds(led, [2, 0])];
     const matrixSize = 3; // 2 node rows (0,1) + 1 branch row (2)
 
     const result = solve(elements, matrixSize);
@@ -255,7 +255,7 @@ describe("SevenSeg", () => {
       makeVoltageSource(i + 1, 0, 8 + i, v),
     );
 
-    const elements: AnalogElement[] = [...vsElements, sevenSeg];
+    const elements: AnalogElement[] = [...vsElements, withNodeIds(sevenSeg, [1, 2, 3, 4, 5, 6, 7, 8])];
     const matrixSize = 16; // 8 node rows (0..7) + 8 branch rows (8..15)
 
     const result = solve(elements, matrixSize);

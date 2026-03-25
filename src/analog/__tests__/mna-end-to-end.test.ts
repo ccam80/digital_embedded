@@ -2,7 +2,7 @@
  * End-to-end MNA engine tests.
  *
  * These tests exercise the FULL pipeline:
- *   real ComponentDefinitions → compileAnalogCircuit() → MNAEngine → verify
+ *   real ComponentDefinitions → compileUnified() → MNAEngine → verify
  *
  * They close the critical test gap where existing tests either:
  *   (a) use hand-built ConcreteCompiledAnalogCircuit (bypass compiler), or
@@ -25,7 +25,7 @@ import type { PropertyValue } from "../../core/properties.js";
 import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import { ComponentRegistry } from "../../core/registry.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { EngineState } from "../../core/engine-interface.js";
@@ -174,7 +174,7 @@ describe("End-to-end: full pipeline", () => {
     addWire(circuit, 20, 0, 20, 0);
     addWire(circuit, 30, 0, 30, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
     // Vs + R1 + R2 (ground is structural, skipped by compiler)
@@ -224,7 +224,7 @@ describe("End-to-end: full pipeline", () => {
     addWire(circuit, 20, 0, 20, 0);
     addWire(circuit, 30, 0, 30, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 
@@ -641,7 +641,7 @@ describe("MOSFET through compiler", () => {
     addWire(circuit, 40, 0, 40, 0);
     addWire(circuit, 50, 0, 50, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 
@@ -715,7 +715,7 @@ describe("MOSFET through compiler", () => {
     addWire(circuit, 40, 0, 40, 0);
     addWire(circuit, 50, 0, 50, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 
@@ -790,7 +790,7 @@ describe("MOSFET through compiler", () => {
     addWire(circuit, 40, 0, 40, 0);
     addWire(circuit, 50, 0, 50, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 

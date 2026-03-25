@@ -31,7 +31,7 @@ import type { Pin } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { ResistorDefinition } from "../../components/passives/resistor.js";
 import { DcVoltageSourceDefinition } from "../../components/sources/dc-voltage-source.js";
 import { GroundDefinition } from "../../components/io/ground.js";
@@ -522,7 +522,7 @@ function makeAnalogElement(
 
 describe("runner_integration", () => {
   it("runner_integration", () => {
-    // Full pipeline: compileAnalogCircuit → MNAEngine.init → dcOperatingPoint → read by label.
+    // Full pipeline: compileUnified → MNAEngine.init → dcOperatingPoint → read by label.
     //
     // Circuit: Vs=5V → R1=1kΩ → midpoint (labeled "V_mid") → R2=1kΩ → GND
     // Expected: V_mid = 2.5V
@@ -574,8 +574,8 @@ describe("runner_integration", () => {
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 1 }));
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 1 }));
 
-    // Compile via compileAnalogCircuit (the full pipeline under test)
-    const compiled = compileAnalogCircuit(circuit, registry);
+    // Compile via compileUnified (the full pipeline under test)
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 

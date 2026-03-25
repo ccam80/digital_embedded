@@ -21,6 +21,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 
@@ -201,9 +202,9 @@ describe("OpAmp", () => {
     const matrixSize = 9;
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = OpAmpDefinition.models!.analog!.factory(
+    const opampEl = withNodeIds(OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
-    );
+    ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
     // 75Ω load on output
     const G_load = 1 / 75;
@@ -277,9 +278,9 @@ describe("Integration", () => {
     const matrixSize = 10;
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = OpAmpDefinition.models!.analog!.factory(
+    const opampEl = withNodeIds(OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
-    );
+    ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
     const rin = makeResistor(nVin, nInn, 1000);
     const rf  = makeResistor(nInn, nOut, 10000);
@@ -317,9 +318,9 @@ describe("Integration", () => {
 
     const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
     // in- and out share nFeedback (voltage follower)
-    const opampEl = OpAmpDefinition.models!.analog!.factory(
+    const opampEl = withNodeIds(OpAmpDefinition.models!.analog!.factory(
       new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
-    );
+    ), [nFeedback, nInp, nFeedback]); // pinLayout order: [in-, in+, out]
 
     const vsVin  = makeDcVoltageSource(nInp,  0, brVin,  3.7);
     const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);

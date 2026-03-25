@@ -75,21 +75,25 @@ function make555(
   nodes: { vcc: number; gnd: number; trig: number; thr: number; ctrl: number; rst: number; dis: number; out: number },
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return Timer555Definition.models!.analog!.factory(
-    new Map([
-      ["DIS",  nodes.dis],
-      ["TRIG", nodes.trig],
-      ["THR",  nodes.thr],
-      ["VCC",  nodes.vcc],
-      ["CTRL", nodes.ctrl],
-      ["OUT",  nodes.out],
-      ["RST",  nodes.rst],
-      ["GND",  nodes.gnd],
-    ]),
-    [],
-    -1,
-    makeProps(overrides),
-    () => 0,
+  // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
+  return withNodeIds(
+    Timer555Definition.models!.analog!.factory(
+      new Map([
+        ["DIS",  nodes.dis],
+        ["TRIG", nodes.trig],
+        ["THR",  nodes.thr],
+        ["VCC",  nodes.vcc],
+        ["CTRL", nodes.ctrl],
+        ["OUT",  nodes.out],
+        ["RST",  nodes.rst],
+        ["GND",  nodes.gnd],
+      ]),
+      [],
+      -1,
+      makeProps(overrides),
+      () => 0,
+    ),
+    [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
   );
 }
 
@@ -182,6 +186,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 import {
   makeCapacitor,
   makeVoltageSource,
+  withNodeIds,
 } from "../../../analog/test-elements.js";
 
 // ---------------------------------------------------------------------------

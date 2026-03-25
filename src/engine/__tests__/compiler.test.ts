@@ -7,7 +7,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compileCircuit, compileDigitalPartition } from "../compiler.js";
+import { compileDigitalPartition } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { findSCCs } from "../tarjan.js";
 import { topologicalSort } from "../topological-sort.js";
 import { Circuit, Wire } from "@/core/circuit";
@@ -160,7 +161,7 @@ describe("Compiler", () => {
     const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, twoInputPins());
     circuit.addElement(andEl);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // Each unconnected pin forms its own net
     expect(compiled.netCount).toBe(3);
@@ -201,7 +202,7 @@ describe("Compiler", () => {
     // Wire from NOT output (2,0) to AND input-a (8,0)
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.componentCount).toBe(2);
     // NOT output and AND first input share a net via wire
@@ -254,7 +255,7 @@ describe("Compiler", () => {
     // NOR2 output (10,0) → NOR1 input-b (0,1)
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 0, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.componentCount).toBe(2);
 
@@ -290,7 +291,7 @@ describe("Compiler", () => {
     circuit.addElement(andEl);
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // The NOT output (pin index 1, position 2,0) and AND input-a (pin index 0,
     // position 8,0) should be on the same net.
@@ -326,7 +327,7 @@ describe("Compiler", () => {
     circuit.addElement(new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins()));
     circuit.addElement(new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins()));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // executeFns must be populated at both type IDs
     expect(compiled.executeFns[notTypeId]).toBeDefined();
@@ -374,7 +375,7 @@ describe("Compiler", () => {
     // Wire from In output (0,0) to Out input (10,0)
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.labelToNetId.has("A")).toBe(true);
     expect(compiled.labelToNetId.has("S")).toBe(true);
@@ -393,7 +394,7 @@ describe("Compiler", () => {
     const circuit = new Circuit();
     circuit.addElement(new TestElement("Xyzzy", "xyzzy-1", { x: 0, y: 0 }, notPins()));
 
-    expect(() => compileCircuit(circuit, registry)).toThrow(/unknown component type "Xyzzy"/);
+    expect(() => compileUnified(circuit, registry)).toThrow(/unknown component type "Xyzzy"/);
   });
 
   // -------------------------------------------------------------------------
@@ -417,7 +418,7 @@ describe("Compiler", () => {
     circuit.addElement(new TestElement("Src", "src-1", { x: 0, y: 0 }, singleBitOutPins));
     circuit.addElement(new TestElement("Dst", "dst-1", { x: 0, y: 0 }, eightBitInPins));
 
-    expect(() => compileCircuit(circuit, registry)).toThrow(BitsException);
+    expect(() => compileUnified(circuit, registry)).toThrow(BitsException);
   });
 
   // -------------------------------------------------------------------------
@@ -438,7 +439,7 @@ describe("Compiler", () => {
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
     circuit.addWire(wire);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.wireToNetId.has(wire)).toBe(true);
     // The wire's net ID should be valid (0 <= netId < netCount)
@@ -453,7 +454,7 @@ describe("Compiler", () => {
   it("emptyCircuitCompiles", () => {
     const registry = new ComponentRegistry();
     const circuit = new Circuit();
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     expect(compiled.netCount).toBe(0);
     expect(compiled.componentCount).toBe(0);
     expect(compiled.evaluationOrder.length).toBe(0);
@@ -900,7 +901,7 @@ describe("compileDigitalPartition", () => {
   // matchesCircuitCompilerOutputForChainedGates
   // -------------------------------------------------------------------------
   it("matchesCircuitCompilerOutputForChainedGates", () => {
-    // Build via compileCircuit and via compileDigitalPartition, compare results.
+    // Build via compileUnified and via compileDigitalPartition, compare results.
     // NOT(0,0) → AND(8,0): wire from (2,0) to (8,0)
 
     const notDef = makeDefinition("Not", notPins());
@@ -911,12 +912,12 @@ describe("compileDigitalPartition", () => {
     const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
 
-    // Via compileCircuit (old path)
+    // Via compileUnified (circuit-level path)
     const circuit = new Circuit();
     circuit.addElement(notEl);
     circuit.addElement(andEl);
     circuit.addWire(wire);
-    const compiledOld = compileCircuit(circuit, registry);
+    const compiledOld = compileUnified(circuit, registry).digital!;
 
     // Via compileDigitalPartition (new path)
     // NOT pins: in@(0,0), out@(2,0) — world: (0,0) and (2,0)
@@ -1055,7 +1056,7 @@ describe("Compiler — feedback wire mapping", () => {
     circuit.addWire(w2);
     circuit.addWire(w3);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // All 3 wires must be in wireToNetId
     expect(compiled.wireToNetId.size).toBe(3);
@@ -1116,7 +1117,7 @@ describe("Compiler — feedback wire mapping", () => {
     circuit.addWire(wb2);
     circuit.addWire(wb3);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // All 6 wires must be in wireToNetId
     const allWires = [wf1, wf2, wf3, wb1, wb2, wb3];

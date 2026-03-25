@@ -29,7 +29,7 @@ import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import { ComponentRegistry } from "../../core/registry.js";
 import type { PropertyValue } from "../../core/properties.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { TransistorModelRegistry } from "../transistor-model-registry.js";
 import { registerAnalogFactory } from "../transistor-expansion.js";
@@ -187,7 +187,7 @@ function gnd(circuit: Circuit, xG: number): void {
 
 function getVoltageAtX(
   engine: MNAEngine,
-  compiled: ReturnType<typeof compileAnalogCircuit>,
+  compiled: NonNullable<ReturnType<typeof compileUnified>["analog"]>,
   targetX: number,
 ): number {
   for (const [wire, nodeId] of compiled.wireToNodeId) {
@@ -321,12 +321,12 @@ function addDffWires(
 
 type SolveResult = {
   engine: MNAEngine;
-  compiled: ReturnType<typeof compileAnalogCircuit>;
+  compiled: NonNullable<ReturnType<typeof compileUnified>["analog"]>;
   converged: boolean;
 };
 
 function solveDc(circuit: Circuit, registry: ComponentRegistry): SolveResult {
-  const compiled = compileAnalogCircuit(circuit, registry);
+  const compiled = compileUnified(circuit, registry).analog!;
   const engine = new MNAEngine();
   engine.init(compiled);
   engine.configure({ maxIterations: 500, reltol: 1e-3, abstol: 1e-6 });
@@ -344,7 +344,7 @@ function runTransient(
   tEndNs: number,
   maxDtNs = 0.05,
 ): SolveResult & { completed: boolean } {
-  const compiled = compileAnalogCircuit(circuit, registry);
+  const compiled = compileUnified(circuit, registry).analog!;
   const engine = new MNAEngine();
   engine.init(compiled);
   engine.configure({ maxIterations: 500, reltol: 1e-3, abstol: 1e-6, maxTimeStep: maxDtNs * 1e-9 });
@@ -450,7 +450,7 @@ describe("CmosDFF", () => {
     // Assert: Q crosses VDD/2 between 0.1ns and 50ns after ramp start.
     const tRampStartNs = 10;
     const { circuit, registry, qX } = buildDffRamp(VDD, tRampStartNs);
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const engine = new MNAEngine();
     engine.init(compiled);
     engine.configure({ maxIterations: 500, reltol: 1e-3, abstol: 1e-6, maxTimeStep: 0.05e-9 });

@@ -22,6 +22,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 
@@ -56,12 +57,15 @@ function makeSPST(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SwitchSPSTDefinition.models!.analog!.factory(
-    new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
-    [],
-    -1,
-    makeProps(overrides),
-    () => 0,
+  return withNodeIds(
+    SwitchSPSTDefinition.models!.analog!.factory(
+      new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
+      [],
+      -1,
+      makeProps(overrides),
+      () => 0,
+    ),
+    [nIn, nOut, nCtrl],
   );
 }
 
@@ -72,12 +76,15 @@ function makeSPDT(
   nNC: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SwitchSPDTDefinition.models!.analog!.factory(
-    new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
-    [],
-    -1,
-    makeProps(overrides),
-    () => 0,
+  return withNodeIds(
+    SwitchSPDTDefinition.models!.analog!.factory(
+      new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
+      [],
+      -1,
+      makeProps(overrides),
+      () => 0,
+    ),
+    [nCom, nNO, nNC, nCtrl],
   );
 }
 

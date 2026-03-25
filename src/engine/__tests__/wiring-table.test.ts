@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compileCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { DigitalEngine } from "../digital-engine.js";
 
 import { Circuit, Wire } from "@/core/circuit";
@@ -199,7 +199,7 @@ describe("WiringIndirection", () => {
     circuit.addWire(new Wire({ x: 2, y: 4 }, { x: 4, y: 1 }));
     circuit.addWire(new Wire({ x: 6, y: 0 }, { x: 8, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const wt = compiled.layout.wiringTable;
 
     const engine = new DigitalEngine("level");
@@ -244,7 +244,7 @@ describe("WiringIndirection", () => {
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
     circuit.addWire(new Wire({ x: 2, y: 4 }, { x: 4, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const wt = compiled.layout.wiringTable;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
@@ -283,7 +283,7 @@ describe("WiringIndirection", () => {
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
     circuit.addWire(new Wire({ x: 2, y: 1 }, { x: 4, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
 
@@ -359,7 +359,7 @@ describe("WiringIndirection", () => {
     // Wire: AND.out(8,4) -> Carry.in(10,4)
     circuit.addWire(new Wire({ x: 8, y: 4 }, { x: 10, y: 4 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const wt = compiled.layout.wiringTable;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
@@ -414,7 +414,7 @@ describe("WiringIndirection", () => {
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
     circuit.addWire(new Wire({ x: 2, y: 4 }, { x: 4, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const wt = compiled.layout.wiringTable;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
@@ -452,7 +452,7 @@ describe("WiringIndirection", () => {
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
     circuit.addWire(new Wire({ x: 2, y: 1 }, { x: 4, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const wt = compiled.layout.wiringTable;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
@@ -487,7 +487,7 @@ describe("WiringIndirection", () => {
     const circuit = new Circuit();
     circuit.addElement(new TestElement("And", "and0", { x: 0, y: 0 }, twoInputOneOutput()));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.layout.wiringTable).toBeInstanceOf(Int32Array);
     expect(compiled.wiringTable).toBeInstanceOf(Int32Array);

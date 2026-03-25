@@ -20,7 +20,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../analog/analog-engine.js";
-import { makeResistor, makeVoltageSource, makeCurrentSource } from "../../../analog/test-elements.js";
+import { makeResistor, makeVoltageSource, makeCurrentSource, withNodeIds } from "../../../analog/test-elements.js";
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
@@ -44,12 +44,15 @@ function makeOTAElement(
     ["vt", vt],
     ["label", ""],
   ]).entries());
-  return OTADefinition.models!.analog!.factory(
-    new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
-    [],
-    -1,
-    props,
-    () => 0,
+  return withNodeIds(
+    OTADefinition.models!.analog!.factory(
+      new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    ),
+    [nVp, nVm, nIabc, nOutP, nOutN],
   );
 }
 

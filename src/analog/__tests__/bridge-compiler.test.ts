@@ -2,7 +2,7 @@
  * Tests for analog compiler bridge adapter insertion (Task 4b.2.2).
  *
  * Verifies:
- * - compileAnalogCircuit accepts FlattenResult with crossEngineBoundaries
+ * - compileUnified routes analog circuits through compileAnalogPartition
  * - Digital subcircuit is compiled separately by the digital compiler
  * - BridgeOutputAdapter created for each 'out' pin mapping
  * - BridgeInputAdapter created for each 'in' pin mapping
@@ -23,7 +23,7 @@ import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { LOGIC_FAMILY_PRESETS } from "../../core/logic-family.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 import type { SubcircuitHost } from "../../engine/flatten.js";
@@ -418,7 +418,7 @@ describe("BridgeCompilation", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     expect(compiled.bridges).toHaveLength(1);
     const bridge = compiled.bridges[0]!;
@@ -439,7 +439,7 @@ describe("BridgeCompilation", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     // Pin "Y" is direction "out" → should create 1 BridgeOutputAdapter
@@ -463,7 +463,7 @@ describe("BridgeCompilation", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     // Pins "A" and "B" are direction "in" → should create 2 BridgeInputAdapters
@@ -489,7 +489,7 @@ describe("BridgeCompilation", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     const inner = bridge.compiledInner;
@@ -567,7 +567,7 @@ describe("BridgeCompilation", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     expect(compiled.bridges).toHaveLength(1);
     const bridge = compiled.bridges[0]!;

@@ -32,7 +32,7 @@ function makeSparkGap(overrides: Partial<{
     overrides.rOff ?? 1e10,
     overrides.iHold ?? 0.01,
   );
-  Object.assign(el, { pinNodeIds: [1, 2] });
+  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 

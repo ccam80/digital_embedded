@@ -46,6 +46,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 
@@ -717,6 +718,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -775,12 +777,12 @@ describe("AnalogLED", () => {
     const matrixSize = 3;
     const branchRow = 2;
 
-    const vs = makeDcVoltageSource(2, 0, branchRow, 5);
+    const vs = withNodeIds(makeDcVoltageSource(2, 0, branchRow, 5), [2, 0]);
     const r = makeResistorElementForLed(1, 2, 220);
 
     const props = new PropertyBag();
     props.set("color", "red");
-    const led = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const led = withNodeIds(LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -808,12 +810,12 @@ describe("AnalogLED", () => {
     const matrixSize = 3;
     const branchRow = 2;
 
-    const vs = makeDcVoltageSource(2, 0, branchRow, 5);
+    const vs = withNodeIds(makeDcVoltageSource(2, 0, branchRow, 5), [2, 0]);
     const r = makeResistorElementForLed(1, 2, 100);
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    const led = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const led = withNodeIds(LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

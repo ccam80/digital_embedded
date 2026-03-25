@@ -25,7 +25,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import { pnjlim } from "./newton-raphson.js";
 import {
   capacitorConductance,
@@ -33,6 +33,30 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "./integration.js";
+
+// ---------------------------------------------------------------------------
+// withNodeIds — test helper for factory-created elements
+// ---------------------------------------------------------------------------
+
+/**
+ * Stamp pinNodeIds and allNodeIds onto an AnalogElementCore, promoting it
+ * to a full AnalogElement. Used by tests that call component factories
+ * directly (bypassing the compiler which normally sets these fields).
+ *
+ * @param core - Factory return value (AnalogElementCore)
+ * @param pinNodeIds - Pin node IDs in pinLayout order
+ * @param internalNodeIds - Optional internal node IDs (default: none)
+ */
+export function withNodeIds(
+  core: AnalogElementCore,
+  pinNodeIds: readonly number[],
+  internalNodeIds: readonly number[] = [],
+): AnalogElement {
+  return Object.assign(core, {
+    pinNodeIds,
+    allNodeIds: [...pinNodeIds, ...internalNodeIds],
+  }) as AnalogElement;
+}
 
 // ---------------------------------------------------------------------------
 // Internal helper — stamp into solver, skipping ground (node 0)

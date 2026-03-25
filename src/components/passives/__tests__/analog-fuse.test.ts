@@ -313,6 +313,7 @@ describe("AnalogFuseElement", () => {
       const G_load = 1 / rLoad;
       const loadResistor = {
         pinNodeIds: [2, 0] as readonly number[],
+        allNodeIds: [2, 0] as readonly number[],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,

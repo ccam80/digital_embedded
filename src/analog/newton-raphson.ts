@@ -229,7 +229,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
       const el = elements[ei];
       if (!el.isNonlinear) continue;
       let elDelta = 0;
-      for (const ni of (el.pinNodeIds ?? [])) {
+      for (const ni of el.pinNodeIds) {
         if (ni > 0 && ni - 1 < matrixSize) {
           const d = Math.abs(voltages[ni - 1] - prevVoltages[ni - 1]);
           if (d > elDelta) elDelta = d;

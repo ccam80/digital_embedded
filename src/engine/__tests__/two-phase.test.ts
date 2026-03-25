@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compileCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { DigitalEngine } from "../digital-engine.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
@@ -190,7 +190,7 @@ describe("SampleFn", () => {
     dff.position = { x: 0, y: 0 };
     circuit.addElement(dff);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const typeId = compiled.typeIds[0]!;
     expect(compiled.sampleFns[typeId]).toBe(sampleDFF);
   });
@@ -204,7 +204,7 @@ describe("SampleFn", () => {
     and1.position = { x: 0, y: 0 };
     circuit.addElement(and1);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const typeId = compiled.typeIds[0]!;
     expect(compiled.sampleFns[typeId]).toBeNull();
   });
@@ -259,7 +259,7 @@ describe("TwoPhaseStep", () => {
     // Wire DFF_B.Q → Out.in
     circuit.addWire(new Wire({ x: 22, y: 0 }, { x: 30, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine();
     engine.init(compiled);
 
@@ -315,7 +315,7 @@ describe("TwoPhaseStep", () => {
     // Shared clock
     circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 10, y: 1 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine();
     engine.init(compiled);
 
@@ -402,7 +402,7 @@ describe("TwoPhaseStep", () => {
     // Wire And.out → Out.in
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 20, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine();
     engine.init(compiled);
 

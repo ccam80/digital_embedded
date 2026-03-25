@@ -11,7 +11,7 @@ import { ModelLibrary, validateModel } from "../model-library.js";
 import type { DeviceModel } from "../model-library.js";
 import type { DeviceType } from "../model-parser.js";
 import { DIODE_DEFAULTS } from "../model-defaults.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
@@ -288,7 +288,7 @@ describe("ModelBinding", () => {
     ]);
 
     // Compile — this triggers model binding
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // Verify no compilation errors
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");

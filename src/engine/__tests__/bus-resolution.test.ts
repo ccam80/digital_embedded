@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { BusNet, BusResolver } from "../bus-resolution.js";
 import { BurnException } from "@/core/errors.js";
-import { compileCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { DigitalEngine } from "../digital-engine.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
@@ -521,7 +521,7 @@ describe("BusIntegration", () => {
 
     circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.busResolver).not.toBeNull();
     expect(compiled.multiDriverNets.size).toBeGreaterThanOrEqual(1);
@@ -564,7 +564,7 @@ describe("BusIntegration", () => {
 
     circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
 
@@ -611,7 +611,7 @@ describe("BusIntegration", () => {
 
     circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
 
@@ -654,7 +654,7 @@ describe("BusIntegration", () => {
 
     circuit.addWire(new Wire({ x: 5, y: 5 }, { x: 5, y: 0 }));
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
 
@@ -682,7 +682,7 @@ describe("BusIntegration", () => {
     const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, andPins);
     circuit.addElement(andEl);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.busResolver).toBeNull();
     expect(compiled.multiDriverNets.size).toBe(0);

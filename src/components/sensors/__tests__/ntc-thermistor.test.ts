@@ -47,7 +47,7 @@ function makeNTC(overrides: Partial<{
     overrides.shB,
     overrides.shC,
   );
-  Object.assign(el, { pinNodeIds: [1, 2] });
+  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 

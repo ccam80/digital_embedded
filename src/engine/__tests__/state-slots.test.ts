@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compileCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { Circuit } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
@@ -178,7 +178,7 @@ describe("StateSlotAllocation", () => {
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     expect(compiled.signalArraySize).toBe(compiled.netCount + 2);
 
@@ -199,7 +199,7 @@ describe("StateSlotAllocation", () => {
     dff2.position = { x: 20, y: 0 };
     circuit.addElement(dff2);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     const offset0 = compiled.layout.stateOffset(0);
     const offset1 = compiled.layout.stateOffset(1);
@@ -224,7 +224,7 @@ describe("StateSlotAllocation", () => {
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     const engine = new DigitalEngine("level");
     engine.init(compiled);
@@ -259,7 +259,7 @@ describe("StateSlotAllocation", () => {
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     const andStateOffset = compiled.layout.stateOffset(0);
     const dffStateOffset = compiled.layout.stateOffset(1);
@@ -298,7 +298,7 @@ describe("StateSlotAllocation", () => {
       { key: "size", label: "Size", type: PropertyType.INT, defaultValue: 4 },
     ];
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     const offset0 = compiled.layout.stateOffset(0);
     const offset1 = compiled.layout.stateOffset(1);

@@ -374,7 +374,7 @@ describe("Probe", () => {
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [3] });
+      Object.assign(analogElement, { pinNodeIds: [3], allNodeIds: [3] });
 
       analogElement.stamp(mockSolver);
 
@@ -390,7 +390,7 @@ describe("Probe", () => {
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [3] });
+      Object.assign(analogElement, { pinNodeIds: [3], allNodeIds: [3] });
 
       const voltages = new Float64Array(5);
       voltages[3] = 4.72;
@@ -427,7 +427,7 @@ describe("Probe", () => {
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [5] });
+      Object.assign(analogElement, { pinNodeIds: [5], allNodeIds: [5] });
 
       expect(analogElement.pinNodeIds).toEqual([5]);
       expect(analogElement.branchIndex).toBe(-1);

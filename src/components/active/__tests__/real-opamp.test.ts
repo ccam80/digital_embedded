@@ -17,6 +17,7 @@ import { SparseSolver } from "../../../analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -54,10 +55,10 @@ function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogE
   const props = new PropertyBag(entries);
   const pinNodes = new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]);
   const el = createRealOpAmpElement(pinNodes, props);
-  // Inject pinNodeIds in pinLayout order: [in-, in+, out, Vcc+, Vcc-] → [2, 1, 3, 4, 5]
+  // pinLayout order: [in-, in+, out, Vcc+, Vcc-] → [2, 1, 3, 4, 5]
   const pinLayout = RealOpAmpDefinition.pinLayout;
-  Object.assign(el, { pinNodeIds: pinLayout.map(p => pinNodes.get(p.label) ?? 0) });
-  return el as AnalogElement;
+  const pinNodeIds = pinLayout.map(p => pinNodes.get(p.label) ?? 0);
+  return withNodeIds(el, pinNodeIds);
 }
 
 /**
@@ -103,6 +104,20 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
       solver.stampRHS(k, voltage * scale);
     },
   };
+}
+
+/**
+ * Create a RealOpAmp element with pinNodeIds stamped via withNodeIds.
+ * pinLayout order: [in-, in+, out, Vcc+, Vcc-]
+ */
+function makeOpAmp(
+  pinNodes: Map<string, number>,
+  props: PropertyBag,
+): AnalogElement {
+  const el = createRealOpAmpElement(pinNodes, props);
+  const pinLayout = RealOpAmpDefinition.pinLayout;
+  const pinNodeIds = pinLayout.map(p => pinNodes.get(p.label) ?? 0);
+  return withNodeIds(el, pinNodeIds);
 }
 
 /**
@@ -182,7 +197,7 @@ describe("DCGain", () => {
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -226,7 +241,7 @@ describe("DCGain", () => {
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -333,7 +348,7 @@ describe("SlewRate", () => {
 
     const slewRate = 0.5e6; // V/s
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", slewRate],
@@ -382,7 +397,7 @@ describe("SlewRate", () => {
     const slewRate = 0.5e6;
     const dt = 1e-6;
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", slewRate],
@@ -448,7 +463,7 @@ describe("Offset", () => {
 
     const vos = 1e-3; // 1 mV
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -459,7 +474,7 @@ describe("Offset", () => {
       ["iMax",     25e-3],
       ["vSatPos",  1.5],
       ["vSatNeg",  1.5],
-    ]));
+    ])), [nInp, nInn, nOut, nVccP, nVccN]);
 
     // Non-inverting amplifier: in- connected through Rin=1Ω to gnd, Rf=999Ω from out to in-
     // Gain = 1 + 999/1 = 1000
@@ -503,7 +518,7 @@ describe("CurrentLimit", () => {
 
     const iMax = 25e-3;
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nOut], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
+    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nOut], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
       ["aol",      100000],
       ["gbw",      1e6],
       ["slewRate", 0.5e6],
@@ -514,7 +529,7 @@ describe("CurrentLimit", () => {
       ["iMax",     iMax],
       ["vSatPos",  1.5],
       ["vSatNeg",  1.5],
-    ]));
+    ])), [nInp, nOut, nOut, nVccP, nVccN]);
 
     const rLoad = 10; // 10Ω heavy load
 
@@ -577,7 +592,7 @@ describe("RealOpAmp", () => {
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
-    const opamp = createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), props);
+    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), props), [nInp, nFeedback, nFeedback, nVccP, nVccN]);
     const elements: AnalogElement[] = [
       opamp,
       makeDcSource(nInp,  0, brVin,   3.0),

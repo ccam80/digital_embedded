@@ -17,6 +17,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
@@ -234,6 +235,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -277,7 +279,7 @@ describe("Integration", () => {
 
     // Diode: anode=node1, cathode=ground(0)
     const diodeProps = { _modelParams: { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 } };
-    const d = createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps as unknown as PropertyBag);
+    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps as unknown as PropertyBag), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

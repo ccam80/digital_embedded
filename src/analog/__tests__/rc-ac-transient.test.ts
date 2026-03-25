@@ -305,7 +305,7 @@ import type { PropertyValue } from "../../core/properties.js";
 import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import { ComponentRegistry } from "../../core/registry.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 
 import { ResistorDefinition } from "../../components/passives/resistor.js";
 import { CapacitorDefinition } from "../../components/passives/capacitor.js";
@@ -405,7 +405,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     addWire(circuit, 20, 0, 20, 0);
     addWire(circuit, 30, 0, 30, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter(d => d.severity === "error");
     expect(errors).toHaveLength(0);
 
@@ -458,7 +458,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     addWire(circuit, 20, 0, 20, 0);
     addWire(circuit, 30, 0, 30, 0);
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const engine = new MNAEngine();
     engine.init(compiled);
     engine.dcOperatingPoint();
@@ -546,7 +546,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     addWire(circuit, 30, 0, 30, 0);  // node_gnd
 
     // Compile
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter(d => d.severity === "error");
     expect(errors).toHaveLength(0);
 

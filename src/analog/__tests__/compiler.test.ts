@@ -18,7 +18,7 @@ import { ComponentRegistry } from "../../core/registry.js";
 import type { ComponentCategory } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement factory for tests
@@ -260,7 +260,7 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
 describe("AnalogCompiler", () => {
   it("compiles_resistor_divider", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // Vs, R1, R2 → 3 analog elements (Ground is skipped by the compiler)
     expect(compiled.elements.length).toBe(3);
@@ -277,7 +277,7 @@ describe("AnalogCompiler", () => {
 
   it("assigns_ground_node_zero", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // The voltage source element should have one terminal at ground (node 0)
     const vsElement = compiled.elements[0];
@@ -303,7 +303,7 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     expect(compiled.labelToNodeId.has("V_in")).toBe(true);
     expect(compiled.labelToNodeId.has("V_mid")).toBe(true);
@@ -330,9 +330,9 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
     // Compiler must not throw — emits a warning diagnostic instead
-    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     // nodeCount = 2 (node at x=10 and node at x=30)
     expect(compiled.nodeCount).toBe(2);
   });
@@ -356,9 +356,9 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
     // Compiler must not throw — emits an error diagnostic
-    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     // Both voltage sources are compiled; branchCount = 2
     expect(compiled.elements.length).toBe(2);
     expect(compiled.branchCount).toBe(2);
@@ -375,7 +375,7 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
 
     // Must compile without throwing (warning diagnostic emitted)
-    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
   });
 
   it("rejects_digital_only_component", () => {
@@ -392,8 +392,8 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
     // Digital-only components emit an error diagnostic instead of throwing
-    expect(() => compileAnalogCircuit(circuit, registry)).not.toThrow();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+    const compiled = compileUnified(circuit, registry).analog!;
     expect(compiled.diagnostics.some((d) => d.code === "unsupported-component-in-analog")).toBe(true);
   });
 
@@ -437,7 +437,7 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(factorySpy).toHaveBeenCalledOnce();
 
@@ -460,14 +460,14 @@ describe("AnalogCompiler", () => {
     const circuit = new Circuit({ engineType: "digital" });
     const registry = buildTestRegistry();
 
-    expect(() => compileAnalogCircuit(circuit, registry)).toThrow(
+    expect(() => compileUnified(circuit, registry)).toThrow(
       /engineType must be "analog"/,
     );
   });
 
   it("elementToCircuitElement_maps_index_to_element", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // 3 elements (Vs, R1, R2 — Ground is skipped)
     for (let i = 0; i < compiled.elements.length; i++) {
@@ -477,7 +477,7 @@ describe("AnalogCompiler", () => {
 
   it("wireToNodeId_maps_wires_to_nodes", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     // Every wire in the circuit should appear in the map
     for (const wire of circuit.wires) {
@@ -487,21 +487,21 @@ describe("AnalogCompiler", () => {
 
   it("matrixSize_equals_nodeCount_plus_branchCount", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     expect(compiled.matrixSize).toBe(compiled.nodeCount + compiled.branchCount);
   });
 
   it("netCount_equals_nodeCount", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     expect(compiled.netCount).toBe(compiled.nodeCount);
   });
 
   it("componentCount_equals_elementCount", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     expect(compiled.componentCount).toBe(compiled.elementCount);
     expect(compiled.elementCount).toBe(compiled.elements.length);

@@ -59,7 +59,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
   const el = InductorDefinition.models!.analog!.factory(pinNodes, [], branchIdx, props, () => 0);
-  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()) });
+  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
 

@@ -17,6 +17,7 @@ import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../components/sources/dc-voltage-source.js";
+import { withNodeIds } from "../test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
 
@@ -115,13 +116,13 @@ describe("Refactor", () => {
     const diagnostics = new DiagnosticCollector();
 
     const propsObj = { _modelParams: NMOS_10U_1U };
-    const nmosElement = createMosfetElement(
+    const nmosElement = withNodeIds(createMosfetElement(
       1,
       new Map([["G", 3], ["S", 0], ["D", 1]]), // G=node3, S=ground, D=node1
       [],
       -1,
       propsObj as unknown as PropertyBag,
-    );
+    ), [3, 0, 1]); // pinLayout order: [G, S, D]
 
     const vddSource = makeDcVoltageSource(2, 0, 3, 5.0);  // Vdd=5V, branch index 3
     const vgateSource = makeDcVoltageSource(3, 0, 4, 3.0); // Vgate=3V, branch index 4
@@ -165,13 +166,13 @@ describe("Refactor", () => {
     const diagnostics = new DiagnosticCollector();
 
     const propsObj = { _modelParams: PMOS_DEFAULTS };
-    const pmosElement = createMosfetElement(
+    const pmosElement = withNodeIds(createMosfetElement(
       -1,
       new Map([["G", 3], ["S", 2], ["D", 1]]), // G=node3, S=node2(Vss), D=node1
       [],
       -1,
       propsObj as unknown as PropertyBag,
-    );
+    ), [3, 1, 2]); // pinLayout order: [G, D, S] for PMOS
 
     const rdElement = makeResistorElement(1, 0, 1000); // Rd from drain to GND
     const vssSource = makeDcVoltageSource(2, 0, 3, 5.0); // Vss=5V, branch index 3

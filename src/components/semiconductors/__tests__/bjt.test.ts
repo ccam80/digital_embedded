@@ -23,6 +23,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
@@ -110,6 +111,7 @@ function makeResistor(nodeA: number, nodeB: number, R: number): AnalogElement {
   const G = 1 / R;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -332,8 +334,7 @@ describe("NPN", () => {
 
   it("pinNodeIds_correct", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj as unknown as PropertyBag);
-    Object.assign(element, { pinNodeIds: [3, 5, 7] });
+    const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj as unknown as PropertyBag), [3, 5, 7]);
     expect(element.pinNodeIds).toEqual([3, 5, 7]);
   });
 
@@ -436,8 +437,7 @@ describe("Definitions", () => {
   it("npn_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = NpnBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0);
-    Object.assign(el, { pinNodeIds: [1, 2, 3] });
+    const el = withNodeIds(NpnBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -445,8 +445,7 @@ describe("Definitions", () => {
   it("pnp_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = PnpBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0);
-    Object.assign(el, { pinNodeIds: [1, 2, 3] });
+    const el = withNodeIds(PnpBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -496,7 +495,7 @@ describe("Integration", () => {
 
     // BJT: C=node1, B=node2, E=gnd(0)
     const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag);
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag), [2, 1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -561,7 +560,7 @@ describe("Integration", () => {
     // BJT: B=gnd, C=node1, E=gnd → base=0=ground, emitter=0=ground
     // createBjtElement pin order: [B, C, E]
     const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag);
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag), [0, 1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

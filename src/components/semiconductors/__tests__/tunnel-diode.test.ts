@@ -19,6 +19,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../analog/sparse-solver.js";
 import { newtonRaphson } from "../../../analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../analog/diagnostics.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 
@@ -230,17 +231,18 @@ describe("TunnelDiode", () => {
 
     const vTarget = (TD_DEFAULTS.vp + TD_DEFAULTS.vv) / 2; // ~0.29V
 
-    const td = createTunnelDiodeElement(
+    const td = withNodeIds(createTunnelDiodeElement(
       new Map([["A", 2], ["K", 0]]),
       [],
       -1,
       new PropertyBag(Object.entries(TD_DEFAULTS)),
-    );
+    ), [2, 0]);
 
     // Resistor element
     const G = 1 / 100;
     const resistor: AnalogElement = {
       pinNodeIds: [1, 2],
+      allNodeIds: [1, 2],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
@@ -255,6 +257,7 @@ describe("TunnelDiode", () => {
     // Voltage source: node1 = vTarget, gnd (branch row = 2, matrix index 2)
     const vsource: AnalogElement = {
       pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
       branchIndex: 2,
       isNonlinear: false,
       isReactive: false,

@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../analog/test-elements.js";
+import { makeResistor, makeVoltageSource, withNodeIds } from "../../../analog/test-elements.js";
 import { OptocouplerDefinition } from "../optocoupler.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
@@ -44,12 +44,15 @@ function makeOptocouplerElement(
     ["bandwidth", 50000],
     ["label",    ""],
   ]).entries());
-  return OptocouplerDefinition.models!.analog!.factory(
-    new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
-    [],
-    -1,
-    props,
-    () => 0,
+  return withNodeIds(
+    OptocouplerDefinition.models!.analog!.factory(
+      new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    ),
+    [nAnode, nCathode, nCollector, nEmitter],
   );
 }
 

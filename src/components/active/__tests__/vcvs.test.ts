@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../analog/test-elements.js";
+import { makeResistor, makeVoltageSource, withNodeIds } from "../../../analog/test-elements.js";
 import { VCVSDefinition } from "../vcvs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
@@ -36,12 +36,15 @@ function makeVCVSElement(
     ["gain", gain],
     ["label", ""],
   ]).entries());
-  return VCVSDefinition.models!.analog!.factory(
-    new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
-    [],
-    branchIdx,
-    props,
-    () => 0,
+  return withNodeIds(
+    VCVSDefinition.models!.analog!.factory(
+      new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
+      [],
+      branchIdx,
+      props,
+      () => 0,
+    ),
+    [nCtrlP, nCtrlN, nOutP, nOutN],
   );
 }
 

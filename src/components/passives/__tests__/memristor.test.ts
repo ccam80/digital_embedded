@@ -41,7 +41,7 @@ function makeMemristor(overrides: Partial<{
     overrides.deviceLength ?? DEVICE_LENGTH,
     overrides.windowOrder ?? WINDOW_ORDER,
   );
-  Object.assign(el, { pinNodeIds: [1, 2] });
+  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 

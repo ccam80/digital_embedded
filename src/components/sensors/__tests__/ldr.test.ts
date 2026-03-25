@@ -31,7 +31,7 @@ function makeLDR(overrides: Partial<{
     overrides.gamma ?? 0.7,
     overrides.lux ?? 500,
   );
-  Object.assign(el, { pinNodeIds: [1, 2] });
+  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 

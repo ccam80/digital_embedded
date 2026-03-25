@@ -25,7 +25,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor } from "../test-elements.js";
+import { makeVoltageSource, makeResistor, withNodeIds } from "../test-elements.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,
@@ -96,7 +96,7 @@ function make2InputGateCircuit(
   // Load resistor from output node (1-based=3) to ground
   const rLoad = makeResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, vsB, rLoad, gateElement];
+  const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(gateElement, [1, 2, 3])];
 
   return { solver, diagnostics, elements, matrixSize: 5 };
 }
@@ -120,7 +120,7 @@ function make1InputGateCircuit(
   const vsIn = makeVoltageSource(1, 0, 2, vIn); // node 1, branch row 2
   const rLoad = makeResistor(2, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsIn, rLoad, gateElement];
+  const elements: AnalogElement[] = [vsIn, rLoad, withNodeIds(gateElement, [1, 2])];
 
   return { solver, diagnostics, elements, matrixSize: 3 };
 }
@@ -381,7 +381,7 @@ describe("Loading", () => {
     // Load on output
     const rLoad = makeResistor(2, 0, LOAD_R);
 
-    const elements: AnalogElement[] = [vs, rSource, rLoad, gate];
+    const elements: AnalogElement[] = [vs, rSource, rLoad, withNodeIds(gate, [1, 2])];
     const matrixSize = 4; // solver nodes 0,1,2 + branch row 3
 
     const result = newtonRaphson({
@@ -409,11 +409,10 @@ describe("Factory", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
     // pinNodes: "In_1"=1, "In_2"=2, "out"=3
-    const element = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
@@ -428,11 +427,10 @@ describe("Factory", () => {
   it("not_factory_returns_1_input_element", () => {
     const factory = makeNotAnalogFactory();
     const props = new PropertyBag();
-    const element = factory(
-      new Map([["In_1", 1], ["out", 2]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["In_1", 1], ["out", 2]]), [], -1, props, () => 0),
+      [1, 2],
     );
-    Object.assign(element, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
 
     expect(element).toBeDefined();
     expect(element.pinNodeIds.length).toBe(2);
@@ -441,10 +439,10 @@ describe("Factory", () => {
   it("nand_factory_correct_truth_table", () => {
     const factory = makeNandAnalogFactory(2);
     const props = new PropertyBag();
-    const gate = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
-    ) as BehavioralGateElement;
+    const gate = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
+    ) as unknown as BehavioralGateElement;
 
     // Build a circuit, drive both inputs HIGH, expect LOW output
     const inA = new DigitalInputPinModel(CMOS_3V3);
@@ -475,11 +473,10 @@ describe("Factory", () => {
   it("or_factory_returns_analog_element", () => {
     const factory = makeOrAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });
@@ -487,11 +484,10 @@ describe("Factory", () => {
   it("nor_factory_returns_analog_element", () => {
     const factory = makeNorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });
@@ -499,11 +495,10 @@ describe("Factory", () => {
   it("xor_factory_returns_analog_element", () => {
     const factory = makeXorAnalogFactory(2);
     const props = new PropertyBag();
-    const element = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });

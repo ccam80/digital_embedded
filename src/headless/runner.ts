@@ -15,9 +15,9 @@ import type { AnalogEngine, DcOpResult, CompiledAnalogCircuit } from "@/core/ana
 import type { ComponentRegistry } from "@/core/registry";
 import { BitVector } from "@/core/signal";
 import { OscillationError } from "@/core/errors";
-import { compileCircuit } from "@/engine/compiler";
 import { DigitalEngine } from "@/engine/digital-engine";
 import type { ConcreteCompiledCircuit } from "@/engine/digital-engine";
+import { compileCircuit } from "@/engine/compiler";
 import { compileAnalogCircuit } from "@/analog/compiler.js";
 import { TransistorModelRegistry } from "@/analog/transistor-model-registry.js";
 import { registerAllCmosGateModels } from "@/analog/transistor-models/cmos-gates.js";

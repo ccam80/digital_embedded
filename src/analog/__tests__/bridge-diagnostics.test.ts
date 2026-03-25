@@ -15,7 +15,7 @@ import { makeBridgeInputAdapter } from "../bridge-adapter.js";
 import type { BridgeInstance } from "../bridge-instance.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { DiagnosticCollector } from "../diagnostics.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { Pin } from "../../core/pin.js";
@@ -446,7 +446,7 @@ describe("bridge-impedance-mismatch", () => {
       crossEngineBoundaries: [boundary],
     };
 
-    const compiled = compileAnalogCircuit(flattenResult, registry);
+    const compiled = compileUnified(flattenResult, registry).analog!;
 
     const mismatchDiags = compiled.diagnostics.filter(
       (d) => d.code === "bridge-impedance-mismatch",

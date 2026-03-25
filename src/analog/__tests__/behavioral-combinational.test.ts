@@ -18,7 +18,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor } from "../test-elements.js";
+import { makeVoltageSource, makeResistor, withNodeIds } from "../test-elements.js";
 import {
   BehavioralMuxElement,
   BehavioralDemuxElement,
@@ -122,7 +122,7 @@ describe("Mux", () => {
     const vsIn3  = makeVoltageSource(6, 0, 12, inputVoltages[3]);
     const rLoad  = makeResistor(7, 0, LOAD_R);           // output at circuit node 7
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn0, vsIn1, vsIn2, vsIn3, rLoad, mux];
+    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn0, vsIn1, vsIn2, vsIn3, rLoad, withNodeIds(mux, [1, 2, 3, 4, 5, 6, 7])];
     return { elements, matrixSize: 13 };
   }
 
@@ -211,7 +211,7 @@ describe("Demux", () => {
       loads.push(makeResistor(3 + i, 0, LOAD_R));  // circuit nodes 3..6
     }
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn, ...loads, demux];
+    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn, ...loads, withNodeIds(demux, [1, 2, 3, 4, 5, 6, 7])];
     return { elements, matrixSize: 10 };
   }
 
@@ -304,7 +304,7 @@ describe("Decoder", () => {
       loads.push(makeResistor(3 + i, 0, LOAD_R));  // circuit nodes 3..6
     }
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, ...loads, decoder];
+    const elements: AnalogElement[] = [vsSel0, vsSel1, ...loads, withNodeIds(decoder, [1, 2, 3, 4, 5, 6])];
     return { elements, matrixSize: 8 };
   }
 
@@ -365,9 +365,9 @@ describe("Registration", () => {
     const props = new PropertyBag([]);
     // 2:1 mux (selectorBits=1): pins "sel", "in_0", "in_1", "out"
     const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = factory(
-      new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), [], -1, props, () => 0),
+      [1, 2, 3, 4],
     );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
@@ -377,9 +377,9 @@ describe("Registration", () => {
     const props = new PropertyBag([]);
     // 1:2 demux (selectorBits=1): pins "sel", "out_0", "out_1", "in"
     const factory = makeBehavioralDemuxAnalogFactory(1);
-    const element = factory(
-      new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]), [], -1, props, () => 0),
+      [1, 2, 3, 4],
     );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
@@ -389,9 +389,9 @@ describe("Registration", () => {
     const props = new PropertyBag([]);
     // 1-bit decoder (selectorBits=1): pins "sel", "out_0", "out_1"
     const factory = makeBehavioralDecoderAnalogFactory(1);
-    const element = factory(
-      new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]),
-      [], -1, props, () => 0,
+    const element = withNodeIds(
+      factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);

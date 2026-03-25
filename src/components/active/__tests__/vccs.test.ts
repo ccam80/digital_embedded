@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../analog/test-elements.js";
+import { makeResistor, makeVoltageSource, withNodeIds } from "../../../analog/test-elements.js";
 import { VCCSDefinition } from "../vccs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
@@ -37,12 +37,15 @@ function makeVCCSElement(
     ["transconductance", gm],
     ["label", ""],
   ]).entries());
-  return VCCSDefinition.models!.analog!.factory(
-    new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
-    [],
-    -1,
-    props,
-    () => 0,
+  return withNodeIds(
+    VCCSDefinition.models!.analog!.factory(
+      new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    ),
+    [nCtrlP, nCtrlN, nOutP, nOutN],
   );
 }
 

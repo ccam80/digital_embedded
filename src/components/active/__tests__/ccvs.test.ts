@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../analog/test-elements.js";
+import { makeResistor, makeVoltageSource, withNodeIds } from "../../../analog/test-elements.js";
 import { CCVSDefinition } from "../ccvs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../analog/element.js";
@@ -37,12 +37,15 @@ function makeCCVSElement(
     ["transresistance", rm],
     ["label", ""],
   ]).entries());
-  return CCVSDefinition.models!.analog!.factory(
-    new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
-    [],
-    senseBranchIdx,
-    props,
-    () => 0,
+  return withNodeIds(
+    CCVSDefinition.models!.analog!.factory(
+      new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
+      [],
+      senseBranchIdx,
+      props,
+      () => 0,
+    ),
+    [nSenseP, nSenseN, nOutP, nOutN],
   );
 }
 

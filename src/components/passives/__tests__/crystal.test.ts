@@ -238,6 +238,7 @@ describe("Crystal", () => {
       const G_bleed = 1e-9; // 1nS = 1GΩ
       const gminShunts = {
         pinNodeIds: [1, 2, 3] as readonly number[],
+        allNodeIds: [1, 2, 3] as readonly number[],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,

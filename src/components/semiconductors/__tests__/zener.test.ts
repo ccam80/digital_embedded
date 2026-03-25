@@ -15,6 +15,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
@@ -58,6 +59,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -173,7 +175,7 @@ describe("Integration", () => {
     const branchRow = 2;
 
     // 12V source: node2(+) to ground(-)
-    const vs = makeDcVoltageSource(2, 0, branchRow, 12);
+    const vs = withNodeIds(makeDcVoltageSource(2, 0, branchRow, 12), [2, 0]);
 
     // 1kΩ resistor: node1 ↔ node2
     const r = makeResistorElement(1, 2, 1000);
@@ -182,7 +184,7 @@ describe("Integration", () => {
     // When node1 ≈ 5.1V, Vd = 0 - 5.1 = -5.1V (breakdown)
     // IBV=1e-3 gives sharp clamping at BV (SPICE default)
     const zenerProps = { _modelParams: { IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 } };
-    const z = createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps as unknown as PropertyBag);
+    const z = withNodeIds(createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps as unknown as PropertyBag), [0, 1]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

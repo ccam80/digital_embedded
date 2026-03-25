@@ -29,6 +29,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
@@ -116,6 +117,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -368,7 +370,7 @@ describe("NR", () => {
 
     // createNJfetElement pin order: [G, S, D]
     const propsObj = { _modelParams: NJFET_PARAMS };
-    const jfet = createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), -1, propsObj as unknown as PropertyBag);
+    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), -1, propsObj as unknown as PropertyBag), [3, 0, 1]);
     const rd = makeResistorElement(2, 1, 10000); // Rd=10kΩ from Vdd to drain
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0); // Vdd=10V
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0); // Vg=0V

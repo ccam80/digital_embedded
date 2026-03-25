@@ -33,6 +33,7 @@ import { SparseSolver } from "../sparse-solver.js";
 import {
   makeVoltageSource,
   makeResistor,
+  withNodeIds,
 } from "../test-elements.js";
 import {
   BehavioralGateElement,
@@ -129,7 +130,7 @@ function buildAndGateCircuit(
   // Load resistor on output (10kΩ from node 3 to ground)
   const rLoad = makeResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, vsB, rLoad, andGate];
+  const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
 
   return {
     netCount: 3,
@@ -189,7 +190,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
   // Load resistor on output
   const rLoad = makeResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, rSource, vsB, rLoad, andGate];
+  const elements: AnalogElement[] = [vsA, rSource, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
 
   return {
     netCount: 4,
@@ -256,7 +257,7 @@ function buildDffToggleCircuit(): {
   const rLoadQ = makeResistor(3, 0, LOAD_R);    // 10kΩ from ~Q to ground
   const rLoadQBar = makeResistor(3, 0, LOAD_R); // duplicate for symmetry (reuse node 3)
 
-  const elements: AnalogElement[] = [rLoadQ, element];
+  const elements: AnalogElement[] = [rLoadQ, withNodeIds(element, [1, 4, 3, 4])];
 
   const circuit: ConcreteCompiledAnalogCircuit = {
     netCount: 4,
@@ -424,7 +425,7 @@ describe("Integration", () => {
       nodeCount: 3,
       branchCount: 2,
       matrixSize: 5,
-      elements: [vsA, vsB, rLoad, andGate],
+      elements: [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])],
       labelToNodeId: new Map(),
       wireToNodeId: new Map(),
     };
@@ -546,9 +547,9 @@ describe("Integration", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
     // nodeIds: 1-based MNA node IDs
-    const andGate = factory(
-      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+    const andGate = withNodeIds(
+      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
+      [1, 2, 3],
     );
 
     const vsA = makeVoltageSource(1, 0, 3, 3.3);
@@ -587,9 +588,9 @@ describe("Integration", () => {
     // nodeIds: [D=1, C=2, Q=3, ~Q=4] (1-based MNA node IDs)
     const factory = makeDFlipflopAnalogFactory();
     const props = new PropertyBag();
-    const dff = factory(
-      new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]),
-      [], -1, props, () => 0,
+    const dff = withNodeIds(
+      factory(new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]), [], -1, props, () => 0),
+      [1, 2, 3, 4],
     );
 
     // Load resistors on Q and ~Q for stable voltage nodes

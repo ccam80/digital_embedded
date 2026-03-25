@@ -22,7 +22,7 @@ import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ExecuteFunction } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry(analogFactory);
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(analogFactory).not.toHaveBeenCalled();
   });
@@ -244,7 +244,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     expect(compiled.bridges).toHaveLength(1);
   });
@@ -253,7 +253,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
 
     // DigitalXor: 2 inputs → 2 BridgeInputAdapters; 1 output → 1 BridgeOutputAdapter
@@ -268,7 +268,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
     const inner = bridge.compiledInner;
 
@@ -288,7 +288,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
 
     for (const adapter of bridge.inputAdapters) {
@@ -303,7 +303,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
   });
@@ -314,7 +314,7 @@ describe("DigitalBridgePath", () => {
     // No simulationMode → defaults to "analog-pins"
     const circuit = buildCircuit();
 
-    compileAnalogCircuit(circuit, registry);
+    compileUnified(circuit, registry);
 
     expect(analogFactory).toHaveBeenCalledOnce();
     // Behavioral path produces no bridges
@@ -324,7 +324,7 @@ describe("DigitalBridgePath", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
 
     // Each adapter label should contain its pin name

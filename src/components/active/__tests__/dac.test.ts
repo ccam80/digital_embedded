@@ -26,6 +26,7 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import { SparseSolver } from "../../../analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
@@ -85,7 +86,15 @@ function solveDac(
     ["rOut",  100],
   ]);
 
-  const dacEl = DACDefinition.models!.analog!.factory(dacPinNodes, [], -1, props, () => 0);
+  const dacPinNodeIds: number[] = [];
+  for (let i = 0; i < BITS; i++) dacPinNodeIds.push(i + 1);  // D0=1..D7=8
+  dacPinNodeIds.push(nVRefNode);  // VREF
+  dacPinNodeIds.push(nOutNode);   // OUT
+  dacPinNodeIds.push(0);          // GND
+  const dacEl = withNodeIds(
+    DACDefinition.models!.analog!.factory(dacPinNodes, [], -1, props, () => 0),
+    dacPinNodeIds,
+  );
 
   // Digital input voltage sources: HIGH = vRef, LOW = 0
   const elements: AnalogElement[] = [dacEl];

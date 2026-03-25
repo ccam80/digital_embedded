@@ -18,7 +18,7 @@ import type { ComponentLayout, ExecuteFunction } from "@/core/registry";
 import { executeNFET } from "../../components/switching/nfet.js";
 import { executePFET as _executePFET } from "../../components/switching/pfet.js";
 import { executeTransGate } from "../../components/switching/trans-gate.js";
-import { compileCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { DigitalEngine } from "../digital-engine.js";
 import { BusResolver } from "../bus-resolution.js";
 import { Circuit, Wire } from "@/core/circuit";
@@ -351,7 +351,7 @@ describe("SwitchNetwork", () => {
 
     // No extra wires needed since pins overlap
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
 
     // NFET should be classified as unidirectional (1) not bidirectional (2)
     // since D and S nets each have only one driver
@@ -440,7 +440,7 @@ describe("SwitchNetwork", () => {
     // Wire DriverD output (13,6) to DriverC/S junction (13,3)
     circuit.addWire(new Wire({ x: 13, y: 6 }, { x: 13, y: 3 }));
 
-    const compiled = compileCircuit(circuit, registry2);
+    const compiled = compileUnified(circuit, registry2).digital!;
 
     // D net has 2 drivers (DriverA + DriverB), S net has 2 drivers (DriverC + DriverD)
     // NFET should be classified as bidirectional (2)
@@ -508,7 +508,7 @@ describe("SwitchNetwork", () => {
     circuit.addElement(elN);
     circuit.addElement(elG);
 
-    const compiled = compileCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).digital!;
     const engine = new DigitalEngine("level");
     engine.init(compiled);
 

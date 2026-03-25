@@ -2,7 +2,7 @@
  * lrcxor fixture tests — digital and behavioral mode for XOR gate in analog circuits.
  *
  * Tests the full pipeline:
- *   compileAnalogCircuit() → MNAEngine → verify output voltages
+ *   compileUnified() → MNAEngine → verify output voltages
  *
  * Circuit topology (DC simplified version of the lrcxor.dig fixture):
  *   VS1 (DC, V_HIGH or V_LOW) → R_drive → XOR In_1 (node at x=20)
@@ -34,7 +34,7 @@ import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import { ComponentRegistry } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { compileAnalogCircuit } from "../compiler.js";
+import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../core/engine-interface.js";
 import { loadDig } from "../../io/dig-loader.js";
@@ -353,7 +353,7 @@ function compiledAndRunDcOp(
   outputWire: Wire,
   mode: "analog-pins" | "logical" = "analog-pins",
 ): DcResult {
-  const compiled = compileAnalogCircuit(circuit, registry);
+  const compiled = compileUnified(circuit, registry).analog!;
   const errors = compiled.diagnostics.filter((d) => d.severity === "error");
   expect(errors, `Compile errors: ${errors.map((e) => e.message).join(", ")}`).toHaveLength(0);
 
@@ -509,7 +509,7 @@ describe("lrcxor fixture — digital mode", () => {
       in1High: true,
       in2High: false,
     });
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
 
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors, `Errors: ${errors.map((e) => e.message).join(", ")}`).toHaveLength(0);
@@ -796,7 +796,7 @@ describe("lrcxor.dig fixture file integration", () => {
     expect(circuit.elements.length).toBeGreaterThan(0);
 
     circuit.metadata.engineType = "analog";
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(
       errors,
@@ -811,7 +811,7 @@ describe("lrcxor.dig fixture file integration", () => {
     const circuit = loadDig(FIXTURE_XML, registry);
     circuit.metadata.engineType = "analog";
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors, `Compile errors: ${errors.map((e) => e.message).join("; ")}`).toHaveLength(0);
 
@@ -849,7 +849,7 @@ describe("lrcxor.dig fixture file integration", () => {
     expect(xorEl, "XOR element should be present in fixture").toBeDefined();
     xorEl!.getProperties().set("simulationMode", "analog-pins");
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors, `Compile errors: ${errors.map((e) => e.message).join("; ")}`).toHaveLength(0);
 
@@ -896,7 +896,7 @@ describe("lrcxor.dig fixture file integration", () => {
     // fix-under-test covers)
     xorEl!.getProperties().set("simulationMode", "logical");
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors, `Compile errors: ${errors.map((e) => e.message).join("; ")}`).toHaveLength(0);
 
@@ -976,9 +976,9 @@ describe("bridge error paths", () => {
     circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 1 }));
 
     // Should not throw — diagnostics collect the issue
-    let compiled: ReturnType<typeof compileAnalogCircuit> | undefined;
+    let compiled: NonNullable<ReturnType<typeof compileUnified>["analog"]> | undefined;
     expect(() => {
-      compiled = compileAnalogCircuit(circuit, registry);
+      compiled = compileUnified(circuit, registry);
     }).not.toThrow();
 
     // The compiler skips elements with unconnected pins; the result is valid
@@ -1034,7 +1034,7 @@ describe("bridge error paths", () => {
     circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 1 }));
     circuit.addWire(new Wire({ x: 50, y: 0 }, { x: 50, y: 1 }));
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(errors, `Compile errors: ${errors.map((e) => e.message).join("; ")}`).toHaveLength(0);
 
@@ -1059,7 +1059,7 @@ describe("bridge error paths", () => {
         in2High: false,
       });
 
-      const compiled = compileAnalogCircuit(circuit, registry);
+      const compiled = compileUnified(circuit, registry).analog!;
       const errors = compiled.diagnostics.filter((d) => d.severity === "error");
       expect(errors, `mode=${mode} compile errors: ${errors.map((e) => e.message).join("; ")}`).toHaveLength(0);
 
@@ -1090,7 +1090,7 @@ describe("bridge error paths", () => {
       in2High: false,
     });
 
-    const compiled = compileAnalogCircuit(circuit, registry);
+    const compiled = compileUnified(circuit, registry).analog!;
     expect(compiled.bridges).toHaveLength(1);
 
     const bridge = compiled.bridges[0]!;

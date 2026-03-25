@@ -29,6 +29,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
 import type { AnalogElement } from "../../../analog/element.js";
 import { MOSFET_NMOS_DEFAULTS } from "../../../analog/model-defaults.js";
@@ -81,7 +82,7 @@ function makeNmosAtVgs_Vds(
   const propsObj = { _modelParams: modelParams };
   const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj as unknown as PropertyBag);
   // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal → [2, 1, 3, 3]
-  Object.assign(element, { pinNodeIds: [2, 1, 3, 3] });
+  Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
 
   // Drive to operating point: vG=vgs+vS, vD=vds+vS, vS=0
   const voltages = new Float64Array(3);
@@ -268,7 +269,7 @@ describe("NMOS", () => {
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj as unknown as PropertyBag);
     // pinNodeIds set by compiler in production; here we verify the factory uses pin nodes correctly
     // by checking that stamp methods work when pinNodeIds is injected (pinLayout: [G, D, S, B])
-    Object.assign(element, { pinNodeIds: [2, 1, 3, 3] }); // G=2, D=1, S=3, B=S=3
+    Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] }); // G=2, D=1, S=3, B=S=3
     // pinNodeIds includes D, G, S, and bulk (= S when not specified)
     expect(element.pinNodeIds).toContain(1); // D
     expect(element.pinNodeIds).toContain(2); // G
@@ -518,7 +519,7 @@ describe("Integration", () => {
     // createMosfetElement pin order: [G, S, D]
     const nmosParams = { ...MOSFET_NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = { _modelParams: nmosParams };
-    const nmos = createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj as unknown as PropertyBag);
+    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj as unknown as PropertyBag), [3, 0, 1]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

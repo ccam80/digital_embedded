@@ -27,6 +27,7 @@ import type { ExpressionContext } from "../expression-evaluate.js";
  */
 class TestControlledSource extends ControlledSourceElement {
   readonly pinNodeIds: readonly number[] = [1, 0];
+  readonly allNodeIds: readonly number[] = [1, 0];
   readonly branchIndex = -1;
 
   lastValue = 0;

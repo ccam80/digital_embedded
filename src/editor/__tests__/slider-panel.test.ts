@@ -286,6 +286,7 @@ describe("Integration", () => {
     const setParamCalls: { key: string; value: number }[] = [];
     const mockElement = {
       pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,

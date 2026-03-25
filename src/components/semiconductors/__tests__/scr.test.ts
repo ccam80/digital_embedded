@@ -18,6 +18,7 @@ import { DiagnosticCollector } from "../../../analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { withNodeIds } from "../../../analog/test-elements.js";
 import type { AnalogElement } from "../../../analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -106,8 +108,8 @@ describe("SCR", () => {
     //   branchRow index = 2 (third row, after 2 node rows)
 
     const matrixSize = 3; // node1, node2, branch
-    const scr = createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
-    const vs = makeDcVoltageSource(2, 0, 2, 50);
+    const scr = withNodeIds(createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS))), [1, 0, 0]);
+    const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
 
     const solver = new SparseSolver();
