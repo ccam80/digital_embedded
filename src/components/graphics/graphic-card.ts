@@ -445,7 +445,6 @@ export const GraphicCardDefinition: ComponentDefinition = {
   name: "GraphicCard",
   typeId: -1,
   factory: graphicCardFactory,
-  executeFn: executeGraphicCard,
   pinLayout: buildGraphicCardPinDeclarations(
     DEFAULT_DATA_BITS,
     DEFAULT_GRAPHIC_WIDTH,
@@ -454,8 +453,13 @@ export const GraphicCardDefinition: ComponentDefinition = {
   propertyDefs: GRAPHIC_CARD_PROPERTY_DEFS,
   attributeMap: GRAPHIC_CARD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.GRAPHICS,
-  inputSchema: ["A", "str", "C", "ld", "B"],
-  outputSchema: ["D"],
+  models: {
+    digital: {
+      executeFn: executeGraphicCard,
+      inputSchema: ["A", "str", "C", "ld", "B"],
+      outputSchema: ["D"],
+    },
+  },
   helpText:
     "GraphicCard — memory-mapped graphics framebuffer with double buffering.\n" +
     "Inputs: A (address), str (store strobe), C (clock), ld (load/read), B (bank select), D (data in).\n" +

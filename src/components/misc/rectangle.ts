@@ -196,13 +196,17 @@ export const RectangleDefinition: ComponentDefinition = {
   name: "Rectangle",
   typeId: -1,
   factory: rectangleFactory,
-  executeFn: executeRectangle,
   pinLayout: [],
   propertyDefs: RECTANGLE_PROPERTY_DEFS,
   attributeMap: RECTANGLE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
-  inputSchema: [],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeRectangle,
+      inputSchema: [],
+      outputSchema: [],
+    },
+  },
   helpText:
     "Rectangle — visual grouping box on the canvas.\n" +
     "No simulation behavior. Used to group related circuit sections.\n" +

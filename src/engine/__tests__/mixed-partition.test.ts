@@ -1,12 +1,12 @@
 /**
  * Tests for mixed-mode circuit partitioning and compilation.
  *
- * Component engine types used in tests:
- *   - "Resistor"  → engineType: "analog"
- *   - "DcVoltageSource" → engineType: "analog"
- *   - "Ground"          → engineType: "both"
- *   - "And"             → engineType: "both"
- *   - "Add"             → engineType: undefined (defaults to "digital")
+ * Component model types used in tests:
+ *   - "Resistor"        → analog-only (models.analog only)
+ *   - "DcVoltageSource" → analog-only (models.analog only)
+ *   - "Ground"          → both digital and analog models
+ *   - "And"             → both digital and analog models
+ *   - "Add"             → digital-only (models.digital only)
  *   - "In" / "Out"      → used as interface elements
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -50,7 +50,7 @@ function createElement(
 describe("detectEngineMode", () => {
   it("returns 'digital' for digital-only circuits", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    // Add is digital-only (no engineType → defaults to "digital")
+    // Add is digital-only (models.digital only)
     circuit.addElement(createElement(registry, "Add", { x: 5, y: 5 }));
     circuit.addElement(createElement(registry, "In", { x: 0, y: 0 }, { label: "A" }));
     expect(detectEngineMode(circuit, registry)).toBe("digital");
@@ -58,9 +58,9 @@ describe("detectEngineMode", () => {
 
   it("returns 'analog' for analog-only circuits", () => {
     const circuit = new Circuit({ engineType: "auto" });
-    // AnalogResistor is engineType: "analog"
+    // Resistor is analog-only
     circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
-    // DcVoltageSource is engineType: "analog"
+    // DcVoltageSource is analog-only
     circuit.addElement(createElement(registry, "DcVoltageSource", { x: 5, y: 10 }));
     expect(detectEngineMode(circuit, registry)).toBe("analog");
   });
@@ -68,7 +68,7 @@ describe("detectEngineMode", () => {
   it("returns 'mixed' when both analog-only and digital-only components are present", () => {
     const circuit = new Circuit({ engineType: "auto" });
     circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
-    // Add has no engineType → defaults to "digital"
+    // Add is digital-only
     circuit.addElement(createElement(registry, "Add", { x: 10, y: 5 }));
     expect(detectEngineMode(circuit, registry)).toBe("mixed");
   });
@@ -76,7 +76,7 @@ describe("detectEngineMode", () => {
   it("returns 'digital' for 'both'-only components", () => {
     const circuit = new Circuit({ engineType: "auto" });
     circuit.addElement(createElement(registry, "And", { x: 5, y: 5 }));
-    // And has engineType "both" — not analog-only, not digital-only
+    // And has both digital and analog models — not analog-only, not digital-only
     expect(detectEngineMode(circuit, registry)).toBe("digital");
   });
 
@@ -84,7 +84,7 @@ describe("detectEngineMode", () => {
     const circuit = new Circuit({ engineType: "auto" });
     circuit.addElement(createElement(registry, "Resistor", { x: 5, y: 5 }));
     circuit.addElement(createElement(registry, "And", { x: 10, y: 5 }));
-    // AnalogResistor is analog-only, And is "both" — no digital-only present
+    // Resistor is analog-only, And has both models — no digital-only present
     expect(detectEngineMode(circuit, registry)).toBe("analog");
   });
 });

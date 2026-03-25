@@ -192,16 +192,20 @@ export const PullDownDefinition: ComponentDefinition = {
   name: "PullDown",
   typeId: -1,
   factory: pullDownFactory,
-  executeFn: executePullDown,
   pinLayout: buildPullDownPinDeclarations(1),
   propertyDefs: PULL_DOWN_PROPERTY_DEFS,
   attributeMap: PULL_DOWN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "PullDown — pulls a floating net to logic 0.\n" +
     "Connects a resistor from GND to the output net.\n" +
     "When no active-high driver overrides, the net reads as logic 0.",
-  defaultDelay: 0,
+  models: {
+    digital: {
+      executeFn: executePullDown,
+      inputSchema: [],
+      outputSchema: ["out"],
+      defaultDelay: 0,
+    },
+  },
 };

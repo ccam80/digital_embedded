@@ -279,13 +279,17 @@ export const KeyboardDefinition: ComponentDefinition = {
   name: "Keyboard",
   typeId: -1,
   factory: keyboardFactory,
-  executeFn: executeKeyboard,
   pinLayout: buildKeyboardPinDeclarations(),
   propertyDefs: KEYBOARD_PROPERTY_DEFS,
   attributeMap: KEYBOARD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.TERMINAL,
-  inputSchema: ["C", "en"],
-  outputSchema: ["D", "av"],
+  models: {
+    digital: {
+      executeFn: executeKeyboard,
+      inputSchema: ["C", "en"],
+      outputSchema: ["D", "av"],
+    },
+  },
   helpText:
     "Keyboard — keyboard input source.\n" +
     "rd (1-bit): rising edge dequeues the front key from the queue.\n" +

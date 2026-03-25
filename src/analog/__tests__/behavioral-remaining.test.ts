@@ -390,7 +390,7 @@ describe("Relay", () => {
 describe("Registration", () => {
   /**
    * all_both_components_have_analog_factory:
-   * All 12 components from task 6.1.4 must have engineType "both" and analogFactory.
+   * All 12 components from task 6.1.4 must have both digital and analog models.
    */
   it("all_both_components_have_analog_factory", () => {
     const definitions = [

@@ -147,13 +147,17 @@ export const TextDefinition: ComponentDefinition = {
   name: "Text",
   typeId: -1,
   factory: textFactory,
-  executeFn: executeText,
   pinLayout: [],
   propertyDefs: TEXT_PROPERTY_DEFS,
   attributeMap: TEXT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
-  inputSchema: [],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeText,
+      inputSchema: [],
+      outputSchema: [],
+    },
+  },
   helpText:
     "Text — visual annotation label on the canvas.\n" +
     "No simulation behavior. Used for documentation and labelling.\n" +

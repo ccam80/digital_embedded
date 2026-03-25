@@ -396,13 +396,17 @@ export const VGADefinition: ComponentDefinition = {
   name: "VGA",
   typeId: -1,
   factory: vgaFactory,
-  executeFn: executeVga,
   pinLayout: buildVgaPinDeclarations(DEFAULT_COLOR_BITS),
   propertyDefs: VGA_PROPERTY_DEFS,
   attributeMap: VGA_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.GRAPHICS,
-  inputSchema: ["R", "G", "B", "H", "V", "C"],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeVga,
+      inputSchema: ["R", "G", "B", "H", "V", "C"],
+      outputSchema: [],
+    },
+  },
   helpText:
     "VGA — VGA-resolution pixel display.\n" +
     "Inputs: R, G, B (color channels), H (HSync), V (VSync), C (pixel clock).\n" +

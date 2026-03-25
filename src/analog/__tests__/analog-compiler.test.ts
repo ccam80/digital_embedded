@@ -2,7 +2,7 @@
  * Tests for analog compiler behavioral digital component support (Task 4a.5.1 + 4a.5.2).
  *
  * Verifies:
- * - Analog compiler accepts engineType "both" components with analogFactory
+ * - Analog compiler accepts components with both digital and analog models
  * - Logic family resolution cascade: pin > component > circuit > default
  * - Pure-digital components in analog circuits produce unsupported-component-in-analog diagnostic
  * - simulationMode property handling: behavioral (default), digital stub, transistor stub
@@ -127,7 +127,7 @@ function makeGatePinLayout(inputCount: number): PinDeclaration[] {
 }
 
 /**
- * Build a registry with a Ground, a "both"-engineType AND gate, and a digital-only gate.
+ * Build a registry with a Ground, a dual-model (digital+analog) AND gate, and a digital-only gate.
  */
 function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry {
   const registry = new ComponentRegistry();

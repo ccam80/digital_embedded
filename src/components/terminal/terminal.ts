@@ -297,13 +297,17 @@ export const TerminalDefinition: ComponentDefinition = {
   name: "Terminal",
   typeId: -1,
   factory: terminalFactory,
-  executeFn: executeTerminal,
   pinLayout: buildTerminalPinDeclarations(),
   propertyDefs: TERMINAL_PROPERTY_DEFS,
   attributeMap: TERMINAL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.TERMINAL,
-  inputSchema: ["D", "C", "en"],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeTerminal,
+      inputSchema: ["D", "C", "en"],
+      outputSchema: [],
+    },
+  },
   helpText:
     "Terminal — serial text terminal with keyboard input.\n" +
     "din (8-bit): character code to display.\n" +

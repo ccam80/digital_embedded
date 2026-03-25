@@ -17,7 +17,7 @@ import { exportGif } from '../export/gif.js';
 import { exportZip } from '../export/zip.js';
 
 import { createDefaultRegistry } from '../components/register-all.js';
-import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
+import { hasDigitalModel, hasAnalogModel, availableModels } from '../core/registry.js';
 import { Circuit } from '../core/circuit.js';
 import { ComponentPalette } from '../editor/palette.js';
 import { PaletteUI } from '../editor/palette-ui.js';
@@ -192,7 +192,7 @@ export function initApp(search?: string): void {
   // Analog component types — their output pins are circuit nodes, not signal drivers,
   // so the shorted-outputs consistency check must skip them.
   const analogTypeIds: ReadonlySet<string> = new Set(
-    registry.getByEngineType("analog").map((d) => d.name),
+    registry.getWithModel("analog").map((d) => d.name),
   );
   let circuit = new Circuit();
 
@@ -406,7 +406,7 @@ export function initApp(search?: string): void {
       if (def) {
         propertyPanel.showProperties(element, def.propertyDefs);
         if (isAnalogOrMixed()) {
-          if (def.simulationModes && def.simulationModes.length > 1) {
+          if (availableModels(def).length > 1) {
             propertyPanel.showSimulationModeDropdown(element, def);
           }
           const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
@@ -1556,7 +1556,7 @@ export function initApp(search?: string): void {
     const tempPanel = new PropertyPanel(propsContainer);
     tempPanel.showProperties(elementHit, def.propertyDefs);
     if (isAnalogOrMixed()) {
-      if (def.simulationModes && def.simulationModes.length > 1) {
+      if (availableModels(def).length > 1) {
         tempPanel.showSimulationModeDropdown(elementHit, def);
       }
       const family = circuit.metadata.logicFamily ?? defaultLogicFamily();

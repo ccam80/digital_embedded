@@ -258,13 +258,17 @@ export const TestcaseDefinition: ComponentDefinition = {
   name: "Testcase",
   typeId: -1,
   factory: testcaseFactory,
-  executeFn: executeTestcase,
   pinLayout: buildTestcasePinDeclarations(),
   propertyDefs: TESTCASE_PROPERTY_DEFS,
   attributeMap: TESTCASE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MISC,
-  inputSchema: [],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeTestcase,
+      inputSchema: [],
+      outputSchema: [],
+    },
+  },
   helpText:
     "Testcase — embedded truth table test element.\n" +
     "Contains test data (pin names + expected input/output rows).\n" +

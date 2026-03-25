@@ -268,13 +268,17 @@ export const LedMatrixDefinition: ComponentDefinition = {
   name: "LedMatrix",
   typeId: -1,
   factory: ledMatrixFactory,
-  executeFn: executeLedMatrix,
   pinLayout: buildLedMatrixPinDeclarations(8, 3),
   propertyDefs: LED_MATRIX_PROPERTY_DEFS,
   attributeMap: LED_MATRIX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.GRAPHICS,
-  inputSchema: ["r-data", "c-addr"],
-  outputSchema: [],
+  models: {
+    digital: {
+      executeFn: executeLedMatrix,
+      inputSchema: ["r-data", "c-addr"],
+      outputSchema: [],
+    },
+  },
   helpText:
     "LedMatrix — NxN LED grid display.\n" +
     "r-data input selects which rows are lit in the addressed column.\n" +

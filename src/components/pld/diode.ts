@@ -562,52 +562,64 @@ export const PldDiodeDefinition: ComponentDefinition = {
   name: "PldDiode",
   typeId: -1,
   factory: diodeFactory,
-  executeFn: executeDiode,
   pinLayout: buildDiodePinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
-  inputSchema: ["out1", "out2"],
-  outputSchema: [],
   helpText:
     "Diode — bidirectional current-flow element for PLD wired-OR/AND arrays.\n" +
     "Use in conjunction with pull-up/pull-down resistors.\n" +
     "blown=true permanently opens the diode.",
-  defaultDelay: 0,
+  models: {
+    digital: {
+      executeFn: executeDiode,
+      inputSchema: ["out1", "out2"],
+      outputSchema: [],
+      defaultDelay: 0,
+    },
+  },
 };
 
 export const PldDiodeForwardDefinition: ComponentDefinition = {
   name: "PldDiodeForward",
   typeId: -1,
   factory: diodeForwardFactory,
-  executeFn: executeDiodeForward,
   pinLayout: buildDiodeForwardPinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText:
     "DiodeForward — forward diode for wired-OR PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=high-Z. Requires pull-down on output net.\n" +
     "blown=true permanently opens the diode.",
-  defaultDelay: 0,
+  models: {
+    digital: {
+      executeFn: executeDiodeForward,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+      defaultDelay: 0,
+    },
+  },
 };
 
 export const PldDiodeBackwardDefinition: ComponentDefinition = {
   name: "PldDiodeBackward",
   typeId: -1,
   factory: diodeBackwardFactory,
-  executeFn: executeDiodeBackward,
   pinLayout: buildDiodeBackwardPinDeclarations(),
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
-  inputSchema: ["in"],
-  outputSchema: ["out"],
   helpText:
     "DiodeBackward — backward diode for wired-AND PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=0. Requires pull-up on output net.\n" +
     "blown=true permanently opens the diode.",
-  defaultDelay: 0,
+  models: {
+    digital: {
+      executeFn: executeDiodeBackward,
+      inputSchema: ["in"],
+      outputSchema: ["out"],
+      defaultDelay: 0,
+    },
+  },
 };

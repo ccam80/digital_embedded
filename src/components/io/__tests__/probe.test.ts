@@ -408,8 +408,8 @@ describe("Probe", () => {
       const registry = new ComponentRegistry();
       registry.register(ProbeDefinition);
 
-      const digitalComponents = registry.getByEngineType("digital");
-      const analogComponents = registry.getByEngineType("analog");
+      const digitalComponents = registry.getWithModel("digital");
+      const analogComponents = registry.getWithModel("analog");
 
       const probeInDigital = digitalComponents.some((c) => c.name === "Probe");
       const probeInAnalog = analogComponents.some((c) => c.name === "Probe");

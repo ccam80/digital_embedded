@@ -21,10 +21,10 @@
  */
 
 import { Circuit, Wire } from "../core/circuit.js";
-import type { EngineType } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import { AbstractCircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { hasDigitalModel, hasAnalogModel } from "../core/registry.js";
 import type { Pin } from "../core/pin.js";
 import { PinDirection } from "../core/pin.js";
 import type { RenderContext, Rect } from "../core/renderer-interface.js";
@@ -124,6 +124,45 @@ export function flattenCircuit(circuit: Circuit, registry: ComponentRegistry): F
 }
 
 // ---------------------------------------------------------------------------
+// Domain resolution helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Determine the active simulation domain of a circuit.
+ *
+ * When the circuit's engineType metadata is "digital" or "analog", that value
+ * is returned directly. When it is "auto", the domain is inferred from the
+ * models available on the circuit's non-subcircuit leaf components: if any
+ * component has only analog models, the circuit is "analog"; if all have
+ * digital models, the circuit is "digital". Returns "auto" when no leaf
+ * components are registered or the domain is indeterminate.
+ */
+function resolveCircuitDomain(
+  circuit: Circuit,
+  registry: ComponentRegistry,
+): "digital" | "analog" | "auto" {
+  const explicitType = circuit.metadata.engineType;
+  if (explicitType === "digital" || explicitType === "analog") {
+    return explicitType;
+  }
+
+  let hasDigital = false;
+  let hasAnalog = false;
+
+  for (const el of circuit.elements) {
+    if (isSubcircuitHost(el)) continue;
+    const def = registry.get(el.typeId);
+    if (def === undefined) continue;
+    if (hasDigitalModel(def)) hasDigital = true;
+    if (hasAnalogModel(def)) hasAnalog = true;
+  }
+
+  if (hasAnalog && !hasDigital) return "analog";
+  if (hasDigital && !hasAnalog) return "digital";
+  return "auto";
+}
+
+// ---------------------------------------------------------------------------
 // Internal recursive flattener
 // ---------------------------------------------------------------------------
 
@@ -153,7 +192,7 @@ function flattenCircuitScoped(
   // subcircuit wires, then add bridge wires for subcircuit interface pins.
   const resultWires: Wire[] = [];
 
-  const outerEngineType: EngineType = circuit.metadata.engineType;
+  const outerDomain = resolveCircuitDomain(circuit, registry);
 
   // For each element, either pass it through (leaf) or inline it (subcircuit).
   for (let elemIdx = 0; elemIdx < circuit.elements.length; elemIdx++) {
@@ -167,16 +206,17 @@ function flattenCircuitScoped(
     }
 
     const instanceName = buildInstanceName(el, elemIdx, scopePrefix);
-    const internalEngineType: EngineType = el.internalCircuit.metadata.engineType;
 
-    // Detect cross-engine boundary:
-    //   (a) internal engineType differs from outer engineType, OR
-    //   (b) the subcircuit instance has simulationMode='digital' in an
-    //       analog-engine outer circuit.
+    // Detect cross-engine boundary using model-based domain checks:
+    //   (a) the subcircuit instance has simulationMode='digital' in an analog
+    //       outer context, OR
+    //   (b) the internal circuit's components resolve to a different domain
+    //       than the outer circuit (using activeModel/hasDigitalModel/hasAnalogModel).
     const instanceSimMode = el.getAttribute("simulationMode");
+    const internalDomain = resolveCircuitDomain(el.internalCircuit, registry);
     const isCrossEngine =
-      internalEngineType !== outerEngineType ||
-      (outerEngineType === "analog" && instanceSimMode === "digital");
+      (outerDomain === "analog" && instanceSimMode === "digital") ||
+      (outerDomain !== internalDomain && internalDomain !== "auto" && outerDomain !== "auto");
 
     if (isCrossEngine) {
       // Record the boundary and leave the element as a placeholder.
@@ -184,8 +224,8 @@ function flattenCircuitScoped(
       boundaries.push({
         subcircuitElement: el,
         internalCircuit: el.internalCircuit,
-        internalEngineType,
-        outerEngineType,
+        internalEngineType: el.internalCircuit.metadata.engineType,
+        outerEngineType: circuit.metadata.engineType,
         pinMappings,
         instanceName,
       });

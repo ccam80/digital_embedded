@@ -3,10 +3,10 @@
  *
  * Verifies:
  *   - Each gate type has analogFactory defined
- *   - Each gate type has engineType === "both"
- *   - getByEngineType("analog") includes all gate types
- *   - getByEngineType("digital") still includes all gate types
- *   - simulationModes includes 'logical' and 'analog-pins' for each gate
+ *   - Each gate type has both digital and analog models
+ *   - getWithModel("analog") includes all gate types
+ *   - getWithModel("digital") still includes all gate types
+ *   - Each gate has both digital and analog models
  */
 
 import { describe, it, expect } from "vitest";
@@ -47,7 +47,7 @@ describe("Registration", () => {
     expect(registry.get("And")!.models?.analog?.factory).toBeDefined();
   });
 
-  it("and_engine_type_is_both", () => {
+  it("and_has_both_digital_and_analog_models", () => {
     const registry = makeGateRegistry();
     const def = registry.get("And")!;
     expect(def.models?.digital).toBeDefined();
@@ -66,7 +66,7 @@ describe("Registration", () => {
     }
   });
 
-  it("all_gates_have_engine_type_both", () => {
+  it("all_gates_have_both_digital_and_analog_models", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
@@ -83,7 +83,7 @@ describe("Registration", () => {
 describe("Palette", () => {
   it("analog_palette_includes_gates", () => {
     const registry = makeGateRegistry();
-    const analogDefs = registry.getByEngineType("analog");
+    const analogDefs = registry.getWithModel("analog");
     const analogNames = analogDefs.map((d) => d.name);
 
     expect(analogNames).toContain("And");
@@ -97,7 +97,7 @@ describe("Palette", () => {
 
   it("digital_palette_still_includes_gates", () => {
     const registry = makeGateRegistry();
-    const digitalDefs = registry.getByEngineType("digital");
+    const digitalDefs = registry.getWithModel("digital");
     const digitalNames = digitalDefs.map((d) => d.name);
 
     expect(digitalNames).toContain("And");

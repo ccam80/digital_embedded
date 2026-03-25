@@ -150,7 +150,7 @@ function createWire(savedWire: DtsWire): Wire {
  *
  * Returns the main circuit and a map of subcircuit names to Circuit objects.
  * The subcircuits map is empty when the document has no `subcircuitDefinitions`.
- * Accepts both `format: 'dts'` (current) and `format: 'digb'` (legacy compat).
+ * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
  *
  * @throws Error if the JSON is malformed or the document fails validation.
  * @throws Error if any component type is not found in the registry.

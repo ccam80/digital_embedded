@@ -305,8 +305,8 @@ describe("ComponentRegistry", () => {
       };
       registry.register(def);
 
-      const digital = registry.getByEngineType("digital");
-      const analog = registry.getByEngineType("analog");
+      const digital = registry.getWithModel("digital");
+      const analog = registry.getWithModel("analog");
 
       expect(digital.map((d) => d.name)).toContain("SharedComponent");
       expect(analog.map((d) => d.name)).toContain("SharedComponent");
@@ -320,8 +320,8 @@ describe("ComponentRegistry", () => {
       };
       registry.register(def);
 
-      const digital = registry.getByEngineType("digital");
-      const analog = registry.getByEngineType("analog");
+      const digital = registry.getWithModel("digital");
+      const analog = registry.getWithModel("analog");
 
       expect(digital.map((d) => d.name)).not.toContain("PureAnalog");
       expect(analog.map((d) => d.name)).toContain("PureAnalog");
@@ -467,7 +467,7 @@ describe("ComponentRegistry", () => {
       expect(stored.defaultModel).toBe("digital");
     });
 
-    it("getByEngineType digital returns components with digital model", () => {
+    it("getWithModel digital returns components with digital model", () => {
       registry.register(makeDefinition("Gate1"));
       registry.register(makeDefinition("Gate2"));
       const def: ComponentDefinition = {
@@ -475,38 +475,38 @@ describe("ComponentRegistry", () => {
         models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
-      const digital = registry.getByEngineType("digital");
+      const digital = registry.getWithModel("digital");
       expect(digital.map((d) => d.name)).toContain("Gate1");
       expect(digital.map((d) => d.name)).toContain("Gate2");
       expect(digital.map((d) => d.name)).not.toContain("PureAnalogOnly");
     });
 
-    it("getByEngineType analog returns components with analog model", () => {
+    it("getWithModel analog returns components with analog model", () => {
       registry.register(makeDefinition("DigOnlyGate"));
       const def: ComponentDefinition = {
         ...makeDefinition("AnalogPassive"),
         models: { analog: { factory: stubAnalogFactory } },
       };
       registry.register(def);
-      const analog = registry.getByEngineType("analog");
+      const analog = registry.getWithModel("analog");
       expect(analog.map((d) => d.name)).toContain("AnalogPassive");
       expect(analog.map((d) => d.name)).not.toContain("DigOnlyGate");
     });
   });
 
   describe("alias must not shadow a later canonical name", () => {
-    it("registering a canonical name that matches an existing alias throws", () => {
+    it("alias shadows later canonical registration", () => {
       registry.register(makeDefinition("PldDiode"));
       registry.registerAlias("Diode", "PldDiode");
 
       // An alias occupying "Diode" would shadow a later canonical "Diode"
       // registration (get() checks aliases first). The fix is to never
       // create such an alias — verify that the conflict is detectable.
-      const analogDiode = { ...makeDefinition("Diode"), engineType: "analog" as const };
+      const diode = makeDefinition("Diode");
       // register() succeeds (name not in _byName), but get() would return
       // PldDiode via the alias. This is the bug scenario we guard against
       // in register-all.ts by not creating the conflicting alias.
-      registry.register(analogDiode);
+      registry.register(diode);
       // With the alias still present, get("Diode") returns PldDiode —
       // demonstrating why the alias must not exist.
       const result = registry.get("Diode");
@@ -516,8 +516,8 @@ describe("ComponentRegistry", () => {
     it("without the alias, get(Diode) returns the semiconductor Diode", () => {
       registry.register(makeDefinition("PldDiode"));
       // No alias "Diode" → "PldDiode"
-      const analogDiode = { ...makeDefinition("Diode"), engineType: "analog" as const };
-      registry.register(analogDiode);
+      const diode = makeDefinition("Diode");
+      registry.register(diode);
 
       const result = registry.get("Diode");
       expect(result).toBeDefined();

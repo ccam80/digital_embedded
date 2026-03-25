@@ -100,7 +100,7 @@ export interface DtsDocument {
  * Checks structural requirements and field types. Returns the typed document
  * on success, throws a descriptive Error on any failure.
  *
- * Accepts both `format: 'dts'` (current) and `format: 'digb'` (legacy compat).
+ * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
  */
 export function validateDtsDocument(data: unknown): DtsDocument {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {

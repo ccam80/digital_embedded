@@ -11,6 +11,7 @@ import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
 import type { ComponentDefinition } from "@/core/registry";
+import { availableModels } from "@/core/registry";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
@@ -160,8 +161,8 @@ export class PropertyPanel {
     element: CircuitElement,
     def: ComponentDefinition,
   ): void {
-    const modes = def.simulationModes;
-    if (!modes || modes.length <= 1) return;
+    const modes = availableModels(def);
+    if (modes.length <= 1) return;
 
     const bag = element.getProperties();
     const current = bag.has("simulationMode")
@@ -257,8 +258,8 @@ export class PropertyPanel {
     for (const pin of pins) {
       const pinLabel = pin.label;
       const fields = pin.direction === PinDirection.OUTPUT ? outputFields : inputFields;
-      const pinOverride = def.pinElectricalOverrides?.[pinLabel];
-      const resolved = resolvePinElectrical(family, pinOverride, def.pinElectrical);
+      const pinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
+      const resolved = resolvePinElectrical(family, pinOverride, def.models?.analog?.pinElectrical);
 
       const pinDiv = document.createElement("div");
       pinDiv.style.cssText = "margin:6px 0 0 8px;font-size:11px;";

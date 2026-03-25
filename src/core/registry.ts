@@ -393,13 +393,11 @@ export class ComponentRegistry {
     return this._byCategory.get(category) ?? [];
   }
 
-  /** Return all definitions that have a simulation model for the given engine type. */
-  getByEngineType(engineType: "digital" | "analog"): ComponentDefinition[] {
-    return Array.from(this._byName.values()).filter((d) => {
-      if (engineType === "digital") return hasDigitalModel(d);
-      if (engineType === "analog") return hasAnalogModel(d);
-      return false;
-    });
+  /** Return all definitions that have a simulation model for the given model key. */
+  getWithModel(modelKey: string): ComponentDefinition[] {
+    return Array.from(this._byName.values()).filter((d) =>
+      d.models[modelKey as keyof ComponentModels] !== undefined
+    );
   }
 
   /** Total number of registered component types. */

@@ -1,4 +1,6 @@
 export { UnionFind } from "./union-find.js";
+export { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
+export type { ModelAssignment } from "./extract-connectivity.js";
 
 export type {
   ResolvedGroupPin,

@@ -194,16 +194,20 @@ export const PullUpDefinition: ComponentDefinition = {
   name: "PullUp",
   typeId: -1,
   factory: pullUpFactory,
-  executeFn: executePullUp,
   pinLayout: buildPullUpPinDeclarations(1),
   propertyDefs: PULL_UP_PROPERTY_DEFS,
   attributeMap: PULL_UP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
-  inputSchema: [],
-  outputSchema: ["out"],
   helpText:
     "PullUp — pulls a floating net to logic 1.\n" +
     "Connects a resistor from VDD to the output net.\n" +
     "When no active-low driver overrides, the net reads as logic 1.",
-  defaultDelay: 0,
+  models: {
+    digital: {
+      executeFn: executePullUp,
+      inputSchema: [],
+      outputSchema: ["out"],
+      defaultDelay: 0,
+    },
+  },
 };
