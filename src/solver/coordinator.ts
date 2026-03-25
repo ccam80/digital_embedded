@@ -563,7 +563,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (this._timingModel === 'discrete') {
       this._speedControl.speed = value;
     } else {
-      this._analogSpeed = Math.max(0, value);
+      this._analogSpeed = Math.max(1e-9, value);
     }
   }
 
@@ -571,7 +571,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (this._timingModel === 'discrete') {
       this._speedControl.speed = this._speedControl.speed * factor;
     } else {
-      this._analogSpeed = Math.max(0, this._analogSpeed * factor);
+      this._analogSpeed = Math.max(1e-9, this._analogSpeed * factor);
     }
   }
 

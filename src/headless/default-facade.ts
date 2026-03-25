@@ -298,7 +298,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Session accessors (not on SimulatorFacade interface)
   // =========================================================================
 
-  /** @deprecated Use getCoordinator() for typed access. Legacy accessor returning the coordinator as SimulationCoordinator | SimulationEngine union. */
+  /** Returns the coordinator as the union type expected by callers that accept either interface. */
   getEngine(): SimulationCoordinator | SimulationEngine | null {
     return this._coordinator;
   }

@@ -250,14 +250,14 @@
   "hotPaths": [
     {
       "path": "src\\headless\\default-facade.ts",
-      "accessCount": 148,
-      "lastAccessed": 1774482115906,
+      "accessCount": 150,
+      "lastAccessed": 1774482800832,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 80,
-      "lastAccessed": 1774481570635,
+      "accessCount": 82,
+      "lastAccessed": 1774482749798,
       "type": "directory"
     },
     {

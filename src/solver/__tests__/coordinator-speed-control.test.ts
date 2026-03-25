@@ -282,12 +282,12 @@ describe('DefaultSimulationCoordinator -- speed control (continuous)', () => {
   });
   it('default analog speed is 1e-3', () => { expect(coord.speed).toBe(1e-3); });
   it('speed setter updates analog speed', () => { coord.speed = 1e-6; expect(coord.speed).toBe(1e-6); });
-  it('speed setter clamps negative to 0', () => { coord.speed = -1; expect(coord.speed).toBe(0); });
+  it('speed setter clamps negative to 1e-9 floor', () => { coord.speed = -1; expect(coord.speed).toBe(1e-9); });
   it('adjustSpeed multiplies analog speed by factor', () => {
     coord.speed = 1e-3; coord.adjustSpeed(10); expect(coord.speed).toBeCloseTo(1e-2, 15);
   });
-  it('adjustSpeed clamps analog speed at 0 for negative result', () => {
-    coord.speed = 1e-3; coord.adjustSpeed(-1); expect(coord.speed).toBe(0);
+  it('adjustSpeed clamps analog speed at 1e-9 floor for negative result', () => {
+    coord.speed = 1e-3; coord.adjustSpeed(-1); expect(coord.speed).toBe(1e-9);
   });
   it('parseSpeed parses float for analog', () => { coord.parseSpeed('0.005'); expect(coord.speed).toBeCloseTo(0.005, 10); });
   it('parseSpeed parses scientific notation for analog', () => { coord.parseSpeed('1e-6'); expect(coord.speed).toBeCloseTo(1e-6, 20); });

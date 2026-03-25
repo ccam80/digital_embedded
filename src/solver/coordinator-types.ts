@@ -263,8 +263,6 @@ export interface SimulationCoordinator {
 
   /**
    * Save a snapshot of all engine state. Returns an opaque ID.
-   * Delegates to the digital backend if present; analog snapshot support
-   * is reserved for future extension.
    */
   saveSnapshot(): SnapshotId;
 
