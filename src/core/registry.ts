@@ -230,7 +230,7 @@ export interface ComponentDefinition {
   /** Construct a CircuitElement for a placed instance from its properties. */
   factory: (props: PropertyBag) => CircuitElement;
   /** Flat simulation function called by the engine's inner loop. */
-  executeFn: ExecuteFunction;
+  executeFn?: ExecuteFunction;
   /**
    * Sequential components provide `sampleFn` to latch inputs on clock edges.
    * Called before the combinational sweep. Combinational components leave
@@ -389,11 +389,26 @@ export interface ComponentDefinition {
  * these must NOT produce a digital model entry.
  */
 function _ensureModels(def: ComponentDefinition): ComponentDefinition {
-  if (def.models !== undefined) return def;
+  if (def.models !== undefined) {
+    const hasAnalogFlatOverrides =
+      def.pinElectrical !== undefined ||
+      def.pinElectricalOverrides !== undefined ||
+      def.transistorModel !== undefined;
+    if (!hasAnalogFlatOverrides) return def;
+
+    const existingAnalog = def.models.analog;
+    if (existingAnalog === undefined) return def;
+
+    const patchedAnalog: AnalogModel = { ...existingAnalog };
+    if (def.pinElectrical !== undefined) patchedAnalog.pinElectrical = def.pinElectrical;
+    if (def.pinElectricalOverrides !== undefined) patchedAnalog.pinElectricalOverrides = def.pinElectricalOverrides;
+    if (def.transistorModel !== undefined) patchedAnalog.transistorModel = def.transistorModel;
+    return { ...def, models: { ...def.models, analog: patchedAnalog } };
+  }
 
   const models: ComponentModels = {};
 
-  if (def.executeFn !== noOpAnalogExecuteFn) {
+  if (def.executeFn !== undefined && def.executeFn !== noOpAnalogExecuteFn) {
     const digital: DigitalModel = { executeFn: def.executeFn };
     if (def.sampleFn !== undefined) digital.sampleFn = def.sampleFn;
     if (def.stateSlotCount !== undefined) digital.stateSlotCount = def.stateSlotCount;
@@ -495,7 +510,8 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is not registered — use register()`);
     }
 
-    const updated: ComponentDefinition = { ...def, typeId: existing.typeId };
+    const withModels = _ensureModels(def);
+    const updated: ComponentDefinition = { ...withModels, typeId: existing.typeId };
     this._byName.set(updated.name, updated);
 
     // Update category list entry

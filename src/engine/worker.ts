@@ -125,8 +125,8 @@ function handleInit(msg: Extract<EngineMessage, { type: "init" }>): void {
   for (const typeName of msg.typeNames) {
     const def = registry.get(typeName);
     if (def !== undefined) {
-      executeFns.push(def.executeFn);
-      sampleFns.push(def.sampleFn ?? null);
+      executeFns.push(def.models!.digital!.executeFn);
+      sampleFns.push(def.models?.digital?.sampleFn ?? null);
     } else {
       console.warn(`Worker: unrecognized type name "${typeName}", using no-op`);
       executeFns.push(noopExecuteFn);

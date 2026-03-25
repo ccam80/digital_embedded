@@ -89,3 +89,16 @@
 - **Status**: complete
 - **Tasks completed**: 6/6
 - **Rounds**: 1
+
+## Task P2-A: Update all consumers to read from models bag + make flat fields optional
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/registry.ts` — made `executeFn` optional; updated `_ensureModels` to patch `models.analog` when flat analog override fields (pinElectrical, pinElectricalOverrides, transistorModel) are present on an already-models-populated def; made `update()` call `_ensureModels`
+  - `src/engine/compiler.ts` — updated all flat field reads: `def.inputSchema`→`def.models?.digital?.inputSchema`, `def.outputSchema`→`def.models?.digital?.outputSchema`, `def.stateSlotCount`→`def.models?.digital?.stateSlotCount`, `def.executeFn`→`def.models!.digital!.executeFn`, `def.sampleFn`→`def.models!.digital!.sampleFn`, `def.switchPins`→`def.models?.digital?.switchPins`, `def.defaultDelay`→`def.models?.digital?.defaultDelay`; removed unused `ComponentDefinition` import
+  - `src/analog/compiler.ts` — updated all flat field reads: `def.transistorModel`→`def.models?.analog?.transistorModel`, `def.requiresBranchRow`→`def.models?.analog?.requiresBranchRow`, `def.getInternalNodeCount`→`def.models?.analog?.getInternalNodeCount`, `def.analogFactory`→`def.models?.analog?.factory` / `def.models!.analog!.factory`, `def.pinElectricalOverrides`→`def.models?.analog?.pinElectricalOverrides`, `def.pinElectrical`→`def.models?.analog?.pinElectrical`, `def.analogDeviceType`→`def.models?.analog?.deviceType` / `def.models!.analog!.deviceType`
+  - `src/engine/worker.ts` — updated `def.executeFn`→`def.models!.digital!.executeFn`, `def.sampleFn`→`def.models?.digital?.sampleFn`
+  - `src/engine/delay.ts` — updated `def.defaultDelay`→`def.models?.digital?.defaultDelay`
+  - `src/analog/__tests__/analog-compiler.test.ts` — updated test setup to use `registry.update()` instead of direct object mutation, so `_ensureModels` is called and `models.analog.transistorModel` is set correctly
+- **Tests**: 7402/7402 passing

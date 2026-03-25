@@ -454,7 +454,7 @@ export function compileAnalogCircuit(
       const passAMode = passAProps.has("simulationMode")
         ? (passAProps.get("simulationMode") as string)
         : (def.simulationModes?.[0] ?? "analog-pins");
-      if ((passAMode === "analog-internals" && def.transistorModel) || passAMode === "logical") {
+      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
         elementMeta.push({
           el,
           branchIdx: -1,
@@ -467,7 +467,7 @@ export function compileAnalogCircuit(
 
     // Assign branch index
     let branchIdx = -1;
-    if (def.requiresBranchRow) {
+    if (def.models?.analog?.requiresBranchRow) {
       // The actual matrix row = nodeCount + branchIdx (0-based within branch block)
       // We store the absolute branch index here; the matrix row is computed
       // as nodeCount_total + branchIdx when building the matrix.
@@ -476,7 +476,7 @@ export function compileAnalogCircuit(
 
     // Allocate internal nodes
     const props = el.getProperties();
-    const internalCount = def.getInternalNodeCount?.(props) ?? 0;
+    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
     const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
     nextInternalNode += internalCount;
 
@@ -546,7 +546,7 @@ export function compileAnalogCircuit(
         ? (props.get("simulationMode") as string)
         : (def.simulationModes?.[0] ?? "analog-pins");
 
-      if (simulationMode === "analog-internals" && def.transistorModel) {
+      if (simulationMode === "analog-internals" && def.models?.analog?.transistorModel) {
         if (!transistorModels) {
           diagnostics.push(
             makeDiagnostic(
@@ -563,7 +563,7 @@ export function compileAnalogCircuit(
           continue;
         }
 
-        if (def.analogFactory !== undefined) {
+        if (def.models?.analog?.factory !== undefined) {
           // Resolve outer pin node IDs for this component (capture wire vertices)
           const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
             def.pinLayout.length,
@@ -713,8 +713,8 @@ export function compileAnalogCircuit(
             continue;
           }
 
-          const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
-          const componentOverride = def.pinElectrical;
+          const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinDecl.label];
+          const componentOverride = def.models?.analog?.pinElectrical;
           // Merge user per-pin overrides (from property panel) with definition overrides
           let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
           if (props.has("_pinElectricalOverrides")) {
@@ -847,7 +847,7 @@ export function compileAnalogCircuit(
     //   2. Definition per-pin     (def.pinElectricalOverrides)
     //   3. Definition component   (def.pinElectrical)
     //   4. Circuit logic family   (circuitFamily)
-    if (elEngineType === "both" && def.analogFactory !== undefined) {
+    if (elEngineType === "both" && def.models?.analog?.factory !== undefined) {
       // Parse user overrides from the property panel (stored as JSON string)
       let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       if (props.has("_pinElectricalOverrides")) {
@@ -859,8 +859,8 @@ export function compileAnalogCircuit(
       const pinLabels = def.pinLayout.map((pd) => pd.label);
       const pinElectricalMap: Record<string, ResolvedPinElectrical> = {};
       for (const pinLabel of pinLabels) {
-        const defPinOverride = def.pinElectricalOverrides?.[pinLabel];
-        const componentOverride = def.pinElectrical;
+        const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
+        const componentOverride = def.models?.analog?.pinElectrical;
         // Merge: user per-pin overrides take highest priority
         const userPinOverride = userOverrides[pinLabel];
         const mergedPinOverride = userPinOverride
@@ -877,11 +877,11 @@ export function compileAnalogCircuit(
 
     // Model binding: semiconductor components get resolved model parameters
     // injected into the props bag under '_modelParams' before factory call.
-    if (def.analogDeviceType !== undefined) {
+    if (def.models?.analog?.deviceType !== undefined) {
       const modelName = props.has("model") ? props.get<string>("model") : "";
       const resolvedModel =
         (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
-        modelLibrary.getDefault(def.analogDeviceType);
+        modelLibrary.getDefault(def.models!.analog!.deviceType);
 
       // Emit diagnostics for any issues with the resolved model
       const modelDiags = validateModel(resolvedModel);
@@ -894,7 +894,7 @@ export function compileAnalogCircuit(
 
     // Call the analog factory — returns AnalogElementCore (no pinNodeIds).
     // Compiler is the SOLE place pinNodeIds is constructed — always pinLayout order.
-    const core = def.analogFactory!(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    const core = def.models!.analog!.factory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
     const element: AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
       allNodeIds: [...pinNodeIds, ...internalNodeIds],

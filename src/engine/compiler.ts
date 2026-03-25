@@ -17,7 +17,7 @@
 
 import type { Circuit, Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
-import type { ComponentRegistry, ExecuteFunction, ComponentDefinition } from "@/core/registry";
+import type { ComponentRegistry, ExecuteFunction } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
 import type { Pin } from "@/core/pin";
 import { PinDirection, pinWorldPosition } from "@/core/pin";
@@ -246,10 +246,10 @@ export function compileCircuit(
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
 
-    if (def.inputSchema) {
+    if (def.models?.digital?.inputSchema) {
       // Schema-driven: build inputs in schema order by matching pin labels
       const inputs: number[] = [];
-      for (const label of def.inputSchema) {
+      for (const label of def.models.digital.inputSchema) {
         const refIdx = refs.findIndex(r => r.pin.label === label);
         if (refIdx >= 0) {
           inputs.push(slotToNetId(slotOf(i, refIdx)));
@@ -268,10 +268,10 @@ export function compileCircuit(
       componentInputNets.push(inputs);
     }
 
-    if (def.outputSchema) {
+    if (def.models?.digital?.outputSchema) {
       // Schema-driven: build outputs in schema order by matching pin labels
       const outputs: number[] = [];
-      for (const label of def.outputSchema) {
+      for (const label of def.models.digital.outputSchema) {
         const refIdx = refs.findIndex(r => r.pin.label === label);
         if (refIdx >= 0) {
           outputs.push(slotToNetId(slotOf(i, refIdx)));
@@ -368,7 +368,7 @@ export function compileCircuit(
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
-    const slotSpec = (def as ComponentDefinition & { stateSlotCount?: number | ((props: PropertyBag) => number) }).stateSlotCount;
+    const slotSpec = def.models?.digital?.stateSlotCount;
     let resolvedSlots = 0;
     if (typeof slotSpec === "function") {
       const props = new PropertyBag(componentPropertiesList[i]!);
@@ -522,7 +522,7 @@ export function compileCircuit(
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
-    const sp = (def as { switchPins?: [number, number] }).switchPins;
+    const sp = def.models?.digital?.switchPins;
     if (sp === undefined) continue;
 
     const refs = allPinRefs[i]!;
@@ -642,10 +642,10 @@ export function compileCircuit(
     const def = registry.get(el.typeId)!;
     typeIds[i] = def.typeId;
     if (!executeFnsMap.has(def.typeId)) {
-      executeFnsMap.set(def.typeId, def.executeFn);
+      executeFnsMap.set(def.typeId, def.models!.digital!.executeFn);
       typeNameMap.set(def.typeId, def.name);
-      if (def.sampleFn !== undefined) {
-        sampleFnsMap.set(def.typeId, def.sampleFn);
+      if (def.models!.digital!.sampleFn !== undefined) {
+        sampleFnsMap.set(def.typeId, def.models!.digital!.sampleFn);
       }
     }
   }
@@ -679,7 +679,7 @@ export function compileCircuit(
     if (typeof instanceDelay === "number") {
       delays[i] = instanceDelay;
     } else {
-      const defDelay = (def as { defaultDelay?: number }).defaultDelay;
+      const defDelay = def.models?.digital?.defaultDelay;
       delays[i] = typeof defDelay === "number" ? defDelay : DEFAULT_GATE_DELAY;
     }
   }

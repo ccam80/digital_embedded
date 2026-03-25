@@ -499,7 +499,7 @@ describe("SimulationMode", () => {
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     // Add transistorModel to the registered definition so the transistor path is triggered
     const def = registry.get("BehavioralAnd")!;
-    (def as { transistorModel?: string }).transistorModel = "CmosAnd2";
+    registry.update({ ...def, transistorModel: "CmosAnd2" });
 
     const compiled = compileAnalogCircuit(circuit, registry);
 

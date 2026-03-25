@@ -48,8 +48,8 @@ export function resolveDelays(
 
       // Priority 2: definition-level default
       const def = registry.get(element.typeId);
-      if (def !== undefined && typeof def.defaultDelay === "number") {
-        delays[i] = def.defaultDelay;
+      if (def !== undefined && typeof def.models?.digital?.defaultDelay === "number") {
+        delays[i] = def.models.digital.defaultDelay;
         continue;
       }
     }
