@@ -147,7 +147,7 @@ export class PropertyPanel {
    * Show the simulation mode dropdown for a component that supports multiple
    * simulation modes in an analog circuit.
    *
-   * Called after showProperties() when the circuit engineType is "analog" and
+   * Called after showProperties() when the circuit has analog components and
    * the selected component has simulationModes with more than one entry. The
    * dropdown is appended after the regular property rows.
    *
@@ -165,9 +165,10 @@ export class PropertyPanel {
     if (modes.length <= 1) return;
 
     const bag = element.getProperties();
+    const defaultMode = def.defaultModel ?? modes[0] ?? "analog-pins";
     const current = bag.has("simulationMode")
       ? (bag.get("simulationMode") as string)
-      : (modes[0] ?? "analog-pins");
+      : defaultMode;
 
     const select = document.createElement("select") as unknown as HTMLSelectElement & { value: string };
     for (const mode of modes) {
@@ -185,7 +186,7 @@ export class PropertyPanel {
       const newMode = select.value;
       const oldValue = bag.has("simulationMode")
         ? bag.get("simulationMode")
-        : (modes[0] ?? "analog-pins");
+        : defaultMode;
       bag.set("simulationMode", newMode);
       for (const cb of this._changeCallbacks) {
         cb("simulationMode", oldValue, newMode);

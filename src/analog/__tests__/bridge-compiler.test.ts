@@ -263,7 +263,7 @@ function buildInnerDigitalCircuit(): {
   bPinPos: { x: number; y: number };
   yPinPos: { x: number; y: number };
 } {
-  const inner = new Circuit({ name: "AndSubcircuit", engineType: "digital" });
+  const inner = new Circuit({ name: "AndSubcircuit" });
 
   const inA = makeInElement("inA", "A", { x: 2, y: 1 });
   const inB = makeInElement("inB", "B", { x: 2, y: 6 });
@@ -317,7 +317,7 @@ interface TestOuterCircuit {
 }
 
 function buildOuterAnalogCircuit(innerCircuit: Circuit): TestOuterCircuit {
-  const outer = new Circuit({ name: "OuterAnalog", engineType: "analog" });
+  const outer = new Circuit({ name: "OuterAnalog" });
 
   // Ground element — gives us node 0 (ground)
   const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
@@ -463,7 +463,6 @@ describe("BridgeCompilation", () => {
     const { circuit: innerCircuit } = buildInnerDigitalCircuit();
     const outerMeta = {
       name: "OuterAnalog",
-      engineType: "analog" as const,
       logicFamily: LOGIC_FAMILY_PRESETS["ttl"],
     };
     const outer = new Circuit(outerMeta);

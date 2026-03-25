@@ -342,7 +342,7 @@ describe("compileAnalogPartition", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
 
     // Build via old path
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
     const registry = buildRegistry(factorySpy);
 

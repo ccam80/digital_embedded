@@ -1170,7 +1170,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const registry = createDefaultRegistry();
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = facade.loadDigXml(xml);
-    circuit.metadata = { ...circuit.metadata, engineType: "analog" };
+    circuit.metadata = { ...circuit.metadata };
 
     // Compile through real analog compiler
     const compiled = compileUnified(circuit, registry).analog!;
@@ -1357,7 +1357,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const registry = createDefaultRegistry();
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = facade.loadDigXml(xml);
-    circuit.metadata = { ...circuit.metadata, engineType: "analog" };
+    circuit.metadata = { ...circuit.metadata };
 
     const compiled = compileUnified(circuit, registry).analog!;
     const engine = new MNAEngine();

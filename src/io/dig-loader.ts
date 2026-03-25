@@ -347,10 +347,9 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
       metadata.customShape = convertCustomShapeData(entry.value.value);
     }
     if (entry.key === "engineType" && entry.value.type === "string") {
-      const et = entry.value.value;
-      if (et === "analog" || et === "digital" || et === "auto") {
-        metadata.engineType = et;
-      }
+      // engineType is read from .dig XML for backward compatibility but is
+      // not stored on CircuitMetadata — the unified compiler derives the
+      // simulation domain from component models.
     }
   }
 

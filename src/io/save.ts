@@ -138,10 +138,6 @@ function serializeMetadata(circuit: Circuit): SavedMetadata {
     measurementOrdering: [...circuit.metadata.measurementOrdering],
     isGeneric: circuit.metadata.isGeneric,
   };
-  // Only write engineType when non-default to keep digital files clean
-  if (circuit.metadata.engineType !== "digital") {
-    meta.engineType = circuit.metadata.engineType;
-  }
   return meta;
 }
 

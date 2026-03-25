@@ -50,7 +50,7 @@ export interface ModelAssignment {
  * Infrastructure components (Wire, Tunnel, Ground, etc.) are tagged as
  * neutral — they participate in connectivity but have no simulation model.
  *
- * When `engineType` is "analog", dual-model components that would otherwise
+ * When `forceAnalogDomain` is true, dual-model components that would otherwise
  * default to "digital" are overridden to "analog" so the analog partition
  * receives them.
  */
@@ -59,6 +59,7 @@ export function resolveModelAssignments(
   registry: ComponentRegistry,
   engineType?: string,
 ): ModelAssignment[] {
+  const forceAnalogDomain = engineType === 'analog';
   const result: ModelAssignment[] = [];
 
   for (let i = 0; i < elements.length; i++) {
@@ -89,11 +90,11 @@ export function resolveModelAssignments(
       modelKey = keys.length > 0 ? keys[0]! : 'neutral';
     }
 
-    // When the circuit is analog and the component has an analog model,
-    // override a "digital" default to "analog" so the component is compiled
-    // by the analog backend.
+    // When the circuit has analog-only components and this component has an
+    // analog model, override a "digital" default to "analog" so the component
+    // is compiled by the analog backend.
     if (
-      engineType === 'analog' &&
+      forceAnalogDomain &&
       modelKey === 'digital' &&
       def.models?.analog !== undefined
     ) {

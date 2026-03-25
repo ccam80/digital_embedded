@@ -1,11 +1,11 @@
 /**
- * Tests for EditorBinding — engine-editor integration layer.
+ * Tests for EditorBinding — coordinator-editor integration layer.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { createEditorBinding } from "../editor-binding";
 import type { EditorBinding } from "../editor-binding";
-import { MockEngine } from "@/test-utils/mock-engine";
+import { MockCoordinator } from "@/test-utils/mock-coordinator";
 import { Wire, Circuit } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
 import type { CircuitElement } from "@/core/element";
@@ -13,6 +13,7 @@ import type { Pin } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { PropertyBag, PropertyValue } from "@/core/properties";
 import type { SerializedElement } from "@/core/element";
+import type { SignalAddress, SignalValue } from "@/compile/types";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement stub for tests
@@ -47,69 +48,89 @@ class StubElement implements CircuitElement {
 describe("EditorBinding", () => {
   let binding: EditorBinding;
   let circuit: Circuit;
-  let engine: MockEngine;
+  let coordinator: MockCoordinator;
   let wire: Wire;
   let element: StubElement;
-  let wireNetMap: Map<Wire, number>;
-  let pinNetMap: Map<string, number>;
+  let wireSignalMap: Map<Wire, SignalAddress>;
+  let pinSignalMap: Map<string, SignalAddress>;
+  const wireAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1 };
+  const pinAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1 };
 
   beforeEach(() => {
     binding = createEditorBinding();
     circuit = new Circuit();
-    engine = new MockEngine();
-    engine.init({ netCount: 8, componentCount: 2 });
+    coordinator = new MockCoordinator();
 
     wire = new Wire({ x: 0, y: 0 }, { x: 10, y: 0 });
     element = new StubElement("elem-1");
 
-    wireNetMap = new Map([[wire, 3]]);
-    pinNetMap = new Map([["elem-1:A", 3]]);
+    wireSignalMap = new Map([[wire, wireAddr]]);
+    pinSignalMap = new Map([["elem-1:A", pinAddr]]);
   });
 
-  it("bind — bind circuit + engine, assert isBound is true", () => {
+  it("bind — bind circuit + coordinator, assert isBound is true", () => {
     expect(binding.isBound).toBe(false);
-    binding.bind(circuit, engine, wireNetMap, pinNetMap);
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.isBound).toBe(true);
   });
 
-  it("unbind — unbind, assert isBound is false, engine is null", () => {
-    binding.bind(circuit, engine, wireNetMap, pinNetMap);
+  it("unbind — unbind, assert isBound is false, coordinator is null, engine is null", () => {
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.isBound).toBe(true);
     binding.unbind();
     expect(binding.isBound).toBe(false);
+    expect(binding.coordinator).toBeNull();
     expect(binding.engine).toBeNull();
   });
 
-  it("getWireValue — bind with known wireNetMap, mock engine returns specific value for net ID", () => {
-    // Set net 3 to value 42
-    engine.setSignalRaw(3, 42);
-    binding.bind(circuit, engine, wireNetMap, pinNetMap);
+  it("getWireSignal — returns SignalValue from coordinator for the wire's address", () => {
+    const expected: SignalValue = { type: "digital", value: 42 };
+    coordinator.setSignal(wireAddr, expected);
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
+
+    const sv = binding.getWireSignal(wire);
+    expect(sv).toEqual(expected);
+  });
+
+  it("getWireValue — returns raw number extracted from digital SignalValue", () => {
+    coordinator.setSignal(wireAddr, { type: "digital", value: 42 });
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
 
     const value = binding.getWireValue(wire);
     expect(value).toBe(42);
-
-    // Verify the engine was called with net ID 3
-    const rawCall = engine.calls.find(
-      (c) => c.method === "getSignalRaw" && c.netId === 3,
-    );
-    expect(rawCall).toBeDefined();
   });
 
-  it("setInput — call setInput(), verify engine.setSignalValue() called with correct net ID", () => {
-    binding.bind(circuit, engine, wireNetMap, pinNetMap);
-    const value = BitVector.fromNumber(1, 1);
-    binding.setInput(element, "A", value);
+  it("getWireValue — returns voltage for analog SignalValue", () => {
+    const analogAddr: SignalAddress = { domain: "analog", nodeId: 5 };
+    const analogWire = new Wire({ x: 0, y: 0 }, { x: 20, y: 0 });
+    const analogWireMap = new Map([[analogWire, analogAddr]]);
+    coordinator.setSignal(analogAddr, { type: "analog", voltage: 3.3 });
+    binding.bind(circuit, coordinator, analogWireMap, pinSignalMap);
 
-    const setCall = engine.calls.find(
-      (c) => c.method === "setSignalValue" && c.netId === 3,
-    );
-    expect(setCall).toBeDefined();
-    if (setCall?.method === "setSignalValue") {
-      expect(setCall.value).toBe(value);
-    }
+    const value = binding.getWireValue(analogWire);
+    expect(value).toBeCloseTo(3.3);
+  });
+
+  it("setInput — calls coordinator.writeSignal() with correct address and digital SignalValue", () => {
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
+    const bv = BitVector.fromNumber(1, 1);
+    binding.setInput(element, "A", bv);
+
+    expect(coordinator.writeCalls).toHaveLength(1);
+    expect(coordinator.writeCalls[0]!.addr).toEqual(pinAddr);
+    expect((coordinator.writeCalls[0]!.value as { type: string; value: number }).value).toBe(1);
   });
 
   it("unboundThrows — calling getWireValue() when unbound throws", () => {
     expect(() => binding.getWireValue(wire)).toThrow();
+  });
+
+  it("unboundThrows — calling getWireSignal() when unbound throws", () => {
+    expect(() => binding.getWireSignal(wire)).toThrow();
+  });
+
+  it("engine accessor — returns digitalBackend from coordinator when bound", () => {
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
+    expect(binding.engine).toBeNull();
   });
 });

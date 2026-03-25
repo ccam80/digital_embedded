@@ -466,9 +466,7 @@ describe("AnalogDispatch", () => {
     const runner = new SimulationRunner(registry);
     const circuit = buildHalfAdder(registry);
 
-    // Default engineType is "auto" (resolves to digital for digital-only circuits)
-    expect(circuit.metadata.engineType).toBe("auto");
-
+    // Engine mode is auto-detected from component models (digital-only → digital)
     const engine = runner.compile(circuit);
 
     // Digital engine can step and produce correct results
@@ -480,20 +478,15 @@ describe("AnalogDispatch", () => {
     expect(runner.readOutput(engine, "C")).toBe(1);
   });
 
-  it("compile_analog_circuit_rejects_digital_components — digital components in analog circuit throw", () => {
+  it("compile_digital_only_circuit_produces_digital_coordinator", () => {
     const registry = buildRegistry();
     const runner = new SimulationRunner(registry);
 
+    // Half-adder has only digital components — coordinator should have digital backend
     const circuit = buildHalfAdder(registry);
-    circuit.metadata.engineType = "analog";
-
-    // The half-adder contains digital-only components (AND, XOR — no analogFactory).
-    // The analog compiler now emits unsupported-component-in-analog diagnostics
-    // instead of throwing, and returns the compiled circuit.
     const coordinator = runner.compile(circuit);
-    // Diagnostics are on the unified compiled output
-    const codes = coordinator.compiled.diagnostics.map((d) => d.code);
-    expect(codes).toContain("unsupported-component-in-analog");
+    expect(coordinator.digitalBackend).not.toBeNull();
+    expect(coordinator.analogBackend).toBeNull();
   });
 
   it("dc_operating_point_throws_for_digital_engine — dcOperatingPoint on digital engine throws TypeError", () => {

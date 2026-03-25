@@ -173,7 +173,7 @@ function buildAndGateCircuit(propsMap: Map<string, PropertyValue> = new Map()): 
   registry: ComponentRegistry;
   factorySpy: ReturnType<typeof vi.fn>;
 } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
   const registry = buildBehavioralRegistry(factorySpy);
 
@@ -234,7 +234,6 @@ describe("BehavioralCompilation", () => {
   it("respects_circuit_logic_family", () => {
     const ttlFamily = LOGIC_FAMILY_PRESETS["ttl"];
     const circuit = new Circuit({
-      engineType: "analog",
       logicFamily: ttlFamily,
     });
 
@@ -268,7 +267,7 @@ describe("BehavioralCompilation", () => {
   });
 
   it("digital_only_component_emits_diagnostic", () => {
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = new ComponentRegistry();
 
     registry.register({
@@ -301,7 +300,7 @@ describe("BehavioralCompilation", () => {
   });
 
   it("pin_override_applied", () => {
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
 
     const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
     const registry = new ComponentRegistry();
@@ -465,7 +464,7 @@ describe("SimulationMode", () => {
 
     // Build the outer analog circuit with the AND gate set to simulationMode: "logical"
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "logical"]]);
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
 
     const andGate = makeElement("BehavioralAnd", "and1", [
       { x: 10, y: 0, label: "In_1" },

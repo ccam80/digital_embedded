@@ -12,7 +12,6 @@ import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { FacadeError } from '../../headless/types.js';
 import type { Pin, Rotation } from '../../core/pin.js';
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
 import type { PinDeclaration } from '../../core/pin.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { ComponentDefinition, ComponentLayout, AnalogFactory } from '../../core/registry.js';
@@ -22,7 +21,8 @@ import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { AnalogElement } from '../../analog/element.js';
 import type { SparseSolver } from '../../analog/sparse-solver.js';
-import type { SignalAddress } from '../types.js';
+import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
+import { ConcreteCompiledAnalogCircuit } from '../../analog/compiled-analog-circuit.js';
 
 class MockElement extends AbstractCircuitElement {
   private readonly _pins: Pin[];
@@ -226,7 +226,7 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
   registry.register(resistorDef);
 
   const circuit = new Circuit();
-  circuit.metadata = { ...circuit.metadata, engineType: 'analog' };
+  circuit.metadata = { ...circuit.metadata };
   const gndEl = makeAnalogElementObj('Ground', 'gnd-1', [{ x: 0, y: 0, label: 'gnd' }]);
   const res1El = makeAnalogElementObj('Resistor', 'res-1', [{ x: 0, y: 0, label: 'p1' }, { x: 0, y: 4, label: 'p2' }]);
   const res2El = makeAnalogElementObj('Resistor', 'res-2', [{ x: 0, y: 4, label: 'p1' }, { x: 0, y: 8, label: 'p2' }]);
@@ -406,6 +406,18 @@ describe('DefaultSimulationCoordinator - digital-only', () => {
     coord.dispose();
   });
 
+  it('writeSignal with analog SignalValue to digital address throws FacadeError', () => {
+    const registry = buildDigitalRegistry();
+    const circuit = buildAndGateCircuit(registry);
+    const unified = compileUnified(circuit, registry);
+    const coord = new DefaultSimulationCoordinator(unified);
+    const addrA = unified.labelSignalMap.get('A')!;
+    expect(() =>
+      coord.writeSignal(addrA, { type: 'analog', voltage: 3.3 }),
+    ).toThrow(FacadeError);
+    coord.dispose();
+  });
+
   it('readByLabel throws FacadeError for unknown label', () => {
     const registry = buildDigitalRegistry();
     const circuit = buildAndGateCircuit(registry);
@@ -436,7 +448,7 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
   it('has null digitalBackend and non-null analogBackend', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
-    if (unified.analog === null) return;
+    expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
     expect(coord.digitalBackend).toBeNull();
     expect(coord.analogBackend).not.toBeNull();
@@ -446,7 +458,7 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
   it('step does not throw for analog-only circuit', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
-    if (unified.analog === null) return;
+    expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
     expect(() => coord.step()).not.toThrow();
     coord.dispose();
@@ -455,10 +467,108 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
   it('readSignal with digital address throws FacadeError on analog-only coordinator', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
-    if (unified.analog === null) return;
+    expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
     const addr: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1 };
     expect(() => coord.readSignal(addr)).toThrow(FacadeError);
     coord.dispose();
+  });
+});
+
+// ===========================================================================
+// Helpers — mixed-signal
+// ===========================================================================
+
+/**
+ * Build a minimal ConcreteCompiledAnalogCircuit with no elements, suitable
+ * for mixed-signal tests that only need both backends to exist.
+ */
+function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
+  return new ConcreteCompiledAnalogCircuit({
+    nodeCount: 1,
+    branchCount: 0,
+    elements: [],
+    labelToNodeId: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    elementToCircuitElement: new Map(),
+    bridges: [],
+  });
+}
+
+/**
+ * Assemble a CompiledCircuitUnified that has both digital and analog backends
+ * with no bridges. The digital domain comes from a real AND-gate compilation;
+ * the analog domain is a minimal stub.
+ */
+function buildMixedCompiledUnified(): CompiledCircuitUnified {
+  const digitalRegistry = buildDigitalRegistry();
+  const digitalCircuit = buildAndGateCircuit(digitalRegistry);
+  const digitalUnified = compileUnified(digitalCircuit, digitalRegistry);
+  // The AND-gate circuit is digital-only, so analog must be null here.
+  expect(digitalUnified.digital).not.toBeNull();
+
+  const analogDomain = buildMinimalAnalogDomain();
+
+  return {
+    digital: digitalUnified.digital,
+    analog: analogDomain,
+    bridges: [],
+    wireSignalMap: new Map([...digitalUnified.wireSignalMap]),
+    labelSignalMap: new Map([...digitalUnified.labelSignalMap]),
+    diagnostics: [],
+  };
+}
+
+// ===========================================================================
+// Tests — mixed-signal
+// ===========================================================================
+
+describe('DefaultSimulationCoordinator - mixed-signal', () => {
+  it('has both digitalBackend and analogBackend for mixed circuit', () => {
+    const unified = buildMixedCompiledUnified();
+    const coord = new DefaultSimulationCoordinator(unified);
+    expect(coord.digitalBackend).not.toBeNull();
+    expect(coord.analogBackend).not.toBeNull();
+    coord.dispose();
+  });
+
+  it('step works without bridges when both backends exist', () => {
+    const unified = buildMixedCompiledUnified();
+    expect(unified.bridges).toHaveLength(0);
+    const coord = new DefaultSimulationCoordinator(unified);
+    // With no bridges, _stepMixed takes the early return path: digital.step() + analog.step()
+    expect(() => coord.step()).not.toThrow();
+    expect(() => coord.step()).not.toThrow();
+    coord.dispose();
+  });
+
+  it('reset clears bridge state and notifies observers', () => {
+    const unified = buildMixedCompiledUnified();
+    const coord = new DefaultSimulationCoordinator(unified);
+    const onStep = vi.fn();
+    const onReset = vi.fn();
+    coord.addMeasurementObserver({ onStep, onReset });
+
+    coord.step();
+    coord.step();
+    coord.step();
+    expect(onStep).toHaveBeenCalledTimes(3);
+
+    coord.reset();
+    expect(onReset).toHaveBeenCalledTimes(1);
+
+    // After reset, step count restarts from 1
+    coord.step();
+    expect(onStep.mock.calls[3]![0]).toBe(1);
+
+    coord.dispose();
+  });
+
+  it('dispose cleans up both backends without throwing', () => {
+    const unified = buildMixedCompiledUnified();
+    const coord = new DefaultSimulationCoordinator(unified);
+    coord.step();
+    expect(() => coord.dispose()).not.toThrow();
   });
 });

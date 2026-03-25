@@ -376,7 +376,7 @@ function buildAnalogRegistry(): ComponentRegistry {
 
 describe("RC lowpass AC transient — compiler pipeline", () => {
   it("compilation produces correct topology", () => {
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildAnalogRegistry();
 
     const vs = makeElement("AcVoltageSource", "vs1",
@@ -429,7 +429,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
   });
 
   it("transient stepping produces time-varying output", () => {
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildAnalogRegistry();
 
     const vs = makeElement("AcVoltageSource", "vs1",
@@ -505,7 +505,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     //   node_src (x=10): AcVoltageSource.pos, Resistor.A
     //   node_out (x=20): Resistor.B, Capacitor.A
     //   node_gnd (x=30): AcVoltageSource.neg, Capacitor.B, Ground
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildAnalogRegistry();
 
     const vs = makeElement("AcVoltageSource", "vs1",

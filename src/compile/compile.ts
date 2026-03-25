@@ -20,6 +20,7 @@
 
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { hasAnalogModel, hasDigitalModel } from "../core/registry.js";
 import type { TransistorModelRegistry } from "../analog/transistor-model-registry.js";
 import { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
@@ -76,21 +77,39 @@ export function compileUnified(
     crossEngineBoundaries = [];
   }
 
-  const engineType = circuit.metadata.engineType;
-
   // -------------------------------------------------------------------------
-  // Step 2: Validate component registrations for non-analog circuits.
+  // Step 2: Detect whether the circuit targets the analog domain.
   //
-  // For digital and auto circuits, unknown component types must throw so
-  // callers receive a clear error rather than a silently broken compiled model.
-  // Analog-only circuits handle unknown components via diagnostics instead.
+  // A circuit is analog when any of its components — including infrastructure
+  // elements like Ground and VDD — has an analog model but no digital model.
+  // This drives two downstream decisions:
+  //   - Whether to skip digital-component validation (analog circuits may
+  //     contain types not in the digital registry).
+  //   - Whether to pass "analog" as the domain hint to resolveModelAssignments
+  //     so dual-model components default to the analog backend.
+  //
+  // Ground and VDD are analog-only infrastructure and serve as the canonical
+  // indicator that a circuit is wired for MNA simulation.
   // -------------------------------------------------------------------------
 
-  if (engineType !== "analog") {
-    const INFRASTRUCTURE = new Set([
-      "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
-      "Splitter", "Driver", "NotConnected", "ScopeTrigger",
-    ]);
+  const INFRASTRUCTURE = new Set([
+    "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
+    "Splitter", "Driver", "NotConnected", "ScopeTrigger",
+  ]);
+
+  let hasAnalogOnlyComponent = false;
+  for (const el of circuit.elements) {
+    const def = registry.get(el.typeId);
+    if (def === undefined) continue;
+    if (hasAnalogModel(def) && !hasDigitalModel(def)) {
+      hasAnalogOnlyComponent = true;
+      break;
+    }
+  }
+
+  const derivedEngineType = hasAnalogOnlyComponent ? "analog" : "digital";
+
+  if (!hasAnalogOnlyComponent) {
     for (const el of circuit.elements) {
       if (INFRASTRUCTURE.has(el.typeId)) continue;
       if (registry.get(el.typeId) === undefined) {
@@ -106,7 +125,7 @@ export function compileUnified(
   // Step 2b: Resolve model assignments for each element
   // -------------------------------------------------------------------------
 
-  const flatModelAssignments = resolveModelAssignments(circuit.elements, registry, engineType);
+  const flatModelAssignments = resolveModelAssignments(circuit.elements, registry, derivedEngineType);
 
   // -------------------------------------------------------------------------
   // Step 3: Extract connectivity groups (unified netlist)
@@ -141,7 +160,7 @@ export function compileUnified(
   // reached. For a pure-analog circuit with no digital components at all, skip.
   // -------------------------------------------------------------------------
 
-  const isAnalogOnly = engineType === "analog" && digitalPartition.components.length === 0;
+  const isAnalogOnly = hasAnalogOnlyComponent && digitalPartition.components.length === 0;
   const hasDigitalComponents = digitalPartition.components.length > 0;
   let compiledDigital: ReturnType<typeof compileDigitalPartition> | null = null;
   if (!isAnalogOnly && hasDigitalComponents) {
@@ -177,11 +196,7 @@ export function compileUnified(
   // digital partition (they have no analog model).
   // -------------------------------------------------------------------------
 
-  if (engineType === "analog" && compiledAnalog !== null) {
-    const INFRASTRUCTURE = new Set([
-      "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
-      "Splitter", "Driver", "NotConnected", "ScopeTrigger",
-    ]);
+  if (hasAnalogOnlyComponent && compiledAnalog !== null) {
     for (const el of circuit.elements) {
       if (INFRASTRUCTURE.has(el.typeId)) continue;
       const def = registry.get(el.typeId);

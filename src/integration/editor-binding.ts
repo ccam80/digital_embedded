@@ -1,11 +1,11 @@
 /**
- * EditorBinding — integration layer connecting the compiled engine to the
+ * EditorBinding — integration layer connecting the compiled coordinator to the
  * visual editor.
  *
- * Holds the Wire→netId and pin-key→netId mappings produced by the compiler.
- * Routes interactive input (user clicking an In component) through to the
- * engine via setSignalValue(). Provides getWireValue() and getPinValue() for
- * the renderer and property panels.
+ * Holds the Wire→SignalAddress and pin-key→SignalAddress mappings produced by
+ * the unified compiler. Routes interactive input (user clicking an In component)
+ * through to the coordinator via writeSignal(). Provides getWireSignal(),
+ * getWireValue(), and getPinValue() for the renderer and property panels.
  *
  * Browser-free: no Canvas2D or DOM imports. The renderer calls into this
  * module; this module does not import the renderer.
@@ -15,6 +15,16 @@ import type { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { SimulationEngine } from "@/core/engine-interface";
 import type { BitVector } from "@/core/signal";
+import type { SignalAddress, SignalValue } from "@/compile/types";
+import type { SimulationCoordinator } from "@/compile/coordinator-types";
+
+// ---------------------------------------------------------------------------
+// Helper: extract a raw number from a SignalValue
+// ---------------------------------------------------------------------------
+
+function signalToNumber(sv: SignalValue): number {
+  return sv.type === "digital" ? sv.value : sv.voltage;
+}
 
 // ---------------------------------------------------------------------------
 // EditorBinding interface
@@ -22,24 +32,32 @@ import type { BitVector } from "@/core/signal";
 
 export interface EditorBinding {
   /**
-   * Connect a circuit, engine, and net-ID mappings.
+   * Connect a circuit, coordinator, and signal-address mappings.
    *
-   * circuit     — the compiled circuit providing component-to-pin context.
-   * wireNetMap  — maps each Wire to the net ID assigned by the compiler.
-   * pinNetMap   — maps "{instanceId}:{pinLabel}" keys to net IDs.
+   * circuit         — the compiled circuit providing component-to-pin context.
+   * coordinator     — unified simulation coordinator for all domains.
+   * wireSignalMap   — maps each Wire to its SignalAddress (from CompiledCircuitUnified).
+   * pinSignalMap    — maps "{instanceId}:{pinLabel}" keys to SignalAddresses.
    */
   bind(
     circuit: Circuit,
-    engine: SimulationEngine,
-    wireNetMap: Map<Wire, number>,
-    pinNetMap: Map<string, number>,
+    coordinator: SimulationCoordinator,
+    wireSignalMap: Map<Wire, SignalAddress>,
+    pinSignalMap: Map<string, SignalAddress>,
   ): void;
 
-  /** Disconnect from the engine and clear all mappings. */
+  /** Disconnect from the coordinator and clear all mappings. */
   unbind(): void;
 
   /**
-   * Return the raw signal value for a wire.
+   * Return the SignalValue for a wire.
+   * Throws if not currently bound.
+   */
+  getWireSignal(wire: Wire): SignalValue;
+
+  /**
+   * Return the raw numeric signal value for a wire.
+   * Extracts value from SignalValue (digital → value, analog → voltage).
    * Throws if not currently bound.
    */
   getWireValue(wire: Wire): number;
@@ -52,7 +70,7 @@ export interface EditorBinding {
 
   /**
    * Drive an input signal change from the UI.
-   * Looks up the net ID for the pin, then calls engine.setSignalValue().
+   * Looks up the SignalAddress for the pin, then calls coordinator.writeSignal().
    * Throws if not currently bound.
    */
   setInput(element: CircuitElement, pinLabel: string, value: BitVector): void;
@@ -60,7 +78,10 @@ export interface EditorBinding {
   /** True when bind() has been called and unbind() has not. */
   readonly isBound: boolean;
 
-  /** The bound engine, or null when unbound. */
+  /** The bound coordinator, or null when unbound. */
+  readonly coordinator: SimulationCoordinator | null;
+
+  /** The digital backend engine, or null when unbound or no digital domain. */
   readonly engine: SimulationEngine | null;
 }
 
@@ -69,51 +90,55 @@ export interface EditorBinding {
 // ---------------------------------------------------------------------------
 
 class EditorBindingImpl implements EditorBinding {
-  private _engine: SimulationEngine | null = null;
-  private _wireNetMap: Map<Wire, number> = new Map();
-  private _pinNetMap: Map<string, number> = new Map();
+  private _coordinator: SimulationCoordinator | null = null;
+  private _wireSignalMap: Map<Wire, SignalAddress> = new Map();
+  private _pinSignalMap: Map<string, SignalAddress> = new Map();
 
   bind(
     circuit: Circuit,
-    engine: SimulationEngine,
-    wireNetMap: Map<Wire, number>,
-    pinNetMap: Map<string, number>,
+    coordinator: SimulationCoordinator,
+    wireSignalMap: Map<Wire, SignalAddress>,
+    pinSignalMap: Map<string, SignalAddress>,
   ): void {
-    void circuit; // circuit reference not stored; engine manages state
-    this._engine = engine;
-    this._wireNetMap = wireNetMap;
-    this._pinNetMap = pinNetMap;
+    void circuit;
+    this._coordinator = coordinator;
+    this._wireSignalMap = wireSignalMap;
+    this._pinSignalMap = pinSignalMap;
   }
 
   unbind(): void {
-    this._engine = null;
-    this._wireNetMap = new Map();
-    this._pinNetMap = new Map();
+    this._coordinator = null;
+    this._wireSignalMap = new Map();
+    this._pinSignalMap = new Map();
+  }
+
+  getWireSignal(wire: Wire): SignalValue {
+    if (this._coordinator === null) {
+      throw new Error("EditorBinding: not bound to a coordinator");
+    }
+    const addr = this._wireSignalMap.get(wire);
+    if (addr === undefined) {
+      throw new Error("EditorBinding: wire has no signal address");
+    }
+    return this._coordinator.readSignal(addr);
   }
 
   getWireValue(wire: Wire): number {
-    if (this._engine === null) {
-      throw new Error("EditorBinding: not bound to an engine");
-    }
-    const netId = this._wireNetMap.get(wire);
-    if (netId === undefined) {
-      throw new Error("EditorBinding: wire has no net assignment");
-    }
-    return this._engine.getSignalRaw(netId);
+    return signalToNumber(this.getWireSignal(wire));
   }
 
   getPinValue(element: CircuitElement, pinLabel: string): number {
-    if (this._engine === null) {
-      throw new Error("EditorBinding: not bound to an engine");
+    if (this._coordinator === null) {
+      throw new Error("EditorBinding: not bound to a coordinator");
     }
     const key = `${element.instanceId}:${pinLabel}`;
-    const netId = this._pinNetMap.get(key);
-    if (netId === undefined) {
+    const addr = this._pinSignalMap.get(key);
+    if (addr === undefined) {
       throw new Error(
-        `EditorBinding: pin "${key}" has no net assignment`,
+        `EditorBinding: pin "${key}" has no signal address`,
       );
     }
-    return this._engine.getSignalRaw(netId);
+    return signalToNumber(this._coordinator.readSignal(addr));
   }
 
   setInput(
@@ -121,25 +146,32 @@ class EditorBindingImpl implements EditorBinding {
     pinLabel: string,
     value: BitVector,
   ): void {
-    if (this._engine === null) {
-      throw new Error("EditorBinding: not bound to an engine");
+    if (this._coordinator === null) {
+      throw new Error("EditorBinding: not bound to a coordinator");
     }
     const key = `${element.instanceId}:${pinLabel}`;
-    const netId = this._pinNetMap.get(key);
-    if (netId === undefined) {
+    const addr = this._pinSignalMap.get(key);
+    if (addr === undefined) {
       throw new Error(
-        `EditorBinding: pin "${key}" has no net assignment`,
+        `EditorBinding: pin "${key}" has no signal address`,
       );
     }
-    this._engine.setSignalValue(netId, value);
+    const sv: SignalValue = addr.domain === "digital"
+      ? { type: "digital", value: value.toNumber() }
+      : { type: "analog", voltage: value.toNumber() };
+    this._coordinator.writeSignal(addr, sv);
   }
 
   get isBound(): boolean {
-    return this._engine !== null;
+    return this._coordinator !== null;
+  }
+
+  get coordinator(): SimulationCoordinator | null {
+    return this._coordinator;
   }
 
   get engine(): SimulationEngine | null {
-    return this._engine;
+    return this._coordinator?.digitalBackend ?? null;
   }
 }
 

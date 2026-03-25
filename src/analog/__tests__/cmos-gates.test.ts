@@ -200,7 +200,7 @@ function getVoltageAtX(
 // ---------------------------------------------------------------------------
 
 function buildInverter(vin: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_IN = 20, X_GND = 30, X_OUT = 40;
@@ -231,7 +231,7 @@ function buildInverter(vin: number, vdd = 3.3): { circuit: Circuit; registry: Co
 // ---------------------------------------------------------------------------
 
 function buildNand2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_OUT = 40, X_GND = 50, X_MID = 60;
@@ -263,7 +263,7 @@ function buildNand2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regi
 // ---------------------------------------------------------------------------
 
 function buildNor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_OUT = 40, X_GND = 50, X_MID = 60;
@@ -294,7 +294,7 @@ function buildNor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 // ---------------------------------------------------------------------------
 
 function buildAnd2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_NOUT = 40, X_GND = 50, X_MID = 60, X_OUT = 70;
@@ -328,7 +328,7 @@ function buildAnd2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 // ---------------------------------------------------------------------------
 
 function buildOr2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_NOUT = 40, X_GND = 50, X_MID = 60, X_OUT = 70;
@@ -370,7 +370,7 @@ function buildOr2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regist
 // ---------------------------------------------------------------------------
 
 function buildXor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 25, X_OUT = 30, X_GND = 50, X_ABAR = 60, X_BBAR = 70;
@@ -411,7 +411,7 @@ function buildXor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 // ---------------------------------------------------------------------------
 
 function buildXnor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_A = 20, X_B = 25, X_XOR = 30, X_GND = 50, X_ABAR = 60, X_BBAR = 70, X_OUT = 80;
@@ -457,7 +457,7 @@ function buildXnor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regi
 // ---------------------------------------------------------------------------
 
 function buildBuffer(vin: number, vdd = 3.3): { circuit: Circuit; registry: ComponentRegistry; outX: number } {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = buildRegistry();
 
   const X_VDD = 10, X_IN = 20, X_GND = 30, X_MID = 50, X_OUT = 60;

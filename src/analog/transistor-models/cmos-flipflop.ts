@@ -174,7 +174,7 @@ function makeOutEl(label: string, xNet: number, yRow: number): CircuitElement {
 // ---------------------------------------------------------------------------
 
 export function createCmosDFlipflop(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   // Interface elements
   circuit.addElement(makeInEl("D", 10, 0));

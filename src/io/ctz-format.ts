@@ -332,7 +332,7 @@ export function mapCtzToCircuit(
   registry: ComponentRegistry,
   diagnostics: Diagnostic[],
 ): Circuit {
-  const circuit = new Circuit({ name: "Imported from CircuitJS", engineType: "analog" });
+  const circuit = new Circuit({ name: "Imported from CircuitJS" });
 
   let placeholderCounter = 0;
 

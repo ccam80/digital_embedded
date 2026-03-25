@@ -1,12 +1,11 @@
 /**
  * Analog circuit compiler.
  *
- * Transforms a visual `Circuit` with `engineType: "analog"` into a
+ * Transforms a visual `Circuit` containing analog components into a
  * `ConcreteCompiledAnalogCircuit` that the MNA engine can simulate.
  *
  * Steps:
- *  1. Verify circuit.metadata.engineType === "analog"
- *  2. Build node map (wire groups → MNA node IDs, ground = 0)
+ *  1. Build node map (wire groups → MNA node IDs, ground = 0)
  *  3. Assign sequential branch indices to components with requiresBranchRow
  *  4. Allocate internal nodes via getInternalNodeCount
  *  5. Resolve pin→node bindings for each element
@@ -423,7 +422,7 @@ function extractDigitalSubcircuit(
     }
   }
 
-  const innerCircuit = new Circuit({ engineType: "digital" });
+  const innerCircuit = new Circuit();
   for (const el of digitalElements) { innerCircuit.addElement(el); }
   for (const wire of circuit.wires) {
     const root = uf.find(posKeyForPartition(wire.start));
@@ -440,8 +439,8 @@ function extractDigitalSubcircuit(
     innerCircuit.addElement(el);
   }
 
-  const analogCircuit = new Circuit({ engineType: "analog" });
-  analogCircuit.metadata = { ...circuit.metadata, engineType: "analog" };
+  const analogCircuit = new Circuit();
+  analogCircuit.metadata = { ...circuit.metadata };
   for (const el of analogElements) { analogCircuit.addElement(el); }
   for (const wire of circuit.wires) {
     const root = uf.find(posKeyForPartition(wire.start));
@@ -663,8 +662,7 @@ function buildAnalogNodeMap(
  * @param circuitOrResult - The visual Circuit model or a FlattenResult
  * @param registry        - The component registry with analog ComponentDefinitions
  * @returns A compiled circuit ready for MNA simulation
- * @throws Error if circuit.metadata.engineType !== "analog" or if a
- *         non-analog component is found in the circuit
+ * @throws Error if a non-analog component is found in the circuit
  */
 function compileAnalogCircuit(
   circuitOrResult: Circuit | FlattenResult,
@@ -710,13 +708,8 @@ function compileAnalogCircuit(
     }
   }
 
-  // Step 1: Verify engine type (accept "analog" and "auto" for mixed-mode)
-  if (circuit.metadata.engineType !== "analog" && circuit.metadata.engineType !== "auto") {
-    throw new Error(
-      `compileAnalogCircuit: circuit engineType must be "analog" or "auto", ` +
-        `got "${circuit.metadata.engineType}"`,
-    );
-  }
+  // Step 1: Verify that the circuit has at least one analog component.
+  // The unified compiler only routes here when analog components are present.
 
   // Step 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
   const nodeMap = buildAnalogNodeMap(circuit);
@@ -2525,7 +2518,6 @@ function detectHighSourceImpedance(
  *   - One In element per input pin, labeled to match the component's pin label
  *   - One Out element per output pin, labeled to match the component's pin label
  *   - Wires connecting each In/Out to the component's pins
- *   - metadata.engineType = "digital"
  *
  * The resulting circuit can be compiled by the digital compiler and used as
  * the inner circuit of a BridgeInstance. The digital compiler's labelToNetId
@@ -2549,7 +2541,7 @@ function synthesizeDigitalCircuit(
   def: import("../core/registry.js").ComponentDefinition,
   registry: ComponentRegistry,
 ): Circuit {
-  const inner = new Circuit({ name: el.typeId, engineType: "digital" });
+  const inner = new Circuit({ name: el.typeId });
 
   // Build stripped props: copy all properties except analog-compiler concerns.
   const srcProps = el.getProperties();

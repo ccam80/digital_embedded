@@ -14,6 +14,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { Viewport } from '../editor/viewport.js';
 import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
+import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
@@ -66,7 +67,7 @@ export interface TestBridge {
   /** Get current viewport state. */
   getViewport(): { zoom: number; panX: number; panY: number };
 
-  /** Get current engine type from circuit metadata. */
+  /** Get current engine type derived from circuit components. */
   getEngineType(): string;
 
   /**
@@ -193,7 +194,12 @@ export function createTestBridge(
     },
 
     getEngineType() {
-      return circuit.metadata.engineType;
+      const hasAnalogOnly = circuit.elements.some(el => {
+        const def = registry.get(el.typeId);
+        if (def === undefined) return false;
+        return hasAnalogModel(def) && !hasDigitalModel(def);
+      });
+      return hasAnalogOnly ? 'analog' : 'digital';
     },
 
     getAnalogState() {

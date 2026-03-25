@@ -8,6 +8,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PropertyType, PropertyBag } from "@/core/properties";
 import type { PropertyDefinition } from "@/core/properties";
+import type { ComponentDefinition } from "@/core/registry";
+import { ComponentCategory } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stub
@@ -268,5 +270,154 @@ describe("PropertyPanel", () => {
 
     expect(panel.isCollapsed()).toBe(false);
     expect(container.style["display"]).toBe("");
+  });
+
+  // ---------------------------------------------------------------------------
+  // showSimulationModeDropdown tests
+  // ---------------------------------------------------------------------------
+
+  it("simulationModeDropdown_multiModelShowsDropdown — multi-model component adds simulationMode row", () => {
+    const def: ComponentDefinition = {
+      name: "BehavioralAnd",
+      typeId: -1,
+      factory: () => { throw new Error("stub"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      models: {
+        digital: { executeFn: () => {} },
+        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+      },
+    };
+    const el = makeElement([]);
+    panel.showProperties(el as any, []);
+    const countBefore = container.children.length;
+
+    panel.showSimulationModeDropdown(el as any, def as any);
+
+    // One new row should be added
+    expect(container.children.length).toBe(countBefore + 1);
+    // simulationMode input should be registered
+    expect(panel.getInput("simulationMode")).toBeDefined();
+  });
+
+  it("simulationModeDropdown_singleModelNoDropdown — single-model component does not add dropdown", () => {
+    const def: ComponentDefinition = {
+      name: "And",
+      typeId: -1,
+      factory: () => { throw new Error("stub"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      models: {
+        digital: { executeFn: () => {} },
+      },
+    };
+    const el = makeElement([]);
+    panel.showProperties(el as any, []);
+    const countBefore = container.children.length;
+
+    panel.showSimulationModeDropdown(el as any, def as any);
+
+    // No row added for single-model component
+    expect(container.children.length).toBe(countBefore);
+    expect(panel.getInput("simulationMode")).toBeUndefined();
+  });
+
+  it("simulationModeDropdown_usesDefaultModel — uses def.defaultModel as initial value when no bag entry", () => {
+    const def: ComponentDefinition = {
+      name: "BehavioralAnd",
+      typeId: -1,
+      factory: () => { throw new Error("stub"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      defaultModel: "analog",
+      models: {
+        digital: { executeFn: () => {} },
+        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+      },
+    };
+    const el = makeElement([]);
+    panel.showProperties(el as any, []);
+    panel.showSimulationModeDropdown(el as any, def as any);
+
+    const input = panel.getInput("simulationMode")!;
+    expect(input).toBeDefined();
+    // Default should be "analog" per def.defaultModel
+    expect(input.getValue()).toBe("analog");
+  });
+
+  it("simulationModeDropdown_changeUpdatesBagAndFiresCallback — changing dropdown updates PropertyBag and fires callback", () => {
+    const def: ComponentDefinition = {
+      name: "BehavioralAnd",
+      typeId: -1,
+      factory: () => { throw new Error("stub"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      models: {
+        digital: { executeFn: () => {} },
+        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+      },
+    };
+    const el = makeElement([]);
+    panel.showProperties(el as any, []);
+    panel.showSimulationModeDropdown(el as any, def as any);
+
+    const onChange = vi.fn();
+    panel.onPropertyChange(onChange);
+
+    // Find the select element in the dropdown row and trigger change
+    const dropdownRow = container.children[container.children.length - 1] as StubElement;
+    const select = dropdownRow.children[1] as StubElement;
+    select.value = "analog";
+    select.dispatchEvent("change");
+
+    // Callback should have fired
+    expect(onChange).toHaveBeenCalledOnce();
+    const [key, , newVal] = onChange.mock.calls[0]!;
+    expect(key).toBe("simulationMode");
+    expect(newVal).toBe("analog");
+
+    // PropertyBag should be updated
+    const bag = el.getProperties();
+    expect(bag.get("simulationMode")).toBe("analog");
+  });
+
+  it("simulationModeDropdown_existingBagValueUsedAsDefault — bag value takes precedence over def.defaultModel", () => {
+    const def: ComponentDefinition = {
+      name: "BehavioralAnd",
+      typeId: -1,
+      factory: () => { throw new Error("stub"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      defaultModel: "digital",
+      models: {
+        digital: { executeFn: () => {} },
+        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+      },
+    };
+    // Pre-set bag with "analog"
+    const el = makeElement([]);
+    el.getProperties().set("simulationMode", "analog");
+    panel.showProperties(el as any, []);
+    panel.showSimulationModeDropdown(el as any, def as any);
+
+    const input = panel.getInput("simulationMode")!;
+    expect(input).toBeDefined();
+    // Bag value "analog" should override defaultModel "digital"
+    expect(input.getValue()).toBe("analog");
   });
 });

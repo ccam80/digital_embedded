@@ -447,7 +447,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('node count matches reference compileUnified for resistor divider', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({ engineType: 'analog' });
+    const circuit = new Circuit({  });
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -468,7 +468,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('element count matches reference for resistor divider', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({ engineType: 'analog' });
+    const circuit = new Circuit({  });
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -487,7 +487,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('wireSignalMap has analog addresses for all wires', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({ engineType: 'analog' });
+    const circuit = new Circuit({  });
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -518,7 +518,7 @@ describe('compileUnified — RC circuit (analog)', () => {
   it('branch count matches reference for RC circuit', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({ engineType: 'analog' });
+    const circuit = new Circuit({  });
     // Vs: pos=node1(x=10), neg=ground(x=0)  → 1 branch
     // R:  node1(x=10) — node2(x=20)          → 0 branches
     // C:  node2(x=20) — ground(x=0)          → 1 branch
@@ -540,7 +540,7 @@ describe('compileUnified — RC circuit (analog)', () => {
   it('matrix size matches reference for RC circuit', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({ engineType: 'analog' });
+    const circuit = new Circuit({  });
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));

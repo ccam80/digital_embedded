@@ -15,24 +15,9 @@ import type { DcOpResult } from "@/core/analog-engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
 import { OscillationError } from "@/core/errors";
 import { compileUnified } from "@/compile/compile.js";
-import { TransistorModelRegistry } from "@/analog/transistor-model-registry.js";
-import { registerAllCmosGateModels } from "@/analog/transistor-models/cmos-gates.js";
-import { registerCmosDFlipflop } from "@/analog/transistor-models/cmos-flipflop.js";
-import { registerDarlingtonModels } from "@/analog/transistor-models/darlington.js";
+import { getTransistorModels } from "@/analog/default-models.js";
 import { DefaultSimulationCoordinator } from "@/compile/coordinator.js";
 import { FacadeError } from "./types.js";
-
-/** Lazily-built singleton TransistorModelRegistry with all known models. */
-let _transistorModels: TransistorModelRegistry | null = null;
-function getTransistorModels(): TransistorModelRegistry {
-  if (!_transistorModels) {
-    _transistorModels = new TransistorModelRegistry();
-    registerAllCmosGateModels(_transistorModels);
-    registerCmosDFlipflop(_transistorModels);
-    registerDarlingtonModels(_transistorModels);
-  }
-  return _transistorModels;
-}
 
 /**
  * Factory function that creates and initialises a SimulationEngine from a
@@ -62,10 +47,11 @@ export class SimulationRunner {
   private readonly _registry: ComponentRegistry;
 
   /**
-   * Maps Engine instances to their coordinator records for
+   * Maps engine or coordinator instances to their coordinator records for
    * label resolution. WeakMap avoids memory leaks when engines are discarded.
+   * Uses `object` key type since values may be Engine, SimulationCoordinator, etc.
    */
-  private readonly _records = new WeakMap<Engine, RunnerRecord>();
+  private readonly _records = new WeakMap<object, RunnerRecord>();
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -87,47 +73,21 @@ export class SimulationRunner {
    * @returns              A SimulationEngine ready for stepping.
    */
   compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationCoordinator {
-    if (circuit.metadata.engineType === "analog") {
-      const unified = compileUnified(circuit, this._registry, getTransistorModels());
-
-      // Check for digital-only components in analog circuit
-      const INFRASTRUCTURE = new Set([
-        "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
-        "Splitter", "Driver", "NotConnected", "ScopeTrigger",
-      ]);
-      for (const el of circuit.elements) {
-        if (INFRASTRUCTURE.has(el.typeId)) continue;
-        const def = this._registry.get(el.typeId);
-        if (!def) continue;
-        if (def.models?.analog === undefined && def.models?.digital !== undefined) {
-          unified.diagnostics.push({
-            code: "unsupported-component-in-analog",
-            severity: "error",
-            message: `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-          });
-        }
-      }
-
-      const coordinator = new DefaultSimulationCoordinator(unified);
-
-      const engineKey = (unified.analog as unknown as Engine)
-        ?? (coordinator as unknown as Engine);
-      this._records.set(engineKey, { coordinator });
-      this._records.set(coordinator as unknown as Engine, { coordinator });
-      return coordinator;
-    }
-
-    const unified = compileUnified(circuit, this._registry);
+    const unified = compileUnified(circuit, this._registry, getTransistorModels());
     const coordinator = new DefaultSimulationCoordinator(unified);
 
-    if (engineFactory !== undefined) {
-      const overrideEngine = engineFactory(unified.digital!);
-      this._records.set(overrideEngine, { coordinator });
-    } else {
-      const digitalEngine = coordinator.digitalBackend!;
-      this._records.set(digitalEngine, { coordinator });
+    if (unified.analog !== null) {
+      this._records.set(unified.analog, { coordinator });
     }
-    this._records.set(coordinator as unknown as Engine, { coordinator });
+    if (unified.digital !== null) {
+      if (engineFactory !== undefined) {
+        const overrideEngine = engineFactory(unified.digital);
+        this._records.set(overrideEngine, { coordinator });
+      } else {
+        this._records.set(coordinator.digitalBackend!, { coordinator });
+      }
+    }
+    this._records.set(coordinator, { coordinator });
 
     return coordinator;
   }
@@ -309,10 +269,8 @@ export class SimulationRunner {
   private _resolveBackendEngine(engineOrCoord: SimulationEngine): SimulationEngine {
     const record = this._records.get(engineOrCoord);
     if (record !== undefined) {
-      const backend = record.coordinator.digitalBackend ?? record.coordinator.analogBackend;
-      if (backend !== null) {
-        return (backend as unknown as SimulationEngine);
-      }
+      const digital = record.coordinator.digitalBackend;
+      if (digital !== null) return digital;
     }
     return engineOrCoord;
   }

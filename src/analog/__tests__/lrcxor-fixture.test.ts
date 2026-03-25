@@ -250,7 +250,7 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
     in2High = false,
   } = opts;
 
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit({  });
   const registry = simulationMode === "logical"
     ? buildDigitalRegistry()
     : buildBehavioralRegistry();
@@ -799,7 +799,7 @@ describe("lrcxor.dig fixture file integration", () => {
 
     expect(circuit.elements.length).toBeGreaterThan(0);
 
-    circuit.metadata.engineType = "analog";
+
     const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
     expect(
@@ -813,7 +813,7 @@ describe("lrcxor.dig fixture file integration", () => {
     // steps and verify the engine never enters ERROR state.
     const registry = buildFixtureRegistry();
     const circuit = loadDig(FIXTURE_XML, registry);
-    circuit.metadata.engineType = "analog";
+
 
     const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
@@ -846,7 +846,7 @@ describe("lrcxor.dig fixture file integration", () => {
     // then verify the engine runs without error and produces non-zero voltages.
     const registry = buildFixtureRegistry();
     const circuit = loadDig(FIXTURE_XML, registry);
-    circuit.metadata.engineType = "analog";
+
 
     // Switch the XOR element to simplified mode
     const xorEl = circuit.elements.find((el) => el.typeId === "XOr");
@@ -881,7 +881,7 @@ describe("lrcxor.dig fixture file integration", () => {
     // output adapter respects the overridden vOH.
     const registry = buildFixtureRegistry();
     const circuit = loadDig(FIXTURE_XML, registry);
-    circuit.metadata.engineType = "analog";
+
 
     const customVOH = 5.0;
     const baseXorDef = registry.get("XOr")!;
@@ -940,7 +940,7 @@ describe("bridge error paths", () => {
   it("digital_mode_with_unconnected_pin_emits_diagnostic", () => {
     // Build a minimal XOR circuit where In_2 has no wire — the compiler should
     // emit an unconnected-pin diagnostic rather than crash.
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildDigitalRegistry();
 
     // VS1 → R_drive → XOR In_1 (neg=GND at x=50, pos at x=10)
@@ -995,7 +995,7 @@ describe("bridge error paths", () => {
     // Drive one XOR input with a voltage in the indeterminate band (1.5V, which
     // is between vIL=0.8V and vIH=2.0V). The bridge must NOT crash or enter
     // ERROR state — it should hold the last known state (default LOW).
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildDigitalRegistry();
 
     const vIndeterminate = 1.5; // between vIL=0.8 and vIH=2.0

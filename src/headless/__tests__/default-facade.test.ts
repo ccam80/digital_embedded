@@ -217,18 +217,16 @@ describe('DefaultSimulatorFacade', () => {
   // G1: Analog dispatch — facade routes analog circuits to MNA engine
   // -------------------------------------------------------------------------
 
-  it('routes analog circuits to analog engine and populates getCompiledAnalog()', () => {
+  it('digital-only circuit routes to digital engine with null compiledAnalog', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAndGate(facade);
-    circuit.metadata.engineType = 'analog';
 
-    const engine = facade.compile(circuit);
+    const coordinator = facade.compile(circuit);
 
-    expect(facade.getEngine()).toBe(engine);
-    // getCompiledAnalog() is populated for analog circuits
-    expect(facade.getCompiledAnalog()).not.toBeNull();
-    // getCompiled() is null for analog circuits (digital-only field)
-    expect(facade.getCompiled()).toBeNull();
+    expect(facade.getEngine()).toBe(coordinator);
+    // Digital-only circuit: getCompiled() is populated, getCompiledAnalog() is null
+    expect(facade.getCompiled()).not.toBeNull();
+    expect(facade.getCompiledAnalog()).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -292,7 +290,7 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
       ],
     });
 
-    circuit.metadata = { ...circuit.metadata, engineType: "auto" };
+    circuit.metadata = { ...circuit.metadata };
 
     const engine = facade.compile(circuit);
     expect(engine).toBeDefined();
@@ -301,7 +299,7 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
   it("compiles a pure analog circuit in auto mode", () => {
     const facade = new DefaultSimulatorFacade(autoModeRegistry);
 
-    const circuit = new Circuit({ engineType: "auto" });
+    const circuit = new Circuit({  });
     const v1 = createAutoModeElement(autoModeRegistry, "DcVoltageSource", { x: 0, y: 5 }, { label: "V1", voltage: 5 });
     const r1 = createAutoModeElement(autoModeRegistry, "Resistor", { x: 10, y: 5 }, { label: "R1", resistance: 1000 });
     const gnd = createAutoModeElement(autoModeRegistry, "Ground", { x: 10, y: 10 });

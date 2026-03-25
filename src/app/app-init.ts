@@ -357,13 +357,13 @@ export function initApp(search?: string): void {
     if (!insertMenuDropdown) return;
     insertMenuDropdown.innerHTML = '';
     const reg = palette.getRegistry();
-    const engineFilter = circuit.metadata.engineType;
-    const isAuto = engineFilter === 'auto';
-    const order = (engineFilter === 'analog' || isAuto) ? INSERT_ORDER_ANALOG : INSERT_ORDER_DIGITAL;
+    const engineFilter = palette.getEngineTypeFilter();
+    const isAll = engineFilter === null;
+    const order = (engineFilter === 'analog' || isAll) ? INSERT_ORDER_ANALOG : INSERT_ORDER_DIGITAL;
     for (const catKey of order) {
       const allDefs = reg.getByCategory(catKey as any);
-      // Filter by engine type (auto mode shows all)
-      const defs = isAuto ? allDefs : allDefs.filter(d => {
+      // Filter by engine type (null = show all)
+      const defs = isAll ? allDefs : allDefs.filter(d => {
         if (engineFilter === 'digital') return hasDigitalModel(d);
         if (engineFilter === 'analog') return hasAnalogModel(d);
         return false;
@@ -404,7 +404,7 @@ export function initApp(search?: string): void {
       const def = registry.get(element.typeId);
       if (def) {
         propertyPanel.showProperties(element, def.propertyDefs);
-        if (isAnalogOrMixed()) {
+        if (isAnalogMode()) {
           if (availableModels(def).length > 1) {
             propertyPanel.showSimulationModeDropdown(element, def);
           }
@@ -422,7 +422,7 @@ export function initApp(search?: string): void {
       if (selected.size === 1) {
         const element = selected.values().next().value!;
         const def = registry.get(element.typeId);
-        const analogCompiled = facade.getCompiledAnalog() as ConcreteCompiledAnalogCircuit | null;
+        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
         if (def?.propertyDefs && analogCompiled) {
           // Find the element index in the compiled circuit
           let elementIndex = -1;
@@ -459,7 +459,7 @@ export function initApp(search?: string): void {
 
   /** True when a simulation (digital or analog) is active. */
   function isSimActive(): boolean {
-    return binding.isBound || facade.getCompiledAnalog() !== null;
+    return binding.isBound || ((facade.getCoordinator()?.analogBackend ?? null) !== null);
   }
 
   /**
@@ -511,31 +511,14 @@ export function initApp(search?: string): void {
     facade.invalidate();
   }
 
-  /** Returns true when the circuit contains analog components (analog or mixed mode). */
-  function isAnalogOrMixed(): boolean {
-    if (circuit.metadata.engineType === 'analog') return true;
-    if (circuit.metadata.engineType === 'auto') {
-      const neutralTypes = new Set([
-        'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
-        'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
-      ]);
-      const hasAnalogOnly = circuit.elements.some(el => {
-        if (neutralTypes.has(el.typeId)) return false;
-        const def = registry.get(el.typeId);
-        if (def === undefined) return false;
-        return hasAnalogModel(def) && !hasDigitalModel(def);
-      });
-      return hasAnalogOnly;
-    }
-    return false;
-  }
+
 
   function compileAndBind(): boolean {
     // Clear previous diagnostic overlays — each compile attempt starts fresh.
     diagnosticOverlays = [];
 
     // Determine effective engine mode for UI branching
-    let isAnalog = isAnalogOrMixed();
+    let isAnalog = isAnalogMode();
 
     if (binding.isBound) {
       facade.getEngine()?.stop?.();
@@ -546,7 +529,7 @@ export function initApp(search?: string): void {
     if (isAnalog) {
       try {
         const engine = facade.compile(circuit);
-        const ac = facade.getCompiledAnalog();
+        const ac = facade.getCoordinator()?.compiled.analog ?? null;
 
         if (ac) {
           const concreteAc = ac as unknown as ConcreteCompiledAnalogCircuit;
@@ -580,7 +563,7 @@ export function initApp(search?: string): void {
         clearStatus();
 
         if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
-          const analogCompiled = facade.getCompiledAnalog();
+          const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
           if (analogCompiled) {
             for (const sig of watchedSignals) {
               const nodeId = analogCompiled.labelToNodeId.get(sig.name);
@@ -616,10 +599,12 @@ export function initApp(search?: string): void {
     }
 
     try {
-      const engine = facade.compile(circuit);
+      facade.compile(circuit);
       const compiled = facade.getCompiled();
       if (compiled) {
-        binding.bind(circuit, engine, compiled.wireToNetId, compiled.pinNetMap);
+        const coordinator = facade.getCoordinator()!;
+        const unified = coordinator.compiled;
+        binding.bind(circuit, coordinator, unified.wireSignalMap, unified.labelSignalMap);
       }
       compiledDirty = false;
       clearStatus();
@@ -648,7 +633,7 @@ export function initApp(search?: string): void {
   function invalidateCompiled(): void {
     compiledDirty = true;
     const eng = facade.getEngine();
-    if (eng?.getState?.() === EngineState.RUNNING) eng.stop?.();
+    if ((eng as import("../core/engine-interface.js").SimulationEngine | null)?.getState?.() === EngineState.RUNNING) eng?.stop?.();
     if (binding.isBound) binding.unbind();
     disposeAnalog();
     // Dispose viewer panels — they hold stale net IDs
@@ -658,7 +643,7 @@ export function initApp(search?: string): void {
 
   const wireSignalAccessAdapter: WireSignalAccess = {
     getWireValue(wire: Wire): { raw: number; width: number } | { voltage: number } | undefined {
-      const analogCompiled = facade.getCompiledAnalog();
+      const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
       const analogEng = facade.getEngine();
       if (analogEng && analogCompiled) {
         const nodeId = analogCompiled.wireToNodeId.get(wire);
@@ -1017,7 +1002,7 @@ export function initApp(search?: string): void {
 
     // During simulation, only allow toggling interactive components (In, Clock, etc.)
     if (isSimActive()) {
-      if (facade.getCompiledAnalog() !== null) {
+      if (facade.getCoordinator()?.analogBackend !== null) {
         // During analog simulation, allow element selection (for slider panel)
         const elementHit = hitTestElements(worldPt, circuit.elements, hitMargin);
         if (elementHit) {
@@ -1034,7 +1019,7 @@ export function initApp(search?: string): void {
                   elementHit.setAttribute('closed', false);
                   compiledDirty = true;
                   if (compileAndBind()) {
-                    const acUp = facade.getCompiledAnalog();
+                    const acUp = facade.getCoordinator()?.compiled.analog ?? null;
                     const engUp = facade.getEngine();
                     if (acUp !== null && engUp) {
                       engUp.start?.();
@@ -1054,7 +1039,7 @@ export function initApp(search?: string): void {
               }
               compiledDirty = true;
               if (compileAndBind()) {
-                const acToggle = facade.getCompiledAnalog();
+                const acToggle = facade.getCoordinator()?.compiled.analog ?? null;
                 const engToggle = facade.getEngine();
                 if (acToggle !== null && engToggle) {
                   engToggle.start?.();
@@ -1563,7 +1548,7 @@ export function initApp(search?: string): void {
     popup.appendChild(propsContainer);
     const tempPanel = new PropertyPanel(propsContainer);
     tempPanel.showProperties(elementHit, def.propertyDefs);
-    if (isAnalogOrMixed()) {
+    if (isAnalogMode()) {
       if (availableModels(def).length > 1) {
         tempPanel.showSimulationModeDropdown(elementHit, def);
       }
@@ -1571,11 +1556,11 @@ export function initApp(search?: string): void {
       tempPanel.showPinElectricalOverrides(elementHit, def, family);
     }
     tempPanel.onPropertyChange(() => {
-      if (isAnalogOrMixed() && isSimActive()) {
+      if (isAnalogMode() && isSimActive()) {
         // Seamlessly recompile — don't hard-stop the analog simulation
         compiledDirty = true;
         if (compileAndBind()) {
-          const analogCompiled = facade.getCompiledAnalog();
+          const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
           const eng = facade.getEngine();
           if (analogCompiled !== null && eng) {
             eng.start?.();
@@ -1687,7 +1672,7 @@ export function initApp(search?: string): void {
     if (e.key === ' ') {
       e.preventDefault();
       if (isSimActive()) {
-        if (facade.getCompiledAnalog() !== null) {
+        if (facade.getCoordinator()?.analogBackend !== null) {
           disposeAnalog();
         } else {
           stopContinuousRun();
@@ -1699,14 +1684,14 @@ export function initApp(search?: string): void {
       } else {
         if (compiledDirty && !compileAndBind()) return;
         const analogEngine = facade.getEngine();
-        const analogCompiled = facade.getCompiledAnalog();
+        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
         if (analogCompiled !== null && analogEngine) {
           startAnalogRenderLoop(
             analogEngine as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
             circuit,
             analogCompiled,
           );
-        } else if (facade.getEngine()?.getState?.() !== EngineState.RUNNING) {
+        } else if ((facade.getEngine() as import('../core/engine-interface.js').SimulationEngine | null)?.getState?.() !== EngineState.RUNNING) {
           startContinuousRun();
         }
       }
@@ -1905,7 +1890,7 @@ export function initApp(search?: string): void {
   const speedUnitEl = document.querySelector('.speed-unit') as HTMLElement | null;
 
   function isAnalogMode(): boolean {
-    return facade.getCompiledAnalog() !== null;
+    return (facade.getCoordinator()?.analogBackend ?? null) !== null;
   }
 
   /**
@@ -2208,7 +2193,7 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     const eng = facade.getEngine();
     if (!eng) return;
-    if (facade.getCompiledAnalog() !== null) {
+    if (facade.getCoordinator()?.analogBackend !== null) {
       try {
         facade.step(eng);
         clearStatus();
@@ -2231,7 +2216,7 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-run')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    const analogCompiled = facade.getCompiledAnalog();
+    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
     const eng = facade.getEngine();
     if (analogCompiled !== null && eng) {
       if (analogRafHandle !== -1) return;
@@ -2249,7 +2234,7 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
     if (!isSimActive()) return;
-    if (facade.getCompiledAnalog() !== null) {
+    if (facade.getCoordinator()?.analogBackend !== null) {
       disposeAnalog();
     } else {
       stopContinuousRun();
@@ -2264,7 +2249,7 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     const eng = facade.getEngine();
     if (!eng) return;
-    if (facade.getCompiledAnalog() !== null) {
+    if (facade.getCoordinator()?.analogBackend !== null) {
       try { facade.step(eng); clearStatus(); } catch (err) {
         showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
       }
@@ -2283,7 +2268,7 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (facade.getCompiledAnalog() !== null) {
+    if (facade.getCoordinator()?.analogBackend !== null) {
       showStatus('Run-to-break is not available for analog circuits');
       return;
     }
@@ -2420,12 +2405,12 @@ export function initApp(search?: string): void {
   function rebuildViewers(): void {
     disposeViewers();
     const compiled = facade.getCompiled();
-    const analogCompiled = facade.getCompiledAnalog();
+    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
     if ((!compiled && !analogCompiled) || watchedSignals.length === 0) return;
 
     const eng = facade.getEngine();
     const ae = analogCompiled !== null ? eng : null;
-    const isAnalog = (circuit.metadata.engineType === 'analog' || circuit.metadata.engineType === 'auto') && ae !== null;
+    const isAnalog = isAnalogMode() && ae !== null;
 
     if (viewerTimingContainer) {
       if (isAnalog && ae) {
@@ -2502,7 +2487,7 @@ export function initApp(search?: string): void {
 
   /** Add a wire's net to the watched signals and rebuild viewers. */
   function addWireToViewer(wire: Wire, panelIndex?: number): void {
-    const analogCompiled = facade.getCompiledAnalog();
+    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
     if (analogCompiled) {
       const nodeId = analogCompiled.wireToNodeId.get(wire);
       if (nodeId === undefined) return;
@@ -2597,7 +2582,7 @@ export function initApp(search?: string): void {
   const bodeRenderer = new BodePlotRenderer();
 
   document.getElementById('btn-ac-sweep')?.addEventListener('click', () => {
-    if (circuit.metadata.engineType !== 'analog' && circuit.metadata.engineType !== 'auto') {
+    if (!isAnalogMode()) {
       showStatus('AC Sweep is only available for analog/auto circuits', true);
       return;
     }
@@ -2611,7 +2596,7 @@ export function initApp(search?: string): void {
   document.getElementById('ac-sweep-run')?.addEventListener('click', () => {
     if (acSweepDialog) acSweepDialog.style.display = 'none';
 
-    if (circuit.metadata.engineType !== 'analog' && circuit.metadata.engineType !== 'auto') {
+    if (!isAnalogMode()) {
       showStatus('AC Sweep requires an analog circuit', true);
       return;
     }
@@ -2637,7 +2622,7 @@ export function initApp(search?: string): void {
     const acParams: AcParams = { type: sweepType, numPoints, fStart, fStop, sourceLabel, outputNodes };
 
     const acEng = facade.getEngine();
-    if (!acEng || facade.getCompiledAnalog() === null) {
+    if (!acEng || facade.getCoordinator()?.analogBackend === null || facade.getCoordinator()?.analogBackend === undefined) {
       showStatus('AC Sweep: analog engine not initialized — compile the circuit first', true);
       return;
     }
@@ -2760,7 +2745,7 @@ export function initApp(search?: string): void {
         // "Add Slider" — for components with FLOAT properties during analog sim
         if (activeSliderPanel && isSimActive()) {
           const def = registry.get(elementHit.typeId);
-          const ac = facade.getCompiledAnalog() as ConcreteCompiledAnalogCircuit | null;
+          const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
           if (def?.propertyDefs && ac) {
             const floatProps = def.propertyDefs.filter(p => p.type === PropertyType.FLOAT);
             if (floatProps.length > 0) {
@@ -2799,8 +2784,8 @@ export function initApp(search?: string): void {
 
       // "Add to Traces" — per-pin voltage and element current
       // Available even when sim is stopped (signals are queued for when it starts)
-      if (isAnalogOrMixed()) {
-        const ac = facade.getCompiledAnalog() as ConcreteCompiledAnalogCircuit | null;
+      if (isAnalogMode()) {
+        const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
         _appendComponentTraceItems(items, elementHit, ac);
       }
 
@@ -2819,7 +2804,7 @@ export function initApp(search?: string): void {
       // Wire viewer items (add/remove from scope)
       if (isSimActive()) {
         const compiled = facade.getCompiled();
-        const analogCompiled = facade.getCompiledAnalog();
+        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
         if (compiled || analogCompiled) {
           if (items.length > 0) items.push(separator());
           _appendWireViewerItems(items, wireHit, compiled, analogCompiled);
@@ -2863,12 +2848,12 @@ export function initApp(search?: string): void {
       // Speed control
       items.push(
         { label: 'Speed \u00d710', action: () => {
-          if (isAnalogOrMixed()) { analogTargetRate = Math.min(1e6, analogTargetRate * 10); }
+          if (isAnalogMode()) { analogTargetRate = Math.min(1e6, analogTargetRate * 10); }
           else { speedControl.multiplyBy10(); }
           updateSpeedDisplay();
         }, enabled: true },
         { label: 'Speed \u00f710', action: () => {
-          if (isAnalogOrMixed()) { analogTargetRate = Math.max(1e-15, analogTargetRate / 10); }
+          if (isAnalogMode()) { analogTargetRate = Math.max(1e-15, analogTargetRate / 10); }
           else { speedControl.divideBy10(); }
           updateSpeedDisplay();
         }, enabled: true },
@@ -2882,7 +2867,7 @@ export function initApp(search?: string): void {
 
   // Helper: append wire-viewer items for a wire
   type ConcreteCompiledCircuitType = NonNullable<ReturnType<typeof facade.getCompiled>>;
-  type AnalogCompiledCircuitType = NonNullable<ReturnType<typeof facade.getCompiledAnalog>>;
+  type AnalogCompiledCircuitType = ConcreteCompiledAnalogCircuit;
 
   function _appendWireViewerItems(
     items: MenuItem[],
@@ -3008,8 +2993,9 @@ export function initApp(search?: string): void {
             // Need at least one voltage probe to create a scope panel first
             // Add a voltage probe for pin 0, then on next rebuild the current will be available
             const panelIdx = nextPanelIndex();
-            if (nodeIds.length > 0) {
-              watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, netId: nodeIds[0], width: 1, group: 'probe', panelIndex: panelIdx });
+            const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
+            if (pinNodeIds.length > 0) {
+              watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, netId: pinNodeIds[0]!, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
               // Now add current to the newly created panel
               if (scopePanels.length > 0) {
@@ -3054,7 +3040,7 @@ export function initApp(search?: string): void {
     ];
 
     // In analog mode, swap the quick insert list
-    if (isAnalogOrMixed()) {
+    if (isAnalogMode()) {
       QUICK_INSERT.length = 0;
       QUICK_INSERT.push(
         { label: 'Insert Resistor', type: 'Resistor' },
@@ -3142,7 +3128,7 @@ export function initApp(search?: string): void {
       }
 
       // Add current for elements connected to viewed signals
-      const ac = facade.getCompiledAnalog() as ConcreteCompiledAnalogCircuit | null;
+      const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
       if (ac) {
         const currentItems: MenuItem[] = [];
         const seen = new Set<number>();
@@ -3430,8 +3416,7 @@ export function initApp(search?: string): void {
     for (const el of loaded.elements) circuit.addElement(el);
     for (const w of loaded.wires) circuit.addWire(w);
     circuit.metadata = loaded.metadata;
-    const et = loaded.metadata.engineType;
-    palette.setEngineTypeFilter(et === 'analog' ? 'analog' : et === 'auto' ? 'auto' : null);
+    palette.setEngineTypeFilter(isAnalogMode() ? 'analog' : null);
     paletteUI.render();
     rebuildInsertMenu();
     updateCircuitModeLabel();
@@ -4515,17 +4500,17 @@ export function initApp(search?: string): void {
   function updateCircuitModeLabel(): void {
     const label = document.getElementById('circuit-mode-label');
     if (label) {
-      const et = circuit.metadata.engineType;
-      label.textContent = et === 'analog' ? 'Analog' : et === 'auto' ? 'Auto' : 'Digital';
+      const f = palette.getEngineTypeFilter();
+      label.textContent = f === 'analog' ? 'Analog' : f === 'digital' ? 'Digital' : 'Auto';
     }
   }
 
   document.getElementById('btn-circuit-mode')?.addEventListener('click', () => {
-    const current = circuit.metadata.engineType;
-    // Cycle: auto → digital → analog → auto
-    const next = current === 'auto' ? 'digital' : current === 'digital' ? 'analog' : 'auto';
-    circuit.metadata = { ...circuit.metadata, engineType: next };
-    palette.setEngineTypeFilter(next === 'analog' ? 'analog' : next === 'digital' ? 'digital' : 'auto');
+    const current = palette.getEngineTypeFilter();
+    // Cycle: null (auto) → digital → analog → null (auto)
+    const next: "digital" | "analog" | null =
+      current === null ? 'digital' : current === 'digital' ? 'analog' : null;
+    palette.setEngineTypeFilter(next === 'analog' ? 'analog' : next === 'digital' ? 'digital' : null);
     paletteUI.render();
     rebuildInsertMenu();
     updateCircuitModeLabel();
@@ -5524,7 +5509,7 @@ export function initApp(search?: string): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
     const analogTestCtx: AnalogTestContext = {
       get engine() { return facade.getEngine() as unknown as import('../analog/analog-engine.js').MNAEngine | null; },
-      get compiled() { return facade.getCompiledAnalog(); },
+      get compiled() { return facade.getCoordinator()?.compiled.analog ?? null; },
     };
 
     (window as unknown as Record<string, unknown>).__test = createTestBridge(

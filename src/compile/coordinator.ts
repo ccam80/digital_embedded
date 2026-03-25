@@ -34,6 +34,14 @@ import type {
 import type { ConcreteCompiledAnalogCircuit } from '../analog/compiled-analog-circuit.js';
 
 /**
+ * Per-bridge-adapter state for top-level digital↔analog bridges.
+ * Tracks previous bit for hysteresis in the indeterminate voltage band.
+ */
+interface TopLevelBridgeState {
+  prevBit: number;
+}
+
+/**
  * Per-bridge runtime state for the coordinator's bridge sync logic.
  * Per-bridge internal state for bridge sync between analog and digital domains.
  */
@@ -51,15 +59,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _digital: SimulationEngine | null;
   private readonly _analog: AnalogEngine | null;
   private readonly _bridges: BridgeAdapter[];
+  private readonly _topLevelBridgeStates: TopLevelBridgeState[];
   private readonly _bridgeInstances: BridgeInstance[];
   private readonly _bridgeStates: BridgeState[];
   private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
   private _stepCount = 0;
+  private _voltageBuffer: Float64Array | null = null;
 
   constructor(compiled: CompiledCircuitUnified) {
     this._compiled = compiled;
     this._bridges = compiled.bridges;
+    this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0 }));
 
     if (compiled.digital !== null) {
       const engine = new DigitalEngine('level');
@@ -77,6 +88,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
       const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
       this._bridgeInstances = compiledAnalog.bridges ?? [];
+      this._voltageBuffer = new Float64Array(compiledAnalog.matrixSize);
     } else {
       this._analog = null;
       this._bridgeInstances = [];
@@ -113,6 +125,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   reset(): void {
     this._digital?.reset();
     this._analog?.reset();
+    for (const state of this._topLevelBridgeStates) {
+      state.prevBit = 0;
+    }
     for (const state of this._bridgeStates) {
       state.innerEngine.reset();
       state.prevInputBits.fill(false);
@@ -162,10 +177,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       return;
     }
 
-    for (const bridge of this._bridges) {
+    for (let i = 0; i < this._bridges.length; i++) {
+      const bridge = this._bridges[i]!;
       if (bridge.direction !== 'analog-to-digital') continue;
       const voltage = analog.getNodeVoltage(bridge.analogNodeId);
-      const bit = this._thresholdVoltage(voltage, bridge);
+      const bit = this._thresholdVoltage(voltage, bridge, i);
       digital.setSignalValue(bridge.digitalNetId, BitVector.fromNumber(bit, bridge.bitWidth));
     }
 
@@ -418,13 +434,21 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._diagnostics = collector;
   }
 
-  private _thresholdVoltage(voltage: number, bridge: BridgeAdapter): number {
+  private _thresholdVoltage(voltage: number, bridge: BridgeAdapter, bridgeIndex: number): number {
     const spec = bridge.electricalSpec;
     const vIH = spec.vIH ?? 2.0;
     const vIL = spec.vIL ?? 0.8;
-    if (voltage >= vIH) return 1;
-    if (voltage <= vIL) return 0;
-    return 0;
+    const state = this._topLevelBridgeStates[bridgeIndex]!;
+    if (voltage >= vIH) {
+      state.prevBit = 1;
+      return 1;
+    }
+    if (voltage <= vIL) {
+      state.prevBit = 0;
+      return 0;
+    }
+    // Indeterminate band: hold previous value (hysteresis)
+    return state.prevBit;
   }
 
   /**
@@ -453,8 +477,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _getAnalogVoltages(): Float64Array {
     const analog = this._analog!;
     const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
-    const size = compiledAnalog.matrixSize;
-    const voltages = new Float64Array(size);
+    const voltages = this._voltageBuffer!;
+    voltages.fill(0);
     for (let i = 0; i < compiledAnalog.nodeCount; i++) {
       voltages[i] = analog.getNodeVoltage(i + 1);
     }

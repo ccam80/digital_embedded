@@ -97,9 +97,6 @@ export interface CustomShapeData {
 // CircuitMetadata
 // ---------------------------------------------------------------------------
 
-/** Simulation engine type for a circuit. */
-export type EngineType = "digital" | "analog" | "auto";
-
 export interface CircuitMetadata {
   /** Display name for this circuit. */
   name: string;
@@ -121,8 +118,6 @@ export interface CircuitMetadata {
   shapeType: string;
   /** Custom shape data parsed from the <shape> element in CUSTOM mode subcircuits. */
   customShape?: CustomShapeData;
-  /** Simulation engine type. Defaults to "digital" for backward compatibility. */
-  engineType: EngineType;
   /**
    * Logic family configuration for this circuit.
    * When absent, defaultLogicFamily() (CMOS 3.3V) is used by the analog engine.
@@ -141,7 +136,6 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     chipWidth: 3,
     chipHeight: 3,
     shapeType: "DEFAULT",
-    engineType: "auto",
   };
 }
 

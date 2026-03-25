@@ -510,3 +510,100 @@ Import `BitsException` from `../../core/errors.js`.
     3. `src/analog/__tests__/mixed-signal-coordinator.test.ts` — the coordinator's own test
   - No Phase 4 code (`src/compile/coordinator.ts`, `src/headless/`) imports MixedSignalCoordinator
   - Phase 4 complete: P4-1 through P4-7 all complete
+
+## Task P5-1: EditorBinding wireSignalMap migration
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/integration/editor-binding.ts, src/integration/__tests__/editor-binding.test.ts
+- **Files created**: src/test-utils/mock-coordinator.ts
+- **Tests**: 9/9 passing
+
+## Task P5-2: Remove circuit.metadata.engineType
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/circuit.ts` — removed `EngineType` type export and `engineType` field from `CircuitMetadata`/`defaultCircuitMetadata()`
+  - `src/compile/compile.ts` — replaced metadata read with component model detection (hasAnalogModel/hasDigitalModel)
+  - `src/compile/extract-connectivity.ts` — minor comment update; function signature preserved
+  - `src/engine/flatten.ts` — `resolveCircuitDomain()` now derives from component models only; boundary records use derived domain values
+  - `src/engine/cross-engine-boundary.ts` — changed `EngineType` import to `string` for boundary fields
+  - `src/analog/compiler.ts` — removed `engineType` validation guard and internal Circuit constructor assignments
+  - `src/analog/transistor-models/cmos-flipflop.ts` — removed `engineType: "analog"` from Circuit constructors
+  - `src/analog/transistor-models/cmos-gates.ts` — removed `engineType: "analog"` from Circuit constructors
+  - `src/analog/transistor-models/darlington.ts` — removed `engineType: "analog"` from Circuit constructors
+  - `src/headless/default-facade.ts` — replaced metadata read with component model detection
+  - `src/headless/runner.ts` — unified compile paths using single `compileUnified` call
+  - `src/app/app-init.ts` — `isAnalogOrMixed()` now checks component models; mode toggle cycles palette filter
+  - `src/app/test-bridge.ts` — `getEngineType()` detects from component models
+  - `src/io/dig-loader.ts` — reads `engineType` from XML for backward compat but discards it
+  - `src/io/load.ts` — removed `engineType` from deserialized metadata; Zod schema still accepts it optionally
+  - `src/io/save.ts` — removed conditional `engineType` serialization block
+  - `src/io/ctz-format.ts` — removed `engineType: "analog"` from Circuit constructor
+  - `src/editor/palette.ts` — no changes needed (used `getEngineTypeFilter()`)
+  - `src/editor/property-panel.ts` — no changes needed
+  - `src/integration/__tests__/editor-binding.test.ts` — no changes needed
+  - `src/io/save-schema.ts` — no changes needed
+  - `src/app/__tests__/mode-toggle.test.ts` — rewritten to test palette filter cycling instead of metadata
+  - `src/engine/__tests__/flatten-bridge.test.ts` — added `makeRegistryWithAnalog()` helper; updated all 4 cross-engine tests to use model-based domain detection
+- **Tests**: 7506/7510 passing (4 pre-existing submodule ENOENT failures, 0 regressions)
+- **Notes**:
+  - Zero `metadata.engineType` reads in production code; loader/save retain for file backward compat only
+  - Domain detection: `hasAnalogModel(def) && !hasDigitalModel(def)` includes Ground/VDD as analog-only infrastructure
+  - Infrastructure exclusion bug fixed: Ground/VDD must NOT be excluded from analog detection loop
+  - flatten-bridge tests fixed: outer/internal circuits needed actual analog-only components (Resistor registered as analog-only) for `resolveCircuitDomain()` to return "analog" rather than "auto"
+  - In/Out elements registered as analog-only in internal analog circuit test fixtures so they don't create "auto" mixed detection
+
+## Task P5-3: App-init simplification
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/app/app-init.ts`, `src/headless/default-facade.ts`
+- **Tests**: 7506/7510 passing (4 pre-existing submodule ENOENT failures, 0 regressions)
+- **Notes**:
+  - Removed `isAnalogOrMixed()` function entirely from app-init.ts
+  - Replaced all `facade.getCompiledAnalog()` calls with `facade.getCoordinator()?.compiled.analog ?? null`
+  - Replaced all `facade.getCompiledAnalog() !== null` checks with `(facade.getCoordinator()?.analogBackend ?? null) !== null`
+  - Added `getCoordinator(): DefaultSimulationCoordinator | null` accessor to `DefaultSimulatorFacade`
+  - Renamed local `isAnalogMode()` function to use coordinator-based check: `(facade.getCoordinator()?.analogBackend ?? null) !== null`
+  - Fixed `isSimActive()` to use coordinator check instead of getCompiledAnalog
+  - Updated `binding.bind()` call to use `coordinator`, `unified.wireSignalMap`, and `unified.labelSignalMap` (from P5-1 signature)
+  - Fixed `engine` unused variable by dropping return value of `facade.compile()`
+  - Fixed `nodeIds` undefined reference (was `analogEl.pinNodeIds`)
+  - Remaining pre-existing TS errors in app-init.ts: `getState` on union type, `setAttribute` not on CircuitElement, `import.meta.env`, `currentFolderName` unused — these existed before P5-3 and are masked by vitest transpileOnly mode
+  - Acceptance checks: zero `isAnalogOrMixed`, zero `getCompiledAnalog`, zero `engineType`, zero `wireToNetId` in editor-binding
+
+## Task P5-4: Property panel simulationModel dropdown
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/editor/property-panel.ts`, `src/editor/__tests__/property-panel.test.ts`
+- **Tests**: 11/11 passing (5 new tests added); full suite 7511/7515 (4 pre-existing submodule ENOENT failures, 0 regressions)
+- **Notes**:
+  - `showSimulationModeDropdown()` was already implemented in property-panel.ts
+  - Fixed bug: was using `modes[0]` as default instead of `def.defaultModel ?? modes[0]`
+  - Fixed same bug in onChange handler fallback
+  - Added 5 new tests:
+    1. `simulationModeDropdown_multiModelShowsDropdown` — multi-model component adds dropdown row
+    2. `simulationModeDropdown_singleModelNoDropdown` — single-model component does not add dropdown
+    3. `simulationModeDropdown_usesDefaultModel` — `def.defaultModel` used as initial value
+    4. `simulationModeDropdown_changeUpdatesBagAndFiresCallback` — change event updates PropertyBag and fires callback
+    5. `simulationModeDropdown_existingBagValueUsedAsDefault` — existing bag value takes precedence over defaultModel
+  - app-init.ts already correctly calls `showSimulationModeDropdown` when `isAnalogMode()` and `availableModels(def).length > 1`
+  - Recompilation is triggered by the onChange callback firing, which app-init wires to set `compiledDirty = true`
+
+## Task P5-5: Full test suite verification + Phase 5 acceptance
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 7511/7515 passing (4 pre-existing submodule ENOENT failures, 0 regressions)
+- **Notes**:
+  - Test count increased from baseline 7497 to 7511 (+14 new tests added across P5-1 through P5-4)
+  - All 4 failing tests are pre-existing ENOENT errors for missing ref/Digital submodule files
+  - Grep verification results:
+    - `engineType` in production code: only in loader/save backward compat + palette filter methods + extract-connectivity internal param — all acceptable
+    - `isAnalogOrMixed`: zero hits
+    - `getCompiledAnalog` in app-init.ts: zero hits
+    - `wireToNetId` in editor-binding.ts: zero hits
+  - Phase 5 complete: P5-1 through P5-5 all complete

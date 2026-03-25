@@ -194,14 +194,35 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
   return reg;
 }
 
+function makeRegistryWithAnalog(digitalIds: string[], analogIds: string[]): ComponentRegistry {
+  const reg = makeRegistry(...digitalIds);
+  for (const typeId of analogIds) {
+    const def: ComponentDefinition = {
+      name: typeId,
+      typeId: -1,
+      factory: (_props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: typeId,
+      models: {
+        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+      },
+    };
+    reg.register(def);
+  }
+  return reg;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("CrossEngine", () => {
   it("analog_subcircuit_in_digital_not_flattened — analog-engine subcircuit inside digital outer circuit produces boundary", () => {
-    // Internal circuit is analog
-    const internal = new Circuit({ name: "AnalogFilter", engineType: "analog" });
+    // Internal circuit is analog — contains Resistor (analog-only)
+    const internal = new Circuit({ name: "AnalogFilter" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const resistor = makeLeaf("Resistor", "r-1", { x: 5, y: 0 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 0 });
@@ -209,8 +230,10 @@ describe("CrossEngine", () => {
     internal.addElement(resistor);
     internal.addElement(outEl);
 
-    // Outer circuit is digital
-    const outer = new Circuit({ name: "Top", engineType: "digital" });
+    // Outer circuit is digital — contains And (digital-only)
+    const outer = new Circuit({ name: "Top" });
+    const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
+    outer.addElement(andEl);
     const pins: Pin[] = [
       { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
@@ -218,7 +241,10 @@ describe("CrossEngine", () => {
     const subEl = makeSubcircuitElement("AnalogFilter", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
 
-    const registry = makeRegistry("And", "In", "Out", "Resistor");
+    // Registry: And/In/Out are digital-model; Resistor is analog-only.
+    // In and Out inside the internal circuit are also registered as analog-only
+    // so the internal circuit resolves to "analog" (not "auto").
+    const registry = makeRegistryWithAnalog(["And"], ["In", "Out", "Resistor"]);
     const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
 
     // Boundary must be recorded
@@ -235,7 +261,7 @@ describe("CrossEngine", () => {
 
   it("digital_subcircuit_in_analog_not_flattened — digital-engine subcircuit inside analog outer circuit produces boundary", () => {
     // Internal circuit is digital
-    const internal = new Circuit({ name: "Counter", engineType: "digital" });
+    const internal = new Circuit({ name: "Counter" });
     const inEl = makeInElement("in-1", "CLK", { x: 0, y: 0 });
     const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
     const outEl = makeOutElement("out-1", "Q", { x: 10, y: 0 });
@@ -243,8 +269,10 @@ describe("CrossEngine", () => {
     internal.addElement(andEl);
     internal.addElement(outEl);
 
-    // Outer circuit is analog
-    const outer = new Circuit({ name: "Top", engineType: "analog" });
+    // Outer circuit is analog — contains Resistor (analog-only) to make domain detectable
+    const outer = new Circuit({ name: "Top" });
+    const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
+    outer.addElement(resistor);
     const pins: Pin[] = [
       { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Q", bitWidth: 1, isNegated: false, isClock: false },
@@ -252,7 +280,7 @@ describe("CrossEngine", () => {
     const subEl = makeSubcircuitElement("Counter", "sub-1", { x: 0, y: 0 }, internal, pins);
     outer.addElement(subEl);
 
-    const registry = makeRegistry("And", "In", "Out");
+    const registry = makeRegistryWithAnalog(["And", "In", "Out"], ["Resistor"]);
     const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
 
     // Boundary must be recorded
@@ -267,7 +295,7 @@ describe("CrossEngine", () => {
   });
 
   it("same_engine_subcircuit_still_flattened — digital subcircuit in digital outer circuit flattens normally with no boundaries", () => {
-    const internal = new Circuit({ name: "AndWrapper", engineType: "digital" });
+    const internal = new Circuit({ name: "AndWrapper" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 0 });
@@ -275,7 +303,7 @@ describe("CrossEngine", () => {
     internal.addElement(andEl);
     internal.addElement(outEl);
 
-    const outer = new Circuit({ name: "Top", engineType: "digital" });
+    const outer = new Circuit({ name: "Top" });
     const pins: Pin[] = [
       { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
@@ -299,14 +327,17 @@ describe("CrossEngine", () => {
 
   it("simulation_mode_digital_overrides — analog-engine subcircuit with simulationMode=digital in analog outer circuit produces boundary", () => {
     // Internal circuit is analog but instance has simulationMode='digital'
-    const internal = new Circuit({ name: "Gate", engineType: "analog" });
+    const internal = new Circuit({ name: "Gate" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 0 });
     internal.addElement(inEl);
     internal.addElement(outEl);
 
-    // Outer circuit is analog; instance has simulationMode='digital'
-    const outer = new Circuit({ name: "Top", engineType: "analog" });
+    // Outer circuit is analog — contains Resistor (analog-only) to make domain detectable
+    // Instance has simulationMode='digital' which overrides internal circuit domain
+    const outer = new Circuit({ name: "Top" });
+    const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
+    outer.addElement(resistor);
     const pins: Pin[] = [
       { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
@@ -314,7 +345,7 @@ describe("CrossEngine", () => {
     const subEl = makeSubcircuitElement("Gate", "sub-1", { x: 0, y: 0 }, internal, pins, { simulationMode: "digital" });
     outer.addElement(subEl);
 
-    const registry = makeRegistry("In", "Out");
+    const registry = makeRegistryWithAnalog(["In", "Out"], ["Resistor"]);
     const { crossEngineBoundaries } = flattenCircuit(outer, registry);
 
     // simulationMode='digital' on instance overrides, producing a boundary
@@ -323,7 +354,7 @@ describe("CrossEngine", () => {
   });
 
   it("pin_mappings_correct — subcircuit with 2 inputs + 1 output produces 3 BoundaryPinMapping entries with correct labels and directions", () => {
-    const internal = new Circuit({ name: "ALU", engineType: "digital" });
+    const internal = new Circuit({ name: "ALU" });
     const inA = makeInElement("in-a", "A", { x: 0, y: 0 });
     const inB = makeInElement("in-b", "B", { x: 0, y: 5 });
     const outEl = makeOutElement("out-1", "S", { x: 10, y: 0 });
@@ -331,8 +362,10 @@ describe("CrossEngine", () => {
     internal.addElement(inB);
     internal.addElement(outEl);
 
-    // Outer is analog
-    const outer = new Circuit({ name: "Top", engineType: "analog" });
+    // Outer is analog — contains Resistor (analog-only) to make domain detectable
+    const outer = new Circuit({ name: "Top" });
+    const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
+    outer.addElement(resistor);
     const pins: Pin[] = [
       { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.INPUT,  position: { x: 0, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
@@ -341,7 +374,7 @@ describe("CrossEngine", () => {
     const subEl = makeSubcircuitElement("ALU", "sub-1", { x: 0, y: 0 }, internal, pins);
     outer.addElement(subEl);
 
-    const registry = makeRegistry("In", "Out");
+    const registry = makeRegistryWithAnalog(["In", "Out"], ["Resistor"]);
     const { crossEngineBoundaries } = flattenCircuit(outer, registry);
 
     expect(crossEngineBoundaries.length).toBe(1);

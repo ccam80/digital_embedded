@@ -538,7 +538,7 @@ describe("runner_integration", () => {
     registry.register(DcVoltageSourceDefinition);
     registry.register(ProbeDefinition);
 
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
 
     // Voltage source: neg at (30,0)/GND, pos at (10,0)
     // DcVoltageSource pinLayout: neg at index 0, pos at index 1

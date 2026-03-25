@@ -140,7 +140,7 @@ function makeOutEl(label: string, xNet: number, yRow: number): CircuitElement {
 // ---------------------------------------------------------------------------
 
 export function createCmosInverter(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("in", 10, 0));
   circuit.addElement(makeInEl("VDD", 30, 0));
@@ -179,7 +179,7 @@ export function createCmosInverter(_modelRegistry: TransistorModelRegistry): Cir
 // ---------------------------------------------------------------------------
 
 export function createCmosNand2(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -233,7 +233,7 @@ export function createCmosNand2(_modelRegistry: TransistorModelRegistry): Circui
 // ---------------------------------------------------------------------------
 
 export function createCmosNor2(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -290,7 +290,7 @@ export function createCmosNor2(_modelRegistry: TransistorModelRegistry): Circuit
 // ---------------------------------------------------------------------------
 
 export function createCmosAnd2(modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -357,7 +357,7 @@ export function createCmosAnd2(modelRegistry: TransistorModelRegistry): Circuit 
 // ---------------------------------------------------------------------------
 
 export function createCmosOr2(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -449,7 +449,7 @@ export function createCmosOr2(_modelRegistry: TransistorModelRegistry): Circuit 
 // ---------------------------------------------------------------------------
 
 export function createCmosXor2(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -519,7 +519,7 @@ export function createCmosXor2(_modelRegistry: TransistorModelRegistry): Circuit
 // ---------------------------------------------------------------------------
 
 export function createCmosXnor2(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
   circuit.addElement(makeInEl("In_2", 20, 0));
@@ -600,7 +600,7 @@ export function createCmosXnor2(_modelRegistry: TransistorModelRegistry): Circui
 // ---------------------------------------------------------------------------
 
 export function createCmosBuffer(_modelRegistry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   circuit.addElement(makeInEl("in", 10, 0));
   circuit.addElement(makeInEl("VDD", 30, 0));

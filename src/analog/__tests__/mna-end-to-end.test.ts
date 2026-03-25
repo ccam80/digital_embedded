@@ -147,7 +147,7 @@ describe("End-to-end: full pipeline", () => {
     // node_mid (x=20): R1.B, R2.A
     // node_gnd (x=30): R2.B, Vs.neg, GND
 
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildAnalogRegistry();
 
     // DcVoltageSource pin order: [neg, pos]
@@ -198,7 +198,7 @@ describe("End-to-end: full pipeline", () => {
 
   it("diode_circuit_dc_op_via_compiler", () => {
     // Vs=5V → R=1kΩ → Diode(anode→cathode) → GND
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildAnalogRegistry();
 
     // DcVoltageSource pin order: [neg, pos]
@@ -604,7 +604,7 @@ describe("MOSFET through compiler", () => {
     //   x=40: Vg+ (vg.pos), NMOS G
     //   x=50: vg.neg, GND2
 
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildMosfetRegistry();
 
     // DcVoltageSource pin order: [neg, pos]
@@ -678,7 +678,7 @@ describe("MOSFET through compiler", () => {
     // In triode: ids = KP*W/L*((Vgs-Vth)*Vds - Vds²/2)
     // KCL: (5-Vdrain)/100k = ids(Vdrain) → Vdrain ≈ small positive value
 
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildMosfetRegistry();
 
     // DcVoltageSource pin order: [neg, pos]
@@ -753,7 +753,7 @@ describe("MOSFET through compiler", () => {
     //   x=40: Vg.pos, PMOS G
     //   x=50: Vg.neg, GND2
 
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
     const registry = buildMosfetRegistry();
 
     // DcVoltageSource pin order: [neg, pos]

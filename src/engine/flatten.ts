@@ -123,9 +123,9 @@ export interface FlattenResult {
  * subcircuit instances replaced by their internal components) and a list of
  * cross-engine boundaries that were NOT flattened.
  *
- * Cross-engine subcircuits (where the internal engineType differs from the
- * outer circuit's engineType, or where the subcircuit instance has
- * simulationMode='digital' in an analog-engine outer circuit) are preserved
+ * Cross-engine subcircuits (where the internal domain differs from the
+ * outer circuit's domain, or where the subcircuit instance has
+ * simulationMode='digital' in an analog outer circuit) are preserved
  * as opaque placeholder elements in the flat result. The compiler must handle
  * them separately via bridge adapters.
  *
@@ -149,22 +149,16 @@ export function flattenCircuit(circuit: Circuit, registry: ComponentRegistry): F
 /**
  * Determine the active simulation domain of a circuit.
  *
- * When the circuit's engineType metadata is "digital" or "analog", that value
- * is returned directly. When it is "auto", the domain is inferred from the
- * models available on the circuit's non-subcircuit leaf components: if any
- * component has only analog models, the circuit is "analog"; if all have
- * digital models, the circuit is "digital". Returns "auto" when no leaf
- * components are registered or the domain is indeterminate.
+ * The domain is inferred from the models available on the circuit's
+ * non-subcircuit leaf components: if any component has only analog models,
+ * the circuit is "analog"; if all have digital models, the circuit is
+ * "digital". Returns "auto" when no leaf components are registered or the
+ * domain is indeterminate.
  */
 function resolveCircuitDomain(
   circuit: Circuit,
   registry: ComponentRegistry,
 ): "digital" | "analog" | "auto" {
-  const explicitType = circuit.metadata.engineType;
-  if (explicitType === "digital" || explicitType === "analog") {
-    return explicitType;
-  }
-
   let hasDigital = false;
   let hasAnalog = false;
 
@@ -243,8 +237,8 @@ function flattenCircuitScoped(
       boundaries.push({
         subcircuitElement: el,
         internalCircuit: el.internalCircuit,
-        internalEngineType: el.internalCircuit.metadata.engineType,
-        outerEngineType: circuit.metadata.engineType,
+        internalEngineType: internalDomain,
+        outerEngineType: outerDomain,
         pinMappings,
         instanceName,
       });

@@ -158,7 +158,7 @@ function makeInEl(label: string, xNet: number, yRow: number): CircuitElement {
 // ---------------------------------------------------------------------------
 
 export function createNpnDarlington(_registry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   // Interface elements
   circuit.addElement(makeInEl("B", 10, 0));
@@ -200,7 +200,7 @@ export function createNpnDarlington(_registry: TransistorModelRegistry): Circuit
 // ---------------------------------------------------------------------------
 
 export function createPnpDarlington(_registry: TransistorModelRegistry): Circuit {
-  const circuit = new Circuit({ engineType: "analog" });
+  const circuit = new Circuit();
 
   // Interface elements
   circuit.addElement(makeInEl("B", 10, 0));

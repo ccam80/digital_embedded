@@ -424,7 +424,7 @@ describe("compileUnified", () => {
     const registry = makeRegistry(groundDef, resistorDef);
 
     const circuit = new Circuit();
-    circuit.metadata = { ...circuit.metadata, engineType: "analog" };
+    circuit.metadata = { ...circuit.metadata };
 
     // Ground at (0,0)
     const gndEl = makeAnalogElement("Ground", "gnd-1", [{ x: 0, y: 0, label: "gnd" }]);

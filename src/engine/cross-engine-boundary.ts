@@ -1,4 +1,4 @@
-import type { Circuit, EngineType } from "../core/circuit.js";
+import type { Circuit } from "../core/circuit.js";
 import type { SubcircuitHost } from "./flatten.js";
 
 /**
@@ -61,11 +61,11 @@ export interface CrossEngineBoundary {
   /** The subcircuit's internal circuit definition. */
   internalCircuit: Circuit;
 
-  /** Engine type of the internal circuit. */
-  internalEngineType: EngineType;
+  /** Derived domain of the internal circuit ("digital" | "analog" | "auto"). */
+  internalEngineType: string;
 
-  /** Engine type of the outer circuit. */
-  outerEngineType: EngineType;
+  /** Derived domain of the outer circuit ("digital" | "analog" | "auto"). */
+  outerEngineType: string;
 
   /** One entry per interface pin on the subcircuit. */
   pinMappings: BoundaryPinMapping[];

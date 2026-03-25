@@ -263,7 +263,7 @@ describe("ModelBinding", () => {
 
     // Build circuit: Ground at (0,0), DiodeStub anode=(10,0) cathode=(0,0)
     // model property = "D1N4148" (custom model)
-    const circuit = new Circuit({ engineType: "analog" });
+    const circuit = new Circuit({  });
 
     const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
     const diode = makeElement("DiodeStub", "d1",
