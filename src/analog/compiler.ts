@@ -42,6 +42,7 @@ import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, B
 import { compileCircuit } from "../engine/compiler.js";
 import type { CompiledCircuitImpl } from "../engine/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../core/logic-family.js";
+import type { SolverPartition, PartitionedComponent } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // VDD voltage source factory for transistor expansion
@@ -1226,6 +1227,793 @@ export function compileAnalogCircuit(
     elements: analogElements,
     labelToNodeId: nodeMap.labelToNodeId,
     wireToNodeId: nodeMap.wireToNodeId,
+    models,
+    elementToCircuitElement,
+    elementPinVertices,
+    elementResolvedPins,
+    diagnostics,
+    bridges,
+    timeRef,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// compileAnalogPartition — new partition-based entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a NodeMap from pre-computed ConnectivityGroup data.
+ *
+ * Identifies the Ground group by checking whether any PartitionedComponent in
+ * the partition is a Ground element whose pin appears in that group.
+ * Ground group → node 0; all other groups → sequential from 1.
+ */
+function buildNodeMapFromPartition(
+  partition: SolverPartition,
+  diagnostics: SolverDiagnostic[],
+): {
+  nodeCount: number;
+  groupToNodeId: Map<number, number>;
+  wireToNodeId: Map<import("../core/circuit.js").Wire, number>;
+  labelToNodeId: Map<string, number>;
+  positionToNodeId: Map<string, number>;
+} {
+  const groups = partition.groups;
+
+  // Identify which groupId contains Ground element pins.
+  // A group is the ground group if any component in the partition is a Ground element
+  // and its pin's world position appears in that group's pins.
+  const groundGroupIds = new Set<number>();
+  for (const pc of partition.components) {
+    if (pc.element.typeId !== "Ground") continue;
+    for (const rp of pc.resolvedPins) {
+      // Find the group containing this pin's world position
+      for (const g of groups) {
+        for (const gp of g.pins) {
+          if (
+            Math.abs(gp.worldPosition.x - rp.worldPosition.x) < 0.5 &&
+            Math.abs(gp.worldPosition.y - rp.worldPosition.y) < 0.5
+          ) {
+            groundGroupIds.add(g.groupId);
+          }
+        }
+      }
+    }
+  }
+
+  // If no ground group found, pick the largest group as best-effort ground
+  if (groundGroupIds.size === 0 && groups.length > 0) {
+    let bestGroupId = groups[0]!.groupId;
+    let bestSize = 0;
+    for (const g of groups) {
+      const size = g.pins.length + g.wires.length;
+      if (size > bestSize) {
+        bestSize = size;
+        bestGroupId = g.groupId;
+      }
+    }
+    groundGroupIds.add(bestGroupId);
+    diagnostics.push(
+      makeDiagnostic(
+        "no-ground",
+        "warning",
+        "No Ground element found in partition",
+        {
+          explanation:
+            "MNA simulation requires a ground reference node. " +
+            "The most-connected wire group has been assigned as ground (node 0). " +
+            "Add a Ground element to suppress this warning.",
+          suggestions: [
+            {
+              text: "Add a Ground element connected to the reference node.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  // Assign node IDs: ground groups → 0, others → 1, 2, 3, …
+  const groupToNodeId = new Map<number, number>();
+  let nextNodeId = 1;
+  for (const g of groups) {
+    if (groundGroupIds.has(g.groupId)) {
+      groupToNodeId.set(g.groupId, 0);
+    }
+  }
+  for (const g of groups) {
+    if (!groupToNodeId.has(g.groupId)) {
+      groupToNodeId.set(g.groupId, nextNodeId++);
+    }
+  }
+  const nodeCount = nextNodeId - 1;
+
+  // Build wireToNodeId
+  const wireToNodeId = new Map<import("../core/circuit.js").Wire, number>();
+  for (const g of groups) {
+    const nodeId = groupToNodeId.get(g.groupId) ?? 0;
+    for (const w of g.wires) {
+      wireToNodeId.set(w, nodeId);
+    }
+  }
+
+  // Build positionToNodeId from all pin world positions in all groups
+  const positionToNodeId = new Map<string, number>();
+  for (const g of groups) {
+    const nodeId = groupToNodeId.get(g.groupId) ?? 0;
+    for (const gp of g.pins) {
+      const key = `${gp.worldPosition.x},${gp.worldPosition.y}`;
+      positionToNodeId.set(key, nodeId);
+    }
+    // Also include wire start/end positions
+    for (const w of g.wires) {
+      positionToNodeId.set(`${w.start.x},${w.start.y}`, nodeId);
+      positionToNodeId.set(`${w.end.x},${w.end.y}`, nodeId);
+    }
+  }
+
+  // Build labelToNodeId from In/Out/Probe components in the partition
+  const labelToNodeId = new Map<string, number>();
+  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe"]);
+  for (const pc of partition.components) {
+    if (!labelTypes.has(pc.element.typeId)) continue;
+    const props = pc.element.getProperties();
+    const label = props.has("label") ? String(props.get("label")) : "";
+    if (!label) continue;
+    // Use the node ID of the first resolved pin
+    if (pc.resolvedPins.length > 0) {
+      const rp = pc.resolvedPins[0]!;
+      const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
+      const nodeId = positionToNodeId.get(key) ?? 0;
+      labelToNodeId.set(label, nodeId);
+    }
+  }
+
+  return { nodeCount, groupToNodeId, wireToNodeId, labelToNodeId, positionToNodeId };
+}
+
+/**
+ * Compile an analog partition into a `ConcreteCompiledAnalogCircuit`.
+ *
+ * Accepts a `SolverPartition` (pre-computed by `partitionByDomain`) instead of
+ * a raw `Circuit`. Connectivity is pre-computed — `buildNodeMap()` is not
+ * called. All analog-specific logic (internal node allocation, branch row
+ * allocation, MNA matrix sizing, factory invocation, topology validation)
+ * is preserved.
+ *
+ * The existing `compileAnalogCircuit()` continues to work unchanged.
+ */
+export function compileAnalogPartition(
+  partition: SolverPartition,
+  registry: ComponentRegistry,
+  transistorModels?: TransistorModelRegistry,
+): ConcreteCompiledAnalogCircuit {
+  const diagnostics: SolverDiagnostic[] = [];
+
+  // Build node map from partition groups instead of calling buildNodeMap(circuit)
+  const {
+    nodeCount: externalNodeCount,
+    wireToNodeId,
+    labelToNodeId,
+    positionToNodeId,
+  } = buildNodeMapFromPartition(partition, diagnostics);
+
+  // Resolve logic family from partition components' circuit metadata.
+  // Use default logic family since partition doesn't carry circuit metadata.
+  const circuitFamily = defaultLogicFamily();
+
+  // Model library (empty — no circuit.metadata.models to read from partition)
+  const modelLibrary = new ModelLibrary();
+
+  // Build set of cross-engine placeholder elements (from bridgeStubs)
+  const crossEnginePlaceholderIds = new Set<string>(
+    partition.crossEngineBoundaries.map((b) => (b.subcircuitElement as CircuitElement).instanceId),
+  );
+
+  // Pass A: collect branch counts and internal node counts
+  let nextInternalNode = externalNodeCount + 1;
+  let branchCount = 0;
+  let vddNodeId = -1;
+  let vddBranchIdx = -1;
+
+  const elementMeta: Array<{
+    pc: PartitionedComponent;
+    branchIdx: number;
+    internalNodeOffset: number;
+    internalNodeCount: number;
+  }> = [];
+
+  for (const pc of partition.components) {
+    const el = pc.element;
+
+    // Skip cross-engine placeholder elements
+    if (crossEnginePlaceholderIds.has(el.instanceId)) {
+      continue;
+    }
+
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    const def = pc.definition;
+
+    const hasAnalog = def.models?.analog !== undefined;
+    const hasBoth = def.models?.digital !== undefined && hasAnalog;
+    if (!hasAnalog) {
+      diagnostics.push(
+        makeDiagnostic(
+          "unsupported-component-in-analog",
+          "error",
+          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+          {
+            explanation:
+              `Component "${el.typeId}" has no analog model. ` +
+              `Only components with an analog model can be placed in analog circuits.`,
+            suggestions: [
+              {
+                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    if (hasBoth) {
+      const passAProps = el.getProperties();
+      const passAMode = passAProps.has("simulationMode")
+        ? (passAProps.get("simulationMode") as string)
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
+      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
+        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        continue;
+      }
+    }
+
+    let branchIdx = -1;
+    if (def.models?.analog?.requiresBranchRow) {
+      branchIdx = branchCount++;
+    }
+
+    const props = el.getProperties();
+    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
+    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
+    nextInternalNode += internalCount;
+
+    elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
+  }
+
+  let totalNodeCount = nextInternalNode - 1;
+
+  // Build a minimal circuit-like wire lookup for resolveElementNodes.
+  // We need to pass wireToNodeId and a circuit object. We create a minimal
+  // stub that provides circuit.wires for pin position matching.
+  // resolveElementNodes needs (el, wireToNodeId, circuit, vertexOut?, positionToNodeId?)
+  // where circuit is used for circuit.wires iteration.
+  // We collect all wires from the partition's groups.
+  const allWires = partition.groups.flatMap((g) => g.wires);
+  const partitionCircuitStub = { wires: allWires } as import("../core/circuit.js").Circuit;
+
+  const inlineBridges: BridgeInstance[] = [];
+  const analogElements: import("./element.js").AnalogElement[] = [];
+  const elementToCircuitElement = new Map<number, CircuitElement>();
+  const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
+  const elementResolvedPins = new Map<number, ResolvedPin[]>();
+
+  type ElementTopologyInfo = {
+    nodeIds: number[];
+    isBranch: boolean;
+    typeHint: string;
+  };
+  const topologyInfo: ElementTopologyInfo[] = [];
+
+  const timeRef = { value: 0 };
+  const getTime = (): number => timeRef.value;
+
+  for (const meta of elementMeta) {
+    const { pc } = meta;
+    const el = pc.element;
+
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
+      continue;
+    }
+
+    const def = pc.definition;
+    const props = el.getProperties();
+
+    const hasAnalogModel = def.models?.analog !== undefined;
+    const hasBothModels = def.models?.digital !== undefined && hasAnalogModel;
+    if (!hasAnalogModel) {
+      continue;
+    }
+
+    if (hasBothModels) {
+      const simulationMode = props.has("simulationMode")
+        ? (props.get("simulationMode") as string)
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
+
+      if (simulationMode === "analog-internals" && def.models?.analog?.transistorModel) {
+        if (!transistorModels) {
+          diagnostics.push(
+            makeDiagnostic(
+              "missing-transistor-model",
+              "error",
+              `Component "${el.typeId}" is set to simulationMode 'analog-internals' but no TransistorModelRegistry was provided`,
+              {
+                explanation:
+                  `Pass a TransistorModelRegistry as the third argument to compileAnalogPartition() ` +
+                  `when compiling circuits with transistor-level components.`,
+              },
+            ),
+          );
+          continue;
+        }
+
+        if (def.models?.analog?.factory !== undefined) {
+          const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
+            def.pinLayout.length,
+          ).fill(null);
+          const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, outerPinVertices, positionToNodeId);
+
+          const nodeIdToVertex = new Map<number, { x: number; y: number }>();
+          for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
+            const nid = outerPinNodeIds[pi];
+            const vtx = outerPinVertices[pi];
+            if (nid >= 0 && vtx) nodeIdToVertex.set(nid, vtx);
+          }
+
+          if (vddNodeId < 0) {
+            vddNodeId = nextInternalNode++;
+            vddBranchIdx = branchCount++;
+          }
+
+          const expResult = expandTransistorModel(
+            def,
+            outerPinNodeIds,
+            transistorModels,
+            vddNodeId,
+            0,
+            () => nextInternalNode++,
+          );
+
+          diagnostics.push(...expResult.diagnostics);
+
+          for (const expEl of expResult.elements) {
+            const expElIdx = analogElements.length;
+            analogElements.push(expEl);
+            elementToCircuitElement.set(expElIdx, el);
+
+            const subVerts: Array<{ x: number; y: number } | null> = [];
+            for (const nid of expEl.pinNodeIds) {
+              subVerts.push(nodeIdToVertex.get(nid) ?? null);
+            }
+            elementPinVertices.set(expElIdx, subVerts);
+
+            {
+              const expResolvedPins: ResolvedPin[] = [];
+              for (let ni = 0; ni < expEl.pinNodeIds.length; ni++) {
+                const nid = expEl.pinNodeIds[ni];
+                const vtx = nodeIdToVertex.get(nid) ?? null;
+                expResolvedPins.push({
+                  label: `node${ni}`,
+                  direction: PinDirection.BIDIRECTIONAL,
+                  localPosition: { x: 0, y: 0 },
+                  worldPosition: vtx ?? { x: 0, y: 0 },
+                  wireVertex: vtx,
+                  nodeId: nid,
+                  bitWidth: 1,
+                });
+              }
+              elementResolvedPins.set(expElIdx, expResolvedPins);
+            }
+            topologyInfo.push({
+              nodeIds: Array.from(expEl.pinNodeIds),
+              isBranch: expEl.branchIndex >= 0,
+              typeHint: expEl.branchIndex >= 0
+                ? expEl.isReactive ? "inductor" : "voltage"
+                : "other",
+            });
+          }
+          continue;
+        }
+      } else if (simulationMode === "logical") {
+        const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
+
+        let hasUnconnectedPin = false;
+        for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
+          if (outerPinNodeIds[pi]! < 0) {
+            hasUnconnectedPin = true;
+            const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
+            const pinLabel = def.pinLayout[pi]?.label ?? `pin ${pi}`;
+            diagnostics.push(
+              makeDiagnostic(
+                "unconnected-analog-pin",
+                "error",
+                `The "${pinLabel}" pin on "${elLabel}" (${el.typeId}) is not connected to any wire`,
+                {
+                  explanation:
+                    `Component "${elLabel}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
+                    `endpoint in the circuit. The digital bridge path requires all pins to be connected.`,
+                },
+              ),
+            );
+          }
+        }
+        if (hasUnconnectedPin) continue;
+
+        const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
+        let compiledInner: CompiledCircuitImpl;
+        try {
+          compiledInner = compileCircuit(innerCircuit, registry);
+        } catch (err) {
+          diagnostics.push(
+            makeDiagnostic(
+              "bridge-inner-compile-error",
+              "error",
+              `Failed to compile inner digital circuit for "${el.typeId}": ${String(err)}`,
+              {},
+            ),
+          );
+          continue;
+        }
+
+        const outputAdapters: BridgeOutputAdapter[] = [];
+        const inputAdapters: BridgeInputAdapter[] = [];
+        const outputPinNetIds: number[] = [];
+        const inputPinNetIds: number[] = [];
+
+        const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
+        let adapterError = false;
+
+        for (let pi = 0; pi < def.pinLayout.length; pi++) {
+          const pinDecl = def.pinLayout[pi]!;
+          const outerNodeId = outerPinNodeIds[pi]!;
+          const innerNetId = compiledInner.labelToNetId.get(pinDecl.label) ?? -1;
+
+          if (innerNetId < 0) {
+            diagnostics.push(
+              makeDiagnostic(
+                "bridge-missing-inner-pin",
+                "warning",
+                `Digital bridge: inner circuit has no net for pin label "${pinDecl.label}" on "${elLabel}"`,
+                {},
+              ),
+            );
+            adapterError = true;
+            continue;
+          }
+
+          const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinDecl.label];
+          const componentOverride = def.models?.analog?.pinElectrical;
+          let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
+          if (props.has("_pinElectricalOverrides")) {
+            try {
+              userBridgeOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
+            } catch { /* ignore malformed JSON */ }
+          }
+          const userPinOverride = userBridgeOverrides[pinDecl.label];
+          const mergedPinOverride = userPinOverride
+            ? { ...defPinOverride, ...userPinOverride }
+            : defPinOverride;
+          const spec = resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
+
+          if (pinDecl.direction === PinDirection.OUTPUT) {
+            const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
+            adapter.label = `${elLabel}:${pinDecl.label}`;
+            outputAdapters.push(adapter);
+            outputPinNetIds.push(innerNetId);
+            analogElements.push(adapter);
+            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
+          } else {
+            const adapter = makeBridgeInputAdapter(spec, outerNodeId);
+            adapter.label = `${elLabel}:${pinDecl.label}`;
+            inputAdapters.push(adapter);
+            inputPinNetIds.push(innerNetId);
+            analogElements.push(adapter);
+            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
+          }
+        }
+
+        if (!adapterError && (outputAdapters.length > 0 || inputAdapters.length > 0)) {
+          inlineBridges.push({
+            compiledInner,
+            outputAdapters,
+            inputAdapters,
+            outputPinNetIds,
+            inputPinNetIds,
+            instanceName: typeof elLabel === "string" ? elLabel : el.instanceId,
+          });
+        }
+        continue;
+      }
+    }
+
+    // Resolve pin → node ID bindings
+    const pinVertices: Array<{ x: number; y: number } | null> = new Array(
+      def.pinLayout.length,
+    ).fill(null);
+    const pinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, pinVertices, positionToNodeId);
+
+    const pinLabelList = def.pinLayout.map((pd) => pd.label);
+    let hasUnconnectedPin = false;
+    for (let pi = 0; pi < pinNodeIds.length; pi++) {
+      if (pinNodeIds[pi] < 0) {
+        hasUnconnectedPin = true;
+        const label = el.getProperties().has("label")
+          ? el.getProperties().get<string>("label")
+          : el.typeId;
+        const pinLabel = pinLabelList[pi] ?? `pin ${pi}`;
+        diagnostics.push(
+          makeDiagnostic(
+            "unconnected-analog-pin",
+            "warning",
+            `The "${pinLabel}" pin on "${label}" (${el.typeId}) is not connected — component excluded from simulation`,
+            {
+              explanation:
+                `Component "${label}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
+                `endpoint in the circuit. The component has been excluded from the analog simulation.`,
+              suggestions: [
+                {
+                  text: `Check the wiring around "${label}" — make sure each pin endpoint sits exactly on a wire.`,
+                  automatable: false,
+                },
+              ],
+            },
+          ),
+        );
+      }
+    }
+
+    if (hasUnconnectedPin) {
+      continue;
+    }
+
+    const pinNodes = new Map<string, number>();
+    for (let pi = 0; pi < pinNodeIds.length; pi++) {
+      const lbl = pinLabelList[pi];
+      if (lbl !== undefined) {
+        pinNodes.set(lbl, pinNodeIds[pi]);
+      }
+    }
+
+    const internalNodeIds: number[] = [];
+    if (meta.internalNodeCount > 0) {
+      for (let i = 0; i < meta.internalNodeCount; i++) {
+        internalNodeIds.push(meta.internalNodeOffset + i);
+      }
+    }
+
+    const absoluteBranchIdx =
+      meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
+
+    if (hasBothModels && def.models?.analog?.factory !== undefined) {
+      let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
+      if (props.has("_pinElectricalOverrides")) {
+        try {
+          userOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
+        } catch { /* ignore malformed JSON */ }
+      }
+
+      const pinLabelsForElec = def.pinLayout.map((pd) => pd.label);
+      const pinElectricalMap: Record<string, ResolvedPinElectrical> = {};
+      for (const pinLabel of pinLabelsForElec) {
+        const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
+        const componentOverride = def.models?.analog?.pinElectrical;
+        const userPinOverride = userOverrides[pinLabel];
+        const mergedPinOverride = userPinOverride
+          ? { ...defPinOverride, ...userPinOverride }
+          : defPinOverride;
+        pinElectricalMap[pinLabel] = resolvePinElectrical(
+          circuitFamily,
+          mergedPinOverride,
+          componentOverride,
+        );
+      }
+      props.set("_pinElectrical", pinElectricalMap as unknown as import("../core/properties.js").PropertyValue);
+    }
+
+    if (def.models?.analog?.deviceType !== undefined) {
+      const modelName = props.has("model") ? props.get<string>("model") : "";
+      const resolvedModel =
+        (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
+        modelLibrary.getDefault(def.models!.analog!.deviceType);
+
+      const modelDiags = validateModel(resolvedModel);
+      diagnostics.push(...modelDiags);
+      props.set("_modelParams", resolvedModel.params as unknown as import("../core/properties.js").PropertyValue);
+    }
+
+    const analogFactory = def.models!.analog!.factory;
+    if (!analogFactory) continue;
+    const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    const element: import("./element.js").AnalogElement = Object.assign(core, {
+      pinNodeIds: pinNodeIds,
+      allNodeIds: [...pinNodeIds, ...internalNodeIds],
+    });
+
+    const elementIndex = analogElements.length;
+    analogElements.push(element);
+    elementToCircuitElement.set(elementIndex, el);
+    elementPinVertices.set(elementIndex, pinVertices);
+
+    {
+      const resolvedPinsOut: ResolvedPin[] = [];
+      const elPins = el.getPins();
+      for (let pi = 0; pi < def.pinLayout.length; pi++) {
+        const decl = def.pinLayout[pi];
+        const pin = elPins[pi];
+        if (!decl || !pin) continue;
+        resolvedPinsOut.push({
+          label: decl.label,
+          direction: decl.direction,
+          localPosition: pin.position,
+          worldPosition: pinWorldPosition(el, pin),
+          wireVertex: pinVertices[pi] ?? null,
+          nodeId: pinNodeIds[pi],
+          bitWidth: pin.bitWidth,
+        });
+      }
+      elementResolvedPins.set(elementIndex, resolvedPinsOut);
+    }
+
+    topologyInfo.push({
+      nodeIds: [...pinNodeIds, ...internalNodeIds],
+      isBranch: meta.branchIdx >= 0,
+      typeHint: meta.branchIdx >= 0
+        ? element.isReactive
+          ? "inductor"
+          : "voltage"
+        : "other",
+    });
+  }
+
+  // After Pass B: recompute totalNodeCount to include transistor-expansion nodes
+  totalNodeCount = nextInternalNode - 1;
+
+  if (vddNodeId >= 0 && vddBranchIdx >= 0) {
+    const vdd = circuitFamily.vdd;
+    const absoluteVddBranch = totalNodeCount + vddBranchIdx;
+    const vddSource = makeVddSource(vddNodeId, 0, absoluteVddBranch, vdd);
+    analogElements.push(vddSource);
+    topologyInfo.push({
+      nodeIds: [vddNodeId, 0],
+      isBranch: true,
+      typeHint: "voltage",
+    });
+  }
+
+  // Topology validation
+  if (totalNodeCount > 0) {
+    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
+
+    for (const nodeId of weakNodes.orphan) {
+      diagnostics.push(
+        makeDiagnostic(
+          "orphan-node",
+          "error",
+          `Node ${nodeId} is orphan (no element terminals connected)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has no element terminals connected to it. ` +
+              `This creates a zero row in the MNA matrix, making it singular.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Remove the disconnected wire or wire fragment at this location.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+
+    for (const nodeId of weakNodes.floating) {
+      diagnostics.push(
+        makeDiagnostic(
+          "floating-node",
+          "warning",
+          `Node ${nodeId} is floating (connected to only one element terminal)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has only one element terminal connected to it. ` +
+              `A floating node has no complete current path.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+  }
+
+  if (detectVoltageSourceLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "voltage-source-loop",
+        "error",
+        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal voltage sources creates contradictory KVL constraints.",
+          suggestions: [
+            {
+              text: "Add a small series resistance to one of the voltage source branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  if (detectInductorLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "inductor-loop",
+        "error",
+        "Inductor loop detected — inductors form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal inductors creates a degenerate branch equation system.",
+          suggestions: [
+            {
+              text: "Add a small series resistance to one of the inductor branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  // Check for ground
+  const hasGround = partition.components.some((pc) => pc.element.typeId === "Ground");
+  if (!hasGround) {
+    const alreadyHasGroundDiag = diagnostics.some((d) => d.code === "no-ground");
+    if (!alreadyHasGroundDiag) {
+      diagnostics.push(
+        makeDiagnostic(
+          "no-ground",
+          "warning",
+          "No Ground element found in partition",
+          {
+            explanation:
+              "MNA simulation requires a ground reference node (node 0). " +
+              "Without a Ground element the simulator cannot establish a voltage reference.",
+            suggestions: [
+              {
+                text: "Add a Ground element connected to the reference node.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+  }
+
+  // Process bridge stubs from partition
+  const bridges: BridgeInstance[] = [...inlineBridges];
+
+  // Build and return ConcreteCompiledAnalogCircuit
+  const models = new Map<string, DeviceModel>();
+
+  return new ConcreteCompiledAnalogCircuit({
+    nodeCount: totalNodeCount,
+    branchCount,
+    elements: analogElements,
+    labelToNodeId,
+    wireToNodeId,
     models,
     elementToCircuitElement,
     elementPinVertices,

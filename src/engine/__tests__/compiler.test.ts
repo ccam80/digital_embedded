@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compileCircuit } from "../compiler.js";
+import { compileCircuit, compileDigitalPartition } from "../compiler.js";
 import { findSCCs } from "../tarjan.js";
 import { topologicalSort } from "../topological-sort.js";
 import { Circuit, Wire } from "@/core/circuit";
@@ -21,6 +21,7 @@ import type { RenderContext, Rect } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyBag as PropertyBagType } from "@/core/properties";
 import { BitsException } from "@/core/errors";
+import type { SolverPartition, ConnectivityGroup, PartitionedComponent, ResolvedGroupPin } from "@/compile/types";
 
 // ---------------------------------------------------------------------------
 // Minimal test CircuitElement implementation
@@ -598,6 +599,425 @@ describe("TopologicalSort", () => {
   it("handlesSingleNode", () => {
     const order = topologicalSort([[]]);
     expect(order).toEqual([0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers: build SolverPartition manually from circuit topology
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a minimal SolverPartition from a list of elements and their pin
+ * connectivity. Each unique (elementIndex, pinIndex) group is described by a
+ * group assignment array: groupAssignments[elemIdx][pinIdx] = groupId.
+ * Wires are assigned to groups based on which group their positions belong to.
+ */
+function buildPartition(
+  elements: TestElement[],
+  pinDeclarationsList: PinDeclaration[][],
+  groupAssignments: number[][], // [elemIdx][pinIdx] = groupId
+  wires: Wire[],
+  wireGroupAssignments: number[], // [wireIdx] = groupId
+  registry: ComponentRegistry,
+): SolverPartition {
+  // Collect all unique group IDs and build groups
+  const groupMap = new Map<number, { pins: ResolvedGroupPin[]; wires: Wire[] }>();
+
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i]!;
+    const decls = pinDeclarationsList[i]!;
+    const assignments = groupAssignments[i]!;
+    for (let j = 0; j < decls.length; j++) {
+      const groupId = assignments[j]!;
+      if (!groupMap.has(groupId)) {
+        groupMap.set(groupId, { pins: [], wires: [] });
+      }
+      const decl = decls[j]!;
+      groupMap.get(groupId)!.pins.push({
+        elementIndex: i,
+        pinIndex: j,
+        pinLabel: decl.label,
+        direction: decl.direction,
+        bitWidth: decl.defaultBitWidth,
+        worldPosition: { x: el.position.x + decl.position.x, y: el.position.y + decl.position.y },
+        wireVertex: null,
+        domain: "digital",
+      });
+    }
+  }
+
+  for (let w = 0; w < wires.length; w++) {
+    const groupId = wireGroupAssignments[w]!;
+    if (!groupMap.has(groupId)) {
+      groupMap.set(groupId, { pins: [], wires: [] });
+    }
+    groupMap.get(groupId)!.wires.push(wires[w]!);
+  }
+
+  const groups: ConnectivityGroup[] = [];
+  for (const [groupId, data] of groupMap) {
+    groups.push({
+      groupId,
+      pins: data.pins,
+      wires: data.wires,
+      domains: new Set(["digital"]),
+    });
+  }
+
+  const partitionedComponents: PartitionedComponent[] = elements.map((el, i) => {
+    const def = registry.get(el.typeId)!;
+    const decls = pinDeclarationsList[i]!;
+    const assignments = groupAssignments[i]!;
+    const resolvedPins: ResolvedGroupPin[] = decls.map((decl, j) => ({
+      elementIndex: i,
+      pinIndex: j,
+      pinLabel: decl.label,
+      direction: decl.direction,
+      bitWidth: decl.defaultBitWidth,
+      worldPosition: { x: el.position.x + decl.position.x, y: el.position.y + decl.position.y },
+      wireVertex: null,
+      domain: "digital",
+    }));
+    return {
+      element: el,
+      definition: def as ComponentDefinition,
+      model: def.models!.digital! as import("@/core/registry").DigitalModel,
+      resolvedPins,
+    };
+  });
+
+  return {
+    components: partitionedComponents,
+    groups,
+    bridgeStubs: [],
+    crossEngineBoundaries: [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// compileDigitalPartition tests
+// ---------------------------------------------------------------------------
+
+describe("compileDigitalPartition", () => {
+  // -------------------------------------------------------------------------
+  // emptyPartitionCompiles
+  // -------------------------------------------------------------------------
+  it("emptyPartitionCompiles", () => {
+    const partition: SolverPartition = {
+      components: [],
+      groups: [],
+      bridgeStubs: [],
+      crossEngineBoundaries: [],
+    };
+    const registry = new ComponentRegistry();
+    const compiled = compileDigitalPartition(partition, registry);
+    expect(compiled.netCount).toBe(0);
+    expect(compiled.componentCount).toBe(0);
+    expect(compiled.evaluationOrder.length).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // singleGatePartitionMatchesCircuitCompiler
+  // -------------------------------------------------------------------------
+  it("singleGatePartitionMatchesCircuitCompiler", () => {
+    // AND gate with no connections: 3 isolated pins → 3 groups/nets
+    const andDef = makeDefinition("And", twoInputPins());
+    const registry = makeRegistry(andDef);
+
+    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, twoInputPins());
+
+    // Group assignments: each pin is its own group (isolated)
+    // pin 0 (a at 0,0) = group 0, pin 1 (b at 0,1) = group 1, pin 2 (out at 2,0) = group 2
+    const partition = buildPartition(
+      [andEl],
+      [twoInputPins()],
+      [[0, 1, 2]],
+      [],
+      [],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+
+    expect(compiled.netCount).toBe(3);
+    expect(compiled.componentCount).toBe(1);
+    expect(compiled.evaluationOrder.length).toBe(1);
+    expect(compiled.evaluationOrder[0]!.isFeedback).toBe(false);
+    expect(compiled.layout.inputCount(0)).toBe(2);
+    expect(compiled.layout.outputCount(0)).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // connectedGatesProduceSharedNet
+  // -------------------------------------------------------------------------
+  it("connectedGatesProduceSharedNet", () => {
+    // NOT → AND: NOT output and AND input-a share group 1
+    // Groups: NOT.in=0, NOT.out+AND.a=1, AND.b=2, AND.out=3
+    const notDef = makeDefinition("Not", notPins());
+    const andDef = makeDefinition("And", twoInputPins());
+    const registry = makeRegistry(notDef, andDef);
+
+    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+
+    // notPins: [in@(0,0)=group0, out@(2,0)=group1]
+    // twoInputPins: [a@(0,0)=group1, b@(0,1)=group2, out@(2,0)=group3]
+    const partition = buildPartition(
+      [notEl, andEl],
+      [notPins(), twoInputPins()],
+      [[0, 1], [1, 2, 3]],
+      [wire],
+      [1],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+
+    expect(compiled.componentCount).toBe(2);
+    // 4 groups → 4 nets
+    expect(compiled.netCount).toBe(4);
+
+    // NOT output and AND first input share net (group 1)
+    const wt = compiled.layout.wiringTable;
+    const notOutputNetId = wt[compiled.layout.outputOffset(0)]!;
+    const andFirstInputNetId = wt[compiled.layout.inputOffset(1)]!;
+    expect(notOutputNetId).toBe(andFirstInputNetId);
+
+    // Wire is in wireToNetId and maps to the shared net
+    expect(compiled.wireToNetId.has(wire)).toBe(true);
+    expect(compiled.wireToNetId.get(wire)).toBe(notOutputNetId);
+  });
+
+  // -------------------------------------------------------------------------
+  // evaluationOrderRespectsDependency
+  // -------------------------------------------------------------------------
+  it("evaluationOrderRespectsDependency", () => {
+    // NOT → AND: NOT must evaluate before AND
+    const notDef = makeDefinition("Not", notPins());
+    const andDef = makeDefinition("And", twoInputPins());
+    const registry = makeRegistry(notDef, andDef);
+
+    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+
+    const partition = buildPartition(
+      [notEl, andEl],
+      [notPins(), twoInputPins()],
+      [[0, 1], [1, 2, 3]],
+      [],
+      [],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+
+    const orderByComponent = new Map<number, number>();
+    for (let g = 0; g < compiled.evaluationOrder.length; g++) {
+      for (const idx of compiled.evaluationOrder[g]!.componentIndices) {
+        orderByComponent.set(idx, g);
+      }
+    }
+
+    expect(orderByComponent.get(0)!).toBeLessThanOrEqual(orderByComponent.get(1)!);
+    for (const group of compiled.evaluationOrder) {
+      expect(group.isFeedback).toBe(false);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // feedbackLoopDetected
+  // -------------------------------------------------------------------------
+  it("feedbackLoopDetected", () => {
+    // SR latch: NOR1 output → NOR2 input-a (group 1), NOR2 output → NOR1 input-b (group 3)
+    // Groups: NOR1.in0=0, NOR1.out+NOR2.in0=1, NOR2.in1=2, NOR2.out+NOR1.in1=3
+    const norDef = makeDefinition("Nor", twoInputPins());
+    const registry = makeRegistry(norDef);
+
+    const nor1 = new TestElement("Nor", "nor-1", { x: 0, y: 0 }, twoInputPins());
+    const nor2 = new TestElement("Nor", "nor-2", { x: 8, y: 0 }, twoInputPins());
+    const w1 = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+    const w2 = new Wire({ x: 10, y: 0 }, { x: 0, y: 1 });
+
+    // NOR1: [a@(0,0)=group0, b@(0,1)=group3, out@(2,0)=group1]
+    // NOR2: [a@(0,0)=group1, b@(0,1)=group2, out@(2,0)=group3]
+    const partition = buildPartition(
+      [nor1, nor2],
+      [twoInputPins(), twoInputPins()],
+      [[0, 3, 1], [1, 2, 3]],
+      [w1, w2],
+      [1, 3],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+
+    expect(compiled.componentCount).toBe(2);
+    const feedbackGroups = compiled.evaluationOrder.filter(g => g.isFeedback);
+    expect(feedbackGroups.length).toBe(1);
+    expect(feedbackGroups[0]!.componentIndices.length).toBe(2);
+    const indices = Array.from(feedbackGroups[0]!.componentIndices);
+    expect(indices).toContain(0);
+    expect(indices).toContain(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // labelToNetIdBuiltFromPartition
+  // -------------------------------------------------------------------------
+  it("labelToNetIdBuiltFromPartition", () => {
+    // In(label="A") and Out(label="S") connected via shared group 0
+    const inPins = inputOnlyPin("A", { x: 0, y: 0 });
+    const outPins = outputOnlyPin("S", { x: 0, y: 0 });
+
+    const inDef = makeDefinition("In", inPins);
+    const outDef = makeDefinition("Out", outPins);
+    const registry = makeRegistry(inDef, outDef);
+
+    const inProps = new PropertyBag([["label", "A"]]);
+    const outProps = new PropertyBag([["label", "S"]]);
+    const inEl = new TestElement("In", "in-1", { x: 0, y: 0 }, inPins, inProps);
+    const outEl = new TestElement("Out", "out-1", { x: 10, y: 0 }, outPins, outProps);
+    const wire = new Wire({ x: 0, y: 0 }, { x: 10, y: 0 });
+
+    // Both pins in group 0 (connected)
+    const partition = buildPartition(
+      [inEl, outEl],
+      [inPins, outPins],
+      [[0], [0]],
+      [wire],
+      [0],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+
+    expect(compiled.labelToNetId.has("A")).toBe(true);
+    expect(compiled.labelToNetId.has("S")).toBe(true);
+    expect(compiled.labelToNetId.get("A")).toBe(compiled.labelToNetId.get("S"));
+  });
+
+  // -------------------------------------------------------------------------
+  // matchesCircuitCompilerOutputForChainedGates
+  // -------------------------------------------------------------------------
+  it("matchesCircuitCompilerOutputForChainedGates", () => {
+    // Build via compileCircuit and via compileDigitalPartition, compare results.
+    // NOT(0,0) → AND(8,0): wire from (2,0) to (8,0)
+
+    const notDef = makeDefinition("Not", notPins());
+    const andDef = makeDefinition("And", twoInputPins());
+    const registry = makeRegistry(notDef, andDef);
+
+    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+
+    // Via compileCircuit (old path)
+    const circuit = new Circuit();
+    circuit.addElement(notEl);
+    circuit.addElement(andEl);
+    circuit.addWire(wire);
+    const compiledOld = compileCircuit(circuit, registry);
+
+    // Via compileDigitalPartition (new path)
+    // NOT pins: in@(0,0), out@(2,0) — world: (0,0) and (2,0)
+    // AND pins: a@(0,0), b@(0,1), out@(2,0) — world: (8,0), (8,1), (10,0)
+    // Shared net: NOT.out(2,0) and AND.a(8,0) are in same group
+    // Groups: NOT.in=0, NOT.out+AND.a=1, AND.b=2, AND.out=3
+    const partition = buildPartition(
+      [notEl, andEl],
+      [notPins(), twoInputPins()],
+      [[0, 1], [1, 2, 3]],
+      [wire],
+      [1],
+      registry,
+    );
+    const compiledNew = compileDigitalPartition(partition, registry);
+
+    // Both should have same net count
+    expect(compiledNew.netCount).toBe(compiledOld.netCount);
+    expect(compiledNew.componentCount).toBe(compiledOld.componentCount);
+
+    // Both should have same evaluation order structure
+    expect(compiledNew.evaluationOrder.length).toBe(compiledOld.evaluationOrder.length);
+
+    // The NOT output net and AND first input net must be the same in both
+    const oldWt = compiledOld.layout.wiringTable;
+    const newWt = compiledNew.layout.wiringTable;
+    const oldNotOut = oldWt[compiledOld.layout.outputOffset(0)]!;
+    const newNotOut = newWt[compiledNew.layout.outputOffset(0)]!;
+    const oldAndIn = oldWt[compiledOld.layout.inputOffset(1)]!;
+    const newAndIn = newWt[compiledNew.layout.inputOffset(1)]!;
+
+    // Both paths: NOT output and AND first input share the same net
+    expect(oldNotOut).toBe(oldAndIn);
+    expect(newNotOut).toBe(newAndIn);
+
+    // Wire is mapped in both
+    expect(compiledOld.wireToNetId.has(wire)).toBe(true);
+    expect(compiledNew.wireToNetId.has(wire)).toBe(true);
+
+    // Wire maps to the same relative net (the shared NOT.out/AND.in net)
+    expect(compiledOld.wireToNetId.get(wire)).toBe(oldNotOut);
+    expect(compiledNew.wireToNetId.get(wire)).toBe(newNotOut);
+  });
+
+  // -------------------------------------------------------------------------
+  // bitWidthMismatchThrows
+  // -------------------------------------------------------------------------
+  it("bitWidthMismatchThrowsInPartition", () => {
+    // 1-bit output connected to 8-bit input in the same group → BitsException
+    const singleBitOutPins: PinDeclaration[] = [
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    ];
+    const eightBitInPins: PinDeclaration[] = [
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+    ];
+
+    const srcDef = makeDefinition("Src", singleBitOutPins);
+    const dstDef = makeDefinition("Dst", eightBitInPins);
+    const registry = makeRegistry(srcDef, dstDef);
+
+    const srcEl = new TestElement("Src", "src-1", { x: 0, y: 0 }, singleBitOutPins);
+    const dstEl = new TestElement("Dst", "dst-1", { x: 0, y: 0 }, eightBitInPins);
+
+    // Both pins in group 0 — will trigger bit-width mismatch
+    const partition = buildPartition(
+      [srcEl, dstEl],
+      [singleBitOutPins, eightBitInPins],
+      [[0], [0]],
+      [],
+      [],
+      registry,
+    );
+
+    expect(() => compileDigitalPartition(partition, registry)).toThrow(BitsException);
+  });
+
+  // -------------------------------------------------------------------------
+  // wireToNetIdPopulatedFromGroups
+  // -------------------------------------------------------------------------
+  it("wireToNetIdPopulatedFromGroups", () => {
+    // Partition with a wire assigned to a group — the wire must appear in wireToNetId
+    const notDef = makeDefinition("Not", notPins());
+    const registry = makeRegistry(notDef);
+    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const wire = new Wire({ x: 0, y: 0 }, { x: 2, y: 0 });
+
+    // Both NOT pins in group 0 with wire in group 0
+    const partition = buildPartition(
+      [notEl],
+      [notPins()],
+      [[0, 0]],
+      [wire],
+      [0],
+      registry,
+    );
+
+    const compiled = compileDigitalPartition(partition, registry);
+    expect(compiled.wireToNetId.has(wire)).toBe(true);
+    const netId = compiled.wireToNetId.get(wire)!;
+    expect(netId).toBeGreaterThanOrEqual(0);
+    expect(netId).toBeLessThan(compiled.netCount);
   });
 });
 

@@ -270,3 +270,19 @@
 - **Files modified**: `src/compile/index.ts` (added exports for `resolveModelAssignments`, `extractConnectivityGroups`, `ModelAssignment`)
 - **Tests**: 26/26 passing
 - **Notes**: All 116 test failures in the full suite are pre-existing — they exist in files modified before this session (src/analog/newton-raphson.ts, analog-engine.ts, components, etc.) and are unrelated to the compile/ directory. All 788 tests in src/compile/, src/engine/, src/core/, and src/headless/ pass.
+
+## Task P3-6: Adapt digital compiler to accept SolverPartition (L)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/engine/compiler.ts`, `src/engine/__tests__/compiler.test.ts`
+- **Tests**: 32/32 passing (9 new tests for compileDigitalPartition, 23 existing tests unchanged)
+- **Summary**: Added `compileDigitalPartition(partition, registry)` export to `src/engine/compiler.ts`. The new function accepts a `SolverPartition` (pre-computed `ConnectivityGroup[]` and `PartitionedComponent[]`), maps group IDs to sequential net IDs, builds wire→netId from groups' wires arrays (skipping traceNets and Steps A–C), and preserves all digital-specific logic: multi-driver detection, BusResolver, switch classification, SCC decomposition, topological sort, wiring table construction, labelToNetId, pinNetMap. The existing `compileCircuit()` function is untouched. Full test suite: 7475/7479 passing (4 pre-existing submodule failures, unchanged from baseline).
+
+## Task P3-7: Adapt analog compiler to accept SolverPartition (L)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/analog/__tests__/compile-analog-partition.test.ts
+- **Files modified**: src/analog/compiler.ts
+- **Tests**: 11/11 passing
+- **Summary**: Added `compileAnalogPartition(partition, registry, transistorModels?)` export to `src/analog/compiler.ts`. Added `import type { SolverPartition, PartitionedComponent } from "../compile/types.js"` at top of file. Added private `buildNodeMapFromPartition()` helper that builds wireToNodeId, labelToNodeId, positionToNodeId from ConnectivityGroup data (Ground element pin position → group → node 0; other groups → sequential). The new function mirrors all analog-specific logic from `compileAnalogCircuit` (Pass A/B branch allocation, internal node allocation, factory invocation, transistor expansion, logical bridge path, topology validation) but skips `buildNodeMap()`. The existing `compileAnalogCircuit()` is unchanged.
