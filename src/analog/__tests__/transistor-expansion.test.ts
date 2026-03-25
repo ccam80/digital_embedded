@@ -24,7 +24,7 @@ import type { CircuitElement } from "../../core/element.js";
 import type { Rect, RenderContext } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { ComponentCategory, noOpAnalogExecuteFn } from "../../core/registry.js";
+import { ComponentCategory } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import { TransistorModelRegistry } from "../transistor-model-registry.js";
@@ -122,16 +122,18 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
   return {
     name,
     typeId: -1,
-    engineType: "both" as const,
-    transistorModel,
-    simulationModes: ["logical", "analog-pins", "analog-internals"],
     factory: (_props) => makeElement(name, crypto.randomUUID(), []),
-    executeFn: noOpAnalogExecuteFn,
     pinLayout,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
+    models: {
+      digital: { executeFn: () => {} },
+      analog: { transistorModel },
+    },
+    defaultModel: "digital",
+    transistorModel,
   };
 }
 

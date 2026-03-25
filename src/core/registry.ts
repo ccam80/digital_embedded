@@ -148,12 +148,6 @@ export type ExecuteFunction = (
   layout: ComponentLayout,
 ) => void;
 
-/**
- * @deprecated No-op ExecuteFunction for legacy test code.
- * Production analog-only components simply omit models.digital.
- */
-export const noOpAnalogExecuteFn: ExecuteFunction = () => {};
-
 // ---------------------------------------------------------------------------
 // ComponentModels — structured simulation model container
 // ---------------------------------------------------------------------------
@@ -177,7 +171,7 @@ export interface DigitalModel {
  * Stamps conductance/current into sparse matrix via factory.
  */
 export interface AnalogModel {
-  factory: (
+  factory?: (
     pinNodes: ReadonlyMap<string, number>,
     internalNodeIds: readonly number[],
     branchIdx: number,

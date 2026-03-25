@@ -896,7 +896,11 @@ export function compileAnalogCircuit(
 
     // Call the analog factory — returns AnalogElementCore (no pinNodeIds).
     // Compiler is the SOLE place pinNodeIds is constructed — always pinLayout order.
-    const core = def.models!.analog!.factory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    // factory is optional on AnalogModel (transistor-expanded components omit it),
+    // but those are handled by the expansion path above and never reach here.
+    const analogFactory = def.models!.analog!.factory;
+    if (!analogFactory) continue;
+    const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
     const element: AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
       allNodeIds: [...pinNodeIds, ...internalNodeIds],
