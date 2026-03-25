@@ -83,7 +83,7 @@ export class SimulationRunner {
         const overrideEngine = engineFactory(unified.digital);
         this._records.set(overrideEngine, { coordinator });
       } else {
-        this._records.set(coordinator.digitalBackend!, { coordinator });
+        this._records.set(coordinator.getDigitalEngine()!, { coordinator });
       }
     }
     this._records.set(coordinator, { coordinator });
@@ -144,21 +144,6 @@ export class SimulationRunner {
 
         let stable = true;
         for (let n = 0; n < before.length; n++) {
-          if (before[n] !== after[n]) { stable = false; break; }
-        }
-        if (stable) return;
-      }
-    } else {
-      const netCount = 64;
-      for (let iter = 0; iter < maxIterations; iter++) {
-        const before = new Uint32Array(netCount);
-        for (let i = 0; i < netCount; i++) before[i] = engine.getSignalRaw(i);
-        engine.step();
-        const after = new Uint32Array(netCount);
-        for (let i = 0; i < netCount; i++) after[i] = engine.getSignalRaw(i);
-
-        let stable = true;
-        for (let n = 0; n < netCount; n++) {
           if (before[n] !== after[n]) { stable = false; break; }
         }
         if (stable) return;

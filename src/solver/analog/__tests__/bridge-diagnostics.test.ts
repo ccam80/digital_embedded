@@ -118,7 +118,7 @@ function setAnalogVoltage(
   nodeId: number,
   voltage: number,
 ): void {
-  const analog = coordinator.analogBackend as any;
+  const analog = coordinator.getAnalogEngine() as any;
   if (analog._voltages && analog._voltages.length > 0) {
     analog._voltages[nodeId - 1] = voltage;
   }

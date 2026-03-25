@@ -6,8 +6,6 @@
  *   2. Calls coordinator.setComponentProperty(element, key, value), which
  *      internally calls setParam() on the element and triggers engine re-stamp.
  *
- * The coordinator encapsulates all analog-domain details; this bridge never
- * touches AnalogEngine or CompiledAnalogCircuit directly.
  */
 
 import type { SimulationCoordinator } from "@/solver/coordinator-types.js";

@@ -308,7 +308,7 @@ describe("Integration", () => {
 
     // Use DefaultSimulationCoordinator which owns bridge sync
     const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
-    const engine = coord.analogBackend as MNAEngine;
+    const engine = coord.getAnalogEngine() as MNAEngine;
 
     // DC OP at LOW: node ≈ 0V
     expect(engine.getNodeVoltage(ADAPTER_NODE)).toBeLessThan(0.1);
@@ -402,7 +402,7 @@ describe("Integration", () => {
 
     // Use DefaultSimulationCoordinator which owns bridge sync
     const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
-    const engine = coord.analogBackend as MNAEngine;
+    const engine = coord.getAnalogEngine() as MNAEngine;
 
     // Access the inner engine through coordinator private state
     const innerEngine: DigitalEngine = (coord as any)._bridgeStates[0].innerEngine;
@@ -415,7 +415,7 @@ describe("Integration", () => {
     innerEngine.setSignalValue(4, BitVector.fromNumber(0, 1)); // Q3 = 0
 
     // Simulate a threshold crossing: set analog voltage at input node and run sync
-    const analog = coord.analogBackend as any;
+    const analog = coord.getAnalogEngine() as any;
     analog._voltages[IN_ADAPTER_NODE - 1] = 3.3;
     (coord as any)._syncBeforeAnalogStep();
 
@@ -492,14 +492,14 @@ describe("Integration", () => {
 
     // Use DefaultSimulationCoordinator which owns bridge sync
     const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
-    const engine = coord.analogBackend as MNAEngine;
+    const engine = coord.getAnalogEngine() as MNAEngine;
 
     // Pre-set the inner engine's output net to HIGH (buffer output = input HIGH)
     const innerEngine: DigitalEngine = (coord as any)._bridgeStates[0].innerEngine;
     innerEngine.setSignalValue(1, BitVector.fromNumber(1, 1));
 
     // Set analog voltage at input node and run sync
-    const analog = coord.analogBackend as any;
+    const analog = coord.getAnalogEngine() as any;
     analog._voltages[0] = 3.3; // input adapter reads from solver[0]
     (coord as any)._syncBeforeAnalogStep();
 

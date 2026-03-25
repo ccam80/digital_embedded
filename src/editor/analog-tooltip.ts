@@ -10,12 +10,10 @@
  * to the left of the cursor; similarly for the bottom edge.
  */
 
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { RenderContext } from "@/core/renderer-interface";
 import type { HitResult } from "@/editor/hit-test";
 import type { CircuitElement } from "@/core/element";
-import type { ResolvedPin } from "@/core/pin";
 import { formatSI } from "@/editor/si-format";
 import type { WireCurrentResolver } from "@/editor/wire-current-resolver";
 
@@ -24,12 +22,8 @@ import type { WireCurrentResolver } from "@/editor/wire-current-resolver";
 // ---------------------------------------------------------------------------
 
 export class AnalogTooltip {
-  private readonly _engine: AnalogEngine;
+  private readonly _coordinator: SimulationCoordinator;
   private readonly _resolver: WireCurrentResolver;
-  private readonly _compiled: CompiledAnalogCircuit;
-
-  /** Inverted map: CircuitElement → element index in compiled.elements. */
-  private readonly _elementIndexMap: Map<CircuitElement, number>;
 
   /** The pending or active tooltip text (empty = not visible). */
   private _text: string = "";
@@ -51,23 +45,11 @@ export class AnalogTooltip {
   private _timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    engine: AnalogEngine,
+    coordinator: SimulationCoordinator,
     resolver: WireCurrentResolver,
-    compiled: CompiledAnalogCircuit,
   ) {
-    this._engine = engine;
+    this._coordinator = coordinator;
     this._resolver = resolver;
-    this._compiled = compiled;
-
-    // Build inverted index: CircuitElement → element index.
-    this._elementIndexMap = new Map();
-    if ("elementToCircuitElement" in compiled) {
-      const etoc = (compiled as { elementToCircuitElement: Map<number, CircuitElement> })
-        .elementToCircuitElement;
-      for (const [idx, el] of etoc) {
-        this._elementIndexMap.set(el, idx);
-      }
-    }
   }
 
   /**
@@ -190,43 +172,40 @@ export class AnalogTooltip {
     if (hit === null || hit.type === "none") return "";
 
     if (hit.type === "wire") {
-      const nodeId = this._compiled.wireToNodeId.get(hit.wire);
-      if (nodeId === undefined) return "";
-      const voltage = this._engine.getNodeVoltage(nodeId);
-      return formatSI(voltage, "V");
+      const addr = this._coordinator.compiled.wireSignalMap.get(hit.wire);
+      if (addr === undefined || addr.domain !== "analog") return "";
+      const sv = this._coordinator.readSignal(addr);
+      if (sv.type !== "analog") return "";
+      return formatSI(sv.voltage, "V");
     }
 
     if (hit.type === "pin") {
-      const el = hit.element;
-      const eIdx = this._elementIndexMap.get(el);
-      if (eIdx === undefined) return "";
-      const analogEl = this._compiled.elements[eIdx];
-      if (analogEl === undefined) return "";
-      // For a pin hit, show the voltage at the pin's node.
-      // Look up the node ID by label via elementResolvedPins (compiled,
-      // always in pinLayout order) — avoids any ordering assumption.
-      const pinLabel = hit.pin.label;
-      const compiledAny = this._compiled as unknown as
-        { elementResolvedPins?: Map<number, ResolvedPin[]> };
-      const resolvedPins = compiledAny.elementResolvedPins?.get(eIdx);
-      const rp = resolvedPins?.find(p => p.label === pinLabel);
-      const nodeId = rp?.nodeId ?? analogEl.pinNodeIds[0];
-      if (nodeId === undefined || nodeId <= 0) {
-        return formatSI(0, "V");
-      }
-      const voltage = this._engine.getNodeVoltage(nodeId);
+      const pinVoltages = this._coordinator.getPinVoltages(hit.element);
+      if (pinVoltages === null) return "";
+      const voltage = pinVoltages.get(hit.pin.label);
+      if (voltage === undefined) return "";
       return formatSI(voltage, "V");
     }
 
     if (hit.type === "element") {
-      const eIdx = this._elementIndexMap.get(hit.element);
-      if (eIdx === undefined) return "";
-      const current = this._engine.getElementCurrent(eIdx);
-      const power = this._engine.getElementPower(eIdx);
-      return `${formatSI(Math.abs(current), "A")}, ${formatSI(Math.abs(power), "W")}`;
+      return this._textForElement(hit.element);
     }
 
     return "";
+  }
+
+  private _textForElement(element: CircuitElement): string {
+    const ctx = this._coordinator.getCurrentResolverContext();
+    if (ctx === null) return "";
+    let eIdx = -1;
+    for (const [idx, el] of ctx.elementToCircuitElement) {
+      if (el === element) { eIdx = idx; break; }
+    }
+    if (eIdx === -1) return "";
+    const current = this._coordinator.readElementCurrent(eIdx);
+    const power = this._coordinator.readElementPower(eIdx);
+    if (current === null || power === null) return "";
+    return `${formatSI(Math.abs(current), "A")}, ${formatSI(Math.abs(power), "W")}`;
   }
 
   private _hide(): void {

@@ -11,12 +11,10 @@
  * Off by default. Toggled via toolbar or View menu.
  *
  * Max-power tracking uses instant expansion / slow contraction smoothing
- * (same approach as VoltageRangeTracker) to avoid visual jitter when peak
- * power briefly drops.
+ * so that visual jitter is avoided when peak power briefly drops.
  */
 
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { RenderContext } from "@/core/renderer-interface";
 import type { Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
@@ -39,30 +37,15 @@ const SMOOTHING = 0.05;
 // ---------------------------------------------------------------------------
 
 export class PowerOverlay {
-  private readonly _engine: AnalogEngine;
-  private readonly _compiled: CompiledAnalogCircuit;
-
-  /** Inverted map: CircuitElement → element index. */
-  private readonly _elementIndexMap: Map<CircuitElement, number>;
+  private readonly _coordinator: SimulationCoordinator;
 
   private _mode: "off" | "labels" | "heatmap" = "off";
 
   /** Smoothed maximum power across all elements (for heatmap normalization). */
   private _smoothedMax: number = 0;
 
-  constructor(engine: AnalogEngine, compiled: CompiledAnalogCircuit) {
-    this._engine = engine;
-    this._compiled = compiled;
-
-    // Build inverted index: CircuitElement → element index.
-    this._elementIndexMap = new Map();
-    if ("elementToCircuitElement" in compiled) {
-      const etoc = (compiled as { elementToCircuitElement: Map<number, CircuitElement> })
-        .elementToCircuitElement;
-      for (const [idx, el] of etoc) {
-        this._elementIndexMap.set(el, idx);
-      }
-    }
+  constructor(coordinator: SimulationCoordinator) {
+    this._coordinator = coordinator;
   }
 
   /** Set the display mode. */
@@ -100,14 +83,20 @@ export class PowerOverlay {
 
   /** Gather power for each circuit element, indexed parallel to the elements array. */
   private _gatherPowers(elements: readonly CircuitElement[]): Float64Array {
+    const ctx = this._coordinator.getCurrentResolverContext();
     const powers = new Float64Array(elements.length);
+    if (ctx === null) return powers;
+
+    const elementIndexMap = new Map<CircuitElement, number>();
+    for (const [idx, el] of ctx.elementToCircuitElement) {
+      elementIndexMap.set(el, idx);
+    }
+
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i]!;
-      const eIdx = this._elementIndexMap.get(el);
-      if (eIdx === undefined) {
-        powers[i] = 0;
-      } else {
-        powers[i] = Math.abs(this._engine.getElementPower(eIdx));
+      const eIdx = elementIndexMap.get(el);
+      if (eIdx !== undefined) {
+        powers[i] = Math.abs(this._coordinator.readElementPower(eIdx) ?? 0);
       }
     }
     return powers;

@@ -139,30 +139,18 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   runToStable(engineOrCoord: SimulationCoordinator | SimulationEngine, maxIterations = 1000, opts?: StepOptions): void {
     const settleOpts = opts ?? { clockAdvance: false };
 
-    if ('snapshotSignals' in engineOrCoord) {
-      const coord = engineOrCoord as SimulationCoordinator;
+    const coord: SimulationCoordinator | null =
+      'snapshotSignals' in engineOrCoord
+        ? (engineOrCoord as SimulationCoordinator)
+        : this._coordinator;
+
+    if (coord !== null) {
       for (let iter = 0; iter < maxIterations; iter++) {
         const before = coord.snapshotSignals();
         this.step(coord, settleOpts);
         const after = coord.snapshotSignals();
         let stable = true;
         for (let n = 0; n < before.length; n++) {
-          if (before[n] !== after[n]) { stable = false; break; }
-        }
-        if (stable) return;
-      }
-    } else {
-      // Legacy SimulationEngine path (used by SimulationRunner)
-      const engine = engineOrCoord as SimulationEngine;
-      const netCount = 64;
-      for (let iter = 0; iter < maxIterations; iter++) {
-        const before = new Uint32Array(netCount);
-        for (let i = 0; i < netCount; i++) before[i] = engine.getSignalRaw(i);
-        this.step(engine, settleOpts);
-        const after = new Uint32Array(netCount);
-        for (let i = 0; i < netCount; i++) after[i] = engine.getSignalRaw(i);
-        let stable = true;
-        for (let n = 0; n < netCount; n++) {
           if (before[n] !== after[n]) { stable = false; break; }
         }
         if (stable) return;
@@ -259,10 +247,10 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
     const parsed = parseTestData(resolvedData, inputCount);
 
-    // Test execution requires a digital engine. Resolve the digital backend.
+    // Test execution requires a digital engine.
     let digitalEngine: SimulationEngine | null = null;
-    if ('digitalBackend' in engineOrCoord) {
-      digitalEngine = (engineOrCoord as SimulationCoordinator).digitalBackend as SimulationEngine | null;
+    if (engineOrCoord instanceof DefaultSimulationCoordinator) {
+      digitalEngine = engineOrCoord.getDigitalEngine();
     } else if ('getSignalRaw' in engineOrCoord) {
       digitalEngine = engineOrCoord as SimulationEngine;
     }

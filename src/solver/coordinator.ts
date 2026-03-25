@@ -163,9 +163,19 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     }
   }
 
-  get digitalBackend(): SimulationEngine | null { return this._digital; }
-  get analogBackend(): AnalogEngine | null { return this._analog; }
   get compiled(): CompiledCircuitUnified { return this._compiled; }
+
+  /**
+   * Returns the internal digital engine for use by solver-internal code only.
+   * Consumers must not call this — use capability queries and coordinator methods.
+   */
+  getDigitalEngine(): SimulationEngine | null { return this._digital; }
+
+  /**
+   * Returns the internal analog engine for use by solver-internal code only.
+   * Consumers must not call this — use readSignal, readElementCurrent, etc.
+   */
+  getAnalogEngine(): AnalogEngine | null { return this._analog; }
 
   start(): void { this._digital?.start(); this._analog?.start(); }
   stop(): void { this._digital?.stop(); this._analog?.stop(); }
@@ -726,6 +736,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   readBranchCurrent(branchIndex: number): number | null {
     if (this._analog === null) return null;
     return this._analog.getBranchCurrent(branchIndex);
+  }
+
+  readElementPower(elementIndex: number): number | null {
+    if (this._analog === null) return null;
+    return this._analog.getElementPower(elementIndex);
   }
 
   saveSnapshot(): SnapshotId {

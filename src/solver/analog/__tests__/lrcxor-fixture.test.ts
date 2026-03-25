@@ -379,7 +379,7 @@ function compiledAndRunDcOp(
     // sync. Run transient steps so the coordinator syncs digital outputs and
     // the RC-coupled analog circuit reaches steady state.
     const coord = new DefaultSimulationCoordinator(unified);
-    const engine = coord.analogBackend as MNAEngine;
+    const engine = coord.getAnalogEngine() as MNAEngine;
     for (let i = 0; i < 20; i++) {
       coord.step();
       if (engine.getState() === EngineState.ERROR) break;

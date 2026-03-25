@@ -6,9 +6,9 @@
  * writeCalls record.
  */
 
-import type { SimulationEngine, MeasurementObserver, SnapshotId } from "@/core/engine-interface";
+import type { MeasurementObserver, SnapshotId } from "@/core/engine-interface";
 import { EngineState } from "@/core/engine-interface";
-import type { AnalogEngine, DcOpResult } from "@/core/analog-engine-interface";
+import type { DcOpResult } from "@/core/analog-engine-interface";
 import type {
   SimulationCoordinator,
   FrameStepResult,
@@ -26,8 +26,8 @@ export class MockCoordinator implements SimulationCoordinator {
   readonly writeCalls: WriteCall[] = [];
 
   private _signals: Map<string, SignalValue> = new Map();
-  private _digitalBackend: SimulationEngine | null = null;
-  private _analogBackend: AnalogEngine | null = null;
+  private _hasDigital: boolean = false;
+  private _hasAnalog: boolean = false;
   readonly _observers: Set<MeasurementObserver> = new Set();
 
   /** Inject a signal value for a given address, keyed by JSON-serialized address. */
@@ -35,9 +35,10 @@ export class MockCoordinator implements SimulationCoordinator {
     this._signals.set(JSON.stringify(addr), value);
   }
 
-  /** Set the digital backend (optional, for engine accessor tests). */
-  setDigitalBackend(engine: SimulationEngine): void {
-    this._digitalBackend = engine;
+  /** Configure capability flags (used in tests that need domain-specific behavior). */
+  setCapabilities(opts: { digital?: boolean; analog?: boolean }): void {
+    if (opts.digital !== undefined) this._hasDigital = opts.digital;
+    if (opts.analog !== undefined) this._hasAnalog = opts.analog;
   }
 
   readSignal(addr: SignalAddress): SignalValue {
@@ -73,10 +74,10 @@ export class MockCoordinator implements SimulationCoordinator {
   get signalCount(): number { return 0; }
   snapshotSignals(): Float64Array { return new Float64Array(0); }
 
-  supportsMicroStep(): boolean { return this._digitalBackend !== null; }
-  supportsRunToBreak(): boolean { return this._digitalBackend !== null; }
-  supportsAcSweep(): boolean { return this._analogBackend !== null; }
-  supportsDcOp(): boolean { return this._analogBackend !== null; }
+  supportsMicroStep(): boolean { return this._hasDigital; }
+  supportsRunToBreak(): boolean { return this._hasDigital; }
+  supportsAcSweep(): boolean { return this._hasAnalog; }
+  supportsDcOp(): boolean { return this._hasAnalog; }
 
   microStep(): void { /* no-op */ }
   runToBreak(): void { /* no-op */ }
@@ -108,19 +109,12 @@ export class MockCoordinator implements SimulationCoordinator {
 
   readElementCurrent(_elementIndex: number): number | null { return null; }
   readBranchCurrent(_branchIndex: number): number | null { return null; }
+  readElementPower(_elementIndex: number): number | null { return null; }
 
   saveSnapshot(): SnapshotId { return 0; }
   restoreSnapshot(_id: SnapshotId): void { /* no-op */ }
 
   getCurrentResolverContext(): CurrentResolverContext | null { return null; }
-
-  get digitalBackend(): SimulationEngine | null {
-    return this._digitalBackend;
-  }
-
-  get analogBackend(): AnalogEngine | null {
-    return this._analogBackend;
-  }
 
   get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; diagnostics: readonly Diagnostic[] } {
     return {

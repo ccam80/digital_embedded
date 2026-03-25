@@ -11,7 +11,7 @@
 
 import type { SimulationEngine, MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
-import type { AnalogEngine, DcOpResult } from "../core/analog-engine-interface.js";
+import type { DcOpResult } from "../core/analog-engine-interface.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
 import type { AcParams, AcResult } from "./analog/ac-analysis.js";
 import type { Wire } from "../core/circuit.js";
@@ -74,12 +74,6 @@ export interface SimulationCoordinator {
   /** Read all labeled signals. Returns Map<label, SignalValue>. */
   readAllSignals(): Map<string, SignalValue>;
 
-  /** Access the digital backend. Null if no digital domain. */
-  readonly digitalBackend: SimulationEngine | null;
-
-  /** Access the analog backend. Null if no analog domain. */
-  readonly analogBackend: AnalogEngine | null;
-
   /**
    * Unified compilation output. Only the domain-agnostic maps and diagnostics
    * are exposed to consumers via this interface. Access to compiled.digital or
@@ -99,7 +93,7 @@ export interface SimulationCoordinator {
   removeMeasurementObserver(observer: MeasurementObserver): void;
 
   // -------------------------------------------------------------------------
-  // §1.1 Capability queries (replace analogBackend/digitalBackend null-checks)
+  // §1.1 Capability queries
   // -------------------------------------------------------------------------
 
   /** True when the coordinator can perform a micro-step (gate-level single evaluation). */
@@ -256,6 +250,12 @@ export interface SimulationCoordinator {
    * Returns null if not available (no analog domain or index out of range).
    */
   readBranchCurrent(branchIndex: number): number | null;
+
+  /**
+   * Read element power by element index.
+   * Returns null if not available (digital-only element or no analog domain).
+   */
+  readElementPower(elementIndex: number): number | null;
 
   // -------------------------------------------------------------------------
   // §1.9 Snapshot management (for TimingDiagramPanel time-cursor scrubbing)

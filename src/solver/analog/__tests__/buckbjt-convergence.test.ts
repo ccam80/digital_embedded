@@ -56,14 +56,14 @@ describe('buckbjt.dig convergence', () => {
     }
 
     // The analog backend should still be functional (not in ERROR state)
-    const analog = coordinator.analogBackend as AnalogEngine;
+    const analog = coordinator.getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
     expect(analog.simTime).toBeGreaterThan(0);
   });
 
   it('survives 2000 transient steps without ERROR state', () => {
     const coordinator = loadBuckBjt();
-    const analog = coordinator.analogBackend as AnalogEngine;
+    const analog = coordinator.getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
 
     for (let i = 0; i < 2000; i++) {
@@ -82,7 +82,7 @@ describe('buckbjt.dig convergence', () => {
     // The UI run loop targets analogTargetRate=1e-3 sim-s/wall-s.
     // A 600ms wall-clock run ≈ 600µs of sim time.
     const coordinator = loadBuckBjt();
-    const analog = coordinator.analogBackend as AnalogEngine;
+    const analog = coordinator.getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
 
     const targetSimTime = 600e-6; // 600µs

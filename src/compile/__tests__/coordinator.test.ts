@@ -241,13 +241,13 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - digital-only', () => {
-  it('has non-null digitalBackend and null analogBackend', () => {
+  it('has non-null digital engine and null analog engine', () => {
     const registry = buildDigitalRegistry();
     const circuit = buildAndGateCircuit(registry);
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.digitalBackend).not.toBeNull();
-    expect(coord.analogBackend).toBeNull();
+    expect(coord.getDigitalEngine()).not.toBeNull();
+    expect(coord.getAnalogEngine()).toBeNull();
     coord.dispose();
   });
 
@@ -445,13 +445,13 @@ describe('DefaultSimulationCoordinator - digital-only', () => {
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analog-only', () => {
-  it('has null digitalBackend and non-null analogBackend', () => {
+  it('has null digital engine and non-null analog engine', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
     expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.digitalBackend).toBeNull();
-    expect(coord.analogBackend).not.toBeNull();
+    expect(coord.getDigitalEngine()).toBeNull();
+    expect(coord.getAnalogEngine()).not.toBeNull();
     coord.dispose();
   });
 
@@ -525,11 +525,11 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - mixed-signal', () => {
-  it('has both digitalBackend and analogBackend for mixed circuit', () => {
+  it('has both digital and analog engines for mixed circuit', () => {
     const unified = buildMixedCompiledUnified();
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.digitalBackend).not.toBeNull();
-    expect(coord.analogBackend).not.toBeNull();
+    expect(coord.getDigitalEngine()).not.toBeNull();
+    expect(coord.getAnalogEngine()).not.toBeNull();
     coord.dispose();
   });
 

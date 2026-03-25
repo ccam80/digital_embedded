@@ -7,8 +7,8 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { MockRenderContext } from "./mock-render-context";
-import { MockEngine } from "./mock-engine";
+import { MockRenderContext } from "../mock-render-context";
+import { MockEngine } from "../mock-engine";
 import type { CompiledCircuit } from "@/core/engine-interface";
 
 // ---------------------------------------------------------------------------

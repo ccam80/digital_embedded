@@ -8,55 +8,25 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { AnalogTooltip } from "@/editor/analog-tooltip";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import { MockCoordinator } from "@/test-utils/mock-coordinator";
 import type { HitResult } from "@/editor/hit-test";
 import { Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
+import type { SignalAddress } from "@/compile/types";
+import type { CurrentResolverContext } from "@/solver/coordinator-types";
+import type { AnalogElement } from "@/solver/analog/element";
 
 // ---------------------------------------------------------------------------
 // Minimal mocks
 // ---------------------------------------------------------------------------
 
-function makeEngine(opts: {
-  nodeVoltages?: Record<number, number>;
-  elementCurrents?: Record<number, number>;
-  elementPowers?: Record<number, number>;
-}): AnalogEngine {
-  return {
-    getNodeVoltage: (id: number) => opts.nodeVoltages?.[id] ?? 0,
-    getElementCurrent: (id: number) => opts.elementCurrents?.[id] ?? 0,
-    getElementPower: (id: number) => opts.elementPowers?.[id] ?? 0,
-    // Unused Engine interface methods — minimal stubs.
-    getBranchCurrent: () => 0,
-    simTime: 0,
-    lastDt: 0,
-    dcOperatingPoint: () => { throw new Error("not used"); },
-    configure: () => {},
-    onDiagnostic: () => {},
-    addBreakpoint: () => {},
-    clearBreakpoints: () => {},
-    // Engine base
-    step: () => ({ accepted: true, dt: 0 }),
-    reset: () => {},
-    compile: () => { throw new Error("not used"); },
-  } as unknown as AnalogEngine;
-}
-
 function makeWire(): Wire {
   return new Wire({ x: 0, y: 0 }, { x: 10, y: 0 });
 }
 
-function makeCircuitElement(pinLabels: string[] = []): CircuitElement {
+function makeCircuitElement(): CircuitElement {
   return {
-    getPins: () => pinLabels.map((label, i) => ({
-      label,
-      position: { x: i, y: 0 },
-      direction: "INPUT" as const,
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-    })),
+    getPins: () => [],
     getBoundingBox: () => ({ x: 0, y: 0, width: 10, height: 10 }),
     position: { x: 0, y: 0 },
     rotation: 0,
@@ -64,40 +34,100 @@ function makeCircuitElement(pinLabels: string[] = []): CircuitElement {
   } as unknown as CircuitElement;
 }
 
-function makeCompiled(opts: {
+function makeCoordinator(opts: {
   wire?: Wire;
   wireNodeId?: number;
   element?: CircuitElement;
   elementIndex?: number;
-  elementNodeIndices?: number[];
-}): CompiledAnalogCircuit {
-  const wireToNodeId = new Map<Wire, number>();
-  if (opts.wire !== undefined && opts.wireNodeId !== undefined) {
-    wireToNodeId.set(opts.wire, opts.wireNodeId);
+  elementCurrent?: number;
+  elementPower?: number;
+  pinVoltages?: Map<string, number>;
+  wireVoltage?: number;
+}): MockCoordinator {
+  const coord = new MockCoordinator();
+
+  if (opts.wire !== undefined && opts.wireNodeId !== undefined && opts.wireVoltage !== undefined) {
+    const addr: SignalAddress = { domain: 'analog', nodeId: opts.wireNodeId };
+    coord.compiled.wireSignalMap.set(opts.wire, addr);
+    coord.setSignal(addr, { type: 'analog', voltage: opts.wireVoltage });
   }
 
-  const elementToCircuitElement = new Map<number, CircuitElement>();
-  const elements: { pinNodeIds: number[]; allNodeIds: number[] }[] = [];
+  if (opts.element !== undefined && opts.pinVoltages !== undefined) {
+    (coord as any)._pinVoltages = new Map([[opts.element, opts.pinVoltages]]);
+  }
 
   if (opts.element !== undefined && opts.elementIndex !== undefined) {
-    elementToCircuitElement.set(opts.elementIndex, opts.element);
-    elements[opts.elementIndex] = {
-      pinNodeIds: opts.elementNodeIndices ?? [1],
-      allNodeIds: opts.elementNodeIndices ?? [1],
+    const elementMap = new Map<number, CircuitElement>([[opts.elementIndex, opts.element]]);
+    const resolverCtx: CurrentResolverContext = {
+      wireToNodeId: new Map(),
+      elements: [] as unknown as readonly AnalogElement[],
+      elementToCircuitElement: elementMap,
+      circuitElements: [opts.element],
+      getElementPinCurrents: () => [],
+    };
+    (coord as any)._resolverCtx = resolverCtx;
+    (coord as any)._elementCurrents = new Map([[opts.elementIndex, opts.elementCurrent ?? 0]]);
+    (coord as any)._elementPowers = new Map([[opts.elementIndex, opts.elementPower ?? 0]]);
+  }
+
+  return coord;
+}
+
+class TestCoordinator extends MockCoordinator {
+  private _wireSignalMap = new Map<Wire, SignalAddress>();
+  private _labelSignalMap = new Map<string, SignalAddress>();
+  private _pinVoltagesMap = new Map<CircuitElement, Map<string, number>>();
+  private _resolverCtx: CurrentResolverContext | null = null;
+  private _elementCurrents = new Map<number, number>();
+  private _elementPowers = new Map<number, number>();
+
+  setWireSignal(wire: Wire, nodeId: number, voltage: number): void {
+    const addr: SignalAddress = { domain: 'analog', nodeId };
+    this._wireSignalMap.set(wire, addr);
+    this.setSignal(addr, { type: 'analog', voltage });
+  }
+
+  setElementData(
+    element: CircuitElement,
+    elementIndex: number,
+    current: number,
+    power: number,
+  ): void {
+    const elementMap = new Map<number, CircuitElement>([[elementIndex, element]]);
+    this._resolverCtx = {
+      wireToNodeId: new Map(),
+      elements: [] as unknown as readonly AnalogElement[],
+      elementToCircuitElement: elementMap,
+      circuitElements: [element],
+      getElementPinCurrents: () => [],
+    };
+    this._elementCurrents.set(elementIndex, current);
+    this._elementPowers.set(elementIndex, power);
+  }
+
+  override get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; diagnostics: readonly import("@/compile/types").Diagnostic[] } {
+    return {
+      wireSignalMap: this._wireSignalMap,
+      labelSignalMap: this._labelSignalMap,
+      diagnostics: [],
     };
   }
 
-  return {
-    wireToNodeId,
-    elementToCircuitElement,
-    elements,
-    nodeCount: 5,
-    elementCount: elements.length,
-    labelToNodeId: new Map(),
-    // CompiledCircuit base
-    netCount: 5,
-    componentCount: elements.length,
-  } as unknown as CompiledAnalogCircuit;
+  override getPinVoltages(element: CircuitElement): Map<string, number> | null {
+    return this._pinVoltagesMap.get(element) ?? null;
+  }
+
+  override getCurrentResolverContext(): CurrentResolverContext | null {
+    return this._resolverCtx;
+  }
+
+  override readElementCurrent(elementIndex: number): number | null {
+    return this._elementCurrents.get(elementIndex) ?? null;
+  }
+
+  override readElementPower(elementIndex: number): number | null {
+    return this._elementPowers.get(elementIndex) ?? null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,13 +141,12 @@ describe("Tooltip", () => {
 
   it("wire_shows_voltage", () => {
     const wire = makeWire();
-    const engine = makeEngine({ nodeVoltages: { 3: 3.3 } });
-    const compiled = makeCompiled({ wire, wireNodeId: 3 });
+    const coord = new TestCoordinator();
+    coord.setWireSignal(wire, 3, 3.3);
 
-    const tooltip = new AnalogTooltip(engine, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any, compiled);
+    const tooltip = new AnalogTooltip(coord, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any);
 
     const hit: HitResult = { type: "wire", wire };
-    // Move mouse so timer fires immediately (we'll check text directly).
     vi.useFakeTimers();
     tooltip.onMouseMove(100, 100, hit);
     vi.advanceTimersByTime(250);
@@ -127,11 +156,11 @@ describe("Tooltip", () => {
   });
 
   it("component_shows_current_and_power", () => {
-    const element = makeCircuitElement(["A", "B"]);
-    const engine = makeEngine({ elementCurrents: { 0: 0.005 }, elementPowers: { 0: 0.025 } });
-    const compiled = makeCompiled({ element, elementIndex: 0, elementNodeIndices: [1, 2] });
+    const element = makeCircuitElement();
+    const coord = new TestCoordinator();
+    coord.setElementData(element, 0, 0.005, 0.025);
 
-    const tooltip = new AnalogTooltip(engine, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any, compiled);
+    const tooltip = new AnalogTooltip(coord, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any);
 
     const hit: HitResult = { type: "element", element };
     vi.useFakeTimers();
@@ -147,10 +176,10 @@ describe("Tooltip", () => {
     vi.useFakeTimers();
 
     const wire = makeWire();
-    const engine = makeEngine({ nodeVoltages: { 1: 1.0 } });
-    const compiled = makeCompiled({ wire, wireNodeId: 1 });
+    const coord = new TestCoordinator();
+    coord.setWireSignal(wire, 1, 1.0);
 
-    const tooltip = new AnalogTooltip(engine, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any, compiled);
+    const tooltip = new AnalogTooltip(coord, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any);
 
     const hit: HitResult = { type: "wire", wire };
     tooltip.onMouseMove(0, 0, hit);
@@ -168,10 +197,10 @@ describe("Tooltip", () => {
     vi.useFakeTimers();
 
     const wire = makeWire();
-    const engine = makeEngine({ nodeVoltages: { 1: 5.0 } });
-    const compiled = makeCompiled({ wire, wireNodeId: 1 });
+    const coord = new TestCoordinator();
+    coord.setWireSignal(wire, 1, 5.0);
 
-    const tooltip = new AnalogTooltip(engine, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any, compiled);
+    const tooltip = new AnalogTooltip(coord, { getWireCurrent: () => undefined, clear: () => {}, resolve: () => {} } as any);
 
     const hit: HitResult = { type: "wire", wire };
     tooltip.onMouseMove(0, 0, hit);

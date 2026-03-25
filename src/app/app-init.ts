@@ -998,16 +998,6 @@ export function initApp(search?: string): void {
             ? (current === 0 ? 1 : 0)
             : ((current + 1) & ((1 << bitWidth) - 1));
           binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          if (elementHit.typeId === 'Clock') {
-            const compiled = facade.getCompiled();
-            const clockManager = facade.getClockManager();
-            if (clockManager !== null && compiled !== null) {
-              const netId = compiled.pinNetMap.get(`${elementHit.instanceId}:out`);
-              if (netId !== undefined) {
-                clockManager.setClockPhase(netId, newVal !== 0);
-              }
-            }
-          }
           const eng = facade.getEngine();
           if (eng?.getState?.() !== EngineState.RUNNING) {
             facade.step(eng!, { clockAdvance: elementHit.typeId !== 'Clock' });
@@ -1930,6 +1920,10 @@ export function initApp(search?: string): void {
       currentFlowAnimator.update(wallDt, circuit);
     }
     coordinator.updateVoltageTracking();
+    const vRange = coordinator.voltageRange;
+    if (vRange !== null) {
+      analogVoltageTracker.update(vRange.min, vRange.max);
+    }
   }
 
   function _deactivateAnalogVisualization(): void {

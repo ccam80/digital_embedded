@@ -11,8 +11,6 @@
  * visually distinguishable when the range spans large values.
  */
 
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-
 /** Default range when no nodes are present. */
 const DEFAULT_MIN = -5;
 const DEFAULT_MAX = 5;
@@ -34,43 +32,29 @@ export class VoltageRangeTracker {
   private _fixedMax: number | null = null;
 
   /**
-   * Scan all MNA node voltages and update the tracked [min, max] range.
+   * Expand the tracked [min, max] range to include the given voltage bounds.
    *
    * The range is latched: it only expands to accommodate new extremes and
    * never contracts. Call `reset()` when the simulation restarts.
    *
-   * @param engine - The active analog engine.
-   * @param nodeCount - Number of non-ground MNA nodes.
+   * Ground (0V) is always included. If rawMin and rawMax are too close,
+   * padding is applied to ensure a non-zero-width range.
+   *
+   * @param rawMin - Minimum voltage seen this frame.
+   * @param rawMax - Maximum voltage seen this frame.
    */
-  update(engine: AnalogEngine, nodeCount: number): void {
-    if (nodeCount <= 0) {
-      return;
+  update(rawMin: number, rawMax: number): void {
+    let lo = Math.min(rawMin, 0);
+    let hi = Math.max(rawMax, 0);
+
+    if (hi - lo < UNIFORM_PADDING * 2) {
+      const mid = (lo + hi) / 2;
+      lo = mid - UNIFORM_PADDING;
+      hi = mid + UNIFORM_PADDING;
     }
 
-    // Scan all node voltages to find raw min/max
-    let rawMin = 0; // ground always included
-    let rawMax = 0;
-
-    for (let i = 1; i <= nodeCount; i++) {
-      const v = engine.getNodeVoltage(i);
-      if (v < rawMin) rawMin = v;
-      if (v > rawMax) rawMax = v;
-    }
-
-    // Handle uniform voltage: expand to avoid zero-width range
-    if (rawMax - rawMin < UNIFORM_PADDING * 2) {
-      const mid = (rawMin + rawMax) / 2;
-      rawMin = mid - UNIFORM_PADDING;
-      rawMax = mid + UNIFORM_PADDING;
-    }
-
-    // Latching: only expand, never contract
-    if (rawMax > this._autoMax) {
-      this._autoMax = rawMax;
-    }
-    if (rawMin < this._autoMin) {
-      this._autoMin = rawMin;
-    }
+    if (hi > this._autoMax) this._autoMax = hi;
+    if (lo < this._autoMin) this._autoMin = lo;
   }
 
   /**

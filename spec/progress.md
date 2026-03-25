@@ -953,3 +953,44 @@ Import `BitsException` from `../../core/errors.js`.
   - Wire context menu: uses `viewCoordinator` directly
   - `_appendComponentTraceItems()`: now accepts `CurrentResolverContext | null` instead of `ConcreteCompiledAnalogCircuit | null`; uses `resolverCtx.wireToNodeId`, `resolverCtx.elements`, `resolverCtx.elementToCircuitElement`
   - Scope context menu "Add current" uses `getCurrentResolverContext()` instead of `compiled.analog`
+
+---
+## Wave 5b.3 Summary
+- **Status**: complete
+- **Tasks completed**: 7/7
+- **Rounds**: 2 (3 agents round 1 with lock contention, 1 agent round 2 for remaining 5)
+- **Tests**: 7655/7659 passing (+138 new tests vs baseline)
+
+## Task P5b-28: Remove digitalBackend/analogBackend from SimulationCoordinator interface (§1.12)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/coordinator-types.ts` — removed `digitalBackend` and `analogBackend` from interface; removed `AnalogEngine` import; cleaned up §1.1 comment
+  - `src/solver/coordinator.ts` — removed public `get digitalBackend()` and `get analogBackend()` getters; added `getDigitalEngine()` and `getAnalogEngine()` internal accessors for solver/headless use
+  - `src/headless/default-facade.ts` — updated `runTests()` to use `instanceof DefaultSimulationCoordinator` + `getDigitalEngine()` instead of `digitalBackend` duck-type check
+  - `src/headless/runner.ts` — updated `compile()` to use `coordinator.getDigitalEngine()!` instead of `coordinator.digitalBackend!`
+  - `src/test-utils/mock-coordinator.ts` — removed `_digitalBackend`/`_analogBackend` fields and getters; replaced `setDigitalBackend()` with `setCapabilities({ digital?, analog? })`; updated capability methods to use boolean flags; removed `SimulationEngine` and `AnalogEngine` imports
+  - `src/compile/__tests__/coordinator.test.ts` — updated 3 tests to use `getDigitalEngine()`/`getAnalogEngine()` instead of removed getters
+  - `src/headless/__tests__/runner.test.ts` — added `DefaultSimulationCoordinator` import; updated 2 assertions to use `getDigitalEngine()`/`getAnalogEngine()`
+  - `src/solver/analog/__tests__/bridge-diagnostics.test.ts` — updated `analogBackend` to `getAnalogEngine()`
+  - `src/solver/analog/__tests__/bridge-integration.test.ts` — updated all `analogBackend` uses to `getAnalogEngine()`
+  - `src/solver/analog/__tests__/buckbjt-convergence.test.ts` — updated all `analogBackend` uses to `getAnalogEngine()`
+  - `src/solver/analog/__tests__/lrcxor-fixture.test.ts` — updated `analogBackend` to `getAnalogEngine()`
+- **Tests**: 7655/7659 passing (4 pre-existing ENOENT submodule failures, unchanged from baseline)
+
+## Task P5b-29: Run §7 grep acceptance checks and fix all violations
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/test-utils/__tests__/infrastructure.test.ts (moved from src/test-utils/infrastructure.test.ts)
+- **Files modified**: src/editor/voltage-range.ts, src/editor/analog-tooltip.ts, src/editor/power-overlay.ts, src/app/app-init.ts, src/editor/slider-engine-bridge.ts, src/solver/coordinator-types.ts, src/solver/coordinator.ts, src/test-utils/mock-coordinator.ts, src/editor/__tests__/voltage-range.test.ts, src/editor/__tests__/analog-tooltip.test.ts, src/editor/__tests__/power-overlay.test.ts
+- **Tests**: 7655/7659 passing (4 pre-existing ENOENT failures from missing ref/Digital submodule)
+- **Summary**: All 6 spec §7 grep acceptance checks now return zero hits. Fixed violations across: VoltageRangeTracker.update() signature (engine→rawMin/rawMax), AnalogTooltip constructor (engine+compiled→coordinator), PowerOverlay constructor (engine+compiled→coordinator), app-init.ts legacy clock/facade calls removed, slider-engine-bridge.ts historical comment removed, MockCoordinator backend fields removed.
+
+## Task P5b-30: Full test suite verification
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 7655/7659 passing (4 pre-existing ENOENT failures — ref/Digital submodule not initialised)
+- **Summary**: Full Vitest suite runs clean. 336 test files pass (2 fail with ENOENT on ref/Digital paths, pre-existing per test-baseline). No regressions introduced by P5b-28/P5b-29 changes.

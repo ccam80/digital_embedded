@@ -18,6 +18,7 @@
 
 import { describe, it, expect } from "vitest";
 import { SimulationRunner } from "../runner.js";
+import { DefaultSimulationCoordinator } from "@/solver/coordinator.js";
 import type { Engine } from "@/core/engine-interface";
 import { ComponentRegistry } from "@/core/registry";
 import { PropertyBag, PropertyType } from "@/core/properties";
@@ -485,8 +486,8 @@ describe("AnalogDispatch", () => {
     // Half-adder has only digital components — coordinator should have digital backend
     const circuit = buildHalfAdder(registry);
     const coordinator = runner.compile(circuit);
-    expect(coordinator.digitalBackend).not.toBeNull();
-    expect(coordinator.analogBackend).toBeNull();
+    expect((coordinator as DefaultSimulationCoordinator).getDigitalEngine()).not.toBeNull();
+    expect((coordinator as DefaultSimulationCoordinator).getAnalogEngine()).toBeNull();
   });
 
   it("dc_operating_point_throws_for_digital_engine — dcOperatingPoint on digital engine throws TypeError", () => {
