@@ -581,7 +581,7 @@ describe("CmosInverter", () => {
   it("transient_propagation_delay", () => {
     // Input at 0V → output HIGH. Confirm circuit is well-behaved in transient.
     const { circuit: c0, registry: r0, outX: o0 } = buildInverter(0, VDD);
-    const compiled0 = compileUnified(c0, r0);
+    const compiled0 = compileUnified(c0, r0).analog!;
     const engine0 = new MNAEngine();
     engine0.init(compiled0);
     const dc0 = engine0.dcOperatingPoint();
@@ -590,7 +590,7 @@ describe("CmosInverter", () => {
 
     // Input at VDD → output LOW. Confirmed already by other tests.
     const { circuit: cV, registry: rV, outX: oV } = buildInverter(VDD, VDD);
-    const compiledV = compileUnified(cV, rV);
+    const compiledV = compileUnified(cV, rV).analog!;
     const engineV = new MNAEngine();
     engineV.init(compiledV);
     const dcV = engineV.dcOperatingPoint();

@@ -23,7 +23,8 @@ import type { ComponentRegistry } from "../core/registry.js";
 import type { TransistorModelRegistry } from "../analog/transistor-model-registry.js";
 import { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
-import { flattenCircuit } from "../engine/flatten.js";
+import { flattenCircuit, isSubcircuitHost } from "../engine/flatten.js";
+import type { FlattenResult } from "../engine/flatten.js";
 import { compileDigitalPartition } from "../engine/compiler.js";
 import { compileAnalogPartition } from "../analog/compiler.js";
 import { BitsException } from "../core/errors.js";
@@ -43,42 +44,86 @@ import type { Diagnostic } from "../headless/netlist-types.js";
 /**
  * Compile a circuit through the unified Phase 3 pipeline.
  *
- * @param circuit           The visual circuit model (elements + wires).
+ * Accepts either a raw Circuit or a pre-flattened FlattenResult (from
+ * flattenCircuit). When a FlattenResult is provided its crossEngineBoundaries
+ * are passed through to compileAnalogPartition for bridge adapter creation.
+ *
+ * @param circuitOrResult   The visual circuit model or a pre-flattened result.
  * @param registry          Component registry providing definitions and models.
  * @param transistorModels  Optional transistor model registry for analog BJT/MOSFET.
  * @returns                 CompiledCircuitUnified with both domains, bridges, and maps.
  */
 export function compileUnified(
-  circuit: Circuit,
+  circuitOrResult: Circuit | FlattenResult,
   registry: ComponentRegistry,
   transistorModels?: TransistorModelRegistry,
 ): CompiledCircuitUnified {
   const diagnostics: Diagnostic[] = [];
 
   // -------------------------------------------------------------------------
-  // Step 1: Resolve model assignments for each element
+  // Step 1: Unwrap input — accept Circuit or FlattenResult
   // -------------------------------------------------------------------------
 
-  const modelAssignments = resolveModelAssignments(circuit.elements, registry);
+  let circuit: Circuit;
+  let crossEngineBoundaries: FlattenResult["crossEngineBoundaries"];
+
+  if ("crossEngineBoundaries" in circuitOrResult) {
+    circuit = circuitOrResult.circuit;
+    crossEngineBoundaries = circuitOrResult.crossEngineBoundaries;
+  } else {
+    // Only flatten when there are subcircuit elements — flattening creates new
+    // Wire objects which would break wireToNetId identity for callers that hold
+    // references to the original Wire instances.
+    const hasSubcircuits = circuitOrResult.elements.some(isSubcircuitHost);
+    if (hasSubcircuits) {
+      const flattenResult = flattenCircuit(circuitOrResult, registry);
+      circuit = flattenResult.circuit;
+      crossEngineBoundaries = flattenResult.crossEngineBoundaries;
+    } else {
+      circuit = circuitOrResult;
+      crossEngineBoundaries = [];
+    }
+  }
+
+  const engineType = circuit.metadata.engineType;
 
   // -------------------------------------------------------------------------
-  // Step 2: Flatten the circuit (inline same-domain subcircuits)
+  // Step 2: Validate component registrations for non-analog circuits.
+  //
+  // For digital and auto circuits, unknown component types must throw so
+  // callers receive a clear error rather than a silently broken compiled model.
+  // Analog-only circuits handle unknown components via diagnostics instead.
   // -------------------------------------------------------------------------
 
-  const flattenResult = flattenCircuit(circuit, registry);
-  const flatCircuit = flattenResult.circuit;
-  const crossEngineBoundaries = flattenResult.crossEngineBoundaries;
+  if (engineType !== "analog") {
+    const INFRASTRUCTURE = new Set([
+      "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
+      "Splitter", "Driver", "NotConnected", "ScopeTrigger",
+    ]);
+    for (const el of circuit.elements) {
+      if (INFRASTRUCTURE.has(el.typeId)) continue;
+      if (registry.get(el.typeId) === undefined) {
+        throw new Error(
+          `unknown component type "${el.typeId}" — ` +
+          `register this component type before compiling`,
+        );
+      }
+    }
+  }
 
-  // Re-resolve model assignments after flattening (element list may have changed)
-  const flatModelAssignments = resolveModelAssignments(flatCircuit.elements, registry);
+  // -------------------------------------------------------------------------
+  // Step 2b: Resolve model assignments for each element
+  // -------------------------------------------------------------------------
+
+  const flatModelAssignments = resolveModelAssignments(circuit.elements, registry, engineType);
 
   // -------------------------------------------------------------------------
   // Step 3: Extract connectivity groups (unified netlist)
   // -------------------------------------------------------------------------
 
   const [groups, connectivityDiagnostics] = extractConnectivityGroups(
-    flatCircuit.elements,
-    flatCircuit.wires,
+    circuit.elements,
+    circuit.wires,
     registry,
     flatModelAssignments,
   );
@@ -91,24 +136,29 @@ export function compileUnified(
   const { digital: digitalPartition, analog: analogPartition, bridges: bridgeDescriptors } =
     partitionByDomain(
       groups,
-      flatCircuit.elements,
+      circuit.elements,
       registry,
       flatModelAssignments,
       crossEngineBoundaries,
     );
 
   // -------------------------------------------------------------------------
-  // Step 5: Compile digital domain (if partition is non-empty)
+  // Step 5: Compile digital domain
+  //
+  // Always compile when the circuit is digital or has digital components so
+  // that error-throwing paths (unregistered component, bit-width mismatch) are
+  // reached. For a pure-analog circuit with no digital components at all, skip.
   // -------------------------------------------------------------------------
 
-  const hasDigital = digitalPartition.components.length > 0;
+  const isAnalogOnly = engineType === "analog" && digitalPartition.components.length === 0;
+  const hasDigitalComponents = digitalPartition.components.length > 0;
   let compiledDigital: ReturnType<typeof compileDigitalPartition> | null = null;
-  if (hasDigital) {
+  if (!isAnalogOnly && hasDigitalComponents) {
     try {
       compiledDigital = compileDigitalPartition(digitalPartition, registry);
     } catch (e) {
       if (e instanceof BitsException) {
-        diagnostics.push({ severity: 'error', code: 'width-mismatch', message: e.message });
+        diagnostics.push({ severity: "error", code: "width-mismatch", message: e.message });
       } else {
         throw e;
       }
@@ -121,8 +171,39 @@ export function compileUnified(
 
   const hasAnalog = analogPartition.components.length > 0;
   const compiledAnalog = hasAnalog
-    ? compileAnalogPartition(analogPartition, registry, transistorModels)
+    ? compileAnalogPartition(
+        analogPartition,
+        registry,
+        transistorModels,
+        circuit.metadata.logicFamily ?? undefined,
+        circuit,
+      )
     : null;
+
+  // -------------------------------------------------------------------------
+  // Step 6b: For analog circuits, inject unsupported-component-in-analog
+  // diagnostics for any digital-only components that were routed to the
+  // digital partition (they have no analog model).
+  // -------------------------------------------------------------------------
+
+  if (engineType === "analog" && compiledAnalog !== null) {
+    const INFRASTRUCTURE = new Set([
+      "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
+      "Splitter", "Driver", "NotConnected", "ScopeTrigger",
+    ]);
+    for (const el of circuit.elements) {
+      if (INFRASTRUCTURE.has(el.typeId)) continue;
+      const def = registry.get(el.typeId);
+      if (!def) continue;
+      if (def.models?.analog === undefined && def.models?.digital !== undefined) {
+        compiledAnalog.diagnostics.push({
+          code: "unsupported-component-in-analog",
+          severity: "error",
+          message: `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+        });
+      }
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Step 7: Build groupId → netId/nodeId lookup maps for bridge cross-reference

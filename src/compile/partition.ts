@@ -167,8 +167,15 @@ export function partitionByDomain(
       // - If the component has an analog model (e.g. Ground in analog circuits),
       //   route to analog so it can be processed by the analog backend.
       // - Otherwise route to digital so the digital backend can handle wiring.
-      if (hasAnalogModel(def) && !hasDigitalModel(def)) {
+      if (hasAnalogModel(def)) {
+        // Neutral components with an analog model (Ground, Probe, VDD, etc.)
+        // must go to the analog partition so the analog compiler can use them
+        // for ground detection and label-to-node mapping. They also go to
+        // digital so the digital backend can handle wiring connections.
         analogComponents.push(partComp);
+        if (hasDigitalModel(def)) {
+          digitalComponents.push(partComp);
+        }
       } else {
         digitalComponents.push(partComp);
       }
@@ -195,12 +202,22 @@ export function partitionByDomain(
     const isBoundary = g.domains.size > 1;
 
     // A group with no domain tags (all-neutral pins) belongs to the digital
-    // partition — this covers infrastructure-only nets (wires, In/Out stubs,
-    // components with no models) in pure-digital circuits.
+    // partition in digital circuits. In analog/mixed circuits it must also be
+    // included in the analog partition — but ONLY if it contains pins from
+    // elements that are in the analog partition (e.g., In/Out/Probe with
+    // analog-only models). Adding ALL neutral groups would create spurious
+    // MNA nodes that break the analog topology.
     const isNeutralOnly = !hasDigital && !hasAnalog;
 
     if (hasDigital || isNeutralOnly) digitalGroups.push(g);
-    if (hasAnalog) analogGroups.push(g);
+    if (hasAnalog) {
+      analogGroups.push(g);
+    } else if (isNeutralOnly) {
+      // Check if any pin in this group belongs to an analog-partition element
+      const analogElementIndices = new Set(analogComponents.map(c => elements.indexOf(c.element)));
+      const touchesAnalogElement = g.pins.some(p => analogElementIndices.has(p.elementIndex));
+      if (touchesAnalogElement) analogGroups.push(g);
+    }
 
     if (isBoundary) {
       const direction = bridgeDirection(g);

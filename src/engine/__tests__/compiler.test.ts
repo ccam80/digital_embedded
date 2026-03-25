@@ -401,7 +401,9 @@ describe("Compiler", () => {
   // bitWidthMismatchThrows (BitsException)
   // -------------------------------------------------------------------------
   it("bitWidthMismatchThrows", () => {
-    // 1-bit output connected to 8-bit input — should throw BitsException
+    // 1-bit output connected to 8-bit input — compileUnified emits a
+    // width-mismatch diagnostic instead of throwing so the caller receives
+    // a structured error report rather than an uncaught exception.
     const singleBitOutPins: PinDeclaration[] = [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
     ];
@@ -418,7 +420,9 @@ describe("Compiler", () => {
     circuit.addElement(new TestElement("Src", "src-1", { x: 0, y: 0 }, singleBitOutPins));
     circuit.addElement(new TestElement("Dst", "dst-1", { x: 0, y: 0 }, eightBitInPins));
 
-    expect(() => compileUnified(circuit, registry)).toThrow(BitsException);
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+    const result = compileUnified(circuit, registry);
+    expect(result.diagnostics.some((d) => d.code === "width-mismatch")).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -454,10 +458,11 @@ describe("Compiler", () => {
   it("emptyCircuitCompiles", () => {
     const registry = new ComponentRegistry();
     const circuit = new Circuit();
-    const compiled = compileUnified(circuit, registry).digital!;
-    expect(compiled.netCount).toBe(0);
-    expect(compiled.componentCount).toBe(0);
-    expect(compiled.evaluationOrder.length).toBe(0);
+    const result = compileUnified(circuit, registry);
+    // An empty circuit has no components — both domains are null.
+    expect(result.digital).toBeNull();
+    expect(result.analog).toBeNull();
+    expect(result.diagnostics).toHaveLength(0);
   });
 });
 

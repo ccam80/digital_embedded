@@ -1776,6 +1776,8 @@ export function compileAnalogPartition(
   partition: SolverPartition,
   registry: ComponentRegistry,
   transistorModels?: TransistorModelRegistry,
+  logicFamily?: LogicFamilyConfig,
+  outerCircuit?: Circuit,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
@@ -1787,12 +1789,28 @@ export function compileAnalogPartition(
     positionToNodeId,
   } = buildAnalogNodeMapFromPartition(partition, diagnostics);
 
-  // Resolve logic family from partition components' circuit metadata.
-  // Use default logic family since partition doesn't carry circuit metadata.
-  const circuitFamily = defaultLogicFamily();
+  // Use the caller-supplied logic family or fall back to the default.
+  const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Model library (empty — no circuit.metadata.models to read from partition)
+  // Model library: populate from outerCircuit.metadata.models when provided,
+  // matching the same pattern as compileAnalogCircuit (lines 731-745).
   const modelLibrary = new ModelLibrary();
+  if (outerCircuit !== undefined &&
+      (outerCircuit.metadata as Record<string, unknown>)["models"] instanceof Map) {
+    const circuitModels = (outerCircuit.metadata as Record<string, unknown>)["models"] as Map<string, DeviceModel>;
+    for (const model of circuitModels.values()) {
+      const params: Record<string, number> =
+        model.params instanceof Map
+          ? Object.fromEntries(model.params.entries())
+          : (model.params as unknown as Record<string, number>);
+      modelLibrary.add({
+        name: model.name,
+        type: model.type as import("./model-parser.js").DeviceType,
+        level: 1,
+        params,
+      });
+    }
+  }
 
   // Build set of cross-engine placeholder elements (from bridgeStubs)
   const crossEnginePlaceholderIds = new Set<string>(
@@ -2390,8 +2408,31 @@ export function compileAnalogPartition(
     }
   }
 
-  // Process bridge stubs from partition
+  // Process cross-engine boundaries into BridgeInstances when an outer circuit
+  // is provided (supplies the wire-endpoint geometry needed for node resolution).
   const bridges: BridgeInstance[] = [...inlineBridges];
+  if (outerCircuit !== undefined) {
+    for (const boundary of partition.crossEngineBoundaries) {
+      const bridgeInstance = compileBridgeInstance(
+        boundary,
+        wireToNodeId,
+        outerCircuit,
+        totalNodeCount,
+        circuitFamily,
+        registry,
+        diagnostics,
+      );
+      if (bridgeInstance !== null) {
+        for (const adapter of bridgeInstance.outputAdapters) {
+          analogElements.push(adapter);
+        }
+        for (const adapter of bridgeInstance.inputAdapters) {
+          analogElements.push(adapter);
+        }
+        bridges.push(bridgeInstance);
+      }
+    }
+  }
 
   // Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();

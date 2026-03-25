@@ -457,12 +457,15 @@ describe("AnalogCompiler", () => {
   });
 
   it("rejects_non_analog_circuit", () => {
+    // compileUnified is the unified entry point — it handles all engineTypes.
+    // A digital circuit with no digital-model components compiles to null analog
+    // and null digital (no components in either partition).
     const circuit = new Circuit({ engineType: "digital" });
     const registry = buildTestRegistry();
 
-    expect(() => compileUnified(circuit, registry)).toThrow(
-      /engineType must be "analog"/,
-    );
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+    const result = compileUnified(circuit, registry);
+    expect(result.analog).toBeNull();
   });
 
   it("elementToCircuitElement_maps_index_to_element", () => {

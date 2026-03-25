@@ -249,9 +249,21 @@
   },
   "hotPaths": [
     {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774431205397,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\active\\__tests__\\real-opamp.test.ts",
       "accessCount": 21,
       "lastAccessed": 1774426124507,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\analog-engine.ts",
+      "accessCount": 16,
+      "lastAccessed": 1774430880707,
       "type": "file"
     },
     {
@@ -273,12 +285,6 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\analog-engine.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774427745883,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
       "accessCount": 13,
       "lastAccessed": 1774425718783,
@@ -288,6 +294,12 @@
       "path": "src\\analog\\__tests__\\behavioral-integration.test.ts",
       "accessCount": 11,
       "lastAccessed": 1774426210190,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774430093072,
       "type": "file"
     },
     {
@@ -369,10 +381,16 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
+      "path": "src",
       "accessCount": 5,
-      "lastAccessed": 1774426330155,
-      "type": "file"
+      "lastAccessed": 1774429752039,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog",
+      "accessCount": 5,
+      "lastAccessed": 1774431370237,
+      "type": "directory"
     },
     {
       "path": "src\\components\\sources\\variable-rail.ts",
@@ -421,18 +439,6 @@
       "accessCount": 4,
       "lastAccessed": 1774425559950,
       "type": "file"
-    },
-    {
-      "path": "src\\analog",
-      "accessCount": 4,
-      "lastAccessed": 1774425633338,
-      "type": "directory"
-    },
-    {
-      "path": "src",
-      "accessCount": 4,
-      "lastAccessed": 1774426713681,
-      "type": "directory"
     },
     {
       "path": "src\\analog\\test-elements.ts",
@@ -495,6 +501,18 @@
       "type": "directory"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 2,
+      "lastAccessed": 1774429573324,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 2,
+      "lastAccessed": 1774429580917,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\scr.ts",
       "accessCount": 1,
       "lastAccessed": 1774424630749,
@@ -529,24 +547,6 @@
       "accessCount": 1,
       "lastAccessed": 1774425617496,
       "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 1,
-      "lastAccessed": 1774425935344,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 1,
-      "lastAccessed": 1774425935559,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774425956252,
-      "type": "file"
     }
   ],
   "userDirectives": []

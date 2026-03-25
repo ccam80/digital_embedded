@@ -49,10 +49,15 @@ export interface ModelAssignment {
  *
  * Infrastructure components (Wire, Tunnel, Ground, etc.) are tagged as
  * neutral — they participate in connectivity but have no simulation model.
+ *
+ * When `engineType` is "analog", dual-model components that would otherwise
+ * default to "digital" are overridden to "analog" so the analog partition
+ * receives them.
  */
 export function resolveModelAssignments(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
+  engineType?: string,
 ): ModelAssignment[] {
   const result: ModelAssignment[] = [];
 
@@ -82,6 +87,17 @@ export function resolveModelAssignments(
     } else {
       const keys = availableModels(def);
       modelKey = keys.length > 0 ? keys[0]! : 'neutral';
+    }
+
+    // When the circuit is analog and the component has an analog model,
+    // override a "digital" default to "analog" so the component is compiled
+    // by the analog backend.
+    if (
+      engineType === 'analog' &&
+      modelKey === 'digital' &&
+      def.models?.analog !== undefined
+    ) {
+      modelKey = 'analog';
     }
 
     // Resolve the actual model object
