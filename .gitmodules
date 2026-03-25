@@ -1,6 +1,0 @@
-[submodule "ref/Digital"]
-	path = ref/Digital
-	url = https://github.com/hneemann/Digital.git
-[submodule "ref/circuitjs1"]
-	path = ref/circuitjs1
-	url = https://github.com/sharpie7/circuitjs1.git
