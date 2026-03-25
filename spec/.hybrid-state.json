@@ -1,7 +1,7 @@
 {
   "phase": "5b",
-  "wave": "5b.1",
-  "completed_waves": ["5b.1"],
+  "wave": "5b.2",
+  "completed_waves": ["5b.1", "5b.2"],
   "status": "in_progress",
-  "last_updated": "2026-03-26T11:50:00+13:00"
+  "last_updated": "2026-03-26T12:15:00+13:00"
 }

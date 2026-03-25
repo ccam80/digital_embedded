@@ -250,14 +250,14 @@
   "hotPaths": [
     {
       "path": "src\\headless\\default-facade.ts",
-      "accessCount": 134,
-      "lastAccessed": 1774479567966,
+      "accessCount": 137,
+      "lastAccessed": 1774480724122,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 73,
-      "lastAccessed": 1774479444454,
+      "accessCount": 74,
+      "lastAccessed": 1774480320014,
       "type": "directory"
     },
     {
@@ -274,14 +274,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 31,
-      "lastAccessed": 1774479365389,
+      "accessCount": 36,
+      "lastAccessed": 1774480636853,
       "type": "file"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 23,
-      "lastAccessed": 1774479365508,
+      "accessCount": 27,
+      "lastAccessed": 1774480636830,
       "type": "file"
     },
     {

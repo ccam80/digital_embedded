@@ -32,8 +32,6 @@ import { ElementRenderer } from '../editor/element-renderer.js';
 import { WireRenderer } from '../editor/wire-renderer.js';
 import { GridRenderer } from '../editor/grid.js';
 import { UndoRedoStack } from '../editor/undo-redo.js';
-import { SpeedControl } from '../integration/speed-control.js';
-import { AnalogRateController } from '../integration/analog-rate-controller.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { LockedModeGuard } from '../editor/locked-mode.js';
 import { ColorSchemeManager, buildColorMap } from '../editor/color-scheme.js';
@@ -62,11 +60,9 @@ import { EngineState } from '../core/engine-interface.js';
 import { BitVector } from '../core/signal.js';
 import { PropertyBag } from '../core/properties.js';
 import { pinWorldPosition } from '../core/pin.js';
-import type { Diagnostic } from '../headless/netlist-types.js';
 import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
-import type { ConcreteCompiledCircuit } from '../solver/digital/digital-engine.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import { TimingDiagramPanel } from '../runtime/timing-diagram.js';
@@ -76,9 +72,7 @@ import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
 import { SliderPanel } from '../editor/slider-panel.js';
 import { SliderEngineBridge } from '../editor/slider-engine-bridge.js';
-import { PropertyType } from '../core/properties.js';
 import { AnalogScopePanel } from '../runtime/analog-scope-panel.js';
-import type { ConcreteCompiledAnalogCircuit } from '../solver/analog/compiled-analog-circuit.js';
 import type { AcParams } from '../solver/analog/ac-analysis.js';
 import { BodePlotRenderer } from '../runtime/bode-plot.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
@@ -212,11 +206,7 @@ export function initApp(search?: string): void {
   const undoStack = new UndoRedoStack();
   const lockedModeGuard = new LockedModeGuard();
   const colorSchemeManager = new ColorSchemeManager(useDark ? 'default' : 'light');
-  const speedControl = new SpeedControl();
   const contextMenu = new ContextMenu(document.body);
-
-  /** Analog simulation rate in sim-seconds per wall-second.  Default 1e-3. */
-  let analogTargetRate = 1e-3;
 
   /**
    * World-space positions of diagnostic errors/warnings to highlight on the
@@ -279,15 +269,6 @@ export function initApp(search?: string): void {
         }
       }
     }
-  }
-
-  function formatDiagnostics(diagnostics: Diagnostic[]): string {
-    if (diagnostics.length === 0) return '';
-    const first = diagnostics[0]!;
-    const base = diagnostics.length === 1
-      ? first.message
-      : `${diagnostics.length} errors: ${first.message}`;
-    return first.fix ? `${base} (fix: ${first.fix})` : base;
   }
 
   statusDismiss.addEventListener('click', clearStatus);
@@ -424,28 +405,17 @@ export function initApp(search?: string): void {
       activeSliderPanel.removeUnpinned();
       if (selected.size === 1) {
         const element = selected.values().next().value!;
-        const def = registry.get(element.typeId);
-        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
-        if (def?.propertyDefs && analogCompiled) {
-          // Find the element index in the compiled circuit
-          let elementIndex = -1;
-          for (const [idx, ce] of analogCompiled.elementToCircuitElement) {
-            if (ce === element) { elementIndex = idx; break; }
-          }
-          if (elementIndex >= 0) {
-            for (const propDef of def.propertyDefs) {
-              if (propDef.type === PropertyType.FLOAT) {
-                const currentVal = element.getProperties().getOrDefault<number>(propDef.key, propDef.defaultValue as number);
-                const unit = PROPERTY_UNIT_MAP[propDef.key] ?? '';
-                activeSliderPanel.addSlider(
-                  elementIndex,
-                  propDef.key,
-                  propDef.label,
-                  currentVal,
-                  { unit, logScale: true },
-                );
-              }
-            }
+        const sliderCoordinator = facade.getCoordinator();
+        if (sliderCoordinator) {
+          const sliderProps = sliderCoordinator.getSliderProperties(element);
+          for (const sp of sliderProps) {
+            activeSliderPanel.addSlider(
+              sp.elementIndex,
+              sp.key,
+              sp.label,
+              sp.currentValue,
+              { unit: sp.unit, logScale: sp.logScale },
+            );
           }
         }
       }
@@ -460,9 +430,10 @@ export function initApp(search?: string): void {
   const binding = createEditorBinding();
   let compiledDirty = true;
 
-  /** True when a simulation (digital or analog) is active. */
+  /** True when a simulation is active (any circuit type). */
   function isSimActive(): boolean {
-    return binding.isBound || ((facade.getCoordinator()?.analogBackend ?? null) !== null);
+    const coordinator = facade.getCoordinator();
+    return coordinator !== null && coordinator.getState() === EngineState.RUNNING;
   }
 
   /**
@@ -510,7 +481,7 @@ export function initApp(search?: string): void {
 
   /** Dispose the analog engine and clear analog state. */
   function disposeAnalog(): void {
-    stopAnalogRenderLoop();
+    _deactivateAnalogVisualization();
     facade.invalidate();
   }
 
@@ -519,9 +490,6 @@ export function initApp(search?: string): void {
   function compileAndBind(): boolean {
     // Clear previous diagnostic overlays — each compile attempt starts fresh.
     diagnosticOverlays = [];
-
-    // Determine effective engine mode for UI branching
-    let isAnalog = isAnalogMode();
 
     // Merge any collinear/duplicate wire segments before compiling.
     // This eliminates redundant wires that create cycles in the wire graph,
@@ -534,106 +502,86 @@ export function initApp(search?: string): void {
     }
     disposeAnalog();
 
-    if (isAnalog) {
-      try {
-        const engine = facade.compile(circuit);
-        const ac = facade.getCoordinator()?.compiled.analog ?? null;
+    try {
+      facade.compile(circuit);
+      const coordinator = facade.getCoordinator()!;
+      const unified = coordinator.compiled;
 
-        if (ac) {
-          const concreteAc = ac as unknown as ConcreteCompiledAnalogCircuit;
-          const compileErrors = concreteAc.diagnostics.filter(d => d.severity === 'error');
-          if (compileErrors.length > 0) {
-            const friendlyMessages = compileErrors.map(d => d.summary);
-            const combined = friendlyMessages.join(' | ');
-            console.error('Analog compilation diagnostics:', compileErrors);
-            showStatus(`Analog circuit problem: ${combined}`, true);
-            populateDiagnosticOverlays(concreteAc.diagnostics, concreteAc.wireToNodeId);
-            scheduleRender();
-            facade.invalidate();
-            return false;
+      // Check diagnostics from the unified compilation result.
+      const compileErrors = unified.diagnostics.filter(d => d.severity === 'error');
+      if (compileErrors.length > 0) {
+        const friendlyMessages = compileErrors.map(d => d.message);
+        const combined = friendlyMessages.join(' | ');
+        console.error('Compilation diagnostics:', compileErrors);
+        showStatus(`Circuit problem: ${combined}`, true);
+        // Populate analog-domain overlays only when a resolver context is available.
+        const resolverCtx = coordinator.getCurrentResolverContext();
+        if (resolverCtx !== null) {
+          const wireToNodeId = new Map<Wire, number>();
+          for (const [wire, addr] of unified.wireSignalMap) {
+            if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
           }
-
-          const compileWarnings = concreteAc.diagnostics.filter(d => d.severity === 'warning');
-          if (compileWarnings.length > 0) {
-            console.warn('Analog compilation warnings:', compileWarnings.map(d => d.summary));
-            // Show warning overlays even on successful compile
-            populateDiagnosticOverlays(compileWarnings, concreteAc.wireToNodeId);
-            scheduleRender();
-          }
+          populateDiagnosticOverlays(
+            compileErrors as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
+            wireToNodeId,
+          );
         }
-
-        const dcResult = facade.getDcOpResult();
-        if (dcResult && !dcResult.converged) {
-          showStatus('Warning: DC operating point did not converge', true);
-        }
-
-        compiledDirty = false;
-        clearStatus();
-
-        if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
-          const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-          if (analogCompiled) {
-            for (const sig of watchedSignals) {
-              const nodeId = analogCompiled.labelToNodeId.get(sig.name);
-              if (nodeId !== undefined) {
-                sig.netId = nodeId;
-                sig.width = 1;
-              }
-            }
-          }
-          rebuildViewers();
-        }
-
-        void engine;
-        return true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('Analog compilation failed:', msg, err);
-        const friendly = _friendlyAnalogError(msg, circuit);
-        showStatus(`Analog compilation error: ${friendly}`, true);
+        scheduleRender();
         facade.invalidate();
         return false;
       }
-    }
 
-    // Pre-compilation diagnostics (digital only)
-    const diagnostics = facade.validate(circuit);
-    const errors = diagnostics.filter(d => d.severity === 'error');
-    if (errors.length > 0) {
-      const msg = formatDiagnostics(errors);
-      console.error('Pre-compilation diagnostics:', msg);
-      showStatus(`Compilation error: ${msg}`, true);
-      return false;
-    }
-
-    try {
-      facade.compile(circuit);
-      const compiled = facade.getCompiled();
-      if (compiled) {
-        const coordinator = facade.getCoordinator()!;
-        const unified = coordinator.compiled;
-        binding.bind(circuit, coordinator, unified.wireSignalMap, unified.labelSignalMap);
+      const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
+      if (compileWarnings.length > 0) {
+        console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
+        const resolverCtx = coordinator.getCurrentResolverContext();
+        if (resolverCtx !== null) {
+          const wireToNodeId = new Map<Wire, number>();
+          for (const [wire, addr] of unified.wireSignalMap) {
+            if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
+          }
+          populateDiagnosticOverlays(
+            compileWarnings as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
+            wireToNodeId,
+          );
+        }
+        scheduleRender();
       }
+
+      // Bind the editor to the coordinator using unified signal maps.
+      binding.bind(circuit, coordinator, unified.wireSignalMap, unified.labelSignalMap);
+
+      const dcResult = facade.getDcOpResult();
+      if (dcResult && !dcResult.converged) {
+        showStatus('Warning: DC operating point did not converge', true);
+      }
+
       compiledDirty = false;
       clearStatus();
+
       if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
-        const compiledCircuit = facade.getCompiled();
-        if (compiledCircuit) {
-          for (const sig of watchedSignals) {
-            const newNetId = compiledCircuit.labelToNetId.get(sig.name);
-            if (newNetId !== undefined) {
-              sig.netId = newNetId;
-              sig.width = compiledCircuit.netWidths[newNetId] ?? 1;
+        for (const sig of watchedSignals) {
+          const addr = unified.labelSignalMap.get(sig.name);
+          if (addr !== undefined) {
+            if (addr.domain === 'digital') {
+              sig.netId = addr.netId;
+              sig.width = addr.bitWidth;
+            } else {
+              sig.netId = addr.nodeId;
+              sig.width = 1;
             }
           }
         }
         rebuildViewers();
       }
+
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('Compilation failed:', msg);
-      showStatus(`Compilation error: ${msg}`, true);
+      console.error('Compilation failed:', msg, err);
+      const friendly = _friendlyAnalogError(msg, circuit);
+      showStatus(`Compilation error: ${friendly}`, true);
+      facade.invalidate();
       return false;
     }
   }
@@ -660,7 +608,7 @@ export function initApp(search?: string): void {
         if (sv.type === "analog") {
           return { voltage: sv.voltage };
         }
-        return { raw: sv.value, width: addr.bitWidth };
+        return { raw: sv.value, width: addr.domain === 'digital' ? addr.bitWidth : 1 };
       } catch {
         return undefined;
       }
@@ -1000,8 +948,8 @@ export function initApp(search?: string): void {
 
     // During simulation, only allow toggling interactive components (In, Clock, etc.)
     if (isSimActive()) {
-      if (facade.getCoordinator()?.analogBackend !== null) {
-        // During analog simulation, allow element selection (for slider panel)
+      if (facade.getCoordinator()?.timingModel !== 'discrete') {
+        // During analog/mixed simulation, allow element selection (for slider panel)
         const elementHit = hitTestElements(worldPt, circuit.elements, hitMargin);
         if (elementHit) {
           selection.clear();
@@ -1541,7 +1489,7 @@ export function initApp(search?: string): void {
       }
     }
     tempPanel.onPropertyChange(() => {
-      if (isAnalogMode() && isSimActive()) {
+      if (facade.getCoordinator()?.timingModel !== 'discrete' && isSimActive()) {
         // Seamlessly recompile — don't hard-stop the analog simulation
         compiledDirty = true;
         if (compileAndBind()) {
@@ -1648,13 +1596,9 @@ export function initApp(search?: string): void {
     if (e.key === ' ') {
       e.preventDefault();
       if (isSimActive()) {
-        if (facade.getCoordinator()?.analogBackend !== null) {
-          disposeAnalog();
-        } else {
-          stopSimulation();
-          binding.unbind();
-          facade.getEngine()?.dispose?.();
-        }
+        stopSimulation();
+        binding.unbind();
+        facade.invalidate();
         compiledDirty = true;
         scheduleRender();
       } else {
@@ -1855,59 +1799,26 @@ export function initApp(search?: string): void {
   const speedInput = document.getElementById('speed-input') as HTMLInputElement | null;
   const speedUnitEl = document.querySelector('.speed-unit') as HTMLElement | null;
 
-  function isAnalogMode(): boolean {
-    return (facade.getCoordinator()?.analogBackend ?? null) !== null;
-  }
-
-  /**
-   * Format analog rate for display.  Uses SI-prefix style:
-   *   0.000001 → "1e-6",  0.001 → "1e-3",  0.1 → "0.1",  1 → "1",  10 → "10"
-   */
-  function formatAnalogRate(rate: number): string {
-    if (rate >= 0.1) return String(parseFloat(rate.toPrecision(4)));
-    return rate.toExponential().replace(/\.?0+e/, 'e').replace('e+', 'e');
-  }
-
   function updateSpeedDisplay(): void {
-    if (!speedInput) return;
-    if (isAnalogMode()) {
-      speedInput.value = formatAnalogRate(analogTargetRate);
-      if (speedUnitEl) speedUnitEl.textContent = 'sim/real s';
-      speedInput.title = 'Simulation seconds per real second';
-    } else {
-      speedInput.value = String(speedControl.speed);
-      if (speedUnitEl) speedUnitEl.textContent = 'steps/s';
-      speedInput.title = 'Steps per second';
-    }
+    const coordinator = facade.getCoordinator();
+    if (!coordinator || !speedInput) return;
+    const fmt = coordinator.formatSpeed();
+    speedInput.value = fmt.value;
+    if (speedUnitEl) speedUnitEl.textContent = fmt.unit;
   }
 
   document.getElementById('btn-speed-down')?.addEventListener('click', () => {
-    if (isAnalogMode()) {
-      analogTargetRate = Math.max(1e-15, analogTargetRate / 10);
-    } else {
-      speedControl.divideBy10();
-    }
+    facade.getCoordinator()?.adjustSpeed(0.1);
     updateSpeedDisplay();
   });
 
   document.getElementById('btn-speed-up')?.addEventListener('click', () => {
-    if (isAnalogMode()) {
-      analogTargetRate = Math.min(1e6, analogTargetRate * 10);
-    } else {
-      speedControl.multiplyBy10();
-    }
+    facade.getCoordinator()?.adjustSpeed(10);
     updateSpeedDisplay();
   });
 
   speedInput?.addEventListener('change', () => {
-    if (isAnalogMode()) {
-      const parsed = Number(speedInput.value);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        analogTargetRate = Math.max(1e-15, Math.min(1e6, parsed));
-      }
-    } else {
-      speedControl.parseText(speedInput.value);
-    }
+    facade.getCoordinator()?.parseSpeed(speedInput.value);
     updateSpeedDisplay();
   });
 
@@ -1917,229 +1828,130 @@ export function initApp(search?: string): void {
 
   let runRafHandle = -1;
 
-  // Analog-specific render loop state
-  let analogRafHandle = -1;
   let currentFlowAnimator: CurrentFlowAnimator | null = null;
+  let _wireCurrentResolver: WireCurrentResolver | null = null;
   const analogVoltageTracker = new VoltageRangeTracker();
   let activeSliderPanel: SliderPanel | null = null;
 
-  /** Property key → SI unit for slider display. */
-  const PROPERTY_UNIT_MAP: Record<string, string> = {
-    resistance: '\u03A9',
-    capacitance: 'F',
-    inductance: 'H',
-    voltage: 'V',
-    current: 'A',
-    frequency: 'Hz',
-  };
-
-  /**
-   * Unified entry point: starts the simulation render loop for any circuit
-   * type (digital-only, analog-only, or mixed). Internally dispatches to
-   * the appropriate timing model (speed-control for digital, rate-controller
-   * for analog) while always stepping through the coordinator.
-   */
   function startSimulation(): void {
     const coordinator = facade.getCoordinator();
     if (!coordinator) return;
+    if (coordinator.getState() === EngineState.RUNNING) return;
 
-    const analogEngine = coordinator.analogBackend;
-    const analogCompiled = coordinator.compiled.analog ?? null;
+    selection.clear();
+    coordinator.start();
 
-    if (analogEngine !== null && analogCompiled !== null) {
-      // --- Analog / mixed path ---
-      if (analogRafHandle !== -1) return;
-      coordinator.start();
-      _startAnalogLoop(coordinator, analogEngine, analogCompiled);
-    } else {
-      // --- Digital-only path ---
-      if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) return;
-      selection.clear();
-      coordinator.start();
-      _startDigitalLoop(coordinator);
+    if (coordinator.timingModel !== 'discrete') {
+      _activateAnalogVisualization(coordinator);
     }
+
+    _startRenderLoop(coordinator);
   }
 
-  /** Digital-only render loop: steps coordinator at speed-control rate. */
-  function _startDigitalLoop(coordinator: import('../compile/coordinator-types.js').SimulationCoordinator): void {
+  function _startRenderLoop(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator): void {
     let lastTime = performance.now();
 
     const tick = (now: number): void => {
-      if (coordinator.digitalBackend?.getState?.() !== EngineState.RUNNING) {
+      if (coordinator.getState() !== EngineState.RUNNING) {
         runRafHandle = -1;
         scheduleRender();
         return;
       }
-      const dt = (now - lastTime) / 1000;
+
+      const wallDt = (now - lastTime) / 1000;
       lastTime = now;
-      const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
-      for (let i = 0; i < stepsThisFrame; i++) {
-        try {
+      const frame = coordinator.computeFrameSteps(wallDt);
+
+      try {
+        if (frame.simTimeGoal !== null) {
+          const stepStart = performance.now();
           facade.step(coordinator);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          showStatus(`Simulation error: ${msg}`, true);
-          stopSimulation();
-          return;
+          while (coordinator.simTime! < frame.simTimeGoal) {
+            if (performance.now() - stepStart > frame.budgetMs) break;
+            facade.step(coordinator);
+            if (coordinator.getState() === EngineState.ERROR) {
+              showStatus('Simulation error: solver failed to converge', true);
+              stopSimulation();
+              return;
+            }
+          }
+        } else {
+          for (let i = 0; i < frame.steps; i++) {
+            facade.step(coordinator);
+          }
         }
+      } catch (err) {
+        showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
+        stopSimulation();
+        return;
       }
+
+      if (coordinator.timingModel !== 'discrete') {
+        _updateAnalogVisualization(coordinator, wallDt);
+      }
+
       scheduleRender();
       runRafHandle = requestAnimationFrame(tick);
     };
     runRafHandle = requestAnimationFrame(tick);
   }
 
-  /** Analog / mixed render loop: steps coordinator at analog rate, animates current-flow. */
-  function _startAnalogLoop(
-    coordinator: import('../compile/coordinator-types.js').SimulationCoordinator,
-    analogEngine: import('../core/analog-engine-interface.js').AnalogEngine,
-    analogCompiled: import('../core/analog-engine-interface.js').CompiledAnalogCircuit,
-  ): void {
+  function _activateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator): void {
     analogVoltageTracker.reset();
-    const resolver = new WireCurrentResolver();
-    currentFlowAnimator = new CurrentFlowAnimator(resolver);
+    _wireCurrentResolver = new WireCurrentResolver();
+    currentFlowAnimator = new CurrentFlowAnimator(_wireCurrentResolver);
     currentFlowAnimator.setEnabled(true);
     applyCurrentVizSettings(loadEngineSettings());
     wireRenderer.setVoltageTracker(analogVoltageTracker);
 
-    // Build pin-voltage factory for element renderer.
-    // Build a position→nodeId lookup from the unified wireSignalMap so that
-    // ALL elements (including infrastructure like Tunnel) can show voltage.
-    const posToAnalogNodeId = new Map<string, number>();
-    for (const [wire, addr] of coordinator.compiled.wireSignalMap) {
-      if (addr.domain !== "analog") continue;
-      posToAnalogNodeId.set(`${wire.start.x},${wire.start.y}`, addr.nodeId);
-      posToAnalogNodeId.set(`${wire.end.x},${wire.end.y}`, addr.nodeId);
-    }
     elementRenderer.setAnalogContext((element) => {
-      const pinLabelToNodeId = new Map<string, number>();
-      for (const pin of element.getPins()) {
-        const wp = pinWorldPosition(element, pin);
-        const nodeId = posToAnalogNodeId.get(`${wp.x},${wp.y}`);
-        if (nodeId !== undefined) {
-          pinLabelToNodeId.set(pin.label, nodeId);
-        }
-      }
-      if (pinLabelToNodeId.size === 0) return undefined;
+      const pinVoltages = coordinator.getPinVoltages(element);
+      if (!pinVoltages) return undefined;
       const tracker = analogVoltageTracker;
       const scheme = colorSchemeManager.getActive();
       return {
-        getPinVoltage(pinLabel: string): number | undefined {
-          const nodeId = pinLabelToNodeId.get(pinLabel);
-          if (nodeId === undefined) return undefined;
-          try {
-            return analogEngine.getNodeVoltage(nodeId);
-          } catch {
-            return undefined;
-          }
-        },
-        voltageColor(voltage: number): string {
-          return voltageToColor(voltage, tracker, scheme);
-        },
+        getPinVoltage: (pinLabel: string) => pinVoltages.get(pinLabel),
+        voltageColor: (voltage: number) => voltageToColor(voltage, tracker, scheme),
       };
     });
 
-    // --- Slider panel setup ---
     const sliderContainer = document.getElementById('slider-panel');
     if (sliderContainer) {
       sliderContainer.style.display = '';
       activeSliderPanel = new SliderPanel(sliderContainer);
-      new SliderEngineBridge(activeSliderPanel, analogEngine, analogCompiled);
+      new SliderEngineBridge(activeSliderPanel, coordinator);
     }
+  }
 
-    // Rate controller: paces the analog engine at analogTargetRate sim-s / wall-s.
-    const analogRate = new AnalogRateController({ targetRate: analogTargetRate });
-    let lastAnalogRate = analogTargetRate;
-
-    // Show analog units on the speed display now that we're in analog mode.
-    updateSpeedDisplay();
-
-    let lastTime = performance.now();
-
-    const tick = (now: number): void => {
-      const wallDtSeconds = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // Sync rate from UI; reset miss tracking on change.
-      if (analogTargetRate !== lastAnalogRate) {
-        analogRate.targetRate = analogTargetRate;
-        analogRate.reset();
-        lastAnalogRate = analogTargetRate;
-        clearStatus();
-      }
-
-      const { targetSimAdvance, budgetMs } = analogRate.computeFrameTarget(wallDtSeconds);
-      const simTimeGoal = analogEngine.simTime + targetSimAdvance;
-      const stepStart = performance.now();
-      let missed = false;
-
-      try {
-        // Always do at least one step per frame so the sim never stalls.
-        coordinator.step();
-        if (analogEngine.getState() === EngineState.ERROR) {
-          showStatus('Analog simulation error: solver failed to converge', true);
-          disposeAnalog();
-          compiledDirty = true;
-          scheduleRender();
-          return;
-        }
-        while (analogEngine.simTime < simTimeGoal) {
-          if (performance.now() - stepStart > budgetMs) {
-            missed = true;
-            break;
-          }
-          coordinator.step();
-          if (analogEngine.getState() === EngineState.ERROR) {
-            showStatus('Analog simulation error: solver failed to converge', true);
-            disposeAnalog();
-            compiledDirty = true;
-            scheduleRender();
-            return;
-          }
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showStatus(`Analog simulation error: ${msg}`, true);
-        disposeAnalog();
-        compiledDirty = true;
-        scheduleRender();
-        return;
-      }
-
-      // Track frame misses and show/clear warning.
-      const result = analogRate.recordFrame(now, missed);
-      if (result.warningChanged) {
-        if (result.warningActive) {
-          showStatus(
-            'Simulation is running slower than the designated speed — ' +
-            'this circuit is too complex to compute that fast',
-            true,
-          );
-        } else {
-          clearStatus();
-        }
-      }
-
+  function _updateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator, wallDt: number): void {
+    if (currentFlowAnimator && _wireCurrentResolver) {
       const resolverCtx = coordinator.getCurrentResolverContext();
-      if (resolverCtx) resolver.resolve(resolverCtx);
-      currentFlowAnimator!.update(wallDtSeconds, circuit);
-      analogVoltageTracker.update(analogEngine, analogCompiled.nodeCount);
+      if (resolverCtx) _wireCurrentResolver.resolve(resolverCtx);
+      currentFlowAnimator.update(wallDt, circuit);
+    }
+    coordinator.updateVoltageTracking();
+  }
 
-      scheduleRender();
-      analogRafHandle = requestAnimationFrame(tick);
-    };
-    analogRafHandle = requestAnimationFrame(tick);
+  function _deactivateAnalogVisualization(): void {
+    if (currentFlowAnimator) {
+      currentFlowAnimator.setEnabled(false);
+      currentFlowAnimator = null;
+    }
+    _wireCurrentResolver = null;
+    wireRenderer.setVoltageTracker(null);
+    elementRenderer.setAnalogContext(null);
+    if (activeSliderPanel) {
+      activeSliderPanel.dispose();
+      activeSliderPanel = null;
+    }
+    const sliderContainer = document.getElementById('slider-panel');
+    if (sliderContainer) sliderContainer.style.display = 'none';
   }
 
   function stopSimulation(): void {
-    // Stop whichever loop is active
     if (runRafHandle !== -1) {
       cancelAnimationFrame(runRafHandle);
       runRafHandle = -1;
-    }
-    if (analogRafHandle !== -1) {
-      cancelAnimationFrame(analogRafHandle);
-      analogRafHandle = -1;
     }
     const coordinator = facade.getCoordinator();
     if (coordinator) {
@@ -2150,28 +1962,6 @@ export function initApp(search?: string): void {
     scheduleRender();
   }
 
-  function stopAnalogRenderLoop(): void {
-    if (analogRafHandle !== -1) {
-      cancelAnimationFrame(analogRafHandle);
-      analogRafHandle = -1;
-    }
-    if (currentFlowAnimator !== null) {
-      currentFlowAnimator.setEnabled(false);
-      currentFlowAnimator = null;
-    }
-    wireRenderer.setVoltageTracker(null);
-    elementRenderer.setAnalogContext(null);
-    // --- Slider panel teardown ---
-    if (activeSliderPanel) {
-      activeSliderPanel.dispose();
-      activeSliderPanel = null;
-    }
-    const sliderContainer = document.getElementById('slider-panel');
-    if (sliderContainer) sliderContainer.style.display = 'none';
-    // Restore digital speed display units.
-    updateSpeedDisplay();
-  }
-
   // -------------------------------------------------------------------------
   // Toolbar: Step / Run / Stop
   // -------------------------------------------------------------------------
@@ -2180,8 +1970,7 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
     if (!coordinator) return;
-    // Stop continuous run if active, then do a single step
-    if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) coordinator.stop();
+    if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
     try {
       facade.step(coordinator);
       clearStatus();
@@ -2199,13 +1988,9 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
     if (!isSimActive()) return;
-    if (facade.getCoordinator()?.analogBackend !== null) {
-      disposeAnalog();
-    } else {
-      stopSimulation();
-      binding.unbind();
-      facade.getEngine()?.dispose?.();
-    }
+    stopSimulation();
+    binding.unbind();
+    facade.invalidate();
     compiledDirty = true;
     scheduleRender();
   });
@@ -2214,18 +1999,13 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
     if (!coordinator) return;
-    if (coordinator.analogBackend !== null) {
-      // Analog/mixed: micro-step is equivalent to a single coordinator step
-      try { facade.step(coordinator); clearStatus(); } catch (err) {
+    if (coordinator.supportsMicroStep()) {
+      if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
+      try { coordinator.microStep(); clearStatus(); } catch (err) {
         showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
       }
     } else {
-      // Digital-only: use microStep on the digital backend
-      if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) coordinator.stop();
-      try {
-        coordinator.digitalBackend?.microStep();
-        clearStatus();
-      } catch (err) {
+      try { facade.step(coordinator); clearStatus(); } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         showStatus(`Simulation error: ${msg}`, true);
       }
@@ -2236,14 +2016,13 @@ export function initApp(search?: string): void {
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
-    if (!coordinator) return;
-    if (coordinator.analogBackend !== null) {
-      showStatus('Run-to-break is not available for analog circuits');
+    if (!coordinator?.supportsRunToBreak()) {
+      showStatus('Run-to-break is not available for this circuit type');
       return;
     }
-    if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) return;
+    if (coordinator.getState() === EngineState.RUNNING) return;
     try {
-      coordinator.digitalBackend?.runToBreak();
+      coordinator.runToBreak();
       clearStatus();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -2295,48 +2074,6 @@ export function initApp(search?: string): void {
   }
   const scopePanels: ScopePanelEntry[] = [];
 
-  /** Build a human-readable name for a net ID from the pinNetMap. */
-  function netIdToName(cc: ConcreteCompiledCircuit, netId: number): string {
-    // Try labelToNetId first (In/Out/Probe labels)
-    for (const [label, nid] of cc.labelToNetId) {
-      if (nid === netId) return label;
-    }
-    // Fall back to pinNetMap — find instanceId:pin, resolve component label
-    for (const [pinKey, nid] of cc.pinNetMap) {
-      if (nid === netId) {
-        const [instId, pinLabel] = pinKey.split(':');
-        // Try to find a label for this component
-        for (const [, el] of cc.componentToElement) {
-          if (el.instanceId === instId) {
-            const elLabel = el.getProperties().getOrDefault<string>('label', '');
-            const compName = elLabel || el.typeId;
-            return `${compName}:${pinLabel}`;
-          }
-        }
-        return pinKey;
-      }
-    }
-    return `net${netId}`;
-  }
-
-  /** Determine signal group from its source element type. */
-  function netIdToGroup(cc: ConcreteCompiledCircuit, netId: number): 'input' | 'output' | 'probe' {
-    for (const [pinKey, nid] of cc.pinNetMap) {
-      if (nid === netId) {
-        const instId = pinKey.split(':')[0];
-        for (const [, el] of cc.componentToElement) {
-          if (el.instanceId === instId) {
-            if (el.typeId === 'In' || el.typeId === 'Clock') return 'input';
-            if (el.typeId === 'Out') return 'output';
-            if (el.typeId === 'Probe') return 'probe';
-            return 'probe';
-          }
-        }
-      }
-    }
-    return 'probe';
-  }
-
   /** Tear down any active viewer panels and unregister observers. */
   function disposeViewers(): void {
     const eng = facade.getEngine();
@@ -2371,17 +2108,14 @@ export function initApp(search?: string): void {
   /** Rebuild viewer panels from the current watchedSignals list. */
   function rebuildViewers(): void {
     disposeViewers();
-    const compiled = facade.getCompiled();
-    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-    if ((!compiled && !analogCompiled) || watchedSignals.length === 0) return;
+    const coordinator = facade.getCoordinator();
+    if (!coordinator || watchedSignals.length === 0) return;
 
-    const eng = facade.getEngine();
-    const ae = analogCompiled !== null ? eng : null;
-    const isAnalog = isAnalogMode() && ae !== null;
+    const isAnalog = coordinator.timingModel !== 'discrete';
 
     if (viewerTimingContainer) {
-      if (isAnalog && ae) {
-        // Group signals by panelIndex
+      if (isAnalog) {
+        // Group signals by panelIndex for multi-panel scope view
         const panelGroups = new Map<number, WatchedSignal[]>();
         for (const s of watchedSignals) {
           const idx = s.panelIndex ?? 0;
@@ -2397,33 +2131,41 @@ export function initApp(search?: string): void {
           viewerTimingContainer.appendChild(cvs);
           // Size after DOM insertion so clientWidth/Height are available
           requestAnimationFrame(() => sizeCanvasInContainer(cvs));
-          const panel = new AnalogScopePanel(cvs, ae as unknown as import('../core/analog-engine-interface.js').AnalogEngine);
+          const panel = new AnalogScopePanel(cvs, coordinator);
           for (const s of signals) {
-            panel.addVoltageChannel(s.netId, s.name);
+            panel.addVoltageChannel(
+              { domain: 'analog' as const, nodeId: s.netId },
+              s.name,
+            );
           }
           _attachScopeContextMenu(cvs, panel, signals);
           scopePanels.push({ canvas: cvs, panel });
         }
-      } else if (eng) {
+      } else {
         const cvs = document.createElement('canvas');
         viewerTimingContainer.appendChild(cvs);
         requestAnimationFrame(() => sizeCanvasInContainer(cvs));
-        const channels = watchedSignals.map(s => ({ name: s.name, netId: s.netId, width: s.width }));
-        activeTimingPanel = new TimingDiagramPanel(cvs, eng, channels, {
+        const channels = watchedSignals.map(s => ({
+          name: s.name,
+          addr: coordinator.compiled.labelSignalMap.get(s.name)
+            ?? { domain: 'digital' as const, netId: s.netId, bitWidth: s.width },
+          width: s.width,
+        }));
+        activeTimingPanel = new TimingDiagramPanel(cvs, coordinator, channels, {
           snapshotInterval: 0,
-          stepsPerSecond: speedControl.speed,
+          stepsPerSecond: coordinator.speed,
         });
-        (eng as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeTimingPanel);
+        coordinator.addMeasurementObserver(activeTimingPanel);
       }
     }
 
-    const coordinator = facade.getCoordinator();
-    if (viewerValuesContainer && coordinator) {
+    if (viewerValuesContainer) {
       const signals: SignalDescriptor[] = watchedSignals.map(s => ({
         name: s.name,
         addr: isAnalog
           ? { domain: 'analog' as const, nodeId: s.netId }
-          : { domain: 'digital' as const, netId: s.netId, bitWidth: s.width },
+          : (coordinator.compiled.labelSignalMap.get(s.name)
+              ?? { domain: 'digital' as const, netId: s.netId, bitWidth: s.width }),
         width: s.width,
         group: s.group,
       }));
@@ -2455,33 +2197,32 @@ export function initApp(search?: string): void {
 
   /** Add a wire's net to the watched signals and rebuild viewers. */
   function addWireToViewer(wire: Wire, panelIndex?: number): void {
-    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-    if (analogCompiled) {
-      const nodeId = analogCompiled.wireToNodeId.get(wire);
-      if (nodeId === undefined) return;
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+    const addr = coordinator.compiled.wireSignalMap.get(wire);
+    if (addr === undefined) return;
+
+    if (addr.domain === 'analog') {
+      const nodeId = addr.nodeId;
       if (watchedSignals.some(s => s.netId === nodeId)) return;
       let name = `node${nodeId}`;
-      for (const [label, nid] of analogCompiled.labelToNodeId) {
-        if (nid === nodeId) { name = label; break; }
+      for (const [label, a] of coordinator.compiled.labelSignalMap) {
+        if (a.domain === 'analog' && a.nodeId === nodeId) { name = label; break; }
       }
       const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
       watchedSignals.push({ name, netId: nodeId, width: 1, group: 'probe', panelIndex: idx });
-      viewerPanel?.classList.add('open');
-      showViewerTab('timing');
-      rebuildViewers();
-      return;
+    } else {
+      const netId = addr.netId;
+      if (watchedSignals.some(s => s.netId === netId)) return;
+      let name = `net${netId}`;
+      let width = addr.bitWidth;
+      let group: SignalGroup = 'probe';
+      for (const [label, a] of coordinator.compiled.labelSignalMap) {
+        if (a.domain === 'digital' && a.netId === netId) { name = label; break; }
+      }
+      const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
+      watchedSignals.push({ name, netId, width, group, panelIndex: idx });
     }
-    const compiled = facade.getCompiled();
-    if (!compiled) return;
-    const netId = compiled.wireToNetId.get(wire);
-    if (netId === undefined) return;
-    if (watchedSignals.some(s => s.netId === netId)) return;
-
-    const name = netIdToName(compiled, netId);
-    const width = compiled.netWidths[netId] ?? 1;
-    const group = netIdToGroup(compiled, netId);
-    const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
-    watchedSignals.push({ name, netId, width, group, panelIndex: idx });
 
     viewerPanel?.classList.add('open');
     showViewerTab('timing');
@@ -2550,8 +2291,8 @@ export function initApp(search?: string): void {
   const bodeRenderer = new BodePlotRenderer();
 
   document.getElementById('btn-ac-sweep')?.addEventListener('click', () => {
-    if (!isAnalogMode()) {
-      showStatus('AC Sweep is only available for analog/auto circuits', true);
+    if (!facade.getCoordinator()?.supportsAcSweep()) {
+      showStatus('AC Sweep requires a circuit with analog components', true);
       return;
     }
     if (acSweepDialog) acSweepDialog.style.display = 'flex';
@@ -2564,8 +2305,9 @@ export function initApp(search?: string): void {
   document.getElementById('ac-sweep-run')?.addEventListener('click', () => {
     if (acSweepDialog) acSweepDialog.style.display = 'none';
 
-    if (!isAnalogMode()) {
-      showStatus('AC Sweep requires an analog circuit', true);
+    const coordinator = facade.getCoordinator();
+    if (!coordinator?.supportsAcSweep()) {
+      showStatus('AC Sweep requires a circuit with analog components', true);
       return;
     }
 
@@ -2589,14 +2331,8 @@ export function initApp(search?: string): void {
 
     const acParams: AcParams = { type: sweepType, numPoints, fStart, fStop, sourceLabel, outputNodes };
 
-    const acEng = facade.getEngine();
-    if (!acEng || facade.getCoordinator()?.analogBackend === null || facade.getCoordinator()?.analogBackend === undefined) {
-      showStatus('AC Sweep: analog engine not initialized — compile the circuit first', true);
-      return;
-    }
-
     try {
-      const result = (acEng as unknown as { acAnalysis(p: AcParams): ReturnType<import('../core/analog-engine-interface.js').AnalogEngine['acAnalysis']> }).acAnalysis(acParams);
+      const result = coordinator.acAnalysis(acParams)!;
 
       if (result.diagnostics.length > 0) {
         const errs = result.diagnostics.filter(d => d.severity === 'error');
@@ -2730,28 +2466,19 @@ export function initApp(search?: string): void {
 
         // "Add Slider" — for components with FLOAT properties during analog sim
         if (activeSliderPanel && isSimActive()) {
-          const def = registry.get(elementHit.typeId);
-          const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
-          if (def?.propertyDefs && ac) {
-            const floatProps = def.propertyDefs.filter(p => p.type === PropertyType.FLOAT);
-            if (floatProps.length > 0) {
-              let elementIndex = -1;
-              for (const [idx, ce] of ac.elementToCircuitElement) {
-                if (ce === elementHit) { elementIndex = idx; break; }
-              }
-              if (elementIndex >= 0) {
-                items.push(separator());
-                for (const propDef of floatProps) {
-                  const currentVal = elementHit.getProperties().getOrDefault<number>(propDef.key, propDef.defaultValue as number);
-                  const unit = PROPERTY_UNIT_MAP[propDef.key] ?? '';
-                  items.push({
-                    label: `Add Slider: ${propDef.label}`,
-                    action: () => {
-                      activeSliderPanel!.addSlider(elementIndex, propDef.key, propDef.label, currentVal, { unit, logScale: true });
-                    },
-                    enabled: true,
-                  });
-                }
+          const sliderCoord = facade.getCoordinator();
+          if (sliderCoord) {
+            const sliderProps = sliderCoord.getSliderProperties(elementHit);
+            if (sliderProps.length > 0) {
+              items.push(separator());
+              for (const sp of sliderProps) {
+                items.push({
+                  label: `Add Slider: ${sp.label}`,
+                  action: () => {
+                    activeSliderPanel!.addSlider(sp.elementIndex, sp.key, sp.label, sp.currentValue, { unit: sp.unit, logScale: sp.logScale });
+                  },
+                  enabled: true,
+                });
               }
             }
           }
@@ -2769,10 +2496,13 @@ export function initApp(search?: string): void {
       }
 
       // "Add to Traces" — per-pin voltage and element current
-      // Available even when sim is stopped (signals are queued for when it starts)
-      if (isAnalogMode()) {
-        const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
-        _appendComponentTraceItems(items, elementHit, ac);
+      // Available when the circuit has analog components (compiled or not yet compiled)
+      if (facade.getCoordinator()?.supportsAcSweep() ?? circuit.elements.some(el => {
+        const def = registry.get(el.typeId);
+        return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
+      })) {
+        const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
+        _appendComponentTraceItems(items, elementHit, resolverCtx);
       }
 
     } else if (wireHit) {
@@ -2789,11 +2519,10 @@ export function initApp(search?: string): void {
 
       // Wire viewer items (add/remove from scope)
       if (isSimActive()) {
-        const compiled = facade.getCompiled();
-        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-        if (compiled || analogCompiled) {
+        const viewCoordinator = facade.getCoordinator();
+        if (viewCoordinator) {
           if (items.length > 0) items.push(separator());
-          _appendWireViewerItems(items, wireHit, compiled, analogCompiled);
+          _appendWireViewerItems(items, wireHit, viewCoordinator);
         }
       }
 
@@ -2834,13 +2563,11 @@ export function initApp(search?: string): void {
       // Speed control
       items.push(
         { label: 'Speed \u00d710', action: () => {
-          if (isAnalogMode()) { analogTargetRate = Math.min(1e6, analogTargetRate * 10); }
-          else { speedControl.multiplyBy10(); }
+          facade.getCoordinator()?.adjustSpeed(10);
           updateSpeedDisplay();
         }, enabled: true },
         { label: 'Speed \u00f710', action: () => {
-          if (isAnalogMode()) { analogTargetRate = Math.max(1e-15, analogTargetRate / 10); }
-          else { speedControl.divideBy10(); }
+          facade.getCoordinator()?.adjustSpeed(0.1);
           updateSpeedDisplay();
         }, enabled: true },
       );
@@ -2852,29 +2579,26 @@ export function initApp(search?: string): void {
   });
 
   // Helper: append wire-viewer items for a wire
-  type ConcreteCompiledCircuitType = NonNullable<ReturnType<typeof facade.getCompiled>>;
-  type AnalogCompiledCircuitType = ConcreteCompiledAnalogCircuit;
-
   function _appendWireViewerItems(
     items: MenuItem[],
     wire: import('../core/circuit.js').Wire,
-    compiled: ConcreteCompiledCircuitType | null,
-    analogCompiled: AnalogCompiledCircuitType | null,
+    coordinator: import('../solver/coordinator-types.js').SimulationCoordinator,
   ): void {
-    let netId: number | undefined;
-    let signalName: string;
+    const addr = coordinator.compiled.wireSignalMap.get(wire);
+    if (addr === undefined) return;
 
-    if (analogCompiled) {
-      netId = analogCompiled.wireToNodeId.get(wire);
-      if (netId === undefined) return;
+    const netId = addr.domain === 'analog' ? addr.nodeId : addr.netId;
+    let signalName: string;
+    if (addr.domain === 'analog') {
       signalName = `node${netId}`;
-      for (const [label, nid] of analogCompiled.labelToNodeId) {
-        if (nid === netId) { signalName = label; break; }
+      for (const [label, a] of coordinator.compiled.labelSignalMap) {
+        if (a.domain === 'analog' && a.nodeId === netId) { signalName = label; break; }
       }
     } else {
-      netId = compiled!.wireToNetId.get(wire);
-      if (netId === undefined) return;
-      signalName = netIdToName(compiled!, netId);
+      signalName = `net${netId}`;
+      for (const [label, a] of coordinator.compiled.labelSignalMap) {
+        if (a.domain === 'digital' && a.netId === netId) { signalName = label; break; }
+      }
     }
 
     const isWatched = watchedSignals.some(s => s.netId === netId);
@@ -2915,20 +2639,19 @@ export function initApp(search?: string): void {
   function _appendComponentTraceItems(
     items: MenuItem[],
     element: import('../core/element.js').CircuitElement,
-    ac: ConcreteCompiledAnalogCircuit | null,
+    resolverCtx: import('../solver/coordinator-types.js').CurrentResolverContext | null,
   ): void {
     const label = _elementLabel(element);
     const pins = element.getPins();
 
-    // If sim is running with compiled analog data, use precise node mapping
-    if (ac) {
+    if (resolverCtx) {
       let elementIndex = -1;
-      for (const [idx, ce] of ac.elementToCircuitElement) {
+      for (const [idx, ce] of resolverCtx.elementToCircuitElement) {
         if (ce === element) { elementIndex = idx; break; }
       }
       if (elementIndex < 0) return;
 
-      const analogEl = ac.elements[elementIndex];
+      const analogEl = resolverCtx.elements[elementIndex];
       if (!analogEl) return;
 
       if (items.length > 0) items.push(separator());
@@ -2940,7 +2663,7 @@ export function initApp(search?: string): void {
         const pinLabel = pin.label;
         const wp = pinWorldPosition(element, pin);
         let nodeId: number | undefined;
-        for (const [wire, nid] of ac.wireToNodeId) {
+        for (const [wire, nid] of resolverCtx.wireToNodeId) {
           if (
             (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
             (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
@@ -2955,10 +2678,13 @@ export function initApp(search?: string): void {
           action: () => {
             const panelIdx = nextPanelIndex();
             if (scopePanels.length > 0) {
-              scopePanels[0].panel.addVoltageChannel(nodeId, `${label}.${pinLabel}`);
+              scopePanels[0].panel.addVoltageChannel(
+                { domain: 'analog' as const, nodeId: nodeId! },
+                `${label}.${pinLabel}`,
+              );
               scopePanels[0].panel.render();
             } else {
-              watchedSignals.push({ name: `${label}.${pinLabel}`, netId: nodeId, width: 1, group: 'probe', panelIndex: panelIdx });
+              watchedSignals.push({ name: `${label}.${pinLabel}`, netId: nodeId!, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
             }
             viewerPanel?.classList.add('open');
@@ -2968,7 +2694,7 @@ export function initApp(search?: string): void {
         });
       }
 
-      // Element current trace (works for all elements via getElementCurrent)
+      // Element current trace
       items.push({
         label: `Trace Current: ${label}`,
         action: () => {
@@ -2976,14 +2702,11 @@ export function initApp(search?: string): void {
             scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
             scopePanels[0].panel.render();
           } else {
-            // Need at least one voltage probe to create a scope panel first
-            // Add a voltage probe for pin 0, then on next rebuild the current will be available
             const panelIdx = nextPanelIndex();
             const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
             if (pinNodeIds.length > 0) {
               watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, netId: pinNodeIds[0]!, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
-              // Now add current to the newly created panel
               if (scopePanels.length > 0) {
                 scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
               }
@@ -2995,13 +2718,9 @@ export function initApp(search?: string): void {
         enabled: true,
       });
     } else {
-      // Sim not compiled yet — offer to queue voltage probes via watchedSignals
-      // These will be wired up when the simulation starts
       if (pins.length === 0) return;
       if (items.length > 0) items.push(separator());
 
-      // For pre-sim, use labelToNodeId which won't be available yet.
-      // Queue signal names — rebuildViewers() will resolve them on sim start.
       items.push({
         label: `Trace Voltages: ${label} (starts on Run)`,
         action: () => {
@@ -3025,8 +2744,12 @@ export function initApp(search?: string): void {
       { label: 'Insert Clock', type: 'Clock' },
     ];
 
-    // In analog mode, swap the quick insert list
-    if (isAnalogMode()) {
+    // When circuit has analog-only components, swap the quick insert list
+    const hasAnalogOnlyComponents = circuit.elements.some(el => {
+      const def = registry.get(el.typeId);
+      return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
+    });
+    if (hasAnalogOnlyComponents) {
       QUICK_INSERT.length = 0;
       QUICK_INSERT.push(
         { label: 'Insert Resistor', type: 'Resistor' },
@@ -3114,17 +2837,17 @@ export function initApp(search?: string): void {
       }
 
       // Add current for elements connected to viewed signals
-      const ac = facade.getCoordinator()?.compiled.analog ?? null as ConcreteCompiledAnalogCircuit | null;
-      if (ac) {
+      const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
+      if (resolverCtx) {
         const currentItems: MenuItem[] = [];
         const seen = new Set<number>();
         for (const sig of signals) {
-          for (let idx = 0; idx < ac.elements.length; idx++) {
+          for (let idx = 0; idx < resolverCtx.elements.length; idx++) {
             if (seen.has(idx)) continue;
-            const analogEl = ac.elements[idx];
+            const analogEl = resolverCtx.elements[idx];
             if (!analogEl.pinNodeIds.includes(sig.netId)) continue;
             seen.add(idx);
-            const ce = ac.elementToCircuitElement.get(idx);
+            const ce = resolverCtx.elementToCircuitElement.get(idx);
             const elLabel = ce ? _elementLabel(ce) : `element${idx}`;
             const alreadyHas = channels.some(c => (c.kind === 'current' || c.kind === 'elementCurrent') && c.label === `${elLabel} I`);
             if (!alreadyHas) {
@@ -3402,7 +3125,12 @@ export function initApp(search?: string): void {
     for (const el of loaded.elements) circuit.addElement(el);
     for (const w of loaded.wires) circuit.addWire(w);
     circuit.metadata = loaded.metadata;
-    palette.setEngineTypeFilter(isAnalogMode() ? 'analog' : null);
+    palette.setEngineTypeFilter(
+      circuit.elements.some(el => {
+        const def = registry.get(el.typeId);
+        return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
+      }) ? 'analog' : null
+    );
     paletteUI.render();
     rebuildInsertMenu();
     updateCircuitModeLabel();

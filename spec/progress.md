@@ -847,3 +847,109 @@ Import `BitsException` from `../../core/errors.js`.
 - **Agent**: implementer
 - **Files modified**: src/app/app-init.ts
 - **Note**: The remaining app-init.ts call site work from P5b-12 was completed during P5b-20 when the app-init.ts lock became available. rebuildViewers() now builds SignalDescriptor with addr (domain + netId/nodeId based on isAnalog flag), creates DataTablePanel with coordinator, and registers as coordinator.addMeasurementObserver.
+
+---
+## Wave 5b.2 Summary
+- **Status**: complete
+- **Tasks completed**: 9/9
+- **Rounds**: 1
+- **Tests**: 7655/7659 passing (+138 new tests vs baseline)
+
+## Task P5b-21: Merge render loops into single _startRenderLoop with computeFrameSteps
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing (4 pre-existing submodule ENOENT failures, unchanged from baseline)
+- **Changes**:
+  - Removed `analogRafHandle` variable; only `runRafHandle` remains
+  - Replaced `_startDigitalLoop()` and `_startAnalogLoop()` with unified `_startRenderLoop(coordinator)` using `coordinator.computeFrameSteps(wallDt)` and `coordinator.getState()`
+  - Updated `startSimulation()` to use `coordinator.getState()` guard and `coordinator.timingModel` check
+  - Updated `stopSimulation()` to only cancel `runRafHandle` (no `analogRafHandle`)
+  - Removed unused `AnalogRateController` import
+
+## Task P5b-26: Visualization: extract activate/update/deactivate using coordinator methods
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing (same run as P5b-21)
+- **Changes**:
+  - Extracted `_activateAnalogVisualization(coordinator)` — uses `coordinator.getPinVoltages()`, `SliderEngineBridge(panel, coordinator)` (2-arg form)
+  - Extracted `_updateAnalogVisualization(coordinator, wallDt)` — uses `coordinator.getCurrentResolverContext()`, `coordinator.updateVoltageTracking()`
+  - Extracted `_deactivateAnalogVisualization()` — replaces `stopAnalogRenderLoop()`
+  - Added `_wireCurrentResolver` outer variable for shared access between activate/update
+  - Updated `disposeAnalog()` to call `_deactivateAnalogVisualization()` instead of `stopAnalogRenderLoop()`
+
+## Task P5b-22: Merge dual compileAndBind paths, eliminate compiled.analog reach-throughs
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing (4 pre-existing ENOENT failures)
+- **Changes**:
+  - Merged dual analog/digital compileAndBind branches into single unified path
+  - Replaced `compiled.analog` reach-throughs with `coordinator.compiled.wireSignalMap` / `coordinator.compiled.labelSignalMap`
+  - `binding.bind()` now uses unified signal maps for both domains
+  - `populateDiagnosticOverlays` called only when `getCurrentResolverContext()` is non-null
+  - Watched signal resolution uses `labelSignalMap` with domain discrimination
+
+## Task P5b-23: Unify button handlers (step/micro-step/run-to-break/stop) with capability queries
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing
+- **Changes**:
+  - btn-step: replaced `coordinator.digitalBackend?.getState?.()` with `coordinator.getState()`
+  - btn-stop: replaced analog/digital branch with single `stopSimulation(); facade.invalidate()`
+  - btn-micro-step: replaced `analogBackend !== null` branch with `coordinator.supportsMicroStep()`, calls `coordinator.microStep()`
+  - btn-run-to-break: replaced `analogBackend !== null` branch with `coordinator?.supportsRunToBreak()`, calls `coordinator.runToBreak()`
+  - isSimActive(): replaced `binding.isBound || analogBackend !== null` with `coordinator.getState() === EngineState.RUNNING`
+  - Spacebar handler: removed analog/digital branching
+
+## Task P5b-24: Speed UI - use coordinator.formatSpeed/adjustSpeed
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing
+- **Changes**:
+  - Removed `SpeedControl` import and `speedControl` variable
+  - Removed `analogTargetRate` variable and `formatAnalogRate()` function
+  - `updateSpeedDisplay()` uses `coordinator.formatSpeed()`
+  - Speed up/down buttons use `coordinator.adjustSpeed(10/0.1)`
+  - Speed input change uses `coordinator.parseSpeed()`
+
+## Task P5b-25: Context menus - replace isAnalogMode with capability queries
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing
+- **Changes**:
+  - Deleted `isAnalogMode()` function entirely
+  - Palette filter uses `circuit.elements.some(el => hasAnalogModel(def) && !hasDigitalModel(def))`
+  - AC sweep guard uses `coordinator.supportsAcSweep()`
+  - AC sweep run uses `coordinator.acAnalysis()` directly
+  - Property change handler uses `coordinator.timingModel !== 'discrete'`
+  - Analog sim click handler uses `coordinator.timingModel !== 'discrete'`
+  - Quick insert list uses `hasAnalogModel`/`hasDigitalModel` check
+  - "Add Slider" context menu uses `coordinator.getSliderProperties()`
+  - "Add to Traces" uses `coordinator.getCurrentResolverContext()`
+  - Slider population in selection uses `coordinator.getSliderProperties()`
+  - Removed unused `PropertyType`, `ConcreteCompiledAnalogCircuit`, `formatDiagnostics`, `PROPERTY_UNIT_MAP`, `netIdToName`, `netIdToGroup`, `ConcreteCompiledCircuit` imports and functions
+
+## Task P5b-27: Wire viewer + rebuildViewers - unify via wireSignalMap/SignalAddress
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/app-init.ts
+- **Tests**: 7655/7659 passing
+- **Changes**:
+  - `rebuildViewers()`: uses `coordinator.compiled.labelSignalMap` for channel construction; `AnalogScopePanel(cvs, coordinator)`; `TimingDiagramPanel(cvs, coordinator, channels)`; no `getCompiled()` or `compiled.analog` 
+  - `addWireToViewer()`: uses `coordinator.compiled.wireSignalMap` to resolve wire → addr, `labelSignalMap` for name lookup
+  - `_appendWireViewerItems()`: refactored to take `SimulationCoordinator` instead of `(compiled, analogCompiled)`, uses `wireSignalMap`/`labelSignalMap`
+  - Wire context menu: uses `viewCoordinator` directly
+  - `_appendComponentTraceItems()`: now accepts `CurrentResolverContext | null` instead of `ConcreteCompiledAnalogCircuit | null`; uses `resolverCtx.wireToNodeId`, `resolverCtx.elements`, `resolverCtx.elementToCircuitElement`
+  - Scope context menu "Add current" uses `getCurrentResolverContext()` instead of `compiled.analog`
