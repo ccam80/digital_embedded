@@ -1,30 +1,30 @@
-# Test Baseline — Phase 3
+# Test Baseline — Phase 4
 
-- **Timestamp**: 2026-03-25T16:04:33Z
-- **Phase**: Phase 3 — Unified netlist extraction and partitioning
+- **Timestamp**: 2026-03-25T23:40:11Z
+- **Phase**: Phase 4 — SimulationCoordinator and analog integration
 - **Command**: `npm test` (Vitest 2.1.9)
-- **Result**: 7405/7409 passing, 4 failing, 0 errors
+- **Result**: 7486/7490 passing, 4 failing, 0 errors
 
 ## Summary
 
-**325 test files passed** with **7405 individual test cases passing**. **4 pre-existing failures** due to missing reference files from git submodule.
+**328 test files passed** with **7486 individual test cases passing**. **4 pre-existing failures** due to missing reference files from git submodule.
 
 ### Test Execution Details
 
-- **Total Test Files**: 327
-- **Passing Test Files**: 325
+- **Total Test Files**: 330
+- **Passing Test Files**: 328
 - **Failing Test Files**: 2
-- **Total Tests**: 7409
-- **Passed**: 7405
+- **Total Tests**: 7490
+- **Passed**: 7486
 - **Failed**: 4
 - **Errors**: 0
-- **Total Duration**: 20.06s
-  - Transform: 11.81s
+- **Total Duration**: 16.50s
+  - Transform: 17.28s
   - Setup: 0ms
-  - Collection: 47.34s
-  - Test execution: 13.82s
-  - Environment: 6.02s
-  - Prepare: 108.06s
+  - Collection: 62.17s
+  - Test execution: 16.50s
+  - Environment: 6.62s
+  - Prepare: 52.31s
 
 ## Test Coverage by Component
 
@@ -131,8 +131,9 @@ All 4 failures are due to missing reference files from the Digital submodule (`r
 ### Notes
 
 - 4 pre-existing test failures due to missing git submodule files (not environment or code issues)
-- All subsystems are operational (7405/7409 tests passing)
+- All subsystems are operational (7486/7490 tests passing)
 - Legacy audit tests confirm no stale references to old systems (CheerpJ, Digital.jar, xstream, Java package names, or JVM references)
 - HTML Canvas-related warnings in timing diagram tests are expected (getContext() requires canvas npm package mock, but tests pass regardless)
-- Analog shape audit confirms perfect visual fidelity with reference implementations (29/29 Dice ≥ 0.9)
-- Phase 3 baseline established for all 327 test files covering unified netlist and partitioning work
+- Analog shape audit confirms perfect visual fidelity with reference implementations (292/292 Dice ≥ 0.8)
+- Phase 4 baseline established for all 330 test files covering SimulationCoordinator and analog integration work
+- 81 new tests added since Phase 3 (7405 → 7486), all passing

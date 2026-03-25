@@ -3,6 +3,9 @@ export { compileUnified } from "./compile.js";
 export { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
 export type { ModelAssignment } from "./extract-connectivity.js";
 
+export type { SimulationCoordinator } from "./coordinator-types.js";
+export { DefaultSimulationCoordinator } from "./coordinator.js";
+
 export type {
   ResolvedGroupPin,
   ConnectivityGroup,

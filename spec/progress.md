@@ -438,3 +438,11 @@ Import `BitsException` from `../../core/errors.js`.
   - `src/headless/runner.ts` — replaced `compileCircuit`/`compileAnalogCircuit` imports with `compileUnified` + `compileAnalogPartition`; updated analog/digital compile paths; added null-analog fallback that builds empty partition + injects unsupported-component-in-analog diagnostics for digital-only components
   - `src/analog/__tests__/compile-analog-partition.test.ts` — replaced `compileAnalogCircuit` import with `compileUnified`; updated comparison test to use `compileUnified(circuit, registry).analog!`
 - **Tests**: 7486/7490 passing (4 pre-existing submodule failures only)
+
+## Task P4-1: Define SimulationCoordinator interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/coordinator-types.ts
+- **Files modified**: src/compile/index.ts
+- **Tests**: 0/0 passing (P4-1 is types-only, no runtime behaviour — acceptance is "types compile with no errors")
+- **Notes**: TypeScript compiler reports zero errors for both new/modified files. Pre-existing tsc errors in unrelated test files are unchanged from baseline.
