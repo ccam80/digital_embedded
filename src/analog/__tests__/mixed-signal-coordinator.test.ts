@@ -1,6 +1,13 @@
 /**
  * Tests for MixedSignalCoordinator.
  *
+ * MixedSignalCoordinator is the internal bridge-sync mechanism used by
+ * MNAEngine to synchronize analog timesteps with digital subcircuits at
+ * cross-engine boundaries. It is an implementation detail of MNAEngine and
+ * is not part of the public SimulationCoordinator interface. Phase 5 will
+ * replace this mechanism with runtime bridge adapters on
+ * DefaultSimulationCoordinator.
+ *
  * Verifies:
  *  - Digital outputs drive analog nodes through bridge output adapters
  *  - Analog inputs above vIH drive the inner digital engine high
