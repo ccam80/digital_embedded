@@ -15,16 +15,22 @@
  * Spec: unified-component-architecture.md Section 5 (Phase 4, P4-2/P4-6).
  */
 
-import type { SimulationEngine, MeasurementObserver } from '../core/engine-interface.js';
-import type { AnalogEngine } from '../core/analog-engine-interface.js';
+import type { SimulationEngine, MeasurementObserver, SnapshotId } from '../core/engine-interface.js';
+import { EngineState } from '../core/engine-interface.js';
+import type { AnalogEngine, DcOpResult } from '../core/analog-engine-interface.js';
 import { DigitalEngine } from './digital/digital-engine.js';
+import type { ConcreteCompiledCircuit } from './digital/digital-engine.js';
+import { ClockManager } from './digital/clock.js';
 import { MNAEngine } from './analog/analog-engine.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
 import { readMnaVoltage } from './analog/digital-pin-model.js';
 import { makeDiagnostic, DiagnosticCollector } from './analog/diagnostics.js';
 import type { BridgeInstance } from './analog/bridge-instance.js';
-import type { SimulationCoordinator } from './coordinator-types.js';
+import type { SimulationCoordinator, FrameStepResult, CurrentResolverContext, SliderPropertyDescriptor } from './coordinator-types.js';
+import type { CircuitElement } from '../core/element.js';
+import type { Wire } from '../core/circuit.js';
+import type { AcParams, AcResult } from './analog/ac-analysis.js';
 import type {
   CompiledCircuitUnified,
   BridgeAdapter,
@@ -32,6 +38,28 @@ import type {
   SignalValue,
 } from '../compile/types.js';
 import type { ConcreteCompiledAnalogCircuit } from './analog/compiled-analog-circuit.js';
+import { SpeedControl } from '../integration/speed-control.js';
+import type { ComponentRegistry } from '../core/registry.js';
+import { PropertyType } from '../core/properties.js';
+
+/** Elements that support live parameter mutation via setParam(key, value). */
+interface ParameterMutableElement {
+  setParam(key: string, value: number): void;
+}
+
+function isParameterMutable(el: unknown): el is ParameterMutableElement {
+  return typeof (el as ParameterMutableElement).setParam === 'function';
+}
+
+/** SI unit strings for common analog property keys. */
+const ANALOG_PROPERTY_UNITS: Record<string, string> = {
+  resistance: '\u03A9',
+  capacitance: 'F',
+  inductance: 'H',
+  voltage: 'V',
+  current: 'A',
+  frequency: 'Hz',
+};
 
 /**
  * Per-bridge-adapter state for top-level digital↔analog bridges.
@@ -41,10 +69,7 @@ interface TopLevelBridgeState {
   prevBit: number;
 }
 
-/**
- * Per-bridge runtime state for the coordinator's bridge sync logic.
- * Per-bridge internal state for bridge sync between analog and digital domains.
- */
+/** Per-bridge runtime state for bridge sync between analog and digital domains. */
 interface BridgeState {
   innerEngine: DigitalEngine;
   prevInputBits: boolean[];
@@ -62,12 +87,21 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _topLevelBridgeStates: TopLevelBridgeState[];
   private readonly _bridgeInstances: BridgeInstance[];
   private readonly _bridgeStates: BridgeState[];
+  private readonly _clockManager: ClockManager | null;
   private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
   private _stepCount = 0;
   private _voltageBuffer: Float64Array | null = null;
+  private readonly _timingModel: 'discrete' | 'continuous' | 'mixed';
+  private readonly _speedControl: SpeedControl;
+  /** Analog speed in sim-s/wall-s. Used when timingModel is continuous or mixed. */
+  private _analogSpeed: number = 1e-3;
+  private _voltageMin: number = Infinity;
+  private _voltageMax: number = -Infinity;
+  private readonly _registry: ComponentRegistry | null;
 
-  constructor(compiled: CompiledCircuitUnified) {
+  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
+    this._registry = registry ?? null;
     this._compiled = compiled;
     this._bridges = compiled.bridges;
     this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0 }));
@@ -93,6 +127,20 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       this._analog = null;
       this._bridgeInstances = [];
     }
+
+    if (compiled.digital !== null && compiled.analog !== null) {
+      this._timingModel = 'mixed';
+    } else if (compiled.analog !== null) {
+      this._timingModel = 'continuous';
+    } else {
+      this._timingModel = 'discrete';
+    }
+
+    this._clockManager = compiled.digital !== null
+      ? new ClockManager(compiled.digital as ConcreteCompiledCircuit)
+      : null;
+
+    this._speedControl = new SpeedControl();
 
     this._bridgeStates = this._bridgeInstances.map((bridge) => {
       const innerEngine = new DigitalEngine('level');
@@ -137,6 +185,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       state.oscillatingCount.fill(0);
     }
     this._stepCount = 0;
+    this._voltageMin = Infinity;
+    this._voltageMax = -Infinity;
     for (const obs of this._observers) obs.onReset();
   }
 
@@ -426,6 +476,267 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   addMeasurementObserver(observer: MeasurementObserver): void { this._observers.add(observer); }
   removeMeasurementObserver(observer: MeasurementObserver): void { this._observers.delete(observer); }
+
+  supportsMicroStep(): boolean { return this._digital !== null; }
+  supportsRunToBreak(): boolean { return this._digital !== null; }
+  supportsAcSweep(): boolean { return this._analog !== null; }
+  supportsDcOp(): boolean { return this._analog !== null; }
+
+  microStep(): void {
+    if (this._digital !== null) this._digital.microStep();
+  }
+
+  runToBreak(): void {
+    if (this._digital !== null) this._digital.runToBreak();
+  }
+
+  dcOperatingPoint(): DcOpResult | null {
+    if (this._analog === null) return null;
+    return this._analog.dcOperatingPoint();
+  }
+
+  acAnalysis(params: AcParams): AcResult | null {
+    if (this._analog === null) return null;
+    return this._analog.acAnalysis(params);
+  }
+
+  get simTime(): number | null {
+    return this._analog !== null ? this._analog.simTime : null;
+  }
+
+  getState(): EngineState {
+    const digitalState = this._digital?.getState();
+    const analogState = this._analog?.getState();
+    if (digitalState === EngineState.ERROR || analogState === EngineState.ERROR) return EngineState.ERROR;
+    if (digitalState === EngineState.RUNNING || analogState === EngineState.RUNNING) return EngineState.RUNNING;
+    if (digitalState === EngineState.PAUSED || analogState === EngineState.PAUSED) return EngineState.PAUSED;
+    return EngineState.STOPPED;
+  }
+
+  get signalCount(): number {
+    const digitalCount = this._compiled.digital?.netCount ?? 0;
+    const analogCount = this._analog !== null
+      ? (this._compiled.analog as ConcreteCompiledAnalogCircuit).nodeCount
+      : 0;
+    return digitalCount + analogCount;
+  }
+
+  snapshotSignals(): Float64Array {
+    const count = this.signalCount;
+    const snapshot = new Float64Array(count);
+    const digitalCount = this._compiled.digital?.netCount ?? 0;
+    if (this._digital !== null) {
+      for (let i = 0; i < digitalCount; i++) {
+        snapshot[i] = this._digital.getSignalRaw(i);
+      }
+    }
+    if (this._analog !== null) {
+      const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+      for (let i = 0; i < compiledAnalog.nodeCount; i++) {
+        snapshot[digitalCount + i] = this._analog.getNodeVoltage(i + 1);
+      }
+    }
+    return snapshot;
+  }
+
+  get timingModel(): 'discrete' | 'continuous' | 'mixed' {
+    return this._timingModel;
+  }
+
+  get speed(): number {
+    return this._timingModel === 'discrete'
+      ? this._speedControl.speed
+      : this._analogSpeed;
+  }
+
+  set speed(value: number) {
+    if (this._timingModel === 'discrete') {
+      this._speedControl.speed = value;
+    } else {
+      this._analogSpeed = Math.max(0, value);
+    }
+  }
+
+  adjustSpeed(factor: number): void {
+    if (this._timingModel === 'discrete') {
+      this._speedControl.speed = this._speedControl.speed * factor;
+    } else {
+      this._analogSpeed = Math.max(0, this._analogSpeed * factor);
+    }
+  }
+
+  parseSpeed(text: string): void {
+    if (this._timingModel === 'discrete') {
+      this._speedControl.parseText(text);
+    } else {
+      const parsed = Number(text);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        this._analogSpeed = parsed;
+      }
+    }
+  }
+
+  formatSpeed(): { value: string; unit: string } {
+    if (this._timingModel === 'discrete') {
+      const s = this._speedControl.speed;
+      if (s >= 1_000_000) return { value: String(s / 1_000_000), unit: 'MHz' };
+      if (s >= 1_000) return { value: String(s / 1_000), unit: 'kHz' };
+      return { value: String(s), unit: 'Hz' };
+    }
+    const rate = this._analogSpeed;
+    if (rate >= 1) return { value: String(rate), unit: 's/s' };
+    if (rate >= 1e-3) return { value: String(rate * 1_000), unit: 'ms/s' };
+    if (rate >= 1e-6) return { value: String(rate * 1_000_000), unit: 'µs/s' };
+    return { value: String(rate * 1e9), unit: 'ns/s' };
+  }
+
+  computeFrameSteps(wallDtSeconds: number): FrameStepResult {
+    const clampedDt = Math.min(wallDtSeconds, 0.1);
+    if (this._timingModel === 'discrete') {
+      return {
+        steps: Math.round(this._speedControl.speed * clampedDt),
+        simTimeGoal: null,
+        budgetMs: Infinity,
+        missed: false,
+      };
+    }
+    const simTime = this._analog!.simTime;
+    return {
+      steps: 0,
+      simTimeGoal: simTime + this._analogSpeed * clampedDt,
+      budgetMs: 12,
+      missed: false,
+    };
+  }
+
+  advanceClocks(): void {
+    if (this._clockManager === null || this._digital === null) return;
+    this._clockManager.advanceClocks((this._digital as DigitalEngine).getSignalArray());
+  }
+
+  getPinVoltages(element: CircuitElement): Map<string, number> | null {
+    if (this._analog === null) return null;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    let elementIndex = -1;
+    for (const [idx, el] of compiledAnalog.elementToCircuitElement) {
+      if (el === element) {
+        elementIndex = idx;
+        break;
+      }
+    }
+    if (elementIndex === -1) return null;
+    const resolvedPins = compiledAnalog.elementResolvedPins.get(elementIndex);
+    if (resolvedPins === undefined || resolvedPins.length === 0) return null;
+    const result = new Map<string, number>();
+    for (const pin of resolvedPins) {
+      result.set(pin.label, this._analog.getNodeVoltage(pin.nodeId));
+    }
+    return result;
+  }
+
+  getWireAnalogNodeId(wire: Wire): number | undefined {
+    if (this._analog === null) return undefined;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    return compiledAnalog.wireToNodeId.get(wire);
+  }
+
+  get voltageRange(): { min: number; max: number } | null {
+    if (this._analog === null) return null;
+    if (this._voltageMin === Infinity) return { min: 0, max: 0 };
+    return { min: this._voltageMin, max: this._voltageMax };
+  }
+
+  updateVoltageTracking(): void {
+    if (this._analog === null) return;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    for (let i = 1; i <= compiledAnalog.nodeCount; i++) {
+      const v = this._analog.getNodeVoltage(i);
+      if (v < this._voltageMin) this._voltageMin = v;
+      if (v > this._voltageMax) this._voltageMax = v;
+    }
+  }
+
+  getCurrentResolverContext(): CurrentResolverContext | null {
+    if (this._analog === null) return null;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    const analog = this._analog;
+    return {
+      wireToNodeId: compiledAnalog.wireToNodeId,
+      elements: compiledAnalog.elements,
+      elementToCircuitElement: compiledAnalog.elementToCircuitElement,
+      getElementPinCurrents(elementIndex: number): number[] {
+        return analog.getElementPinCurrents(elementIndex);
+      },
+    };
+  }
+
+  getSliderProperties(element: CircuitElement): SliderPropertyDescriptor[] {
+    if (this._analog === null || this._registry === null) return [];
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    let elementIndex = -1;
+    for (const [idx, ce] of compiledAnalog.elementToCircuitElement) {
+      if (ce === element) { elementIndex = idx; break; }
+    }
+    if (elementIndex === -1) return [];
+    const def = this._registry.get(element.typeId);
+    if (!def?.propertyDefs) return [];
+    const result: SliderPropertyDescriptor[] = [];
+    for (const propDef of def.propertyDefs) {
+      if (propDef.type !== PropertyType.FLOAT) continue;
+      const currentValue = element.getProperties().getOrDefault<number>(
+        propDef.key,
+        (propDef.defaultValue as number) ?? 0,
+      );
+      result.push({
+        elementIndex,
+        key: propDef.key,
+        label: propDef.label,
+        currentValue,
+        unit: ANALOG_PROPERTY_UNITS[propDef.key] ?? '',
+        logScale: true,
+      });
+    }
+    return result;
+  }
+
+  setComponentProperty(element: CircuitElement, key: string, value: number): void {
+    if (this._analog === null) return;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    let elementIndex = -1;
+    for (const [idx, ce] of compiledAnalog.elementToCircuitElement) {
+      if (ce === element) { elementIndex = idx; break; }
+    }
+    if (elementIndex === -1) return;
+    const el = compiledAnalog.elements[elementIndex];
+    if (el === undefined) return;
+    if (isParameterMutable(el)) {
+      el.setParam(key, value);
+    }
+    this._analog.configure({});
+  }
+
+  readElementCurrent(elementIndex: number): number | null {
+    if (this._analog === null) return null;
+    return this._analog.getElementCurrent(elementIndex);
+  }
+
+  readBranchCurrent(branchIndex: number): number | null {
+    if (this._analog === null) return null;
+    return this._analog.getBranchCurrent(branchIndex);
+  }
+
+  saveSnapshot(): SnapshotId {
+    if (this._digital !== null) {
+      return this._digital.saveSnapshot();
+    }
+    return 0;
+  }
+
+  restoreSnapshot(id: SnapshotId): void {
+    if (this._digital !== null) {
+      this._digital.restoreSnapshot(id);
+    }
+  }
 
   /**
    * Attach a DiagnosticCollector for runtime bridge diagnostics.

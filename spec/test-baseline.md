@@ -1,15 +1,15 @@
 # Test Baseline
 
-- **Timestamp**: 2026-03-26T01:27:16Z
-- **Phase**: Phase 5 (Simplify Consumers)
-- **Command**: `npm test`
-- **Result**: 7497/7501 passing, 4 failing, 0 errors
+- **Timestamp**: 2026-03-25T21:19:14Z
+- **Phase**: Phase 6 (Directory restructure — engine/ and analog/ → solver/)
+- **Command**: npm test
+- **Result**: 7517/7521 passing, 4 failing, 0 errors
 
 ## Summary
 
-Test Files: 328 passed, 2 failed (330 total)
-Tests: 7497 passed, 4 failed (7501 total)
-Duration: 29.66s (transform 39.44s, setup 0ms, collect 91.60s, tests 29.21s, environment 16.47s, prepare 105.28s)
+Test Files: 329 passed, 2 failed (331 total)
+Tests: 7517 passed, 4 failed (7521 total)
+Duration: 14.12s (transform 18.23s, setup 0ms, collect 63.17s, tests 23.76s, environment 6.25s, prepare 49.16s)
 
 ## Failing Tests (pre-existing)
 

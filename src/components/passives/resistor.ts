@@ -197,7 +197,7 @@ function createResistorElement(
 const RESISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "resistance",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Resistance (Ω)",
     unit: "Ω",
     defaultValue: 1000,

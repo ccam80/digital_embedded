@@ -98,6 +98,13 @@ export function loadDigCircuit(
     circuit.addWire(createWireFromDig(dw));
   }
 
+  // Merge collinear overlapping/duplicate/reversed wire segments FIRST.
+  // .dig files (especially hand-edited ones) often contain redundant wires
+  // that create cycles in the wire graph, breaking current visualization.
+  // This must run before splitWiresAtJunctions — otherwise the merge would
+  // re-fuse segments that were intentionally split at T-junction points.
+  circuit.mergeCollinearWires();
+
   // Split wires at T-junctions so endpoint-based net resolution sees the
   // connection.  Digital's Java editor always splits wires at junctions,
   // but hand-edited or externally-generated .dig files may not.
@@ -346,8 +353,7 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
     if (entry.key === "customShape" && entry.value.type === "customShape") {
       metadata.customShape = convertCustomShapeData(entry.value.value);
     }
-    if (entry.key === "engineType" && entry.value.type === "string") {
-    }
+    // engineType is silently ignored — the unified compiler derives domain from component models.
   }
 
   return metadata;

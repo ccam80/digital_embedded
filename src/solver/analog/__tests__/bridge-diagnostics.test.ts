@@ -360,7 +360,7 @@ describe("bridge-impedance-mismatch", () => {
     // Inner digital circuit: a single In component labeled "SIG" with output pin at (2,1).
     // The label must match the subcircuit host's pin label so flattenCircuit's
     // buildPinMappings can resolve inner↔outer pin correspondence.
-    const innerCircuit = new Circuit({  });
+    const innerCircuit = new Circuit();
 
     const innerInProps = new PropertyBag([["label", "SIG"]]);
 
@@ -398,7 +398,7 @@ describe("bridge-impedance-mismatch", () => {
     // Wire:
     //   (10,0)-(10,0): self-loop connecting HighZResistor.p1 and subcircuit.SIG
 
-    const outerCircuit = new Circuit({  });
+    const outerCircuit = new Circuit();
 
     const gndPin: Pin = {
       direction: PinDirection.BIDIRECTIONAL,

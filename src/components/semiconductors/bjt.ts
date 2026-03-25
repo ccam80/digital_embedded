@@ -281,15 +281,21 @@ export function createBjtElement(
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
 
-      // Apply pnjlim to both junctions
+      // Apply pnjlim to both junctions independently
       const vbeLimited = pnjlim(vbeRaw, vbe, nfVt, vcritBE);
       const vbcLimited = pnjlim(vbcRaw, vbc, nrVt, vcritBC);
 
-      // Write limited voltages back
-      // For NPN: vB - vE = vbeLimited → adjust vB
-      // For PNP: polarity*(vB - vE) = vbeLimited → vB - vE = vbeLimited/polarity
+      // Write limited voltages back into the solution vector consistently.
+      // Both junctions share the base node, so we must adjust vB AND vC
+      // to enforce both limits simultaneously (keep vE as the anchor).
+      // Original bug: only vB was adjusted for vbe, silently corrupting vbc.
       if (nodeB > 0) {
         voltages[nodeB - 1] = vE + vbeLimited * polarity;
+      }
+      if (nodeC > 0) {
+        // vbc = polarity*(vB'-vC) = vbcLimited → vC = vB' - vbcLimited*polarity
+        const vBnew = nodeB > 0 ? voltages[nodeB - 1] : vE + vbeLimited * polarity;
+        voltages[nodeC - 1] = vBnew - vbcLimited * polarity;
       }
 
       vbe = vbeLimited;

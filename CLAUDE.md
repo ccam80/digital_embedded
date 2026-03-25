@@ -46,7 +46,7 @@ The editor/renderer/interaction layer MUST be engine-agnostic. The same canvas, 
 Concretely:
 - No simulation logic in canvas/editor code
 - Simulation engine is a pluggable interface (start, stop, step, read/write signal values)
-- Components declare which engine type they target
+- Components do not declare an engine type — the unified compiler derives the simulation domain (digital/analog) from each component's registered models
 - Editor calls engine through the interface, never directly
 - Components program against abstract `RenderContext` and engine interfaces, not Canvas2D or engine implementations
 
@@ -455,7 +455,7 @@ The same `RenderContext` interface is implemented by `CanvasRenderer` (live canv
 
 | Module | File | Purpose |
 |--------|------|---------|
-| `EditorBinding` | `src/integration/editor-binding.ts` | Bridges compiled engine ↔ editor: wire→netId and pin→netId mappings for live signal display and input driving |
+| `EditorBinding` | `src/integration/editor-binding.ts` | Bridges compiled engine ↔ editor: wire→`SignalAddress` and pin→`SignalAddress` mappings; reads signals via `SimulationCoordinator` for live signal display, writes via `coordinator.writeSignal()` for input driving |
 | `SpeedControl` | `src/integration/speed-control.ts` | Simulation speed (1–10M steps/sec) with text parsing |
 
 ### Runtime Panels

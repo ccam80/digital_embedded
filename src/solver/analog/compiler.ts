@@ -1782,6 +1782,7 @@ export function compileAnalogPartition(
   // Build node map from partition groups
   const {
     nodeCount: externalNodeCount,
+    groupToNodeId,
     wireToNodeId,
     labelToNodeId,
     positionToNodeId,
@@ -2443,6 +2444,7 @@ export function compileAnalogPartition(
     elementToCircuitElement,
     elementPinVertices,
     elementResolvedPins,
+    groupToNodeId,
     diagnostics,
     bridges,
     timeRef,

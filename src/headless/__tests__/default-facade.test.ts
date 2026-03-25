@@ -299,7 +299,7 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
   it("compiles a pure analog circuit in auto mode", () => {
     const facade = new DefaultSimulatorFacade(autoModeRegistry);
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const v1 = createAutoModeElement(autoModeRegistry, "DcVoltageSource", { x: 0, y: 5 }, { label: "V1", voltage: 5 });
     const r1 = createAutoModeElement(autoModeRegistry, "Resistor", { x: 10, y: 5 }, { label: "R1", resistance: 1000 });
     const gnd = createAutoModeElement(autoModeRegistry, "Ground", { x: 10, y: 10 });

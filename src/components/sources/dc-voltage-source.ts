@@ -134,7 +134,7 @@ const DC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 const DC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "voltage",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Voltage (V)",
     unit: "V",
     defaultValue: 5,

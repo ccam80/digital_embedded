@@ -88,6 +88,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  During migration, coexists with elementPinVertices. */
   readonly elementResolvedPins: Map<number, ResolvedPin[]>;
 
+  /** Maps connectivity group ID → MNA node ID. Used by the unified compiler
+   *  to build groupIdToAnalogNodeId without wire-based lookup (which fails
+   *  for zero-wire groups where components connect via pin overlap). */
+  readonly groupToNodeId: Map<number, number>;
+
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
@@ -115,6 +120,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementToCircuitElement: Map<number, CircuitElement>;
     elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
     elementResolvedPins?: Map<number, ResolvedPin[]>;
+    groupToNodeId?: Map<number, number>;
     diagnostics?: SolverDiagnostic[];
     bridges?: BridgeInstance[];
     timeRef?: { value: number };
@@ -129,6 +135,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.elementToCircuitElement = params.elementToCircuitElement;
     this.elementPinVertices = params.elementPinVertices ?? new Map();
     this.elementResolvedPins = params.elementResolvedPins ?? new Map();
+    this.groupToNodeId = params.groupToNodeId ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.bridges = params.bridges ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };

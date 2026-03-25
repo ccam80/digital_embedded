@@ -113,7 +113,7 @@ const VARIABLE_RAIL_PIN_LAYOUT: PinDeclaration[] = [
 const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "voltage",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Voltage (V)",
     unit: "V",
     defaultValue: 5,
@@ -121,7 +121,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
   },
   {
     key: "minVoltage",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Min Voltage (V)",
     unit: "V",
     defaultValue: 0,
@@ -129,7 +129,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
   },
   {
     key: "maxVoltage",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Max Voltage (V)",
     unit: "V",
     defaultValue: 30,
@@ -137,7 +137,7 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
   },
   {
     key: "resistance",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Internal Resistance (Ω)",
     unit: "Ω",
     defaultValue: 0.01,

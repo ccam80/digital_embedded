@@ -232,7 +232,7 @@ function buildTestRegistry(): ComponentRegistry {
  *   x=0  → ground (Vs-, R2-B, Gnd pin)
  */
 function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
-  const circuit = new Circuit({  });
+  const circuit = new Circuit();
   const registry = buildTestRegistry();
 
   const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
@@ -285,7 +285,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("maps_labels_to_nodes", () => {
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     const labelIn:  Map<string, PropertyValue> = new Map([["label", "V_in"]]);
@@ -314,7 +314,7 @@ describe("AnalogCompiler", () => {
 
   it("detects_floating_node", () => {
     // R1 with one end at x=30 that no other element touches → node at x=30 is floating
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
@@ -340,7 +340,7 @@ describe("AnalogCompiler", () => {
   it("detects_voltage_source_loop", () => {
     // Vs1: pos=node1(x=10), neg=node2(x=20)
     // Vs2: pos=node2(x=20), neg=node1(x=10)  → KVL loop
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     const vs1 = makeElement("AnalogVs", "vs1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
@@ -366,7 +366,7 @@ describe("AnalogCompiler", () => {
 
   it("detects_missing_ground", () => {
     // No Ground element → node map builder emits no-ground diagnostic
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     const r1 = makeElement("AnalogR", "r1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
@@ -379,7 +379,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("rejects_digital_only_component", () => {
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     // AND gate has no engineType → defaults to "digital"
@@ -398,7 +398,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("calls_analog_factory_with_correct_args", () => {
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = new ComponentRegistry();
 
     const factorySpy = vi.fn(
@@ -460,7 +460,7 @@ describe("AnalogCompiler", () => {
     // compileUnified is the unified entry point — it handles all engineTypes.
     // A digital circuit with no digital-model components compiles to null analog
     // and null digital (no components in either partition).
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     const registry = buildTestRegistry();
 
     expect(() => compileUnified(circuit, registry)).not.toThrow();

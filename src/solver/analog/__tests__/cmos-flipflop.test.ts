@@ -233,7 +233,7 @@ type DffCircuit = {
  * Build DFF with a DC clock source (CLK held at vClk throughout).
  */
 function buildDffDc(vD: number, vClk: number, vdd = 3.3): DffCircuit {
-  const circuit = new Circuit({  });
+  const circuit = new Circuit();
   const registry = buildRegistry();
   const X_VDD = 5, X_D = 10, X_CLK = 20, X_GND = 30;
 
@@ -253,7 +253,7 @@ function buildDffDc(vD: number, vClk: number, vdd = 3.3): DffCircuit {
  * tStartNs. D is a fixed DC voltage.
  */
 function buildDffRamp(vD: number, tStartNs: number, vdd = 3.3): DffCircuit {
-  const circuit = new Circuit({  });
+  const circuit = new Circuit();
   const registry = buildRegistry();
   const X_VDD = 5, X_D = 10, X_CLK = 20, X_GND = 30;
 

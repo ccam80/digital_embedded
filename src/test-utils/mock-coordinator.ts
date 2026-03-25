@@ -7,9 +7,12 @@
  */
 
 import type { SimulationEngine, MeasurementObserver } from "@/core/engine-interface";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
-import type { CompiledCircuitUnified, SignalAddress, SignalValue } from "@/compile/types";
+import { EngineState } from "@/core/engine-interface";
+import type { AnalogEngine, DcOpResult } from "@/core/analog-engine-interface";
+import type { SimulationCoordinator, FrameStepResult } from "@/solver/coordinator-types";
+import type { Diagnostic, SignalAddress, SignalValue } from "@/compile/types";
+import type { Wire } from "@/core/circuit";
+import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
 
 export type WriteCall = { addr: SignalAddress; value: SignalValue };
 
@@ -60,6 +63,34 @@ export class MockCoordinator implements SimulationCoordinator {
   addMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
   removeMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
 
+  get signalCount(): number { return 0; }
+  snapshotSignals(): Float64Array { return new Float64Array(0); }
+
+  supportsMicroStep(): boolean { return this._digitalBackend !== null; }
+  supportsRunToBreak(): boolean { return this._digitalBackend !== null; }
+  supportsAcSweep(): boolean { return this._analogBackend !== null; }
+  supportsDcOp(): boolean { return this._analogBackend !== null; }
+
+  microStep(): void { /* no-op */ }
+  runToBreak(): void { /* no-op */ }
+  dcOperatingPoint(): DcOpResult | null { return null; }
+  acAnalysis(_params: AcParams): AcResult | null { return null; }
+
+  get simTime(): number | null { return null; }
+  getState(): EngineState { return EngineState.STOPPED; }
+
+  get timingModel(): 'discrete' | 'continuous' | 'mixed' { return 'discrete'; }
+  get speed(): number { return 1000; }
+  set speed(_value: number) { /* no-op */ }
+  adjustSpeed(_factor: number): void { /* no-op */ }
+  parseSpeed(_text: string): void { /* no-op */ }
+  formatSpeed(): { value: string; unit: string } { return { value: '1', unit: 'kHz' }; }
+  computeFrameSteps(_wallDtSeconds: number): FrameStepResult {
+    return { steps: 1, simTimeGoal: null, budgetMs: Infinity, missed: false };
+  }
+
+  advanceClocks(): void { /* no-op */ }
+
   get digitalBackend(): SimulationEngine | null {
     return this._digitalBackend;
   }
@@ -68,11 +99,8 @@ export class MockCoordinator implements SimulationCoordinator {
     return this._analogBackend;
   }
 
-  get compiled(): CompiledCircuitUnified {
+  get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; diagnostics: readonly Diagnostic[] } {
     return {
-      digital: null,
-      analog: null,
-      bridges: [],
       wireSignalMap: new Map(),
       labelSignalMap: new Map(),
       diagnostics: [],

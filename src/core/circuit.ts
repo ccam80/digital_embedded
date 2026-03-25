@@ -11,6 +11,7 @@ import type { Pin } from "./pin.js";
 import { pinWorldPosition } from "./pin.js";
 import type { CircuitElement } from "./element.js";
 import type { LogicFamilyConfig } from "./logic-family.js";
+import { mergeCollinearSegments } from "../editor/wire-merge.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -207,6 +208,26 @@ export class Circuit {
       }
     }
     return removed;
+  }
+
+  /**
+   * Merge collinear overlapping or adjacent wire segments.
+   *
+   * Replaces the wire list with the output of mergeCollinearSegments(),
+   * which fuses horizontal/vertical wires that share an axis and touch or
+   * overlap.  This eliminates duplicate, reversed, and redundant segments
+   * that can appear in hand-edited .dig files or after interactive edits.
+   *
+   * @returns The number of wires removed by merging.
+   */
+  mergeCollinearWires(): number {
+    const before = this.wires.length;
+    const merged = mergeCollinearSegments(this.wires);
+    this.wires.length = 0;
+    for (const w of merged) {
+      this.wires.push(w);
+    }
+    return before - this.wires.length;
   }
 
   /**

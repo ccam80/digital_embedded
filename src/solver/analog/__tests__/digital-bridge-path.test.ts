@@ -189,7 +189,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
  * builder assigns it a unique non-zero MNA node ID.
  */
 function buildCircuit(propsMap: Map<string, PropertyValue> = new Map()) {
-  const circuit = new Circuit({  });
+  const circuit = new Circuit();
 
   // DigitalXor element at position (10, 0), rotation=0
   const xorProps = new PropertyBag();

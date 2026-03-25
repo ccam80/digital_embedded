@@ -1,8 +1,8 @@
 /**
  * Shared lazily-built TransistorModelRegistry with all known models.
  *
- * Provides a single getTransistorModels() entry point used by both
- * DefaultSimulatorFacade and SimulationRunner.
+ * Provides a single getTransistorModels() entry point for all compilation
+ * paths (facade, runner, and direct compiler calls).
  */
 import { TransistorModelRegistry } from './transistor-model-registry.js';
 import { registerAllCmosGateModels } from './transistor-models/cmos-gates.js';

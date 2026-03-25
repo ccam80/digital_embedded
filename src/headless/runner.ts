@@ -73,7 +73,7 @@ export class SimulationRunner {
    */
   compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationCoordinator {
     const unified = compileUnified(circuit, this._registry, getTransistorModels());
-    const coordinator = new DefaultSimulationCoordinator(unified);
+    const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
 
     if (unified.analog !== null) {
       this._records.set(unified.analog, { coordinator });

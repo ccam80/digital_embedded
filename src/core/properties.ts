@@ -47,6 +47,12 @@ export interface PropertyDefinition {
    *  property input displays with auto-scaled SI prefix and accepts prefixed
    *  text entry (e.g. "4.7k", "100n", "2.2u"). */
   unit?: string;
+  /**
+   * Conditional visibility: this property row is only shown when the property
+   * identified by `key` has one of the listed `values`. Used to hide
+   * waveform-specific parameters (e.g. sweep fields only when waveform="sweep").
+   */
+  visibleWhen?: { key: string; values: PropertyValue[] };
 }
 
 // ---------------------------------------------------------------------------

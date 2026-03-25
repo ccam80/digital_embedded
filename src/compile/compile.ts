@@ -224,26 +224,14 @@ export function compileUnified(
     }
   }
 
-  // Map groupId → analog nodeId via compiled analog circuit's wireToNodeId
-  // We derive this from the analog partition groups and the compiled analog result.
+  // Map groupId → analog nodeId via the analog compiler's groupToNodeId.
+  // This is authoritative — it handles zero-wire groups (direct pin overlap)
+  // that the old wire-based lookup missed.
   const groupIdToAnalogNodeId = new Map<number, number>();
   if (compiledAnalog !== null) {
-    for (const group of analogPartition.groups) {
-      // Find the node ID by looking up any wire in this group's wireToNodeId
-      for (const wire of group.wires) {
-        const nodeId = compiledAnalog.wireToNodeId.get(wire);
-        if (nodeId !== undefined) {
-          groupIdToAnalogNodeId.set(group.groupId, nodeId);
-          break;
-        }
-      }
-      if (!groupIdToAnalogNodeId.has(group.groupId)) {
-        diagnostics.push({
-          severity: "warning",
-          code: "unmapped-analog-group",
-          message: `Analog connectivity group ${group.groupId} has no wire-based node mapping`,
-        });
-      }
+    const concreteAnalog = compiledAnalog as import("../solver/analog/compiled-analog-circuit.js").ConcreteCompiledAnalogCircuit;
+    for (const [groupId, nodeId] of concreteAnalog.groupToNodeId) {
+      groupIdToAnalogNodeId.set(groupId, nodeId);
     }
   }
 

@@ -71,6 +71,8 @@ export class PropertyPanel {
     this._clear();
 
     const bag = element.getProperties();
+    /** Rows with conditional visibility, keyed by the property they depend on. */
+    const conditionalRows: Map<string, { row: HTMLElement; values: PropertyValue[] }[]> = new Map();
 
     for (const def of definitions) {
       const currentValue = bag.has(def.key)
@@ -83,6 +85,16 @@ export class PropertyPanel {
       const row = this._buildRow(def.label, input.element);
       this._container.appendChild(row);
 
+      // Track rows with visibleWhen conditions
+      if (def.visibleWhen) {
+        const depKey = def.visibleWhen.key;
+        if (!conditionalRows.has(depKey)) conditionalRows.set(depKey, []);
+        conditionalRows.get(depKey)!.push({ row, values: def.visibleWhen.values });
+        // Apply initial visibility
+        const depValue = bag.has(depKey) ? bag.get(depKey) : definitions.find(d => d.key === depKey)?.defaultValue;
+        row.style.display = def.visibleWhen.values.includes(depValue as PropertyValue) ? "" : "none";
+      }
+
       // Capture oldValue at callback registration time.
       const capturedKey = def.key;
       input.onChange((newValue) => {
@@ -92,6 +104,13 @@ export class PropertyPanel {
         bag.set(capturedKey, newValue);
         for (const cb of this._changeCallbacks) {
           cb(capturedKey, oldValue, newValue);
+        }
+        // Update conditional visibility of dependent rows
+        const deps = conditionalRows.get(capturedKey);
+        if (deps) {
+          for (const dep of deps) {
+            dep.row.style.display = dep.values.includes(newValue) ? "" : "none";
+          }
         }
       });
     }

@@ -404,12 +404,17 @@ export function initApp(search?: string): void {
       const def = registry.get(element.typeId);
       if (def) {
         propertyPanel.showProperties(element, def.propertyDefs);
-        if (isAnalogMode()) {
-          if (availableModels(def).length > 1) {
-            propertyPanel.showSimulationModeDropdown(element, def);
+        if (availableModels(def).length > 1) {
+          propertyPanel.showSimulationModeDropdown(element, def);
+        }
+        if (hasDigitalModel(def)) {
+          const simModel = element.getProperties().has("simulationModel")
+            ? element.getProperties().get("simulationModel") as string
+            : (def.defaultModel ?? "logical");
+          if (simModel === "logical" || simModel === "analog-pins") {
+            const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
+            propertyPanel.showPinElectricalOverrides(element, def, family);
           }
-          const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-          propertyPanel.showPinElectricalOverrides(element, def, family);
         }
       }
     } else {
@@ -418,7 +423,7 @@ export function initApp(search?: string): void {
 
     // --- Populate analog sliders for selected element ---
     if (activeSliderPanel) {
-      activeSliderPanel.removeAll();
+      activeSliderPanel.removeUnpinned();
       if (selected.size === 1) {
         const element = selected.values().next().value!;
         const def = registry.get(element.typeId);
@@ -519,6 +524,11 @@ export function initApp(search?: string): void {
 
     // Determine effective engine mode for UI branching
     let isAnalog = isAnalogMode();
+
+    // Merge any collinear/duplicate wire segments before compiling.
+    // This eliminates redundant wires that create cycles in the wire graph,
+    // which would cause the current resolver to zero-out entire components.
+    circuit.mergeCollinearWires();
 
     if (binding.isBound) {
       facade.getEngine()?.stop?.();
@@ -643,26 +653,16 @@ export function initApp(search?: string): void {
 
   const wireSignalAccessAdapter: WireSignalAccess = {
     getWireValue(wire: Wire): { raw: number; width: number } | { voltage: number } | undefined {
-      const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-      const analogEng = facade.getEngine();
-      if (analogEng && analogCompiled) {
-        const nodeId = analogCompiled.wireToNodeId.get(wire);
-        if (nodeId === undefined) return undefined;
-        try {
-          const voltage = (analogEng as unknown as { getNodeVoltage(id: number): number }).getNodeVoltage(nodeId);
-          return { voltage };
-        } catch {
-          return undefined;
-        }
-      }
-      const compiled = facade.getCompiled();
-      if (!binding.isBound || compiled === null) return undefined;
-      const netId = compiled.wireToNetId.get(wire);
-      if (netId === undefined) return undefined;
+      const coordinator = facade.getCoordinator();
+      if (!coordinator) return undefined;
+      const addr = coordinator.compiled.wireSignalMap.get(wire);
+      if (addr === undefined) return undefined;
       try {
-        const raw = binding.getWireValue(wire);
-        const width = compiled.netWidths[netId] ?? 1;
-        return { raw, width };
+        const sv = coordinator.readSignal(addr);
+        if (sv.type === "analog") {
+          return { voltage: sv.voltage };
+        }
+        return { raw: sv.value, width: addr.bitWidth };
       } catch {
         return undefined;
       }
@@ -1530,12 +1530,17 @@ export function initApp(search?: string): void {
     popup.appendChild(propsContainer);
     const tempPanel = new PropertyPanel(propsContainer);
     tempPanel.showProperties(elementHit, def.propertyDefs);
-    if (isAnalogMode()) {
-      if (availableModels(def).length > 1) {
-        tempPanel.showSimulationModeDropdown(elementHit, def);
+    if (availableModels(def).length > 1) {
+      tempPanel.showSimulationModeDropdown(elementHit, def);
+    }
+    if (hasDigitalModel(def)) {
+      const simModel = elementHit.getProperties().has("simulationModel")
+        ? elementHit.getProperties().get("simulationModel") as string
+        : (def.defaultModel ?? "logical");
+      if (simModel === "logical" || simModel === "analog-pins") {
+        const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
+        tempPanel.showPinElectricalOverrides(elementHit, def, family);
       }
-      const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-      tempPanel.showPinElectricalOverrides(elementHit, def, family);
     }
     tempPanel.onPropertyChange(() => {
       if (isAnalogMode() && isSimActive()) {
@@ -2000,30 +2005,24 @@ export function initApp(search?: string): void {
     wireRenderer.setVoltageTracker(analogVoltageTracker);
 
     // Build pin-voltage factory for element renderer.
-    // Maps each CircuitElement → its AnalogElement's pinNodeIds → MNA voltages.
-    const concreteCompiled = analogCompiled as ConcreteCompiledAnalogCircuit;
-    const circuitElToIndex = new Map<import('../core/element.js').CircuitElement, number>();
-    for (const [idx, ce] of concreteCompiled.elementToCircuitElement) {
-      circuitElToIndex.set(ce, idx);
+    // Build a position→nodeId lookup from the unified wireSignalMap so that
+    // ALL elements (including infrastructure like Tunnel) can show voltage.
+    const posToAnalogNodeId = new Map<string, number>();
+    for (const [wire, addr] of coordinator.compiled.wireSignalMap) {
+      if (addr.domain !== "analog") continue;
+      posToAnalogNodeId.set(`${wire.start.x},${wire.start.y}`, addr.nodeId);
+      posToAnalogNodeId.set(`${wire.end.x},${wire.end.y}`, addr.nodeId);
     }
     elementRenderer.setAnalogContext((element) => {
-      const idx = circuitElToIndex.get(element);
-      if (idx === undefined) return undefined;
-      const analogEl = concreteCompiled.elements[idx];
-      if (!analogEl) return undefined;
       const pinLabelToNodeId = new Map<string, number>();
       for (const pin of element.getPins()) {
         const wp = pinWorldPosition(element, pin);
-        for (const [wire, nodeId] of concreteCompiled.wireToNodeId) {
-          if (
-            (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
-            (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
-          ) {
-            pinLabelToNodeId.set(pin.label, nodeId);
-            break;
-          }
+        const nodeId = posToAnalogNodeId.get(`${wp.x},${wp.y}`);
+        if (nodeId !== undefined) {
+          pinLabelToNodeId.set(pin.label, nodeId);
         }
       }
+      if (pinLabelToNodeId.size === 0) return undefined;
       const tracker = analogVoltageTracker;
       const scheme = colorSchemeManager.getActive();
       return {
@@ -2683,16 +2682,34 @@ export function initApp(search?: string): void {
       if (!locked) {
         items.push(
           { label: 'Properties\u2026', action: () => {
-            selection.select(elementHit);
-            // Selection change auto-opens property panel
+            // Force property panel open even if already selected
+            const def = registry.get(elementHit.typeId);
+            if (def) {
+              selection.select(elementHit);
+              propertyPanel.showProperties(elementHit, def.propertyDefs);
+              if (availableModels(def).length > 1) {
+                propertyPanel.showSimulationModeDropdown(elementHit, def);
+              }
+              if (hasDigitalModel(def)) {
+                const simModel = elementHit.getProperties().has("simulationModel")
+                  ? elementHit.getProperties().get("simulationModel") as string
+                  : (def.defaultModel ?? "logical");
+                if (simModel === "logical" || simModel === "analog-pins") {
+                  const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
+                  propertyPanel.showPinElectricalOverrides(elementHit, def, family);
+                }
+              }
+            }
           }, enabled: true },
           { label: 'Rotate', shortcut: 'R', action: () => {
             const cmd = rotateSelection([...selection.getSelectedElements()]);
             undoStack.push(cmd);
+            invalidateCompiled();
           }, enabled: true },
           { label: 'Mirror', shortcut: 'M', action: () => {
             const cmd = mirrorSelection([...selection.getSelectedElements()]);
             undoStack.push(cmd);
+            invalidateCompiled();
           }, enabled: true },
           separator(),
           { label: 'Copy', shortcut: 'Ctrl+C', action: () => {

@@ -310,7 +310,7 @@ function createPotentiometerElement(
 const POTENTIOMETER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "resistance",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Resistance (Ω)",
     unit: "Ω",
     defaultValue: 10000,

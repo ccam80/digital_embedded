@@ -139,7 +139,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "current",
-    type: PropertyType.INT,
+    type: PropertyType.FLOAT,
     label: "Current (A)",
     unit: "A",
     defaultValue: 0.01,

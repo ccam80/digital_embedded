@@ -250,26 +250,32 @@
   "hotPaths": [
     {
       "path": "src\\headless\\default-facade.ts",
-      "accessCount": 98,
-      "lastAccessed": 1774444103223,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 53,
-      "lastAccessed": 1774442609422,
+      "accessCount": 132,
+      "lastAccessed": 1774478627564,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 45,
-      "lastAccessed": 1774445351601,
+      "accessCount": 71,
+      "lastAccessed": 1774478842345,
       "type": "directory"
+    },
+    {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 68,
+      "lastAccessed": 1774477597193,
+      "type": "file"
     },
     {
       "path": "src\\analog\\analog-engine.ts",
       "accessCount": 40,
       "lastAccessed": 1774441513446,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 26,
+      "lastAccessed": 1774478224856,
       "type": "file"
     },
     {
@@ -279,15 +285,15 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774435122784,
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 19,
+      "lastAccessed": 1774478225075,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
+      "path": "src\\engine\\compiler.ts",
       "accessCount": 16,
-      "lastAccessed": 1774443747459,
+      "lastAccessed": 1774435122784,
       "type": "file"
     },
     {
@@ -315,15 +321,15 @@
       "type": "file"
     },
     {
+      "path": "src\\components",
+      "accessCount": 12,
+      "lastAccessed": 1774478314905,
+      "type": "directory"
+    },
+    {
       "path": "src\\analog\\__tests__\\behavioral-integration.test.ts",
       "accessCount": 11,
       "lastAccessed": 1774426210190,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 11,
-      "lastAccessed": 1774441809322,
       "type": "file"
     },
     {
@@ -357,6 +363,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774476207892,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
       "accessCount": 7,
       "lastAccessed": 1774425540291,
@@ -367,6 +379,12 @@
       "accessCount": 7,
       "lastAccessed": 1774425648635,
       "type": "file"
+    },
+    {
+      "path": "src\\components\\sources\\variable-rail.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774469448649,
+      "type": "directory"
     },
     {
       "path": "src\\components\\active\\__tests__\\opamp.test.ts",
@@ -403,12 +421,6 @@
       "accessCount": 5,
       "lastAccessed": 1774425623974,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\sources\\variable-rail.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774424674358,
-      "type": "directory"
     },
     {
       "path": "src\\components\\active",
@@ -465,12 +477,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components",
-      "accessCount": 2,
-      "lastAccessed": 1774424649891,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\active\\opamp.ts",
       "accessCount": 2,
       "lastAccessed": 1774424656681,
@@ -504,12 +510,6 @@
       "path": "src\\analog\\behavioral-remaining.ts",
       "accessCount": 2,
       "lastAccessed": 1774425583053,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\sources\\dc-voltage-source.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774425607332,
       "type": "directory"
     },
     {

@@ -152,7 +152,7 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
 // ---------------------------------------------------------------------------
 
 function buildCmosInverterSubcircuit(): Circuit {
-  const circuit = new Circuit({  });
+  const circuit = new Circuit();
 
   // Interface elements
   // In "in": has pin at x=10
@@ -352,7 +352,7 @@ describe("Expansion", () => {
     const modelRegistry = new TransistorModelRegistry();
 
     // Subcircuit containing a digital-only component (FlipflopD has no analogFactory)
-    const subcircuit = new Circuit({  });
+    const subcircuit = new Circuit();
     // In "in" interface element
     const inEl = makeElement("In", "in-el", [{ x: 10, y: 0, label: "out" }], [["label", "in"]]);
     // FlipflopD — digital-only (no analogFactory registered)

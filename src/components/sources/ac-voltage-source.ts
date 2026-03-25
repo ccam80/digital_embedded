@@ -317,10 +317,19 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   },
   {
     key: "waveform",
-    type: PropertyType.STRING,
+    type: PropertyType.ENUM,
     label: "Waveform",
     defaultValue: "sine",
-    description: "Waveform type: sine | square | triangle | sawtooth | sweep | am | fm | noise",
+    enumValues: ["sine", "square", "triangle", "sawtooth", "expression", "sweep", "am", "fm", "noise"],
+    description: "Waveform shape",
+  },
+  {
+    key: "expression",
+    type: PropertyType.STRING,
+    label: "Expression",
+    defaultValue: "sin(2 * pi * 1000 * t)",
+    description: "Waveform expression with t as time variable",
+    visibleWhen: { key: "waveform", values: ["expression"] },
   },
   {
     key: "freqStart",
@@ -328,6 +337,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Sweep Start Freq (Hz)",
     defaultValue: 100,
     description: "Start frequency for sweep waveform (Hz)",
+    visibleWhen: { key: "waveform", values: ["sweep"] },
   },
   {
     key: "freqEnd",
@@ -335,6 +345,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Sweep End Freq (Hz)",
     defaultValue: 10000,
     description: "End frequency for sweep waveform (Hz)",
+    visibleWhen: { key: "waveform", values: ["sweep"] },
   },
   {
     key: "sweepDuration",
@@ -342,20 +353,24 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Sweep Duration (s)",
     defaultValue: 1,
     description: "Duration of the frequency sweep in seconds",
+    visibleWhen: { key: "waveform", values: ["sweep"] },
   },
   {
     key: "sweepMode",
-    type: PropertyType.STRING,
+    type: PropertyType.ENUM,
     label: "Sweep Mode",
     defaultValue: "linear",
-    description: "Sweep interpolation: linear | log",
+    enumValues: ["linear", "log"],
+    description: "Sweep interpolation mode",
+    visibleWhen: { key: "waveform", values: ["sweep"] },
   },
   {
     key: "modulationFreq",
     type: PropertyType.INT,
     label: "Modulation Freq (Hz)",
     defaultValue: 100,
-    description: "Modulation frequency for AM and FM waveforms (Hz)",
+    description: "Modulation frequency (Hz)",
+    visibleWhen: { key: "waveform", values: ["am", "fm"] },
   },
   {
     key: "modulationDepth",
@@ -363,6 +378,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Modulation Depth (0-1)",
     defaultValue: 1,
     description: "AM modulation depth (0 = no modulation, 1 = full AM)",
+    visibleWhen: { key: "waveform", values: ["am"] },
   },
   {
     key: "modulationIndex",
@@ -370,13 +386,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Modulation Index (rad)",
     defaultValue: 1,
     description: "FM modulation index (peak phase deviation in radians)",
-  },
-  {
-    key: "expression",
-    type: PropertyType.STRING,
-    label: "Expression",
-    defaultValue: "sin(2 * pi * 1000 * t)",
-    description: "Waveform expression with t as time variable (used when waveform=expression)",
+    visibleWhen: { key: "waveform", values: ["fm"] },
   },
   {
     key: "label",

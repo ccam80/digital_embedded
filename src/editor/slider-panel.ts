@@ -47,6 +47,8 @@ interface SliderEntry {
   input: HTMLInputElement;
   /** Value display span. */
   valueDisplay: HTMLSpanElement;
+  /** When true, slider stays visible after element is deselected. */
+  pinned: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,9 +141,21 @@ export class SliderPanel {
     valueDisplay.style.textAlign = "right";
     valueDisplay.textContent = unit ? formatSI(currentValue, unit) : String(currentValue);
 
+    // Pin button — keeps slider visible after deselection
+    const pinBtn = document.createElement("button");
+    pinBtn.type = "button";
+    pinBtn.title = "Pin slider (keep visible)";
+    pinBtn.textContent = "\u{1F4CC}"; // 📌 pushpin
+    pinBtn.style.cssText = "background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;opacity:0.4;flex-shrink:0;";
+    pinBtn.addEventListener("click", () => {
+      entry.pinned = !entry.pinned;
+      pinBtn.style.opacity = entry.pinned ? "1" : "0.4";
+    });
+
     rowDiv.appendChild(labelSpan);
     rowDiv.appendChild(input);
     rowDiv.appendChild(valueDisplay);
+    rowDiv.appendChild(pinBtn);
     this._container.appendChild(rowDiv);
 
     const entry: SliderEntry = {
@@ -156,6 +170,7 @@ export class SliderPanel {
       container: rowDiv,
       input,
       valueDisplay,
+      pinned: false,
     };
 
     this._sliders.push(entry);
@@ -205,6 +220,22 @@ export class SliderPanel {
       entry.container.parentNode?.removeChild(entry.container);
     }
     this._sliders = [];
+  }
+
+  /**
+   * Remove only unpinned sliders. Pinned sliders stay visible across
+   * selection changes so the user can keep adjusting them.
+   */
+  removeUnpinned(): void {
+    const kept: SliderEntry[] = [];
+    for (const entry of this._sliders) {
+      if (entry.pinned) {
+        kept.push(entry);
+      } else {
+        entry.container.parentNode?.removeChild(entry.container);
+      }
+    }
+    this._sliders = kept;
   }
 
   /**

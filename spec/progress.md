@@ -634,3 +634,92 @@ Import `BitsException` from `../../core/errors.js`.
   - `src/compile/coordinator-types.ts` → `src/solver/coordinator-types.ts`
 - **Tests**: 7485/7491 passing (6 failures are all pre-existing ENOENT: 3 dig-parser + 1 resolve-generics + 1 lrcxor-fixture + 1 wire-current-resolver)
 - **Notes**: Purely mechanical — zero behaviour change. All old directories empty and removed.
+
+## Task P5b-4: Move speed control into coordinator: computeFrameSteps, adjustSpeed, parseSpeed, formatSpeed
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/__tests__/coordinator-speed-control.test.ts
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts
+- **Tests**: 39/39 passing
+
+## Task P5b-1: Add capability queries to SimulationCoordinator interface + implement (§1.1)
+- **Status**: complete (implemented by P5b-2 agent after P5b-1 agent crashed with stale locks)
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/coordinator-types.ts`, `src/solver/coordinator.ts`, `src/test-utils/mock-coordinator.ts`
+- **Tests**: included in P5b-2 test file (coordinator-capability.test.ts)
+- **Notes**: P5b-1 agent had implemented §1.4 speed control methods before crashing. This agent added §1.1 capability queries (supportsMicroStep, supportsRunToBreak, supportsAcSweep, supportsDcOp) on top.
+
+## Task P5b-2: Add unified execution methods: microStep, runToBreak, dcOp, acAnalysis, getState, simTime (§1.2)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/solver/__tests__/coordinator-capability.test.ts`
+- **Files modified**: `src/solver/coordinator-types.ts`, `src/solver/coordinator.ts`, `src/test-utils/mock-coordinator.ts`
+- **Tests**: 30/30 passing (covers §1.1, §1.2, §1.3)
+- **Notes**:
+  - Added §1.1 capability queries: supportsMicroStep(), supportsRunToBreak(), supportsAcSweep(), supportsDcOp()
+  - Added §1.2 unified execution: microStep(), runToBreak(), dcOperatingPoint(), acAnalysis(), simTime, getState()
+  - Added §1.3 signal snapshot: snapshotSignals(), signalCount (also covers P5b-3)
+  - Updated MockCoordinator to implement all new interface members
+  - Full suite: 7580/7584 passing (4 pre-existing ENOENT failures, 0 regressions, +63 new tests)
+
+## Task P5b-3: Add snapshotSignals() and signalCount (§1.3)
+- **Status**: complete (implemented alongside P5b-2)
+- **Agent**: implementer
+- **Files created**: none (tests in coordinator-capability.test.ts)
+- **Files modified**: `src/solver/coordinator-types.ts`, `src/solver/coordinator.ts`, `src/test-utils/mock-coordinator.ts`
+- **Tests**: 30/30 passing (snapshotSignals tests included in coordinator-capability.test.ts)
+
+## Task P5b-6: Add visualization context (getPinVoltages, getWireAnalogNodeId, voltageRange, updateVoltageTracking §1.6)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/__tests__/coordinator-visualization.test.ts
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts
+- **Tests**: 19/19 passing
+- **Notes**: Fixed test fixture — zero-length wires are silently dropped by Circuit.addWire(); replaced with non-zero-length wires. Changed RC circuit to resistor divider (two 1kΩ in series, 5V source) so DC steady state has two distinct non-ground voltages (5V and 2.5V). Fixed vcc pin layout so neg=(0,0) connects to ground and pos=(4,0) is the +5V rail.
+
+## Task P5b-7: Add slider context (getSliderProperties, setComponentProperty §1.7)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/__tests__/coordinator-slider-snapshot.test.ts
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts, src/headless/default-facade.ts, src/headless/runner.ts
+- **Tests**: 21/21 passing (combined with P5b-8 and P5b-9 in coordinator-slider-snapshot.test.ts)
+- **Notes**: Added SliderPropertyDescriptor interface to coordinator-types.ts. Added getSliderProperties() (scans analog partition for FLOAT properties via registry) and setComponentProperty() (calls setParam() on ParameterMutableElement if found). Constructor updated to accept optional ComponentRegistry. Call sites in default-facade.ts and runner.ts updated to pass registry.
+
+## Task P5b-8: Add measurement signal reading (readElementCurrent, readBranchCurrent §1.8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (tests included in coordinator-slider-snapshot.test.ts)
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts
+- **Tests**: 21/21 passing (shared test file with P5b-7 and P5b-9)
+- **Notes**: Added readElementCurrent() and readBranchCurrent() delegating to MNAEngine. Both return null when no analog backend.
+
+## Task P5b-9: Add snapshot management (saveSnapshot, restoreSnapshot §1.9)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (tests included in coordinator-slider-snapshot.test.ts)
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts
+- **Tests**: 21/21 passing (shared test file with P5b-7 and P5b-8)
+- **Notes**: saveSnapshot() delegates to digital backend if present; returns 0 when no digital backend. restoreSnapshot() is a no-op when no digital backend. Note: buildAnalogCoordinator() fixture uses Ground (which has both digital and analog models), so the coordinator is mixed not truly analog-only. Test adjusted to save before restore on the analog-fixture coordinator. Full suite: 7626/7630 passing (4 pre-existing ENOENT failures, 0 regressions).
+
+## Task P5b-10: Add current resolver context: getCurrentResolverContext (%1.10)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/__tests__/coordinator-current-resolver.test.ts
+- **Files modified**: none
+- **Tests**: 2/2 passing
+
+## Task P5b-5: Move ClockManager into coordinator, add advanceClocks() (§1.5)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/__tests__/coordinator-clock.test.ts
+- **Files modified**: src/test-utils/mock-coordinator.ts (added advanceClocks() stub)
+- **Tests**: 6/6 passing
+
+## Task P5b-11: Narrow compiled accessor type to expose only unified maps + diagnostics (§1.11)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/coordinator-types.ts, src/test-utils/mock-coordinator.ts, src/solver/__tests__/coordinator-capability.test.ts
+- **Tests**: 6/6 new tests passing (36/36 total in coordinator-capability.test.ts)
+- **Notes**: Narrowed SimulationCoordinator interface compiled accessor to { wireSignalMap, labelSignalMap, diagnostics }. Removed CompiledCircuitUnified from interface import. Updated mock-coordinator.ts to match narrowed type. Added Wire and Diagnostic imports. Full suite: 7634/7638 passing (4 pre-existing ENOENT failures, 0 regressions).

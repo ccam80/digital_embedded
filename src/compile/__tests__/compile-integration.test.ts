@@ -5,8 +5,6 @@
  * digital, analog, and mixed-mode circuits.
  *
  * Circuit construction mirrors the patterns used in:
- *   src/engine/__tests__/compiler.test.ts
- *   src/analog/__tests__/compiler.test.ts
  *   src/compile/__tests__/extract-connectivity.test.ts
  */
 
@@ -373,14 +371,14 @@ describe('compileUnified — simple AND gate (digital only)', () => {
     const unified = compileUnified(circuit, registry);
 
     // Both should agree on the net ID for this wire
-    const legacyNetId = reference.wireToNetId.get(wire);
+    const referenceNetId = reference.wireToNetId.get(wire);
     const unifiedAddr = unified.wireSignalMap.get(wire);
 
-    expect(legacyNetId).toBeDefined();
+    expect(referenceNetId).toBeDefined();
     expect(unifiedAddr).toBeDefined();
     expect(unifiedAddr!.domain).toBe('digital');
     if (unifiedAddr!.domain === 'digital') {
-      expect(unifiedAddr.netId).toBe(legacyNetId);
+      expect(unifiedAddr.netId).toBe(referenceNetId);
     }
   });
 });
@@ -410,10 +408,10 @@ describe('compileUnified — SR latch (digital feedback)', () => {
 
     expect(unified.digital).not.toBeNull();
 
-    // Legacy detects feedback SCC
-    const legacyFeedback = reference.evaluationOrder.filter((g) => g.isFeedback);
-    expect(legacyFeedback.length).toBe(1);
-    expect(legacyFeedback[0]!.componentIndices.length).toBe(2);
+    // Reference compiler detects feedback SCC
+    const referenceFeedback = reference.evaluationOrder.filter((g) => g.isFeedback);
+    expect(referenceFeedback.length).toBe(1);
+    expect(referenceFeedback[0]!.componentIndices.length).toBe(2);
 
     // Unified must also detect the same feedback SCC
     const unifiedFeedback = unified.digital!.evaluationOrder.filter((g) => g.isFeedback);
@@ -447,7 +445,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('node count matches reference compileUnified for resistor divider', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -468,7 +466,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('element count matches reference for resistor divider', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -487,7 +485,7 @@ describe('compileUnified — resistor divider (analog only)', () => {
   it('wireSignalMap has analog addresses for all wires', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -518,7 +516,7 @@ describe('compileUnified — RC circuit (analog)', () => {
   it('branch count matches reference for RC circuit', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     // Vs: pos=node1(x=10), neg=ground(x=0)  → 1 branch
     // R:  node1(x=10) — node2(x=20)          → 0 branches
     // C:  node2(x=20) — ground(x=0)          → 1 branch
@@ -540,7 +538,7 @@ describe('compileUnified — RC circuit (analog)', () => {
   it('matrix size matches reference for RC circuit', () => {
     const registry = buildAnalogRegistry();
 
-    const circuit = new Circuit({  });
+    const circuit = new Circuit();
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -874,14 +872,14 @@ describe('compileUnified — labelSignalMap', () => {
     const unified = compileUnified(circuit, registry);
 
     // Both maps should agree on the net ID for label "A"
-    const legacyNetIdA = reference.labelToNetId.get('A');
+    const referenceNetIdA = reference.labelToNetId.get('A');
     const unifiedAddrA = unified.labelSignalMap.get('A');
 
-    expect(legacyNetIdA).toBeDefined();
+    expect(referenceNetIdA).toBeDefined();
     expect(unifiedAddrA).toBeDefined();
     expect(unifiedAddrA!.domain).toBe('digital');
     if (unifiedAddrA!.domain === 'digital') {
-      expect(unifiedAddrA.netId).toBe(legacyNetIdA);
+      expect(unifiedAddrA.netId).toBe(referenceNetIdA);
     }
   });
 });

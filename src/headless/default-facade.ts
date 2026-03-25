@@ -123,7 +123,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._engineMode = engineMode;
 
     const unified = compileUnified(circuit, this._registry, getTransistorModels());
-    const coordinator = new DefaultSimulationCoordinator(unified);
+    const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
     this._coordinator = coordinator;
 
     if (unified.digital !== null && engineMode !== 'analog') {
@@ -149,15 +149,11 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   step(engineOrCoord: SimulationCoordinator | SimulationEngine, opts?: StepOptions): void {
     const advance = opts?.clockAdvance !== false;
 
-    if (advance && this._clockManager !== null && this._coordinator?.digitalBackend instanceof DigitalEngine) {
-      this._clockManager.advanceClocks(this._coordinator.digitalBackend.getSignalArray());
+    if (advance && this._isCoordinator(engineOrCoord)) {
+      engineOrCoord.advanceClocks();
     }
 
-    if (this._isCoordinator(engineOrCoord)) {
-      engineOrCoord.step();
-    } else {
-      engineOrCoord.step();
-    }
+    engineOrCoord.step();
   }
 
   run(engineOrCoord: SimulationCoordinator | SimulationEngine, cycles: number, opts?: StepOptions): void {
@@ -325,7 +321,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Session accessors (not on SimulatorFacade interface)
   // =========================================================================
 
-  /** Returns the currently active coordinator, or null if none compiled yet. */
+  /** @deprecated Use getCoordinator() for typed access. Legacy accessor returning the coordinator as SimulationCoordinator | SimulationEngine union. */
   getEngine(): SimulationCoordinator | SimulationEngine | null {
     return this._coordinator;
   }
