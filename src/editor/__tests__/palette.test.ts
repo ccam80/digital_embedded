@@ -31,7 +31,7 @@ function stubDef(
     factory: (_props) => {
       throw new Error("not needed in palette tests");
     },
-    executeFn: () => {},
+    models: { digital: { executeFn: () => {} } },
   };
 }
 

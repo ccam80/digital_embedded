@@ -44,12 +44,14 @@ const GATE_NAMES = ["And", "NAnd", "Or", "NOr", "XOr", "XNOr", "Not"];
 describe("Registration", () => {
   it("and_has_analog_factory", () => {
     const registry = makeGateRegistry();
-    expect(registry.get("And")!.analogFactory).toBeDefined();
+    expect(registry.get("And")!.models?.analog?.factory).toBeDefined();
   });
 
   it("and_engine_type_is_both", () => {
     const registry = makeGateRegistry();
-    expect(registry.get("And")!.engineType).toBe("both");
+    const def = registry.get("And")!;
+    expect(def.models?.digital).toBeDefined();
+    expect(def.models?.analog).toBeDefined();
   });
 
   it("all_gates_have_analog_factory", () => {
@@ -58,8 +60,8 @@ describe("Registration", () => {
       const def = registry.get(name);
       expect(def, `Expected ${name} to be registered`).toBeDefined();
       expect(
-        def!.analogFactory,
-        `Expected ${name} to have analogFactory`,
+        def!.models?.analog?.factory,
+        `Expected ${name} to have analog factory`,
       ).toBeDefined();
     }
   });
@@ -68,7 +70,8 @@ describe("Registration", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
-      expect(def.engineType, `${name} engineType`).toBe("both");
+      expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
+      expect(def.models?.analog, `${name} should have analog model`).toBeDefined();
     }
   });
 });
@@ -115,27 +118,16 @@ describe("SimulationModes", () => {
   it("and_supports_digital_and_behavioral", () => {
     const registry = makeGateRegistry();
     const def = registry.get("And")!;
-    expect(def.simulationModes).toBeDefined();
-    expect(def.simulationModes).toContain("logical");
-    expect(def.simulationModes).toContain("analog-pins");
+    expect(def.models?.digital).toBeDefined();
+    expect(def.models?.analog).toBeDefined();
   });
 
   it("all_gates_support_digital_and_simplified", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
-      expect(
-        def.simulationModes,
-        `${name} simulationModes`,
-      ).toBeDefined();
-      expect(
-        def.simulationModes,
-        `${name} should include 'logical'`,
-      ).toContain("logical");
-      expect(
-        def.simulationModes,
-        `${name} should include 'analog-pins'`,
-      ).toContain("analog-pins");
+      expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
+      expect(def.models?.analog, `${name} should have analog model`).toBeDefined();
     }
   });
 });

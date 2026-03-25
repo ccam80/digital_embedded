@@ -90,29 +90,27 @@ function noopExec(): ExecuteFunction {
   return (_idx, _state, _layout) => {};
 }
 
-function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinition {
-  const pinLayout = Array.from({ length: pinCount }, (_, i) => ({
-    label: `p${i}`,
-    direction: PinDirection.BIDIRECTIONAL as unknown as import("../../core/pin.js").PinDirection,
-  }));
+function makeAnalogStubDef(typeId: string, _pinCount: number): ComponentDefinition {
   return {
     name: typeId,
     typeId: -1,
     factory: (_props) => new MinimalLeafElement(typeId, "auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: typeId,
-    engineType: "analog",
-    analogFactory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
-      pinNodeIds: [...pinNodes.values()],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      stamp(_s: SparseSolver) {},
-    }),
+    models: {
+      analog: {
+        factory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+          pinNodeIds: [...pinNodes.values()],
+          branchIndex: -1,
+          isNonlinear: false,
+          isReactive: false,
+          stamp(_s: SparseSolver) {},
+        }),
+      },
+    },
   };
 }
 
@@ -121,12 +119,12 @@ function makeDigitalInDef(): ComponentDefinition {
     name: "In",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("In", "auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [{ label: "out", direction: PinDirection.OUTPUT }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "In",
+    models: { digital: { executeFn: noopExec() } },
   };
 }
 
@@ -135,12 +133,12 @@ function makeDigitalOutDef(): ComponentDefinition {
     name: "Out",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("Out", "auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [{ label: "in", direction: PinDirection.INPUT }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "Out",
+    models: { digital: { executeFn: noopExec() } },
   };
 }
 
@@ -149,7 +147,6 @@ function makeAndDef(): ComponentDefinition {
     name: "And",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("And", "auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [
       { label: "In_1", direction: PinDirection.INPUT },
       { label: "In_2", direction: PinDirection.INPUT },
@@ -159,6 +156,7 @@ function makeAndDef(): ComponentDefinition {
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "And",
+    models: { digital: { executeFn: noopExec() } },
   };
 }
 
@@ -167,13 +165,12 @@ function makeGroundDef(): ComponentDefinition {
     name: "Ground",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("Ground", "auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "Ground",
-    engineType: "analog",
+    models: { analog: {} },
   };
 }
 

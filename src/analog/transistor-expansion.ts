@@ -66,7 +66,8 @@ export function expandTransistorModel(
   const diagnostics: SolverDiagnostic[] = [];
 
   // Validate: must have transistorModel set
-  if (!componentDef.transistorModel) {
+  const transistorModelName = componentDef.models?.analog?.transistorModel;
+  if (!transistorModelName) {
     diagnostics.push(
       makeDiagnostic(
         "missing-transistor-model",
@@ -75,11 +76,11 @@ export function expandTransistorModel(
         {
           explanation:
             `The component "${componentDef.name}" is configured for transistor-level simulation ` +
-            `but its ComponentDefinition has no transistorModel field. ` +
-            `Set transistorModel to the name of a registered transistor model subcircuit.`,
+            `but its ComponentDefinition has no models.analog.transistorModel field. ` +
+            `Set models.analog.transistorModel to the name of a registered transistor model subcircuit.`,
           suggestions: [
             {
-              text: `Add transistorModel: 'CmosXxx' to the ComponentDefinition for "${componentDef.name}".`,
+              text: `Add models: { analog: { transistorModel: 'CmosXxx' } } to the ComponentDefinition for "${componentDef.name}".`,
               automatable: false,
             },
           ],
@@ -90,17 +91,17 @@ export function expandTransistorModel(
   }
 
   // Look up the subcircuit in the registry
-  const subcircuit = modelRegistry.get(componentDef.transistorModel);
+  const subcircuit = modelRegistry.get(transistorModelName);
   if (!subcircuit) {
     diagnostics.push(
       makeDiagnostic(
         "missing-transistor-model",
         "error",
-        `Transistor model subcircuit "${componentDef.transistorModel}" is not registered`,
+        `Transistor model subcircuit "${transistorModelName}" is not registered`,
         {
           explanation:
             `Component "${componentDef.name}" references transistor model ` +
-            `"${componentDef.transistorModel}" which has not been registered ` +
+            `"${transistorModelName}" which has not been registered ` +
             `in the TransistorModelRegistry. Call registerAllCmosGateModels() before compiling.`,
         },
       ),
@@ -198,10 +199,10 @@ export function expandTransistorModel(
         makeDiagnostic(
           "invalid-transistor-model",
           "error",
-          `Transistor model "${componentDef.transistorModel}" contains non-analog component "${el.typeId}"`,
+          `Transistor model "${transistorModelName}" contains non-analog component "${el.typeId}"`,
           {
             explanation:
-              `The transistor model subcircuit "${componentDef.transistorModel}" contains ` +
+              `The transistor model subcircuit "${transistorModelName}" contains ` +
               `component type "${el.typeId}" which has no analog factory and cannot be ` +
               `stamped into the MNA matrix. Transistor models must contain only analog ` +
               `leaf components (MOSFETs, resistors, voltage sources, etc.).`,

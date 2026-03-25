@@ -549,10 +549,10 @@ describe("CmosDFF", () => {
 
 describe("Registration", () => {
   it("d_flipflop_has_transistor_model", () => {
-    expect(DDefinition.transistorModel).toBe("CmosDFlipflop");
+    expect(DDefinition.models?.analog?.transistorModel).toBe("CmosDFlipflop");
   });
 
   it("d_flipflop_has_analog_mode", () => {
-    expect(DDefinition.simulationModes).toContain("analog-internals");
+    expect(DDefinition.models?.analog?.transistorModel).toBeDefined();
   });
 });

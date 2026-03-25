@@ -113,13 +113,17 @@ function makeDefinition(
     typeId: -1,
     factory: (props: PropertyBagType) =>
       new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
-    executeFn,
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    ...(defaultDelay !== undefined ? { defaultDelay } : {}),
+    models: {
+      digital: {
+        executeFn,
+        ...(defaultDelay !== undefined ? { defaultDelay } : {}),
+      },
+    },
   };
 }
 

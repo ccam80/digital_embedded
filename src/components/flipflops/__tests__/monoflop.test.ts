@@ -305,7 +305,7 @@ describe("Monoflop", () => {
     });
 
     it("MonoflopDefinition has executeFn=executeMonoflop", () => {
-      expect(MonoflopDefinition.executeFn).toBe(executeMonoflop);
+      expect(MonoflopDefinition.models!.digital!.executeFn).toBe(executeMonoflop);
     });
 
     it("MonoflopDefinition propertyDefs include timerDelay", () => {

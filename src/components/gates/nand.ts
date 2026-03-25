@@ -286,17 +286,10 @@ export const NAndDefinition: ComponentDefinition = {
   name: "NAnd",
   typeId: -1,
   factory: nandFactory,
-  executeFn: executeNAnd,
-  analogFactory: makeNandAnalogFactory(0),
-  transistorModel: "CmosNand2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NAND_PROPERTY_DEFS,
   attributeMap: NAND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "NAnd gate — performs bitwise NOT(AND) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

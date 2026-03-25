@@ -280,7 +280,6 @@ function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinitio
     name: typeId,
     typeId: -1,
     factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: Array.from({ length: pinCount }, (_, i) => ({
       label: `p${i}`,
       direction: PinDirection.BIDIRECTIONAL,
@@ -289,14 +288,17 @@ function makeAnalogStubDef(typeId: string, pinCount: number): ComponentDefinitio
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: typeId,
-    engineType: "analog",
-    analogFactory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
-      pinNodeIds: [...pinNodes.values()],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      stamp(_s: SparseSolver) {},
-    }),
+    models: {
+      analog: {
+        factory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+          pinNodeIds: [...pinNodes.values()],
+          branchIndex: -1,
+          isNonlinear: false,
+          isReactive: false,
+          stamp(_s: SparseSolver) {},
+        }),
+      },
+    },
   };
 }
 
@@ -305,13 +307,12 @@ function makeGroundDef(): ComponentDefinition {
     name: "Ground",
     typeId: -1,
     factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "Ground",
-    engineType: "analog",
+    models: { analog: {} },
   };
 }
 
@@ -320,12 +321,12 @@ function makeDigitalInDef(): ComponentDefinition {
     name: "In",
     typeId: -1,
     factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
-    executeFn: noopExec(),
     pinLayout: [{ label: "out", direction: PinDirection.OUTPUT }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "In",
+    models: { digital: { executeFn: noopExec() } },
   };
 }
 

@@ -287,17 +287,10 @@ export const AndDefinition: ComponentDefinition = {
   name: "And",
   typeId: -1,
   factory: andFactory,
-  executeFn: executeAnd,
-  analogFactory: makeAndAnalogFactory(0),
-  transistorModel: "CmosAnd2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: AND_PROPERTY_DEFS,
   attributeMap: AND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "And gate — performs bitwise AND of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

@@ -473,7 +473,7 @@ describe("AndGate", () => {
     });
 
     it("AndDefinition has executeFn=executeAnd", () => {
-      expect(AndDefinition.executeFn).toBe(executeAnd);
+      expect(AndDefinition.models.digital?.executeFn).toBe(executeAnd);
     });
 
     it("AndDefinition has a non-empty pinLayout", () => {

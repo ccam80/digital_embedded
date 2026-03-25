@@ -68,7 +68,6 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [
       { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' },
@@ -77,6 +76,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
+    models: { digital: { executeFn: noop } },
   });
 
   registry.register({
@@ -85,7 +85,6 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 1),
     ], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [
       { key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' },
@@ -94,6 +93,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
+    models: { digital: { executeFn: noop } },
   });
 
   registry.register({
@@ -108,7 +108,6 @@ function buildRegistry(): ComponentRegistry {
       pins.push(makePin('out', PinDirection.OUTPUT, 4, Math.floor(count / 2)));
       return new StubElement('And', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
     },
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [
       { key: 'inputCount', type: PropertyType.INT, label: 'Inputs', defaultValue: 2 },
@@ -117,6 +116,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop } },
   });
 
   registry.register({
@@ -131,7 +131,6 @@ function buildRegistry(): ComponentRegistry {
       pins.push(makePin('out', PinDirection.OUTPUT, 4, Math.floor(count / 2)));
       return new StubElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
     },
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [
       { key: 'inputCount', type: PropertyType.INT, label: 'Inputs', defaultValue: 2 },
@@ -140,6 +139,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop } },
   });
 
   registry.register({
@@ -149,7 +149,6 @@ function buildRegistry(): ComponentRegistry {
       makePin('in', PinDirection.INPUT, 0, 0),
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [
       { key: 'bitWidth', type: PropertyType.INT, label: 'Bits', defaultValue: 1 },
@@ -157,6 +156,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop } },
   });
 
   return registry;

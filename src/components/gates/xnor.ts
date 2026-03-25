@@ -316,17 +316,10 @@ export const XNOrDefinition: ComponentDefinition = {
   name: "XNOr",
   typeId: -1,
   factory: xnorFactory,
-  executeFn: executeXNOr,
-  analogFactory: makeXnorAnalogFactory(0),
-  transistorModel: "CmosXnor2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XNOR_PROPERTY_DEFS,
   attributeMap: XNOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "XNOr gate — performs bitwise NOT(XOR) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

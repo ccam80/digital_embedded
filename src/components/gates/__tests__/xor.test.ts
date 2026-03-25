@@ -348,7 +348,7 @@ describe("XOrGate", () => {
     });
 
     it("XOrDefinition has executeFn=executeXOr", () => {
-      expect(XOrDefinition.executeFn).toBe(executeXOr);
+      expect(XOrDefinition.models!.digital!.executeFn).toBe(executeXOr);
     });
 
     it("XOrDefinition has a non-empty pinLayout", () => {

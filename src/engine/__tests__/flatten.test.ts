@@ -176,12 +176,14 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
       name: typeId,
       typeId: -1,
       factory: (_props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
-      executeFn: makeNoOpExecute(),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: typeId,
+      models: {
+        digital: { executeFn: makeNoOpExecute() },
+      },
     };
     reg.register(def);
   }

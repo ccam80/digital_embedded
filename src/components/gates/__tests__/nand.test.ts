@@ -291,7 +291,7 @@ describe("NAndGate", () => {
     });
 
     it("NAndDefinition has executeFn=executeNAnd", () => {
-      expect(NAndDefinition.executeFn).toBe(executeNAnd);
+      expect(NAndDefinition.models!.digital!.executeFn).toBe(executeNAnd);
     });
 
     it("NAndDefinition has a non-empty pinLayout", () => {

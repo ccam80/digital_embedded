@@ -439,24 +439,24 @@ describe("T", () => {
 
 describe("Registration", () => {
   it("all_flipflops_have_analog_factory", () => {
-    // JK, RS, T and all async variants must have analogFactory defined
-    expect(JKDefinition.analogFactory).toBeDefined();
-    expect(typeof JKDefinition.analogFactory).toBe("function");
+    // JK, RS, T and all async variants must have analog factory defined
+    expect(JKDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof JKDefinition.models?.analog?.factory).toBe("function");
 
-    expect(RSDefinition.analogFactory).toBeDefined();
-    expect(typeof RSDefinition.analogFactory).toBe("function");
+    expect(RSDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof RSDefinition.models?.analog?.factory).toBe("function");
 
-    expect(TDefinition.analogFactory).toBeDefined();
-    expect(typeof TDefinition.analogFactory).toBe("function");
+    expect(TDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof TDefinition.models?.analog?.factory).toBe("function");
 
-    expect(JKAsyncDefinition.analogFactory).toBeDefined();
-    expect(typeof JKAsyncDefinition.analogFactory).toBe("function");
+    expect(JKAsyncDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof JKAsyncDefinition.models?.analog?.factory).toBe("function");
 
-    expect(RSAsyncDefinition.analogFactory).toBeDefined();
-    expect(typeof RSAsyncDefinition.analogFactory).toBe("function");
+    expect(RSAsyncDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof RSAsyncDefinition.models?.analog?.factory).toBe("function");
 
-    expect(DAsyncDefinition.analogFactory).toBeDefined();
-    expect(typeof DAsyncDefinition.analogFactory).toBe("function");
+    expect(DAsyncDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof DAsyncDefinition.models?.analog?.factory).toBe("function");
   });
 });
 

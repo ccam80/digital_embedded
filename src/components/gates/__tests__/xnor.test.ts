@@ -334,7 +334,7 @@ describe("XNOrGate", () => {
     });
 
     it("XNOrDefinition has executeFn=executeXNOr", () => {
-      expect(XNOrDefinition.executeFn).toBe(executeXNOr);
+      expect(XNOrDefinition.models!.digital!.executeFn).toBe(executeXNOr);
     });
 
     it("XNOrDefinition has a non-empty pinLayout", () => {

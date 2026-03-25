@@ -269,7 +269,7 @@ describe("FlipflopD", () => {
     });
 
     it("DDefinition has executeFn=executeD", () => {
-      expect(DDefinition.executeFn).toBe(executeD);
+      expect(DDefinition.models!.digital!.executeFn).toBe(executeD);
     });
 
     it("DDefinition can be registered without error", () => {
@@ -362,7 +362,7 @@ describe("FlipflopDAsync", () => {
     });
 
     it("DAsyncDefinition has executeFn=executeDAsync", () => {
-      expect(DAsyncDefinition.executeFn).toBe(executeDAsync);
+      expect(DAsyncDefinition.models!.digital!.executeFn).toBe(executeDAsync);
     });
 
     it("DAsyncDefinition can be registered without error", () => {
@@ -506,7 +506,7 @@ describe("FlipflopJK", () => {
     });
 
     it("JKDefinition has executeFn=executeJK", () => {
-      expect(JKDefinition.executeFn).toBe(executeJK);
+      expect(JKDefinition.models!.digital!.executeFn).toBe(executeJK);
     });
 
     it("JKDefinition can be registered without error", () => {
@@ -714,7 +714,7 @@ describe("FlipflopRS", () => {
     });
 
     it("RSDefinition has executeFn=executeRS", () => {
-      expect(RSDefinition.executeFn).toBe(executeRS);
+      expect(RSDefinition.models!.digital!.executeFn).toBe(executeRS);
     });
 
     it("RSDefinition can be registered without error", () => {
@@ -825,7 +825,7 @@ describe("FlipflopRSAsync", () => {
     });
 
     it("RSAsyncDefinition has executeFn=executeRSAsync", () => {
-      expect(RSAsyncDefinition.executeFn).toBe(executeRSAsync);
+      expect(RSAsyncDefinition.models!.digital!.executeFn).toBe(executeRSAsync);
     });
 
     it("RSAsyncDefinition can be registered without error", () => {
@@ -996,7 +996,7 @@ describe("FlipflopT", () => {
     });
 
     it("TDefinition has executeFn=executeT", () => {
-      expect(TDefinition.executeFn).toBe(executeT);
+      expect(TDefinition.models!.digital!.executeFn).toBe(executeT);
     });
 
     it("TDefinition can be registered without error", () => {

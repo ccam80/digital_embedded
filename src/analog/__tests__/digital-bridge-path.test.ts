@@ -104,7 +104,6 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
       isNegated: false,
       isClock: false,
     }]),
-    executeFn: noopExecuteFn as unknown as ExecuteFunction,
     pinLayout: [{
       label: "out",
       direction: PinDirection.OUTPUT,
@@ -117,6 +116,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction } },
   });
 
   // Out: one INPUT pin at (0,0), label and bitWidth from props
@@ -131,7 +131,6 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
       isNegated: false,
       isClock: false,
     }]),
-    executeFn: noopExecuteFn as unknown as ExecuteFunction,
     pinLayout: [{
       label: "in",
       direction: PinDirection.INPUT,
@@ -144,6 +143,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction } },
   });
 
   // DigitalXor: 2 INPUT pins + 1 OUTPUT pin, engineType "both"

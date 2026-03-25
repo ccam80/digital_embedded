@@ -323,7 +323,7 @@ describe("NOrGate", () => {
     });
 
     it("NOrDefinition has executeFn=executeNOr", () => {
-      expect(NOrDefinition.executeFn).toBe(executeNOr);
+      expect(NOrDefinition.models!.digital!.executeFn).toBe(executeNOr);
     });
 
     it("NOrDefinition has a non-empty pinLayout", () => {

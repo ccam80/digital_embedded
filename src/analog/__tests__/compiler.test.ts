@@ -122,7 +122,6 @@ function makeBaseDef(name: string) {
   return {
     name,
     typeId: -1,
-    executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
     pinLayout: [] as import("../../core/pin.js").PinDeclaration[],
     propertyDefs: [] as import("../../core/properties.js").PropertyDefinition[],
     attributeMap: [] as import("../../core/registry.js").AttributeMapping[],
@@ -140,61 +139,76 @@ function buildTestRegistry(): ComponentRegistry {
 
   registry.register({
     ...makeBaseDef("AnalogVs"),
-    engineType: "analog" as const,
-    requiresBranchRow: true,
-    analogFactory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-      const [n0, n1] = [...pinNodes.values()];
-      return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+    models: {
+      analog: {
+        requiresBranchRow: true,
+        factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+          const [n0, n1] = [...pinNodes.values()];
+          return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+        },
+      },
     },
   });
 
   registry.register({
     ...makeBaseDef("AnalogR"),
-    engineType: "analog" as const,
-    requiresBranchRow: false,
-    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-      const [n0, n1] = [...pinNodes.values()];
-      return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+    models: {
+      analog: {
+        requiresBranchRow: false,
+        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+          const [n0, n1] = [...pinNodes.values()];
+          return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+        },
+      },
     },
   });
 
   registry.register({
     ...makeBaseDef("AnalogL"),
-    engineType: "analog" as const,
-    requiresBranchRow: true,
-    analogFactory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-      const [n0, n1] = [...pinNodes.values()];
-      return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+    models: {
+      analog: {
+        requiresBranchRow: true,
+        factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+          const [n0, n1] = [...pinNodes.values()];
+          return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+        },
+      },
     },
   });
 
   registry.register({
     ...makeBaseDef("Ground"),
-    engineType: "analog" as const,
+    models: { analog: {} },
   });
 
   registry.register({
     ...makeBaseDef("In"),
-    engineType: "analog" as const,
-    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-      const [n0] = [...pinNodes.values()];
-      return makeTestResistorElement(n0 ?? 0, 0);
+    models: {
+      analog: {
+        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+          const [n0] = [...pinNodes.values()];
+          return makeTestResistorElement(n0 ?? 0, 0);
+        },
+      },
     },
   });
 
   registry.register({
     ...makeBaseDef("Out"),
-    engineType: "analog" as const,
-    analogFactory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-      const [n0] = [...pinNodes.values()];
-      return makeTestResistorElement(n0 ?? 0, 0);
+    models: {
+      analog: {
+        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+          const [n0] = [...pinNodes.values()];
+          return makeTestResistorElement(n0 ?? 0, 0);
+        },
+      },
     },
   });
 
-  // AND gate — digital-only (no engineType → defaults to "digital")
+  // AND gate — digital-only
   registry.register({
     ...makeBaseDef("And"),
-    // no engineType → "digital"
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
   });
 
   return registry;
@@ -393,18 +407,21 @@ describe("AnalogCompiler", () => {
 
     registry.register({
       ...makeBaseDef("SpyVs"),
-      engineType: "analog" as const,
-      requiresBranchRow: true,
       pinLayout: [
         { label: "pos", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
         { label: "neg", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
       ],
-      analogFactory: factorySpy,
+      models: {
+        analog: {
+          requiresBranchRow: true,
+          factory: factorySpy,
+        },
+      },
     });
 
     registry.register({
       ...makeBaseDef("Ground"),
-      engineType: "analog" as const,
+      models: { analog: {} },
     });
 
     // Vs: pos at (10,0), neg at (0,0) = ground

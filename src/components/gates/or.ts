@@ -300,17 +300,10 @@ export const OrDefinition: ComponentDefinition = {
   name: "Or",
   typeId: -1,
   factory: orFactory,
-  executeFn: executeOr,
-  analogFactory: makeOrAnalogFactory(0),
-  transistorModel: "CmosOr2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: OR_PROPERTY_DEFS,
   attributeMap: OR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "Or gate — performs bitwise OR of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

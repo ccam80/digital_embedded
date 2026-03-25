@@ -339,7 +339,7 @@ describe("NotGate", () => {
     });
 
     it("NotDefinition has executeFn=executeNot", () => {
-      expect(NotDefinition.executeFn).toBe(executeNot);
+      expect(NotDefinition.models!.digital!.executeFn).toBe(executeNot);
     });
 
     it("NotDefinition has a non-empty pinLayout", () => {

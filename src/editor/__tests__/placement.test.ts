@@ -42,7 +42,6 @@ function makeMockDefinition(): ComponentDefinition {
     name: "MockComp",
     typeId: -1,
     factory: (_props: PropertyBag): CircuitElement => makeStubElement(),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],

@@ -374,7 +374,7 @@ describe("OrGate", () => {
     });
 
     it("OrDefinition has executeFn=executeOr", () => {
-      expect(OrDefinition.executeFn).toBe(executeOr);
+      expect(OrDefinition.models!.digital!.executeFn).toBe(executeOr);
     });
 
     it("OrDefinition has a non-empty pinLayout", () => {

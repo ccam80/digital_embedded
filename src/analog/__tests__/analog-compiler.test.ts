@@ -98,7 +98,6 @@ function makeBaseDef(name: string) {
   return {
     name,
     typeId: -1,
-    executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
     pinLayout: [] as PinDeclaration[],
     propertyDefs: [] as import("../../core/properties.js").PropertyDefinition[],
     attributeMap: [] as import("../../core/registry.js").AttributeMapping[],
@@ -135,23 +134,25 @@ function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): Compone
 
   registry.register({
     ...makeBaseDef("Ground"),
-    engineType: "analog" as const,
+    models: { analog: {} },
   });
 
   const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
 
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
-    engineType: "both" as const,
     pinLayout: makeGatePinLayout(2),
     simulationModes: ["logical", "analog-pins"] as const,
-    analogFactory: andFactory as unknown as import("../../core/registry.js").ComponentDefinition["analogFactory"],
+    models: {
+      digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
+      analog: { factory: andFactory as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+    },
   });
 
-  // Digital-only gate (no analogFactory, no engineType → defaults to "digital")
+  // Digital-only gate
   registry.register({
     ...makeBaseDef("DigitalOnlyGate"),
-    // no engineType → "digital"
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
   });
 
   return registry;
@@ -271,13 +272,13 @@ describe("BehavioralCompilation", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      engineType: "analog" as const,
+      models: { analog: {} },
     });
 
-    // Digital-only component — no engineType means "digital"
+    // Digital-only component — only digital model, no analog
     registry.register({
       ...makeBaseDef("PureDigital"),
-      // no engineType → defaults to "digital"
+      models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
 
     const digitalComp = makeElement("PureDigital", "d1", [{ x: 10, y: 0 }]);
@@ -306,19 +307,23 @@ describe("BehavioralCompilation", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      engineType: "analog" as const,
+      models: { analog: {} },
     });
 
     // Register a gate with per-pin rOut override on "out" pin
     registry.register({
       ...makeBaseDef("HighDriveAnd"),
-      engineType: "both" as const,
       pinLayout: makeGatePinLayout(2),
       simulationModes: ["logical", "analog-pins"] as const,
-      pinElectricalOverrides: {
-        out: { rOut: 25 },
+      models: {
+        digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
+        analog: {
+          factory: factorySpy as unknown as import("../../core/registry.js").AnalogModel["factory"],
+          pinElectricalOverrides: {
+            out: { rOut: 25 },
+          },
+        },
       },
-      analogFactory: factorySpy as unknown as import("../../core/registry.js").ComponentDefinition["analogFactory"],
     });
 
     const andGate = makeElement("HighDriveAnd", "and1", [
@@ -411,7 +416,7 @@ describe("SimulationMode", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      engineType: "analog" as const,
+      models: { analog: {} },
     });
 
     registry.register({
@@ -424,9 +429,9 @@ describe("SimulationMode", () => {
         isNegated: false,
         isClock: false,
       }]),
-      executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
       pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
       propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+      models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
 
     registry.register({
@@ -439,14 +444,13 @@ describe("SimulationMode", () => {
         isNegated: false,
         isClock: false,
       }]),
-      executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction,
       pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
       propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+      models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
 
     registry.register({
       ...makeBaseDef("BehavioralAnd"),
-      engineType: "both" as const,
       pinLayout: makeGatePinLayout(2),
       simulationModes: ["logical", "analog-pins"] as const,
       factory: makeStubElFactory("BehavioralAnd", (_props) => [
@@ -454,7 +458,10 @@ describe("SimulationMode", () => {
         { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false },
         { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false },
       ]),
-      analogFactory: factorySpy as unknown as import("../../core/registry.js").ComponentDefinition["analogFactory"],
+      models: {
+        digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
+        analog: { factory: factorySpy as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+      },
     });
 
     // Build the outer analog circuit with the AND gate set to simulationMode: "logical"

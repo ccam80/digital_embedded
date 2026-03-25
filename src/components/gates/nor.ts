@@ -308,17 +308,10 @@ export const NOrDefinition: ComponentDefinition = {
   name: "NOr",
   typeId: -1,
   factory: norFactory,
-  executeFn: executeNOr,
-  analogFactory: makeNorAnalogFactory(0),
-  transistorModel: "CmosNor2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: NOR_PROPERTY_DEFS,
   attributeMap: NOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "NOr gate — performs bitwise NOT(OR) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

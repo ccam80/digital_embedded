@@ -238,8 +238,8 @@
   "hotPaths": [
     {
       "path": "src\\analog\\compiler.ts",
-      "accessCount": 182,
-      "lastAccessed": 1774402468079,
+      "accessCount": 183,
+      "lastAccessed": 1774403994502,
       "type": "file"
     },
     {
@@ -273,15 +273,15 @@
       "type": "directory"
     },
     {
-      "path": "",
-      "accessCount": 49,
-      "lastAccessed": 1774399154497,
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 50,
+      "lastAccessed": 1774404368061,
       "type": "directory"
     },
     {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 48,
-      "lastAccessed": 1774400937356,
+      "path": "",
+      "accessCount": 49,
+      "lastAccessed": 1774399154497,
       "type": "directory"
     },
     {
@@ -297,15 +297,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 42,
-      "lastAccessed": 1774398110600,
+      "path": "src\\components",
+      "accessCount": 43,
+      "lastAccessed": 1774404414947,
       "type": "directory"
     },
     {
-      "path": "src\\components",
-      "accessCount": 41,
-      "lastAccessed": 1774403362025,
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 42,
+      "lastAccessed": 1774398110600,
       "type": "directory"
     },
     {
@@ -321,16 +321,16 @@
       "type": "file"
     },
     {
+      "path": "src\\analog\\transistor-expansion.ts",
+      "accessCount": 21,
+      "lastAccessed": 1774404014490,
+      "type": "directory"
+    },
+    {
       "path": "src\\analog\\behavioral-gate.ts",
       "accessCount": 20,
       "lastAccessed": 1774390124956,
       "type": "file"
-    },
-    {
-      "path": "src\\analog\\transistor-expansion.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774401352849,
-      "type": "directory"
     },
     {
       "path": "src\\analog\\__tests__\\fet-base.test.ts",
@@ -340,8 +340,8 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774403308208,
+      "accessCount": 17,
+      "lastAccessed": 1774404086579,
       "type": "file"
     },
     {

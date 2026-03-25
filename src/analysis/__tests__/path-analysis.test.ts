@@ -66,12 +66,12 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     name: 'In',
     typeId: -1,
     factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
+    models: { digital: { executeFn: noop, defaultDelay: 0 } },
     defaultDelay: 0,
   });
 
@@ -79,12 +79,12 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     name: 'Out',
     typeId: -1,
     factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
+    models: { digital: { executeFn: noop, defaultDelay: 0 } },
     defaultDelay: 0,
   });
 
@@ -92,12 +92,12 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     name: 'And',
     typeId: -1,
     factory: (props) => new StubElement('And', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop, defaultDelay: andDelay } },
     defaultDelay: andDelay,
   });
 
@@ -105,12 +105,12 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     name: 'Or',
     typeId: -1,
     factory: (props) => new StubElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop, defaultDelay: orDelay } },
     defaultDelay: orDelay,
   });
 
@@ -118,12 +118,12 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     name: 'Not',
     typeId: -1,
     factory: (props) => new StubElement('Not', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
-    executeFn: noop,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
+    models: { digital: { executeFn: noop, defaultDelay: notDelay } },
     defaultDelay: notDelay,
   });
 

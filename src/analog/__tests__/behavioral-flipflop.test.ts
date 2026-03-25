@@ -314,21 +314,22 @@ describe("DFF", () => {
 describe("Registration", () => {
   it("d_flipflop_has_analog_factory", () => {
     // DDefinition.name is "D_FF" in this codebase
-    expect(DDefinition.analogFactory).toBeDefined();
-    expect(typeof DDefinition.analogFactory).toBe("function");
+    expect(DDefinition.models?.analog?.factory).toBeDefined();
+    expect(typeof DDefinition.models?.analog?.factory).toBe("function");
   });
 
   it("d_flipflop_engine_type_is_both", () => {
-    expect(DDefinition.engineType).toBe("both");
+    expect(DDefinition.models?.digital).toBeDefined();
+    expect(DDefinition.models?.analog).toBeDefined();
   });
 
   it("d_flipflop_simulation_modes_include_digital_and_simplified", () => {
-    expect(DDefinition.simulationModes).toContain("logical");
-    expect(DDefinition.simulationModes).toContain("analog-pins");
+    expect(DDefinition.models?.digital).toBeDefined();
+    expect(DDefinition.models?.analog).toBeDefined();
   });
 
   it("analog_factory_returns_analog_element", () => {
-    const factory = DDefinition.analogFactory!;
+    const factory = DDefinition.models!.analog!.factory!;
     // nodeIds: [D=1, C=2, Q=3, ~Q=4]
     // Use the factory directly — it reads _pinElectrical from props (falls back to CMOS 3.3V defaults)
     const props = {

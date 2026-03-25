@@ -308,17 +308,10 @@ export const XOrDefinition: ComponentDefinition = {
   name: "XOr",
   typeId: -1,
   factory: xorFactory,
-  executeFn: executeXOr,
-  analogFactory: makeXorAnalogFactory(0),
-  transistorModel: "CmosXor2",
-  simulationModes: ["logical", "analog-pins", "analog-internals"],
-  engineType: "both",
   pinLayout: buildPinDeclarations(2, 1, false),
   propertyDefs: XOR_PROPERTY_DEFS,
   attributeMap: XOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["In_1", "In_2"],
-  outputSchema: ["out"],
   helpText:
     "XOr gate — performs bitwise XOR of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +

@@ -123,13 +123,17 @@ function makeRegistry(name: string, defaultDelay?: number): ComponentRegistry {
     name,
     typeId: -1,
     factory: (_props) => new MockElement(name),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    ...(defaultDelay !== undefined ? { defaultDelay } : {}),
+    models: {
+      digital: {
+        executeFn: () => {},
+        ...(defaultDelay !== undefined ? { defaultDelay } : {}),
+      },
+    },
   };
   registry.register(def);
   return registry;

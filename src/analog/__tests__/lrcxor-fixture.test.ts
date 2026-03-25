@@ -182,27 +182,25 @@ function buildDigitalRegistry(): ComponentRegistry {
   registry.register({
     name: "In",
     typeId: -1,
-    engineType: "digital" as const,
     factory: inStubFactory,
-    executeFn: noopExecuteFn as unknown as ComponentDefinition["executeFn"],
     pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
     category: 0,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as ComponentDefinition["executeFn"] as import("../../core/registry.js").ExecuteFunction } },
   } as unknown as ComponentDefinition);
 
   registry.register({
     name: "Out",
     typeId: -1,
-    engineType: "digital" as const,
     factory: outStubFactory,
-    executeFn: noopExecuteFn as unknown as ComponentDefinition["executeFn"],
     pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
     category: 0,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as ComponentDefinition["executeFn"] as import("../../core/registry.js").ExecuteFunction } },
   } as unknown as ComponentDefinition);
 
   return registry;
@@ -746,33 +744,28 @@ function buildFixtureRegistry(): ComponentRegistry {
     getHelpText() { return ""; },
   } as unknown as CircuitElement);
 
-  const importedComponentDefinition = {} as import("../../core/registry.js").ComponentDefinition;
   registry.register({
-    ...importedComponentDefinition,
     name: "In",
     typeId: -1,
-    engineType: "digital" as const,
     factory: inStubFactory,
-    executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ComponentDefinition["executeFn"],
     pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
     category: 0,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
   } as unknown as import("../../core/registry.js").ComponentDefinition);
 
   registry.register({
-    ...importedComponentDefinition,
     name: "Out",
     typeId: -1,
-    engineType: "digital" as const,
     factory: outStubFactory,
-    executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ComponentDefinition["executeFn"],
     pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
     category: 0,
     helpText: "",
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
   } as unknown as import("../../core/registry.js").ComponentDefinition);
 
   return registry;

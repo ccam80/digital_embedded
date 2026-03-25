@@ -251,20 +251,10 @@ export const DDefinition: ComponentDefinition = {
   name: "D_FF",
   typeId: -1,
   factory: dFactory,
-  executeFn: executeD,
-  sampleFn: sampleD,
-  stateSlotCount: 2,
-  defaultDelay: 10,
-  engineType: "both",
-  analogFactory: makeDFlipflopAnalogFactory(),
-  transistorModel: 'CmosDFlipflop',
-  simulationModes: ['logical', 'analog-pins', 'analog-internals'],
   pinLayout: D_FF_PIN_DECLARATIONS,
   propertyDefs: D_FF_PROPERTY_DEFS,
   attributeMap: D_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
-  inputSchema: ["D", "C"],
-  outputSchema: ["Q", "~Q"],
   helpText:
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +

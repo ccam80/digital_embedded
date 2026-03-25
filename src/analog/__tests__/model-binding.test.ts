@@ -231,13 +231,12 @@ describe("ModelBinding", () => {
       name: "Ground",
       typeId: -1,
       factory: (_props) => { throw new Error("unused"); },
-      executeFn: noopExecFn(),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "Ground",
-      engineType: "analog",
+      models: { analog: {} },
     } as unknown as ComponentDefinition);
 
     // DiodeStub — analog component with analogDeviceType = "D"
@@ -245,7 +244,6 @@ describe("ModelBinding", () => {
       name: "DiodeStub",
       typeId: -1,
       factory: (_props) => { throw new Error("unused"); },
-      executeFn: noopExecFn(),
       pinLayout: [
         { label: "A", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
         { label: "K", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
@@ -254,9 +252,12 @@ describe("ModelBinding", () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "DiodeStub",
-      engineType: "analog",
-      analogDeviceType: "D",
-      analogFactory: diodeFactory,
+      models: {
+        analog: {
+          deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+          factory: diodeFactory,
+        },
+      },
     } as unknown as ComponentDefinition);
 
     // Build circuit: Ground at (0,0), DiodeStub anode=(10,0) cathode=(0,0)

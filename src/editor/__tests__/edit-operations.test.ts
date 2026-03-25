@@ -75,12 +75,12 @@ function makeDefinition(typeId: string = "StubComp"): ComponentDefinition {
         getAttribute: (_name: string): PropertyValue | undefined => undefined,
       };
     },
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "stub",
+    models: { digital: { executeFn: () => {} } },
   };
 }
 

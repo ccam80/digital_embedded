@@ -257,7 +257,7 @@ describe("PNP", () => {
 describe("Registration", () => {
   describe("npn_darlington_registered", () => {
     it("DarlingtonNPN has transistorModel set", () => {
-      expect(DarlingtonNpnDefinition.transistorModel).toBe("DarlingtonNPN");
+      expect(DarlingtonNpnDefinition.models?.analog?.transistorModel).toBe("DarlingtonNPN");
     });
 
     it("DarlingtonNPN is in SEMICONDUCTORS category", () => {
@@ -270,7 +270,7 @@ describe("Registration", () => {
     });
 
     it("DarlingtonPNP has transistorModel set", () => {
-      expect(DarlingtonPnpDefinition.transistorModel).toBe("DarlingtonPNP");
+      expect(DarlingtonPnpDefinition.models?.analog?.transistorModel).toBe("DarlingtonPNP");
     });
 
     it("registerDarlingtonModels registers both models in registry", () => {

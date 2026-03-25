@@ -423,14 +423,10 @@ export const BooleanFunctionDefinition: ComponentDefinition = {
   name: "Function",
   typeId: -1,
   factory: booleanFunctionFactory,
-  executeFn: executeBooleanFunction,
-  defaultDelay: 10,
   pinLayout: buildFunctionPinDeclarations(2, 1),
   propertyDefs: BOOLEAN_FUNCTION_PROPERTY_DEFS,
   attributeMap: BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
-  inputSchema: ["in0", "in1"],
-  outputSchema: ["out"],
   helpText:
     "Boolean Function — a user-defined combinational function expressed as a truth table.\n" +
     "inputCount sets the number of input variables (1–8).\n" +

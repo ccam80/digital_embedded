@@ -799,7 +799,7 @@ describe("CmosBuffer", () => {
 
 describe("Registration", () => {
   it("not_has_transistor_model", () => {
-    expect(NotDefinition.transistorModel).toBe("CmosInverter");
+    expect(NotDefinition.models?.analog?.transistorModel).toBe("CmosInverter");
   });
 
   it("all_gates_have_transistor_mode", () => {
@@ -814,7 +814,7 @@ describe("Registration", () => {
     ];
 
     for (const { name, def } of gateTypes) {
-      expect(def.simulationModes, `${name} simulationModes`).toContain("analog-internals");
+      expect(def.models?.analog?.transistorModel, `${name} transistorModel`).toBeDefined();
     }
   });
 

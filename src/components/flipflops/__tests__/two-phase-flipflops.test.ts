@@ -96,7 +96,7 @@ describe("DFlipFlop", () => {
 
 describe("AsyncDFlipFlop", () => {
   it("has_no_sampleFn", () => {
-    expect(DAsyncDefinition.sampleFn).toBeUndefined();
+    expect(DAsyncDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 });
 
@@ -177,11 +177,11 @@ describe("RSFlipFlop", () => {
 
 describe("AsyncFlipFlops", () => {
   it("JKAsyncDefinition has no sampleFn", () => {
-    expect(JKAsyncDefinition.sampleFn).toBeUndefined();
+    expect(JKAsyncDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 
   it("RSAsyncDefinition has no sampleFn", () => {
-    expect(RSAsyncDefinition.sampleFn).toBeUndefined();
+    expect(RSAsyncDefinition.models?.digital?.sampleFn).toBeUndefined();
   });
 });
 
@@ -209,22 +209,22 @@ describe("Monoflop", () => {
 
 describe("Definitions", () => {
   it("DDefinition has sampleFn", () => {
-    expect(DDefinition.sampleFn).toBe(sampleD);
+    expect(DDefinition.models!.digital!.sampleFn).toBe(sampleD);
   });
 
   it("JKDefinition has sampleFn", () => {
-    expect(JKDefinition.sampleFn).toBe(sampleJK);
+    expect(JKDefinition.models!.digital!.sampleFn).toBe(sampleJK);
   });
 
   it("TDefinition has sampleFn", () => {
-    expect(TDefinition.sampleFn).toBe(sampleT);
+    expect(TDefinition.models!.digital!.sampleFn).toBe(sampleT);
   });
 
   it("RSDefinition has sampleFn", () => {
-    expect(RSDefinition.sampleFn).toBe(sampleRS);
+    expect(RSDefinition.models!.digital!.sampleFn).toBe(sampleRS);
   });
 
   it("MonoflopDefinition has sampleFn", () => {
-    expect(MonoflopDefinition.sampleFn).toBe(sampleMonoflop);
+    expect(MonoflopDefinition.models!.digital!.sampleFn).toBe(sampleMonoflop);
   });
 });

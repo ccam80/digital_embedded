@@ -304,7 +304,6 @@ export const DarlingtonNpnDefinition: ComponentDefinition = {
   models: {
     analog: { transistorModel: "DarlingtonNPN" },
   },
-  transistorModel: "DarlingtonNPN",
 };
 
 export const DarlingtonPnpDefinition: ComponentDefinition = {
@@ -324,5 +323,4 @@ export const DarlingtonPnpDefinition: ComponentDefinition = {
   models: {
     analog: { transistorModel: "DarlingtonPNP" },
   },
-  transistorModel: "DarlingtonPNP",
 };
