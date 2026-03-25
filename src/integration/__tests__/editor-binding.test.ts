@@ -108,7 +108,7 @@ describe("EditorBinding", () => {
     binding.bind(circuit, coordinator, analogWireMap, pinSignalMap);
 
     const value = binding.getWireValue(analogWire);
-    expect(value).toBeCloseTo(3.3);
+    expect(value).toBe(3.3);
   });
 
   it("setInput — calls coordinator.writeSignal() with correct address and digital SignalValue", () => {
@@ -132,5 +132,20 @@ describe("EditorBinding", () => {
   it("engine accessor — returns digitalBackend from coordinator when bound", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.engine).toBeNull();
+  });
+
+  it("engine accessor — returns non-null digitalBackend when coordinator has one", () => {
+    const mockEngine = {
+      step: () => {},
+      reset: () => {},
+      dispose: () => {},
+      getSignal: () => ({ type: "digital" as const, value: 0 }),
+      setSignal: () => {},
+      addObserver: () => {},
+      removeObserver: () => {},
+    } as unknown as import("@/core/engine-interface").SimulationEngine;
+    coordinator.setDigitalBackend(mockEngine);
+    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
+    expect(binding.engine).toBe(mockEngine);
   });
 });

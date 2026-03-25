@@ -276,7 +276,7 @@ describe("PropertyPanel", () => {
   // showSimulationModeDropdown tests
   // ---------------------------------------------------------------------------
 
-  it("simulationModeDropdown_multiModelShowsDropdown — multi-model component adds simulationMode row", () => {
+  it("simulationModelDropdown_multiModelShowsDropdown — multi-model component adds simulationModel row", () => {
     const def: ComponentDefinition = {
       name: "BehavioralAnd",
       typeId: -1,
@@ -299,11 +299,14 @@ describe("PropertyPanel", () => {
 
     // One new row should be added
     expect(container.children.length).toBe(countBefore + 1);
-    // simulationMode input should be registered
-    expect(panel.getInput("simulationMode")).toBeDefined();
+    // simulationModel input should be registered
+    const input = panel.getInput("simulationModel");
+    expect(input).toBeDefined();
+    // Initial value should default to "digital" (first available model when no defaultModel set)
+    expect(input!.getValue()).toBe("digital");
   });
 
-  it("simulationModeDropdown_singleModelNoDropdown — single-model component does not add dropdown", () => {
+  it("simulationModelDropdown_singleModelNoDropdown — single-model component does not add dropdown", () => {
     const def: ComponentDefinition = {
       name: "And",
       typeId: -1,
@@ -325,10 +328,10 @@ describe("PropertyPanel", () => {
 
     // No row added for single-model component
     expect(container.children.length).toBe(countBefore);
-    expect(panel.getInput("simulationMode")).toBeUndefined();
+    expect(panel.getInput("simulationModel")).toBeUndefined();
   });
 
-  it("simulationModeDropdown_usesDefaultModel — uses def.defaultModel as initial value when no bag entry", () => {
+  it("simulationModelDropdown_usesDefaultModel — uses def.defaultModel as initial value when no bag entry", () => {
     const def: ComponentDefinition = {
       name: "BehavioralAnd",
       typeId: -1,
@@ -348,13 +351,13 @@ describe("PropertyPanel", () => {
     panel.showProperties(el as any, []);
     panel.showSimulationModeDropdown(el as any, def as any);
 
-    const input = panel.getInput("simulationMode")!;
+    const input = panel.getInput("simulationModel")!;
     expect(input).toBeDefined();
     // Default should be "analog" per def.defaultModel
     expect(input.getValue()).toBe("analog");
   });
 
-  it("simulationModeDropdown_changeUpdatesBagAndFiresCallback — changing dropdown updates PropertyBag and fires callback", () => {
+  it("simulationModelDropdown_changeUpdatesBagAndFiresCallback — changing dropdown updates PropertyBag and fires callback", () => {
     const def: ComponentDefinition = {
       name: "BehavioralAnd",
       typeId: -1,
@@ -385,15 +388,15 @@ describe("PropertyPanel", () => {
     // Callback should have fired
     expect(onChange).toHaveBeenCalledOnce();
     const [key, , newVal] = onChange.mock.calls[0]!;
-    expect(key).toBe("simulationMode");
+    expect(key).toBe("simulationModel");
     expect(newVal).toBe("analog");
 
     // PropertyBag should be updated
     const bag = el.getProperties();
-    expect(bag.get("simulationMode")).toBe("analog");
+    expect(bag.get("simulationModel")).toBe("analog");
   });
 
-  it("simulationModeDropdown_existingBagValueUsedAsDefault — bag value takes precedence over def.defaultModel", () => {
+  it("simulationModelDropdown_existingBagValueUsedAsDefault — bag value takes precedence over def.defaultModel", () => {
     const def: ComponentDefinition = {
       name: "BehavioralAnd",
       typeId: -1,
@@ -411,11 +414,11 @@ describe("PropertyPanel", () => {
     };
     // Pre-set bag with "analog"
     const el = makeElement([]);
-    el.getProperties().set("simulationMode", "analog");
+    el.getProperties().set("simulationModel", "analog");
     panel.showProperties(el as any, []);
     panel.showSimulationModeDropdown(el as any, def as any);
 
-    const input = panel.getInput("simulationMode")!;
+    const input = panel.getInput("simulationModel")!;
     expect(input).toBeDefined();
     // Bag value "analog" should override defaultModel "digital"
     expect(input.getValue()).toBe("analog");

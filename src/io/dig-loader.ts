@@ -347,9 +347,6 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
       metadata.customShape = convertCustomShapeData(entry.value.value);
     }
     if (entry.key === "engineType" && entry.value.type === "string") {
-      // engineType is read from .dig XML for backward compatibility but is
-      // not stored on CircuitMetadata — the unified compiler derives the
-      // simulation domain from component models.
     }
   }
 

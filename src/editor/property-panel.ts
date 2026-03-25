@@ -148,14 +148,14 @@ export class PropertyPanel {
    * simulation modes in an analog circuit.
    *
    * Called after showProperties() when the circuit has analog components and
-   * the selected component has simulationModes with more than one entry. The
+   * the selected component has simulationModels with more than one entry. The
    * dropdown is appended after the regular property rows.
    *
    * Default is "analog-pins" (read at call time, never persisted on the element
    * until the user changes it).
    *
    * @param element   The selected circuit element.
-   * @param def       The component definition declaring simulationModes.
+   * @param def       The component definition declaring simulationModels.
    */
   showSimulationModeDropdown(
     element: CircuitElement,
@@ -166,8 +166,8 @@ export class PropertyPanel {
 
     const bag = element.getProperties();
     const defaultMode = def.defaultModel ?? modes[0] ?? "analog-pins";
-    const current = bag.has("simulationMode")
-      ? (bag.get("simulationMode") as string)
+    const current = bag.has("simulationModel")
+      ? (bag.get("simulationModel") as string)
       : defaultMode;
 
     const select = document.createElement("select") as unknown as HTMLSelectElement & { value: string };
@@ -184,18 +184,18 @@ export class PropertyPanel {
 
     (select as unknown as { addEventListener(e: string, cb: () => void): void }).addEventListener("change", () => {
       const newMode = select.value;
-      const oldValue = bag.has("simulationMode")
-        ? bag.get("simulationMode")
+      const oldValue = bag.has("simulationModel")
+        ? bag.get("simulationModel")
         : defaultMode;
-      bag.set("simulationMode", newMode);
+      bag.set("simulationModel", newMode);
       for (const cb of this._changeCallbacks) {
-        cb("simulationMode", oldValue, newMode);
+        cb("simulationModel", oldValue, newMode);
       }
     });
 
     const row = this._buildRow("Mode", select as unknown as HTMLElement);
     this._container.appendChild(row);
-    this._inputs.set("simulationMode", {
+    this._inputs.set("simulationModel", {
       element: select as unknown as HTMLElement,
       onChange: (_cb: (v: PropertyValue) => void) => { /* managed internally via select change event */ },
       setValue: (v: PropertyValue) => { select.value = v as string; },

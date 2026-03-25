@@ -41,7 +41,7 @@ const SavedMetadataSchema = z.object({
   description: z.string(),
   measurementOrdering: z.array(z.string()),
   isGeneric: z.boolean(),
-  engineType: z.string().optional(), // retained for backward-compat deserialization only
+  engineType: z.string().optional(),
 });
 
 const SavedElementSchema = z.object({

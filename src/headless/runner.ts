@@ -65,8 +65,7 @@ export class SimulationRunner {
    * Compile a circuit into an initialized SimulationEngine.
    *
    * Runs the compiler (topological sort + net assignment), creates a
-   * DefaultSimulationCoordinator, and returns the underlying digital or analog
-   * backend engine for backward-compatible stepping.
+   * DefaultSimulationCoordinator, and returns it as a SimulationCoordinator.
    *
    * @param circuit        The visual circuit model to compile.
    * @param engineFactory  Optional factory to create a non-default engine (digital path only).

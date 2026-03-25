@@ -1019,16 +1019,7 @@ export function initApp(search?: string): void {
                   elementHit.setAttribute('closed', false);
                   compiledDirty = true;
                   if (compileAndBind()) {
-                    const acUp = facade.getCoordinator()?.compiled.analog ?? null;
-                    const engUp = facade.getEngine();
-                    if (acUp !== null && engUp) {
-                      engUp.start?.();
-                      startAnalogRenderLoop(
-                        engUp as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
-                        circuit,
-                        acUp,
-                      );
-                    }
+                    startSimulation();
                   }
                   scheduleRender();
                 };
@@ -1039,16 +1030,7 @@ export function initApp(search?: string): void {
               }
               compiledDirty = true;
               if (compileAndBind()) {
-                const acToggle = facade.getCoordinator()?.compiled.analog ?? null;
-                const engToggle = facade.getEngine();
-                if (acToggle !== null && engToggle) {
-                  engToggle.start?.();
-                  startAnalogRenderLoop(
-                    engToggle as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
-                    circuit,
-                    acToggle,
-                  );
-                }
+                startSimulation();
               }
             } catch {
               // ignore toggle errors
@@ -1560,16 +1542,7 @@ export function initApp(search?: string): void {
         // Seamlessly recompile — don't hard-stop the analog simulation
         compiledDirty = true;
         if (compileAndBind()) {
-          const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-          const eng = facade.getEngine();
-          if (analogCompiled !== null && eng) {
-            eng.start?.();
-            startAnalogRenderLoop(
-              eng as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
-              circuit,
-              analogCompiled,
-            );
-          }
+          startSimulation();
         }
       } else {
         invalidateCompiled();
@@ -1675,7 +1648,7 @@ export function initApp(search?: string): void {
         if (facade.getCoordinator()?.analogBackend !== null) {
           disposeAnalog();
         } else {
-          stopContinuousRun();
+          stopSimulation();
           binding.unbind();
           facade.getEngine()?.dispose?.();
         }
@@ -1683,17 +1656,7 @@ export function initApp(search?: string): void {
         scheduleRender();
       } else {
         if (compiledDirty && !compileAndBind()) return;
-        const analogEngine = facade.getEngine();
-        const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-        if (analogCompiled !== null && analogEngine) {
-          startAnalogRenderLoop(
-            analogEngine as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
-            circuit,
-            analogCompiled,
-          );
-        } else if ((facade.getEngine() as import('../core/engine-interface.js').SimulationEngine | null)?.getState?.() !== EngineState.RUNNING) {
-          startContinuousRun();
-        }
+        startSimulation();
       }
       return;
     }
@@ -1946,56 +1909,12 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
-  // Continuous run loop — steps engine at speed-control rate and repaints
+  // Unified simulation loop — uses coordinator.step() for all circuit types
   // -------------------------------------------------------------------------
 
   let runRafHandle = -1;
 
-  function startContinuousRun(): void {
-    selection.clear();
-    const eng = facade.getEngine();
-    eng?.start?.();
-    let lastTime = performance.now();
-
-    const tick = (now: number): void => {
-      const currentEng = facade.getEngine();
-      if (currentEng?.getState?.() !== EngineState.RUNNING) {
-        runRafHandle = -1;
-        scheduleRender();
-        return;
-      }
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-      const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
-      for (let i = 0; i < stepsThisFrame; i++) {
-        try {
-          facade.step(currentEng);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          showStatus(`Simulation error: ${msg}`, true);
-          stopContinuousRun();
-          return;
-        }
-      }
-      scheduleRender();
-      runRafHandle = requestAnimationFrame(tick);
-    };
-    runRafHandle = requestAnimationFrame(tick);
-  }
-
-  function stopContinuousRun(): void {
-    if (runRafHandle !== -1) {
-      cancelAnimationFrame(runRafHandle);
-      runRafHandle = -1;
-    }
-    facade.getEngine()?.stop?.();
-    scheduleRender();
-  }
-
-  // -------------------------------------------------------------------------
-  // Analog render loop — steps analog engine and animates current-flow dots
-  // -------------------------------------------------------------------------
-
+  // Analog-specific render loop state
   let analogRafHandle = -1;
   let currentFlowAnimator: CurrentFlowAnimator | null = null;
   const analogVoltageTracker = new VoltageRangeTracker();
@@ -2011,9 +1930,66 @@ export function initApp(search?: string): void {
     frequency: 'Hz',
   };
 
-  function startAnalogRenderLoop(
+  /**
+   * Unified entry point: starts the simulation render loop for any circuit
+   * type (digital-only, analog-only, or mixed). Internally dispatches to
+   * the appropriate timing model (speed-control for digital, rate-controller
+   * for analog) while always stepping through the coordinator.
+   */
+  function startSimulation(): void {
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+
+    const analogEngine = coordinator.analogBackend;
+    const analogCompiled = coordinator.compiled.analog ?? null;
+
+    if (analogEngine !== null && analogCompiled !== null) {
+      // --- Analog / mixed path ---
+      if (analogRafHandle !== -1) return;
+      coordinator.start();
+      _startAnalogLoop(coordinator, analogEngine, analogCompiled);
+    } else {
+      // --- Digital-only path ---
+      if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) return;
+      selection.clear();
+      coordinator.start();
+      _startDigitalLoop(coordinator);
+    }
+  }
+
+  /** Digital-only render loop: steps coordinator at speed-control rate. */
+  function _startDigitalLoop(coordinator: import('../compile/coordinator-types.js').SimulationCoordinator): void {
+    let lastTime = performance.now();
+
+    const tick = (now: number): void => {
+      if (coordinator.digitalBackend?.getState?.() !== EngineState.RUNNING) {
+        runRafHandle = -1;
+        scheduleRender();
+        return;
+      }
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      const stepsThisFrame = Math.max(1, Math.round(speedControl.speed * dt));
+      for (let i = 0; i < stepsThisFrame; i++) {
+        try {
+          facade.step(coordinator);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          showStatus(`Simulation error: ${msg}`, true);
+          stopSimulation();
+          return;
+        }
+      }
+      scheduleRender();
+      runRafHandle = requestAnimationFrame(tick);
+    };
+    runRafHandle = requestAnimationFrame(tick);
+  }
+
+  /** Analog / mixed render loop: steps coordinator at analog rate, animates current-flow. */
+  function _startAnalogLoop(
+    coordinator: import('../compile/coordinator-types.js').SimulationCoordinator,
     analogEngine: import('../core/analog-engine-interface.js').AnalogEngine,
-    analogCircuit: import('../core/circuit.js').Circuit,
     analogCompiled: import('../core/analog-engine-interface.js').CompiledAnalogCircuit,
   ): void {
     analogVoltageTracker.reset();
@@ -2035,10 +2011,6 @@ export function initApp(search?: string): void {
       if (idx === undefined) return undefined;
       const analogEl = concreteCompiled.elements[idx];
       if (!analogEl) return undefined;
-      // Resolve pin label → MNA node ID by matching pin world positions
-      // against wireToNodeId. This is correct regardless of the order of
-      // pinNodeIds (which may differ from pin declaration order, e.g.
-      // FET pinNodeIds = [D,G,S] but pinLayout = [G,S,D]).
       const pinLabelToNodeId = new Map<string, number>();
       for (const pin of element.getPins()) {
         const wp = pinWorldPosition(element, pin);
@@ -2075,8 +2047,6 @@ export function initApp(search?: string): void {
     if (sliderContainer) {
       sliderContainer.style.display = '';
       activeSliderPanel = new SliderPanel(sliderContainer);
-      // Bridge registers its callback in the constructor via panel.onSliderChange();
-      // the panel's callback array keeps the closure alive until dispose().
       new SliderEngineBridge(activeSliderPanel, analogEngine, analogCompiled);
     }
 
@@ -2108,8 +2078,8 @@ export function initApp(search?: string): void {
 
       try {
         // Always do at least one step per frame so the sim never stalls.
-        analogEngine.step();
-        if ((analogEngine as unknown as { getState(): EngineState }).getState() === EngineState.ERROR) {
+        coordinator.step();
+        if (analogEngine.getState() === EngineState.ERROR) {
           showStatus('Analog simulation error: solver failed to converge', true);
           disposeAnalog();
           compiledDirty = true;
@@ -2121,8 +2091,8 @@ export function initApp(search?: string): void {
             missed = true;
             break;
           }
-          analogEngine.step();
-          if ((analogEngine as unknown as { getState(): EngineState }).getState() === EngineState.ERROR) {
+          coordinator.step();
+          if (analogEngine.getState() === EngineState.ERROR) {
             showStatus('Analog simulation error: solver failed to converge', true);
             disposeAnalog();
             compiledDirty = true;
@@ -2153,14 +2123,33 @@ export function initApp(search?: string): void {
         }
       }
 
-      resolver.resolve(analogEngine, analogCircuit, analogCompiled as unknown as ResolvedAnalogCircuit);
-      currentFlowAnimator!.update(wallDtSeconds, analogCircuit);
+      resolver.resolve(analogEngine, circuit, analogCompiled as unknown as ResolvedAnalogCircuit);
+      currentFlowAnimator!.update(wallDtSeconds, circuit);
       analogVoltageTracker.update(analogEngine, analogCompiled.nodeCount);
 
       scheduleRender();
       analogRafHandle = requestAnimationFrame(tick);
     };
     analogRafHandle = requestAnimationFrame(tick);
+  }
+
+  function stopSimulation(): void {
+    // Stop whichever loop is active
+    if (runRafHandle !== -1) {
+      cancelAnimationFrame(runRafHandle);
+      runRafHandle = -1;
+    }
+    if (analogRafHandle !== -1) {
+      cancelAnimationFrame(analogRafHandle);
+      analogRafHandle = -1;
+    }
+    const coordinator = facade.getCoordinator();
+    if (coordinator) {
+      coordinator.stop();
+    } else {
+      facade.getEngine()?.stop?.();
+    }
+    scheduleRender();
   }
 
   function stopAnalogRenderLoop(): void {
@@ -2191,45 +2180,23 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    const eng = facade.getEngine();
-    if (!eng) return;
-    if (facade.getCoordinator()?.analogBackend !== null) {
-      try {
-        facade.step(eng);
-        clearStatus();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showStatus(`Simulation error: ${msg}`, true);
-      }
-    } else {
-      if (eng.getState?.() === EngineState.RUNNING) eng.stop?.();
-      try {
-        facade.step(eng);
-        clearStatus();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showStatus(`Simulation error: ${msg}`, true);
-      }
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+    // Stop continuous run if active, then do a single step
+    if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) coordinator.stop();
+    try {
+      facade.step(coordinator);
+      clearStatus();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showStatus(`Simulation error: ${msg}`, true);
     }
     scheduleRender();
   });
 
   document.getElementById('btn-run')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    const analogCompiled = facade.getCoordinator()?.compiled.analog ?? null;
-    const eng = facade.getEngine();
-    if (analogCompiled !== null && eng) {
-      if (analogRafHandle !== -1) return;
-      eng.start?.();
-      startAnalogRenderLoop(
-        eng as unknown as import('../core/analog-engine-interface.js').AnalogEngine,
-        circuit,
-        analogCompiled,
-      );
-      return;
-    }
-    if (eng?.getState?.() === EngineState.RUNNING) return;
-    startContinuousRun();
+    startSimulation();
   });
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
@@ -2237,7 +2204,7 @@ export function initApp(search?: string): void {
     if (facade.getCoordinator()?.analogBackend !== null) {
       disposeAnalog();
     } else {
-      stopContinuousRun();
+      stopSimulation();
       binding.unbind();
       facade.getEngine()?.dispose?.();
     }
@@ -2247,16 +2214,18 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-micro-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    const eng = facade.getEngine();
-    if (!eng) return;
-    if (facade.getCoordinator()?.analogBackend !== null) {
-      try { facade.step(eng); clearStatus(); } catch (err) {
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+    if (coordinator.analogBackend !== null) {
+      // Analog/mixed: micro-step is equivalent to a single coordinator step
+      try { facade.step(coordinator); clearStatus(); } catch (err) {
         showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
       }
     } else {
-      if (eng.getState?.() === EngineState.RUNNING) eng.stop?.();
+      // Digital-only: use microStep on the digital backend
+      if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) coordinator.stop();
       try {
-        (eng as unknown as { microStep(): void }).microStep();
+        coordinator.digitalBackend?.microStep();
         clearStatus();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -2268,15 +2237,15 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
-    if (facade.getCoordinator()?.analogBackend !== null) {
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+    if (coordinator.analogBackend !== null) {
       showStatus('Run-to-break is not available for analog circuits');
       return;
     }
-    const eng = facade.getEngine();
-    if (!eng) return;
-    if (eng.getState?.() === EngineState.RUNNING) return;
+    if (coordinator.digitalBackend?.getState?.() === EngineState.RUNNING) return;
     try {
-      (eng as unknown as { runToBreak(): void }).runToBreak();
+      coordinator.digitalBackend?.runToBreak();
       clearStatus();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -2694,7 +2663,7 @@ export function initApp(search?: string): void {
   canvas.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault();
     contextMenu.hide();
-    // Also remove any legacy wire-context-menu still in the DOM
+    // Remove wire-context-menu from the DOM
     document.getElementById('wire-context-menu')?.remove();
 
     const worldPt = canvasToWorld(e);

@@ -40,7 +40,7 @@ export interface EditorBinding {
    * pinSignalMap    — maps "{instanceId}:{pinLabel}" keys to SignalAddresses.
    */
   bind(
-    circuit: Circuit,
+    _circuit: Circuit,
     coordinator: SimulationCoordinator,
     wireSignalMap: Map<Wire, SignalAddress>,
     pinSignalMap: Map<string, SignalAddress>,
@@ -95,12 +95,11 @@ class EditorBindingImpl implements EditorBinding {
   private _pinSignalMap: Map<string, SignalAddress> = new Map();
 
   bind(
-    circuit: Circuit,
+    _circuit: Circuit,
     coordinator: SimulationCoordinator,
     wireSignalMap: Map<Wire, SignalAddress>,
     pinSignalMap: Map<string, SignalAddress>,
   ): void {
-    void circuit;
     this._coordinator = coordinator;
     this._wireSignalMap = wireSignalMap;
     this._pinSignalMap = pinSignalMap;
