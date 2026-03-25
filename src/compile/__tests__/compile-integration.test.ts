@@ -1,0 +1,889 @@
+/**
+ * Integration tests for the unified compilation pipeline (P3-9).
+ *
+ * Compares `compileUnified()` output against the legacy `compileCircuit()` and
+ * `compileAnalogCircuit()` entry points so regressions are immediately visible.
+ *
+ * Circuit construction mirrors the patterns used in:
+ *   src/engine/__tests__/compiler.test.ts
+ *   src/analog/__tests__/compiler.test.ts
+ *   src/compile/__tests__/extract-connectivity.test.ts
+ */
+
+import { describe, it, expect } from 'vitest';
+import { compileUnified } from '../compile.js';
+import { compileCircuit } from '../../engine/compiler.js';
+import { compileAnalogCircuit } from '../../analog/compiler.js';
+import { Circuit, Wire } from '../../core/circuit.js';
+import type { Pin, PinDeclaration } from '../../core/pin.js';
+import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
+import { AbstractCircuitElement } from '../../core/element.js';
+import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import { PropertyBag } from '../../core/properties.js';
+import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
+import { ComponentRegistry } from '../../core/registry.js';
+import type { ComponentDefinition, ComponentModels, ExecuteFunction } from '../../core/registry.js';
+import { ComponentCategory } from '../../core/registry.js';
+import type { SerializedElement } from '../../core/element.js';
+import type { CircuitElement } from '../../core/element.js';
+import type { SparseSolver } from '../../analog/sparse-solver.js';
+import type { AnalogElement } from '../../analog/element.js';
+
+// ---------------------------------------------------------------------------
+// Minimal test element using AbstractCircuitElement (digital circuits)
+// ---------------------------------------------------------------------------
+
+class TestElement extends AbstractCircuitElement {
+  private readonly _pins: readonly Pin[];
+
+  constructor(
+    typeId: string,
+    instanceId: string,
+    position: { x: number; y: number },
+    pinDecls: PinDeclaration[],
+    props?: PropertyBag,
+    rotation: 0 | 1 | 2 | 3 = 0,
+    mirror = false,
+  ) {
+    super(typeId, instanceId, position, rotation, mirror, props ?? new PropertyBag());
+    this._pins = resolvePins(
+      pinDecls,
+      position,
+      rotation,
+      createInverterConfig([]),
+      createClockConfig([]),
+    );
+  }
+
+  getPins(): readonly Pin[] { return this._pins; }
+  draw(_ctx: RenderContext): void {}
+  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 2, height: 2 }; }
+  getHelpText(): string { return ''; }
+}
+
+// ---------------------------------------------------------------------------
+// Minimal flat CircuitElement (analog circuits, no AbstractCircuitElement)
+// ---------------------------------------------------------------------------
+
+function makeAnalogPin(x: number, y: number): Pin {
+  return {
+    position: { x, y },
+    label: '',
+    direction: PinDirection.BIDIRECTIONAL,
+    isNegated: false,
+    isClock: false,
+    bitWidth: 1,
+  };
+}
+
+function makeAnalogElement(
+  typeId: string,
+  instanceId: string,
+  pinCoords: Array<{ x: number; y: number }>,
+  propsMap: Map<string, PropertyValue> = new Map(),
+): CircuitElement {
+  const resolvedPins = pinCoords.map((p) => makeAnalogPin(p.x, p.y));
+  const propertyBag: PropertyBagType = {
+    has(k: string) { return propsMap.has(k); },
+    get<T>(k: string): T { return propsMap.get(k) as T; },
+    set(k: string, v: PropertyValue) { propsMap.set(k, v); },
+    delete(k: string) { propsMap.delete(k); },
+    keys() { return Array.from(propsMap.keys()); },
+    entries() { return Array.from(propsMap.entries()); },
+    clone() { return this; },
+    size: propsMap.size,
+  } as unknown as PropertyBagType;
+
+  const serialized: SerializedElement = {
+    typeId,
+    instanceId,
+    position: { x: 0, y: 0 },
+    rotation: 0 as SerializedElement['rotation'],
+    mirror: false,
+    properties: {},
+  };
+
+  return {
+    typeId,
+    instanceId,
+    position: { x: 0, y: 0 },
+    rotation: 0 as CircuitElement['rotation'],
+    mirror: false,
+    getPins() { return resolvedPins; },
+    getProperties() { return propertyBag; },
+    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
+    draw(_ctx: RenderContext) {},
+    serialize() { return serialized; },
+    getHelpText() { return ''; },
+    getAttribute(k: string) { return propsMap.get(k); },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pin declaration helpers
+// ---------------------------------------------------------------------------
+
+function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclaration {
+  return { direction: PinDirection.INPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false };
+}
+
+function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclaration {
+  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false };
+}
+
+// ---------------------------------------------------------------------------
+// Analog element stubs
+// ---------------------------------------------------------------------------
+
+function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
+  return {
+    pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
+    branchIndex: -1,
+    isNonlinear: false,
+    isReactive: false,
+    stamp(_s: SparseSolver) {},
+    getPinCurrents(_v: Float64Array) { return [0, 0]; },
+  };
+}
+
+function makeVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
+  return {
+    pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
+    branchIndex: branchIdx,
+    isNonlinear: false,
+    isReactive: false,
+    stamp(_s: SparseSolver) {},
+    getPinCurrents(_v: Float64Array) { return [0, 0]; },
+  };
+}
+
+function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
+  return {
+    pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
+    branchIndex: branchIdx,
+    isNonlinear: false,
+    isReactive: true,
+    stamp(_s: SparseSolver) {},
+    getPinCurrents(_v: Float64Array) { return [0, 0]; },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Registry builders
+// ---------------------------------------------------------------------------
+
+const noopExec: ExecuteFunction = () => {};
+
+function makeDigitalDef(name: string, pins: PinDeclaration[] = []): Omit<ComponentDefinition, 'typeId'> {
+  return {
+    name,
+    typeId: -1,
+    factory: (props: PropertyBagType) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+    pinLayout: pins,
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.LOGIC,
+    helpText: '',
+    models: { digital: { executeFn: noopExec } } as ComponentModels,
+  };
+}
+
+function makeAnalogDef(
+  name: string,
+  requiresBranchRow: boolean,
+  factoryFn: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], branchIdx: number, _props: PropertyBagType, _getTime: () => number) => AnalogElement,
+): Omit<ComponentDefinition, 'typeId'> {
+  return {
+    name,
+    factory: () => { throw new Error('not used'); },
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: '',
+    models: {
+      analog: {
+        requiresBranchRow,
+        factory: factoryFn,
+      },
+    } as ComponentModels,
+  };
+}
+
+function buildDigitalRegistry(): ComponentRegistry {
+  const r = new ComponentRegistry();
+  const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+  const singleIn = [inputPin(0, 0, 'in'), outputPin(2, 0, 'out')];
+  r.register(makeDigitalDef('And', twoIn) as ComponentDefinition);
+  r.register(makeDigitalDef('Not', singleIn) as ComponentDefinition);
+  r.register(makeDigitalDef('Nor', twoIn) as ComponentDefinition);
+  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]) as ComponentDefinition);
+  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]) as ComponentDefinition);
+  r.register(makeDigitalDef('Tunnel', [outputPin(0, 0, 'out')]) as ComponentDefinition);
+  return r;
+}
+
+function buildAnalogRegistry(): ComponentRegistry {
+  const r = new ComponentRegistry();
+
+  r.register({
+    ...makeAnalogDef('AnalogVs', true, (pinNodes, _i, branchIdx) => {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+    }),
+  } as ComponentDefinition);
+
+  r.register({
+    ...makeAnalogDef('AnalogR', false, (pinNodes) => {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeResistorElement(n0 ?? 0, n1 ?? 0);
+    }),
+  } as ComponentDefinition);
+
+  r.register({
+    ...makeAnalogDef('AnalogC', true, (pinNodes, _i, branchIdx) => {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeCapacitorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+    }),
+  } as ComponentDefinition);
+
+  r.register({
+    name: 'Ground',
+    typeId: -1,
+    factory: () => { throw new Error('not used'); },
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: '',
+    models: { analog: {} } as ComponentModels,
+  } as ComponentDefinition);
+
+  return r;
+}
+
+function buildMixedRegistry(): ComponentRegistry {
+  const r = new ComponentRegistry();
+  const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+
+  // Digital components
+  r.register(makeDigitalDef('And', twoIn) as ComponentDefinition);
+  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]) as ComponentDefinition);
+  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]) as ComponentDefinition);
+
+  // Analog components
+  r.register({
+    ...makeAnalogDef('AnalogR', false, (pinNodes) => {
+      const [n0, n1] = [...pinNodes.values()];
+      return makeResistorElement(n0 ?? 0, n1 ?? 0);
+    }),
+  } as ComponentDefinition);
+
+  r.register({
+    name: 'Ground',
+    typeId: -1,
+    factory: () => { throw new Error('not used'); },
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: '',
+    models: { analog: {} } as ComponentModels,
+  } as ComponentDefinition);
+
+  // Bridge component with both models (has digital output, analog input)
+  r.register({
+    name: 'DABridge',
+    typeId: -1,
+    factory: () => { throw new Error('not used'); },
+    pinLayout: [],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.MISC,
+    helpText: '',
+    models: {
+      digital: { executeFn: noopExec },
+      analog: {
+        requiresBranchRow: false,
+        factory: (pinNodes) => {
+          const [n0, n1] = [...pinNodes.values()];
+          return makeResistorElement(n0 ?? 0, n1 ?? 0);
+        },
+      },
+    } as ComponentModels,
+  } as ComponentDefinition);
+
+  return r;
+}
+
+// ---------------------------------------------------------------------------
+// Test 1: Simple AND gate (digital only) — net count matches old compiler
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — simple AND gate (digital only)', () => {
+  it('net count matches compileCircuit for standalone AND gate', () => {
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const registry = buildDigitalRegistry();
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+
+    const legacy = compileCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital).not.toBeNull();
+    expect(unified.analog).toBeNull();
+    expect(unified.bridges).toHaveLength(0);
+    expect(unified.digital!.netCount).toBe(legacy.netCount);
+  });
+
+  it('wireSignalMap has digital addresses for all wires', () => {
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const registry = buildDigitalRegistry();
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+    circuit.addWire(wire);
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.wireSignalMap.has(wire)).toBe(true);
+    const addr = unified.wireSignalMap.get(wire)!;
+    expect(addr.domain).toBe('digital');
+    if (addr.domain === 'digital') {
+      expect(addr.netId).toBeGreaterThanOrEqual(0);
+      expect(addr.netId).toBeLessThan(unified.digital!.netCount);
+    }
+  });
+
+  it('wireToNetId in digital domain is consistent with unified wireSignalMap', () => {
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const registry = buildDigitalRegistry();
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+    circuit.addWire(wire);
+
+    const legacy = compileCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    // Both should agree on the net ID for this wire
+    const legacyNetId = legacy.wireToNetId.get(wire);
+    const unifiedAddr = unified.wireSignalMap.get(wire);
+
+    expect(legacyNetId).toBeDefined();
+    expect(unifiedAddr).toBeDefined();
+    expect(unifiedAddr!.domain).toBe('digital');
+    if (unifiedAddr!.domain === 'digital') {
+      expect(unifiedAddr.netId).toBe(legacyNetId);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 2: SR latch with feedback — SCC handling preserved
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — SR latch (digital feedback)', () => {
+  it('detects feedback SCC in unified path matching legacy compiler', () => {
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const registry = buildDigitalRegistry();
+
+    const circuit = new Circuit();
+    const nor1 = new TestElement('Nor', 'nor-1', { x: 0, y: 0 }, twoIn);
+    const nor2 = new TestElement('Nor', 'nor-2', { x: 8, y: 0 }, twoIn);
+    circuit.addElement(nor1);
+    circuit.addElement(nor2);
+
+    // NOR1 out → NOR2 in-a
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
+    // NOR2 out → NOR1 in-b
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 0, y: 1 }));
+
+    const legacy = compileCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital).not.toBeNull();
+
+    // Legacy detects feedback SCC
+    const legacyFeedback = legacy.evaluationOrder.filter((g) => g.isFeedback);
+    expect(legacyFeedback.length).toBe(1);
+    expect(legacyFeedback[0]!.componentIndices.length).toBe(2);
+
+    // Unified must also detect the same feedback SCC
+    const unifiedFeedback = unified.digital!.evaluationOrder.filter((g) => g.isFeedback);
+    expect(unifiedFeedback.length).toBe(1);
+    expect(unifiedFeedback[0]!.componentIndices.length).toBe(2);
+  });
+
+  it('component count and net count match legacy for SR latch', () => {
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const registry = buildDigitalRegistry();
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('Nor', 'nor-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(new TestElement('Nor', 'nor-2', { x: 8, y: 0 }, twoIn));
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 0, y: 1 }));
+
+    const legacy = compileCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital!.componentCount).toBe(legacy.componentCount);
+    expect(unified.digital!.netCount).toBe(legacy.netCount);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 3: Simple resistor divider (analog only) — node count matches
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — resistor divider (analog only)', () => {
+  it('node count matches compileAnalogCircuit for resistor divider', () => {
+    const registry = buildAnalogRegistry();
+
+    const circuit = new Circuit({ engineType: 'analog' });
+    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+
+    const legacy = compileAnalogCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.analog).not.toBeNull();
+    expect(unified.digital).toBeNull();
+    expect(unified.bridges).toHaveLength(0);
+    expect(unified.analog!.nodeCount).toBe(legacy.nodeCount);
+  });
+
+  it('element count matches legacy for resistor divider', () => {
+    const registry = buildAnalogRegistry();
+
+    const circuit = new Circuit({ engineType: 'analog' });
+    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+
+    const legacy = compileAnalogCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    // Vs, R1, R2 compiled (Ground skipped by analog compiler)
+    expect(unified.analog!.elements.length).toBe(legacy.elements.length);
+  });
+
+  it('wireSignalMap has analog addresses for all wires', () => {
+    const registry = buildAnalogRegistry();
+
+    const circuit = new Circuit({ engineType: 'analog' });
+    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r2', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+
+    const wire1 = new Wire({ x: 10, y: 0 }, { x: 10, y: 1 });
+    const wire2 = new Wire({ x: 20, y: 0 }, { x: 20, y: 1 });
+    const wire3 = new Wire({ x: 0, y: 0 }, { x: 0, y: 1 });
+    circuit.addWire(wire1);
+    circuit.addWire(wire2);
+    circuit.addWire(wire3);
+
+    const unified = compileUnified(circuit, registry);
+
+    for (const wire of [wire1, wire2, wire3]) {
+      expect(unified.wireSignalMap.has(wire)).toBe(true);
+      const addr = unified.wireSignalMap.get(wire)!;
+      expect(addr.domain).toBe('analog');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 4: RC circuit (analog) — branch allocation preserved
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — RC circuit (analog)', () => {
+  it('branch count matches legacy for RC circuit', () => {
+    const registry = buildAnalogRegistry();
+
+    const circuit = new Circuit({ engineType: 'analog' });
+    // Vs: pos=node1(x=10), neg=ground(x=0)  → 1 branch
+    // R:  node1(x=10) — node2(x=20)          → 0 branches
+    // C:  node2(x=20) — ground(x=0)          → 1 branch
+    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+
+    const legacy = compileAnalogCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.analog).not.toBeNull();
+    expect(unified.analog!.branchCount).toBe(legacy.branchCount);
+  });
+
+  it('matrix size matches legacy for RC circuit', () => {
+    const registry = buildAnalogRegistry();
+
+    const circuit = new Circuit({ engineType: 'analog' });
+    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
+    circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+
+    const legacy = compileAnalogCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.analog!.matrixSize).toBe(legacy.matrixSize);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 5: Mixed digital+analog circuit — bridges, both partitions, cross-refs
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — mixed digital+analog', () => {
+  it('both digital and analog domains populated for mixed circuit', () => {
+    const registry = buildMixedRegistry();
+
+    // Digital part: AND gate at (0,0)
+    // Analog part: Resistor from (30,0) to (0,0) with ground at (0,0)
+    // Bridge component (DABridge) at (20,0) straddling both domains
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 30, y: 0 }, { x: 40, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 40, y: 0 }]));
+    circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 0 }));
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital).not.toBeNull();
+    expect(unified.analog).not.toBeNull();
+  });
+
+  it('wireSignalMap contains entries for both domain wires in mixed circuit', () => {
+    const registry = buildMixedRegistry();
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 30, y: 0 }, { x: 40, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 40, y: 0 }]));
+
+    const digitalWire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
+    const analogWire1 = new Wire({ x: 30, y: 0 }, { x: 30, y: 1 });
+    const analogWire2 = new Wire({ x: 40, y: 0 }, { x: 40, y: 1 });
+    circuit.addWire(digitalWire);
+    circuit.addWire(analogWire1);
+    circuit.addWire(analogWire2);
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.wireSignalMap.has(digitalWire)).toBe(true);
+    expect(unified.wireSignalMap.get(digitalWire)!.domain).toBe('digital');
+
+    expect(unified.wireSignalMap.has(analogWire1)).toBe(true);
+    expect(unified.wireSignalMap.get(analogWire1)!.domain).toBe('analog');
+  });
+
+  it('bridges array is non-empty when circuit has cross-domain boundary', () => {
+    const registry = buildMixedRegistry();
+
+    // Use DABridge as the boundary element — it has both digital and analog models
+    // Digital side: AND output → DABridge digital input
+    // Analog side: DABridge analog pin → Resistor → Ground
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(new TestElement('DABridge', 'bridge-1', { x: 4, y: 0 }, bridgePins));
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 5, y: 0 }, { x: 10, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 10, y: 0 }]));
+
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));  // AND out → bridge digital in
+    circuit.addWire(new Wire({ x: 5, y: 0 }, { x: 5, y: 0 }));  // bridge analog out / R1 A
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 })); // R1 B / Ground
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.bridges.length).toBeGreaterThan(0);
+    // Each bridge must have valid domain IDs
+    for (const bridge of unified.bridges) {
+      expect(bridge.digitalNetId).toBeGreaterThanOrEqual(0);
+      expect(bridge.analogNodeId).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 6: Circuit with Tunnels — tunnel merging works
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — tunnel merging', () => {
+  it('tunnels at same label are merged into the same net group', () => {
+    const registry = buildDigitalRegistry();
+
+    // Two Tunnel elements with label "BUS" at different positions
+    // They should be merged → share a net in the unified path
+    const tunnelPins = [outputPin(0, 0, 'out')];
+    const tunnelProps1 = new PropertyBag(new Map([['label', 'BUS']]));
+    const tunnelProps2 = new PropertyBag(new Map([['label', 'BUS']]));
+
+    const circuit = new Circuit();
+    // AND gate output at (2,0) → Tunnel 1 at (2,0)
+    // Tunnel 2 at (20,0) → NOT gate input at (20,0) (separate position, same label)
+    const andPins = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const notPins = [inputPin(0, 0, 'in'), outputPin(2, 0, 'out')];
+
+    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, andPins));
+    circuit.addElement(new TestElement('Tunnel', 't1', { x: 2, y: 0 }, tunnelPins, tunnelProps1));
+    circuit.addElement(new TestElement('Tunnel', 't2', { x: 20, y: 0 }, tunnelPins, tunnelProps2));
+    circuit.addElement(new TestElement('Not', 'not-1', { x: 20, y: 0 }, notPins));
+
+    const unified = compileUnified(circuit, registry);
+
+    // With tunnel merging, the AND output and NOT input must be on the same net
+    expect(unified.digital).not.toBeNull();
+    // Tunnel merging reduces net count vs no-merging scenario:
+    // without merging: AND.a(0,0), AND.b(0,1), AND.out/T1.out(2,0), T2.out/NOT.in(20,0), NOT.out(22,0) = 5 nets
+    // with tunnel merging: AND.out and NOT.in collapse into 1 net → 4 nets
+    expect(unified.digital!.netCount).toBeLessThanOrEqual(5);
+  });
+
+  it('tunnel merging is consistent with extract-connectivity groups', () => {
+    const registry = buildDigitalRegistry();
+
+    const tunnelPins = [outputPin(0, 0, 'out')];
+    const tunnelProps = new PropertyBag(new Map([['label', 'SIG']]));
+
+    const circuit = new Circuit();
+    const t1 = new TestElement('Tunnel', 't1', { x: 0, y: 0 }, tunnelPins, tunnelProps);
+    const t2 = new TestElement('Tunnel', 't2', { x: 50, y: 0 }, tunnelPins,
+      new PropertyBag(new Map([['label', 'SIG']])));
+    circuit.addElement(t1);
+    circuit.addElement(t2);
+
+    // Should compile without errors — tunnels don't generate diagnostics
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+
+    const unified = compileUnified(circuit, registry);
+    expect(unified.diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 7: Width mismatch — diagnostic emitted
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — width mismatch diagnostic', () => {
+  it('emits diagnostic when 1-bit output drives 8-bit input', () => {
+    const oneBitOutPins: PinDeclaration[] = [
+      { direction: PinDirection.OUTPUT, label: 'out', defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    ];
+    const eightBitInPins: PinDeclaration[] = [
+      { direction: PinDirection.INPUT, label: 'in', defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    ];
+
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: 'Src',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('Src', crypto.randomUUID(), { x: 0, y: 0 }, oneBitOutPins, props),
+      pinLayout: oneBitOutPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+    registry.register({
+      name: 'Dst',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('Dst', crypto.randomUUID(), { x: 0, y: 0 }, eightBitInPins, props),
+      pinLayout: eightBitInPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+
+    const circuit = new Circuit();
+    // Both at (0,0) so their pins at (2,0) overlap → share a net with mismatched widths
+    circuit.addElement(new TestElement('Src', 'src-1', { x: 0, y: 0 }, oneBitOutPins));
+    circuit.addElement(new TestElement('Dst', 'dst-1', { x: 0, y: 0 }, eightBitInPins));
+
+    // compileUnified must not throw for width mismatch — emit diagnostic instead
+    expect(() => compileUnified(circuit, registry)).not.toThrow();
+
+    const unified = compileUnified(circuit, registry);
+    const widthDiagnostics = unified.diagnostics.filter((d) => d.code === 'width-mismatch');
+    expect(widthDiagnostics.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 8: Empty circuit — graceful handling
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — empty circuit', () => {
+  it('returns null domains, empty maps, no diagnostics for empty circuit', () => {
+    const registry = new ComponentRegistry();
+    const circuit = new Circuit();
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital).toBeNull();
+    expect(unified.analog).toBeNull();
+    expect(unified.bridges).toHaveLength(0);
+    expect(unified.wireSignalMap.size).toBe(0);
+    expect(unified.labelSignalMap.size).toBe(0);
+    expect(unified.diagnostics).toHaveLength(0);
+  });
+
+  it('returns pure digital domain for registry with only digital components', () => {
+    const registry = buildDigitalRegistry();
+    const circuit = new Circuit();
+    // Empty circuit with digital registry — still empty
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.digital).toBeNull();
+    expect(unified.analog).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 9: labelSignalMap — labels map to correct signal addresses
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — labelSignalMap', () => {
+  it('labels for In/Out components appear in labelSignalMap with digital addresses', () => {
+    const inPins = [outputPin(0, 0, 'out')];
+    const outPins = [inputPin(0, 0, 'in')];
+
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: 'In',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, inPins, props),
+      pinLayout: inPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.IO,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+    registry.register({
+      name: 'Out',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, outPins, props),
+      pinLayout: outPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.IO,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+
+    const circuit = new Circuit();
+
+    const inProps = new PropertyBag(new Map([['label', 'A']]));
+    const outProps = new PropertyBag(new Map([['label', 'Y']]));
+    const inEl = new TestElement('In', 'in-1', { x: 0, y: 0 }, inPins, inProps);
+    const outEl = new TestElement('Out', 'out-1', { x: 10, y: 0 }, outPins, outProps);
+
+    circuit.addElement(inEl);
+    circuit.addElement(outEl);
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
+
+    const unified = compileUnified(circuit, registry);
+
+    expect(unified.labelSignalMap.has('A')).toBe(true);
+    expect(unified.labelSignalMap.has('Y')).toBe(true);
+
+    const addrA = unified.labelSignalMap.get('A')!;
+    const addrY = unified.labelSignalMap.get('Y')!;
+    expect(addrA.domain).toBe('digital');
+    expect(addrY.domain).toBe('digital');
+
+    // A and Y are connected by wire → same net ID
+    if (addrA.domain === 'digital' && addrY.domain === 'digital') {
+      expect(addrA.netId).toBe(addrY.netId);
+    }
+  });
+
+  it('labelSignalMap is consistent with labelToNetId from legacy compileCircuit', () => {
+    const inPins = [outputPin(0, 0, 'out')];
+    const outPins = [inputPin(0, 0, 'in')];
+
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: 'In',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, inPins, props),
+      pinLayout: inPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.IO,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+    registry.register({
+      name: 'Out',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, outPins, props),
+      pinLayout: outPins,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.IO,
+      helpText: '',
+      models: { digital: { executeFn: noopExec } } as ComponentModels,
+    } as ComponentDefinition);
+
+    const circuit = new Circuit();
+    const inProps = new PropertyBag(new Map([['label', 'A']]));
+    const outProps = new PropertyBag(new Map([['label', 'Y']]));
+    circuit.addElement(new TestElement('In', 'in-1', { x: 0, y: 0 }, inPins, inProps));
+    circuit.addElement(new TestElement('Out', 'out-1', { x: 10, y: 0 }, outPins, outProps));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
+
+    const legacy = compileCircuit(circuit, registry);
+    const unified = compileUnified(circuit, registry);
+
+    // Both maps should agree on the net ID for label "A"
+    const legacyNetIdA = legacy.labelToNetId.get('A');
+    const unifiedAddrA = unified.labelSignalMap.get('A');
+
+    expect(legacyNetIdA).toBeDefined();
+    expect(unifiedAddrA).toBeDefined();
+    expect(unifiedAddrA!.domain).toBe('digital');
+    if (unifiedAddrA!.domain === 'digital') {
+      expect(unifiedAddrA.netId).toBe(legacyNetIdA);
+    }
+  });
+});

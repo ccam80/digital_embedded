@@ -887,23 +887,61 @@ export function compileDigitalPartition(
   }
 
   // -----------------------------------------------------------------------
-  // Step 4: Build slotToNetId from groups' pin membership
+  // Step 3b: Build flat-circuit elementIndex → partition-local index map
   //
-  // Each ResolvedGroupPin carries an elementIndex and pinIndex that identify
-  // which slot (element i, pin j) belongs to which group.
-  // We build a lookup: (elementIndex, pinIndex) → netId
+  // ResolvedGroupPin.elementIndex is an index into the original flat circuit's
+  // elements array. The partition's components array is a subset, so we need
+  // to translate flat-circuit indices to partition-local indices (0..N-1).
   // -----------------------------------------------------------------------
 
-  // pinNetLookup[elementIndex][pinIndex] = netId
+  const flatIndexToPartitionIndex = new Map<number, number>();
+  for (let i = 0; i < componentCount; i++) {
+    const pc = partitionedComponents[i]!;
+    // Each component's resolvedPins carry the flat-circuit elementIndex.
+    // Use the first resolved pin to discover the flat index, or fall back to
+    // iterating the component's own pins stored in the partition.
+    const firstPin = pc.resolvedPins[0];
+    if (firstPin !== undefined) {
+      flatIndexToPartitionIndex.set(firstPin.elementIndex, i);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Step 4: Build slotToNetId from groups' pin membership
+  //
+  // Each ResolvedGroupPin carries an elementIndex (flat circuit) and pinIndex
+  // that identify which slot belongs to which group.
+  // We build a lookup: (partitionLocalIndex, pinIndex) → netId
+  // -----------------------------------------------------------------------
+
+  // pinNetLookup[partitionLocalIndex][pinIndex] = netId
+  // pinNetLookup[partitionLocalIndex][resolvedPinsPosition] = netId
+  // Keys are positions in pc.resolvedPins (matching allPinRefs[i][j].pinIndex = j).
   const pinNetLookup: number[][] = new Array(componentCount).fill(null).map(() => []);
+
+  // For each component, build a map from originalPinIndex → resolvedPins position.
+  // This translates group pin references (which use originalPinIndex = rp.pinIndex)
+  // to the iteration-position keys used by allPinRefs and slotToNetId.
+  const originalPinIdxToResolvedPos: Map<number, number>[] = [];
+  for (let i = 0; i < componentCount; i++) {
+    const pc = partitionedComponents[i]!;
+    const m = new Map<number, number>();
+    for (let j = 0; j < pc.resolvedPins.length; j++) {
+      m.set(pc.resolvedPins[j]!.pinIndex, j);
+    }
+    originalPinIdxToResolvedPos.push(m);
+  }
 
   for (let g = 0; g < groups.length; g++) {
     const group = groups[g]!;
     const netId = groupIdToNetId.get(group.groupId)!;
     for (const pin of group.pins) {
-      if (pin.elementIndex < componentCount) {
-        const arr = pinNetLookup[pin.elementIndex]!;
-        arr[pin.pinIndex] = netId;
+      const localIdx = flatIndexToPartitionIndex.get(pin.elementIndex);
+      if (localIdx !== undefined) {
+        const resolvedPos = originalPinIdxToResolvedPos[localIdx]!.get(pin.pinIndex);
+        if (resolvedPos !== undefined) {
+          pinNetLookup[localIdx]![resolvedPos] = netId;
+        }
       }
     }
   }
@@ -925,8 +963,8 @@ export function compileDigitalPartition(
 
   const totalNetCount = nextIsolatedNetId;
 
-  const slotToNetId = (elemIdx: number, pinIdx: number): number =>
-    pinNetLookup[elemIdx]?.[pinIdx] ?? 0;
+  const slotToNetId = (elemIdx: number, refIdx: number): number =>
+    pinNetLookup[elemIdx]?.[refIdx] ?? 0;
 
   // -----------------------------------------------------------------------
   // Step 5: Build wireToNetId from groups' wires arrays
