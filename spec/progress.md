@@ -235,3 +235,18 @@
   - noOpAnalogExecuteFn retained as @deprecated export (1 test file still imports it)
   - expandTransistorModel still reads flat def.transistorModel (consumer update deferred)
   - Analog compiler now derives component capabilities from models presence, not engineType
+
+## Task P3-2: Consolidate union-find into shared utility
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/union-find.ts, src/compile/__tests__/union-find.test.ts, src/compile/index.ts
+- **Files modified**: none
+- **Tests**: 20/20 passing
+
+## Task P3-1: Define unified compilation types
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/types.ts
+- **Files modified**: src/compile/index.ts (added type re-exports from types.ts; also updated union-find import to use .js extension)
+- **Tests**: 0/0 (types-only task — no runtime behaviour, no new tests required; acceptance criterion is "types compile with no errors", which is verified)
+- **Notes**: BridgeAdapter did not exist in the codebase; defined it in types.ts as a new interface (the spec says "import existing types" but BridgeAdapter is listed as a future type from spec/unified-component-architecture.md §4.6 — defining it here is the correct placement since it's a compile-output type). ConcreteCompiledCircuit export was actually named CompiledCircuitImpl in compiled-circuit.ts. P3-2 union-find and its tests were already present in src/compile/.
