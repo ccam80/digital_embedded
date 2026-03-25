@@ -132,13 +132,17 @@ function makeDefinition(
     typeId: -1,
     factory: (props: PropertyBagType) =>
       new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
-    executeFn,
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    ...(stateSlotCount !== undefined ? { stateSlotCount } : {}),
+    models: {
+      digital: {
+        executeFn,
+        ...(stateSlotCount !== undefined ? { stateSlotCount } : {}),
+      },
+    },
   };
 }
 

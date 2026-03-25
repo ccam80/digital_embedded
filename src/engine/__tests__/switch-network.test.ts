@@ -133,18 +133,26 @@ function makeDefinition(
   executeFn: ExecuteFunction = noopExecute,
   extra?: Partial<ComponentDefinition>,
 ): ComponentDefinition {
+  const { stateSlotCount, switchPins, defaultDelay, ...restExtra } = extra ?? {};
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBag) =>
       new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
-    executeFn,
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.SWITCHING,
     helpText: "",
-    ...extra,
+    models: {
+      digital: {
+        executeFn,
+        ...(stateSlotCount !== undefined ? { stateSlotCount } : {}),
+        ...(switchPins !== undefined ? { switchPins } : {}),
+        ...(defaultDelay !== undefined ? { defaultDelay } : {}),
+      },
+    },
+    ...restExtra,
   };
 }
 

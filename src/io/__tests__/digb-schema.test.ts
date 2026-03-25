@@ -48,12 +48,14 @@ function makeRegistry(...typeNames: string[]): ComponentRegistry {
       typeId: -1,
       factory: (props: PropertyBag) =>
         new StubElement(name, `inst-${name}`, { x: 0, y: 0 }, 0, false, props),
-      executeFn: () => {},
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: name,
+      models: {
+        digital: { executeFn: () => {} },
+      },
     });
   }
   return registry;

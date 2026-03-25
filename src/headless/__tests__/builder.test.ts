@@ -92,12 +92,14 @@ describe('CircuitBuilder', () => {
         ];
         return new MockCircuitElement('Mock', position, pins);
       },
-      executeFn: () => {},
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: 'LOGIC' as any,
       helpText: 'Mock',
+      models: {
+        digital: { executeFn: () => {} },
+      },
     });
 
     // Register And gate mock
@@ -135,12 +137,14 @@ describe('CircuitBuilder', () => {
         ];
         return new MockCircuitElement('And', position, pins);
       },
-      executeFn: () => {},
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: 'LOGIC' as any,
       helpText: 'And',
+      models: {
+        digital: { executeFn: () => {} },
+      },
     });
 
     builder = new CircuitBuilder(registry);
@@ -249,12 +253,14 @@ describe('CircuitBuilder', () => {
           ];
           return new MockCircuitElement('Wide', position, pins);
         },
-        executeFn: () => {},
         pinLayout: [],
         propertyDefs: [],
         attributeMap: [],
         category: 'LOGIC' as any,
         helpText: 'Wide',
+        models: {
+          digital: { executeFn: () => {} },
+        },
       });
 
       const circuit = builder.createCircuit();

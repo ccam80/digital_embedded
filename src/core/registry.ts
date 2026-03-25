@@ -228,123 +228,14 @@ export interface ComponentDefinition {
   category: ComponentCategory;
   /** Help text displayed to the user. */
   helpText: string;
-  /**
-   * Structured simulation model container. Production definitions supply this
-   * directly. Legacy/test definitions may omit it — the registry's _ensureModels
-   * shim populates it from flat fields (executeFn, analogFactory, etc.) at
-   * registration time.
-   */
-  models?: ComponentModels;
-
-  // --- Legacy flat fields (deprecated — use models bag instead) ---
-  // These are accepted for backwards compatibility with test code.
-  // Production definitions should use models.digital / models.analog directly.
-  /** @deprecated Use models.digital.executeFn */
-  executeFn?: ExecuteFunction;
-  /** @deprecated Use models.digital.sampleFn */
-  sampleFn?: ExecuteFunction;
-  /** @deprecated Use models.digital.stateSlotCount */
-  stateSlotCount?: number | ((props: PropertyBag) => number);
-  /** @deprecated Use models.digital.defaultDelay */
-  defaultDelay?: number;
-  /** @deprecated Use models.digital.switchPins */
-  switchPins?: [number, number];
-  /** @deprecated Use models.digital.inputSchema */
-  inputSchema?: string[];
-  /** @deprecated Use models.digital.outputSchema */
-  outputSchema?: string[];
-  /** @deprecated Use models.analog.factory */
-  analogFactory?: (
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-    getTime: () => number,
-  ) => AnalogElementCore;
-  /** @deprecated Use models.analog.requiresBranchRow */
-  requiresBranchRow?: boolean;
-  /** @deprecated Use models.analog.getInternalNodeCount */
-  getInternalNodeCount?: (props: PropertyBag) => number;
-  /** @deprecated Use models.analog.deviceType */
-  analogDeviceType?: DeviceType;
-  /** @deprecated Use models.analog.pinElectrical */
-  pinElectrical?: PinElectricalSpec;
-  /** @deprecated Use models.analog.pinElectricalOverrides */
-  pinElectricalOverrides?: Record<string, PinElectricalSpec>;
-  /** @deprecated Derived from models keys */
-  engineType?: "digital" | "analog" | "both";
+  /** Structured simulation model container. */
+  models: ComponentModels;
   /**
    * Default model key (e.g. "digital", "analog"). When omitted, the first key
    * present in `models` is used. Hidden from the property panel when only one
    * model is available.
    */
   defaultModel?: string;
-  /**
-   * Available simulation modes for this component.
-   *
-   * The first entry is the default mode used when the user has not chosen one.
-   *
-   * Gates and sequential components: ['logical', 'analog-pins', ...] — default logical.
-   * Components with transistor-level models additionally include 'analog-internals'.
-   * Components whose analog model is already full-fidelity (fuse, switch, relay):
-   * ['analog-internals', 'logical'] — default analog-internals.
-   * Digital-only components omit this.
-   */
-  simulationModes?: ('logical' | 'analog-pins' | 'analog-internals')[];
-  /**
-   * Name of a registered subcircuit for transistor-level expansion.
-   * Populated in Phase 4c; field added here for forward declaration.
-   */
-  transistorModel?: string;
-}
-
-// ---------------------------------------------------------------------------
-// _ensureModels — shim flat fields into models object at registration time
-// ---------------------------------------------------------------------------
-
-/**
- * Populates `def.models` from deprecated flat fields when the caller did not
- * supply it. Keeps backwards compatibility for test code that creates inline
- * definitions with flat fields.
- */
-function _ensureModels(def: ComponentDefinition): ComponentDefinition {
-  if (def.models !== undefined) {
-    // Already has models — but patch analog overrides from flat fields if present
-    if (def.models.analog && (def.pinElectrical || def.pinElectricalOverrides || def.transistorModel)) {
-      const patched = { ...def.models.analog };
-      if (def.pinElectrical && !patched.pinElectrical) patched.pinElectrical = def.pinElectrical;
-      if (def.pinElectricalOverrides && !patched.pinElectricalOverrides) patched.pinElectricalOverrides = def.pinElectricalOverrides;
-      if (def.transistorModel && !patched.transistorModel) patched.transistorModel = def.transistorModel;
-      return { ...def, models: { ...def.models, analog: patched } };
-    }
-    return def;
-  }
-
-  const models: ComponentModels = {};
-
-  if (def.executeFn) {
-    const digital: DigitalModel = { executeFn: def.executeFn };
-    if (def.sampleFn !== undefined) digital.sampleFn = def.sampleFn;
-    if (def.stateSlotCount !== undefined) digital.stateSlotCount = def.stateSlotCount;
-    if (def.defaultDelay !== undefined) digital.defaultDelay = def.defaultDelay;
-    if (def.switchPins !== undefined) digital.switchPins = def.switchPins;
-    if (def.inputSchema !== undefined) digital.inputSchema = def.inputSchema;
-    if (def.outputSchema !== undefined) digital.outputSchema = def.outputSchema;
-    models.digital = digital;
-  }
-
-  if (def.analogFactory !== undefined) {
-    const analog: AnalogModel = { factory: def.analogFactory };
-    if (def.requiresBranchRow !== undefined) analog.requiresBranchRow = def.requiresBranchRow;
-    if (def.getInternalNodeCount !== undefined) analog.getInternalNodeCount = def.getInternalNodeCount;
-    if (def.analogDeviceType !== undefined) analog.deviceType = def.analogDeviceType;
-    if (def.transistorModel !== undefined) analog.transistorModel = def.transistorModel;
-    if (def.pinElectrical !== undefined) analog.pinElectrical = def.pinElectrical;
-    if (def.pinElectricalOverrides !== undefined) analog.pinElectricalOverrides = def.pinElectricalOverrides;
-    models.analog = analog;
-  }
-
-  return { ...def, models };
 }
 
 // ---------------------------------------------------------------------------
@@ -396,8 +287,7 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is already registered`);
     }
 
-    const withModels = _ensureModels(def);
-    const assigned: ComponentDefinition = { ...withModels, typeId: this._nextTypeId++ };
+    const assigned: ComponentDefinition = { ...def, typeId: this._nextTypeId++ };
 
     this._byName.set(assigned.name, assigned);
 
@@ -424,8 +314,7 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is not registered — use register()`);
     }
 
-    const withModels = _ensureModels(def);
-    const updated: ComponentDefinition = { ...withModels, typeId: existing.typeId };
+    const updated: ComponentDefinition = { ...def, typeId: existing.typeId };
     this._byName.set(updated.name, updated);
 
     // Update category list entry

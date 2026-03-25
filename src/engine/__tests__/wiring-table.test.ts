@@ -132,13 +132,17 @@ function makeDef(
     name,
     typeId: -1,
     factory: (props) => new TestElement(name, `${name}-0`, { x: 0, y: 0 }, pins, props),
-    executeFn,
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    ...(opts?.stateSlotCount !== undefined ? { stateSlotCount: opts.stateSlotCount } : {}),
+    models: {
+      digital: {
+        executeFn,
+        ...(opts?.stateSlotCount !== undefined ? { stateSlotCount: opts.stateSlotCount } : {}),
+      },
+    },
   };
 }
 

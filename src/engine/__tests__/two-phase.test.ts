@@ -124,14 +124,18 @@ function makeDef(
     name,
     typeId: -1,
     factory: (props) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
-    executeFn,
-    ...(opts?.sampleFn !== undefined ? { sampleFn: opts.sampleFn } : {}),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
-    ...(opts?.stateSlotCount !== undefined ? { stateSlotCount: opts.stateSlotCount } : {}),
+    models: {
+      digital: {
+        executeFn,
+        ...(opts?.sampleFn !== undefined ? { sampleFn: opts.sampleFn } : {}),
+        ...(opts?.stateSlotCount !== undefined ? { stateSlotCount: opts.stateSlotCount } : {}),
+      },
+    },
   };
 }
 

@@ -72,7 +72,6 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     category: 'IO' as any,
     helpText: '',
     models: { digital: { executeFn: noop, defaultDelay: 0 } },
-    defaultDelay: 0,
   });
 
   registry.register({
@@ -85,7 +84,6 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     category: 'IO' as any,
     helpText: '',
     models: { digital: { executeFn: noop, defaultDelay: 0 } },
-    defaultDelay: 0,
   });
 
   registry.register({
@@ -98,7 +96,6 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     category: 'LOGIC' as any,
     helpText: '',
     models: { digital: { executeFn: noop, defaultDelay: andDelay } },
-    defaultDelay: andDelay,
   });
 
   registry.register({
@@ -111,7 +108,6 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     category: 'LOGIC' as any,
     helpText: '',
     models: { digital: { executeFn: noop, defaultDelay: orDelay } },
-    defaultDelay: orDelay,
   });
 
   registry.register({
@@ -124,7 +120,6 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
     category: 'LOGIC' as any,
     helpText: '',
     models: { digital: { executeFn: noop, defaultDelay: notDelay } },
-    defaultDelay: notDelay,
   });
 
   return registry;

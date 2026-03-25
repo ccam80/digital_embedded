@@ -198,12 +198,12 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new MockElement("In", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executePassThrough,
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
     helpText: "In",
+    models: { digital: { executeFn: executePassThrough } },
   });
 
   registry.register({
@@ -212,12 +212,12 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new MockElement("Out", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("in", PinDirection.INPUT, 0, 0),
     ], props),
-    executeFn: executeNoop,
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
     helpText: "Out",
+    models: { digital: { executeFn: executeNoop } },
   });
 
   registry.register({
@@ -228,12 +228,12 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeXor2,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: "LOGIC" as any,
     helpText: "XOR",
+    models: { digital: { executeFn: executeXor2 } },
   });
 
   registry.register({
@@ -244,12 +244,12 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeAnd2,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: "LOGIC" as any,
     helpText: "AND",
+    models: { digital: { executeFn: executeAnd2 } },
   });
 
   return registry;
@@ -319,12 +319,12 @@ describe("Runner", () => {
       factory: (props) => new MockElement("In", crypto.randomUUID(), { x: 0, y: 0 }, [
         makePin("out", PinDirection.OUTPUT, 2, 0),
       ], props),
-      executeFn: executePassThrough,
       pinLayout: [],
       propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
       attributeMap: [],
       category: "IO" as any,
       helpText: "In",
+      models: { digital: { executeFn: executePassThrough } },
     });
 
     registry.register({
@@ -333,12 +333,12 @@ describe("Runner", () => {
       factory: (props) => new MockElement("Out", crypto.randomUUID(), { x: 0, y: 0 }, [
         makePin("in", PinDirection.INPUT, 4, 0),
       ], props),
-      executeFn: executeNoop,
       pinLayout: [],
       propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
       attributeMap: [],
       category: "IO" as any,
       helpText: "Out",
+      models: { digital: { executeFn: executeNoop } },
     });
 
     const circuit = new Circuit();
@@ -375,15 +375,19 @@ describe("Runner", () => {
       factory: (props) => new MockElement("Osc", crypto.randomUUID(), { x: 0, y: 0 }, [
         makePin("out", PinDirection.OUTPUT, 2, 0),
       ], props),
-      executeFn: (_index: number, state: Uint32Array, __highZs: Uint32Array, layout: ComponentLayout) => {
-        toggle = toggle === 0 ? 1 : 0;
-        state[layout.outputOffset(_index)] = toggle;
-      },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: "LOGIC" as any,
       helpText: "Osc",
+      models: {
+        digital: {
+          executeFn: (_index: number, state: Uint32Array, __highZs: Uint32Array, layout: ComponentLayout) => {
+            toggle = toggle === 0 ? 1 : 0;
+            state[layout.outputOffset(_index)] = toggle;
+          },
+        },
+      },
     });
 
     const circuit = new Circuit();

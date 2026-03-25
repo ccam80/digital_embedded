@@ -96,10 +96,10 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new MockElement("In", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executePassThrough,
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "" }],
     attributeMap: [], category: "IO" as any, helpText: "In",
+    models: { digital: { executeFn: executePassThrough } },
   });
 
   registry.register({
@@ -107,10 +107,10 @@ function buildRegistry(): ComponentRegistry {
     factory: (props) => new MockElement("Out", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("in", PinDirection.INPUT, 0, 0),
     ], props),
-    executeFn: executeNoop,
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "" }],
     attributeMap: [], category: "IO" as any, helpText: "Out",
+    models: { digital: { executeFn: executeNoop } },
   });
 
   registry.register({
@@ -120,7 +120,8 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeXor2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "XOR",
+    pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "XOR",
+    models: { digital: { executeFn: executeXor2 } },
   });
 
   registry.register({
@@ -130,7 +131,8 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeAnd2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "AND",
+    pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "AND",
+    models: { digital: { executeFn: executeAnd2 } },
   });
 
   registry.register({
@@ -139,7 +141,8 @@ function buildRegistry(): ComponentRegistry {
       makePin("in", PinDirection.INPUT, -2, 0),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeNot, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "NOT",
+    pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "NOT",
+    models: { digital: { executeFn: executeNot } },
   });
 
   registry.register({
@@ -149,7 +152,8 @@ function buildRegistry(): ComponentRegistry {
       makePin("in1", PinDirection.INPUT, -2, 1),
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: executeNor2, pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "NOR",
+    pinLayout: [], propertyDefs: [], attributeMap: [], category: "LOGIC" as any, helpText: "NOR",
+    models: { digital: { executeFn: executeNor2 } },
   });
 
   return registry;

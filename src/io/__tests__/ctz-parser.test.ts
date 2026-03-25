@@ -51,12 +51,14 @@ function makeDefinition(name: string): ComponentDefinition {
     typeId: -1,
     factory: (props: PropertyBag) =>
       new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-    executeFn: () => undefined,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.PASSIVES,
     helpText: name,
+    models: {
+      digital: { executeFn: () => undefined },
+    },
   };
 }
 

@@ -142,11 +142,11 @@ function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): Compone
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
     pinLayout: makeGatePinLayout(2),
-    simulationModes: ["logical", "analog-pins"] as const,
     models: {
       digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
       analog: { factory: andFactory as unknown as import("../../core/registry.js").AnalogModel["factory"] },
     },
+    defaultModel: "digital",
   });
 
   // Digital-only gate
@@ -314,7 +314,6 @@ describe("BehavioralCompilation", () => {
     registry.register({
       ...makeBaseDef("HighDriveAnd"),
       pinLayout: makeGatePinLayout(2),
-      simulationModes: ["logical", "analog-pins"] as const,
       models: {
         digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
         analog: {
@@ -360,9 +359,9 @@ describe("BehavioralCompilation", () => {
 
 describe("SimulationMode", () => {
   it("default_is_first_simulationMode_entry", () => {
-    // No simulationMode property set → defaults to simulationModes[0].
-    // Stub registry has simulationModes: ['logical', 'analog-pins'],
-    // so default is 'logical'. Set mode to 'analog-pins' explicitly and
+    // No simulationMode property set → defaults based on defaultModel.
+    // BehavioralAnd has defaultModel: 'digital', so default mode is 'logical'.
+    // Set mode to 'analog-pins' explicitly and
     // verify the factory IS called — proving that without the explicit
     // property the compiler would NOT have taken the analog-pins path.
     const analogPinsProps = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
@@ -452,7 +451,6 @@ describe("SimulationMode", () => {
     registry.register({
       ...makeBaseDef("BehavioralAnd"),
       pinLayout: makeGatePinLayout(2),
-      simulationModes: ["logical", "analog-pins"] as const,
       factory: makeStubElFactory("BehavioralAnd", (_props) => [
         { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false },
         { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false },
@@ -506,7 +504,13 @@ describe("SimulationMode", () => {
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     // Add transistorModel to the registered definition so the transistor path is triggered
     const def = registry.get("BehavioralAnd")!;
-    registry.update({ ...def, transistorModel: "CmosAnd2" });
+    registry.update({
+      ...def,
+      models: {
+        ...def.models,
+        analog: { ...def.models.analog, transistorModel: "CmosAnd2" },
+      },
+    });
 
     const compiled = compileAnalogCircuit(circuit, registry);
 

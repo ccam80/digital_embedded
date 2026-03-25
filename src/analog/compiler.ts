@@ -454,7 +454,7 @@ export function compileAnalogCircuit(
       const passAProps = el.getProperties();
       const passAMode = passAProps.has("simulationMode")
         ? (passAProps.get("simulationMode") as string)
-        : (def.simulationModes?.[0] ?? "analog-pins");
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
       if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
         elementMeta.push({
           el,
@@ -546,7 +546,7 @@ export function compileAnalogCircuit(
     if (hasBothModels) {
       const simulationMode = props.has("simulationMode")
         ? (props.get("simulationMode") as string)
-        : (def.simulationModes?.[0] ?? "analog-pins");
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
 
       if (simulationMode === "analog-internals" && def.models?.analog?.transistorModel) {
         if (!transistorModels) {

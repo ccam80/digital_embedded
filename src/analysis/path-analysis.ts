@@ -198,7 +198,7 @@ function buildDelayMap(circuit: Circuit, registry: ComponentRegistry): Map<strin
   const map = new Map<string, number>();
   for (const el of circuit.elements) {
     const def = registry.get(el.typeId);
-    const delay = def?.defaultDelay ?? DEFAULT_DELAY_NS;
+    const delay = def?.models?.digital?.defaultDelay ?? DEFAULT_DELAY_NS;
     map.set(el.instanceId, delay);
   }
   return map;

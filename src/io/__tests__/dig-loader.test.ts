@@ -73,12 +73,14 @@ function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): C
     name,
     typeId: -1,
     factory: makeFactory(name),
-    executeFn: noopExecute,
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [LABEL_MAPPING, WIDE_SHAPE_MAPPING, INPUTS_MAPPING, BITS_MAPPING, TEST_DATA_MAPPING, ...extraMappings],
     category: ComponentCategory.LOGIC,
     helpText: name,
+    models: {
+      digital: { executeFn: noopExecute },
+    },
   };
 }
 
@@ -517,12 +519,14 @@ describe("DigLoader", () => {
         const bag = new PropertyBag([["bitWidth", bitWidth]]);
         return new TestElement("GateWithDefault", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, bag);
       },
-      executeFn: noopExecute,
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [intConverter("Bits", "bitWidth")],
       category: ComponentCategory.LOGIC,
       helpText: "GateWithDefault",
+      models: {
+        digital: { executeFn: noopExecute },
+      },
     });
 
     const circuit = loadDig(xml, registry);

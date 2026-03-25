@@ -67,12 +67,12 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     factory: (props) => new MockElement("In", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
     helpText: "In",
+    models: { digital: { executeFn: () => {} } },
   });
 
   registry.register({
@@ -81,12 +81,12 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     factory: (props) => new MockElement("Out", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("in", PinDirection.INPUT, 4, 0),
     ], props),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "IO" as any,
     helpText: "Out",
+    models: { digital: { executeFn: () => {} } },
   });
 
   registry.register({
@@ -95,17 +95,21 @@ function buildTracingRegistry(counterValues: number[]): ComponentRegistry {
     factory: (props) => new MockElement("Counter", crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin("out", PinDirection.OUTPUT, 2, 0),
     ], props),
-    executeFn: (_index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => {
-      const val = counterValues[stepIndex] ?? 0;
-      stepIndex = (stepIndex + 1) % counterValues.length;
-      const wt = layout.wiringTable;
-      state[wt[layout.outputOffset(_index)]!] = val;
-    },
     pinLayout: [],
     propertyDefs: [{ key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "Label" }],
     attributeMap: [],
     category: "LOGIC" as any,
     helpText: "Counter",
+    models: {
+      digital: {
+        executeFn: (_index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout) => {
+          const val = counterValues[stepIndex] ?? 0;
+          stepIndex = (stepIndex + 1) % counterValues.length;
+          const wt = layout.wiringTable;
+          state[wt[layout.outputOffset(_index)]!] = val;
+        },
+      },
+    },
   });
 
   return registry;

@@ -67,12 +67,14 @@ function makeGenericCodeDef(typeName: string): ComponentDefinition {
     name: typeName,
     typeId: -1,
     factory: makeTestFactory(typeName),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [],
     attributeMap,
     category: ComponentCategory.MISC,
     helpText: typeName,
+    models: {
+      digital: { executeFn: () => {} },
+    },
   };
 }
 
@@ -361,7 +363,6 @@ function makeTestDef(name: string): ComponentDefinition {
     name,
     typeId: -1,
     factory: makeTestFactory(name),
-    executeFn: () => {},
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [
@@ -369,6 +370,9 @@ function makeTestDef(name: string): ComponentDefinition {
     ],
     category: ComponentCategory.MISC,
     helpText: name,
+    models: {
+      digital: { executeFn: () => {} },
+    },
   };
 }
 

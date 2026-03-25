@@ -80,12 +80,14 @@ function makeRegistry(...names: string[]): ComponentRegistry {
       name,
       typeId: -1,
       factory: () => { throw new Error('not needed in test'); },
-      executeFn: NOOP_EXEC,
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: '',
+      models: {
+        digital: { executeFn: NOOP_EXEC },
+      },
     };
     registry.register(def);
   }
