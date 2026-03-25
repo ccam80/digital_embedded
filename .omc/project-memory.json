@@ -238,26 +238,26 @@
   "hotPaths": [
     {
       "path": "src\\analog\\compiler.ts",
-      "accessCount": 176,
-      "lastAccessed": 1774399981486,
+      "accessCount": 182,
+      "lastAccessed": 1774402468079,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 111,
+      "lastAccessed": 1774403322810,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 109,
+      "lastAccessed": 1774403339438,
       "type": "file"
     },
     {
       "path": "src\\editor\\wire-current-resolver.ts",
       "accessCount": 92,
       "lastAccessed": 1774395932474,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 86,
-      "lastAccessed": 1774399885017,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 74,
-      "lastAccessed": 1774399457978,
       "type": "file"
     },
     {
@@ -279,6 +279,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 48,
+      "lastAccessed": 1774400937356,
+      "type": "directory"
+    },
+    {
       "path": "src\\analog\\element.ts",
       "accessCount": 45,
       "lastAccessed": 1774395707037,
@@ -297,9 +303,9 @@
       "type": "directory"
     },
     {
-      "path": "src\\app\\app-init.ts",
+      "path": "src\\components",
       "accessCount": 41,
-      "lastAccessed": 1774398540101,
+      "lastAccessed": 1774403362025,
       "type": "directory"
     },
     {
@@ -309,15 +315,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components",
-      "accessCount": 33,
-      "lastAccessed": 1774397755880,
-      "type": "directory"
-    },
-    {
       "path": "src\\engine\\compiler.ts",
-      "accessCount": 25,
-      "lastAccessed": 1774397205218,
+      "accessCount": 26,
+      "lastAccessed": 1774403328953,
       "type": "file"
     },
     {
@@ -328,8 +328,8 @@
     },
     {
       "path": "src\\analog\\transistor-expansion.ts",
-      "accessCount": 18,
-      "lastAccessed": 1774397292745,
+      "accessCount": 19,
+      "lastAccessed": 1774401352849,
       "type": "directory"
     },
     {
@@ -340,8 +340,8 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 15,
-      "lastAccessed": 1774398878464,
+      "accessCount": 16,
+      "lastAccessed": 1774403308208,
       "type": "file"
     },
     {
@@ -441,6 +441,12 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\pin-electrical.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774400752502,
+      "type": "file"
+    },
+    {
       "path": "fixtures\\buckbjt.dig",
       "accessCount": 2,
       "lastAccessed": 1774333244690,
@@ -456,12 +462,6 @@
       "path": "src\\integration\\editor-binding.ts",
       "accessCount": 2,
       "lastAccessed": 1774342548601,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\pin-electrical.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774389952007,
       "type": "file"
     },
     {

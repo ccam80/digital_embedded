@@ -193,3 +193,45 @@
   - src/engine/mixed-partition.ts (source fix required — def.engineType no longer set on Resistor/DcVoltageSource which use models directly)
 - **Tests**: 240/240 passing (all 8 targeted files)
 - **Notes**: The mixed-partition.ts source file was also modified because detectEngineMode used def.engineType which is not set on definitions that use models directly (e.g. Resistor). The src/io/__tests__/resolve-generics.test.ts and dig-parser.test.ts failures are pre-existing ENOENT failures caused by missing git submodule (ref/Digital not initialized) — unrelated to these changes.
+
+## Phase 2: Migrate component definitions
+
+| Task | Title | Complexity | Status |
+|------|-------|------------|--------|
+| P2-1 | Mechanically rewrite each definition to use models bag | L | complete |
+| P2-2 | Remove noOpAnalogExecuteFn from production definitions | S | complete |
+| P2-3 | Mark flat fields deprecated on ComponentDefinition interface | M | complete |
+| P2-4 | Retain _ensureModels shim for test backwards compat | S | complete |
+| P2-5 | Remove engineType from production definitions | S | complete |
+| P2-6 | Add defaultModel to multi-model components | S | complete |
+| P2-7 | Full test suite verification | S | complete |
+
+---
+## Wave 2.1 Summary (Phase 2)
+- **Status**: complete
+- **Tasks completed**: 1/1 (P2-A: update consumers + make executeFn optional)
+- **Rounds**: 1
+
+---
+## Wave 2.2 Summary (Phase 2)
+- **Status**: complete
+- **Tasks completed**: 4/4 (migrate all ~140 component definitions + fix analog compiler + fix 31 test files)
+- **Rounds**: 3 (initial 4 parallel implementers, then 2 parallel test fix agents)
+
+---
+## Wave 2.3 Summary (Phase 2)
+- **Status**: complete
+- **Tasks completed**: cleanup (mark flat fields deprecated, fix darlington, fix mixed-partition)
+- **Rounds**: 2
+
+---
+## Phase 2 Summary
+- **Status**: complete
+- **Test result**: 7405/7409 passing (4 pre-existing failures from missing git submodule)
+- **Files changed**: ~290 files across 3 commits
+- **Key decisions**:
+  - Flat fields retained as @deprecated on ComponentDefinition for test backwards compat
+  - _ensureModels shim retained — test code creates ~105 inline definitions with flat fields
+  - noOpAnalogExecuteFn retained as @deprecated export (1 test file still imports it)
+  - expandTransistorModel still reads flat def.transistorModel (consumer update deferred)
+  - Analog compiler now derives component capabilities from models presence, not engineType

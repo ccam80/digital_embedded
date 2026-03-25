@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:/local_working_projects/digital_in_browser/src/analog/__tests__/cmos-gates.test.ts\"}",
-  "error": "File content (14050 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-03-25T00:43:07.836Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && git commit -m \\\"$(cat <<'EOF'\\nWave 2.3: Cleanup — mark flat fields deprecated, fix analog compiler\\n\\nFlat simulation fields on Comp...",
+  "error": "Exit code 1\nOn branch main\nYour branch is ahead of 'origin/main' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nChanges not staged for commit:\n  (use \"git add/rm <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   .omc/project-memory.json\n\tmodified:   .omc/state/last-tool-error.json\n\tmodified:   .omc/state/mission-state.json\n\tmodified:   .omc/state/subagent-tracking.json\n\tdeleted:    spec/.locks/files/s...",
+  "timestamp": "2026-03-25T01:17:10.248Z",
   "retry_count": 1
 }

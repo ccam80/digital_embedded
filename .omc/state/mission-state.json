@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-25T00:47:32.856Z",
+  "updatedAt": "2026-03-25T01:47:46.660Z",
   "missions": [
     {
       "id": "session:21c4cbb9-908b-4260-be26-2718be466e7d:none",
@@ -9263,15 +9263,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-03-24T23:57:59.129Z",
-      "updatedAt": "2026-03-25T00:47:32.856Z",
-      "status": "done",
-      "workerCount": 7,
+      "updatedAt": "2026-03-25T01:47:46.660Z",
+      "status": "running",
+      "workerCount": 11,
       "taskCounts": {
-        "total": 7,
+        "total": 11,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 0,
-        "completed": 7,
+        "inProgress": 1,
+        "completed": 10,
         "failed": 0
       },
       "agents": [
@@ -9344,40 +9344,72 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-03-25T00:47:32.856Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ac665da",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ac665da251dc2406e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-25T00:58:02.164Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ae09ac8",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ae09ac8e3177a5c53",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-25T01:02:32.123Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ae875de",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ae875de9103dfc270",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-25T01:10:21.002Z"
+        },
+        {
+          "name": "code-reviewer:a1a4c53",
+          "role": "code-reviewer",
+          "ownership": "a1a4c53baaad6fcee",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-03-25T01:47:46.660Z"
         }
       ],
       "timeline": [
         {
-          "id": "session-stop:a4e799a670b02b20d:2026-03-25T00:40:19.014Z",
-          "at": "2026-03-25T00:40:19.014Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:a4e799a",
-          "detail": "completed",
-          "sourceKey": "session-stop:a4e799a670b02b20d"
-        },
-        {
-          "id": "session-stop:a202772b0f55043c9:2026-03-25T00:40:55.805Z",
-          "at": "2026-03-25T00:40:55.805Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:a202772",
-          "detail": "completed",
-          "sourceKey": "session-stop:a202772b0f55043c9"
-        },
-        {
-          "id": "session-start:ae19cc45436969977:2026-03-25T00:42:44.157Z",
-          "at": "2026-03-25T00:42:44.157Z",
+          "id": "session-start:ae875de9103dfc270:2026-03-25T01:04:48.004Z",
+          "at": "2026-03-25T01:04:48.004Z",
           "kind": "update",
-          "agent": "claude-orchestrator:implementer:ae19cc4",
-          "detail": "started claude-orchestrator:implementer:ae19cc4",
-          "sourceKey": "session-start:ae19cc45436969977"
+          "agent": "claude-orchestrator:implementer:ae875de",
+          "detail": "started claude-orchestrator:implementer:ae875de",
+          "sourceKey": "session-start:ae875de9103dfc270"
         },
         {
-          "id": "session-stop:ae19cc45436969977:2026-03-25T00:47:32.856Z",
-          "at": "2026-03-25T00:47:32.856Z",
+          "id": "session-stop:ae875de9103dfc270:2026-03-25T01:10:21.002Z",
+          "at": "2026-03-25T01:10:21.002Z",
           "kind": "completion",
-          "agent": "claude-orchestrator:implementer:ae19cc4",
+          "agent": "claude-orchestrator:implementer:ae875de",
           "detail": "completed",
-          "sourceKey": "session-stop:ae19cc45436969977"
+          "sourceKey": "session-stop:ae875de9103dfc270"
+        },
+        {
+          "id": "session-start:a1a4c53baaad6fcee:2026-03-25T01:47:46.660Z",
+          "at": "2026-03-25T01:47:46.660Z",
+          "kind": "update",
+          "agent": "code-reviewer:a1a4c53",
+          "detail": "started code-reviewer:a1a4c53",
+          "sourceKey": "session-start:a1a4c53baaad6fcee"
         }
       ]
     },
