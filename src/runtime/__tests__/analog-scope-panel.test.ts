@@ -2,61 +2,69 @@
  * Tests for AnalogScopePanel — channel capture, reset, Y-axis ranging, FFT.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { AnalogScopePanel } from "../analog-scope-panel.js";
 import { AnalogScopeBuffer } from "../analog-scope-buffer.js";
-import type { AnalogEngine } from "@/core/analog-engine-interface.js";
+import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
+import type { SignalAddress } from "@/compile/types.js";
 
 // ---------------------------------------------------------------------------
-// Mock AnalogEngine
+// Shared signal addresses
 // ---------------------------------------------------------------------------
 
-function makeEngine(overrides: Partial<AnalogEngine> = {}): AnalogEngine {
-  return {
-    simTime: 0,
-    lastDt: 1e-6,
-    getNodeVoltage: vi.fn().mockReturnValue(0),
-    getBranchCurrent: vi.fn().mockReturnValue(0),
-    getElementCurrent: vi.fn().mockReturnValue(0),
-    getElementPower: vi.fn().mockReturnValue(0),
-    dcOperatingPoint: vi.fn(),
-    configure: vi.fn(),
-    onDiagnostic: vi.fn(),
-    addBreakpoint: vi.fn(),
-    clearBreakpoints: vi.fn(),
-    // SimulationEngine / Engine base methods
-    init: vi.fn(),
-    start: vi.fn(),
-    stop: vi.fn(),
-    reset: vi.fn(),
-    step: vi.fn(),
-    dispose: vi.fn(),
-    getState: vi.fn(),
-    addChangeListener: vi.fn(),
-    removeChangeListener: vi.fn(),
-    addMeasurementObserver: vi.fn(),
-    removeMeasurementObserver: vi.fn(),
-    getSignalRaw: vi.fn(),
-    setSignal: vi.fn(),
-    saveSnapshot: vi.fn(),
-    restoreSnapshot: vi.fn(),
-    ...overrides,
-  } as unknown as AnalogEngine;
-}
+const VOLTAGE_ADDR: SignalAddress = { domain: "analog", nodeId: 3 };
+const VOLTAGE_ADDR2: SignalAddress = { domain: "analog", nodeId: 5 };
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePanel(engine: AnalogEngine): AnalogScopePanel {
-  // Pass null canvas — rendering tests would need a real canvas
-  return new AnalogScopePanel(null, engine);
+/**
+ * Build a coordinator with configurable simTime, voltage, and current sources.
+ * Returns the coordinator plus mutation helpers.
+ */
+function buildCoordinator(opts: {
+  simTime?: number;
+  voltage?: number;
+  branchCurrent?: number;
+  elementCurrent?: number;
+} = {}): {
+  coordinator: MockCoordinator;
+  setSimTime(t: number): void;
+  setVoltage(addr: SignalAddress, v: number): void;
+} {
+  const coord = new MockCoordinator();
+  if (opts.voltage !== undefined) {
+    coord.setSignal(VOLTAGE_ADDR, { type: "analog", voltage: opts.voltage });
+    coord.setSignal(VOLTAGE_ADDR2, { type: "analog", voltage: opts.voltage });
+  }
+
+  let currentSimTime = opts.simTime ?? 0;
+  Object.defineProperty(coord, "simTime", {
+    get: () => currentSimTime,
+    configurable: true,
+  });
+
+  if (opts.branchCurrent !== undefined) {
+    const bc = opts.branchCurrent;
+    (coord as unknown as { readBranchCurrent(i: number): number | null }).readBranchCurrent = (_i: number) => bc;
+  }
+  if (opts.elementCurrent !== undefined) {
+    const ec = opts.elementCurrent;
+    (coord as unknown as { readElementCurrent(i: number): number | null }).readElementCurrent = (_i: number) => ec;
+  }
+
+  return {
+    coordinator: coord,
+    setSimTime: (t: number) => { currentSimTime = t; },
+    setVoltage: (addr: SignalAddress, v: number) => {
+      coord.setSignal(addr, { type: "analog", voltage: v });
+    },
+  };
 }
 
-/** Advance engine simTime and call onStep */
-function step(panel: AnalogScopePanel, engine: ReturnType<typeof makeEngine>, t: number): void {
-  (engine as unknown as { simTime: number }).simTime = t;
-  panel.onStep(1);
+function makePanel(coordinator: MockCoordinator): AnalogScopePanel {
+  return new AnalogScopePanel(null, coordinator);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,16 +73,13 @@ function step(panel: AnalogScopePanel, engine: ReturnType<typeof makeEngine>, t:
 
 describe("AnalogScope", () => {
   it("captures_voltage_on_step", () => {
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn().mockReturnValue(4.2),
-    });
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(3, "Vout", "#4488ff");
+    const { coordinator, setSimTime } = buildCoordinator({ voltage: 4.2 });
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "Vout", "#4488ff");
 
-    (engine as unknown as { simTime: number }).simTime = 1e-6;
+    setSimTime(1e-6);
     panel.onStep(1);
 
-    // Access internal buffer via reflection to verify
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0];
     expect(ch).toBeDefined();
     expect(ch!.buffer.sampleCount).toBe(1);
@@ -84,25 +89,16 @@ describe("AnalogScope", () => {
   });
 
   it("multiple_channels_independent", () => {
-    let voltageCallCount = 0;
-    let currentCallCount = 0;
-
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn(() => {
-        voltageCallCount++;
-        return 3.3;
-      }),
-      getBranchCurrent: vi.fn(() => {
-        currentCallCount++;
-        return 0.01;
-      }),
+    const { coordinator, setSimTime } = buildCoordinator({
+      voltage: 3.3,
+      branchCurrent: 0.01,
     });
 
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(1, "V1", "#ff0000");
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1", "#ff0000");
     panel.addCurrentChannel(0, "I1", "#00ff00");
 
-    (engine as unknown as { simTime: number }).simTime = 1e-6;
+    setSimTime(1e-6);
     panel.onStep(1);
 
     const channels = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels;
@@ -122,15 +118,12 @@ describe("AnalogScope", () => {
   });
 
   it("reset_clears_buffers", () => {
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn().mockReturnValue(5),
-    });
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(0, "V1", "#4488ff");
+    const { coordinator, setSimTime } = buildCoordinator({ voltage: 5 });
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1", "#4488ff");
 
-    // Push a few samples
     for (let i = 0; i < 5; i++) {
-      (engine as unknown as { simTime: number }).simTime = i * 1e-6;
+      setSimTime(i * 1e-6);
       panel.onStep(i);
     }
 
@@ -144,47 +137,35 @@ describe("AnalogScope", () => {
 
   it("auto_y_range_tracks_visible", () => {
     const voltages = [0, 1, 2, 3, 4, 5];
-    let idx = 0;
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn(() => voltages[idx % voltages.length]),
-    });
+    const { coordinator, setSimTime, setVoltage } = buildCoordinator({ voltage: 0 });
 
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(0, "V1", "#4488ff");
-    panel.setTimeRange(1); // 1 second window
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1", "#4488ff");
+    panel.setTimeRange(1);
 
-    // Push samples across t=0..5e-3
     for (let i = 0; i < voltages.length; i++) {
-      idx = i;
-      (engine as unknown as { simTime: number }).simTime = i * 1e-3;
+      setVoltage(VOLTAGE_ADDR, voltages[i] ?? 0);
+      setSimTime(i * 1e-3);
       panel.onStep(i);
     }
 
-    // Compute shared Y range to test auto-range
     const vp = (panel as unknown as {
-      _computeSharedYRange: (
-        tStart: number,
-        tEnd: number,
-      ) => { yMin: number; yMax: number };
+      _computeSharedYRange: (tStart: number, tEnd: number) => { yMin: number; yMax: number };
     })._computeSharedYRange(0, 1);
 
-    // Range should be [0-10%padding, 5+10%padding] = [-0.5, 5.5]
     expect(vp.yMin).toBeCloseTo(-0.5, 1);
     expect(vp.yMax).toBeCloseTo(5.5, 1);
   });
 
   it("manual_y_range_overrides", () => {
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn().mockReturnValue(5),
-    });
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(0, "V1", "#4488ff");
+    const { coordinator, setSimTime } = buildCoordinator({ voltage: 5 });
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1", "#4488ff");
     panel.setYRange("V1", 0, 3.3);
     panel.setTimeRange(1);
 
-    // Push samples up to 5V
     for (let i = 0; i < 10; i++) {
-      (engine as unknown as { simTime: number }).simTime = i * 1e-4;
+      setSimTime(i * 1e-4);
       panel.onStep(i);
     }
 
@@ -198,25 +179,22 @@ describe("AnalogScope", () => {
     })._channels;
 
     const ch = channels[0]!;
-    // Manual range should not be overridden even though data goes to 5V
     expect(ch.autoRange).toBe(false);
     expect(ch.yMin).toBeCloseTo(0, 5);
     expect(ch.yMax).toBeCloseTo(3.3, 5);
   });
 
   it("envelope_at_low_zoom", () => {
-    // Push 10000 samples, zoom out to show all. The panel should use
-    // envelope rendering (sample density > ENVELOPE_THRESHOLD = 1000).
-    const engine = makeEngine({
-      getNodeVoltage: vi.fn((id) => Math.sin(2 * Math.PI * id / 1000)),
-    });
-    const panel = makePanel(engine);
-    panel.addVoltageChannel(0, "V1", "#4488ff");
-    panel.setTimeRange(1); // 1-second window
+    const { coordinator, setSimTime, setVoltage } = buildCoordinator({ voltage: 0 });
+
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1", "#4488ff");
+    panel.setTimeRange(1);
 
     const N = 10000;
     for (let i = 0; i < N; i++) {
-      (engine as unknown as { simTime: number }).simTime = i * 1e-4;
+      setVoltage(VOLTAGE_ADDR, Math.sin(2 * Math.PI * i / 1000));
+      setSimTime(i * 1e-4);
       panel.onStep(i);
     }
 
@@ -224,8 +202,6 @@ describe("AnalogScope", () => {
     const ch = channels[0]!;
     expect(ch.buffer.sampleCount).toBeGreaterThanOrEqual(N < 65536 ? N : 65536);
 
-    // The panel should decide to use envelope when more than 1000 samples
-    // are visible. Verify by counting visible samples directly.
     const tEnd = (panel as unknown as { _viewEnd: number })._viewEnd;
     const duration = (panel as unknown as { _viewDuration: number })._viewDuration;
     const tStart = tEnd - duration;
@@ -234,8 +210,8 @@ describe("AnalogScope", () => {
   });
 
   it("fft_enabled_toggle", () => {
-    const engine = makeEngine();
-    const panel = makePanel(engine);
+    const { coordinator } = buildCoordinator();
+    const panel = makePanel(coordinator);
 
     panel.setFftEnabled(true);
     expect((panel as unknown as { _fftEnabled: boolean })._fftEnabled).toBe(true);
@@ -245,13 +221,74 @@ describe("AnalogScope", () => {
   });
 
   it("fft_channel_selection", () => {
-    const engine = makeEngine();
-    const panel = makePanel(engine);
+    const { coordinator } = buildCoordinator();
+    const panel = makePanel(coordinator);
 
-    panel.addVoltageChannel(0, "Vout", "#4488ff");
-    panel.addVoltageChannel(1, "Vin", "#ff4444");
+    panel.addVoltageChannel(VOLTAGE_ADDR, "Vout", "#4488ff");
+    panel.addVoltageChannel(VOLTAGE_ADDR2, "Vin", "#ff4444");
 
     panel.setFftChannel("Vin");
     expect((panel as unknown as { _fftChannelLabel: string })._fftChannelLabel).toBe("Vin");
+  });
+
+  it("registers_as_observer_on_construction", () => {
+    const { coordinator } = buildCoordinator();
+    const panel = makePanel(coordinator);
+
+    const observers = (coordinator as unknown as { _observers: Set<unknown> })._observers;
+    expect(observers.has(panel)).toBe(true);
+  });
+
+  it("deregisters_as_observer_on_dispose", () => {
+    const { coordinator } = buildCoordinator();
+    const panel = makePanel(coordinator);
+
+    panel.dispose();
+
+    const observers = (coordinator as unknown as { _observers: Set<unknown> })._observers;
+    expect(observers.has(panel)).toBe(false);
+  });
+
+  it("reads_element_current_via_coordinator", () => {
+    const { coordinator, setSimTime } = buildCoordinator({ elementCurrent: 0.05 });
+    const panel = makePanel(coordinator);
+    panel.addElementCurrentChannel(2, "Iel", "#ff8800");
+
+    setSimTime(1e-6);
+    panel.onStep(1);
+
+    const channels = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels;
+    const ch = channels.find((c) => c.kind === "elementCurrent");
+    expect(ch).toBeDefined();
+    const samples = ch!.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(0.05);
+  });
+
+  it("reads_branch_current_via_coordinator", () => {
+    const { coordinator, setSimTime } = buildCoordinator({ branchCurrent: 0.02 });
+    const panel = makePanel(coordinator);
+    panel.addCurrentChannel(1, "Ibranch", "#44cccc");
+
+    setSimTime(1e-6);
+    panel.onStep(1);
+
+    const channels = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels;
+    const ch = channels.find((c) => c.kind === "current");
+    expect(ch).toBeDefined();
+    const samples = ch!.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(0.02);
+  });
+
+  it("uses_coordinator_simTime_for_x_axis", () => {
+    const { coordinator, setSimTime } = buildCoordinator({ voltage: 1.0 });
+    const panel = makePanel(coordinator);
+    panel.addVoltageChannel(VOLTAGE_ADDR, "V1");
+
+    setSimTime(5e-3);
+    panel.onStep(1);
+
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
+    const samples = ch.buffer.getSamplesInRange(0, 1);
+    expect(samples.time[0]).toBeCloseTo(5e-3);
   });
 });

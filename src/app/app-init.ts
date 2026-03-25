@@ -56,7 +56,6 @@ import { deserializeDts } from '../io/dts-deserializer.js';
 import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
 import { PostMessageAdapter } from '../io/postmessage-adapter.js';
 import { createTestBridge } from './test-bridge.js';
-import type { AnalogTestContext } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
 import { EngineState } from '../core/engine-interface.js';
@@ -72,7 +71,6 @@ import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import { TimingDiagramPanel } from '../runtime/timing-diagram.js';
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
-import type { ResolvedAnalogCircuit } from '../editor/wire-current-resolver.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
@@ -2122,7 +2120,8 @@ export function initApp(search?: string): void {
         }
       }
 
-      resolver.resolve(analogEngine, circuit, analogCompiled as unknown as ResolvedAnalogCircuit);
+      const resolverCtx = coordinator.getCurrentResolverContext();
+      if (resolverCtx) resolver.resolve(resolverCtx);
       currentFlowAnimator!.update(wallDtSeconds, circuit);
       analogVoltageTracker.update(analogEngine, analogCompiled.nodeCount);
 
@@ -2418,17 +2417,18 @@ export function initApp(search?: string): void {
       }
     }
 
-    if (viewerValuesContainer) {
+    const coordinator = facade.getCoordinator();
+    if (viewerValuesContainer && coordinator) {
       const signals: SignalDescriptor[] = watchedSignals.map(s => ({
-        name: s.name, netId: s.netId, width: s.width, group: s.group,
+        name: s.name,
+        addr: isAnalog
+          ? { domain: 'analog' as const, nodeId: s.netId }
+          : { domain: 'digital' as const, netId: s.netId, bitWidth: s.width },
+        width: s.width,
+        group: s.group,
       }));
-      if (isAnalog && ae) {
-        activeDataTable = new DataTablePanel(viewerValuesContainer, ae as any, signals);
-        (ae as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeDataTable);
-      } else if (eng) {
-        activeDataTable = new DataTablePanel(viewerValuesContainer, eng, signals);
-        (eng as unknown as { addMeasurementObserver(o: unknown): void }).addMeasurementObserver(activeDataTable);
-      }
+      activeDataTable = new DataTablePanel(viewerValuesContainer, coordinator, signals);
+      coordinator.addMeasurementObserver(activeDataTable);
     }
   }
 
@@ -5493,13 +5493,8 @@ export function initApp(search?: string): void {
   // -------------------------------------------------------------------------
 
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-    const analogTestCtx: AnalogTestContext = {
-      get engine() { return facade.getEngine() as unknown as import('../analog/analog-engine.js').MNAEngine | null; },
-      get compiled() { return facade.getCoordinator()?.compiled.analog ?? null; },
-    };
-
     (window as unknown as Record<string, unknown>).__test = createTestBridge(
-      circuit, viewport, canvas, palette, registry, analogTestCtx,
+      circuit, viewport, canvas, palette, registry, facade.getCoordinator() ?? null,
     );
   }
 

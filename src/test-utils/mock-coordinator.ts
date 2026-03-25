@@ -6,12 +6,18 @@
  * writeCalls record.
  */
 
-import type { SimulationEngine, MeasurementObserver } from "@/core/engine-interface";
+import type { SimulationEngine, MeasurementObserver, SnapshotId } from "@/core/engine-interface";
 import { EngineState } from "@/core/engine-interface";
 import type { AnalogEngine, DcOpResult } from "@/core/analog-engine-interface";
-import type { SimulationCoordinator, FrameStepResult } from "@/solver/coordinator-types";
+import type {
+  SimulationCoordinator,
+  FrameStepResult,
+  SliderPropertyDescriptor,
+  CurrentResolverContext,
+} from "@/solver/coordinator-types";
 import type { Diagnostic, SignalAddress, SignalValue } from "@/compile/types";
 import type { Wire } from "@/core/circuit";
+import type { CircuitElement } from "@/core/element";
 import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
 
 export type WriteCall = { addr: SignalAddress; value: SignalValue };
@@ -22,6 +28,7 @@ export class MockCoordinator implements SimulationCoordinator {
   private _signals: Map<string, SignalValue> = new Map();
   private _digitalBackend: SimulationEngine | null = null;
   private _analogBackend: AnalogEngine | null = null;
+  readonly _observers: Set<MeasurementObserver> = new Set();
 
   /** Inject a signal value for a given address, keyed by JSON-serialized address. */
   setSignal(addr: SignalAddress, value: SignalValue): void {
@@ -60,8 +67,8 @@ export class MockCoordinator implements SimulationCoordinator {
   reset(): void { /* no-op */ }
   dispose(): void { /* no-op */ }
 
-  addMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
-  removeMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
+  addMeasurementObserver(observer: MeasurementObserver): void { this._observers.add(observer); }
+  removeMeasurementObserver(observer: MeasurementObserver): void { this._observers.delete(observer); }
 
   get signalCount(): number { return 0; }
   snapshotSignals(): Float64Array { return new Float64Array(0); }
@@ -90,6 +97,22 @@ export class MockCoordinator implements SimulationCoordinator {
   }
 
   advanceClocks(): void { /* no-op */ }
+
+  getPinVoltages(_element: CircuitElement): Map<string, number> | null { return null; }
+  getWireAnalogNodeId(_wire: Wire): number | undefined { return undefined; }
+  get voltageRange(): { min: number; max: number } | null { return null; }
+  updateVoltageTracking(): void { /* no-op */ }
+
+  getSliderProperties(_element: CircuitElement): SliderPropertyDescriptor[] { return []; }
+  setComponentProperty(_element: CircuitElement, _key: string, _value: number): void { /* no-op */ }
+
+  readElementCurrent(_elementIndex: number): number | null { return null; }
+  readBranchCurrent(_branchIndex: number): number | null { return null; }
+
+  saveSnapshot(): SnapshotId { return 0; }
+  restoreSnapshot(_id: SnapshotId): void { /* no-op */ }
+
+  getCurrentResolverContext(): CurrentResolverContext | null { return null; }
 
   get digitalBackend(): SimulationEngine | null {
     return this._digitalBackend;

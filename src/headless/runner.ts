@@ -125,7 +125,8 @@ export class SimulationRunner {
    * Execute cycles until no signal changes between steps, or throw OscillationError.
    *
    * Stability is detected by snapshotting all raw signal values before and after
-   * each step. If the snapshot is unchanged, the circuit has stabilized.
+   * each step via coordinator.snapshotSignals(). If the snapshot is unchanged,
+   * the circuit has stabilized.
    *
    * @param engine          The engine to run.
    * @param maxIterations   Maximum steps before declaring oscillation. Default: 1000.
@@ -133,28 +134,35 @@ export class SimulationRunner {
    */
   runToStable(engine: SimulationEngine, maxIterations = 1000): void {
     const record = this._records.get(engine);
-    const netCount = record?.coordinator.compiled.digital?.netCount
-      ?? record?.coordinator.compiled.analog?.netCount
-      ?? 64;
 
-    for (let iter = 0; iter < maxIterations; iter++) {
-      const before = this._snapshotSignals(engine, netCount);
-      if (record !== undefined) {
-        record.coordinator.step();
-      } else {
-        engine.step();
-      }
-      const after = this._snapshotSignals(engine, netCount);
+    if (record !== undefined) {
+      const coord = record.coordinator;
+      for (let iter = 0; iter < maxIterations; iter++) {
+        const before = coord.snapshotSignals();
+        coord.step();
+        const after = coord.snapshotSignals();
 
-      let stable = true;
-      for (let n = 0; n < netCount; n++) {
-        if (before[n] !== after[n]) {
-          stable = false;
-          break;
+        let stable = true;
+        for (let n = 0; n < before.length; n++) {
+          if (before[n] !== after[n]) { stable = false; break; }
         }
+        if (stable) return;
       }
+    } else {
+      const netCount = 64;
+      for (let iter = 0; iter < maxIterations; iter++) {
+        const before = new Uint32Array(netCount);
+        for (let i = 0; i < netCount; i++) before[i] = engine.getSignalRaw(i);
+        engine.step();
+        const after = new Uint32Array(netCount);
+        for (let i = 0; i < netCount; i++) after[i] = engine.getSignalRaw(i);
 
-      if (stable) return;
+        let stable = true;
+        for (let n = 0; n < netCount; n++) {
+          if (before[n] !== after[n]) { stable = false; break; }
+        }
+        if (stable) return;
+      }
     }
 
     throw new OscillationError(
@@ -243,43 +251,22 @@ export class SimulationRunner {
   /**
    * Run a DC operating-point analysis on an analog engine.
    *
-   * @throws TypeError if the engine is a digital engine.
+   * @throws TypeError if the engine is digital-only (no analog domain).
    */
   dcOperatingPoint(engine: Engine): DcOpResult {
     const record = this._records.get(engine);
-    if (record === undefined || record.coordinator.analogBackend === null) {
+    if (record === undefined || !record.coordinator.supportsDcOp()) {
       throw new TypeError(
         "dcOperatingPoint() requires an analog engine. The provided engine is digital.",
       );
     }
-    return record.coordinator.analogBackend.dcOperatingPoint();
-  }
-
-  // -------------------------------------------------------------------------
-  // Private helpers
-  // -------------------------------------------------------------------------
-
-  /**
-   * Resolve the underlying SimulationEngine from a coordinator or engine.
-   * When compile() returns a SimulationCoordinator, callers pass it back
-   * to step/run/runToStable. This extracts the backend engine for methods
-   * that need getSignalRaw() or other SimulationEngine-specific APIs.
-   */
-  private _resolveBackendEngine(engineOrCoord: SimulationEngine): SimulationEngine {
-    const record = this._records.get(engineOrCoord);
-    if (record !== undefined) {
-      const digital = record.coordinator.digitalBackend;
-      if (digital !== null) return digital;
+    const result = record.coordinator.dcOperatingPoint();
+    if (result === null) {
+      throw new TypeError(
+        "dcOperatingPoint() requires an analog engine. The provided engine is digital.",
+      );
     }
-    return engineOrCoord;
+    return result;
   }
 
-  private _snapshotSignals(engine: SimulationEngine, netCount: number): Uint32Array {
-    const resolved = this._resolveBackendEngine(engine);
-    const snap = new Uint32Array(netCount);
-    for (let i = 0; i < netCount; i++) {
-      snap[i] = resolved.getSignalRaw(i);
-    }
-    return snap;
-  }
 }

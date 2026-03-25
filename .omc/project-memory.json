@@ -250,14 +250,14 @@
   "hotPaths": [
     {
       "path": "src\\headless\\default-facade.ts",
-      "accessCount": 132,
-      "lastAccessed": 1774478627564,
+      "accessCount": 134,
+      "lastAccessed": 1774479567966,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 71,
-      "lastAccessed": 1774478842345,
+      "accessCount": 73,
+      "lastAccessed": 1774479444454,
       "type": "directory"
     },
     {
@@ -274,20 +274,20 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 26,
-      "lastAccessed": 1774478224856,
+      "accessCount": 31,
+      "lastAccessed": 1774479365389,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 23,
+      "lastAccessed": 1774479365508,
       "type": "file"
     },
     {
       "path": "src\\components\\active\\__tests__\\real-opamp.test.ts",
       "accessCount": 21,
       "lastAccessed": 1774426124507,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 19,
-      "lastAccessed": 1774478225075,
       "type": "file"
     },
     {

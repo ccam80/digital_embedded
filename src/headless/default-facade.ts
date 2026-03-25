@@ -8,13 +8,13 @@
  * engine is stopped and disposed before creating a new one.
  *
  * Clock management (F3): step(), run(), and runToStable() advance clocks before
- * each engine step when clockAdvance is enabled (the default).
+ * each engine step when clockAdvance is enabled (the default). Clock advancement
+ * is handled by the coordinator's advanceClocks() method.
  */
 
-import type { Circuit, Wire } from '../core/circuit.js';
+import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
-import type { Engine, SimulationEngine } from '../core/engine-interface.js';
-import type { AnalogEngine } from '../core/analog-engine-interface.js';
+import type { SimulationEngine } from '../core/engine-interface.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition, ComponentRegistry } from '../core/registry.js';
@@ -30,13 +30,9 @@ import type {
 } from './netlist-types.js';
 import type { SimulatorFacade } from './facade.js';
 import { CircuitBuilder } from './builder.js';
-import { ClockManager } from '../solver/digital/clock.js';
-import type { ConcreteCompiledCircuit } from '../solver/digital/digital-engine.js';
-import { DigitalEngine } from '../solver/digital/digital-engine.js';
+import type { CompiledCircuitUnified } from '../compile/types.js';
 import { compileUnified } from '../compile/compile.js';
-import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
 import { getTransistorModels } from '../solver/analog/default-models.js';
-import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/save.js';
 import { deserializeCircuit } from '../io/load.js';
@@ -66,8 +62,6 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Active session state (reset on each compile())
   private _circuit: Circuit | null = null;
   private _coordinator: DefaultSimulationCoordinator | null = null;
-  private _clockManager: ClockManager | null = null;
-  private _engineMode: 'digital' | 'analog' = 'digital';
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -87,7 +81,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return this._builder.addComponent(circuit, typeName, props);
   }
 
-  connect(circuit: Circuit, src: CircuitElement, srcPin: string, dst: CircuitElement, dstPin: string): Wire {
+  connect(circuit: Circuit, src: CircuitElement, srcPin: string, dst: CircuitElement, dstPin: string): import('../core/circuit.js').Wire {
     return this._builder.connect(circuit, src, srcPin, dst, dstPin);
   }
 
@@ -108,28 +102,10 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
     this._circuit = null;
     this._coordinator = null;
-    this._clockManager = null;
-
-    // Derive engine mode from component models present in the circuit.
-    // Any component with an analog model but no digital model (including
-    // Ground and VDD, which are analog-only infrastructure) signals that this
-    // is an analog circuit.
-    const hasAnalogOnly = circuit.elements.some(el => {
-      const def = this._registry.get(el.typeId);
-      if (def === undefined) return false;
-      return hasAnalogModel(def) && !hasDigitalModel(def);
-    });
-    const engineMode: 'digital' | 'analog' = hasAnalogOnly ? 'analog' : 'digital';
-    this._engineMode = engineMode;
 
     const unified = compileUnified(circuit, this._registry, getTransistorModels());
     const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
     this._coordinator = coordinator;
-
-    if (unified.digital !== null && engineMode !== 'analog') {
-      this._clockManager = new ClockManager(unified.digital as ConcreteCompiledCircuit);
-    }
-
     this._circuit = circuit;
 
     return coordinator;
@@ -146,47 +122,51 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
    * Pass { clockAdvance: false } to skip clock advancement (used by test
    * executors that drive clocks manually).
    */
-  step(engineOrCoord: SimulationCoordinator | SimulationEngine, opts?: StepOptions): void {
+  step(coordinator: SimulationCoordinator | SimulationEngine, opts?: StepOptions): void {
     const advance = opts?.clockAdvance !== false;
-
-    if (advance && this._isCoordinator(engineOrCoord)) {
-      engineOrCoord.advanceClocks();
+    if (advance && 'advanceClocks' in coordinator) {
+      (coordinator as SimulationCoordinator).advanceClocks();
     }
-
-    engineOrCoord.step();
+    coordinator.step();
   }
 
-  run(engineOrCoord: SimulationCoordinator | SimulationEngine, cycles: number, opts?: StepOptions): void {
+  run(coordinator: SimulationCoordinator | SimulationEngine, cycles: number, opts?: StepOptions): void {
     for (let i = 0; i < cycles; i++) {
-      this.step(engineOrCoord, opts);
+      this.step(coordinator, opts);
     }
   }
 
   runToStable(engineOrCoord: SimulationCoordinator | SimulationEngine, maxIterations = 1000, opts?: StepOptions): void {
-    const backendEngine = this._resolveBackendEngine(engineOrCoord);
-    const compiled = this._coordinator?.compiled;
-    const netCount = (compiled?.digital as ConcreteCompiledCircuit | null | undefined)?.netCount
-      ?? compiled?.analog?.netCount
-      ?? 64;
-
     const settleOpts = opts ?? { clockAdvance: false };
 
-    for (let iter = 0; iter < maxIterations; iter++) {
-      const before = this._snapshotSignals(backendEngine, netCount);
-
-      this.step(engineOrCoord, settleOpts);
-
-      const after = this._snapshotSignals(backendEngine, netCount);
-
-      let stable = true;
-      for (let n = 0; n < netCount; n++) {
-        if (before[n] !== after[n]) {
-          stable = false;
-          break;
+    if ('snapshotSignals' in engineOrCoord) {
+      const coord = engineOrCoord as SimulationCoordinator;
+      for (let iter = 0; iter < maxIterations; iter++) {
+        const before = coord.snapshotSignals();
+        this.step(coord, settleOpts);
+        const after = coord.snapshotSignals();
+        let stable = true;
+        for (let n = 0; n < before.length; n++) {
+          if (before[n] !== after[n]) { stable = false; break; }
         }
+        if (stable) return;
       }
-
-      if (stable) return;
+    } else {
+      // Legacy SimulationEngine path (used by SimulationRunner)
+      const engine = engineOrCoord as SimulationEngine;
+      const netCount = 64;
+      for (let iter = 0; iter < maxIterations; iter++) {
+        const before = new Uint32Array(netCount);
+        for (let i = 0; i < netCount; i++) before[i] = engine.getSignalRaw(i);
+        this.step(engine, settleOpts);
+        const after = new Uint32Array(netCount);
+        for (let i = 0; i < netCount; i++) after[i] = engine.getSignalRaw(i);
+        let stable = true;
+        for (let n = 0; n < netCount; n++) {
+          if (before[n] !== after[n]) { stable = false; break; }
+        }
+        if (stable) return;
+      }
     }
 
     throw new FacadeError(
@@ -278,11 +258,20 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
 
     const parsed = parseTestData(resolvedData, inputCount);
-    const engine = this._resolveBackendEngine(engineOrCoord);
-    if (!this._isDigitalEngine(engine)) {
+
+    // Test execution requires a digital engine. Resolve the digital backend.
+    let digitalEngine: SimulationEngine | null = null;
+    if ('digitalBackend' in engineOrCoord) {
+      digitalEngine = (engineOrCoord as SimulationCoordinator).digitalBackend as SimulationEngine | null;
+    } else if ('getSignalRaw' in engineOrCoord) {
+      digitalEngine = engineOrCoord as SimulationEngine;
+    }
+
+    if (digitalEngine === null) {
       throw new FacadeError('Test execution requires a digital engine. Analog-only circuits cannot run test vectors.');
     }
-    return executeTests(this, engine, circuit, parsed);
+
+    return executeTests(this, digitalEngine, circuit, parsed);
   }
 
   // =========================================================================
@@ -341,28 +330,16 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return this._loader;
   }
 
-  /** Returns the ClockManager for the current digital session, or null. */
-  getClockManager(): ClockManager | null {
-    return this._clockManager;
-  }
-
-  /** Returns the compiled digital circuit, or null for analog/uncompiled. */
-  getCompiled(): ConcreteCompiledCircuit | null {
-    if (this._engineMode === 'analog') return null;
-    return (this._coordinator?.compiled.digital as ConcreteCompiledCircuit | null | undefined) ?? null;
-  }
-
-  /** Returns the compiled analog circuit, or null for digital/uncompiled. */
-  getCompiledAnalog(): CompiledAnalogCircuit | null {
-    if (this._engineMode !== 'analog') return null;
-    return this._coordinator?.compiled.analog ?? null;
+  /** Returns the unified compiled circuit, or null if none compiled yet. */
+  getCompiledUnified(): CompiledCircuitUnified | null {
+    return this._coordinator?.compiled ?? null;
   }
 
   /** Returns the DC operating-point result, or null if no analog backend. */
-  getDcOpResult(): DcOpResult | null {
-    const analog = this._coordinator?.analogBackend;
-    if (analog === null || analog === undefined) return null;
-    return analog.dcOperatingPoint();
+  getDcOpResult(): import('../core/analog-engine-interface.js').DcOpResult | null {
+    const coord = this._coordinator;
+    if (coord === null) return null;
+    return coord.dcOperatingPoint();
   }
 
   /**
@@ -373,66 +350,15 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._disposeCurrentEngine();
     this._circuit = null;
     this._coordinator = null;
-    this._clockManager = null;
-    this._engineMode = 'digital';
   }
 
   // =========================================================================
   // Private helpers
   // =========================================================================
 
-  /** Type guard: is this a SimulationCoordinator? */
-  private _isCoordinator(v: SimulationCoordinator | SimulationEngine): v is SimulationCoordinator {
-    return 'digitalBackend' in v && 'analogBackend' in v;
-  }
-
-  /**
-   * Extract the underlying backend engine for operations that need raw signal
-   * access (snapshotting, test execution). Prefers the engine matching _engineMode.
-   */
-  private _resolveBackendEngine(engineOrCoord: SimulationCoordinator | SimulationEngine): Engine {
-    if (this._isCoordinator(engineOrCoord)) {
-      if (this._engineMode === 'analog' && engineOrCoord.analogBackend !== null) {
-        return engineOrCoord.analogBackend;
-      }
-      if (engineOrCoord.digitalBackend !== null) {
-        return engineOrCoord.digitalBackend;
-      }
-      if (engineOrCoord.analogBackend !== null) {
-        return engineOrCoord.analogBackend;
-      }
-      throw new FacadeError('Coordinator has no backend engines');
-    }
-    return engineOrCoord;
-  }
-
   private _disposeCurrentEngine(): void {
     if (this._coordinator === null) return;
     this._coordinator.dispose();
     this._coordinator = null;
-  }
-
-  /** Type guard: is this a digital SimulationEngine with getSignalRaw? */
-  private _isDigitalEngine(engine: Engine): engine is SimulationEngine {
-    return 'getSignalRaw' in engine;
-  }
-
-  /** Type guard: is this an AnalogEngine with getNodeVoltage? */
-  private _isAnalogEngine(engine: Engine): engine is AnalogEngine {
-    return 'getNodeVoltage' in engine;
-  }
-
-  private _snapshotSignals(engine: Engine, netCount: number): Float64Array {
-    const snap = new Float64Array(netCount);
-    if (this._isDigitalEngine(engine)) {
-      for (let i = 0; i < netCount; i++) {
-        snap[i] = engine.getSignalRaw(i);
-      }
-    } else if (this._isAnalogEngine(engine)) {
-      for (let i = 0; i < netCount; i++) {
-        snap[i] = engine.getNodeVoltage(i);
-      }
-    }
-    return snap;
   }
 }

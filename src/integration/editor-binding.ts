@@ -13,7 +13,6 @@
 
 import type { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
-import type { SimulationEngine } from "@/core/engine-interface";
 import type { BitVector } from "@/core/signal";
 import type { SignalAddress, SignalValue } from "@/compile/types";
 import type { SimulationCoordinator } from "@/solver/coordinator-types";
@@ -80,9 +79,6 @@ export interface EditorBinding {
 
   /** The bound coordinator, or null when unbound. */
   readonly coordinator: SimulationCoordinator | null;
-
-  /** The digital backend engine, or null when unbound or no digital domain. */
-  readonly engine: SimulationEngine | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,10 +163,6 @@ class EditorBindingImpl implements EditorBinding {
 
   get coordinator(): SimulationCoordinator | null {
     return this._coordinator;
-  }
-
-  get engine(): SimulationEngine | null {
-    return this._coordinator?.digitalBackend ?? null;
   }
 }
 

@@ -664,6 +664,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       wireToNodeId: compiledAnalog.wireToNodeId,
       elements: compiledAnalog.elements,
       elementToCircuitElement: compiledAnalog.elementToCircuitElement,
+      circuitElements: [...compiledAnalog.elementToCircuitElement.values()],
+      elementPinVertices: compiledAnalog.elementPinVertices,
+      elementResolvedPins: compiledAnalog.elementResolvedPins,
       getElementPinCurrents(elementIndex: number): number[] {
         return analog.getElementPinCurrents(elementIndex);
       },

@@ -6,7 +6,7 @@
  * - All circuit mutations use real mouse/keyboard events via Playwright
  * - The test bridge (`window.__test`) is used ONLY for:
  *     - Coordinate queries (worldToScreen, getPinPosition, getCanvasRect)
- *     - Circuit state reads (getCircuitInfo, getAnalogState, getEngineType)
+ *     - Circuit state reads (getCircuitInfo, getAnalogState, getCircuitDomain)
  *   It is NEVER used to mutate circuit state.
  * - No `page.evaluate(() => button.click())` — use Playwright locators/mouse
  * - No conditional fallbacks that silently pass on failure
@@ -112,9 +112,9 @@ export class UICircuitBuilder {
     return this.bridge('bridge.getCircuitInfo()');
   }
 
-  /** Get current engine type from circuit metadata. */
-  async getEngineType(): Promise<string> {
-    return this.bridge('bridge.getEngineType()');
+  /** Get circuit domain derived from circuit component models ('analog' | 'digital'). */
+  async getCircuitDomain(): Promise<string> {
+    return this.bridge('bridge.getCircuitDomain()');
   }
 
   /** Get analog engine state (null if no analog engine active). */

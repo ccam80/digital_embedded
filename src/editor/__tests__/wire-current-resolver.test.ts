@@ -4,9 +4,8 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { WireCurrentResolver } from "../wire-current-resolver";
-import type { ResolvedAnalogCircuit } from "../wire-current-resolver";
 import { Wire, Circuit } from "@/core/circuit";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
+import type { CurrentResolverContext } from "@/solver/coordinator-types";
 import type { AnalogElement } from "@/solver/analog/element";
 import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
@@ -97,63 +96,39 @@ function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
   } as unknown as CircuitElement;
 }
 
-/** Build a mock AnalogEngine that returns specified currents per element. */
-function makeEngine(elementCurrents: number[]): AnalogEngine {
-  return {
-    getElementCurrent: (id: number) => elementCurrents[id] ?? 0,
-    getElementPinCurrents: (id: number) => { const I = elementCurrents[id] ?? 0; return [I, -I]; },
-    getNodeVoltage: () => 0,
-    getBranchCurrent: () => 0,
-    getElementPower: () => 0,
-    simTime: 0,
-    lastDt: 0,
-    dcOperatingPoint: () => ({
-      converged: true,
-      method: "direct" as const,
-      iterations: 0,
-      nodeVoltages: new Float64Array(0),
-      diagnostics: [],
-    }),
-    configure: () => {},
-    onDiagnostic: () => {},
-    addBreakpoint: () => {},
-    clearBreakpoints: () => {},
-    init: () => {},
-    reset: () => {},
-    dispose: () => {},
-    start: () => {},
-    stop: () => {},
-    getState: () => {
-      throw new Error("not used");
-    },
-    addChangeListener: () => {},
-    removeChangeListener: () => {},
-    addMeasurementObserver: () => {},
-    removeMeasurementObserver: () => {},
-    step: () => {},
-  } as unknown as AnalogEngine;
-}
-
-/** Build a ResolvedAnalogCircuit from elements, pin positions, and wire map. */
-function makeCompiled(
+/**
+ * Build a CurrentResolverContext from mock elements, pin positions, and wire map.
+ * The elementCurrents array provides per-element currents; pin currents are [I, -I].
+ */
+function makeContext(
   elements: AnalogElement[],
   circuitElements: CircuitElement[],
   wireToNodeId: Map<Wire, number>,
-): ResolvedAnalogCircuit {
+  elementCurrents: number[],
+): CurrentResolverContext {
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   for (let i = 0; i < circuitElements.length; i++) {
     elementToCircuitElement.set(i, circuitElements[i]);
-    // Mock CEs have position=(0,0) rotation=0, so pin world pos = pin.position
     const pins = circuitElements[i].getPins();
     elementPinVertices.set(i, pins.map(p => ({ x: p.position.x, y: p.position.y })));
   }
-  return { wireToNodeId, elements, elementToCircuitElement, elementPinVertices };
+  return {
+    wireToNodeId,
+    elements,
+    elementToCircuitElement,
+    circuitElements,
+    elementPinVertices,
+    getElementPinCurrents(id: number): number[] {
+      const I = elementCurrents[id] ?? 0;
+      return [I, -I];
+    },
+  };
 }
 
 /**
- * Build a ResolvedAnalogCircuit that also satisfies ConcreteCompiledAnalogCircuit
- * for use with the real MNAEngine.
+ * Build a ConcreteCompiledAnalogCircuit for use with the real MNAEngine.
+ * Call makeContextFromEngine(engine, result) to get the CurrentResolverContext.
  */
 function makeCompiledWithEngine(params: {
   nodeCount: number;
@@ -161,7 +136,7 @@ function makeCompiledWithEngine(params: {
   elements: AnalogElement[];
   circuitElements: CircuitElement[];
   wireToNodeId: Map<Wire, number>;
-}): ResolvedAnalogCircuit & ConcreteCompiledAnalogCircuit {
+}): ConcreteCompiledAnalogCircuit {
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   for (let i = 0; i < params.circuitElements.length; i++) {
@@ -186,7 +161,28 @@ function makeCompiledWithEngine(params: {
     models: new Map(),
     diagnostics: [],
     bridges: [],
-  } as unknown as ResolvedAnalogCircuit & ConcreteCompiledAnalogCircuit;
+  } as unknown as ConcreteCompiledAnalogCircuit;
+}
+
+/**
+ * Build a CurrentResolverContext from a real MNAEngine + compiled circuit.
+ * The engine provides live pin currents; the compiled circuit provides topology.
+ */
+function makeContextFromEngine(
+  engine: MNAEngine,
+  compiled: ConcreteCompiledAnalogCircuit,
+): CurrentResolverContext {
+  return {
+    wireToNodeId: compiled.wireToNodeId,
+    elements: compiled.elements,
+    elementToCircuitElement: compiled.elementToCircuitElement,
+    circuitElements: [...compiled.elementToCircuitElement.values()],
+    elementPinVertices: compiled.elementPinVertices,
+    elementResolvedPins: compiled.elementResolvedPins,
+    getElementPinCurrents(elementIndex: number): number[] {
+      return engine.getElementPinCurrents(elementIndex);
+    },
+  };
 }
 
 // ===========================================================================
@@ -235,10 +231,9 @@ describe("WireCurrentResolver", () => {
       makeCE([{ x: 10, y: 2 }, { x: 10, y: 0 }]), // gnd: A(10,2) B(10,0)
     ];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.005, 0.005, 0.005, 0.005]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.005, 0.005, 0.005, 0.005]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
     expect(resolver.getWireCurrent(w0)!.current).toBeCloseTo(0.005, 6);
     expect(resolver.getWireCurrent(w1)!.current).toBeCloseTo(0.005, 6);
@@ -308,10 +303,9 @@ describe("WireCurrentResolver", () => {
       makeCE([{ x: 6, y: 4 }, { x: 6, y: -2 }]), // gndR2: A(6,4) B(6,-2)
     ];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.01, 0.003, 0.007, 0.003, 0.007]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.003, 0.007, 0.003, 0.007]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
     // Node 1 junction: source injects +10mA, R1 takes -3mA, R2 takes -7mA → balanced
     expect(resolver.getWireCurrent(wSrc)!.current).toBeCloseTo(0.01, 5);
@@ -356,15 +350,13 @@ describe("WireCurrentResolver", () => {
     const elements = [makeMockElement([0, 1])];
     const ces = [makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }])];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.005]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.005]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
+    // A wire not in wireToNodeId (not in the analog domain) has no resolver entry.
     const cDisc = resolver.getWireCurrent(wDisconnected);
-    expect(cDisc).toBeDefined();
-    expect(cDisc!.current).toBe(0);
-    expect(cDisc!.flowSign).toBe(0);
+    expect(cDisc).toBeUndefined();
   });
 
   it("direction_follows_unit_vector", () => {
@@ -385,10 +377,9 @@ describe("WireCurrentResolver", () => {
       makeCE([{ x: 4, y: 0 }, { x: 4, y: 2 }]),    // R1: A(4,0) B(4,2)
     ];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.01, 0.01]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.01]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
     const result = resolver.getWireCurrent(wire);
     expect(result).toBeDefined();
@@ -419,10 +410,9 @@ describe("WireCurrentResolver", () => {
       makeCE([{ x: 4, y: 0 }, { x: 4, y: 2 }]),    // R1: A(4,0), B(4,2)
     ];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.01, 0.01]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.01]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
     const result = resolver.getWireCurrent(wire)!;
     expect(result.current).toBeCloseTo(0.01, 6);
@@ -439,10 +429,9 @@ describe("WireCurrentResolver", () => {
     const elements = [makeMockElement([0, 1])];
     const ces = [makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }])];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.005]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.005]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
     expect(resolver.getWireCurrent(wire)).toBeDefined();
 
     resolver.clear();
@@ -491,10 +480,9 @@ describe("WireCurrentResolver", () => {
       makeCE([{ x: 10, y: 3 }, { x: 10, y: 10 }]), // R3: A(10,3)→n2, B(10,10)→gnd
     ];
 
-    const compiled = makeCompiled(elements, ces, wireToNodeId);
-    const engine = makeEngine([0.010, 0.006, 0.004]);
+    const ctx = makeContext(elements, ces, wireToNodeId, [0.010, 0.006, 0.004]);
 
-    resolver.resolve(engine, circuit, compiled);
+    resolver.resolve(ctx);
 
     const c1 = resolver.getWireCurrent(w1)!;
     const c2 = resolver.getWireCurrent(w2)!;
@@ -591,11 +579,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
     expect(engine.getNodeVoltage(1)).toBeCloseTo(VS, 3);
     expect(engine.getNodeVoltage(2)).toBeCloseTo(V2, 3);
 
-    resolver.resolve(
-      engine as unknown as AnalogEngine,
-      circuit,
-      compiled,
-    );
+    resolver.resolve(makeContextFromEngine(engine, compiled));
 
     const c_n1 = resolver.getWireCurrent(w_n1)!;
     const c_r1b = resolver.getWireCurrent(w_r1b)!;
@@ -725,11 +709,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
     expect(I_R5 - I_R6 - I_R7).toBeCloseTo(0, 8);
 
     // Run resolver
-    resolver.resolve(
-      engine as unknown as AnalogEngine,
-      circuit,
-      compiled,
-    );
+    resolver.resolve(makeContextFromEngine(engine, compiled));
 
     // ---- Node 2 junction KCL ----
     const c2_r1b = resolver.getWireCurrent(w2_r1b)!;
@@ -901,11 +881,7 @@ describe("WireCurrentResolver — AC transient RLC", () => {
       engine.step();
       sampleCount++;
 
-      resolver.resolve(
-        engine as unknown as AnalogEngine,
-        circuit,
-        compiled,
-      );
+      resolver.resolve(makeContextFromEngine(engine, compiled));
 
       // Element currents (convention: positive = from pinNodeIds[0] to [1])
       const I_R = engine.getElementCurrent(1);   // resistor
@@ -1062,11 +1038,7 @@ describe("WireCurrentResolver — cross-component pin-wire matching", () => {
       engine.step();
       sampleCount++;
 
-      resolver.resolve(
-        engine as unknown as AnalogEngine,
-        circuit,
-        compiled,
-      );
+      resolver.resolve(makeContextFromEngine(engine, compiled));
 
       const I_Vs = Math.abs(engine.getElementCurrent(0));
       const I_R  = Math.abs(engine.getElementCurrent(1));
@@ -1247,11 +1219,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       engine.step();
       sampleCount++;
 
-      resolver.resolve(
-        engine as unknown as AnalogEngine,
-        circuit,
-        compiled as unknown as ResolvedAnalogCircuit,
-      );
+      resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
 
       // For each 2-terminal element at a non-junction node,
       // wire current must equal element current.
@@ -1312,11 +1280,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
     // Verify the resolver produces component paths with correct currents
     // by doing one final resolve and checking directly
-    resolver.resolve(
-      engine as unknown as AnalogEngine,
-      circuit,
-      compiled as unknown as ResolvedAnalogCircuit,
-    );
+    resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
     const finalPaths = resolver.getComponentPaths();
     expect(finalPaths.length).toBeGreaterThan(0);
     for (let eIdx = 0, pIdx = 0; eIdx < compiled.elements.length && pIdx < finalPaths.length; eIdx++) {
@@ -1422,11 +1386,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       engine.step();
       sampleCount++;
 
-      resolver.resolve(
-        engine as unknown as AnalogEngine,
-        circuit,
-        compiled as unknown as ResolvedAnalogCircuit,
-      );
+      resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
 
       const paths = resolver.getComponentPaths();
       let pathIdx = 0;
@@ -1575,7 +1535,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     expect(dc.converged).toBe(true);
 
     const resolver = new WireCurrentResolver();
-    resolver.resolve(engine as unknown as AnalogEngine, circuit, compiled);
+    resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
 
     const I_R2 = Math.abs(engine.getElementCurrent(2));
     expect(I_R2).toBeCloseTo(I_expected, 5);

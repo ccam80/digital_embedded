@@ -480,13 +480,13 @@ test.describe('Workflow: analog mode', () => {
 
   test('toggle analog mode and verify palette changes', async ({ page }) => {
     // Initially digital
-    expect(await bridge<string>(page, 'bridge.getEngineType()')).toBe('digital');
+    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('digital');
 
     // Toggle to analog via programmatic click (menu item is inside dropdown)
     await menuAction(page, 'btn-circuit-mode');
     await page.waitForTimeout(300);
 
-    expect(await bridge<string>(page, 'bridge.getEngineType()')).toBe('analog');
+    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('analog');
 
     // Palette should now show analog components — expand all categories
     const categories = page.locator('.palette-category-header');
@@ -508,7 +508,7 @@ test.describe('Workflow: analog mode', () => {
     await menuAction(page, 'btn-circuit-mode');
     await page.waitForTimeout(300);
 
-    expect(await bridge<string>(page, 'bridge.getEngineType()')).toBe('digital');
+    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('digital');
   });
 });
 

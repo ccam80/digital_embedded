@@ -7,6 +7,8 @@
  *
  */
 
+import type { SignalAddress } from "@/compile/types.js";
+
 // ---------------------------------------------------------------------------
 // Sample — one recorded data point
 // ---------------------------------------------------------------------------
@@ -38,17 +40,17 @@ export class WaveformChannel {
 
   /** Signal name shown in the timing diagram label. */
   readonly name: string;
-  /** Net ID used to read from the engine. */
-  readonly netId: number;
+  /** Signal address used to read from the coordinator. */
+  readonly addr: SignalAddress;
   /** Bit width of the signal (1 = digital, >1 = bus). */
   readonly width: number;
 
-  constructor(name: string, netId: number, width: number, capacity: number) {
+  constructor(name: string, addr: SignalAddress, width: number, capacity: number) {
     if (capacity < 1) throw new RangeError("WaveformChannel capacity must be >= 1");
     this._capacity = capacity;
     this._buf = new Array<WaveformSample>(capacity);
     this.name = name;
-    this.netId = netId;
+    this.addr = addr;
     this.width = width;
   }
 

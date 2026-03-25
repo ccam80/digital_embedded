@@ -5,11 +5,11 @@
  * The stub implements only the surface area used by SliderPanel.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { SliderPanel } from "../slider-panel.js";
 import { SliderEngineBridge } from "../slider-engine-bridge.js";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
+import type { CircuitElement } from "@/core/element.js";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stub
@@ -274,65 +274,35 @@ describe("SliderPanel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration test
+// SliderEngineBridge tests
 // ---------------------------------------------------------------------------
 
-describe("Integration", () => {
-  it("slider_changes_resistance", () => {
+describe("SliderEngineBridge", () => {
+  it("slider_change_calls_setComponentProperty", () => {
     const container = makeContainer();
     const panel = new SliderPanel(container as unknown as HTMLElement);
 
-    // Track calls to setParam
-    const setParamCalls: { key: string; value: number }[] = [];
-    const mockElement = {
-      pinNodeIds: [1, 0],
-      allNodeIds: [1, 0],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      stamp: () => {},
-      setParam(key: string, value: number) {
-        setParamCalls.push({ key, value });
-      },
+    const coord = new MockCoordinator();
+
+    // Build a stub CircuitElement and wire it into the coordinator's resolver context
+    const stubElement = {} as CircuitElement;
+    const elementToCircuitElement = new Map<number, CircuitElement>([[0, stubElement]]);
+
+    // Track setComponentProperty calls
+    const setCalls: { element: CircuitElement; key: string; value: number }[] = [];
+    (coord as unknown as {
+      setComponentProperty(el: CircuitElement, key: string, value: number): void;
+    }).setComponentProperty = (el, key, value) => {
+      setCalls.push({ element: el, key, value });
     };
 
-    const mockEngine: AnalogEngine = {
-      configure: vi.fn(),
-      getNodeVoltage: vi.fn().mockReturnValue(0),
-      getBranchCurrent: vi.fn().mockReturnValue(0),
-      getElementCurrent: vi.fn().mockReturnValue(0),
-      getElementPower: vi.fn().mockReturnValue(0),
-      dcOperatingPoint: vi.fn().mockReturnValue({ converged: true, method: "direct", iterations: 1, nodeVoltages: new Float64Array(0), diagnostics: [] }),
-      get simTime() { return 0; },
-      get lastDt() { return 0; },
-      step: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-      getState: vi.fn(),
-      init: vi.fn(),
-      reset: vi.fn(),
-      dispose: vi.fn(),
-      addChangeListener: vi.fn(),
-      removeChangeListener: vi.fn(),
-      onDiagnostic: vi.fn(),
-      addBreakpoint: vi.fn(),
-      clearBreakpoints: vi.fn(),
-    } as unknown as AnalogEngine;
+    // Override getCurrentResolverContext to return a minimal context
+    (coord as unknown as {
+      getCurrentResolverContext(): { elementToCircuitElement: Map<number, CircuitElement> };
+    }).getCurrentResolverContext = () => ({ elementToCircuitElement });
 
-    const mockCompiled: CompiledAnalogCircuit = {
-      elements: [mockElement],
-      nodeCount: 2,
-      elementCount: 1,
-      labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
-      netCount: 2,
-      componentCount: 1,
-    } as unknown as CompiledAnalogCircuit;
+    new SliderEngineBridge(panel, coord);
 
-    // Wire up bridge
-    new SliderEngineBridge(panel, mockEngine, mockCompiled);
-
-    // Add resistance slider for element 0
     panel.addSlider(0, "resistance", "R", 1000, {
       min: 100,
       max: 10000,
@@ -340,15 +310,63 @@ describe("Integration", () => {
       unit: "Ω",
     });
 
-    // Move slider to midpoint → 1000Ω (geometric midpoint of 100–10000)
+    // Move slider to midpoint → geometric midpoint ≈ 1000Ω
     panel.setPosition(0, "resistance", 0.5);
 
-    // setParam should have been called with the new resistance
-    expect(setParamCalls.length).toBeGreaterThan(0);
-    expect(setParamCalls[0].key).toBe("resistance");
-    expect(setParamCalls[0].value).toBeCloseTo(1000, 0);
+    expect(setCalls.length).toBeGreaterThan(0);
+    expect(setCalls[0].element).toBe(stubElement);
+    expect(setCalls[0].key).toBe("resistance");
+    expect(setCalls[0].value).toBeCloseTo(1000, 0);
+  });
 
-    // Engine configure should have been called to trigger re-stamp
-    expect(mockEngine.configure).toHaveBeenCalled();
+  it("slider_change_no_op_when_no_resolver_context", () => {
+    const container = makeContainer();
+    const panel = new SliderPanel(container as unknown as HTMLElement);
+
+    const coord = new MockCoordinator();
+    // coord.getCurrentResolverContext() already returns null by default
+
+    const setCalls: unknown[] = [];
+    (coord as unknown as {
+      setComponentProperty(...args: unknown[]): void;
+    }).setComponentProperty = (...args) => {
+      setCalls.push(args);
+    };
+
+    new SliderEngineBridge(panel, coord);
+
+    panel.addSlider(0, "resistance", "R", 1000, { min: 100, max: 10000, unit: "Ω" });
+    panel.setPosition(0, "resistance", 0.5);
+
+    // No resolver context → setComponentProperty must not be called
+    expect(setCalls.length).toBe(0);
+  });
+
+  it("slider_change_no_op_when_element_not_in_context", () => {
+    const container = makeContainer();
+    const panel = new SliderPanel(container as unknown as HTMLElement);
+
+    const coord = new MockCoordinator();
+
+    // Context exists but elementId=0 is not mapped
+    (coord as unknown as {
+      getCurrentResolverContext(): { elementToCircuitElement: Map<number, CircuitElement> };
+    }).getCurrentResolverContext = () => ({
+      elementToCircuitElement: new Map<number, CircuitElement>(),
+    });
+
+    const setCalls: unknown[] = [];
+    (coord as unknown as {
+      setComponentProperty(...args: unknown[]): void;
+    }).setComponentProperty = (...args) => {
+      setCalls.push(args);
+    };
+
+    new SliderEngineBridge(panel, coord);
+
+    panel.addSlider(0, "resistance", "R", 1000, { min: 100, max: 10000, unit: "Ω" });
+    panel.setPosition(0, "resistance", 0.5);
+
+    expect(setCalls.length).toBe(0);
   });
 });

@@ -224,9 +224,11 @@ describe('DefaultSimulatorFacade', () => {
     const coordinator = facade.compile(circuit);
 
     expect(facade.getEngine()).toBe(coordinator);
-    // Digital-only circuit: getCompiled() is populated, getCompiledAnalog() is null
-    expect(facade.getCompiled()).not.toBeNull();
-    expect(facade.getCompiledAnalog()).toBeNull();
+    // Digital-only circuit: getCompiledUnified() is populated with a digital partition, no analog partition
+    const compiledUnified = facade.getCompiledUnified();
+    expect(compiledUnified).not.toBeNull();
+    expect(compiledUnified!.digital).not.toBeNull();
+    expect(compiledUnified!.analog).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -322,6 +324,8 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
 
     const engine = facade.compile(circuit);
     expect(engine).toBeDefined();
-    expect(facade.getCompiledAnalog()).not.toBeNull();
+    const compiledUnified = facade.getCompiledUnified();
+    expect(compiledUnified).not.toBeNull();
+    expect(compiledUnified!.analog).not.toBeNull();
   });
 });

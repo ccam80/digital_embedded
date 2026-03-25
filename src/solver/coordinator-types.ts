@@ -17,6 +17,7 @@ import type { AcParams, AcResult } from "./analog/ac-analysis.js";
 import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./analog/element.js";
+import type { ResolvedPin } from "../core/pin.js";
 
 /**
  * Result of computeFrameSteps — describes how to advance simulation this frame.
@@ -319,4 +320,19 @@ export interface CurrentResolverContext {
   elementToCircuitElement: ReadonlyMap<number, CircuitElement>;
   /** Get per-pin currents for element at given index (positive = into element). */
   getElementPinCurrents(elementIndex: number): number[];
+  /**
+   * All visual CircuitElements in the circuit (including non-analog elements
+   * such as Tunnels). Used for tunnel-vertex detection in current propagation.
+   */
+  circuitElements: readonly CircuitElement[];
+  /**
+   * Compiler-resolved wire vertices for each element pin.
+   * When present, used directly instead of re-computing pin positions.
+   */
+  elementPinVertices?: ReadonlyMap<number, Array<{ x: number; y: number } | null>>;
+  /**
+   * Compiler-resolved pins in pinLayout order (label, vertex, nodeId).
+   * When present, preferred over elementPinVertices and pinWorldPosition calls.
+   */
+  elementResolvedPins?: ReadonlyMap<number, ResolvedPin[]>;
 }

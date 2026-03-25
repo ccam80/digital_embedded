@@ -1,55 +1,34 @@
 /**
- * SliderEngineBridge — connects SliderPanel to the AnalogEngine.
+ * SliderEngineBridge — connects SliderPanel to the SimulationCoordinator.
  *
  * When a slider value changes, the bridge:
- *   1. Calls the element's optional `setParam()` method to update its internal value.
- *   2. The engine re-stamps and re-factors on the next step (numeric only — no
- *      topology invalidation).
+ *   1. Resolves the analog element from the coordinator's current resolver context.
+ *   2. Calls coordinator.setComponentProperty(element, key, value), which
+ *      internally calls setParam() on the element and triggers engine re-stamp.
  *
- * For linear elements (R, C, L): the conductance / companion model value is
- * updated; re-factor is typically < 1ms.
- * For nonlinear elements: the new parameter takes effect at the next NR
- * iteration (the element reads its params during `stampNonlinear()`).
+ * The coordinator encapsulates all analog-domain details; this bridge never
+ * touches AnalogEngine or CompiledAnalogCircuit directly.
  */
 
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { CompiledAnalogCircuit } from "@/core/analog-engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
 import { SliderPanel } from "./slider-panel.js";
 
 /**
- * Optional extension on AnalogElement for parameter mutation at runtime.
- *
- * Elements that support live parameter updates implement `setParam(key, value)`
- * so the bridge can push new values without re-compiling the circuit.
- */
-export interface ParameterMutableElement {
-  setParam(key: string, value: number): void;
-}
-
-function isParameterMutable(el: unknown): el is ParameterMutableElement {
-  return typeof (el as ParameterMutableElement).setParam === "function";
-}
-
-/**
- * Bridges a SliderPanel to an AnalogEngine so that slider changes propagate
- * to element parameters in real time.
+ * Bridges a SliderPanel to a SimulationCoordinator so that slider changes
+ * propagate to element parameters in real time.
  */
 export class SliderEngineBridge {
   private readonly _panel: SliderPanel;
-  private readonly _engine: AnalogEngine;
-  private readonly _compiled: CompiledAnalogCircuit;
+  private readonly _coordinator: SimulationCoordinator;
 
   /**
-   * @param panel    - The SliderPanel whose changes drive the engine.
-   * @param engine   - The active AnalogEngine instance.
-   * @param compiled - The compiled analog circuit providing element access.
+   * @param panel       - The SliderPanel whose changes drive the coordinator.
+   * @param coordinator - The active SimulationCoordinator.
    */
-  constructor(panel: SliderPanel, engine: AnalogEngine, compiled: CompiledAnalogCircuit) {
+  constructor(panel: SliderPanel, coordinator: SimulationCoordinator) {
     this._panel = panel;
-    this._engine = engine;
-    this._compiled = compiled;
+    this._coordinator = coordinator;
 
-    // Register the change handler
     this._panel.onSliderChange((elementId, propertyKey, value) => {
       this._applyParameterChange(elementId, propertyKey, value);
     });
@@ -60,27 +39,17 @@ export class SliderEngineBridge {
   // ---------------------------------------------------------------------------
 
   /**
-   * Apply a parameter change to the element and signal the engine to
-   * re-stamp on the next step.
-   *
-   * The engine's `configure()` method is called with an empty partial to
-   * trigger a re-stamp without changing any solver parameters. Elements that
-   * implement `setParam` receive the new value directly.
+   * Resolve the CircuitElement for the given analog element index via the
+   * coordinator's current resolver context, then delegate to
+   * coordinator.setComponentProperty() which handles setParam + re-stamp.
    */
   private _applyParameterChange(elementId: number, propertyKey: string, value: number): void {
-    const elements = (this._compiled as unknown as { elements: unknown[] }).elements;
-    if (!elements) return;
+    const ctx = this._coordinator.getCurrentResolverContext();
+    if (!ctx) return;
 
-    const el = elements[elementId];
-    if (!el) return;
+    const element = ctx.elementToCircuitElement.get(elementId);
+    if (!element) return;
 
-    if (isParameterMutable(el)) {
-      el.setParam(propertyKey, value);
-    }
-
-    // Signal the engine that numeric stamps need refreshing on next step.
-    // configure() with an empty partial merges without changing any params,
-    // but it rebuilds the timestep controller so the engine re-reads elements.
-    this._engine.configure({});
+    this._coordinator.setComponentProperty(element, propertyKey, value);
   }
 }

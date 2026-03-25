@@ -18,7 +18,9 @@
  *
  */
 
-import type { MeasurementObserver, SimulationEngine, SnapshotId } from "@/core/engine-interface";
+import type { MeasurementObserver, SnapshotId } from "@/core/engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
+import type { SignalAddress } from "@/compile/types.js";
 import { WaveformChannel } from "./waveform-data.js";
 import type { WaveformSample } from "./waveform-data.js";
 import type { WaveformViewport, CursorTooltipRow } from "./waveform-renderer.js";
@@ -94,14 +96,14 @@ export interface TimingDiagramOptions {
  * Waveform timing diagram panel.
  *
  * Usage:
- *   const panel = new TimingDiagramPanel(canvasEl, engine, channels, opts);
- *   engine.addMeasurementObserver(panel);
+ *   const panel = new TimingDiagramPanel(canvasEl, coordinator, channels, opts);
+ *   coordinator.addMeasurementObserver(panel);
  *   // Later:
- *   engine.removeMeasurementObserver(panel);
+ *   coordinator.removeMeasurementObserver(panel);
  *   panel.dispose();
  */
 export class TimingDiagramPanel implements MeasurementObserver {
-  private readonly _engine: SimulationEngine;
+  private readonly _coordinator: SimulationCoordinator;
   private readonly _channels: WaveformChannel[];
   private readonly _canvas: HTMLCanvasElement | null;
   private readonly _snapshotInterval: number;
@@ -138,12 +140,12 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
   constructor(
     canvas: HTMLCanvasElement | null,
-    engine: SimulationEngine,
-    channels: readonly { name: string; netId: number; width: number }[],
+    coordinator: SimulationCoordinator,
+    channels: readonly { name: string; addr: SignalAddress; width: number }[],
     options: TimingDiagramOptions = {},
   ) {
     this._canvas = canvas;
-    this._engine = engine;
+    this._coordinator = coordinator;
     this._snapshotInterval = options.snapshotInterval ?? 1;
     this._laneHeight = options.laneHeight ?? 60;
     this._leftMargin = options.leftMargin ?? 80;
@@ -153,7 +155,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
     const capacity = options.channelCapacity ?? 1024;
     this._channels = channels.map(
-      (c) => new WaveformChannel(c.name, c.netId, c.width, capacity),
+      (c) => new WaveformChannel(c.name, c.addr, c.width, capacity),
     );
 
     if (canvas !== null) {
@@ -170,13 +172,14 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
     // Record one sample per channel
     for (const ch of this._channels) {
-      const raw = this._engine.getSignalRaw(ch.netId);
+      const sv = this._coordinator.readSignal(ch.addr);
+      const raw = sv.type === "digital" ? sv.value : Math.round(sv.voltage);
       ch.append(stepCount, raw);
     }
 
     // Save snapshot at configured interval
     if (this._snapshotInterval > 0 && stepCount % this._snapshotInterval === 0) {
-      const id = this._engine.saveSnapshot();
+      const id = this._coordinator.saveSnapshot();
       this._snapshots.push({ snapshotId: id, time: stepCount });
     }
 
@@ -298,7 +301,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
       }
     }
 
-    this._engine.restoreSnapshot(best.snapshotId);
+    this._coordinator.restoreSnapshot(best.snapshotId);
   }
 
   // -------------------------------------------------------------------------

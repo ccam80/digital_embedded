@@ -2,9 +2,9 @@
  * AnalogScopePanel — analog oscilloscope panel.
  *
  * Captures voltage and current waveforms at every accepted timestep from the
- * analog engine and renders them on a dedicated HTMLCanvasElement. Supports
- * multiple channels, Y-axis auto-ranging, zoom/pan, and an optional FFT
- * spectrum view (Task 3.3.3).
+ * simulation coordinator and renders them on a dedicated HTMLCanvasElement.
+ * Supports multiple channels, Y-axis auto-ranging, zoom/pan, and an optional
+ * FFT spectrum view (Task 3.3.3).
  *
  * The panel renders to its own canvas using CanvasRenderingContext2D directly,
  * consistent with TimingDiagramPanel. It does not use the engine-agnostic
@@ -12,7 +12,8 @@
  */
 
 import type { MeasurementObserver } from "@/core/engine-interface.js";
-import type { AnalogEngine } from "@/core/analog-engine-interface.js";
+import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
+import type { SignalAddress } from "@/compile/types.js";
 import { AnalogScopeBuffer } from "./analog-scope-buffer.js";
 import {
   drawPolylineTrace,
@@ -36,7 +37,10 @@ export type OverlayKind = "min" | "max" | "mean" | "rms";
 interface ScopeChannel {
   label: string;
   kind: ChannelKind;
-  nodeOrBranchId: number;
+  /** For voltage channels: the SignalAddress to read via coordinator.readSignal(). */
+  addr: SignalAddress | null;
+  /** For current/elementCurrent channels: the branch or element index. */
+  index: number;
   color: string;
   buffer: AnalogScopeBuffer;
   /** Auto Y-range: track min/max of visible samples. */
@@ -80,18 +84,18 @@ const ENVELOPE_THRESHOLD = 1000;
  * Analog oscilloscope panel.
  *
  * Auto-registers itself as a `MeasurementObserver` on construction by calling
- * `engine.addMeasurementObserver(this)`. Call `dispose()` to deregister when
- * the panel is no longer needed.
+ * `coordinator.addMeasurementObserver(this)`. Call `dispose()` to deregister
+ * when the panel is no longer needed.
  *
  * Usage:
- *   const panel = new AnalogScopePanel(canvas, engine);
- *   panel.addVoltageChannel(1, "Vout", "#4488ff");
+ *   const panel = new AnalogScopePanel(canvas, coordinator);
+ *   panel.addVoltageChannel({ domain: 'analog', nodeId: 1 }, "Vout", "#4488ff");
  *   // ... later ...
  *   panel.dispose();
  */
 export class AnalogScopePanel implements MeasurementObserver {
   private readonly _canvas: HTMLCanvasElement | null;
-  private readonly _engine: AnalogEngine;
+  private readonly _coordinator: SimulationCoordinator;
   private readonly _channels: ScopeChannel[] = [];
 
   // Time-axis viewport
@@ -105,10 +109,10 @@ export class AnalogScopePanel implements MeasurementObserver {
 
   private _wheelHandler: ((e: WheelEvent) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement | null, engine: AnalogEngine) {
+  constructor(canvas: HTMLCanvasElement | null, coordinator: SimulationCoordinator) {
     this._canvas = canvas;
-    this._engine = engine;
-    engine.addMeasurementObserver(this);
+    this._coordinator = coordinator;
+    coordinator.addMeasurementObserver(this);
 
     // Wire up scroll-to-zoom on the scope canvas
     if (canvas) {
@@ -121,9 +125,9 @@ export class AnalogScopePanel implements MeasurementObserver {
     }
   }
 
-  /** Deregister from the engine. Call when the panel is no longer needed. */
+  /** Deregister from the coordinator. Call when the panel is no longer needed. */
   dispose(): void {
-    this._engine.removeMeasurementObserver(this);
+    this._coordinator.removeMeasurementObserver(this);
     if (this._canvas && this._wheelHandler) {
       this._canvas.removeEventListener("wheel", this._wheelHandler);
       this._wheelHandler = null;
@@ -144,18 +148,18 @@ export class AnalogScopePanel implements MeasurementObserver {
   isFftEnabled(): boolean { return this._fftEnabled; }
   getFftChannelLabel(): string | null { return this._fftChannelLabel; }
 
-  addVoltageChannel(nodeId: number, label: string, color?: string): void {
-    const ch = this._makeChannel(label, "voltage", nodeId, color);
+  addVoltageChannel(addr: SignalAddress, label: string, color?: string): void {
+    const ch = this._makeChannel(label, "voltage", addr, 0, color);
     this._channels.push(ch);
   }
 
-  addCurrentChannel(branchId: number, label: string, color?: string): void {
-    const ch = this._makeChannel(label, "current", branchId, color);
+  addCurrentChannel(branchIndex: number, label: string, color?: string): void {
+    const ch = this._makeChannel(label, "current", null, branchIndex, color);
     this._channels.push(ch);
   }
 
-  addElementCurrentChannel(elementId: number, label: string, color?: string): void {
-    const ch = this._makeChannel(label, "elementCurrent", elementId, color);
+  addElementCurrentChannel(elementIndex: number, label: string, color?: string): void {
+    const ch = this._makeChannel(label, "elementCurrent", null, elementIndex, color);
     this._channels.push(ch);
   }
 
@@ -167,7 +171,8 @@ export class AnalogScopePanel implements MeasurementObserver {
   private _makeChannel(
     label: string,
     kind: ChannelKind,
-    id: number,
+    addr: SignalAddress | null,
+    index: number,
     color?: string,
   ): ScopeChannel {
     const resolvedColor =
@@ -175,7 +180,8 @@ export class AnalogScopePanel implements MeasurementObserver {
     return {
       label,
       kind,
-      nodeOrBranchId: id,
+      addr,
+      index,
       color: resolvedColor,
       buffer: new AnalogScopeBuffer(65536),
       autoRange: true,
@@ -190,16 +196,17 @@ export class AnalogScopePanel implements MeasurementObserver {
   // -------------------------------------------------------------------------
 
   onStep(_stepCount: number): void {
-    const t = this._engine.simTime;
+    const t = this._coordinator.simTime ?? 0;
 
     for (const ch of this._channels) {
       let value: number;
       if (ch.kind === "voltage") {
-        value = this._engine.getNodeVoltage(ch.nodeOrBranchId);
+        const sv = this._coordinator.readSignal(ch.addr!);
+        value = sv.type === "analog" ? sv.voltage : 0;
       } else if (ch.kind === "elementCurrent") {
-        value = this._engine.getElementCurrent(ch.nodeOrBranchId);
+        value = this._coordinator.readElementCurrent(ch.index) ?? 0;
       } else {
-        value = this._engine.getBranchCurrent(ch.nodeOrBranchId);
+        value = this._coordinator.readBranchCurrent(ch.index) ?? 0;
       }
       ch.buffer.push(t, value);
     }

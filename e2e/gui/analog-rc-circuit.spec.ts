@@ -120,7 +120,7 @@ test.describe('GUI: analog RC circuit', () => {
 
   test('switch to analog mode via GUI click', async () => {
     // Initial mode should be Digital
-    const initialMode = await bridgeEval<string>(harness, 'bridge.getEngineType()');
+    const initialMode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
     expect(initialMode).toBe('digital');
 
     // Click the Circuit Mode button
@@ -128,7 +128,7 @@ test.describe('GUI: analog RC circuit', () => {
     await harness.page.waitForTimeout(200);
 
     // Mode should now be Analog
-    const newMode = await bridgeEval<string>(harness, 'bridge.getEngineType()');
+    const newMode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
     expect(newMode).toBe('analog');
 
     // The mode label should update in the UI
@@ -139,11 +139,11 @@ test.describe('GUI: analog RC circuit', () => {
   test('switch to analog mode and back', async () => {
     await clickIframeButton(harness, 'btn-circuit-mode');
     await harness.page.waitForTimeout(100);
-    expect(await bridgeEval<string>(harness, 'bridge.getEngineType()')).toBe('analog');
+    expect(await bridgeEval<string>(harness, 'bridge.getCircuitDomain()')).toBe('analog');
 
     await clickIframeButton(harness, 'btn-circuit-mode');
     await harness.page.waitForTimeout(100);
-    expect(await bridgeEval<string>(harness, 'bridge.getEngineType()')).toBe('digital');
+    expect(await bridgeEval<string>(harness, 'bridge.getCircuitDomain()')).toBe('digital');
   });
 
   test('analog palette shows analog components after mode switch', async () => {
@@ -162,7 +162,7 @@ test.describe('GUI: analog RC circuit', () => {
     // If none are in the palette tree, check via the bridge
     if (totalAnalog === 0) {
       // Verify at least that the engine type is analog
-      const mode = await bridgeEval<string>(harness, 'bridge.getEngineType()');
+      const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
       expect(mode).toBe('analog');
     } else {
       expect(totalAnalog).toBeGreaterThan(0);
@@ -197,7 +197,7 @@ test.describe('GUI: analog RC circuit', () => {
     expect(labels).toContain('C1');
 
     // Verify engine type is analog
-    const mode = await bridgeEval<string>(harness, 'bridge.getEngineType()');
+    const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
     expect(mode).toBe('analog');
   });
 
@@ -317,7 +317,7 @@ test.describe('GUI: analog RC circuit', () => {
     } else {
       // Analog components might be in the Insert menu rather than palette tree
       // Just verify mode is correct
-      const mode = await bridgeEval<string>(harness, 'bridge.getEngineType()');
+      const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
       expect(mode).toBe('analog');
     }
   });

@@ -15,19 +15,9 @@ import type { Viewport } from '../editor/viewport.js';
 import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
-import type { AnalogEngine } from '../core/analog-engine-interface.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
-
-/**
- * Mutable context for analog engine state. Updated by app-init when analog
- * compilation succeeds or the engine is disposed. The test bridge reads this
- * lazily so it always reflects the current engine state.
- */
-export interface AnalogTestContext {
-  engine: AnalogEngine | null;
-  compiled: { labelToNodeId: Map<string, number>; nodeCount: number } | null;
-}
 
 export interface TestBridge {
   /** Convert a world-space grid position to screen coordinates relative to the canvas. */
@@ -67,8 +57,8 @@ export interface TestBridge {
   /** Get current viewport state. */
   getViewport(): { zoom: number; panX: number; panY: number };
 
-  /** Get current engine type derived from circuit components. */
-  getEngineType(): string;
+  /** Get circuit domain derived from circuit component models ('analog' | 'digital'). */
+  getCircuitDomain(): string;
 
   /**
    * Get analog engine state: simTime, node voltages by label and index.
@@ -103,7 +93,7 @@ export function createTestBridge(
   canvas: HTMLCanvasElement,
   _palette: ComponentPalette,
   registry: ComponentRegistry,
-  analogCtx?: AnalogTestContext,
+  coordinator: SimulationCoordinator | null,
 ): TestBridge {
   function worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
     return {
@@ -193,7 +183,7 @@ export function createTestBridge(
       return { zoom: viewport.zoom, panX: viewport.pan.x, panY: viewport.pan.y };
     },
 
-    getEngineType() {
+    getCircuitDomain() {
       const hasAnalogOnly = circuit.elements.some(el => {
         const def = registry.get(el.typeId);
         if (def === undefined) return false;
@@ -203,22 +193,20 @@ export function createTestBridge(
     },
 
     getAnalogState() {
-      const eng = analogCtx?.engine;
-      const comp = analogCtx?.compiled;
-      if (!eng || !comp) return null;
+      if (!coordinator) return null;
+      const simTime = coordinator.simTime;
+      if (simTime === null) return null;
 
+      const allSignals = coordinator.readAllSignals();
       const nodeVoltages: Record<string, number> = {};
-      for (const [label, nodeId] of comp.labelToNodeId) {
-        nodeVoltages[label] = eng.getNodeVoltage(nodeId);
-      }
-      for (let i = 1; i <= comp.nodeCount; i++) {
-        nodeVoltages[`node_${i}`] = eng.getNodeVoltage(i);
+      for (const [label, sv] of allSignals) {
+        nodeVoltages[label] = sv.type === 'analog' ? sv.voltage : sv.value;
       }
 
       return {
-        simTime: eng.simTime,
+        simTime,
         nodeVoltages,
-        nodeCount: comp.nodeCount,
+        nodeCount: Object.keys(nodeVoltages).length,
       };
     },
 

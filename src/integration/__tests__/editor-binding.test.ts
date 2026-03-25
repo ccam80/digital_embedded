@@ -74,13 +74,12 @@ describe("EditorBinding", () => {
     expect(binding.isBound).toBe(true);
   });
 
-  it("unbind — unbind, assert isBound is false, coordinator is null, engine is null", () => {
+  it("unbind — unbind, assert isBound is false, coordinator is null", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.isBound).toBe(true);
     binding.unbind();
     expect(binding.isBound).toBe(false);
     expect(binding.coordinator).toBeNull();
-    expect(binding.engine).toBeNull();
   });
 
   it("getWireSignal — returns SignalValue from coordinator for the wire's address", () => {
@@ -129,23 +128,8 @@ describe("EditorBinding", () => {
     expect(() => binding.getWireSignal(wire)).toThrow();
   });
 
-  it("engine accessor — returns digitalBackend from coordinator when bound", () => {
+  it("engine property removed — binding does not expose engine, use coordinator directly", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
-    expect(binding.engine).toBeNull();
-  });
-
-  it("engine accessor — returns non-null digitalBackend when coordinator has one", () => {
-    const mockEngine = {
-      step: () => {},
-      reset: () => {},
-      dispose: () => {},
-      getSignal: () => ({ type: "digital" as const, value: 0 }),
-      setSignal: () => {},
-      addObserver: () => {},
-      removeObserver: () => {},
-    } as unknown as import("@/core/engine-interface").SimulationEngine;
-    coordinator.setDigitalBackend(mockEngine);
-    binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
-    expect(binding.engine).toBe(mockEngine);
+    expect("engine" in binding).toBe(false);
   });
 });

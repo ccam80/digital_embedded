@@ -723,3 +723,127 @@ Import `BitsException` from `../../core/errors.js`.
 - **Files modified**: src/solver/coordinator-types.ts, src/test-utils/mock-coordinator.ts, src/solver/__tests__/coordinator-capability.test.ts
 - **Tests**: 6/6 new tests passing (36/36 total in coordinator-capability.test.ts)
 - **Notes**: Narrowed SimulationCoordinator interface compiled accessor to { wireSignalMap, labelSignalMap, diagnostics }. Removed CompiledCircuitUnified from interface import. Updated mock-coordinator.ts to match narrowed type. Added Wire and Diagnostic imports. Full suite: 7634/7638 passing (4 pre-existing ENOENT failures, 0 regressions).
+
+---
+## Wave 5b.1 Summary
+- **Status**: complete
+- **Tasks completed**: 11/11
+- **Rounds**: 3 (4 implementers round 1, 2 retry round 2, 2 retry round 3)
+- **Tests**: 7634/7638 passing (baseline: 7517/7521, +117 new tests)
+
+## Task P5b-13: AnalogScopePanel: take coordinator, use readSignal/readElementCurrent/readBranchCurrent (§4.7)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/runtime/analog-scope-panel.ts, src/runtime/__tests__/analog-scope-panel.test.ts, src/test-utils/mock-coordinator.ts
+- **Tests**: 13/13 passing (analog-scope-panel.test.ts)
+- **Notes**: Changed AnalogScopePanel constructor from (canvas, engine: AnalogEngine) to (canvas, coordinator: SimulationCoordinator). Channel descriptors changed: voltage channels now use SignalAddress (addr field), current/elementCurrent channels use numeric index. onStep now calls coordinator.readSignal(addr), coordinator.readElementCurrent(index), coordinator.readBranchCurrent(index), coordinator.simTime. MockCoordinator updated to implement all interface members added by P5b-5 through P5b-11: real observer set (_observers), getPinVoltages, getWireAnalogNodeId, voltageRange, updateVoltageTracking, getSliderProperties, setComponentProperty, readElementCurrent, readBranchCurrent, saveSnapshot, restoreSnapshot, getCurrentResolverContext. Full suite: 7645/7649 passing (4 pre-existing ENOENT failures, 0 regressions, +11 new tests).
+
+## Task P5b-13: AnalogScopePanel coordinator migration — verification pass
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none (work already done by prior agent)
+- **Tests**: 13/13 passing (analog-scope-panel.test.ts)
+- **Notes**: Prior agent completed full implementation. This pass verified: AnalogScopePanel constructor takes SimulationCoordinator, onStep uses coordinator.readSignal(addr) for voltage, coordinator.readElementCurrent(index) for element current, coordinator.readBranchCurrent(index) for branch current, coordinator.simTime for X-axis. All 13 tests pass. P5b-14 also already complete (TimingDiagramPanel: 20/20 tests passing).
+
+## Task P5b-14: TimingDiagramPanel: take coordinator, use readSignal + saveSnapshot/restoreSnapshot (§4.8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none (work already done by prior agent)
+- **Tests**: 20/20 passing (timing-diagram.test.ts)
+- **Notes**: Prior agent completed full implementation. Verified: TimingDiagramPanel constructor takes SimulationCoordinator + SignalAddress channel descriptors. onStep uses coordinator.readSignal(addr) for all channels. Snapshot management uses coordinator.saveSnapshot() and coordinator.restoreSnapshot(id) for click-to-jump time cursor. Registers as MeasurementObserver on coordinator. All 20 tests pass.
+
+## Task P5b-14: TimingDiagramPanel: take coordinator, use readSignal + saveSnapshot/restoreSnapshot (§4.8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/runtime/timing-diagram.ts, src/runtime/waveform-data.ts, src/runtime/__tests__/timing-diagram.test.ts
+- **Tests**: 20/20 passing (timing-diagram.test.ts)
+- **Notes**: Changed TimingDiagramPanel constructor from (canvas, engine: SimulationEngine, channels, opts) to (canvas, coordinator: SimulationCoordinator, channels, opts). Channel descriptor type changed from { name, netId, width } to { name, addr: SignalAddress, width }. WaveformChannel.netId renamed to addr: SignalAddress. onStep now calls coordinator.readSignal(addr) (extracting .value for digital, Math.round(.voltage) for analog). saveSnapshot/restoreSnapshot now call coordinator.saveSnapshot/restoreSnapshot. Tests rewritten to use MockCoordinator with call-tracking overrides for snapshot operations. Full suite: 7645/7649 passing (4 pre-existing ENOENT failures, 0 regressions).
+
+## Task P5b-18: DefaultSimulatorFacade: remove _engineMode, getCompiled/getCompiledAnalog, _resolveBackendEngine, _snapshotSignals (§2)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/headless/default-facade.ts, src/headless/__tests__/default-facade.test.ts
+- **Tests**: 7646/7650 passing (4 pre-existing ENOENT failures from missing submodule)
+- **Changes made**:
+  - Removed `_engineMode: 'digital' | 'analog'` field and all references
+  - Removed `_clockManager` field (ClockManager now lives inside DefaultSimulationCoordinator)
+  - Removed `getCompiled()` and `getCompiledAnalog()` — replaced with `getCompiledUnified(): CompiledCircuitUnified | null`
+  - Removed `_resolveBackendEngine()`, `_snapshotSignals()`, `_isCoordinator()`, `_isDigitalEngine()`, `_isAnalogEngine()` private methods
+  - Simplified `step()` — uses `'advanceClocks' in coordinator` duck-type check, calls `coordinator.advanceClocks()` then `coordinator.step()`
+  - Simplified `runToStable()` — uses `coordinator.snapshotSignals()` when coord available; falls back to direct engine snapshot for legacy SimulationEngine path
+  - Simplified `compile()` — no `_engineMode` derivation, no `hasAnalogOnly` check, no ClockManager creation (all in coordinator now)
+  - Updated `invalidate()` — removed `_engineMode` reset and `_clockManager` reset
+  - Fixed `runTests()` — replaced `_resolveBackendEngine/_isDigitalEngine` with `'digitalBackend' in engineOrCoord` duck-type check
+  - Updated test assertions: replaced `getCompiled()`/`getCompiledAnalog()` calls with `getCompiledUnified()` accessing `.digital`/`.analog` fields
+  - app-init.ts: NOT updated (file was locked by another agent; app-init.ts is not compiled by Vitest so this does not affect test suite — Wave 5b.3 will update it)
+
+## Task P5b-12: DataTablePanel: take coordinator + SignalAddress descriptors, remove duck-type check
+- **Status**: partial
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/runtime/data-table.ts, src/runtime/__tests__/data-table.test.ts
+- **Tests**: 18/18 passing
+- **If partial — remaining work**: `src/app/app-init.ts` call sites were locked by P5b-15 during this task. The following changes are needed in app-init.ts:
+  1. `WatchedSignal` interface (line ~2283): add `addr: SignalAddress` field alongside or replacing `netId: number`. The addr should be built from `coordinator.compiled.labelSignalMap` by name, falling back to `{domain:'digital', netId: s.netId, bitWidth: s.width}` for digital or `{domain:'analog', nodeId: s.netId}` for analog signals.
+  2. `rebuildViewers()` (line ~2421-2432): Build `signals: SignalDescriptor[]` using `addr` from WatchedSignal. Replace the dual `new DataTablePanel(viewerValuesContainer, ae as any, signals)` and `new DataTablePanel(viewerValuesContainer, eng, signals)` calls with a single `new DataTablePanel(viewerValuesContainer, coordinator, signals)` call, where coordinator = `facade.getCoordinator()!`. Register as observer on coordinator (not eng/ae): `coordinator.addMeasurementObserver(activeDataTable)`.
+  3. Line 2423: Change `netId: s.netId` to `addr: s.addr` in SignalDescriptor construction.
+  4. Lines 2426-2430: Remove isAnalog branching for DataTablePanel; always use coordinator.
+  5. TypeScript errors introduced at lines 2422 (SignalDescriptor type mismatch), 2426 (AnalogEngine not SimulationCoordinator), 2429 (SimulationEngine not SimulationCoordinator), 2403/2958 (number not SignalAddress - these are AnalogScopePanel.addVoltageChannel calls, separate from DataTablePanel) must be resolved.
+
+## Task P5b-19: EditorBinding: remove engine property
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/integration/editor-binding.ts, src/integration/__tests__/editor-binding.test.ts
+- **Tests**: 9/9 passing
+
+## Task P5b-16: SliderEngineBridge: take coordinator, use setComponentProperty
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/editor/slider-engine-bridge.ts, src/editor/__tests__/slider-panel.test.ts
+- **Tests**: 16/16 passing
+
+## Task P5b-17: SimulationRunner: use coordinator.snapshotSignals/signalCount/dcOp, delete _resolveBackendEngine (§4.3)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/headless/runner.ts
+- **Tests**: 7635/7651 passing (4 pre-existing ENOENT submodule failures + 12 new failures from P5b-15's wire-current-resolver.ts changes that are unrelated to this task)
+- **Changes made**:
+  - `runToStable()`: replaced `_snapshotSignals()` + `_resolveBackendEngine()` with `coordinator.snapshotSignals()` when a record is found; retains direct engine path for unregistered engines
+  - `dcOperatingPoint()`: replaced `record.coordinator.analogBackend.dcOperatingPoint()` with `record.coordinator.supportsDcOp()` check + `record.coordinator.dcOperatingPoint()`
+  - Deleted `_resolveBackendEngine()` and `_snapshotSignals()` private methods entirely
+- **Note**: 12 wire-current-resolver test failures are from P5b-15's changes to wire-current-resolver.ts (already in working tree before this task ran), not from runner.ts changes
+
+## Task P5b-15: WireCurrentResolver: accept CurrentResolverContext instead of (engine, circuit, compiled) (§4.5)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/coordinator-types.ts, src/solver/coordinator.ts, src/editor/wire-current-resolver.ts, src/app/app-init.ts, src/editor/__tests__/wire-current-resolver.test.ts
+- **Tests**: 14/14 passing
+
+## Task P5b-17: SimulationRunner: use coordinator.snapshotSignals/signalCount/dcOp, delete _resolveBackendEngine (§4.3)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/headless/runner.ts (already updated by prior agent — verified all spec requirements met: runToStable uses coordinator.snapshotSignals(), dcOperatingPoint uses coordinator.dcOperatingPoint() + coordinator.supportsDcOp(), _resolveBackendEngine and _snapshotSignals deleted)
+- **Tests**: 28/28 passing (runner + batch-runner + test-runner)
+
+## Task P5b-20: TestBridge: remove AnalogTestContext, use coordinator, rename getEngineType→getCircuitDomain
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/app/__tests__/test-bridge.test.ts
+- **Files modified**: src/app/test-bridge.ts, src/app/app-init.ts, e2e/gui/analog-rc-circuit.spec.ts, e2e/gui/workflow-tests.spec.ts, e2e/fixtures/ui-circuit-builder.ts
+- **Tests**: 8/8 passing (new test-bridge test file)
+
+## Task P5b-12 (app-init.ts update): DataTablePanel call sites in app-init.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/app/app-init.ts
+- **Note**: The remaining app-init.ts call site work from P5b-12 was completed during P5b-20 when the app-init.ts lock became available. rebuildViewers() now builds SignalDescriptor with addr (domain + netId/nodeId based on isAnalog flag), creates DataTablePanel with coordinator, and registers as coordinator.addMeasurementObserver.

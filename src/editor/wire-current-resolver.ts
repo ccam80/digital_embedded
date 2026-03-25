@@ -11,11 +11,10 @@
  * indeterminate without resistance.
  */
 
-import type { Wire, Circuit } from "@/core/circuit";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { AnalogElement } from "@/solver/analog/element";
+import type { Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import { pinWorldPosition } from "@/core/pin";
+import type { CurrentResolverContext } from "@/solver/coordinator-types";
 
 // ---------------------------------------------------------------------------
 // WireCurrentResult
@@ -42,24 +41,6 @@ export interface ComponentCurrentPath {
   current: number;
   /** +1 if current flows pin0→pin1, -1 if pin1→pin0, 0 if zero. */
   flowSign: 1 | -1 | 0;
-}
-
-// ---------------------------------------------------------------------------
-// ResolvedAnalogCircuit — the fields the resolver needs from the compiled
-// circuit. ConcreteCompiledAnalogCircuit satisfies this.
-// ---------------------------------------------------------------------------
-
-export interface ResolvedAnalogCircuit {
-  readonly wireToNodeId: Map<Wire, number>;
-  readonly elements: readonly AnalogElement[];
-  readonly elementToCircuitElement: Map<number, CircuitElement>;
-  /** Compiler-resolved wire vertices for each element pin. When present,
-   *  the resolver uses these directly instead of re-computing pin positions. */
-  readonly elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
-  /** Compiler-resolved pins in pinLayout order (label, vertex, nodeId).
-   *  When present, preferred over elementPinVertices for vertex lookup,
-   *  and over pinWorldPosition() calls for world positions in Step 4. */
-  readonly elementResolvedPins?: Map<number, import("../core/pin.js").ResolvedPin[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,23 +139,18 @@ export class WireCurrentResolver {
    * through the tree. Each wire's current = signed subtree injection sum of
    * its child vertex (positive = start→end direction).
    */
-  resolve(engine: AnalogEngine, circuit: Circuit, compiled: ResolvedAnalogCircuit): void {
+  resolve(ctx: CurrentResolverContext): void {
     this._results.clear();
     this._componentPaths = [];
 
-    const { wireToNodeId, elements, elementToCircuitElement, elementPinVertices, elementResolvedPins } = compiled;
+    const { wireToNodeId, elements, elementToCircuitElement, elementPinVertices, elementResolvedPins } = ctx;
 
     // ------------------------------------------------------------------
-    // Step 1: Build node → wires map.
+    // Step 1: Build node → wires map from the analog wire-to-node mapping.
     // ------------------------------------------------------------------
     const nodeToWires = new Map<number, Wire[]>();
 
-    for (const wire of circuit.wires) {
-      const nodeId = wireToNodeId.get(wire);
-      if (nodeId === undefined) {
-        this._results.set(wire, { current: 0, direction: this._unitDir(wire), flowSign: 0 });
-        continue;
-      }
+    for (const [wire, nodeId] of wireToNodeId) {
       if (!nodeToWires.has(nodeId)) nodeToWires.set(nodeId, []);
       nodeToWires.get(nodeId)!.push(wire);
     }
@@ -206,7 +182,7 @@ export class WireCurrentResolver {
         : elementPinVertices?.get(eIdx);
       if (!vertices) continue;
 
-      const pinCurrents = engine.getElementPinCurrents(eIdx);
+      const pinCurrents = ctx.getElementPinCurrents(eIdx);
       for (let t = 0; t < pinCurrents.length; t++) {
         const cv = vertices[t];
         if (!cv) continue;
@@ -227,7 +203,7 @@ export class WireCurrentResolver {
     // ------------------------------------------------------------------
     const tunnelVerticesByNode = new Map<number, Set<string>>();
 
-    for (const el of circuit.elements) {
+    for (const el of ctx.circuitElements) {
       if (el.typeId !== "Tunnel") continue;
       const pins = el.getPins();
       if (pins.length === 0) continue;
@@ -235,7 +211,7 @@ export class WireCurrentResolver {
       const pk = pointKey(wp);
 
       // Find nodeId by matching against wire endpoints at this position
-      for (const wire of circuit.wires) {
+      for (const wire of wireToNodeId.keys()) {
         if (pointKey(wire.start) === pk || pointKey(wire.end) === pk) {
           const nodeId = wireToNodeId.get(wire);
           if (nodeId !== undefined) {
@@ -277,7 +253,7 @@ export class WireCurrentResolver {
       if (!ce) continue;
       const cePins = ce.getPins();
 
-      const pinCurrents = engine.getElementPinCurrents(eIdx);
+      const pinCurrents = ctx.getElementPinCurrents(eIdx);
 
       if (pinCurrents.length > 2) {
         // Multi-pin element: one path per pin branch (pin ↔ junction).

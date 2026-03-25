@@ -2,18 +2,19 @@
  * DataTablePanel — live tabular view of all measured signals.
  *
  * Implements MeasurementObserver to receive step/reset notifications from
- * the simulation engine. Renders one row per signal with the current value
- * formatted in the configured radix. Supports sorting by name and grouping
- * signals by component type (inputs, outputs, probes).
+ * the simulation coordinator. Renders one row per signal with the current
+ * value formatted in the configured radix. Supports sorting by name and
+ * grouping signals by component type (inputs, outputs, probes).
  *
  * Configurable radix per signal via right-click context menu.
  *
  */
 
-import type { MeasurementObserver, SimulationEngine } from "@/core/engine-interface";
+import type { MeasurementObserver } from "@/core/engine-interface";
 import type { DisplayFormat } from "@/core/signal";
 import { BitVector } from "@/core/signal";
-import type { AnalogEngine } from "@/core/analog-engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
+import type { SignalAddress } from "@/compile/types";
 
 // ---------------------------------------------------------------------------
 // Signal group — categorises signals by component type
@@ -28,9 +29,9 @@ export type SignalGroup = "input" | "output" | "probe";
 export interface SignalDescriptor {
   /** Display name shown in the Name column. */
   readonly name: string;
-  /** Net ID used to read the value from the engine. */
-  readonly netId: number;
-  /** Bit width of the signal. */
+  /** Signal address used to read the value from the coordinator. */
+  readonly addr: SignalAddress;
+  /** Bit width of the signal (used for digital signals). */
   readonly width: number;
   /** Component type group. */
   readonly group: SignalGroup;
@@ -56,16 +57,15 @@ interface SignalRow {
  * Live tabular view of measured signals.
  *
  * Usage:
- *   const panel = new DataTablePanel(containerEl, engine, signals);
- *   engine.addMeasurementObserver(panel);
+ *   const panel = new DataTablePanel(containerEl, coordinator, signals);
+ *   coordinator.addMeasurementObserver(panel);
  *   // Later:
- *   engine.removeMeasurementObserver(panel);
+ *   coordinator.removeMeasurementObserver(panel);
  *   panel.dispose();
  */
 export class DataTablePanel implements MeasurementObserver {
   private readonly _container: HTMLElement;
-  private readonly _engine: SimulationEngine;
-  private readonly _analogEngine: AnalogEngine | null;
+  private readonly _coordinator: SimulationCoordinator;
   private _rows: SignalRow[];
   private _sortByName = false;
   private _tableBody: HTMLTableSectionElement | null = null;
@@ -73,14 +73,11 @@ export class DataTablePanel implements MeasurementObserver {
 
   constructor(
     container: HTMLElement,
-    engine: SimulationEngine,
+    coordinator: SimulationCoordinator,
     signals: readonly SignalDescriptor[],
   ) {
     this._container = container;
-    this._engine = engine;
-    this._analogEngine = typeof (engine as unknown as AnalogEngine).getNodeVoltage === 'function'
-      ? engine as unknown as AnalogEngine
-      : null;
+    this._coordinator = coordinator;
     this._rows = signals.map((d) => ({
       descriptor: d,
       radix: "dec" as DisplayFormat,
@@ -96,11 +93,10 @@ export class DataTablePanel implements MeasurementObserver {
   onStep(_stepCount: number): void {
     // Read values eagerly, throttle DOM updates to at most every 50ms.
     for (const row of this._rows) {
-      if (this._analogEngine !== null) {
-        row.value = this._analogEngine.getNodeVoltage(row.descriptor.netId);
-      } else {
-        row.value = this._engine.getSignalValue(row.descriptor.netId);
-      }
+      const sv = this._coordinator.readSignal(row.descriptor.addr);
+      row.value = sv.type === 'digital'
+        ? BitVector.fromNumber(sv.value, row.descriptor.width)
+        : sv.voltage;
     }
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (now - this._lastUpdateTime >= 50) {
