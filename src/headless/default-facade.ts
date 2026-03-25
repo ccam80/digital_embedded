@@ -14,7 +14,6 @@
 import type { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
-import { BitVector } from '../core/signal.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition, ComponentRegistry } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
@@ -35,8 +34,6 @@ import type { ConcreteCompiledCircuit } from '../engine/digital-engine.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
 import { compileUnified } from '../compile/compile.js';
 import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
-import type { AnalogEngine } from '../core/analog-engine-interface.js';
-import { MNAEngine } from '../analog/analog-engine.js';
 import { TransistorModelRegistry } from '../analog/transistor-model-registry.js';
 import { registerAllCmosGateModels } from '../analog/transistor-models/cmos-gates.js';
 import { registerCmosDFlipflop } from '../analog/transistor-models/cmos-flipflop.js';
@@ -48,6 +45,7 @@ import { deserializeCircuit } from '../io/load.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
+import { DefaultSimulationCoordinator } from '../compile/coordinator.js';
 
 /** Lazily-built singleton TransistorModelRegistry with all known models. */
 let _transistorModels: TransistorModelRegistry | null = null;
@@ -82,11 +80,9 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   // Active session state (reset on each compile())
   private _circuit: Circuit | null = null;
-  private _engine: DigitalEngine | (AnalogEngine & SimulationEngine) | null = null;
+  private _coordinator: DefaultSimulationCoordinator | null = null;
   private _clockManager: ClockManager | null = null;
-  private _compiled: ConcreteCompiledCircuit | null = null;
-  private _compiledAnalog: CompiledAnalogCircuit | null = null;
-  private _dcOpResult: DcOpResult | null = null;
+  private _engineMode: 'digital' | 'analog' = 'digital';
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -127,10 +123,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._disposeCurrentEngine();
 
     this._circuit = null;
-    this._compiled = null;
-    this._compiledAnalog = null;
+    this._coordinator = null;
     this._clockManager = null;
-    this._dcOpResult = null;
 
     // Resolve engine mode: "auto" detects from components present.
     // Only route to analog if there is at least one component that has an
@@ -150,38 +144,27 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
       });
       engineMode = hasAnalogOnly ? 'analog' : 'digital';
     }
+    this._engineMode = engineMode as 'digital' | 'analog';
 
-    if (engineMode === 'analog') {
-      const unified = compileUnified(circuit, this._registry, getTransistorModels());
-      const compiledAnalog = unified.analog!;
-      this._compiledAnalog = compiledAnalog;
+    const unified = compileUnified(circuit, this._registry, getTransistorModels());
+    const coordinator = new DefaultSimulationCoordinator(unified);
+    this._coordinator = coordinator;
 
-      const analogEngine = new MNAEngine();
-      analogEngine.init(compiledAnalog);
-      this._engine = analogEngine as unknown as AnalogEngine & SimulationEngine;
-
-      try {
-        this._dcOpResult = analogEngine.dcOperatingPoint();
-      } catch {
-        // intentionally empty
-      }
-
-      this._circuit = circuit;
-      return analogEngine as unknown as SimulationEngine;
+    if (unified.digital !== null && engineMode !== 'analog') {
+      this._clockManager = new ClockManager(unified.digital as ConcreteCompiledCircuit);
     }
 
-    // Digital path: compile via runner so the engine is registered in the
-    // runner's WeakMap for label resolution in runTests().
-    const engine = this._runner.compile(circuit) as DigitalEngine;
-    this._engine = engine;
-
-    const unified = compileUnified(circuit, this._registry);
-    const compiled = unified.digital! as ConcreteCompiledCircuit;
-    this._compiled = compiled;
-    this._clockManager = new ClockManager(compiled);
     this._circuit = circuit;
 
-    return engine;
+    // Also register with runner for runTests() label resolution
+    if (engineMode !== 'analog' && unified.digital !== null) {
+      this._runner.compile(circuit);
+    }
+
+    if (this._engineMode === 'analog') {
+      return (coordinator.analogBackend ?? coordinator.digitalBackend) as unknown as SimulationEngine;
+    }
+    return (coordinator.digitalBackend ?? coordinator.analogBackend) as unknown as SimulationEngine;
   }
 
   // =========================================================================
@@ -198,8 +181,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   step(engine: SimulationEngine, opts?: StepOptions): void {
     const advance = opts?.clockAdvance !== false;
 
-    if (advance && this._clockManager !== null && this._engine instanceof DigitalEngine) {
-      this._clockManager.advanceClocks(this._engine.getSignalArray());
+    if (advance && this._clockManager !== null && this._coordinator?.digitalBackend instanceof DigitalEngine) {
+      this._clockManager.advanceClocks((this._coordinator.digitalBackend as DigitalEngine).getSignalArray());
     }
 
     engine.step();
@@ -212,7 +195,10 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   runToStable(engine: SimulationEngine, maxIterations = 1000, opts?: StepOptions): void {
-    const netCount = this._compiled?.netCount ?? this._compiledAnalog?.netCount ?? 64;
+    const compiled = this._coordinator?.compiled;
+    const netCount = (compiled?.digital as ConcreteCompiledCircuit | null | undefined)?.netCount
+      ?? compiled?.analog?.netCount
+      ?? 64;
 
     // Default to no clock advancement during settling — clocks should only
     // be driven explicitly by the caller (test executor, step button, etc.).
@@ -242,51 +228,39 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   setInput(engine: SimulationEngine, label: string, value: number): void {
-    if (this._compiledAnalog !== null) {
-      // Analog path: delegate to runner which has the WeakMap record.
-      this._runner.setInput(engine, label, value);
-      return;
-    }
-    if (this._compiled === null) {
+    if (this._coordinator === null) {
       throw new FacadeError('No circuit compiled. Call compile() before setInput().');
     }
-    const netId = this._compiled.labelToNetId.get(label);
-    if (netId === undefined) {
-      const available = [...this._compiled.labelToNetId.keys()].join(', ');
+    const addr = this._coordinator.compiled.labelSignalMap.get(label);
+    if (addr === undefined) {
+      const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
       throw new FacadeError(
         `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
       );
     }
-    const width = this._compiled.netWidths[netId] ?? 1;
-    engine.setSignalValue(netId, BitVector.fromNumber(value, width));
+    this._coordinator.writeSignal(addr, { type: 'digital', value });
   }
 
   readOutput(engine: SimulationEngine, label: string): number {
-    if (this._compiledAnalog !== null) {
-      return this._runner.readOutput(engine, label);
-    }
-    if (this._compiled === null) {
+    if (this._coordinator === null) {
       throw new FacadeError('No circuit compiled. Call compile() before readOutput().');
     }
-    const netId = this._compiled.labelToNetId.get(label);
-    if (netId === undefined) {
-      const available = [...this._compiled.labelToNetId.keys()].join(', ');
+    const addr = this._coordinator.compiled.labelSignalMap.get(label);
+    if (addr === undefined) {
+      const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
       throw new FacadeError(
         `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
       );
     }
-    return engine.getSignalRaw(netId);
+    const sv = this._coordinator.readSignal(addr);
+    return sv.type === 'digital' ? sv.value : sv.voltage;
   }
 
   readAllSignals(engine: SimulationEngine): Record<string, number> {
-    if (this._compiledAnalog !== null) {
-      const map = this._runner.readAllSignals(engine);
-      return Object.fromEntries(map);
-    }
-    if (this._compiled === null) return {};
+    if (this._coordinator === null) return {};
     const result: Record<string, number> = {};
-    for (const [label, netId] of this._compiled.labelToNetId) {
-      result[label] = engine.getSignalRaw(netId);
+    for (const [label, sv] of this._coordinator.readAllSignals()) {
+      result[label] = sv.type === 'digital' ? sv.value : sv.voltage;
     }
     return result;
   }
@@ -337,7 +311,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
 
     const parsed = parseTestData(resolvedData, inputCount);
-    return executeTests(this._runner, engine, circuit, parsed);
+    return executeTests(this, engine, circuit, parsed);
   }
 
   // =========================================================================
@@ -378,7 +352,11 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   /** Returns the currently active engine, or null if none compiled yet. */
   getEngine(): SimulationEngine | null {
-    return this._engine as SimulationEngine | null;
+    if (this._coordinator === null) return null;
+    if (this._engineMode === 'analog') {
+      return (this._coordinator.analogBackend ?? this._coordinator.digitalBackend) as unknown as SimulationEngine | null;
+    }
+    return (this._coordinator.digitalBackend ?? this._coordinator.analogBackend) as unknown as SimulationEngine | null;
   }
 
   /** Returns the last compiled circuit, or null if none compiled yet. */
@@ -398,17 +376,22 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   /** Returns the compiled digital circuit, or null for analog/uncompiled. */
   getCompiled(): ConcreteCompiledCircuit | null {
-    return this._compiled;
+    if (this._engineMode === 'analog') return null;
+    return (this._coordinator?.compiled.digital as ConcreteCompiledCircuit | null | undefined) ?? null;
   }
 
   /** Returns the compiled analog circuit, or null for digital/uncompiled. */
   getCompiledAnalog(): CompiledAnalogCircuit | null {
-    return this._compiledAnalog;
+    if (this._engineMode !== 'analog') return null;
+    return this._coordinator?.compiled.analog ?? null;
   }
 
   /** Returns the last DC operating-point result, or null. */
   getDcOpResult(): DcOpResult | null {
-    return this._dcOpResult;
+    const analog = this._coordinator?.analogBackend;
+    if (analog === null || analog === undefined) return null;
+    const eng = analog as unknown as { lastDcOpResult?: DcOpResult };
+    return eng.lastDcOpResult ?? null;
   }
 
   /**
@@ -418,10 +401,9 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   invalidate(): void {
     this._disposeCurrentEngine();
     this._circuit = null;
-    this._compiled = null;
-    this._compiledAnalog = null;
+    this._coordinator = null;
     this._clockManager = null;
-    this._dcOpResult = null;
+    this._engineMode = 'digital';
   }
 
   // =========================================================================
@@ -429,23 +411,9 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // =========================================================================
 
   private _disposeCurrentEngine(): void {
-    if (this._engine === null) return;
-
-    const eng = this._engine as unknown as {
-      getState?(): string;
-      stop?(): void;
-      dispose?(): void;
-    };
-
-    if (eng.getState?.() === 'RUNNING' && eng.stop) {
-      eng.stop();
-    }
-
-    if (eng.dispose) {
-      eng.dispose();
-    }
-
-    this._engine = null;
+    if (this._coordinator === null) return;
+    this._coordinator.dispose();
+    this._coordinator = null;
   }
 
   private _snapshotSignals(engine: SimulationEngine, netCount: number): Uint32Array {

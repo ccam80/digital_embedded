@@ -103,12 +103,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
     digital.step();
 
+    // Digital-to-analog bridge sync: read digital output values and notify
+    // the analog engine of transitions. Full voltage stamping is handled by
+    // MNAEngine's internal MixedSignalCoordinator via BridgeOutputAdapters
+    // (runtime objects created during analog compilation). The BridgeAdapter
+    // descriptors here don't have stamp methods — Phase 5 will unify these
+    // two bridge representations.
     for (const bridge of this._bridges) {
       if (bridge.direction !== 'digital-to-analog') continue;
       const raw = digital.getSignalRaw(bridge.digitalNetId);
-      const voltage = this._digitalToVoltage(raw !== 0, bridge);
-      analog.addBreakpoint(analog.simTime);
-      void voltage;
+      if (raw !== 0) {
+        analog.addBreakpoint(analog.simTime);
+      }
     }
 
     analog.step();

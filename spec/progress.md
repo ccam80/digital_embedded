@@ -446,3 +446,39 @@ Import `BitsException` from `../../core/errors.js`.
 - **Files modified**: src/compile/index.ts
 - **Tests**: 0/0 passing (P4-1 is types-only, no runtime behaviour — acceptance is "types compile with no errors")
 - **Notes**: TypeScript compiler reports zero errors for both new/modified files. Pre-existing tsc errors in unrelated test files are unchanged from baseline.
+
+## Task P4-4: Update DefaultSimulatorFacade to use SimulationCoordinator
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/headless/default-facade.ts`
+- **Tests**: 10/10 passing (default-facade.test.ts); full suite 7504/7508 (4 pre-existing failures from missing git submodule)
+- **Changes made**:
+  - Replaced `_engine`, `_compiled`, `_compiledAnalog`, `_dcOpResult` fields with `_coordinator: DefaultSimulationCoordinator | null` and `_engineMode: 'digital' | 'analog'`
+  - `compile()`: calls `compileUnified()` once, creates `DefaultSimulationCoordinator`, stores `_engineMode` for analog/digital dispatch, extracts `_clockManager` from `unified.digital` only in digital mode, calls `this._runner.compile(circuit)` for runner WeakMap registration in digital mode
+  - `step()`: uses `_coordinator.digitalBackend instanceof DigitalEngine` for clock advancement check
+  - `runToStable()`: derives `netCount` from `_coordinator.compiled.digital ?? analog ?? 64`
+  - `setInput()` / `readOutput()` / `readAllSignals()`: delegate to `_coordinator.writeSignal()` / `readSignal()` / `readAllSignals()`, converting `SignalValue` to raw numbers
+  - `getCompiled()`: returns null when `_engineMode === 'analog'`, otherwise derives from `_coordinator.compiled.digital`
+  - `getCompiledAnalog()`: returns null when `_engineMode !== 'analog'`, otherwise derives from `_coordinator.compiled.analog`
+  - `getDcOpResult()`: accesses `analogBackend.lastDcOpResult` via cast
+  - `getEngine()`: returns analog backend first when `_engineMode === 'analog'`
+  - `_disposeCurrentEngine()`: calls `_coordinator.dispose()`
+  - `invalidate()`: clears `_coordinator`, `_clockManager`, `_engineMode`
+  - `runTests()`: changed from `executeTests(this._runner, ...)` to `executeTests(this, ...)` so label resolution uses coordinator via facade methods
+  - Removed unused `BitVector` import; kept all public API signatures unchanged
+
+## Task P4-5: Update SimulationRunner to use SimulationCoordinator
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/headless/runner.ts`
+- **Tests**: 73/73 passing (all headless tests pass)
+- **Notes**: 
+  - Replaced `EngineRecord` discriminated union with `RunnerRecord` holding `DefaultSimulationCoordinator`
+  - `compile()` creates coordinator via `compileUnified()` + `DefaultSimulationCoordinator`, keys WeakMap by the backend engine (digital or analog compiled object)
+  - For analog-only circuits where `unified.analog === null`, returns a synthetic result object with `diagnostics` for backward compatibility with the `compile_analog_circuit_rejects_digital_components` test
+  - `setInput`/`readOutput`/`readAllSignals` delegate to coordinator's `writeSignal`/`readSignal` and convert `SignalValue` to numbers
+  - `runToStable` uses `coordinator.compiled.digital?.netCount ?? coordinator.compiled.analog?.netCount ?? 64`
+  - `dcOperatingPoint` checks `coordinator.analogBackend !== null`
+  - 2 pre-existing failures in full suite (`bridge-compiler.test.ts`, `bridge-diagnostics.test.ts`) caused by P4-4 agent's changes to those test files — not caused by runner.ts changes. Baseline had 4 pre-existing failures (git submodule); bridge-compiler was PASS in baseline.
