@@ -38,6 +38,8 @@ import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../core/engine-interface.js";
 import { loadDig } from "../../io/dig-loader.js";
+import { DefaultSimulationCoordinator } from "../../compile/coordinator.js";
+import type { CompiledCircuitUnified } from "../../compile/types.js";
 
 // Real component definitions
 import { ResistorDefinition } from "../../components/passives/resistor.js";
@@ -345,6 +347,7 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
 interface DcResult {
   vOut: number;
   engine: MNAEngine;
+  coordinator?: DefaultSimulationCoordinator;
 }
 
 function compiledAndRunDcOp(
@@ -353,7 +356,8 @@ function compiledAndRunDcOp(
   outputWire: Wire,
   mode: "analog-pins" | "logical" = "analog-pins",
 ): DcResult {
-  const compiled = compileUnified(circuit, registry).analog!;
+  const unified = compileUnified(circuit, registry);
+  const compiled = unified.analog!;
   const errors = compiled.diagnostics.filter((d) => d.severity === "error");
   expect(errors, `Compile errors: ${errors.map((e) => e.message).join(", ")}`).toHaveLength(0);
 
@@ -361,29 +365,29 @@ function compiledAndRunDcOp(
   const outNodeId = compiled.wireToNodeId.get(outputWire);
   expect(outNodeId, "Output wire should be mapped to an MNA node").toBeDefined();
 
-  const engine = new MNAEngine();
-  engine.init(compiled);
-
   if (mode === "analog-pins") {
-    // Behavioral: dcOperatingPoint gives direct steady-state
+    // Behavioral: MNAEngine directly, dcOperatingPoint gives steady-state
+    const engine = new MNAEngine();
+    engine.init(compiled);
     const result = engine.dcOperatingPoint();
     expect(result.converged).toBe(true);
     expect(engine.getState()).not.toBe(EngineState.ERROR);
+    const vOut = engine.getNodeVoltage(outNodeId!);
+    return { vOut, engine };
   } else {
-    // Digital: dcOperatingPoint does NOT trigger bridge sync.
-    // Run transient steps so the MixedSignalCoordinator syncs digital outputs.
-    // After the first step() the bridge reads input voltages, runs the inner
-    // digital engine, and sets output adapter logic levels. Subsequent steps
-    // let the RC-coupled analog circuit reach steady state.
+    // Digital bridge path: use DefaultSimulationCoordinator which owns bridge
+    // sync. Run transient steps so the coordinator syncs digital outputs and
+    // the RC-coupled analog circuit reaches steady state.
+    const coord = new DefaultSimulationCoordinator(unified);
+    const engine = coord.analogBackend as MNAEngine;
     for (let i = 0; i < 20; i++) {
-      engine.step();
+      coord.step();
       if (engine.getState() === EngineState.ERROR) break;
     }
     expect(engine.getState()).not.toBe(EngineState.ERROR);
+    const vOut = engine.getNodeVoltage(outNodeId!);
+    return { vOut, engine, coordinator: coord };
   }
-
-  const vOut = engine.getNodeVoltage(outNodeId!);
-  return { vOut, engine };
 }
 
 // ---------------------------------------------------------------------------

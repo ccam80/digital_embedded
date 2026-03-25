@@ -9,6 +9,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
+import type { SimulationCoordinator } from '../compile/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
@@ -82,10 +83,10 @@ export interface SimulatorFacade {
    * topological sort, net ID assignment, function table construction.
    *
    * @param circuit - The circuit to compile
-   * @returns A SimulationEngine ready to step and run
+   * @returns A SimulationCoordinator wrapping the appropriate backend engines
    * @throws FacadeError if circuit is invalid (combinational loops, unconnected pins, etc.)
    */
-  compile(circuit: Circuit): SimulationEngine;
+  compile(circuit: Circuit): SimulationCoordinator;
 
   // ============================================
   // Simulation: Run and interact with engine
@@ -95,59 +96,59 @@ export interface SimulatorFacade {
    * Execute one propagation cycle of the engine
    * Evaluates all components once in topological order, updates net states.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    */
-  step(engine: SimulationEngine): void;
+  step(coordinator: SimulationCoordinator | SimulationEngine): void;
 
   /**
    * Execute N propagation cycles
    * Useful for settling combinational logic or advancing state machines.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    * @param cycles - Number of cycles to execute
    */
-  run(engine: SimulationEngine, cycles: number): void;
+  run(coordinator: SimulationCoordinator | SimulationEngine, cycles: number): void;
 
   /**
    * Execute cycles until the circuit reaches a stable state
    * (all signals unchanged for a full cycle).
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    * @param maxIterations - Safety limit (default 10000); throws if exceeded
    * @throws FacadeError if circuit oscillates and exceeds maxIterations
    */
-  runToStable(engine: SimulationEngine, maxIterations?: number): void;
+  runToStable(coordinator: SimulationCoordinator | SimulationEngine, maxIterations?: number): void;
 
   /**
    * Drive an input pin to a specific value
    * Typically called before step() to set switch/input pin states.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    * @param label - Component label (e.g. "SW0", "Clk")
    * @param value - Numeric value to set
    * @throws FacadeError if label not found or is not an input component
    */
-  setInput(engine: SimulationEngine, label: string, value: number): void;
+  setInput(coordinator: SimulationCoordinator | SimulationEngine, label: string, value: number): void;
 
   /**
    * Read the current value of an output pin
    * Returns the last computed value. Call step() first to update.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    * @param label - Component label
    * @returns The numeric value
    * @throws FacadeError if label not found or is not an output component
    */
-  readOutput(engine: SimulationEngine, label: string): number;
+  readOutput(coordinator: SimulationCoordinator | SimulationEngine, label: string): number;
 
   /**
    * Snapshot all signal values in the circuit
    * For diagnostics, saving/restoring state, and test assertions.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
    * @returns Map of net label (or ID string) to current value
    */
-  readAllSignals(engine: SimulationEngine): Record<string, number>;
+  readAllSignals(coordinator: SimulationCoordinator | SimulationEngine): Record<string, number>;
 
   // ============================================
   // Testing: Run automated test vectors
@@ -165,7 +166,7 @@ export interface SimulatorFacade {
    * @returns TestResults with pass/fail counts and per-vector details
    * @throws FacadeError if no test data is available from either source
    */
-  runTests(engine: SimulationEngine, circuit: Circuit, testData?: string): TestResults;
+  runTests(coordinator: SimulationCoordinator | SimulationEngine, circuit: Circuit, testData?: string): TestResults;
 
   // ============================================
   // File I/O: Load and save circuits

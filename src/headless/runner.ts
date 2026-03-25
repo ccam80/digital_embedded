@@ -10,6 +10,7 @@
 
 import type { Circuit } from "@/core/circuit";
 import type { Engine, SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
+import type { SimulationCoordinator } from "@/compile/coordinator-types.js";
 import type { DcOpResult } from "@/core/analog-engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
 import { OscillationError } from "@/core/errors";
@@ -85,22 +86,11 @@ export class SimulationRunner {
    * @param engineFactory  Optional factory to create a non-default engine (digital path only).
    * @returns              A SimulationEngine ready for stepping.
    */
-  compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationEngine {
+  compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationCoordinator {
     if (circuit.metadata.engineType === "analog") {
       const unified = compileUnified(circuit, this._registry, getTransistorModels());
 
-      const coordinator = new DefaultSimulationCoordinator(unified);
-
-      if (unified.analog !== null) {
-        this._records.set(unified.analog as unknown as Engine, { coordinator });
-        return unified.analog as unknown as SimulationEngine;
-      }
-
-      // No analog components — build a synthetic result object that carries
-      // the unsupported-component-in-analog diagnostics for callers that inspect them.
-      const syntheticResult = {
-        diagnostics: [] as Array<{ code: string; severity: string; message: string }>,
-      };
+      // Check for digital-only components in analog circuit
       const INFRASTRUCTURE = new Set([
         "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
         "Splitter", "Driver", "NotConnected", "ScopeTrigger",
@@ -110,15 +100,21 @@ export class SimulationRunner {
         const def = this._registry.get(el.typeId);
         if (!def) continue;
         if (def.models?.analog === undefined && def.models?.digital !== undefined) {
-          syntheticResult.diagnostics.push({
+          unified.diagnostics.push({
             code: "unsupported-component-in-analog",
             severity: "error",
             message: `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
           });
         }
       }
-      this._records.set(syntheticResult as unknown as Engine, { coordinator });
-      return syntheticResult as unknown as SimulationEngine;
+
+      const coordinator = new DefaultSimulationCoordinator(unified);
+
+      const engineKey = (unified.analog as unknown as Engine)
+        ?? (coordinator as unknown as Engine);
+      this._records.set(engineKey, { coordinator });
+      this._records.set(coordinator as unknown as Engine, { coordinator });
+      return coordinator;
     }
 
     const unified = compileUnified(circuit, this._registry);
@@ -127,12 +123,13 @@ export class SimulationRunner {
     if (engineFactory !== undefined) {
       const overrideEngine = engineFactory(unified.digital!);
       this._records.set(overrideEngine, { coordinator });
-      return overrideEngine;
+    } else {
+      const digitalEngine = coordinator.digitalBackend!;
+      this._records.set(digitalEngine, { coordinator });
     }
+    this._records.set(coordinator as unknown as Engine, { coordinator });
 
-    const digitalEngine = coordinator.digitalBackend!;
-    this._records.set(digitalEngine, { coordinator });
-    return digitalEngine;
+    return coordinator;
   }
 
   // -------------------------------------------------------------------------
@@ -143,15 +140,25 @@ export class SimulationRunner {
    * Execute one propagation cycle.
    */
   step(engine: SimulationEngine): void {
-    engine.step();
+    const record = this._records.get(engine);
+    if (record !== undefined) {
+      record.coordinator.step();
+    } else {
+      engine.step();
+    }
   }
 
   /**
    * Execute N propagation cycles.
    */
   run(engine: SimulationEngine, cycles: number): void {
+    const record = this._records.get(engine);
     for (let i = 0; i < cycles; i++) {
-      engine.step();
+      if (record !== undefined) {
+        record.coordinator.step();
+      } else {
+        engine.step();
+      }
     }
   }
 
@@ -173,7 +180,11 @@ export class SimulationRunner {
 
     for (let iter = 0; iter < maxIterations; iter++) {
       const before = this._snapshotSignals(engine, netCount);
-      engine.step();
+      if (record !== undefined) {
+        record.coordinator.step();
+      } else {
+        engine.step();
+      }
       const after = this._snapshotSignals(engine, netCount);
 
       let stable = true;
@@ -289,10 +300,28 @@ export class SimulationRunner {
   // Private helpers
   // -------------------------------------------------------------------------
 
+  /**
+   * Resolve the underlying SimulationEngine from a coordinator or engine.
+   * When compile() returns a SimulationCoordinator, callers pass it back
+   * to step/run/runToStable. This extracts the backend engine for methods
+   * that need getSignalRaw() or other SimulationEngine-specific APIs.
+   */
+  private _resolveBackendEngine(engineOrCoord: SimulationEngine): SimulationEngine {
+    const record = this._records.get(engineOrCoord);
+    if (record !== undefined) {
+      const backend = record.coordinator.digitalBackend ?? record.coordinator.analogBackend;
+      if (backend !== null) {
+        return (backend as unknown as SimulationEngine);
+      }
+    }
+    return engineOrCoord;
+  }
+
   private _snapshotSignals(engine: SimulationEngine, netCount: number): Uint32Array {
+    const resolved = this._resolveBackendEngine(engine);
     const snap = new Uint32Array(netCount);
     for (let i = 0; i < netCount; i++) {
-      snap[i] = engine.getSignalRaw(i);
+      snap[i] = resolved.getSignalRaw(i);
     }
     return snap;
   }

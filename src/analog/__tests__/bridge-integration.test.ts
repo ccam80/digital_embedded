@@ -32,6 +32,8 @@ import { makeResistor, makeVoltageSource, makeCapacitor } from "../test-elements
 import { EngineState } from "../../core/engine-interface.js";
 import { BitVector } from "../../core/signal.js";
 import { DigitalEngine } from "../../engine/digital-engine.js";
+import { DefaultSimulationCoordinator } from "../../compile/coordinator.js";
+import type { CompiledCircuitUnified } from "../../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // CMOS 3.3V electrical spec used throughout
@@ -54,7 +56,7 @@ const CMOS_3V3: ResolvedPinElectrical = {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a minimal opaque CompiledCircuit that MixedSignalCoordinator's
+ * Build a minimal opaque CompiledCircuit that the coordinator's
  * DigitalEngine.init() accepts. netCount must be >= max net ID used.
  * step() is effectively a no-op (no evaluation order).
  */
@@ -82,6 +84,21 @@ function buildCompiledCircuit(opts: {
     elementToCircuitElement: new Map(),
     bridges: opts.bridges ?? [],
   });
+}
+
+/**
+ * Wrap a ConcreteCompiledAnalogCircuit in a CompiledCircuitUnified for use
+ * with DefaultSimulationCoordinator.
+ */
+function wrapAsUnified(compiled: ConcreteCompiledAnalogCircuit): CompiledCircuitUnified {
+  return {
+    digital: null,
+    analog: compiled,
+    bridges: [],
+    wireSignalMap: new Map(),
+    labelSignalMap: new Map(),
+    diagnostics: [],
+  };
 }
 
 // ===========================================================================
@@ -289,18 +306,16 @@ describe("Integration", () => {
       bridges: [bridge],
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    // Use DefaultSimulationCoordinator which owns bridge sync
+    const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
+    const engine = coord.analogBackend as MNAEngine;
 
     // DC OP at LOW: node ≈ 0V
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
     expect(engine.getNodeVoltage(ADAPTER_NODE)).toBeLessThan(0.1);
 
     // Switch to HIGH: set inner engine's output net so the coordinator
     // reads HIGH and drives the output adapter HIGH on each step.
-    const coordinator = (engine as any)._coordinator;
-    const innerEngine: DigitalEngine = coordinator._bridgeStates[0].innerEngine;
+    const innerEngine: DigitalEngine = (coord as any)._bridgeStates[0].innerEngine;
     innerEngine.setSignalValue(0, BitVector.fromNumber(1, 1)); // output net 0 = HIGH
 
     // Run transient for 10ns with tight timestep (>> τ ≈ 250ps)
@@ -309,7 +324,7 @@ describe("Integration", () => {
     let steps = 0;
     const TARGET_TIME = 10e-9; // 10ns
     while (engine.simTime < TARGET_TIME && steps < 200000) {
-      engine.step();
+      coord.step();
       steps++;
       if (engine.getState() === EngineState.ERROR) break;
     }
@@ -321,6 +336,8 @@ describe("Integration", () => {
     const vFinal = engine.getNodeVoltage(ADAPTER_NODE);
     // Within 1% of steady state
     expect(Math.abs(vFinal - vSteadyExpected) / vSteadyExpected).toBeLessThan(0.01);
+
+    coord.dispose();
   });
 
   it("counter_counts_on_threshold_crossings", () => {
@@ -383,13 +400,12 @@ describe("Integration", () => {
       bridges: [bridge],
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    // Use DefaultSimulationCoordinator which owns bridge sync
+    const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
+    const engine = coord.analogBackend as MNAEngine;
 
     // Access the inner engine through coordinator private state
-    const coordinator = (engine as any)._coordinator;
-    expect(coordinator).not.toBeNull();
-    const innerEngine: DigitalEngine = coordinator._bridgeStates[0].innerEngine;
+    const innerEngine: DigitalEngine = (coord as any)._bridgeStates[0].innerEngine;
 
     // Set output nets to represent count=4 (binary 0100):
     // Q0=0(net1), Q1=0(net2), Q2=1(net3), Q3=0(net4)
@@ -398,14 +414,13 @@ describe("Integration", () => {
     innerEngine.setSignalValue(3, BitVector.fromNumber(1, 1)); // Q2 = 1
     innerEngine.setSignalValue(4, BitVector.fromNumber(0, 1)); // Q3 = 0
 
-    // Simulate a threshold crossing: input at 3.3V (above vIH=2.0V)
-    // readMnaVoltage(nodeId, v) reads v[nodeId-1], so use nodeId-1 as index
-    const voltages = new Float64Array(5);
-    voltages[IN_ADAPTER_NODE - 1] = 3.3;
-    coordinator.syncBeforeAnalogStep(voltages);
+    // Simulate a threshold crossing: set analog voltage at input node and run sync
+    const analog = coord.analogBackend as any;
+    analog._voltages[IN_ADAPTER_NODE - 1] = 3.3;
+    (coord as any)._syncBeforeAnalogStep();
 
     // After sync, Q2 should be HIGH, others LOW
-    const state = coordinator._bridgeStates[0];
+    const state = (coord as any)._bridgeStates[0];
     expect(state.prevOutputBits[0]).toBe(false); // Q0 = 0
     expect(state.prevOutputBits[1]).toBe(false); // Q1 = 0
     expect(state.prevOutputBits[2]).toBe(true);  // Q2 = 1
@@ -424,6 +439,8 @@ describe("Integration", () => {
     // Q0 at MNA node Q0_ADAPTER_NODE=2 → solver index 1 → nodeVoltages[1]
     const vQ0 = dcResult.nodeVoltages[Q0_ADAPTER_NODE - 1]!;
     expect(vQ0).toBeLessThan(0.1);
+
+    coord.dispose();
   });
 
   it("bidirectional_nesting", () => {
@@ -473,21 +490,21 @@ describe("Integration", () => {
       bridges: [bridge],
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    // Use DefaultSimulationCoordinator which owns bridge sync
+    const coord = new DefaultSimulationCoordinator(wrapAsUnified(compiled));
+    const engine = coord.analogBackend as MNAEngine;
 
     // Pre-set the inner engine's output net to HIGH (buffer output = input HIGH)
-    const coordinator = (engine as any)._coordinator;
-    const innerEngine: DigitalEngine = coordinator._bridgeStates[0].innerEngine;
+    const innerEngine: DigitalEngine = (coord as any)._bridgeStates[0].innerEngine;
     innerEngine.setSignalValue(1, BitVector.fromNumber(1, 1));
 
-    // Run syncBeforeAnalogStep with Vs=3.3V at solver[0]
-    const voltages = new Float64Array(3); // matrixSize=3
-    voltages[0] = 3.3; // input adapter reads from solver[0]
-    coordinator.syncBeforeAnalogStep(voltages);
+    // Set analog voltage at input node and run sync
+    const analog = coord.analogBackend as any;
+    analog._voltages[0] = 3.3; // input adapter reads from solver[0]
+    (coord as any)._syncBeforeAnalogStep();
 
     // Output adapter should now be HIGH
-    const state = coordinator._bridgeStates[0];
+    const state = (coord as any)._bridgeStates[0];
     expect(state.prevOutputBits[0]).toBe(true);
 
     // Run DC OP: output node (solver[1]) should be at vOH × R_load/(rOut+R_load)
@@ -500,5 +517,7 @@ describe("Integration", () => {
     // Node2 (solver[1]) = bridge output HIGH → vOH × R_load/(rOut+R_load)
     const expectedV = CMOS_3V3.vOH * 10000 / (CMOS_3V3.rOut + 10000);
     expect(result.nodeVoltages[1]).toBeCloseTo(expectedV, 1);
+
+    coord.dispose();
   });
 });

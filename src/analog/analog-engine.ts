@@ -25,7 +25,6 @@ import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { AnalogElement } from "./element.js";
-import { MixedSignalCoordinator } from "./mixed-signal-coordinator.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 
 // ---------------------------------------------------------------------------
@@ -99,11 +98,6 @@ export class MNAEngine implements AnalogEngine {
   private _lastDt: number = 0;
 
   // -------------------------------------------------------------------------
-  // Mixed-signal coordinator (null when no bridge instances present)
-  // -------------------------------------------------------------------------
-  private _coordinator: MixedSignalCoordinator | null = null;
-
-  // -------------------------------------------------------------------------
   // Solver configuration
   // -------------------------------------------------------------------------
   private _params: SimulationParams = { ...DEFAULT_SIMULATION_PARAMS };
@@ -138,19 +132,6 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._lastDt = 0;
 
-    // Create coordinator if the compiled circuit has bridge instances
-    const compiledWithBridges = circuit as CompiledWithBridges;
-    if (
-      compiledWithBridges.bridges !== undefined &&
-      compiledWithBridges.bridges.length > 0
-    ) {
-      this._coordinator = new MixedSignalCoordinator(this, compiledWithBridges.bridges);
-      this._coordinator.setDiagnosticCollector(this._diagnostics);
-      this._coordinator.init();
-    } else {
-      this._coordinator = null;
-    }
-
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -165,9 +146,6 @@ export class MNAEngine implements AnalogEngine {
     this._lastDt = 0;
     this._timestep = new TimestepController(this._params);
     this._diagnostics.clear();
-    if (this._coordinator !== null) {
-      this._coordinator.reset();
-    }
     this._stepCount = 0;
     for (const obs of this._measurementObservers) {
       obs.onReset();
@@ -177,10 +155,6 @@ export class MNAEngine implements AnalogEngine {
 
   /** Release all resources. Engine must not be used after dispose(). */
   dispose(): void {
-    if (this._coordinator !== null) {
-      this._coordinator.dispose();
-      this._coordinator = null;
-    }
     this._compiled = null;
     this._voltages = new Float64Array(0);
     this._prevVoltages = new Float64Array(0);
@@ -208,11 +182,6 @@ export class MNAEngine implements AnalogEngine {
     const params = this._params;
 
     this._prevVoltages.set(this._voltages);
-
-    // Synchronize digital inner engines before starting the NR solve
-    if (this._coordinator !== null) {
-      this._coordinator.syncBeforeAnalogStep(this._voltages);
-    }
 
     let dt = this._timestep.currentDt;
     const method = this._timestep.currentMethod;
@@ -363,11 +332,6 @@ export class MNAEngine implements AnalogEngine {
       if (el.updateState) {
         el.updateState(dt, this._voltages);
       }
-    }
-
-    // Check for threshold crossings and re-evaluate digital engines if needed
-    if (this._coordinator !== null) {
-      this._coordinator.syncAfterAnalogStep(this._voltages);
     }
 
     // Notify measurement observers

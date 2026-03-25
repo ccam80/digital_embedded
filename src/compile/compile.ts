@@ -44,45 +44,36 @@ import type { Diagnostic } from "../headless/netlist-types.js";
 /**
  * Compile a circuit through the unified Phase 3 pipeline.
  *
- * Accepts either a raw Circuit or a pre-flattened FlattenResult (from
- * flattenCircuit). When a FlattenResult is provided its crossEngineBoundaries
- * are passed through to compileAnalogPartition for bridge adapter creation.
- *
- * @param circuitOrResult   The visual circuit model or a pre-flattened result.
+ * @param inputCircuit      The visual circuit model.
  * @param registry          Component registry providing definitions and models.
  * @param transistorModels  Optional transistor model registry for analog BJT/MOSFET.
  * @returns                 CompiledCircuitUnified with both domains, bridges, and maps.
  */
 export function compileUnified(
-  circuitOrResult: Circuit | FlattenResult,
+  inputCircuit: Circuit,
   registry: ComponentRegistry,
   transistorModels?: TransistorModelRegistry,
 ): CompiledCircuitUnified {
   const diagnostics: Diagnostic[] = [];
 
   // -------------------------------------------------------------------------
-  // Step 1: Unwrap input — accept Circuit or FlattenResult
+  // Step 1: Flatten subcircuits if present
   // -------------------------------------------------------------------------
 
   let circuit: Circuit;
   let crossEngineBoundaries: FlattenResult["crossEngineBoundaries"];
 
-  if ("crossEngineBoundaries" in circuitOrResult) {
-    circuit = circuitOrResult.circuit;
-    crossEngineBoundaries = circuitOrResult.crossEngineBoundaries;
+  // Only flatten when there are subcircuit elements — flattening creates new
+  // Wire objects which would break wireToNetId identity for callers that hold
+  // references to the original Wire instances.
+  const hasSubcircuits = inputCircuit.elements.some(isSubcircuitHost);
+  if (hasSubcircuits) {
+    const flattenResult = flattenCircuit(inputCircuit, registry);
+    circuit = flattenResult.circuit;
+    crossEngineBoundaries = flattenResult.crossEngineBoundaries;
   } else {
-    // Only flatten when there are subcircuit elements — flattening creates new
-    // Wire objects which would break wireToNetId identity for callers that hold
-    // references to the original Wire instances.
-    const hasSubcircuits = circuitOrResult.elements.some(isSubcircuitHost);
-    if (hasSubcircuits) {
-      const flattenResult = flattenCircuit(circuitOrResult, registry);
-      circuit = flattenResult.circuit;
-      crossEngineBoundaries = flattenResult.crossEngineBoundaries;
-    } else {
-      circuit = circuitOrResult;
-      crossEngineBoundaries = [];
-    }
+    circuit = inputCircuit;
+    crossEngineBoundaries = [];
   }
 
   const engineType = circuit.metadata.engineType;
@@ -231,10 +222,12 @@ export function compileUnified(
           break;
         }
       }
-      // If no wires, fall back to pin-based lookup via labelToNodeId matching
-      // is not possible here; use 0 (ground) as fallback
       if (!groupIdToAnalogNodeId.has(group.groupId)) {
-        groupIdToAnalogNodeId.set(group.groupId, 0);
+        diagnostics.push({
+          severity: "warning",
+          code: "unmapped-analog-group",
+          message: `Analog connectivity group ${group.groupId} has no wire-based node mapping`,
+        });
       }
     }
   }

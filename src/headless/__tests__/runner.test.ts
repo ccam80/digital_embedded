@@ -490,10 +490,9 @@ describe("AnalogDispatch", () => {
     // The half-adder contains digital-only components (AND, XOR — no analogFactory).
     // The analog compiler now emits unsupported-component-in-analog diagnostics
     // instead of throwing, and returns the compiled circuit.
-    const engine = runner.compile(circuit);
-    // The compiled result is the ConcreteCompiledAnalogCircuit (runner casts it as engine).
-    const compiled = engine as unknown as { diagnostics: Array<{ code: string }> };
-    const codes = compiled.diagnostics.map((d) => d.code);
+    const coordinator = runner.compile(circuit);
+    // Diagnostics are on the unified compiled output
+    const codes = coordinator.compiled.diagnostics.map((d) => d.code);
     expect(codes).toContain("unsupported-component-in-analog");
   });
 

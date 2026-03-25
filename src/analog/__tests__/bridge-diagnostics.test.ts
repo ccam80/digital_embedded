@@ -7,14 +7,20 @@
  *  - bridge-indeterminate-input: NOT emitted when voltage stays at a valid level
  *  - bridge-oscillating-input: emitted after 20 consecutive threshold crossings
  *  - bridge-impedance-mismatch: emitted when source R > 100 × R_in
+ *
+ * Runtime diagnostics (indeterminate, oscillating) are tested through
+ * DefaultSimulationCoordinator which owns the bridge sync logic.
+ * The compile-time diagnostic (impedance-mismatch) is tested through
+ * compileUnified().
  */
 
 import { describe, it, expect } from "vitest";
-import { MixedSignalCoordinator } from "../mixed-signal-coordinator.js";
+import { DefaultSimulationCoordinator } from "../../compile/coordinator.js";
 import { makeBridgeInputAdapter } from "../bridge-adapter.js";
 import type { BridgeInstance } from "../bridge-instance.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { DiagnosticCollector } from "../diagnostics.js";
+import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -24,10 +30,10 @@ import { PropertyBag } from "../../core/properties.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
 import type { Rect, RenderContext } from "../../core/renderer-interface.js";
-import type { CrossEngineBoundary } from "../../engine/cross-engine-boundary.js";
-import type { FlattenResult, SubcircuitHost } from "../../engine/flatten.js";
+import type { SubcircuitHost } from "../../engine/flatten.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import type { CompiledCircuitUnified } from "../../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // Shared electrical spec — CMOS 3.3V with vIL=0.8, vIH=2.0
@@ -54,15 +60,6 @@ function makeMinimalCompiled(netCount: number): object {
 }
 
 // ---------------------------------------------------------------------------
-// Mock MNAEngine — only needs addBreakpoint and simTime
-// ---------------------------------------------------------------------------
-
-class MockMNAEngine {
-  simTime: number = 0;
-  addBreakpoint(_time: number): void {}
-}
-
-// ---------------------------------------------------------------------------
 // Build a BridgeInstance with a single labeled input adapter
 // ---------------------------------------------------------------------------
 
@@ -84,19 +81,58 @@ function makeSingleInputBridge(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: run coordinator for N timesteps with a fixed voltage
+// Helper: build a DefaultSimulationCoordinator with a bridge instance
 // ---------------------------------------------------------------------------
 
-function runStepsWithVoltage(
-  coordinator: MixedSignalCoordinator,
+function makeCoordinatorWithBridge(
+  bridge: BridgeInstance,
+  nodeCount: number,
+): DefaultSimulationCoordinator {
+  const analogCompiled = new ConcreteCompiledAnalogCircuit({
+    nodeCount,
+    branchCount: 0,
+    elements: [],
+    labelToNodeId: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    elementToCircuitElement: new Map(),
+    bridges: [bridge],
+  });
+  const unified: CompiledCircuitUnified = {
+    digital: null,
+    analog: analogCompiled,
+    bridges: [],
+    wireSignalMap: new Map(),
+    labelSignalMap: new Map(),
+    diagnostics: [],
+  };
+  return new DefaultSimulationCoordinator(unified);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: set MNA engine voltages and run bridge sync steps
+// ---------------------------------------------------------------------------
+
+function setAnalogVoltage(
+  coordinator: DefaultSimulationCoordinator,
+  nodeId: number,
+  voltage: number,
+): void {
+  const analog = coordinator.analogBackend as any;
+  if (analog._voltages && analog._voltages.length > 0) {
+    analog._voltages[nodeId - 1] = voltage;
+  }
+}
+
+function runBridgeSyncSteps(
+  coordinator: DefaultSimulationCoordinator,
   nodeId: number,
   voltage: number,
   steps: number,
 ): void {
-  const voltages = new Float64Array(nodeId + 1);
-  voltages[nodeId - 1] = voltage;
   for (let i = 0; i < steps; i++) {
-    coordinator.syncBeforeAnalogStep(voltages);
+    setAnalogVoltage(coordinator, nodeId, voltage);
+    (coordinator as any)._syncBeforeAnalogStep();
   }
 }
 
@@ -111,26 +147,21 @@ describe("Diagnostics", () => {
       const INPUT_NET = 0;
 
       const bridge = makeSingleInputBridge(INPUT_NODE, INPUT_NET, "sub:A");
-      const mockEngine = new MockMNAEngine();
-      const coordinator = new MixedSignalCoordinator(mockEngine as any, [bridge]);
+      const coordinator = makeCoordinatorWithBridge(bridge, 2);
       const collector = new DiagnosticCollector();
       coordinator.setDiagnosticCollector(collector);
-      coordinator.init();
 
       // 1.5V is between vIL (0.8V) and vIH (2.0V) — indeterminate
-      const indeterminateVoltage = 1.5;
-
-      // Run 15 timesteps (threshold is N=10 consecutive)
-      runStepsWithVoltage(coordinator, INPUT_NODE, indeterminateVoltage, 15);
+      runBridgeSyncSteps(coordinator, INPUT_NODE, 1.5, 15);
 
       const diags = collector.getDiagnostics();
       const indetermDiags = diags.filter((d) => d.code === "bridge-indeterminate-input");
 
       expect(indetermDiags.length).toBeGreaterThanOrEqual(1);
-      // Diagnostic must include pin label
       expect(indetermDiags[0]!.summary).toContain("sub:A");
-      // Diagnostic must include the voltage
       expect(indetermDiags[0]!.summary).toContain("1.500");
+
+      coordinator.dispose();
     });
   });
 
@@ -140,18 +171,18 @@ describe("Diagnostics", () => {
       const INPUT_NET = 0;
 
       const bridge = makeSingleInputBridge(INPUT_NODE, INPUT_NET, "sub:B");
-      const mockEngine = new MockMNAEngine();
-      const coordinator = new MixedSignalCoordinator(mockEngine as any, [bridge]);
+      const coordinator = makeCoordinatorWithBridge(bridge, 2);
       const collector = new DiagnosticCollector();
       coordinator.setDiagnosticCollector(collector);
-      coordinator.init();
 
       // 3.3V is well above vIH (2.0V) — unambiguously logic high
-      runStepsWithVoltage(coordinator, INPUT_NODE, 3.3, 100);
+      runBridgeSyncSteps(coordinator, INPUT_NODE, 3.3, 100);
 
       const diags = collector.getDiagnostics();
       const indetermDiags = diags.filter((d) => d.code === "bridge-indeterminate-input");
       expect(indetermDiags.length).toBe(0);
+
+      coordinator.dispose();
     });
   });
 
@@ -161,44 +192,32 @@ describe("Diagnostics", () => {
       const INPUT_NET = 0;
 
       const bridge = makeSingleInputBridge(INPUT_NODE, INPUT_NET, "sub:CLK");
-      const mockEngine = new MockMNAEngine();
-      const coordinator = new MixedSignalCoordinator(mockEngine as any, [bridge]);
+      const coordinator = makeCoordinatorWithBridge(bridge, 2);
       const collector = new DiagnosticCollector();
       coordinator.setDiagnosticCollector(collector);
-      coordinator.init();
 
-      // Alternate between 1.9V (just below vIH=2.0) and 2.1V (just above vIH=2.0)
-      // so the logic level interpretation changes on every timestep.
-      // We also run syncAfterAnalogStep to drive the oscillating-count logic.
-      const lowVoltage = 1.9;   // readLogicLevel → undefined (indeterminate)
-      const highVoltage = 2.1;  // readLogicLevel → true
+      const lowVoltage = 1.9;
+      const highVoltage = 2.1;
 
-      // Prime the previous voltage: first step with highVoltage so prevInputVoltages is set
-      const voltagesHigh = new Float64Array(INPUT_NODE + 1);
-      voltagesHigh[INPUT_NODE - 1] = highVoltage;
-      coordinator.syncBeforeAnalogStep(voltagesHigh);
-      coordinator.syncAfterAnalogStep(voltagesHigh);
+      // Prime: first step with highVoltage so prevInputVoltages is set
+      setAnalogVoltage(coordinator, INPUT_NODE, highVoltage);
+      (coordinator as any)._syncBeforeAnalogStep();
+      (coordinator as any)._syncAfterAnalogStep();
 
-      // Now alternate for 25 steps to trigger the M=20 threshold
+      // Alternate for 25 steps to trigger the M=20 threshold
       for (let step = 0; step < 25; step++) {
         const v = step % 2 === 0 ? lowVoltage : highVoltage;
-        const voltages = new Float64Array(INPUT_NODE + 1);
-        voltages[INPUT_NODE - 1] = v;
-
-        const prevV = step % 2 === 0 ? highVoltage : lowVoltage;
-        const prevVoltages = new Float64Array(INPUT_NODE + 1);
-        prevVoltages[INPUT_NODE - 1] = prevV;
-
-        // syncAfterAnalogStep compares currVoltage to prevInputVoltages[i]
-        // which was set in the previous call
-        coordinator.syncBeforeAnalogStep(voltages);
-        coordinator.syncAfterAnalogStep(voltages);
+        setAnalogVoltage(coordinator, INPUT_NODE, v);
+        (coordinator as any)._syncBeforeAnalogStep();
+        (coordinator as any)._syncAfterAnalogStep();
       }
 
       const diags = collector.getDiagnostics();
       const oscillatingDiags = diags.filter((d) => d.code === "bridge-oscillating-input");
       expect(oscillatingDiags.length).toBeGreaterThanOrEqual(1);
       expect(oscillatingDiags[0]!.summary).toContain("sub:CLK");
+
+      coordinator.dispose();
     });
   });
 });
@@ -338,12 +357,12 @@ describe("bridge-impedance-mismatch", () => {
     // Default rIn from logic family = 1e7 Ω.
     // Threshold: R_source > 100 * rIn = 1e9 Ω → 2e9 > 1e9 → diagnostic emitted.
 
-    // Inner digital circuit: a single In component labeled "A" with output pin at (2,1).
-    // The digital compiler uses labelToNetId to map "A" → net ID via In/Out elements.
+    // Inner digital circuit: a single In component labeled "SIG" with output pin at (2,1).
+    // The label must match the subcircuit host's pin label so flattenCircuit's
+    // buildPinMappings can resolve inner↔outer pin correspondence.
     const innerCircuit = new Circuit({ engineType: "digital" });
 
-    // PropertyBag with label="A" so compileCircuit can build labelToNetId["A"]
-    const innerInProps = new PropertyBag([["label", "A"]]);
+    const innerInProps = new PropertyBag([["label", "SIG"]]);
 
     // The In element needs an OUTPUT pin so the compiler assigns it a net.
     // Position its output pin at (2,1); wire connects it to (4,1) to give a net.
@@ -429,31 +448,13 @@ describe("bridge-impedance-mismatch", () => {
     registry.register(makeAnalogStubDef("HighZResistor", 2));
     registry.register(makeDigitalInDef());
 
-    // CrossEngineBoundary: subcircuit's "SIG" pin maps to inner "A" (direction "in")
-    const boundary: CrossEngineBoundary = {
-      subcircuitElement: subcircuitEl,
-      internalCircuit: innerCircuit,
-      internalEngineType: "digital",
-      outerEngineType: "analog",
-      pinMappings: [
-        { pinLabel: "SIG", direction: "in", innerLabel: "A", bitWidth: 1 },
-      ],
-      instanceName: "DigSub_0",
-    };
-
-    const flattenResult: FlattenResult = {
-      circuit: outerCircuit,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outerCircuit, registry).analog!;
 
     const mismatchDiags = compiled.diagnostics.filter(
       (d) => d.code === "bridge-impedance-mismatch",
     );
     expect(mismatchDiags.length).toBeGreaterThanOrEqual(1);
     expect(mismatchDiags[0]!.severity).toBe("info");
-    // Diagnostic summary must mention the pin label
-    expect(mismatchDiags[0]!.summary).toContain("DigSub_0:SIG");
+    expect(mismatchDiags[0]!.summary).toContain("SIG");
   });
 });

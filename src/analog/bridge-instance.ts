@@ -1,7 +1,7 @@
 /**
  * BridgeInstance — compiled inner circuit + bridge adapter mappings.
  *
- * Holds everything the MixedSignalCoordinator needs to synchronize one
+ * Holds everything the DefaultSimulationCoordinator needs to synchronize one
  * digital subcircuit running inside an analog simulation:
  *   - The compiled inner circuit (for the digital engine)
  *   - Output adapters (digital→analog) and input adapters (analog→digital)
@@ -16,7 +16,7 @@ import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.j
  * Compiled representation of one cross-engine boundary.
  *
  * Produced by the analog compiler for each CrossEngineBoundary in the
- * FlattenResult. Consumed by the MixedSignalCoordinator.
+ * FlattenResult. Consumed by the DefaultSimulationCoordinator.
  */
 export interface BridgeInstance {
   /**

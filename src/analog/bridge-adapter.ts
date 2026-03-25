@@ -4,7 +4,7 @@
  * BridgeOutputAdapter wraps a DigitalOutputPinModel for use at a cross-engine
  * boundary. Unlike BehavioralGateElement (which evaluates a truth table to
  * compute its own output), the bridge adapter receives its logic level from
- * the MixedSignalCoordinator after each digital engine step.
+ * the DefaultSimulationCoordinator after each digital engine step.
  *
  * BridgeInputAdapter wraps a DigitalInputPinModel for use at a cross-engine
  * boundary. It stamps input loading into the analog MNA matrix and exposes
@@ -30,7 +30,7 @@ import {
  *
  * Stamps a Norton equivalent (conductance 1/rOut + current source V_out/rOut)
  * using DigitalOutputPinModel. The logic level is set externally by the
- * MixedSignalCoordinator — never computed internally.
+ * DefaultSimulationCoordinator — never computed internally.
  *
  * isNonlinear is true because the output level can change between timesteps
  * when the coordinator updates it. stampNonlinear re-stamps the Norton current
@@ -186,7 +186,7 @@ export class BridgeOutputAdapter implements AnalogElement {
  *
  * Stamps input loading (conductance 1/rIn to ground) and a C_in companion
  * model using DigitalInputPinModel. Exposes readLogicLevel() so the
- * MixedSignalCoordinator can threshold-detect the analog node voltage and
+ * DefaultSimulationCoordinator can threshold-detect the analog node voltage and
  * feed the result to the inner digital engine.
  *
  * isNonlinear is false — input loading is a linear resistor.

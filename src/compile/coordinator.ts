@@ -5,7 +5,14 @@
  * domains. Provides a single stepping interface regardless of which backends
  * are active, and notifies registered MeasurementObservers after each step.
  *
- * Spec: unified-component-architecture.md Section 5 (Phase 4, P4-2).
+ * Bridge sync uses BridgeInstance runtime adapters from the compiled analog
+ * circuit. Each BridgeInstance holds BridgeInputAdapter/BridgeOutputAdapter
+ * objects that stamp Norton equivalents into the MNA matrix. The coordinator
+ * creates a DigitalEngine per bridge instance, reads analog voltages via
+ * adapter.readLogicLevel(), and drives output adapters via
+ * adapter.setLogicLevel().
+ *
+ * Spec: unified-component-architecture.md Section 5 (Phase 4, P4-2/P4-6).
  */
 
 import type { SimulationEngine, MeasurementObserver } from '../core/engine-interface.js';
@@ -14,6 +21,9 @@ import { DigitalEngine } from '../engine/digital-engine.js';
 import { MNAEngine } from '../analog/analog-engine.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
+import { readMnaVoltage } from '../analog/digital-pin-model.js';
+import { makeDiagnostic, DiagnosticCollector } from '../analog/diagnostics.js';
+import type { BridgeInstance } from '../analog/bridge-instance.js';
 import type { SimulationCoordinator } from './coordinator-types.js';
 import type {
   CompiledCircuitUnified,
@@ -21,12 +31,29 @@ import type {
   SignalAddress,
   SignalValue,
 } from './types.js';
+import type { ConcreteCompiledAnalogCircuit } from '../analog/compiled-analog-circuit.js';
+
+/**
+ * Per-bridge runtime state for the coordinator's bridge sync logic.
+ * Per-bridge internal state for bridge sync between analog and digital domains.
+ */
+interface BridgeState {
+  innerEngine: DigitalEngine;
+  prevInputBits: boolean[];
+  prevOutputBits: boolean[];
+  prevInputVoltages: number[];
+  indeterminateCount: number[];
+  oscillatingCount: number[];
+}
 
 export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _compiled: CompiledCircuitUnified;
   private readonly _digital: SimulationEngine | null;
   private readonly _analog: AnalogEngine | null;
   private readonly _bridges: BridgeAdapter[];
+  private readonly _bridgeInstances: BridgeInstance[];
+  private readonly _bridgeStates: BridgeState[];
+  private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
   private _stepCount = 0;
 
@@ -47,8 +74,32 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       engine.init(compiled.analog);
       engine.dcOperatingPoint();
       this._analog = engine;
+
+      const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+      this._bridgeInstances = compiledAnalog.bridges ?? [];
     } else {
       this._analog = null;
+      this._bridgeInstances = [];
+    }
+
+    this._bridgeStates = this._bridgeInstances.map((bridge) => {
+      const innerEngine = new DigitalEngine('level');
+      innerEngine.init(bridge.compiledInner);
+      return {
+        innerEngine,
+        prevInputBits: bridge.inputAdapters.map(() => false),
+        prevOutputBits: bridge.outputAdapters.map(() => false),
+        prevInputVoltages: bridge.inputAdapters.map(() => 0),
+        indeterminateCount: bridge.inputAdapters.map(() => 0),
+        oscillatingCount: bridge.inputAdapters.map(() => 0),
+      };
+    });
+
+    if (this._analog !== null) {
+      const mnaEngine = this._analog as MNAEngine;
+      if (typeof mnaEngine.onDiagnostic === 'function') {
+        this._diagnostics = this._createDiagnosticProxy();
+      }
     }
   }
 
@@ -62,6 +113,14 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   reset(): void {
     this._digital?.reset();
     this._analog?.reset();
+    for (const state of this._bridgeStates) {
+      state.innerEngine.reset();
+      state.prevInputBits.fill(false);
+      state.prevOutputBits.fill(false);
+      state.prevInputVoltages.fill(0);
+      state.indeterminateCount.fill(0);
+      state.oscillatingCount.fill(0);
+    }
     this._stepCount = 0;
     for (const obs of this._observers) obs.onReset();
   }
@@ -69,6 +128,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   dispose(): void {
     this._digital?.dispose();
     this._analog?.dispose();
+    for (const state of this._bridgeStates) {
+      state.innerEngine.dispose();
+    }
     this._observers.clear();
   }
 
@@ -78,17 +140,23 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     } else if (this._digital !== null) {
       this._digital.step();
     } else if (this._analog !== null) {
-      this._analog.step();
+      this._stepAnalogWithBridges();
     }
     this._stepCount++;
     for (const obs of this._observers) obs.onStep(this._stepCount);
   }
 
+  /**
+   * Mixed-signal step: both digital and analog backends are active.
+   * Uses BridgeAdapter descriptors (compiled.bridges) for the top-level
+   * digital↔analog net/node mapping, and BridgeInstance runtime adapters
+   * for cross-engine subcircuit boundaries.
+   */
   private _stepMixed(): void {
     const digital = this._digital!;
     const analog = this._analog!;
 
-    if (this._bridges.length === 0) {
+    if (this._bridges.length === 0 && this._bridgeInstances.length === 0) {
       digital.step();
       analog.step();
       return;
@@ -103,21 +171,204 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
     digital.step();
 
-    // Digital-to-analog bridge sync: read digital output values and notify
-    // the analog engine of transitions. Full voltage stamping is handled by
-    // MNAEngine's internal MixedSignalCoordinator via BridgeOutputAdapters
-    // (runtime objects created during analog compilation). The BridgeAdapter
-    // descriptors here don't have stamp methods — Phase 5 will unify these
-    // two bridge representations.
     for (const bridge of this._bridges) {
       if (bridge.direction !== 'digital-to-analog') continue;
       const raw = digital.getSignalRaw(bridge.digitalNetId);
-      if (raw !== 0) {
-        analog.addBreakpoint(analog.simTime);
-      }
+      const high = raw !== 0;
+      this._stampDigitalToAnalog(bridge, high);
+    }
+
+    if (this._bridgeInstances.length > 0) {
+      this._syncBeforeAnalogStep();
     }
 
     analog.step();
+
+    if (this._bridgeInstances.length > 0) {
+      this._syncAfterAnalogStep();
+    }
+  }
+
+  /**
+   * Analog-only step with bridge instances (cross-engine subcircuits).
+   * Uses BridgeInstance runtime adapters for full bridge sync including
+   * Norton equivalent stamping, threshold detection, and diagnostics.
+   */
+  private _stepAnalogWithBridges(): void {
+    const analog = this._analog!;
+
+    if (this._bridgeInstances.length > 0) {
+      this._syncBeforeAnalogStep();
+    }
+
+    analog.step();
+
+    if (this._bridgeInstances.length > 0) {
+      this._syncAfterAnalogStep();
+    }
+  }
+
+  /**
+   * Pre-step bridge sync: read analog voltages at bridge input adapters,
+   * threshold-detect to digital bits, step inner digital engines, read
+   * digital outputs and drive bridge output adapters.
+   */
+  private _syncBeforeAnalogStep(): void {
+    const analog = this._analog!;
+    const voltages = this._getAnalogVoltages();
+
+    for (let b = 0; b < this._bridgeInstances.length; b++) {
+      const bridge = this._bridgeInstances[b]!;
+      const state = this._bridgeStates[b]!;
+
+      for (let i = 0; i < bridge.inputAdapters.length; i++) {
+        const adapter = bridge.inputAdapters[i]!;
+        const netId = bridge.inputPinNetIds[i]!;
+        const nodeId = adapter.inputNodeId;
+        const voltage = readMnaVoltage(nodeId, voltages);
+        const level = adapter.readLogicLevel(voltage);
+
+        if (level === undefined) {
+          state.indeterminateCount[i] = (state.indeterminateCount[i] ?? 0) + 1;
+          if (state.indeterminateCount[i] === 10 && this._diagnostics !== null) {
+            this._diagnostics.emit(
+              makeDiagnostic(
+                'bridge-indeterminate-input',
+                'warning',
+                `Bridge input pin "${adapter.label ?? String(i)}" voltage ${voltage.toFixed(3)}V is in the indeterminate band for 10+ consecutive timesteps`,
+                {
+                  explanation:
+                    `The analog voltage at bridge input "${adapter.label ?? String(i)}" ` +
+                    `(${voltage.toFixed(3)}V) has been between V_IL and V_IH for more than ` +
+                    `10 consecutive timesteps. The digital interpretation is ambiguous. ` +
+                    `Ensure the analog driver can fully swing to a valid logic level.`,
+                },
+              ),
+            );
+          }
+        } else {
+          state.indeterminateCount[i] = 0;
+        }
+
+        const bit = level !== undefined ? level : state.prevInputBits[i] ?? false;
+        state.prevInputBits[i] = bit;
+
+        state.innerEngine.setSignalValue(netId, BitVector.fromNumber(bit ? 1 : 0, 1));
+      }
+
+      state.innerEngine.step();
+
+      let anyOutputChanged = false;
+      for (let o = 0; o < bridge.outputAdapters.length; o++) {
+        const adapter = bridge.outputAdapters[o]!;
+        const netId = bridge.outputPinNetIds[o]!;
+
+        const rawValue = state.innerEngine.getSignalRaw(netId);
+        const signalValue = state.innerEngine.getSignalValue(netId);
+
+        const isHiZ = signalValue.isHighZ && !signalValue.isUndefined;
+        if (isHiZ) {
+          adapter.setHighZ(true);
+        } else {
+          adapter.setHighZ(false);
+          const high = rawValue !== 0;
+          adapter.setLogicLevel(high);
+
+          const prevHigh = state.prevOutputBits[o] ?? false;
+          if (high !== prevHigh) {
+            anyOutputChanged = true;
+          }
+          state.prevOutputBits[o] = high;
+        }
+      }
+
+      if (anyOutputChanged) {
+        analog.addBreakpoint(analog.simTime);
+      }
+    }
+  }
+
+  /**
+   * Post-step bridge sync: check for threshold crossings on analog input
+   * nodes and re-evaluate inner digital engines when crossings are detected.
+   */
+  private _syncAfterAnalogStep(): void {
+    const voltages = this._getAnalogVoltages();
+
+    for (let b = 0; b < this._bridgeInstances.length; b++) {
+      const bridge = this._bridgeInstances[b]!;
+      const state = this._bridgeStates[b]!;
+
+      let crossingDetected = false;
+
+      for (let i = 0; i < bridge.inputAdapters.length; i++) {
+        const adapter = bridge.inputAdapters[i]!;
+        const nodeId = adapter.inputNodeId;
+        const prevVoltage = state.prevInputVoltages[i] ?? 0;
+        const currVoltage = readMnaVoltage(nodeId, voltages);
+
+        const prevLevel = adapter.readLogicLevel(prevVoltage);
+        const currLevel = adapter.readLogicLevel(currVoltage);
+
+        if (prevLevel !== currLevel) {
+          crossingDetected = true;
+          state.oscillatingCount[i] = (state.oscillatingCount[i] ?? 0) + 1;
+          if (state.oscillatingCount[i] === 20 && this._diagnostics !== null) {
+            this._diagnostics.emit(
+              makeDiagnostic(
+                'bridge-oscillating-input',
+                'warning',
+                `Bridge input pin "${adapter.label ?? String(i)}" is oscillating across a threshold for 20+ consecutive timesteps`,
+                {
+                  explanation:
+                    `The analog voltage at bridge input "${adapter.label ?? String(i)}" ` +
+                    `has crossed a logic threshold on every timestep for 20 consecutive steps. ` +
+                    `This may indicate an oscillating signal or simulation instability near a threshold. ` +
+                    `Consider adding hysteresis or a Schmitt trigger at the boundary.`,
+                },
+              ),
+            );
+          }
+        } else {
+          state.oscillatingCount[i] = 0;
+        }
+
+        state.prevInputVoltages[i] = currVoltage;
+      }
+
+      if (crossingDetected) {
+        for (let i = 0; i < bridge.inputAdapters.length; i++) {
+          const adapter = bridge.inputAdapters[i]!;
+          const netId = bridge.inputPinNetIds[i]!;
+          const nodeId = adapter.inputNodeId;
+          const voltage = readMnaVoltage(nodeId, voltages);
+          const level = adapter.readLogicLevel(voltage);
+          const bit = level !== undefined ? level : state.prevInputBits[i] ?? false;
+          state.prevInputBits[i] = bit;
+          state.innerEngine.setSignalValue(netId, BitVector.fromNumber(bit ? 1 : 0, 1));
+        }
+
+        state.innerEngine.step();
+
+        for (let o = 0; o < bridge.outputAdapters.length; o++) {
+          const adapter = bridge.outputAdapters[o]!;
+          const netId = bridge.outputPinNetIds[o]!;
+
+          const rawValue = state.innerEngine.getSignalRaw(netId);
+          const signalValue = state.innerEngine.getSignalValue(netId);
+          const isHiZ = signalValue.isHighZ && !signalValue.isUndefined;
+
+          if (isHiZ) {
+            adapter.setHighZ(true);
+          } else {
+            adapter.setHighZ(false);
+            const high = rawValue !== 0;
+            adapter.setLogicLevel(high);
+            state.prevOutputBits[o] = high;
+          }
+        }
+      }
+    }
   }
 
   readSignal(addr: SignalAddress): SignalValue {
@@ -160,6 +411,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   addMeasurementObserver(observer: MeasurementObserver): void { this._observers.add(observer); }
   removeMeasurementObserver(observer: MeasurementObserver): void { this._observers.delete(observer); }
 
+  /**
+   * Attach a DiagnosticCollector for runtime bridge diagnostics.
+   */
+  setDiagnosticCollector(collector: DiagnosticCollector): void {
+    this._diagnostics = collector;
+  }
+
   private _thresholdVoltage(voltage: number, bridge: BridgeAdapter): number {
     const spec = bridge.electricalSpec;
     const vIH = spec.vIH ?? 2.0;
@@ -169,8 +427,44 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return 0;
   }
 
-  private _digitalToVoltage(high: boolean, bridge: BridgeAdapter): number {
-    const spec = bridge.electricalSpec;
-    return high ? (spec.vOH ?? 3.3) : (spec.vOL ?? 0.0);
+  /**
+   * Drive a digital-to-analog bridge: find the matching BridgeInstance output
+   * adapter and set its logic level. Falls back to breakpoint registration
+   * when no matching runtime adapter exists.
+   */
+  private _stampDigitalToAnalog(bridge: BridgeAdapter, high: boolean): void {
+    for (const inst of this._bridgeInstances) {
+      for (const adapter of inst.outputAdapters) {
+        if (adapter.outputNodeId === bridge.analogNodeId) {
+          adapter.setLogicLevel(high);
+          return;
+        }
+      }
+    }
+    if (high) {
+      this._analog!.addBreakpoint(this._analog!.simTime);
+    }
+  }
+
+  /**
+   * Get the MNA voltage vector from the analog engine.
+   * Uses the engine's getNodeVoltage for each node to build the array.
+   */
+  private _getAnalogVoltages(): Float64Array {
+    const analog = this._analog!;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    const size = compiledAnalog.matrixSize;
+    const voltages = new Float64Array(size);
+    for (let i = 0; i < compiledAnalog.nodeCount; i++) {
+      voltages[i] = analog.getNodeVoltage(i + 1);
+    }
+    return voltages;
+  }
+
+  /**
+   * Create a DiagnosticCollector for the bridge sync logic.
+   */
+  private _createDiagnosticProxy(): DiagnosticCollector {
+    return new DiagnosticCollector();
   }
 }

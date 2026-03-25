@@ -41,13 +41,13 @@ import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import { compileUnified } from "../compile/compile.js";
 import type { CompiledCircuitImpl } from "../engine/compiled-circuit.js";
+import type { LogicFamilyConfig } from "../core/logic-family.js";
+import type { SolverPartition, PartitionedComponent } from "../compile/types.js";
 
 function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry): CompiledCircuitImpl {
   const unified = compileUnified(circuit, registry);
   return unified.digital! as CompiledCircuitImpl;
 }
-import type { LogicFamilyConfig } from "../core/logic-family.js";
-import type { SolverPartition, PartitionedComponent } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // VDD voltage source factory for transistor expansion
@@ -1797,8 +1797,6 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Model library: populate from outerCircuit.metadata.models when provided,
-  // matching the same pattern as compileAnalogCircuit (lines 731-745).
   const modelLibrary = new ModelLibrary();
   if (outerCircuit !== undefined &&
       (outerCircuit.metadata as Record<string, unknown>)["models"] instanceof Map) {

@@ -27,8 +27,6 @@ import { compileUnified } from "@/compile/compile.js";
 import { LOGIC_FAMILY_PRESETS } from "../../core/logic-family.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 import type { SubcircuitHost } from "../../engine/flatten.js";
-import type { CrossEngineBoundary } from "../../engine/cross-engine-boundary.js";
-import type { FlattenResult } from "../../engine/flatten.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement for outer analog circuit leaf elements (Ground, Res)
@@ -375,31 +373,9 @@ function buildOuterAnalogCircuit(innerCircuit: Circuit): TestOuterCircuit {
   // Wire for pin Y: (20,3)-(30,3)
   outer.addWire(new Wire({ x: 20, y: 3 }, { x: 30, y: 3 }));
   // Wire for ground node: connects all ground pins
-  outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+  outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
 
   return { circuit: outer, subcircuitEl, node1: 1, node2: 2, node3: 3 };
-}
-
-// ---------------------------------------------------------------------------
-// Build CrossEngineBoundary from the test data
-// ---------------------------------------------------------------------------
-
-function buildBoundary(
-  subcircuitEl: TestSubcircuitHost,
-  innerCircuit: Circuit,
-): CrossEngineBoundary {
-  return {
-    subcircuitElement: subcircuitEl,
-    internalCircuit: innerCircuit,
-    internalEngineType: "digital",
-    outerEngineType: "analog",
-    pinMappings: [
-      { pinLabel: "A", direction: "in",  innerLabel: "A", bitWidth: 1 },
-      { pinLabel: "B", direction: "in",  innerLabel: "B", bitWidth: 1 },
-      { pinLabel: "Y", direction: "out", innerLabel: "Y", bitWidth: 1 },
-    ],
-    instanceName: "AndGate_0",
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -409,37 +385,24 @@ function buildBoundary(
 describe("BridgeCompilation", () => {
   it("compiles_digital_subcircuit_separately", () => {
     const { circuit: innerCircuit } = buildInnerDigitalCircuit();
-    const { circuit: outerCircuit, subcircuitEl } = buildOuterAnalogCircuit(innerCircuit);
+    const { circuit: outerCircuit } = buildOuterAnalogCircuit(innerCircuit);
     const registry = makeFullRegistry();
 
-    const boundary = buildBoundary(subcircuitEl, innerCircuit);
-    const flattenResult: FlattenResult = {
-      circuit: outerCircuit,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outerCircuit, registry).analog!;
 
     expect(compiled.bridges).toHaveLength(1);
     const bridge = compiled.bridges[0]!;
-    // compiledInner must be a valid compiled circuit with nets
     expect(bridge.compiledInner).toBeDefined();
     expect(bridge.compiledInner.netCount).toBeGreaterThan(0);
-    expect(bridge.instanceName).toBe("AndGate_0");
+    expect(bridge.instanceName).toMatch(/^AndGate_\d+$/);
   });
 
   it("creates_output_adapters", () => {
     const { circuit: innerCircuit } = buildInnerDigitalCircuit();
-    const { circuit: outerCircuit, subcircuitEl } = buildOuterAnalogCircuit(innerCircuit);
+    const { circuit: outerCircuit } = buildOuterAnalogCircuit(innerCircuit);
     const registry = makeFullRegistry();
 
-    const boundary = buildBoundary(subcircuitEl, innerCircuit);
-    const flattenResult: FlattenResult = {
-      circuit: outerCircuit,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outerCircuit, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     // Pin "Y" is direction "out" → should create 1 BridgeOutputAdapter
@@ -454,16 +417,10 @@ describe("BridgeCompilation", () => {
 
   it("creates_input_adapters", () => {
     const { circuit: innerCircuit } = buildInnerDigitalCircuit();
-    const { circuit: outerCircuit, subcircuitEl } = buildOuterAnalogCircuit(innerCircuit);
+    const { circuit: outerCircuit } = buildOuterAnalogCircuit(innerCircuit);
     const registry = makeFullRegistry();
 
-    const boundary = buildBoundary(subcircuitEl, innerCircuit);
-    const flattenResult: FlattenResult = {
-      circuit: outerCircuit,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outerCircuit, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     // Pins "A" and "B" are direction "in" → should create 2 BridgeInputAdapters
@@ -480,16 +437,10 @@ describe("BridgeCompilation", () => {
 
   it("inner_net_ids_mapped", () => {
     const { circuit: innerCircuit } = buildInnerDigitalCircuit();
-    const { circuit: outerCircuit, subcircuitEl } = buildOuterAnalogCircuit(innerCircuit);
+    const { circuit: outerCircuit } = buildOuterAnalogCircuit(innerCircuit);
     const registry = makeFullRegistry();
 
-    const boundary = buildBoundary(subcircuitEl, innerCircuit);
-    const flattenResult: FlattenResult = {
-      circuit: outerCircuit,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outerCircuit, registry).analog!;
 
     const bridge = compiled.bridges[0]!;
     const inner = bridge.compiledInner;
@@ -547,27 +498,11 @@ describe("BridgeCompilation", () => {
 
     // Wire connecting subcircuit Y pin to resistor node
     outer.addWire(new Wire({ x: 20, y: 3 }, { x: 30, y: 3 }));
-    outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
 
     const registry = makeFullRegistry();
 
-    const boundary: CrossEngineBoundary = {
-      subcircuitElement: subcircuitEl,
-      internalCircuit: innerCircuit,
-      internalEngineType: "digital",
-      outerEngineType: "analog",
-      pinMappings: [
-        { pinLabel: "Y", direction: "out", innerLabel: "Y", bitWidth: 1 },
-      ],
-      instanceName: "SingleOut_0",
-    };
-
-    const flattenResult: FlattenResult = {
-      circuit: outer,
-      crossEngineBoundaries: [boundary],
-    };
-
-    const compiled = compileUnified(flattenResult, registry).analog!;
+    const compiled = compileUnified(outer, registry).analog!;
 
     expect(compiled.bridges).toHaveLength(1);
     const bridge = compiled.bridges[0]!;

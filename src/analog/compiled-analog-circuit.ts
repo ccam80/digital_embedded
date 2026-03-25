@@ -95,9 +95,9 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    * Bridge instances for cross-engine subcircuits found during compilation.
    *
    * Each entry corresponds to one CrossEngineBoundary in the FlattenResult.
-   * The MixedSignalCoordinator reads this list during MNAEngine.init() to
-   * create DigitalEngine instances and synchronize signal values at each
-   * analog timestep. Empty when no mixed-signal subcircuits are present.
+   * The DefaultSimulationCoordinator reads this list to create DigitalEngine
+   * instances and synchronize signal values at each analog timestep. Empty
+   * when no mixed-signal subcircuits are present.
    */
   readonly bridges: BridgeInstance[];
 
