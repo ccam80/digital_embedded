@@ -287,7 +287,6 @@ export const RelayDTDefinition: ComponentDefinition = {
   attributeMap: RELAY_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "RelayDT (SPDT) — coil-controlled double-throw contact switch. C connects to T when energised, R when de-energised.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeRelayDT,
@@ -295,6 +294,7 @@ export const RelayDTDefinition: ComponentDefinition = {
       outputSchema: ["A1", "B1", "C1"],
       stateSlotCount: 1,
       switchPins: [2, 3],
+      defaultDelay: 0,
     },
     analog: {
       factory: createRelayDTAnalogElement,

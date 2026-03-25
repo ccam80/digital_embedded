@@ -429,7 +429,6 @@ export const FuseDefinition: ComponentDefinition = {
     "Fuse — one-time irreversible switch with I²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +
     "Simplified: blows when accumulated I²t exceeds the rating.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeFuse,
@@ -437,6 +436,7 @@ export const FuseDefinition: ComponentDefinition = {
       outputSchema: ["out1", "out2"],
       stateSlotCount: 1,
       switchPins: [0, 1],
+      defaultDelay: 0,
     },
     analog: {
       factory: createAnalogFuseElement,

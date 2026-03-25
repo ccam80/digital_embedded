@@ -411,7 +411,6 @@ export const SwitchDTDefinition: ComponentDefinition = {
     "Common terminal A connects to B when closed, to C when open.\n" +
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeSwitchDT,
@@ -419,6 +418,7 @@ export const SwitchDTDefinition: ComponentDefinition = {
       outputSchema: ["A1", "B1", "C1"],
       stateSlotCount: 1,
       switchPins: [0, 1],
+      defaultDelay: 0,
     },
     analog: {
       factory: createSwitchDTAnalogElement,

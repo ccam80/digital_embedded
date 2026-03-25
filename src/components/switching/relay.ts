@@ -301,7 +301,6 @@ export const RelayDefinition: ComponentDefinition = {
   attributeMap: RELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "Relay (SPST) — coil-controlled single-pole single-throw contact switch.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeRelay,
@@ -309,6 +308,7 @@ export const RelayDefinition: ComponentDefinition = {
       outputSchema: ["A1", "B1"],
       stateSlotCount: 1,
       switchPins: [2, 3],
+      defaultDelay: 0,
     },
     analog: {
       factory: createRelayAnalogElement,

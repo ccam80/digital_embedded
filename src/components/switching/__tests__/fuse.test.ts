@@ -241,7 +241,7 @@ describe("Fuse — ComponentDefinition", () => {
     expect(FuseDefinition.attributeMap).toBeDefined();
     expect(FuseDefinition.category).toBe(ComponentCategory.SWITCHING);
     expect(FuseDefinition.helpText).toBeDefined();
-    expect(typeof FuseDefinition.defaultDelay).toBe("number");
+    expect(typeof FuseDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns FuseElement", () => {
@@ -267,6 +267,6 @@ describe("Fuse — ComponentDefinition", () => {
   });
 
   it("defaultDelay — is zero (combinational)", () => {
-    expect(FuseDefinition.defaultDelay).toBe(0);
+    expect(FuseDefinition.models.digital!.defaultDelay).toBe(0);
   });
 });

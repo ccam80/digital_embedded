@@ -225,7 +225,6 @@ export const NFETDefinition: ComponentDefinition = {
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText: "NFET — N-channel MOSFET. G=1 → conducting.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeNFET,
@@ -233,6 +232,7 @@ export const NFETDefinition: ComponentDefinition = {
       outputSchema: ["D", "S"],
       stateSlotCount: 1,
       switchPins: [1, 2],
+      defaultDelay: 0,
     },
   },
 };

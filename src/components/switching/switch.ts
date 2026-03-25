@@ -386,7 +386,6 @@ export const SwitchDefinition: ComponentDefinition = {
     "When closed, terminals A and B are connected (bus nets merged).\n" +
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",
-  defaultDelay: 0,
   models: {
     digital: {
       executeFn: executeSwitch,
@@ -394,6 +393,7 @@ export const SwitchDefinition: ComponentDefinition = {
       outputSchema: ["A1", "B1"],
       stateSlotCount: 1,
       switchPins: [0, 1],
+      defaultDelay: 0,
     },
     analog: {
       factory: createSwitchAnalogElement,

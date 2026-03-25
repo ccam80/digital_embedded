@@ -226,7 +226,7 @@ describe("Relay", () => {
     expect(RelayDefinition.attributeMap).toBeDefined();
     expect(RelayDefinition.category).toBe(ComponentCategory.SWITCHING);
     expect(RelayDefinition.helpText).toBeDefined();
-    expect(typeof RelayDefinition.defaultDelay).toBe("number");
+    expect(typeof RelayDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns RelayElement", () => {
@@ -373,7 +373,7 @@ describe("RelayDT", () => {
     expect(RelayDTDefinition.attributeMap).toBeDefined();
     expect(RelayDTDefinition.category).toBe(ComponentCategory.SWITCHING);
     expect(RelayDTDefinition.helpText).toBeDefined();
-    expect(typeof RelayDTDefinition.defaultDelay).toBe("number");
+    expect(typeof RelayDTDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
   it("factoryCreatesInstance — factory returns RelayDTElement", () => {
