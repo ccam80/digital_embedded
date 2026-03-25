@@ -19,7 +19,8 @@ import { ComponentRegistry } from "../../core/registry.js";
 import type { ComponentCategory } from "../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { compileAnalogCircuit, compileAnalogPartition } from "../compiler.js";
+import { compileAnalogPartition } from "../compiler.js";
+import { compileUnified } from "../../compile/compile.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 
@@ -359,7 +360,7 @@ describe("compileAnalogPartition", () => {
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    const compiledOld = compileAnalogCircuit(circuit, registry);
+    const compiledOld = compileUnified(circuit, registry).analog!;
 
     // Build via new path
     const { partition, registry: registry2 } = buildAndGatePartition(propsMap);

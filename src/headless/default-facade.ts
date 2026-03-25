@@ -33,8 +33,7 @@ import { SimulationRunner } from './runner.js';
 import { ClockManager } from '../engine/clock.js';
 import type { ConcreteCompiledCircuit } from '../engine/digital-engine.js';
 import { DigitalEngine } from '../engine/digital-engine.js';
-import { compileCircuit } from '../engine/compiler.js';
-import { compileAnalogCircuit } from '../analog/compiler.js';
+import { compileUnified } from '../compile/compile.js';
 import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
 import { MNAEngine } from '../analog/analog-engine.js';
@@ -153,7 +152,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
 
     if (engineMode === 'analog') {
-      const compiledAnalog = compileAnalogCircuit(circuit, this._registry, getTransistorModels());
+      const unified = compileUnified(circuit, this._registry, getTransistorModels());
+      const compiledAnalog = unified.analog!;
       this._compiledAnalog = compiledAnalog;
 
       const analogEngine = new MNAEngine();
@@ -175,7 +175,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     const engine = this._runner.compile(circuit) as DigitalEngine;
     this._engine = engine;
 
-    const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
+    const unified = compileUnified(circuit, this._registry);
+    const compiled = unified.digital! as ConcreteCompiledCircuit;
     this._compiled = compiled;
     this._clockManager = new ClockManager(compiled);
     this._circuit = circuit;

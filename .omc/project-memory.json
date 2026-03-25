@@ -250,8 +250,8 @@
   "hotPaths": [
     {
       "path": "src\\compile\\compile.ts",
-      "accessCount": 22,
-      "lastAccessed": 1774431205397,
+      "accessCount": 25,
+      "lastAccessed": 1774434689380,
       "type": "file"
     },
     {
@@ -285,6 +285,12 @@
       "type": "file"
     },
     {
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774434530690,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
       "accessCount": 13,
       "lastAccessed": 1774425718783,
@@ -297,9 +303,9 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
+      "path": "src\\headless\\default-facade.ts",
       "accessCount": 11,
-      "lastAccessed": 1774430093072,
+      "lastAccessed": 1774434549723,
       "type": "file"
     },
     {
@@ -339,10 +345,16 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\default-facade.ts",
+      "path": "src",
       "accessCount": 7,
-      "lastAccessed": 1774426807510,
-      "type": "file"
+      "lastAccessed": 1774434621558,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog",
+      "accessCount": 6,
+      "lastAccessed": 1774434721447,
+      "type": "directory"
     },
     {
       "path": "src\\components\\active\\__tests__\\opamp.test.ts",
@@ -379,18 +391,6 @@
       "accessCount": 5,
       "lastAccessed": 1774425623974,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 5,
-      "lastAccessed": 1774429752039,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog",
-      "accessCount": 5,
-      "lastAccessed": 1774431370237,
-      "type": "directory"
     },
     {
       "path": "src\\components\\sources\\variable-rail.ts",
@@ -453,6 +453,18 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 3,
+      "lastAccessed": 1774434476425,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 3,
+      "lastAccessed": 1774434476835,
+      "type": "file"
+    },
+    {
       "path": "src\\components",
       "accessCount": 2,
       "lastAccessed": 1774424649891,
@@ -499,18 +511,6 @@
       "accessCount": 2,
       "lastAccessed": 1774425607332,
       "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 2,
-      "lastAccessed": 1774429573324,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 2,
-      "lastAccessed": 1774429580917,
-      "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\scr.ts",

@@ -17,8 +17,8 @@ import { BitVector } from "@/core/signal";
 import { OscillationError } from "@/core/errors";
 import { DigitalEngine } from "@/engine/digital-engine";
 import type { ConcreteCompiledCircuit } from "@/engine/digital-engine";
-import { compileCircuit } from "@/engine/compiler";
-import { compileAnalogCircuit } from "@/analog/compiler.js";
+import { compileUnified } from "@/compile/compile.js";
+import { compileAnalogPartition } from "@/analog/compiler.js";
 import { TransistorModelRegistry } from "@/analog/transistor-model-registry.js";
 import { registerAllCmosGateModels } from "@/analog/transistor-models/cmos-gates.js";
 import { registerCmosDFlipflop } from "@/analog/transistor-models/cmos-flipflop.js";
@@ -99,13 +99,34 @@ export class SimulationRunner {
    */
   compile(circuit: Circuit, engineFactory?: EngineFactory): SimulationEngine {
     if (circuit.metadata.engineType === "analog") {
-      const compiled = compileAnalogCircuit(circuit, this._registry, getTransistorModels());
+      const unified = compileUnified(circuit, this._registry, getTransistorModels());
+      const compiled = unified.analog ?? compileAnalogPartition(
+        { components: [], groups: [], bridgeStubs: [], crossEngineBoundaries: [] },
+        this._registry,
+      );
+      const INFRASTRUCTURE = new Set([
+        "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
+        "Splitter", "Driver", "NotConnected", "ScopeTrigger",
+      ]);
+      for (const el of circuit.elements) {
+        if (INFRASTRUCTURE.has(el.typeId)) continue;
+        const def = this._registry.get(el.typeId);
+        if (!def) continue;
+        if (def.models?.analog === undefined && def.models?.digital !== undefined) {
+          compiled.diagnostics.push({
+            code: "unsupported-component-in-analog",
+            severity: "error",
+            message: `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+          });
+        }
+      }
       const engine = compiled as unknown as AnalogEngine;
       this._records.set(engine, { engineType: "analog", engine, compiled });
       return engine as unknown as SimulationEngine;
     }
 
-    const compiled = compileCircuit(circuit, this._registry) as ConcreteCompiledCircuit;
+    const unified = compileUnified(circuit, this._registry);
+    const compiled = unified.digital! as ConcreteCompiledCircuit;
     const engine = engineFactory
       ? engineFactory(compiled)
       : SimulationRunner._defaultEngineFactory(compiled);

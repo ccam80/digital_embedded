@@ -674,10 +674,19 @@
       "status": "completed",
       "completed_at": "2026-03-25T09:46:52.512Z",
       "duration_ms": 836711
+    },
+    {
+      "agent_id": "a3f8f3b7024b67cc9",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-25T10:27:51.370Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-25T10:33:36.371Z",
+      "duration_ms": 345001
     }
   ],
-  "total_spawned": 75,
-  "total_completed": 75,
+  "total_spawned": 76,
+  "total_completed": 76,
   "total_failed": 0,
-  "last_updated": "2026-03-25T09:46:52.627Z"
+  "last_updated": "2026-03-25T10:33:36.477Z"
 }

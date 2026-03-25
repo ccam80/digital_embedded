@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\src\\\\analog\\\\compiler.ts\"}",
-  "error": "File content (30892 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-03-25T09:33:25.858Z",
-  "retry_count": 4
+  "tool_input_preview": "{\"file_path\":\"C:/local_working_projects/digital_in_browser/src/analog/compiler.ts\"}",
+  "error": "File content (31106 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-25T10:28:02.713Z",
+  "retry_count": 1
 }

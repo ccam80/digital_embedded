@@ -426,3 +426,15 @@ Import `BitsException` from `../../core/errors.js`.
   - `src/analog/__tests__/digital-bridge-path.test.ts` — fixed two comments referencing buildNodeMap
 - **Tests**: 7486/7490 passing (4 pre-existing submodule failures)
 - **Grep checklist**: All 11 patterns return 0 hits in src/
+
+## Task remove-compile-exports: Remove compileCircuit/compileAnalogCircuit public exports
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**:
+  - `src/engine/compiler.ts` — removed `export` from `compileCircuit`
+  - `src/analog/compiler.ts` — replaced `import { compileCircuit }` with local `compileInnerDigitalCircuit` helper using `compileUnified`; removed `export` from `compileAnalogCircuit`; replaced all 4 internal `compileCircuit(` calls with `compileInnerDigitalCircuit(`
+  - `src/headless/default-facade.ts` — replaced `compileCircuit`/`compileAnalogCircuit` imports with `compileUnified`; updated both analog and digital compile paths to extract `.analog!` / `.digital!` from unified result
+  - `src/headless/runner.ts` — replaced `compileCircuit`/`compileAnalogCircuit` imports with `compileUnified` + `compileAnalogPartition`; updated analog/digital compile paths; added null-analog fallback that builds empty partition + injects unsupported-component-in-analog diagnostics for digital-only components
+  - `src/analog/__tests__/compile-analog-partition.test.ts` — replaced `compileAnalogCircuit` import with `compileUnified`; updated comparison test to use `compileUnified(circuit, registry).analog!`
+- **Tests**: 7486/7490 passing (4 pre-existing submodule failures only)

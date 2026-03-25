@@ -62,7 +62,7 @@ const COMPILE_INFRASTRUCTURE_TYPES = new Set([
   'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
 ]);
 
-export function compileCircuit(
+function compileCircuit(
   circuit: Circuit,
   registry: ComponentRegistry,
 ): CompiledCircuitImpl {
