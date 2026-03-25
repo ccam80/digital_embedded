@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSplitterAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createSplitterAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 import { extractBits } from "./splitter.js";
 
 // ---------------------------------------------------------------------------

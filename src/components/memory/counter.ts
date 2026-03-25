@@ -29,7 +29,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralCounterAnalogFactory } from "../../analog/behavioral-sequential.js";
+import { makeBehavioralCounterAnalogFactory } from "../../solver/analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

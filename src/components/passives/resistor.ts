@@ -18,8 +18,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Minimum resistance clamp — prevents G → ∞ for degenerate values

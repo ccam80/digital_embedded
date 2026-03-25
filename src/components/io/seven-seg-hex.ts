@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSevenSegAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

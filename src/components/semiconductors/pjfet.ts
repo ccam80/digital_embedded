@@ -30,10 +30,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { NJfetAnalogElement } from "./njfet.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { pnjlim } from "../../analog/newton-raphson.js";
-import { JFET_P_DEFAULTS } from "../../analog/model-defaults.js";
-import type { FetCapacitances } from "../../analog/fet-base.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { JFET_P_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants

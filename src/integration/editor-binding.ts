@@ -16,7 +16,7 @@ import type { CircuitElement } from "@/core/element";
 import type { SimulationEngine } from "@/core/engine-interface";
 import type { BitVector } from "@/core/signal";
 import type { SignalAddress, SignalValue } from "@/compile/types";
-import type { SimulationCoordinator } from "@/compile/coordinator-types";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
 
 // ---------------------------------------------------------------------------
 // Helper: extract a raw number from a SignalValue

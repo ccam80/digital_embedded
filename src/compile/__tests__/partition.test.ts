@@ -5,7 +5,7 @@ import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
 import type { ComponentDefinition, ComponentRegistry, DigitalModel, AnalogModel } from "@/core/registry.js";
-import type { CrossEngineBoundary } from "@/engine/cross-engine-boundary.js";
+import type { CrossEngineBoundary } from "@/solver/digital/cross-engine-boundary.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stubs

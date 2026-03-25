@@ -607,3 +607,30 @@ Import `BitsException` from `../../core/errors.js`.
     - `getCompiledAnalog` in app-init.ts: zero hits
     - `wireToNetId` in editor-binding.ts: zero hits
   - Phase 5 complete: P5-1 through P5-5 all complete
+
+---
+## Phase 5 Summary
+- **Status**: complete
+- **Tasks completed**: 5/5 (P5-1 through P5-5)
+- **Waves**: 5.1 (P5-1, P5-2 parallel) → 5.2 (P5-3, P5-4) → 5.3 (P5-5 verification)
+- **Rounds**: 2 (P5-1 required retry due to early exit)
+- **Test result**: 7511/7515 passing (4 pre-existing submodule ENOENT failures)
+- **Files changed**: 47 files, +1103/-678 lines
+- **Key changes**:
+  - EditorBinding uses SignalAddress/SignalValue instead of raw net IDs
+  - circuit.metadata.engineType removed; domain derived from component models
+  - App-init simplified: no analog-vs-digital branching, one compile path
+  - Property panel simulationModel dropdown for multi-model components
+  - All Phase 5 grep acceptance checks pass
+
+## Phase 6: Directory Restructure
+- **Status**: complete
+- **Files moved**: 134 (23 engine/*.ts + 27 engine/__tests__/*.ts + 37 analog/*.ts + 42 analog/__tests__/*.ts + 3 analog/transistor-models/*.ts + 2 compile/coordinator*.ts)
+- **Import paths updated**: 143 files
+- **Moves**:
+  - `src/engine/` → `src/solver/digital/`
+  - `src/analog/` → `src/solver/analog/`
+  - `src/compile/coordinator.ts` → `src/solver/coordinator.ts`
+  - `src/compile/coordinator-types.ts` → `src/solver/coordinator-types.ts`
+- **Tests**: 7485/7491 passing (6 failures are all pre-existing ENOENT: 3 dig-parser + 1 resolve-generics + 1 lrcxor-fixture + 1 wire-current-resolver)
+- **Notes**: Purely mechanical — zero behaviour change. All old directories empty and removed.

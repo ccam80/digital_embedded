@@ -15,7 +15,7 @@ import type { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Engine, SimulationEngine } from '../core/engine-interface.js';
 import type { AnalogEngine } from '../core/analog-engine-interface.js';
-import type { SimulationCoordinator } from '../compile/coordinator-types.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition, ComponentRegistry } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
@@ -30,12 +30,12 @@ import type {
 } from './netlist-types.js';
 import type { SimulatorFacade } from './facade.js';
 import { CircuitBuilder } from './builder.js';
-import { ClockManager } from '../engine/clock.js';
-import type { ConcreteCompiledCircuit } from '../engine/digital-engine.js';
-import { DigitalEngine } from '../engine/digital-engine.js';
+import { ClockManager } from '../solver/digital/clock.js';
+import type { ConcreteCompiledCircuit } from '../solver/digital/digital-engine.js';
+import { DigitalEngine } from '../solver/digital/digital-engine.js';
 import { compileUnified } from '../compile/compile.js';
 import type { CompiledAnalogCircuit, DcOpResult } from '../core/analog-engine-interface.js';
-import { getTransistorModels } from '../analog/default-models.js';
+import { getTransistorModels } from '../solver/analog/default-models.js';
 import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/save.js';
@@ -43,7 +43,7 @@ import { deserializeCircuit } from '../io/load.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
-import { DefaultSimulationCoordinator } from '../compile/coordinator.js';
+import { DefaultSimulationCoordinator } from '../solver/coordinator.js';
 
 // ---------------------------------------------------------------------------
 // Step options — facade-specific, not on the SimulatorFacade interface

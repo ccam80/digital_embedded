@@ -35,16 +35,16 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { fetlim } from "../../analog/newton-raphson.js";
-import { MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../analog/model-defaults.js";
+import type { IntegrationMethod } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { fetlim } from "../../solver/analog/newton-raphson.js";
+import { MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
-} from "../../analog/integration.js";
-import { AbstractFetElement } from "../../analog/fet-base.js";
-import type { FetCapacitances } from "../../analog/fet-base.js";
+} from "../../solver/analog/integration.js";
+import { AbstractFetElement } from "../../solver/analog/fet-base.js";
+import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants

@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeAndAnalogFactory } from "../../analog/behavioral-gate.js";
+import { makeAndAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

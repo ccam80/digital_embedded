@@ -39,7 +39,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createRelayAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createRelayAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

@@ -28,10 +28,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { pnjlim } from "../../analog/newton-raphson.js";
-import { BJT_NPN_DEFAULTS, BJT_PNP_DEFAULTS } from "../../analog/model-defaults.js";
+import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { BJT_NPN_DEFAULTS, BJT_PNP_DEFAULTS } from "../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants

@@ -21,13 +21,13 @@
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import { hasAnalogModel, hasDigitalModel } from "../core/registry.js";
-import type { TransistorModelRegistry } from "../analog/transistor-model-registry.js";
+import type { TransistorModelRegistry } from "../solver/analog/transistor-model-registry.js";
 import { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
-import { flattenCircuit, isSubcircuitHost } from "../engine/flatten.js";
-import type { FlattenResult } from "../engine/flatten.js";
-import { compileDigitalPartition } from "../engine/compiler.js";
-import { compileAnalogPartition } from "../analog/compiler.js";
+import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";
+import type { FlattenResult } from "../solver/digital/flatten.js";
+import { compileDigitalPartition } from "../solver/digital/compiler.js";
+import { compileAnalogPartition } from "../solver/analog/compiler.js";
 import { BitsException } from "../core/errors.js";
 import type {
   CompiledCircuitUnified,

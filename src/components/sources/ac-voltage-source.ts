@@ -28,10 +28,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { parseExpression, evaluateExpression, ExprParseError } from "../../analog/expression.js";
-import type { ExprNode } from "../../analog/expression.js";
+import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
+import type { ExprNode } from "../../solver/analog/expression.js";
 
 // ---------------------------------------------------------------------------
 // Waveform computation

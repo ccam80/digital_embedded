@@ -10,13 +10,13 @@
 
 import type { Circuit } from "@/core/circuit";
 import type { Engine, SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
-import type { SimulationCoordinator } from "@/compile/coordinator-types.js";
+import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
 import type { DcOpResult } from "@/core/analog-engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
 import { OscillationError } from "@/core/errors";
 import { compileUnified } from "@/compile/compile.js";
-import { getTransistorModels } from "@/analog/default-models.js";
-import { DefaultSimulationCoordinator } from "@/compile/coordinator.js";
+import { getTransistorModels } from "@/solver/analog/default-models.js";
+import { DefaultSimulationCoordinator } from "@/solver/coordinator.js";
 import { FacadeError } from "./types.js";
 
 /**

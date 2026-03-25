@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { GroundDefinition } from "../../io/ground.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver

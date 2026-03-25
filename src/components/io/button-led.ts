@@ -22,7 +22,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createButtonLEDAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createButtonLEDAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

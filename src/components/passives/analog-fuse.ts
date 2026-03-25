@@ -38,8 +38,8 @@
  *   Emits 'fuse-blown' (info) on the timestep when _blown first becomes true.
  */
 
-import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 

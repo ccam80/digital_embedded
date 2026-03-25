@@ -14,8 +14,8 @@ import { describe, it, expect, vi } from "vitest";
 import { createTriodeElement, TriodeDefinition, TriodeCircuitElement } from "../triode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../../analog/element.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Default 12AX7 parameters

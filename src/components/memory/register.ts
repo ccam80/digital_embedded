@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralRegisterAnalogFactory } from "../../analog/behavioral-sequential.js";
+import { makeBehavioralRegisterAnalogFactory } from "../../solver/analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

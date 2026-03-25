@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeXorAnalogFactory } from "../../analog/behavioral-gate.js";
+import { makeXorAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

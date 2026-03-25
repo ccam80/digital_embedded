@@ -20,12 +20,12 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
-} from "../../analog/integration.js";
+} from "../../solver/analog/integration.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout

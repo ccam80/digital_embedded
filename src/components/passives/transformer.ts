@@ -27,10 +27,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { CoupledInductorPair } from "../../analog/coupled-inductor.js";
-import type { CoupledInductorState } from "../../analog/coupled-inductor.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
+import type { CoupledInductorState } from "../../solver/analog/coupled-inductor.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout

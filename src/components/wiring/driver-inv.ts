@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createDriverInvAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createDriverInvAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants — same as Driver (origin-centred)

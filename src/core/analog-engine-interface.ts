@@ -12,7 +12,7 @@
 
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
-import type { AcParams, AcResult } from "../analog/ac-analysis.js";
+import type { AcParams, AcResult } from "../solver/analog/ac-analysis.js";
 
 // ---------------------------------------------------------------------------
 // SimulationParams — transient solver configuration

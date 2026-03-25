@@ -13,7 +13,7 @@
 
 import type { Wire, Circuit } from "@/core/circuit";
 import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { AnalogElement } from "@/analog/element";
+import type { AnalogElement } from "@/solver/analog/element";
 import type { CircuitElement } from "@/core/element";
 import { pinWorldPosition } from "@/core/pin";
 

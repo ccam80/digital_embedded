@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeJKAsyncFlipflopAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
+import { makeJKAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

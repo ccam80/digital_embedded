@@ -11,8 +11,8 @@
 import { describe, it, expect } from "vitest";
 import { createTriacElement, TriacDefinition } from "../triac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Default Triac parameters

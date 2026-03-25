@@ -27,7 +27,7 @@
 import { describe, it, expect } from "vitest";
 import { ADCDefinition } from "../adc.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../analog/element.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Constants

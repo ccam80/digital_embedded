@@ -41,14 +41,14 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../analog/test-elements.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
+import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

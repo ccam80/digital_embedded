@@ -20,12 +20,12 @@ import {
 } from "../transmission-line.js";
 import { PropertyBag, PropertyType } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { ConcreteCompiledAnalogCircuit } from "../../../analog/compiled-analog-circuit.js";
-import { MNAEngine } from "../../../analog/analog-engine.js";
+import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { makeVoltageSource, makeResistor } from "../../../analog/test-elements.js";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
-import { makeDiagnostic } from "../../../analog/diagnostics.js";
+import { makeVoltageSource, makeResistor } from "../../../solver/analog/test-elements.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

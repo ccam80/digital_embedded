@@ -13,7 +13,7 @@
  * point, unity-gain crossing, and phase margin.
  */
 
-import type { AcResult } from "../analog/ac-analysis.js";
+import type { AcResult } from "../solver/analog/ac-analysis.js";
 
 // ---------------------------------------------------------------------------
 // BodeViewport — layout parameters for the Bode plot canvas region

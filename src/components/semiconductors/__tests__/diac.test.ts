@@ -12,8 +12,8 @@ import { describe, it, expect } from "vitest";
 import { createDiacElement, DiacDefinition } from "../diac.js";
 import { createTriacElement } from "../triac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../../analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Default Diac parameters (matching spec defaults)

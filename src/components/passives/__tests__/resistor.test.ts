@@ -5,13 +5,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { ResistorDefinition } from "../resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver

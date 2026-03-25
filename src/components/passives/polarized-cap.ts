@@ -40,13 +40,13 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
-} from "../../analog/integration.js";
+} from "../../solver/analog/integration.js";
 
 // ---------------------------------------------------------------------------
 // Constants

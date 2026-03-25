@@ -18,7 +18,7 @@ import {
 } from "../potentiometer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

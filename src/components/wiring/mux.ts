@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralMuxAnalogFactory } from "../../analog/behavioral-combinational.js";
+import { makeBehavioralMuxAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

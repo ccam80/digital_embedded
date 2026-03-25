@@ -7,21 +7,21 @@ import { WireCurrentResolver } from "../wire-current-resolver";
 import type { ResolvedAnalogCircuit } from "../wire-current-resolver";
 import { Wire, Circuit } from "@/core/circuit";
 import type { AnalogEngine } from "@/core/analog-engine-interface";
-import type { AnalogElement } from "@/analog/element";
+import type { AnalogElement } from "@/solver/analog/element";
 import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { Rect, RenderContext } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
-import { MNAEngine } from "@/analog/analog-engine";
-import type { ConcreteCompiledAnalogCircuit } from "@/analog/analog-engine";
+import { MNAEngine } from "@/solver/analog/analog-engine";
+import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/analog-engine";
 import {
   makeResistor,
   makeVoltageSource,
   makeAcVoltageSource,
   makeCapacitor,
   makeInductor,
-} from "@/analog/test-elements";
+} from "@/solver/analog/test-elements";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -1158,7 +1158,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
     const { compileUnified } = await import("@/compile/compile");
-    const { MNAEngine } = await import("@/analog/analog-engine");
+    const { MNAEngine } = await import("@/solver/analog/analog-engine");
     const { pinWorldPosition } = await import("@/core/pin");
 
     // Load the real lrctest.dig fixture through the full pipeline:
@@ -1348,7 +1348,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
     const { compileUnified } = await import("@/compile/compile");
-    const { MNAEngine } = await import("@/analog/analog-engine");
+    const { MNAEngine } = await import("@/solver/analog/analog-engine");
 
     const xml = readFileSync(
       resolve(__dirname, "../../../fixtures/lrctest.dig"),

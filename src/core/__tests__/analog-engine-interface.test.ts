@@ -18,7 +18,7 @@ import type {
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
 } from "@/core/analog-engine-interface";
-import type { AcParams, AcResult } from "@/analog/ac-analysis";
+import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
 import { DEFAULT_SIMULATION_PARAMS } from "@/core/analog-engine-interface";
 
 // ---------------------------------------------------------------------------

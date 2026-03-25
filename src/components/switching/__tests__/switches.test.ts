@@ -728,13 +728,13 @@ describe("RegistryAliases", () => {
 // ===========================================================================
 
 import { vi } from "vitest";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
   makeResistor,
   makeVoltageSource,
-} from "../../../analog/test-elements.js";
-import { MNAEngine } from "../../../analog/analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../analog/analog-engine.js";
+} from "../../../solver/analog/test-elements.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 function makeMockSolver() {
   const stamps: Array<{ row: number; col: number; value: number }> = [];

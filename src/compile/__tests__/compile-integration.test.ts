@@ -24,8 +24,8 @@ import type { ComponentDefinition, ComponentModels, ExecuteFunction } from '../.
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
-import type { SparseSolver } from '../../analog/sparse-solver.js';
-import type { AnalogElement } from '../../analog/element.js';
+import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
+import type { AnalogElement } from '../../solver/analog/element.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test element using AbstractCircuitElement (digital circuits)

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { DefaultSimulationCoordinator } from '../coordinator.js';
+import { DefaultSimulationCoordinator } from '../../solver/coordinator.js';
 import { compileUnified } from '../compile.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { AbstractCircuitElement } from '../../core/element.js';
@@ -19,10 +19,10 @@ import { ComponentCategory } from '../../core/registry.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
-import type { AnalogElement } from '../../analog/element.js';
-import type { SparseSolver } from '../../analog/sparse-solver.js';
+import type { AnalogElement } from '../../solver/analog/element.js';
+import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
-import { ConcreteCompiledAnalogCircuit } from '../../analog/compiled-analog-circuit.js';
+import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
 
 class MockElement extends AbstractCircuitElement {
   private readonly _pins: Pin[];

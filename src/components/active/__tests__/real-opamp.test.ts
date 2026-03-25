@@ -13,12 +13,12 @@
 import { describe, it, expect } from "vitest";
 import { RealOpAmpDefinition, createRealOpAmpElement, REAL_OPAMP_MODELS } from "../real-opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { withNodeIds } from "../../../analog/test-elements.js";
-import type { AnalogElement } from "../../../analog/element.js";
+import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

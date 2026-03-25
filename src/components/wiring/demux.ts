@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralDemuxAnalogFactory } from "../../analog/behavioral-combinational.js";
+import { makeBehavioralDemuxAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

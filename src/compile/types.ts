@@ -9,9 +9,9 @@ import type { CircuitElement } from "../core/element.js";
 import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
 import type { ComponentDefinition, DigitalModel, AnalogModel } from "../core/registry.js";
-import type { CrossEngineBoundary } from "../engine/cross-engine-boundary.js";
-import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../engine/compiled-circuit.js";
-import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../analog/compiled-analog-circuit.js";
+import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
+import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
+import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
 import type { Diagnostic } from "../headless/netlist-types.js";
 
 export type { Diagnostic };

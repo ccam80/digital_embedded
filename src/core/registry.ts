@@ -9,8 +9,8 @@
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElementCore } from "../analog/element.js";
-import type { DeviceType } from "../analog/model-parser.js";
+import type { AnalogElementCore } from "../solver/analog/element.js";
+import type { DeviceType } from "../solver/analog/model-parser.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
 // ---------------------------------------------------------------------------

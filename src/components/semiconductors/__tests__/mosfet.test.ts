@@ -24,15 +24,15 @@ import {
   computeCapacitances,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../analog/test-elements.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import { MOSFET_NMOS_DEFAULTS } from "../../../analog/model-defaults.js";
+import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import { MOSFET_NMOS_DEFAULTS } from "../../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Default NMOS parameters (W=1µ, L=1µ, KP=120µA/V², VTO=0.7, LAMBDA=0.02)

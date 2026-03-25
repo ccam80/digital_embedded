@@ -17,8 +17,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { VoltageComparatorDefinition } from "../comparator.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

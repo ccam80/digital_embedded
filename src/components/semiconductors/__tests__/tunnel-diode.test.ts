@@ -16,12 +16,12 @@ import {
   TunnelDiodeDefinition,
 } from "../tunnel-diode.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { newtonRaphson } from "../../../analog/newton-raphson.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
-import { withNodeIds } from "../../../analog/test-elements.js";
-import type { AnalogElement } from "../../../analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
+import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters

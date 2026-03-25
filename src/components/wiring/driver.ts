@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createDriverAnalogElement } from "../../analog/behavioral-remaining.js";
+import { createDriverAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

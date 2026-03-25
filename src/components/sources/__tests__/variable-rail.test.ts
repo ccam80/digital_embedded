@@ -4,11 +4,11 @@
 
 import { describe, it, expect } from "vitest";
 import { makeVariableRailElement, VariableRailDefinition } from "../variable-rail.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { solveDcOperatingPoint } from "../../../analog/dc-operating-point.js";
-import { DiagnosticCollector } from "../../../analog/diagnostics.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
+import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import type { AnalogElement } from "../../../analog/element.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------

@@ -21,8 +21,8 @@ import { PinDirection, resolvePins, createInverterConfig, createClockConfig } fr
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
-import type { AnalogElement } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { SerializedElement } from "../../core/element.js";
 
 // ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeDFlipflopAnalogFactory } from "../../analog/behavioral-flipflop.js";
+import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

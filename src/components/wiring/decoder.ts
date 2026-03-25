@@ -26,7 +26,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralDecoderAnalogFactory } from "../../analog/behavioral-combinational.js";
+import { makeBehavioralDecoderAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

@@ -249,9 +249,27 @@
   },
   "hotPaths": [
     {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 98,
+      "lastAccessed": 1774444103223,
+      "type": "file"
+    },
+    {
       "path": "src\\compile\\compile.ts",
-      "accessCount": 25,
-      "lastAccessed": 1774434689380,
+      "accessCount": 53,
+      "lastAccessed": 1774442609422,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 45,
+      "lastAccessed": 1774445351601,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\analog-engine.ts",
+      "accessCount": 40,
+      "lastAccessed": 1774441513446,
       "type": "file"
     },
     {
@@ -261,9 +279,21 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\analog-engine.ts",
+      "path": "src\\engine\\compiler.ts",
       "accessCount": 16,
-      "lastAccessed": 1774430880707,
+      "lastAccessed": 1774435122784,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 16,
+      "lastAccessed": 1774443747459,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\newton-raphson.ts",
+      "accessCount": 15,
+      "lastAccessed": 1774439176257,
       "type": "file"
     },
     {
@@ -279,18 +309,6 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\newton-raphson.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774427744478,
-      "type": "file"
-    },
-    {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774434530690,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
       "accessCount": 13,
       "lastAccessed": 1774425718783,
@@ -303,9 +321,9 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\default-facade.ts",
+      "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 11,
-      "lastAccessed": 1774434549723,
+      "lastAccessed": 1774441809322,
       "type": "file"
     },
     {
@@ -333,6 +351,12 @@
       "type": "file"
     },
     {
+      "path": "src\\analog",
+      "accessCount": 8,
+      "lastAccessed": 1774441778524,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
       "accessCount": 7,
       "lastAccessed": 1774425540291,
@@ -343,18 +367,6 @@
       "accessCount": 7,
       "lastAccessed": 1774425648635,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 7,
-      "lastAccessed": 1774434621558,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog",
-      "accessCount": 6,
-      "lastAccessed": 1774434721447,
-      "type": "directory"
     },
     {
       "path": "src\\components\\active\\__tests__\\opamp.test.ts",
@@ -450,18 +462,6 @@
       "path": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
       "accessCount": 3,
       "lastAccessed": 1774425641432,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 3,
-      "lastAccessed": 1774434476425,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 3,
-      "lastAccessed": 1774434476835,
       "type": "file"
     },
     {

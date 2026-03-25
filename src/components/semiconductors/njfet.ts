@@ -34,11 +34,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractFetElement } from "../../analog/fet-base.js";
-import type { FetCapacitances } from "../../analog/fet-base.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { pnjlim } from "../../analog/newton-raphson.js";
-import { JFET_N_DEFAULTS } from "../../analog/model-defaults.js";
+import { AbstractFetElement } from "../../solver/analog/fet-base.js";
+import type { FetCapacitances } from "../../solver/analog/fet-base.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { JFET_N_DEFAULTS } from "../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants

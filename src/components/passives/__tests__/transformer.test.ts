@@ -32,8 +32,8 @@ import {
 } from "../transformer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { SparseSolver } from "../../../analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor } from "../../../analog/test-elements.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { makeVoltageSource, makeResistor } from "../../../solver/analog/test-elements.js";
 
 // ---------------------------------------------------------------------------
 // Transient simulation helpers

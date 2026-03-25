@@ -30,7 +30,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeRSAsyncLatchAnalogFactory } from "../../analog/behavioral-flipflop-variants.js";
+import { makeRSAsyncLatchAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

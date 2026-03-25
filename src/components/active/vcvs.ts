@@ -43,11 +43,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../analog/element.js";
-import type { SparseSolver } from "../../analog/sparse-solver.js";
-import { parseExpression } from "../../analog/expression.js";
-import { differentiate, simplify } from "../../analog/expression-differentiate.js";
-import { ControlledSourceElement } from "../../analog/controlled-source-base.js";
+import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { parseExpression } from "../../solver/analog/expression.js";
+import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
+import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout

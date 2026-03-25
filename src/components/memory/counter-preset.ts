@@ -32,7 +32,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralCounterPresetAnalogFactory } from "../../analog/behavioral-sequential.js";
+import { makeBehavioralCounterPresetAnalogFactory } from "../../solver/analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants

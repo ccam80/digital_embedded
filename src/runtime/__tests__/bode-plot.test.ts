@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { BodePlotRenderer } from "../bode-plot.js";
 import type { BodeViewport } from "../bode-plot.js";
-import type { AcResult } from "../../analog/ac-analysis.js";
+import type { AcResult } from "../../solver/analog/ac-analysis.js";
 
 // ---------------------------------------------------------------------------
 // Mock canvas context

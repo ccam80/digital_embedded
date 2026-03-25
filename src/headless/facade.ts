@@ -9,7 +9,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { SimulationEngine } from '../core/engine-interface.js';
-import type { SimulationCoordinator } from '../compile/coordinator-types.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';

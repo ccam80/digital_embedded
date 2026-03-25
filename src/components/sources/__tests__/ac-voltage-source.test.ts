@@ -13,14 +13,14 @@ import {
   type AcVoltageSourceAnalogElement,
 } from "../ac-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver } from "../../../analog/sparse-solver.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
   makeResistor,
   makeCapacitor,
   makeVoltageSource,
-} from "../../../analog/test-elements.js";
-import { MNAEngine } from "../../../analog/analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../analog/analog-engine.js";
+} from "../../../solver/analog/test-elements.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
 // Mock solver
