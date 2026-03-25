@@ -93,6 +93,7 @@ function makeElement(
 function makeMosfetAnalogElement(nodeIds: number[]): AnalogElement {
   return {
     pinNodeIds: [...nodeIds],
+    allNodeIds: [...nodeIds],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,

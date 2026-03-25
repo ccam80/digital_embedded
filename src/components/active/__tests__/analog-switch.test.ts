@@ -204,6 +204,7 @@ describe("SPST", () => {
     // R_load = 1000 Ω from nOut to ground
     const rLoad: AnalogElement = {
       pinNodeIds: [nOut, 0],
+      allNodeIds: [nOut, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
@@ -243,6 +244,7 @@ describe("SPST", () => {
 
     const rLoad: AnalogElement = {
       pinNodeIds: [nOut, 0],
+      allNodeIds: [nOut, 0],
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,

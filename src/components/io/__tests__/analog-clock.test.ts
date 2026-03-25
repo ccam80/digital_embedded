@@ -132,12 +132,12 @@ describe("AnalogClock", () => {
     expect(typeof ClockDefinition.factory).toBe("function");
   });
 
-  it("engineType_is_both — clock appears in both digital and analog palettes", () => {
+  it("has both digital and analog models — clock appears in both palettes", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
     expect(ClockDefinition.models.analog).toBeDefined();
   });
 
-  it("simulationModes_includes_logical — logical clock behavior preserved", () => {
+  it("has digital model — logical clock behavior preserved", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
   });
 

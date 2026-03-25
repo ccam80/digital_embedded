@@ -291,7 +291,7 @@ describe("PolarizedCap", () => {
       expect(PolarizedCapDefinition.name).toBe("PolarizedCap");
     });
 
-    it("PolarizedCapDefinition engineType is 'analog'", () => {
+    it("PolarizedCapDefinition has analog model", () => {
       expect(PolarizedCapDefinition.models?.analog).toBeDefined();
     });
 

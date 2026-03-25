@@ -144,7 +144,11 @@ export function partitionByDomain(
     const def = registry.get(el.typeId);
     if (!def) continue;
 
-    const resolvedPins = resolvedPinsByElement.get(i) ?? [];
+    // Sort resolved pins by pinIndex so compileDigitalPartition and
+    // compileAnalogPartition can rely on stable pin-index order.
+    const resolvedPins = (resolvedPinsByElement.get(i) ?? [])
+      .slice()
+      .sort((a, b) => a.pinIndex - b.pinIndex);
 
     const partComp: PartitionedComponent = {
       element: el,
@@ -157,6 +161,17 @@ export function partitionByDomain(
       digitalComponents.push(partComp);
     } else if (ma.modelKey === "analog") {
       analogComponents.push(partComp);
+    } else if (ma.modelKey === "neutral") {
+      // Infrastructure components (In, Out, Ground, Tunnel, etc.) carry no
+      // simulation model. Route them to whichever partition is appropriate:
+      // - If the component has an analog model (e.g. Ground in analog circuits),
+      //   route to analog so it can be processed by the analog backend.
+      // - Otherwise route to digital so the digital backend can handle wiring.
+      if (hasAnalogModel(def) && !hasDigitalModel(def)) {
+        analogComponents.push(partComp);
+      } else {
+        digitalComponents.push(partComp);
+      }
     } else {
       // Unknown model key: route based on which models are present.
       if (hasDigitalModel(def) && !hasAnalogModel(def)) {
@@ -179,7 +194,12 @@ export function partitionByDomain(
     const hasAnalog = g.domains.has("analog");
     const isBoundary = g.domains.size > 1;
 
-    if (hasDigital) digitalGroups.push(g);
+    // A group with no domain tags (all-neutral pins) belongs to the digital
+    // partition — this covers infrastructure-only nets (wires, In/Out stubs,
+    // components with no models) in pure-digital circuits.
+    const isNeutralOnly = !hasDigital && !hasAnalog;
+
+    if (hasDigital || isNeutralOnly) digitalGroups.push(g);
     if (hasAnalog) analogGroups.push(g);
 
     if (isBoundary) {

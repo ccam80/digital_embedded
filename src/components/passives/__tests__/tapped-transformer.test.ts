@@ -351,7 +351,7 @@ describe("TappedTransformerDefinition", () => {
     expect(TappedTransformerDefinition.name).toBe("TappedTransformer");
   });
 
-  it("engineType is analog", () => {
+  it("TappedTransformerDefinition has analog model", () => {
     expect(TappedTransformerDefinition.models?.analog).toBeDefined();
   });
 

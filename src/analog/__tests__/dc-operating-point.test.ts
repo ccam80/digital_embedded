@@ -48,6 +48,7 @@ function makeScalableVoltageSource(
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -76,6 +77,7 @@ function makeScalableCurrentSource(
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,

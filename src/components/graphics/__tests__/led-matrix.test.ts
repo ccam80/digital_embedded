@@ -410,7 +410,7 @@ describe("LedMatrix", () => {
     });
 
     it("LedMatrixDefinition executeFn is executeLedMatrix", () => {
-      expect(LedMatrixDefinition.executeFn).toBe(executeLedMatrix);
+      expect(LedMatrixDefinition.models.digital!.executeFn).toBe(executeLedMatrix);
     });
 
     it("LedMatrixDefinition pinLayout has 2 entries (r-data, c-addr)", () => {

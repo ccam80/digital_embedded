@@ -93,7 +93,7 @@ describe("Ground", () => {
       props,
       () => 0,
     );
-    Object.assign(element, { pinNodeIds: [5] });
+    Object.assign(element, { pinNodeIds: [5], allNodeIds: [5] });
 
     expect(element.pinNodeIds).toEqual([5]);
   });

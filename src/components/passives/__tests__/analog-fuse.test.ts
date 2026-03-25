@@ -339,7 +339,7 @@ describe("AnalogFuseElement", () => {
   });
 
   describe("unified FuseDefinition", () => {
-    it("FuseDefinition engineType is 'both'", () => {
+    it("FuseDefinition has both digital and analog models", () => {
       expect(FuseDefinition.models?.analog).toBeDefined();
     });
 

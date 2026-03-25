@@ -341,7 +341,7 @@ describe("Registration", () => {
       new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4] });
+    Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
     expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);

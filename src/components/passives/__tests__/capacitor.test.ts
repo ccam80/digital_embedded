@@ -142,7 +142,7 @@ describe("Capacitor", () => {
       expect(CapacitorDefinition.name).toBe("Capacitor");
     });
 
-    it("CapacitorDefinition engineType is 'analog'", () => {
+    it("CapacitorDefinition has analog model", () => {
       expect(CapacitorDefinition.models?.analog).toBeDefined();
     });
 

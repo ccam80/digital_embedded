@@ -39,6 +39,7 @@ const DEFAULT_PARAMS: SimulationParams = {
 function makeReactiveElement(truncationError: number): AnalogElement {
   return {
     pinNodeIds: [1, 0],
+    allNodeIds: [1, 0],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
@@ -55,6 +56,7 @@ function makeReactiveElement(truncationError: number): AnalogElement {
 function makeNonReactiveElement(): AnalogElement {
   return {
     pinNodeIds: [1, 0],
+    allNodeIds: [1, 0],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,

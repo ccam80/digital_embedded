@@ -160,6 +160,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -688,6 +689,7 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
   let _trigVoltage = VCC; // starts HIGH (idle)
   const vsTrig: AnalogElement = {
     pinNodeIds: [nTrig, 0],
+    allNodeIds: [nTrig, 0],
     branchIndex: brTrig,
     isNonlinear: false,
     isReactive: false,

@@ -207,6 +207,7 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 
 export class AnalogCrystalElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -250,6 +251,7 @@ export class AnalogCrystalElement implements AnalogElement {
     C0: number,
   ) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this.branchIndex = branchIndex;
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;

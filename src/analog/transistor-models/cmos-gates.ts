@@ -16,7 +16,7 @@
  *
  * Wire connectivity uses unique (x, y) positions: each net is a distinct X
  * coordinate. Wire segments connect components by sharing endpoints at the
- * same X value so that buildNodeMap() groups them into a single MNA node.
+ * same X value so they form a single MNA node.
  */
 
 import { Circuit, Wire } from "../../core/circuit.js";

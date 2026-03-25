@@ -154,7 +154,7 @@ describe("Inductor", () => {
       expect(InductorDefinition.name).toBe("Inductor");
     });
 
-    it("InductorDefinition engineType is 'analog'", () => {
+    it("InductorDefinition has analog model", () => {
       expect(InductorDefinition.models?.analog).toBeDefined();
     });
 

@@ -53,8 +53,6 @@ export interface ComplexSparseSolver {
  */
 /**
  * The return type of analogFactory — everything except pinNodeIds and allNodeIds.
- * Factories return this; the compiler adds both fields from resolved pins and
- * internal node IDs. This ensures both fields are set in exactly one place (the compiler).
  */
 export type AnalogElementCore = Omit<AnalogElement, 'pinNodeIds' | 'allNodeIds'>;
 

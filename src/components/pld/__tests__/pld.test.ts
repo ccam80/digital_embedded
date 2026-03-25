@@ -439,7 +439,7 @@ describe("Diode", () => {
     });
 
     it("PldDiodeDefinition has executeFn=executeDiode", () => {
-      expect(PldDiodeDefinition.executeFn).toBe(executeDiode);
+      expect(PldDiodeDefinition.models.digital!.executeFn).toBe(executeDiode);
     });
 
     it("PldDiodeDefinition category is PLD", () => {
@@ -473,7 +473,7 @@ describe("Diode", () => {
     });
 
     it("PldDiodeDefinition defaultDelay is 0", () => {
-      expect(PldDiodeDefinition.defaultDelay).toBe(0);
+      expect(PldDiodeDefinition.models.digital!.defaultDelay).toBe(0);
     });
   });
 });
@@ -650,7 +650,7 @@ describe("DiodeForward", () => {
     });
 
     it("PldDiodeForwardDefinition executeFn is executeDiodeForward", () => {
-      expect(PldDiodeForwardDefinition.executeFn).toBe(executeDiodeForward);
+      expect(PldDiodeForwardDefinition.models.digital!.executeFn).toBe(executeDiodeForward);
     });
 
     it("PldDiodeForwardDefinition category is PLD", () => {
@@ -674,7 +674,7 @@ describe("DiodeForward", () => {
     });
 
     it("PldDiodeForwardDefinition defaultDelay is 0", () => {
-      expect(PldDiodeForwardDefinition.defaultDelay).toBe(0);
+      expect(PldDiodeForwardDefinition.models.digital!.defaultDelay).toBe(0);
     });
   });
 });
@@ -842,7 +842,7 @@ describe("DiodeBackward", () => {
     });
 
     it("PldDiodeBackwardDefinition executeFn is executeDiodeBackward", () => {
-      expect(PldDiodeBackwardDefinition.executeFn).toBe(executeDiodeBackward);
+      expect(PldDiodeBackwardDefinition.models.digital!.executeFn).toBe(executeDiodeBackward);
     });
 
     it("PldDiodeBackwardDefinition category is PLD", () => {
@@ -862,7 +862,7 @@ describe("DiodeBackward", () => {
     });
 
     it("PldDiodeBackwardDefinition defaultDelay is 0", () => {
-      expect(PldDiodeBackwardDefinition.defaultDelay).toBe(0);
+      expect(PldDiodeBackwardDefinition.models.digital!.defaultDelay).toBe(0);
     });
   });
 });
@@ -1044,7 +1044,7 @@ describe("PullUp", () => {
     });
 
     it("PullUpDefinition has executeFn=executePullUp", () => {
-      expect(PullUpDefinition.executeFn).toBe(executePullUp);
+      expect(PullUpDefinition.models.digital!.executeFn).toBe(executePullUp);
     });
 
     it("PullUpDefinition category is PLD", () => {
@@ -1077,7 +1077,7 @@ describe("PullUp", () => {
     });
 
     it("PullUpDefinition defaultDelay is 0", () => {
-      expect(PullUpDefinition.defaultDelay).toBe(0);
+      expect(PullUpDefinition.models.digital!.defaultDelay).toBe(0);
     });
 
     it("PullUpDefinition helpText mentions 'logic 1' or 'VDD'", () => {
@@ -1275,7 +1275,7 @@ describe("PullDown", () => {
     });
 
     it("PullDownDefinition has executeFn=executePullDown", () => {
-      expect(PullDownDefinition.executeFn).toBe(executePullDown);
+      expect(PullDownDefinition.models.digital!.executeFn).toBe(executePullDown);
     });
 
     it("PullDownDefinition category is PLD", () => {
@@ -1308,7 +1308,7 @@ describe("PullDown", () => {
     });
 
     it("PullDownDefinition defaultDelay is 0", () => {
-      expect(PullDownDefinition.defaultDelay).toBe(0);
+      expect(PullDownDefinition.models.digital!.defaultDelay).toBe(0);
     });
 
     it("PullDownDefinition helpText mentions 'logic 0' or 'GND'", () => {

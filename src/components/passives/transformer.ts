@@ -178,6 +178,7 @@ export class TransformerElement extends AbstractCircuitElement {
  */
 export class AnalogTransformerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -205,6 +206,7 @@ export class AnalogTransformerElement implements AnalogElement {
     rSec: number,
   ) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this.branchIndex = branch1;
     this._branch2 = branch1 + 1;
     // turnsRatio = N_primary / N_secondary (e.g. 10 means 10:1 step-down)

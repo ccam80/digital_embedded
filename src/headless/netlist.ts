@@ -19,7 +19,8 @@ import type {
   Diagnostic,
 } from './netlist-types.js';
 import type { PropertyValue } from '../core/properties.js';
-import { traceNets } from '../engine/net-trace.js';
+import { UnionFind } from '../compile/union-find.js';
+import { pinWorldPosition } from '../core/pin.js';
 import { getComponentLabel } from './address.js';
 
 // ---------------------------------------------------------------------------
@@ -65,22 +66,107 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
   const allPins: ReadonlyArray<readonly Pin[]> = elements.map((el) => el.getPins());
 
   // -------------------------------------------------------------------------
-  // Step 3: Trace nets via wire endpoints and pin positions (F5, F6)
+  // Step 3: Trace nets via wire endpoints and pin positions
   // -------------------------------------------------------------------------
 
   const wires = circuit.wires;
 
-  // Delegate to shared traceNets() which uses pinWorldPosition() (F6 fix).
-  const traced = traceNets(elements, wires, registry);
-  const { slotToNetId: slotToNetIdArr, netCount } = traced;
-
-  // Cumulative pin offsets for slot addressing (mirrors slotBase inside traceNets)
+  // Cumulative pin offsets for slot addressing
   const slotBase: number[] = new Array(componentCount).fill(0);
+  let totalPinSlots = 0;
   {
     let offset = 0;
     for (let i = 0; i < componentCount; i++) {
       slotBase[i] = offset;
       offset += allPins[i]!.length;
+    }
+    totalPinSlots = offset;
+  }
+
+  const wireVirtualBase = totalPinSlots;
+  const totalSlots = totalPinSlots + wires.length * 2;
+  const uf = new UnionFind(totalSlots);
+  const posToNodes = new Map<string, number[]>();
+
+  const addNode = (key: string, node: number): void => {
+    let list = posToNodes.get(key);
+    if (list === undefined) {
+      list = [];
+      posToNodes.set(key, list);
+    }
+    list.push(node);
+  };
+
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const pins = allPins[i]!;
+    for (let j = 0; j < pins.length; j++) {
+      const pin = pins[j]!;
+      const wp = pinWorldPosition(el, pin);
+      addNode(`${wp.x},${wp.y}`, slotBase[i]! + j);
+    }
+  }
+
+  for (let k = 0; k < wires.length; k++) {
+    const wire = wires[k]!;
+    const startNode = wireVirtualBase + k * 2;
+    const endNode = wireVirtualBase + k * 2 + 1;
+    addNode(`${wire.start.x},${wire.start.y}`, startNode);
+    addNode(`${wire.end.x},${wire.end.y}`, endNode);
+    uf.union(startNode, endNode);
+  }
+
+  for (const nodes of posToNodes.values()) {
+    if (nodes.length > 1) {
+      for (let m = 1; m < nodes.length; m++) {
+        uf.union(nodes[0]!, nodes[m]!);
+      }
+    }
+  }
+
+  // Merge Tunnel components with the same label
+  const tunnelsByLabel = new Map<string, number[]>();
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    if (el.typeId === 'Tunnel') {
+      const label = el.getAttribute('label');
+      if (typeof label === 'string' && label.length > 0) {
+        let slots = tunnelsByLabel.get(label);
+        if (slots === undefined) {
+          slots = [];
+          tunnelsByLabel.set(label, slots);
+        }
+        slots.push(slotBase[i]! + 0);
+      }
+    }
+  }
+  for (const tunnelSlots of tunnelsByLabel.values()) {
+    for (let m = 1; m < tunnelSlots.length; m++) {
+      uf.union(tunnelSlots[0]!, tunnelSlots[m]!);
+    }
+  }
+
+  // Assign net IDs from union-find roots (pin slots only)
+  const rootToNetId = new Map<number, number>();
+  let nextNetId = 0;
+  for (let i = 0; i < componentCount; i++) {
+    const pins = allPins[i]!;
+    for (let j = 0; j < pins.length; j++) {
+      const slot = slotBase[i]! + j;
+      const root = uf.find(slot);
+      if (!rootToNetId.has(root)) {
+        rootToNetId.set(root, nextNetId++);
+      }
+    }
+  }
+  const netCount = nextNetId;
+  const slotToNetIdArr: number[] = new Array(totalPinSlots).fill(0);
+  for (let i = 0; i < componentCount; i++) {
+    const pins = allPins[i]!;
+    for (let j = 0; j < pins.length; j++) {
+      const slot = slotBase[i]! + j;
+      const root = uf.find(slot);
+      slotToNetIdArr[slot] = rootToNetId.get(root) ?? 0;
     }
   }
 

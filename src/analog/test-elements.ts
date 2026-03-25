@@ -73,6 +73,7 @@ export function makeResistor(
   const G_val = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -128,6 +129,7 @@ export function makeVoltageSource(
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -185,6 +187,7 @@ export function makeCurrentSource(
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -247,6 +250,7 @@ export function makeDiode(
 
   return {
     pinNodeIds: [nodeAnode, nodeCathode],
+    allNodeIds: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
@@ -358,6 +362,7 @@ export function makeCapacitor(
 
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
@@ -450,6 +455,7 @@ export function makeInductor(
 
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: true,
@@ -539,6 +545,7 @@ export function makeAcVoltageSource(
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,

@@ -60,6 +60,7 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
 function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogElement {
   return {
     pinNodeIds: [...pinNodes.values()],
+    allNodeIds: [...pinNodes.values()],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -89,7 +90,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "",
-    models: { analog: { factory: () => ({ pinNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }) } },
+    models: { analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }) } },
   });
 
   // In: one OUTPUT pin at (0,0), label and bitWidth from props
@@ -184,8 +185,8 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
  *     pin B:   LOCAL (0,2) → world (10, 2)
  *     pin out: LOCAL (2,1) → world (12, 1)
  *
- * Each pin gets a wire connecting it to a distinct endpoint so buildNodeMap
- * assigns it a unique non-zero MNA node ID.
+ * Each pin gets a wire connecting it to a distinct endpoint so the node map
+ * builder assigns it a unique non-zero MNA node ID.
  */
 function buildCircuit(propsMap: Map<string, PropertyValue> = new Map()) {
   const circuit = new Circuit({ engineType: "analog" });
@@ -202,8 +203,7 @@ function buildCircuit(propsMap: Map<string, PropertyValue> = new Map()) {
   circuit.addElement(xorEl);
 
   // Ground element at (0,0) with a pin at LOCAL (0,0) → world (0,0)
-  // buildNodeMap identifies ground by finding Ground elements whose pins
-  // touch wire endpoints.
+  // Ground is identified by finding Ground elements whose pins touch wire endpoints.
   const gndEl = makeStubElFactory("Ground", () => [{
     direction: PinDirection.BIDIRECTIONAL,
     position: { x: 0, y: 0 },

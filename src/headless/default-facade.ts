@@ -42,7 +42,7 @@ import { TransistorModelRegistry } from '../analog/transistor-model-registry.js'
 import { registerAllCmosGateModels } from '../analog/transistor-models/cmos-gates.js';
 import { registerCmosDFlipflop } from '../analog/transistor-models/cmos-flipflop.js';
 import { registerDarlingtonModels } from '../analog/transistor-models/darlington.js';
-import { detectEngineMode, partitionMixedCircuit } from '../engine/mixed-partition.js';
+import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/save.js';
 import { deserializeCircuit } from '../io/load.js';
@@ -133,34 +133,27 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._clockManager = null;
     this._dcOpResult = null;
 
-    // Resolve engine mode: "auto" detects from components present
+    // Resolve engine mode: "auto" detects from components present.
+    // Only route to analog if there is at least one component that has an
+    // analog model but no digital model. Components with both models (gates
+    // with behavioral analog) do not force analog mode.
+    const NEUTRAL_TYPES = new Set([
+      'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
+      'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+    ]);
     let engineMode = circuit.metadata.engineType;
     if (engineMode === 'auto') {
-      const detected = detectEngineMode(circuit, this._registry);
-      if (detected === 'mixed' || detected === 'analog') {
-        engineMode = 'analog'; // mixed uses the analog path with bridge partition
-      } else {
-        engineMode = 'digital';
-      }
+      const hasAnalogOnly = circuit.elements.some(el => {
+        if (NEUTRAL_TYPES.has(el.typeId)) return false;
+        const def = this._registry.get(el.typeId);
+        if (def === undefined) return false;
+        return hasAnalogModel(def) && !hasDigitalModel(def);
+      });
+      engineMode = hasAnalogOnly ? 'analog' : 'digital';
     }
 
     if (engineMode === 'analog') {
-      // Check for mixed-mode: partition digital-only elements into a bridge
-      const detected = detectEngineMode(circuit, this._registry);
-      let compileInput: Circuit | import('../engine/flatten.js').FlattenResult;
-
-      if (detected === 'mixed') {
-        const { analogCircuit, partition } = partitionMixedCircuit(circuit, this._registry);
-        compileInput = {
-          circuit: analogCircuit,
-          crossEngineBoundaries: [],
-          mixedModePartitions: [partition],
-        };
-      } else {
-        compileInput = circuit;
-      }
-
-      const compiledAnalog = compileAnalogCircuit(compileInput, this._registry, getTransistorModels());
+      const compiledAnalog = compileAnalogCircuit(circuit, this._registry, getTransistorModels());
       this._compiledAnalog = compiledAnalog;
 
       const analogEngine = new MNAEngine();

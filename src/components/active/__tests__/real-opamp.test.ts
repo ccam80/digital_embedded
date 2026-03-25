@@ -67,6 +67,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -88,6 +89,7 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
   let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchRow,
     isNonlinear: false,
     isReactive: false,

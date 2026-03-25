@@ -45,6 +45,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   private _solver: SparseSolver | null = null;
 
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
@@ -58,6 +59,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   constructor(pinModel: DigitalOutputPinModel) {
     this._pinModel = pinModel;
     this.pinNodeIds = [pinModel.nodeId];
+    this.allNodeIds = [pinModel.nodeId];
   }
 
   /**
@@ -197,6 +199,7 @@ export class BridgeInputAdapter implements AnalogElement {
   private _solver: SparseSolver | null = null;
 
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: false = false;
   readonly isReactive: true = true;
@@ -210,6 +213,7 @@ export class BridgeInputAdapter implements AnalogElement {
   constructor(pinModel: DigitalInputPinModel) {
     this._pinModel = pinModel;
     this.pinNodeIds = [pinModel.nodeId];
+    this.allNodeIds = [pinModel.nodeId];
   }
 
   /**

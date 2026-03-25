@@ -82,17 +82,36 @@ export function isSubcircuitHost(el: CircuitElement): el is SubcircuitHost {
  * engine type differs from the outer circuit's engine type. The analog
  * compiler uses these to insert bridge adapter elements.
  */
+/**
+ * Describes one cut point between the analog and digital domains.
+ */
+export interface InternalCutPoint {
+  label: string;
+  direction: "in" | "out";
+  innerLabel: string;
+  bitWidth: number;
+  position: { x: number; y: number };
+}
+
+/**
+ * A partition of digital-only elements extracted from a mixed circuit.
+ */
+export interface InternalDigitalPartition {
+  internalCircuit: Circuit;
+  cutPoints: InternalCutPoint[];
+  instanceName: string;
+}
+
 export interface FlattenResult {
   /** The flattened circuit (leaf elements only, except cross-engine placeholders). */
   circuit: Circuit;
   /** Boundaries that the compiler must handle via bridge adapters. */
   crossEngineBoundaries: CrossEngineBoundary[];
   /**
-   * Mixed-mode partitions produced by the mixed-mode partitioner when a
-   * circuit contains both analog-only and digital-only components at the
-   * top level. The analog compiler creates bridge instances for each.
+   * Mixed-mode partitions for circuits containing both analog-only and
+   * digital-only components. The analog compiler creates bridge instances for each.
    */
-  mixedModePartitions?: import("./mixed-partition.js").MixedModePartition[];
+  mixedModePartitions?: InternalDigitalPartition[];
 }
 
 // ---------------------------------------------------------------------------

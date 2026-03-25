@@ -83,7 +83,6 @@ import { AnalogScopePanel } from '../runtime/analog-scope-panel.js';
 import type { ConcreteCompiledAnalogCircuit } from '../analog/compiled-analog-circuit.js';
 import type { AcParams } from '../analog/ac-analysis.js';
 import { BodePlotRenderer } from '../runtime/bode-plot.js';
-import { detectEngineMode } from '../engine/mixed-partition.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
 import type { BodeViewport } from '../runtime/bode-plot.js';
 import { analyseCircuit } from '../analysis/model-analyser.js';
@@ -516,8 +515,17 @@ export function initApp(search?: string): void {
   function isAnalogOrMixed(): boolean {
     if (circuit.metadata.engineType === 'analog') return true;
     if (circuit.metadata.engineType === 'auto') {
-      const detected = detectEngineMode(circuit, registry);
-      return detected === 'analog' || detected === 'mixed';
+      const neutralTypes = new Set([
+        'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
+        'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+      ]);
+      const hasAnalogOnly = circuit.elements.some(el => {
+        if (neutralTypes.has(el.typeId)) return false;
+        const def = registry.get(el.typeId);
+        if (def === undefined) return false;
+        return hasAnalogModel(def) && !hasDigitalModel(def);
+      });
+      return hasAnalogOnly;
     }
     return false;
   }

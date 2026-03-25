@@ -413,7 +413,7 @@ describe("Factory", () => {
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3] });
+    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
@@ -432,7 +432,7 @@ describe("Factory", () => {
       new Map([["In_1", 1], ["out", 2]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2] });
+    Object.assign(element, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
 
     expect(element).toBeDefined();
     expect(element.pinNodeIds.length).toBe(2);
@@ -479,7 +479,7 @@ describe("Factory", () => {
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3] });
+    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });
@@ -491,7 +491,7 @@ describe("Factory", () => {
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3] });
+    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });
@@ -503,7 +503,7 @@ describe("Factory", () => {
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3] });
+    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
   });

@@ -499,18 +499,10 @@ describe("ComponentRegistry", () => {
       registry.register(makeDefinition("PldDiode"));
       registry.registerAlias("Diode", "PldDiode");
 
-      // An alias occupying "Diode" would shadow a later canonical "Diode"
-      // registration (get() checks aliases first). The fix is to never
-      // create such an alias — verify that the conflict is detectable.
       const diode = makeDefinition("Diode");
-      // register() succeeds (name not in _byName), but get() would return
-      // PldDiode via the alias. This is the bug scenario we guard against
-      // in register-all.ts by not creating the conflicting alias.
       registry.register(diode);
-      // With the alias still present, get("Diode") returns PldDiode —
-      // demonstrating why the alias must not exist.
       const result = registry.get("Diode");
-      expect(result!.name).toBe("PldDiode"); // alias wins (the bug)
+      expect(result!.name).toBe("PldDiode"); // alias takes precedence
     });
 
     it("without the alias, get(Diode) returns the semiconductor Diode", () => {

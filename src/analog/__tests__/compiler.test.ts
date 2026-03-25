@@ -85,6 +85,7 @@ function makeElement(
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
@@ -95,6 +96,7 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
 function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
   return {
     pinNodeIds: [nodePos, nodeNeg],
+    allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
@@ -105,6 +107,7 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: true,
@@ -362,7 +365,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("detects_missing_ground", () => {
-    // No Ground element → buildNodeMap emits no-ground diagnostic
+    // No Ground element → node map builder emits no-ground diagnostic
     const circuit = new Circuit({ engineType: "analog" });
     const registry = buildTestRegistry();
 

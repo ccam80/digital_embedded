@@ -185,6 +185,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  */
 export class AnalogTappedTransformerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
@@ -231,6 +232,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     rSec: number,
   ) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this.branchIndex = branch1;
     this._b2 = branch1 + 1;
     this._b3 = branch1 + 2;

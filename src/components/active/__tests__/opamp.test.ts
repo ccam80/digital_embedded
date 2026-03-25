@@ -209,6 +209,7 @@ describe("OpAmp", () => {
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
       pinNodeIds: [nOut, 0],
+      allNodeIds: [nOut, 0],
       branchIndex: -1, isNonlinear: false, isReactive: false,
       stamp(solver: SparseSolver): void {
         solver.stamp(nOut - 1, nOut - 1, G_load);
@@ -246,6 +247,7 @@ describe("Integration", () => {
     const G = 1 / resistance;
     return {
       pinNodeIds: [nodeA, nodeB],
+      allNodeIds: [nodeA, nodeB],
       branchIndex: -1, isNonlinear: false, isReactive: false,
       stamp(solver: SparseSolver): void {
         if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);

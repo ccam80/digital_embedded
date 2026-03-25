@@ -75,6 +75,7 @@ function smoothResistance(
 
 export class AnalogFuseElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -109,6 +110,7 @@ export class AnalogFuseElement implements AnalogElement {
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);

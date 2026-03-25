@@ -351,7 +351,7 @@ describe("Testcase", () => {
     });
 
     it("TestcaseDefinition executeFn is executeTestcase", () => {
-      expect(TestcaseDefinition.executeFn).toBe(executeTestcase);
+      expect(TestcaseDefinition.models.digital!.executeFn).toBe(executeTestcase);
     });
 
     it("TestcaseDefinition category is MISC", () => {

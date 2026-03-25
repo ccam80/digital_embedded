@@ -323,7 +323,7 @@ describe("Terminal", () => {
     });
 
     it("TerminalDefinition executeFn is executeTerminal", () => {
-      expect(TerminalDefinition.executeFn).toBe(executeTerminal);
+      expect(TerminalDefinition.models.digital!.executeFn).toBe(executeTerminal);
     });
 
     it("TerminalDefinition category is TERMINAL", () => {
@@ -585,7 +585,7 @@ describe("Keyboard", () => {
     });
 
     it("KeyboardDefinition executeFn is executeKeyboard", () => {
-      expect(KeyboardDefinition.executeFn).toBe(executeKeyboard);
+      expect(KeyboardDefinition.models.digital!.executeFn).toBe(executeKeyboard);
     });
 
     it("KeyboardDefinition category is TERMINAL", () => {

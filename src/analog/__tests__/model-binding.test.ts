@@ -211,6 +211,7 @@ describe("ModelBinding", () => {
         : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [...pinNodes.values()],
+        allNodeIds: [...pinNodes.values()],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,

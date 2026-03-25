@@ -25,7 +25,7 @@ import type { CircuitElement } from "../core/element.js";
 import type { TransistorModelRegistry } from "./transistor-model-registry.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { PropertyBag } from "../core/properties.js";
-import { buildNodeMap } from "./node-map.js";
+import { pinWorldPosition } from "../core/pin.js";
 
 // ---------------------------------------------------------------------------
 // TransistorExpansionResult
@@ -55,6 +55,90 @@ export interface TransistorExpansionResult {
  * @param nextNodeId       - Closure that returns the next unique MNA node ID on each call
  * @returns TransistorExpansionResult with elements, internal node count, and diagnostics
  */
+function buildWireToNodeId(subcircuit: Circuit): Map<Wire, number> {
+  const pointToId = new Map<string, number>();
+  let nextId = 0;
+
+  function getOrCreate(p: { x: number; y: number }): number {
+    const k = `${p.x},${p.y}`;
+    let id = pointToId.get(k);
+    if (id === undefined) { id = nextId++; pointToId.set(k, id); }
+    return id;
+  }
+
+  const wireStartIds: number[] = [];
+  const wireEndIds: number[] = [];
+  for (const wire of subcircuit.wires) {
+    wireStartIds.push(getOrCreate(wire.start));
+    wireEndIds.push(getOrCreate(wire.end));
+  }
+
+  const total = nextId;
+  const parent = Array.from({ length: Math.max(total, 1) }, (_, i) => i);
+  const rank = new Array<number>(Math.max(total, 1)).fill(0);
+
+  function find(i: number): number {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]!]!; i = parent[i]!; }
+    return i;
+  }
+  function union(a: number, b: number): void {
+    const ra = find(a); const rb = find(b);
+    if (ra === rb) return;
+    if (rank[ra]! < rank[rb]!) parent[ra] = rb;
+    else if (rank[ra]! > rank[rb]!) parent[rb] = ra;
+    else { parent[rb] = ra; rank[ra]!++; }
+  }
+
+  for (let i = 0; i < subcircuit.wires.length; i++) {
+    union(wireStartIds[i]!, wireEndIds[i]!);
+  }
+
+  for (const el of subcircuit.elements) {
+    for (const pin of el.getPins()) {
+      const wp = pinWorldPosition(el, pin);
+      const pinId = getOrCreate(wp);
+      while (parent.length <= pinId) { parent.push(parent.length); rank.push(0); }
+    }
+  }
+
+  const groundElements = subcircuit.elements.filter(el => el.typeId === "Ground");
+  const groundRoots = new Set<number>();
+  for (const gnd of groundElements) {
+    for (const pin of gnd.getPins()) {
+      const wp = pinWorldPosition(gnd, pin);
+      const id = pointToId.get(`${wp.x},${wp.y}`);
+      if (id !== undefined) groundRoots.add(find(id));
+    }
+  }
+
+  if (groundRoots.size === 0 && parent.length > 0) {
+    const groupCount = new Map<number, number>();
+    for (let i = 0; i < parent.length; i++) {
+      const r = find(i); groupCount.set(r, (groupCount.get(r) ?? 0) + 1);
+    }
+    let bestRoot = 0; let bestCount = 0;
+    for (const [r, c] of groupCount) {
+      if (c > bestCount) { bestCount = c; bestRoot = r; }
+    }
+    groundRoots.add(bestRoot);
+  }
+
+  const rootToNodeId = new Map<number, number>();
+  let nextNodeId = 1;
+  for (const gr of groundRoots) rootToNodeId.set(gr, 0);
+  for (let i = 0; i < parent.length; i++) {
+    const r = find(i);
+    if (!rootToNodeId.has(r)) rootToNodeId.set(r, nextNodeId++);
+  }
+
+  const wireToNodeId = new Map<Wire, number>();
+  for (let i = 0; i < subcircuit.wires.length; i++) {
+    const r = find(wireStartIds[i]!);
+    wireToNodeId.set(subcircuit.wires[i]!, rootToNodeId.get(r) ?? 0);
+  }
+  return wireToNodeId;
+}
+
 export function expandTransistorModel(
   componentDef: ComponentDefinition,
   outerPinNodeIds: number[],
@@ -109,9 +193,8 @@ export function expandTransistorModel(
     return { elements: [], internalNodeCount: 0, diagnostics };
   }
 
-  // Build a node map for the subcircuit to get wire-to-nodeId mappings
-  const subNodeMap = buildNodeMap(subcircuit);
-  const subWireToNodeId = subNodeMap.wireToNodeId;
+  // Build wire-to-nodeId mapping for the subcircuit
+  const subWireToNodeId = buildWireToNodeId(subcircuit);
 
   // Classify subcircuit elements into:
   //   - In/Out interface elements (label-matched to outer pins or VDD/GND)
@@ -229,7 +312,7 @@ export function expandTransistorModel(
 
     const props = el.getProperties();
     const core = factory(remappedNodes, -1, props, () => 0);
-    const analogEl: AnalogElement = Object.assign(core, { pinNodeIds: remappedNodes });
+    const analogEl: AnalogElement = Object.assign(core, { pinNodeIds: remappedNodes, allNodeIds: remappedNodes });
     elements.push(analogEl);
   }
 

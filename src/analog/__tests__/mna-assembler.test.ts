@@ -1,17 +1,14 @@
 /**
- * Tests for MNA infrastructure: node mapping, MNA assembler, and test elements.
+ * Tests for MNA infrastructure: MNA assembler and test elements.
  *
  * Test groups:
- *   NodeMapping  — buildNodeMap wire grouping, ground detection, label mapping
  *   Stamping     — full solve with resistors, voltage sources, current sources
  *   Assembler    — stampLinear / stampNonlinear / checkAllConverged behaviour
  *   Convergence  — checkAllConverged edge cases
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { Circuit, Wire } from "../../core/circuit.js";
 import { SparseSolver } from "../sparse-solver.js";
-import { buildNodeMap } from "../node-map.js";
 import { MNAAssembler } from "../mna-assembler.js";
 import {
   makeResistor,
@@ -19,195 +16,6 @@ import {
   makeCurrentSource,
 } from "../test-elements.js";
 import type { AnalogElement } from "../element.js";
-import type { CircuitElement } from "../../core/element.js";
-import type { Pin } from "../../core/pin.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { PropertyBag, PropertyValue } from "../../core/properties.js";
-import type { SerializedElement } from "../../core/element.js";
-import { PinDirection } from "../../core/pin.js";
-
-// ---------------------------------------------------------------------------
-// Minimal mock CircuitElement for node mapping tests
-// ---------------------------------------------------------------------------
-
-function makeMockElement(
-  typeId: string,
-  pinPositions: Array<{ x: number; y: number }>,
-  labelProp?: string,
-): CircuitElement {
-  const pins: Pin[] = pinPositions.map((pos, i) => ({
-    direction: PinDirection.BIDIRECTIONAL,
-    position: pos,
-    label: `pin${i}`,
-    bitWidth: 1,
-    isNegated: false,
-    isClock: false,
-  }));
-
-  const props = new Map<string, PropertyValue>();
-  if (labelProp !== undefined) {
-    props.set("label", labelProp);
-  }
-
-  const propertyBag: PropertyBag = {
-    has(name: string) { return props.has(name); },
-    get<T>(name: string): T { return props.get(name) as T; },
-    set(name: string, value: PropertyValue) { props.set(name, value); },
-    clone() { return this; },
-    keys() { return Array.from(props.keys()); },
-  } as unknown as PropertyBag;
-
-  return {
-    typeId,
-    instanceId: `${typeId}-${Math.random().toString(36).slice(2)}`,
-    position: { x: 0, y: 0 },
-    rotation: 0,
-    mirror: false,
-    getPins() { return pins; },
-    getProperties() { return propertyBag; },
-    getAttribute(name: string) { return props.get(name); },
-    draw(_ctx: RenderContext) {},
-    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
-    serialize(): SerializedElement {
-      return {
-        typeId,
-        instanceId: this.instanceId,
-        position: this.position,
-        rotation: 0,
-        mirror: false,
-        properties: {},
-      };
-    },
-    getHelpText() { return ""; },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// NodeMapping tests
-// ---------------------------------------------------------------------------
-
-describe("NodeMapping", () => {
-  it("assigns_unique_node_ids", () => {
-    // Build a circuit with 3 disjoint wire groups plus a ground wire group.
-    // Each group is a single wire segment not sharing endpoints with others.
-    const circuit = new Circuit();
-
-    // Ground element at (0,0) — wire group 0
-    const gnd = makeMockElement("Ground", [{ x: 0, y: 0 }]);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 10 }));
-
-    // Group 1: isolated wire at y=20
-    circuit.addWire(new Wire({ x: 0, y: 20 }, { x: 10, y: 20 }));
-
-    // Group 2: isolated wire at y=30
-    circuit.addWire(new Wire({ x: 0, y: 30 }, { x: 10, y: 30 }));
-
-    // Group 3: isolated wire at y=40
-    circuit.addWire(new Wire({ x: 0, y: 40 }, { x: 10, y: 40 }));
-
-    const nodeMap = buildNodeMap(circuit);
-
-    expect(nodeMap.nodeCount).toBe(3);
-    expect(nodeMap.diagnostics).toHaveLength(0);
-  });
-
-  it("ground_is_node_zero", () => {
-    const circuit = new Circuit();
-
-    // Ground element with pin at (5, 5)
-    const gnd = makeMockElement("Ground", [{ x: 5, y: 5 }]);
-    circuit.addElement(gnd);
-
-    // Wire connected to ground pin at (5,5)
-    const gndWire1 = new Wire({ x: 5, y: 5 }, { x: 15, y: 5 });
-    const gndWire2 = new Wire({ x: 15, y: 5 }, { x: 25, y: 5 });
-    circuit.addWire(gndWire1);
-    circuit.addWire(gndWire2);
-
-    const nodeMap = buildNodeMap(circuit);
-
-    expect(nodeMap.wireToNodeId.get(gndWire1)).toBe(0);
-    expect(nodeMap.wireToNodeId.get(gndWire2)).toBe(0);
-  });
-
-  it("merged_wires_share_node_id", () => {
-    const circuit = new Circuit();
-
-    // Ground element
-    const gnd = makeMockElement("Ground", [{ x: 0, y: 0 }]);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 1, y: 0 }));
-
-    // Two wires sharing an endpoint at (10, 10) — both should get node ID 1
-    const wire1 = new Wire({ x: 0, y: 10 }, { x: 10, y: 10 });
-    const wire2 = new Wire({ x: 10, y: 10 }, { x: 20, y: 10 });
-    circuit.addWire(wire1);
-    circuit.addWire(wire2);
-
-    const nodeMap = buildNodeMap(circuit);
-
-    const id1 = nodeMap.wireToNodeId.get(wire1);
-    const id2 = nodeMap.wireToNodeId.get(wire2);
-
-    expect(id1).toBeDefined();
-    expect(id2).toBeDefined();
-    expect(id1).toBe(id2);
-    expect(id1).not.toBe(0); // not ground
-  });
-
-  it("labels_mapped", () => {
-    const circuit = new Circuit();
-
-    // Ground element
-    const gnd = makeMockElement("Ground", [{ x: 0, y: 0 }]);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 10 }));
-
-    // Node 1: wire group at y=20, with an In element labelled "A"
-    const wire1 = new Wire({ x: 0, y: 20 }, { x: 10, y: 20 });
-    circuit.addWire(wire1);
-    const inEl = makeMockElement("In", [{ x: 0, y: 20 }], "A");
-    circuit.addElement(inEl);
-
-    // Node 2: wire group at y=30, with an Out element labelled "Y"
-    const wire2 = new Wire({ x: 0, y: 30 }, { x: 10, y: 30 });
-    circuit.addWire(wire2);
-    const outEl = makeMockElement("Out", [{ x: 0, y: 30 }], "Y");
-    circuit.addElement(outEl);
-
-    const nodeMap = buildNodeMap(circuit);
-
-    expect(nodeMap.labelToNodeId.has("A")).toBe(true);
-    expect(nodeMap.labelToNodeId.has("Y")).toBe(true);
-
-    // Both should be non-zero (not ground) and different from each other
-    const nodeA = nodeMap.labelToNodeId.get("A")!;
-    const nodeY = nodeMap.labelToNodeId.get("Y")!;
-    expect(nodeA).toBeGreaterThan(0);
-    expect(nodeY).toBeGreaterThan(0);
-    expect(nodeA).not.toBe(nodeY);
-
-    // Wire node IDs should match the label node IDs
-    expect(nodeMap.wireToNodeId.get(wire1)).toBe(nodeA);
-    expect(nodeMap.wireToNodeId.get(wire2)).toBe(nodeY);
-  });
-
-  it("missing_ground_emits_diagnostic", () => {
-    const circuit = new Circuit();
-
-    // No Ground element — just two isolated wires
-    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 0, y: 20 }, { x: 10, y: 20 }));
-
-    const nodeMap = buildNodeMap(circuit);
-
-    // Should have emitted a no-ground diagnostic, not thrown
-    const noGround = nodeMap.diagnostics.find((d) => d.code === "no-ground");
-    expect(noGround).toBeDefined();
-    expect(noGround!.severity).toBe("warning");
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Stamping tests — full solve

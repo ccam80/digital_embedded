@@ -139,7 +139,7 @@ describe("Potentiometer", () => {
       expect(PotentiometerDefinition.name).toBe("Potentiometer");
     });
 
-    it("PotentiometerDefinition engineType is 'analog'", () => {
+    it("PotentiometerDefinition has analog model", () => {
       expect(PotentiometerDefinition.models?.analog).toBeDefined();
     });
 

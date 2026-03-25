@@ -337,7 +337,7 @@ describe("Crystal", () => {
       expect(CrystalDefinition.name).toBe("QuartzCrystal");
     });
 
-    it("CrystalDefinition engineType is 'analog'", () => {
+    it("CrystalDefinition has analog model", () => {
       expect(CrystalDefinition.models?.analog).toBeDefined();
     });
 

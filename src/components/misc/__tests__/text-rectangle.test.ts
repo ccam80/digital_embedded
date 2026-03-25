@@ -293,7 +293,7 @@ describe("Text", () => {
     });
 
     it("TextDefinition executeFn is executeText", () => {
-      expect(TextDefinition.executeFn).toBe(executeText);
+      expect(TextDefinition.models.digital!.executeFn).toBe(executeText);
     });
 
     it("TextDefinition pinLayout is empty (no pins)", () => {
@@ -566,7 +566,7 @@ describe("Rectangle", () => {
     });
 
     it("RectangleDefinition executeFn is executeRectangle", () => {
-      expect(RectangleDefinition.executeFn).toBe(executeRectangle);
+      expect(RectangleDefinition.models.digital!.executeFn).toBe(executeRectangle);
     });
 
     it("RectangleDefinition pinLayout is empty (no pins)", () => {

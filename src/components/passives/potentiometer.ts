@@ -213,6 +213,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
 class AnalogPotentiometerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
@@ -224,6 +225,7 @@ class AnalogPotentiometerElement implements AnalogElement {
 
   constructor(pinNodeIds: number[], resistance: number, position: number) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this.R = resistance;
     this.position = Math.max(0, Math.min(1, position));
 

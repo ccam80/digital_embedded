@@ -10,9 +10,14 @@
  *  6. patch() returns PatchResult with { diagnostics, addedIds }
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
+import { Circuit, Wire } from '../../core/circuit.js';
+import { PropertyBag } from '../../core/properties.js';
+import { pinWorldPosition } from '../../core/pin.js';
+import type { ComponentRegistry } from '../../core/registry.js';
+import type { CircuitElement } from '../../core/element.js';
 
 const registry = createDefaultRegistry();
 
@@ -242,4 +247,83 @@ describe('DefaultSimulatorFacade', () => {
     expect(engine2).not.toBe(engine1);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Auto-mode compilation
+// ---------------------------------------------------------------------------
+
+let autoModeRegistry: ComponentRegistry;
+
+beforeAll(() => {
+  autoModeRegistry = createDefaultRegistry();
+});
+
+function createAutoModeElement(
+  reg: ComponentRegistry,
+  typeName: string,
+  pos: { x: number; y: number },
+  props?: Record<string, unknown>,
+): CircuitElement {
+  const def = reg.get(typeName);
+  if (!def) throw new Error(`Unknown component type: ${typeName}`);
+  const bag = new PropertyBag(
+    Object.entries(props ?? {}) as [string, import('../../core/properties.js').PropertyValue][],
+  );
+  const el = def.factory(bag);
+  (el as { position: { x: number; y: number } }).position = pos;
+  return el;
+}
+
+describe("DefaultSimulatorFacade auto-mode compilation", () => {
+  it("compiles a pure digital circuit in auto mode", () => {
+    const facade = new DefaultSimulatorFacade(autoModeRegistry);
+    const circuit = facade.build({
+      components: [
+        { id: "A", type: "In", props: { label: "A", bitWidth: 1 } },
+        { id: "B", type: "In", props: { label: "B", bitWidth: 1 } },
+        { id: "gate", type: "And" },
+        { id: "Y", type: "Out", props: { label: "Y" } },
+      ],
+      connections: [
+        ["A:out", "gate:In_1"],
+        ["B:out", "gate:In_2"],
+        ["gate:out", "Y:in"],
+      ],
+    });
+
+    circuit.metadata = { ...circuit.metadata, engineType: "auto" };
+
+    const engine = facade.compile(circuit);
+    expect(engine).toBeDefined();
+  });
+
+  it("compiles a pure analog circuit in auto mode", () => {
+    const facade = new DefaultSimulatorFacade(autoModeRegistry);
+
+    const circuit = new Circuit({ engineType: "auto" });
+    const v1 = createAutoModeElement(autoModeRegistry, "DcVoltageSource", { x: 0, y: 5 }, { label: "V1", voltage: 5 });
+    const r1 = createAutoModeElement(autoModeRegistry, "Resistor", { x: 10, y: 5 }, { label: "R1", resistance: 1000 });
+    const gnd = createAutoModeElement(autoModeRegistry, "Ground", { x: 10, y: 10 });
+    circuit.addElement(v1);
+    circuit.addElement(r1);
+    circuit.addElement(gnd);
+
+    const v1Pins = v1.getPins();
+    const r1Pins = r1.getPins();
+    const gndPins = gnd.getPins();
+    const v1Neg = pinWorldPosition(v1, v1Pins.find(p => p.label === "neg")!);
+    const v1Pos = pinWorldPosition(v1, v1Pins.find(p => p.label === "pos")!);
+    const r1A = pinWorldPosition(r1, r1Pins.find(p => p.label === "A")!);
+    const r1B = pinWorldPosition(r1, r1Pins.find(p => p.label === "B")!);
+    const gndPin = pinWorldPosition(gnd, gndPins[0]!);
+
+    circuit.addWire(new Wire(v1Pos, r1A));
+    circuit.addWire(new Wire(r1B, gndPin));
+    circuit.addWire(new Wire(v1Neg, gndPin));
+
+    const engine = facade.compile(circuit);
+    expect(engine).toBeDefined();
+    expect(facade.getCompiledAnalog()).not.toBeNull();
+  });
 });

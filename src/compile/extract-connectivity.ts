@@ -1,9 +1,7 @@
 /**
  * Unified connectivity extraction — Phase 3 core algorithm.
  *
- * Replaces three separate algorithms (traceNets, buildNodeMap,
- * partitionMixedCircuit's union-find) with a single pass that works for
- * digital, analog, and mixed circuits.
+ * Single pass that works for digital, analog, and mixed circuits.
  */
 
 import type { CircuitElement } from '../core/element.js';

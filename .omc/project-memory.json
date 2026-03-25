@@ -238,68 +238,74 @@
   "hotPaths": [
     {
       "path": "src\\analog\\compiler.ts",
-      "accessCount": 183,
-      "lastAccessed": 1774403994502,
+      "accessCount": 272,
+      "lastAccessed": 1774414514600,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 149,
+      "lastAccessed": 1774413416977,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 111,
-      "lastAccessed": 1774403322810,
+      "accessCount": 149,
+      "lastAccessed": 1774414632722,
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 109,
-      "lastAccessed": 1774403339438,
+      "path": "src\\engine\\compiler.ts",
+      "accessCount": 102,
+      "lastAccessed": 1774414115685,
       "type": "file"
     },
     {
       "path": "src\\editor\\wire-current-resolver.ts",
-      "accessCount": 92,
-      "lastAccessed": 1774395932474,
+      "accessCount": 98,
+      "lastAccessed": 1774409983343,
       "type": "file"
     },
     {
       "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-      "accessCount": 66,
-      "lastAccessed": 1774395721352,
+      "accessCount": 72,
+      "lastAccessed": 1774414554571,
       "type": "file"
     },
     {
-      "path": "src\\analog",
-      "accessCount": 54,
-      "lastAccessed": 1774395924972,
-      "type": "directory"
-    },
-    {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 50,
-      "lastAccessed": 1774404368061,
+      "accessCount": 68,
+      "lastAccessed": 1774413481752,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 49,
-      "lastAccessed": 1774399154497,
+      "accessCount": 62,
+      "lastAccessed": 1774412882243,
       "type": "directory"
     },
     {
-      "path": "src\\analog\\element.ts",
-      "accessCount": 45,
-      "lastAccessed": 1774395707037,
+      "path": "src\\analog",
+      "accessCount": 61,
+      "lastAccessed": 1774414599854,
       "type": "directory"
     },
     {
       "path": "src\\analog\\analog-engine.ts",
-      "accessCount": 45,
-      "lastAccessed": 1774395712049,
+      "accessCount": 59,
+      "lastAccessed": 1774413120106,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analog\\element.ts",
+      "accessCount": 55,
+      "lastAccessed": 1774413117369,
       "type": "directory"
     },
     {
       "path": "src\\components",
-      "accessCount": 43,
-      "lastAccessed": 1774404414947,
+      "accessCount": 48,
+      "lastAccessed": 1774408322096,
       "type": "directory"
     },
     {
@@ -315,15 +321,21 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 26,
-      "lastAccessed": 1774403328953,
+      "path": "src\\analog\\transistor-expansion.ts",
+      "accessCount": 33,
+      "lastAccessed": 1774414269843,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774411190990,
       "type": "file"
     },
     {
-      "path": "src\\analog\\transistor-expansion.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774404014490,
+      "path": "src\\analog\\newton-raphson.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774413119192,
       "type": "directory"
     },
     {
@@ -334,32 +346,44 @@
     },
     {
       "path": "src\\analog\\__tests__\\fet-base.test.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774351251448,
+      "accessCount": 20,
+      "lastAccessed": 1774409366594,
       "type": "file"
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774404086579,
+      "accessCount": 19,
+      "lastAccessed": 1774408332977,
       "type": "file"
     },
     {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774394165241,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\newton-raphson.ts",
-      "accessCount": 12,
-      "lastAccessed": 1774396101470,
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 19,
+      "lastAccessed": 1774413464076,
       "type": "directory"
     },
     {
+      "path": "src\\analog\\controlled-source-base.ts",
+      "accessCount": 18,
+      "lastAccessed": 1774414290590,
+      "type": "file"
+    },
+    {
       "path": "src\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774392341917,
+      "accessCount": 15,
+      "lastAccessed": 1774410222012,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 15,
+      "lastAccessed": 1774411368608,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\node-map.ts",
+      "accessCount": 12,
+      "lastAccessed": 1774412176872,
       "type": "file"
     },
     {
@@ -375,9 +399,9 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\controlled-source-base.ts",
+      "path": "src\\core\\element.ts",
       "accessCount": 10,
-      "lastAccessed": 1774395107429,
+      "lastAccessed": 1774408522586,
       "type": "file"
     },
     {
@@ -387,27 +411,21 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\node-map.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774392342161,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774395712989,
+      "accessCount": 9,
+      "lastAccessed": 1774406764173,
       "type": "directory"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774392972862,
-      "type": "file"
     },
     {
       "path": "src\\components\\semiconductors",
       "accessCount": 7,
       "lastAccessed": 1774394246090,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core",
+      "accessCount": 7,
+      "lastAccessed": 1774412289805,
       "type": "directory"
     },
     {
@@ -417,33 +435,33 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\element.ts",
+      "path": "src\\core\\pin-electrical.ts",
       "accessCount": 6,
-      "lastAccessed": 1774394154715,
+      "lastAccessed": 1774408425440,
       "type": "file"
     },
     {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774348729206,
-      "type": "directory"
+      "path": "src\\headless\\netlist-types.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774408506991,
+      "type": "file"
     },
     {
-      "path": "src\\core",
-      "accessCount": 4,
-      "lastAccessed": 1774392375264,
-      "type": "directory"
+      "path": "src\\headless\\netlist.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774412277933,
+      "type": "file"
+    },
+    {
+      "path": "src\\engine\\net-trace.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774412176231,
+      "type": "file"
     },
     {
       "path": "src\\editor\\wire-renderer.ts",
       "accessCount": 4,
       "lastAccessed": 1774393902159,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\pin-electrical.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774400752502,
       "type": "file"
     },
     {
@@ -453,15 +471,15 @@
       "type": "file"
     },
     {
-      "path": "src\\engine\\net-trace.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774342468587,
-      "type": "file"
-    },
-    {
       "path": "src\\integration\\editor-binding.ts",
       "accessCount": 2,
       "lastAccessed": 1774342548601,
+      "type": "file"
+    },
+    {
+      "path": "src\\analog\\transistor-model-registry.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774410207776,
       "type": "file"
     },
     {
@@ -495,12 +513,6 @@
       "type": "file"
     },
     {
-      "path": "src\\analog\\transistor-model-registry.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774342154188,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\renderer-interface.ts",
       "accessCount": 1,
       "lastAccessed": 1774342434951,
@@ -519,21 +531,9 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\netlist-types.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774342509336,
-      "type": "file"
-    },
-    {
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 1,
       "lastAccessed": 1774342513711,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\netlist.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774342559168,
       "type": "file"
     }
   ],

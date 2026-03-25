@@ -599,7 +599,7 @@ describe("GraphicCard", () => {
     });
 
     it("GraphicCardDefinition executeFn is executeGraphicCard", () => {
-      expect(GraphicCardDefinition.executeFn).toBe(executeGraphicCard);
+      expect(GraphicCardDefinition.models.digital!.executeFn).toBe(executeGraphicCard);
     });
 
     it("GraphicCardDefinition pinLayout has 6 entries", () => {

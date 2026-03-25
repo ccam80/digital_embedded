@@ -23,7 +23,7 @@ import type { SolverDiagnostic } from "../core/analog-engine-interface.js";
 import { pinWorldPosition, PinDirection } from "../core/pin.js";
 import type { PinDeclaration, ResolvedPin } from "../core/pin.js";
 import { PropertyBag } from "../core/properties.js";
-import { buildNodeMap } from "./node-map.js";
+import { hasDigitalModel } from "../core/registry.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { TransistorModelRegistry } from "./transistor-model-registry.js";
 import { expandTransistorModel } from "./transistor-expansion.js";
@@ -35,7 +35,7 @@ import { ModelLibrary, validateModel } from "./model-library.js";
 import { defaultLogicFamily, getLogicFamilyPreset } from "../core/logic-family.js";
 import { resolvePinElectrical } from "../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../core/pin-electrical.js";
-import type { FlattenResult, SubcircuitHost } from "../engine/flatten.js";
+import type { FlattenResult, SubcircuitHost, InternalDigitalPartition, InternalCutPoint } from "../engine/flatten.js";
 import type { CrossEngineBoundary } from "../engine/cross-engine-boundary.js";
 import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
@@ -279,6 +279,370 @@ function detectInductorLoops(
 }
 
 // ---------------------------------------------------------------------------
+// extractDigitalSubcircuit — split mixed-mode circuit into analog + digital parts
+// ---------------------------------------------------------------------------
+
+const NEUTRAL_TYPES_FOR_PARTITION = new Set([
+  "In", "Out", "Ground", "VDD", "Const", "Probe", "Tunnel",
+  "Splitter", "Driver", "NotConnected", "ScopeTrigger",
+]);
+
+function posKeyForPartition(p: { x: number; y: number }): string {
+  return `${Math.round(p.x * 2) / 2},${Math.round(p.y * 2) / 2}`;
+}
+
+class PositionUnionFind {
+  private readonly _parent = new Map<string, string>();
+
+  find(k: string): string {
+    if (!this._parent.has(k)) this._parent.set(k, k);
+    let curr = k;
+    while (this._parent.get(curr) !== curr) {
+      const p = this._parent.get(curr)!;
+      this._parent.set(curr, this._parent.get(p) ?? p);
+      curr = this._parent.get(curr)!;
+    }
+    return curr;
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra !== rb) this._parent.set(ra, rb);
+  }
+}
+
+interface PartitionPinInfo {
+  element: import("../core/element.js").CircuitElement;
+  pinLabel: string;
+  direction: PinDirection;
+  worldPos: { x: number; y: number };
+  bitWidth: number;
+  isDigital: boolean;
+}
+
+function extractDigitalSubcircuit(
+  circuit: Circuit,
+  registry: ComponentRegistry,
+): { analogCircuit: Circuit; partition: InternalDigitalPartition } {
+  const digitalElements = new Set<import("../core/element.js").CircuitElement>();
+  const analogElements = new Set<import("../core/element.js").CircuitElement>();
+
+  for (const el of circuit.elements) {
+    const def = registry.get(el.typeId);
+    if (!def) continue;
+    if (NEUTRAL_TYPES_FOR_PARTITION.has(el.typeId)) {
+      analogElements.add(el);
+      continue;
+    }
+    if (hasDigitalModel(def) && def.models?.analog === undefined) {
+      digitalElements.add(el);
+    } else {
+      analogElements.add(el);
+    }
+  }
+
+  const posToPins = new Map<string, PartitionPinInfo[]>();
+  for (const el of circuit.elements) {
+    const isDigit = digitalElements.has(el);
+    for (const pin of el.getPins()) {
+      const wp = pinWorldPosition(el, pin);
+      const key = posKeyForPartition(wp);
+      if (!posToPins.has(key)) posToPins.set(key, []);
+      posToPins.get(key)!.push({
+        element: el,
+        pinLabel: pin.label,
+        direction: pin.direction,
+        worldPos: wp,
+        bitWidth: pin.bitWidth,
+        isDigital: isDigit,
+      });
+    }
+  }
+
+  const uf = new PositionUnionFind();
+  for (const wire of circuit.wires) {
+    uf.union(posKeyForPartition(wire.start), posKeyForPartition(wire.end));
+  }
+
+  interface PartitionNetInfo {
+    hasDigital: boolean;
+    hasAnalog: boolean;
+    digitalPins: PartitionPinInfo[];
+  }
+  const nets = new Map<string, PartitionNetInfo>();
+
+  function getNet(pk: string): PartitionNetInfo {
+    const root = uf.find(pk);
+    if (!nets.has(root)) nets.set(root, { hasDigital: false, hasAnalog: false, digitalPins: [] });
+    return nets.get(root)!;
+  }
+
+  for (const [pk, pins] of posToPins) {
+    const net = getNet(pk);
+    for (const p of pins) {
+      if (p.isDigital) { net.hasDigital = true; net.digitalPins.push(p); }
+      else { net.hasAnalog = true; }
+    }
+  }
+  for (const wire of circuit.wires) {
+    getNet(posKeyForPartition(wire.start));
+    getNet(posKeyForPartition(wire.end));
+  }
+
+  const cutPoints: InternalCutPoint[] = [];
+  let cutIdx = 0;
+  const processedRoots = new Set<string>();
+
+  for (const [pk] of posToPins) {
+    const root = uf.find(pk);
+    if (processedRoots.has(root)) continue;
+    processedRoots.add(root);
+    const net = nets.get(root);
+    if (!net || !net.hasDigital || !net.hasAnalog) continue;
+
+    const hasDigitalOutput = net.digitalPins.some(p => p.direction === PinDirection.OUTPUT);
+    const hasDigitalInput = net.digitalPins.some(p => p.direction === PinDirection.INPUT);
+
+    if (hasDigitalOutput) {
+      const pin = net.digitalPins.find(p => p.direction === PinDirection.OUTPUT)!;
+      const label = `_mxb_o${cutIdx}`;
+      cutPoints.push({ label, direction: "out", innerLabel: label, bitWidth: pin.bitWidth, position: { x: pin.worldPos.x, y: pin.worldPos.y } });
+      cutIdx++;
+    }
+    if (hasDigitalInput) {
+      const pin = net.digitalPins.find(p => p.direction === PinDirection.INPUT)!;
+      const label = `_mxb_i${cutIdx}`;
+      cutPoints.push({ label, direction: "in", innerLabel: label, bitWidth: pin.bitWidth, position: { x: pin.worldPos.x, y: pin.worldPos.y } });
+      cutIdx++;
+    }
+  }
+
+  const innerCircuit = new Circuit({ engineType: "digital" });
+  for (const el of digitalElements) { innerCircuit.addElement(el); }
+  for (const wire of circuit.wires) {
+    const root = uf.find(posKeyForPartition(wire.start));
+    const net = nets.get(root);
+    if (net?.hasDigital) { innerCircuit.addWire(wire); }
+  }
+  for (const cp of cutPoints) {
+    const typeName = cp.direction === "in" ? "In" : "Out";
+    const def = registry.get(typeName);
+    if (!def) continue;
+    const props = new PropertyBag([["label", cp.label], ["bitWidth", cp.bitWidth]]);
+    const el = def.factory(props);
+    (el as { position: { x: number; y: number } }).position = { x: cp.position.x, y: cp.position.y };
+    innerCircuit.addElement(el);
+  }
+
+  const analogCircuit = new Circuit({ engineType: "analog" });
+  analogCircuit.metadata = { ...circuit.metadata, engineType: "analog" };
+  for (const el of analogElements) { analogCircuit.addElement(el); }
+  for (const wire of circuit.wires) {
+    const root = uf.find(posKeyForPartition(wire.start));
+    const net = nets.get(root);
+    if (net?.hasAnalog) { analogCircuit.addWire(wire); }
+  }
+
+  return {
+    analogCircuit,
+    partition: { internalCircuit: innerCircuit, cutPoints, instanceName: "MixedDigitalPartition" },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildAnalogNodeMap — internal node-map builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the MNA node map for a circuit using union-find over wire endpoints
+ * and component pin world positions.
+ *
+ * Ground elements are always assigned node 0. All other wire groups receive
+ * sequential IDs starting at 1.
+ */
+function buildAnalogNodeMap(
+  circuit: Circuit,
+): {
+  nodeCount: number;
+  diagnostics: SolverDiagnostic[];
+  wireToNodeId: Map<Wire, number>;
+  labelToNodeId: Map<string, number>;
+  positionToNodeId: Map<string, number>;
+} {
+  const diagnostics: SolverDiagnostic[] = [];
+  const { elements, wires } = circuit;
+
+  // Step 1: Collect all unique endpoint positions across all wires
+  const pointToId = new Map<string, number>();
+  let nextId = 0;
+
+  function getOrCreateId(p: { x: number; y: number }): number {
+    const k = `${p.x},${p.y}`;
+    let id = pointToId.get(k);
+    if (id === undefined) {
+      id = nextId++;
+      pointToId.set(k, id);
+    }
+    return id;
+  }
+
+  const wireStartIds: number[] = [];
+  const wireEndIds: number[] = [];
+  for (const wire of wires) {
+    wireStartIds.push(getOrCreateId(wire.start));
+    wireEndIds.push(getOrCreateId(wire.end));
+  }
+
+  // Step 2: Union-find — each wire merges its two endpoints
+  const ufSize = Math.max(nextId, 1);
+  const ufParent = Array.from({ length: ufSize }, (_, i) => i);
+  const ufRank = new Array<number>(ufSize).fill(0);
+
+  function ufFind(i: number): number {
+    while (ufParent[i] !== i) {
+      ufParent[i] = ufParent[ufParent[i]!]!;
+      i = ufParent[i]!;
+    }
+    return i;
+  }
+
+  function ufUnion(a: number, b: number): void {
+    const ra = ufFind(a);
+    const rb = ufFind(b);
+    if (ra === rb) return;
+    if (ufRank[ra]! < ufRank[rb]!) { ufParent[ra] = rb; }
+    else if (ufRank[ra]! > ufRank[rb]!) { ufParent[rb] = ra; }
+    else { ufParent[rb] = ra; ufRank[ra]!++; }
+  }
+
+  for (let i = 0; i < wires.length; i++) {
+    ufUnion(wireStartIds[i]!, wireEndIds[i]!);
+  }
+
+  // Add component pin world positions — grow arrays as needed
+  for (const el of elements) {
+    const pins = el.getPins();
+    for (const pin of pins) {
+      const wp = pinWorldPosition(el, pin);
+      const pinId = getOrCreateId(wp);
+      while (ufParent.length <= pinId) {
+        ufParent.push(ufParent.length);
+        ufRank.push(0);
+      }
+    }
+  }
+
+  // Step 3: Identify ground group
+  const groundElements = elements.filter(el => el.typeId === "Ground");
+  const groundRoots = new Set<number>();
+  for (const gnd of groundElements) {
+    for (const pin of gnd.getPins()) {
+      const wp = pinWorldPosition(gnd, pin);
+      const id = pointToId.get(`${wp.x},${wp.y}`);
+      if (id !== undefined) {
+        groundRoots.add(ufFind(id));
+      }
+    }
+  }
+
+  // Step 3b: Merge Tunnel components with the same label
+  const tunnelsByLabel = new Map<string, number[]>();
+  for (const el of elements) {
+    if (el.typeId !== "Tunnel") continue;
+    const props = el.getProperties();
+    const netName = props.has("NetName") ? String(props.get("NetName")) : "";
+    if (netName.length === 0) continue;
+    const pins = el.getPins();
+    if (pins.length === 0) continue;
+    const wp = pinWorldPosition(el, pins[0]!);
+    const id = pointToId.get(`${wp.x},${wp.y}`);
+    if (id === undefined) continue;
+    let slots = tunnelsByLabel.get(netName);
+    if (slots === undefined) { slots = []; tunnelsByLabel.set(netName, slots); }
+    slots.push(id);
+  }
+  for (const tunnelIds of tunnelsByLabel.values()) {
+    for (let m = 1; m < tunnelIds.length; m++) {
+      ufUnion(tunnelIds[0]!, tunnelIds[m]!);
+    }
+  }
+
+  if (groundRoots.size === 0 && ufParent.length > 0) {
+    const groupCount = new Map<number, number>();
+    for (let i = 0; i < ufParent.length; i++) {
+      const root = ufFind(i);
+      groupCount.set(root, (groupCount.get(root) ?? 0) + 1);
+    }
+    let bestRoot = 0;
+    let bestCount = 0;
+    for (const [root, count] of groupCount) {
+      if (count > bestCount) { bestCount = count; bestRoot = root; }
+    }
+    groundRoots.add(bestRoot);
+    diagnostics.push(
+      makeDiagnostic("no-ground", "warning", "No Ground element found in circuit", {
+        explanation:
+          "MNA simulation requires a ground reference node. " +
+          "The most-connected wire group has been assigned as ground (node 0). " +
+          "Add a Ground element to suppress this warning.",
+        suggestions: [{ text: "Add a Ground element connected to the reference node.", automatable: false }],
+      }),
+    );
+  }
+
+  // Step 4: Assign MNA node IDs
+  const rootToNodeId = new Map<number, number>();
+  let nextNodeId = 1;
+  for (const gr of groundRoots) {
+    rootToNodeId.set(gr, 0);
+  }
+  for (let i = 0; i < ufParent.length; i++) {
+    const root = ufFind(i);
+    if (!rootToNodeId.has(root)) {
+      rootToNodeId.set(root, nextNodeId++);
+    }
+  }
+  const nodeCount = nextNodeId - 1;
+
+  // Step 5: Build wireToNodeId
+  const wireToNodeId = new Map<Wire, number>();
+  for (let i = 0; i < wires.length; i++) {
+    const root = ufFind(wireStartIds[i]!);
+    wireToNodeId.set(wires[i]!, rootToNodeId.get(root) ?? 0);
+  }
+
+  // Step 6: Build labelToNodeId
+  const labelToNodeId = new Map<string, number>();
+  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe"]);
+  for (const el of elements) {
+    if (!labelTypes.has(el.typeId)) continue;
+    let label: string | undefined;
+    const props = el.getProperties();
+    if (props.has("label")) { label = String(props.get("label")); }
+    if (!label) continue;
+    for (const pin of el.getPins()) {
+      const wp = pinWorldPosition(el, pin);
+      const id = pointToId.get(`${wp.x},${wp.y}`);
+      if (id !== undefined) {
+        const root = ufFind(id);
+        labelToNodeId.set(label, rootToNodeId.get(root) ?? 0);
+        break;
+      }
+    }
+  }
+
+  // Step 7: Build positionToNodeId
+  const positionToNodeId = new Map<string, number>();
+  for (const [key, id] of pointToId) {
+    const root = ufFind(id);
+    positionToNodeId.set(key, rootToNodeId.get(root) ?? 0);
+  }
+
+  return { nodeCount, diagnostics, wireToNodeId, labelToNodeId, positionToNodeId };
+}
+
+// ---------------------------------------------------------------------------
 // Main compiler entry point
 // ---------------------------------------------------------------------------
 
@@ -305,15 +669,40 @@ export function compileAnalogCircuit(
   // Unwrap: accept either a raw Circuit or a FlattenResult
   let circuit: Circuit;
   let crossEngineBoundaries: CrossEngineBoundary[];
-  let mixedModePartitions: import("../engine/mixed-partition.js").MixedModePartition[];
+  let mixedModePartitions: InternalDigitalPartition[];
   if ("crossEngineBoundaries" in circuitOrResult) {
     circuit = circuitOrResult.circuit;
     crossEngineBoundaries = circuitOrResult.crossEngineBoundaries;
     mixedModePartitions = circuitOrResult.mixedModePartitions ?? [];
   } else {
-    circuit = circuitOrResult;
+    const rawCircuit = circuitOrResult;
     crossEngineBoundaries = [];
-    mixedModePartitions = [];
+
+    // Detect truly mixed-mode: partition only when BOTH digital-only AND
+    // analog-only components are present. If only digital-only components
+    // exist (no analog), let the per-element check below emit diagnostics.
+    const neutralTypes = new Set([
+      'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
+      'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+    ]);
+    let hasDigitalOnlyEl = false;
+    let hasAnalogOnlyEl = false;
+    for (const el of rawCircuit.elements) {
+      if (neutralTypes.has(el.typeId)) continue;
+      const def = registry.get(el.typeId);
+      if (!def) continue;
+      if (hasDigitalModel(def) && def.models?.analog === undefined) hasDigitalOnlyEl = true;
+      if (def.models?.analog !== undefined && !hasDigitalModel(def)) hasAnalogOnlyEl = true;
+    }
+
+    if (hasDigitalOnlyEl && hasAnalogOnlyEl) {
+      const { analogCircuit, partition } = extractDigitalSubcircuit(rawCircuit, registry);
+      circuit = analogCircuit;
+      mixedModePartitions = [partition];
+    } else {
+      circuit = rawCircuit;
+      mixedModePartitions = [];
+    }
   }
 
   // Step 1: Verify engine type (accept "analog" and "auto" for mixed-mode)
@@ -325,7 +714,7 @@ export function compileAnalogCircuit(
   }
 
   // Step 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
-  const nodeMap = buildNodeMap(circuit);
+  const nodeMap = buildAnalogNodeMap(circuit);
 
   // Resolve the circuit's logic family (used for _pinElectrical injection)
   const circuitFamily = circuit.metadata.logicFamily
@@ -398,7 +787,7 @@ export function compileAnalogCircuit(
     }
 
     // Ground and Tunnel elements do not need an analog factory — they are structural.
-    // Tunnel nets are merged by label in buildNodeMap(); no stamping needed.
+    // Tunnel nets are merged by label during node-map construction; no stamping needed.
     if (el.typeId === "Ground" || el.typeId === "Tunnel") {
       elementMeta.push({
         el,
@@ -1069,9 +1458,8 @@ export function compileAnalogCircuit(
     );
   }
 
-  // Re-check missing ground (buildNodeMap already handles this, but the spec
-  // says the compiler re-checks). If nodeMap already emitted a no-ground
-  // diagnostic we don't duplicate it.
+  // Re-check missing ground. If the node-map builder already emitted a
+  // no-ground diagnostic, don't duplicate it.
   const hasGroundDiag = nodeMap.diagnostics.some((d) => d.code === "no-ground");
   if (!hasGroundDiag) {
     const hasGround = circuit.elements.some(
@@ -1248,7 +1636,7 @@ export function compileAnalogCircuit(
  * the partition is a Ground element whose pin appears in that group.
  * Ground group → node 0; all other groups → sequential from 1.
  */
-function buildNodeMapFromPartition(
+function buildAnalogNodeMapFromPartition(
   partition: SolverPartition,
   diagnostics: SolverDiagnostic[],
 ): {
@@ -1377,8 +1765,8 @@ function buildNodeMapFromPartition(
  * Compile an analog partition into a `ConcreteCompiledAnalogCircuit`.
  *
  * Accepts a `SolverPartition` (pre-computed by `partitionByDomain`) instead of
- * a raw `Circuit`. Connectivity is pre-computed — `buildNodeMap()` is not
- * called. All analog-specific logic (internal node allocation, branch row
+ * a raw `Circuit`. Connectivity is pre-computed in the partition's groups.
+ * All analog-specific logic (internal node allocation, branch row
  * allocation, MNA matrix sizing, factory invocation, topology validation)
  * is preserved.
  *
@@ -1391,13 +1779,13 @@ export function compileAnalogPartition(
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
-  // Build node map from partition groups instead of calling buildNodeMap(circuit)
+  // Build node map from partition groups
   const {
     nodeCount: externalNodeCount,
     wireToNodeId,
     labelToNodeId,
     positionToNodeId,
-  } = buildNodeMapFromPartition(partition, diagnostics);
+  } = buildAnalogNodeMapFromPartition(partition, diagnostics);
 
   // Resolve logic family from partition components' circuit metadata.
   // Use default logic family since partition doesn't carry circuit metadata.

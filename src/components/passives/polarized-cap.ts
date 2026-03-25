@@ -217,6 +217,7 @@ function stampRHS(solver: SparseSolver, row: number, val: number): void {
 
 export class AnalogPolarizedCapElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
+  readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = true;
@@ -250,6 +251,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     emitDiagnostic?: (diag: SolverDiagnostic) => void,
   ) {
     this.pinNodeIds = pinNodeIds;
+    this.allNodeIds = pinNodeIds;
     this.C = capacitance;
     this.G_esr = 1 / Math.max(esr, MIN_RESISTANCE);
     this.G_leak = 1 / Math.max(rLeak, MIN_RESISTANCE);

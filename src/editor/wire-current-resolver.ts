@@ -200,7 +200,6 @@ export class WireCurrentResolver {
 
     for (let eIdx = 0; eIdx < elements.length; eIdx++) {
       // Prefer resolvedPins (pinLayout order, label+vertex+nodeId) when available.
-      // Fall back to elementPinVertices for backwards compatibility.
       const resolvedPins = elementResolvedPins?.get(eIdx);
       const vertices = resolvedPins
         ? resolvedPins.map((rp) => rp.wireVertex)

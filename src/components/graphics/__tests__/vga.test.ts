@@ -501,7 +501,7 @@ describe("VGA", () => {
     });
 
     it("VGADefinition executeFn is executeVga", () => {
-      expect(VGADefinition.executeFn).toBe(executeVga);
+      expect(VGADefinition.models.digital!.executeFn).toBe(executeVga);
     });
 
     it("VGADefinition pinLayout has 6 entries", () => {

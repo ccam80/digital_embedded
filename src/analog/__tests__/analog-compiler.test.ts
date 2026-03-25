@@ -81,6 +81,7 @@ function makeElement(
 function makeStubElement(nodeIds: number[]): AnalogElement {
   return {
     pinNodeIds: nodeIds,
+    allNodeIds: nodeIds,
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
