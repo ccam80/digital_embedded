@@ -15,6 +15,7 @@ import { initRenderPipeline } from './render-pipeline.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import { initSimulationController } from './simulation-controller.js';
 import type { SimulationController } from './simulation-controller.js';
+import { initKeyboardHandler } from './keyboard-handler.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
@@ -1131,240 +1132,9 @@ export function initApp(search?: string): void {
     closePopup();
   }, true);
 
-  // -------------------------------------------------------------------------
-  // Keyboard shortcuts
-  // -------------------------------------------------------------------------
-
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    // Don't intercept keys when the user is typing in an input field
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-      // Still allow Escape to close popups
-      if (e.key === 'Escape') {
-        closePopup();
-      }
-      return;
-    }
-
-    if (e.key === 'Escape') {
-      if (placement.isActive()) {
-        placement.cancel();
-        renderPipeline.scheduleRender();
-      } else if (wireDrawing.isActive()) {
-        wireDrawing.cancel();
-        renderPipeline.scheduleRender();
-      } else if (wireDrag.isActive()) {
-        wireDrag.cancel();
-        dragMode = 'none';
-        invalidateCompiled();
-        renderPipeline.scheduleRender();
-      } else if (circuitStack.length > 0) {
-        navigateBack();
-      }
-      return;
-    }
-
-    if (e.key === ' ') {
-      e.preventDefault();
-      if (isSimActive()) {
-        stopSimulation();
-        binding.unbind();
-        facade.invalidate();
-        compiledDirty = true;
-        renderPipeline.scheduleRender();
-      } else {
-        if (!ctx.ensureCompiled()) return;
-        startSimulation();
-      }
-      return;
-    }
-
-    // Block all edit shortcuts during simulation
-    if (isSimActive()) return;
-
-    // Single-letter placement/wire shortcuts — skip when Ctrl/Meta is held
-    if (!e.ctrlKey && !e.metaKey) {
-      if (e.key === 'i' || e.key === 'I') {
-        const def = registry.get('In');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'o' || e.key === 'O') {
-        const def = registry.get('Out');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'c' || e.key === 'C') {
-        const def = registry.get('Capacitor');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === '1') {
-        const def = registry.get('Const');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'v' || e.key === 'V') {
-        const def = registry.get('VoltageSource');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === '+') {
-        const def = registry.get('VDD');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'l' || e.key === 'L') {
-        const def = registry.get('Inductor');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 't' || e.key === 'T') {
-        const def = registry.get('Tunnel');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'g' || e.key === 'G') {
-        const def = registry.get('Ground');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-
-      if (e.key === 'w' || e.key === 'W') {
-        if (placement.isActive()) placement.cancel();
-        const snapped = snapToGrid(lastWorldPt, 1);
-        wireDrawing.startFromPoint(snapped);
-        renderPipeline.scheduleRender();
-        return;
-      }
-
-      if (e.key === 'R') {
-        const def = registry.get('Resistor');
-        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
-        return;
-      }
-    }
-
-    if (e.key === 'r') {
-      if (placement.isActive()) {
-        placement.rotate();
-        renderPipeline.scheduleRender();
-      } else if (!selection.isEmpty()) {
-        const elements = [...selection.getSelectedElements()];
-        if (elements.length > 0) {
-          const cmd = rotateSelection(elements);
-          undoStack.push(cmd);
-          invalidateCompiled();
-        }
-      }
-      return;
-    }
-
-    if (e.key === 'm' || e.key === 'M') {
-      if (placement.isActive()) {
-        placement.mirror();
-        renderPipeline.scheduleRender();
-      } else if (!selection.isEmpty()) {
-        const elements = [...selection.getSelectedElements()];
-        if (elements.length > 0) {
-          const cmd = mirrorSelection(elements);
-          undoStack.push(cmd);
-          invalidateCompiled();
-        }
-      }
-      return;
-    }
-
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (!selection.isEmpty()) {
-        const elements = [...selection.getSelectedElements()];
-        const wires: Wire[] = [...selection.getSelectedWires()];
-        const cmd = deleteSelection(circuit, elements, wires);
-        undoStack.push(cmd);
-        selection.clear();
-        invalidateCompiled();
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      undoStack.undo();
-      invalidateCompiled();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y')) {
-      undoStack.redo();
-      invalidateCompiled();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-      e.preventDefault();
-      if (!selection.isEmpty()) {
-        clipboard = copyToClipboard(
-          [...selection.getSelectedElements()],
-          [...selection.getSelectedWires()],
-          (typeId: string) => registry.get(typeId),
-        );
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-      e.preventDefault();
-      if (!selection.isEmpty()) {
-        clipboard = copyToClipboard(
-          [...selection.getSelectedElements()],
-          [...selection.getSelectedWires()],
-          (typeId: string) => registry.get(typeId),
-        );
-        const elements = [...selection.getSelectedElements()];
-        const wires: Wire[] = [...selection.getSelectedWires()];
-        const cmd = deleteSelection(circuit, elements, wires);
-        undoStack.push(cmd);
-        selection.clear();
-        invalidateCompiled();
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-      e.preventDefault();
-      if (clipboard.entries.length > 0 || clipboard.wires.length > 0) {
-        placement.startPaste(clipboard);
-        placement.updateCursor(lastWorldPt);
-        renderPipeline.scheduleRender();
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-      e.preventDefault();
-      selection.selectAll(circuit);
-      renderPipeline.scheduleRender();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
-      e.preventDefault();
-      ctx.fitViewport();
-      updateZoomDisplay();
-      renderPipeline.scheduleRender();
-      return;
-    }
-  });
-
   // Speed control, simulation loop, and toolbar sim buttons are now owned by
   // SimulationController (initSimulationController, set up below after ctx).
+  // Keyboard shortcuts are registered via initKeyboardHandler (called after ctx is built).
 
   // -------------------------------------------------------------------------
   // Viewer panels (Timing Diagram + Values Table)
@@ -2484,6 +2254,22 @@ export function initApp(search?: string): void {
     },
   });
 
+  // Register all keyboard shortcuts (merges the three former keydown listeners).
+  initKeyboardHandler(ctx, {
+    startSimulation(): void { simController.startSimulation(); },
+    stopSimulation(): void { simController.stopSimulation(); },
+    invalidateCompiled,
+    closePopup,
+    openSearchBar,
+    togglePresentation,
+    exitPresentation,
+    isPresentationMode(): boolean { return presentationMode; },
+    navigateBack(): boolean { navigateBack(); return circuitStack.length >= 0; },
+    updateZoomDisplay,
+    clearDragMode(): void { dragMode = 'none'; },
+    fileInput,
+  });
+
   // Wire up settings dialog (uses simController.loadEngineSettings etc.)
   {
     const settingsOverlay = document.getElementById('settings-overlay');
@@ -3333,18 +3119,7 @@ export function initApp(search?: string): void {
   document.getElementById('btn-presentation-mode')?.addEventListener('click', togglePresentation);
   exitPresentationBtn?.addEventListener('click', exitPresentation);
 
-  // F4 toggle (added to the existing keydown listener via a second listener)
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'F4') {
-      e.preventDefault();
-      togglePresentation();
-      return;
-    }
-    // Esc exits presentation mode (in addition to existing Esc handling)
-    if (e.key === 'Escape' && presentationMode) {
-      exitPresentation();
-    }
-  });
+  // F4 and presentation-mode Escape are handled in initKeyboardHandler.
 
   // -------------------------------------------------------------------------
   // Tablet mode toggle (View menu)
@@ -4121,20 +3896,7 @@ export function initApp(search?: string): void {
     textarea.focus();
   });
 
-  // -------------------------------------------------------------------------
-  // Keyboard: Ctrl+S save, Ctrl+O open
-  // -------------------------------------------------------------------------
-
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      document.getElementById('btn-save')?.click();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-      e.preventDefault();
-      fileInput?.click();
-    }
-  });
+  // Ctrl+S and Ctrl+O are handled in initKeyboardHandler.
 
   // -------------------------------------------------------------------------
   // postMessage adapter
