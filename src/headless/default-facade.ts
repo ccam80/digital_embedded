@@ -14,7 +14,6 @@
 
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
-import type { SimulationEngine } from '../core/engine-interface.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition, ComponentRegistry } from '../core/registry.js';
@@ -40,6 +39,7 @@ import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
 import { DefaultSimulationCoordinator } from '../solver/coordinator.js';
+import { NullSimulationCoordinator } from '../solver/null-coordinator.js';
 
 // ---------------------------------------------------------------------------
 // Step options — facade-specific, not on the SimulatorFacade interface
@@ -61,7 +61,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   // Active session state (reset on each compile())
   private _circuit: Circuit | null = null;
-  private _coordinator: DefaultSimulationCoordinator | null = null;
+  private _coordinator: SimulationCoordinator = new NullSimulationCoordinator();
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -101,7 +101,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._disposeCurrentEngine();
 
     this._circuit = null;
-    this._coordinator = null;
+    this._coordinator = new NullSimulationCoordinator();
 
     const unified = compileUnified(circuit, this._registry, getTransistorModels());
     const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
@@ -122,39 +122,32 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
    * Pass { clockAdvance: false } to skip clock advancement (used by test
    * executors that drive clocks manually).
    */
-  step(coordinator: SimulationCoordinator | SimulationEngine, opts?: StepOptions): void {
+  step(coordinator: SimulationCoordinator, opts?: StepOptions): void {
     const advance = opts?.clockAdvance !== false;
-    if (advance && 'advanceClocks' in coordinator) {
-      (coordinator as SimulationCoordinator).advanceClocks();
+    if (advance) {
+      coordinator.advanceClocks();
     }
     coordinator.step();
   }
 
-  run(coordinator: SimulationCoordinator | SimulationEngine, cycles: number, opts?: StepOptions): void {
+  run(coordinator: SimulationCoordinator, cycles: number, opts?: StepOptions): void {
     for (let i = 0; i < cycles; i++) {
       this.step(coordinator, opts);
     }
   }
 
-  runToStable(engineOrCoord: SimulationCoordinator | SimulationEngine, maxIterations = 1000, opts?: StepOptions): void {
+  runToStable(coordinator: SimulationCoordinator, maxIterations = 1000, opts?: StepOptions): void {
     const settleOpts = opts ?? { clockAdvance: false };
 
-    const coord: SimulationCoordinator | null =
-      'snapshotSignals' in engineOrCoord
-        ? (engineOrCoord as SimulationCoordinator)
-        : this._coordinator;
-
-    if (coord !== null) {
-      for (let iter = 0; iter < maxIterations; iter++) {
-        const before = coord.snapshotSignals();
-        this.step(coord, settleOpts);
-        const after = coord.snapshotSignals();
-        let stable = true;
-        for (let n = 0; n < before.length; n++) {
-          if (before[n] !== after[n]) { stable = false; break; }
-        }
-        if (stable) return;
+    for (let iter = 0; iter < maxIterations; iter++) {
+      const before = coordinator.snapshotSignals();
+      this.step(coordinator, settleOpts);
+      const after = coordinator.snapshotSignals();
+      let stable = true;
+      for (let n = 0; n < before.length; n++) {
+        if (before[n] !== after[n]) { stable = false; break; }
       }
+      if (stable) return;
     }
 
     throw new FacadeError(
@@ -162,10 +155,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     );
   }
 
-  setInput(_engineOrCoord: SimulationCoordinator | SimulationEngine, label: string, value: number): void {
-    if (this._coordinator === null) {
-      throw new FacadeError('No circuit compiled. Call compile() before setInput().');
-    }
+  setInput(_coordinator: SimulationCoordinator, label: string, value: number): void {
     const addr = this._coordinator.compiled.labelSignalMap.get(label);
     if (addr === undefined) {
       const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
@@ -176,10 +166,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._coordinator.writeSignal(addr, { type: 'digital', value });
   }
 
-  readOutput(_engineOrCoord: SimulationCoordinator | SimulationEngine, label: string): number {
-    if (this._coordinator === null) {
-      throw new FacadeError('No circuit compiled. Call compile() before readOutput().');
-    }
+  readOutput(_coordinator: SimulationCoordinator, label: string): number {
     const addr = this._coordinator.compiled.labelSignalMap.get(label);
     if (addr === undefined) {
       const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
@@ -191,8 +178,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return sv.type === 'digital' ? sv.value : sv.voltage;
   }
 
-  readAllSignals(_engineOrCoord: SimulationCoordinator | SimulationEngine): Record<string, number> {
-    if (this._coordinator === null) return {};
+  readAllSignals(_coordinator: SimulationCoordinator): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [label, sv] of this._coordinator.readAllSignals()) {
       result[label] = sv.type === 'digital' ? sv.value : sv.voltage;
@@ -204,7 +190,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Testing
   // =========================================================================
 
-  runTests(engineOrCoord: SimulationCoordinator | SimulationEngine, circuit: Circuit, testData?: string): TestResults {
+  runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): TestResults {
     const resolvedData = testData ?? extractEmbeddedTestData(circuit);
 
     if (resolvedData === null || resolvedData.trim().length === 0) {
@@ -247,19 +233,11 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
     const parsed = parseTestData(resolvedData, inputCount);
 
-    // Test execution requires a digital engine.
-    let digitalEngine: SimulationEngine | null = null;
-    if (engineOrCoord instanceof DefaultSimulationCoordinator) {
-      digitalEngine = engineOrCoord.getDigitalEngine();
-    } else if ('getSignalRaw' in engineOrCoord) {
-      digitalEngine = engineOrCoord as SimulationEngine;
-    }
-
-    if (digitalEngine === null) {
+    if (coordinator instanceof DefaultSimulationCoordinator && coordinator.getDigitalEngine() === null) {
       throw new FacadeError('Test execution requires a digital engine. Analog-only circuits cannot run test vectors.');
     }
 
-    return executeTests(this, digitalEngine, circuit, parsed);
+    return executeTests(this, coordinator, circuit, parsed);
   }
 
   // =========================================================================
@@ -298,9 +276,23 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Session accessors (not on SimulatorFacade interface)
   // =========================================================================
 
-  /** Returns the currently active DefaultSimulationCoordinator, or null if none compiled yet. */
-  getCoordinator(): DefaultSimulationCoordinator | null {
+  /**
+   * Returns the active coordinator (never null — returns NullSimulationCoordinator
+   * before compile() is called).
+   */
+  getCoordinator(): SimulationCoordinator {
     return this._coordinator;
+  }
+
+  /**
+   * Returns the active DefaultSimulationCoordinator if a circuit has been compiled,
+   * or null if no circuit is compiled yet. Use this at sites that need the concrete
+   * type (e.g. accessing `.compiled.digital` / `.compiled.analog`).
+   */
+  getActiveCoordinator(): DefaultSimulationCoordinator | null {
+    return this._coordinator instanceof DefaultSimulationCoordinator
+      ? this._coordinator
+      : null;
   }
 
   /** Returns the last compiled circuit, or null if none compiled yet. */
@@ -315,14 +307,13 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   /** Returns the unified compiled circuit, or null if none compiled yet. */
   getCompiledUnified(): CompiledCircuitUnified | null {
-    return this._coordinator?.compiled ?? null;
+    const active = this.getActiveCoordinator();
+    return active ? active.compiled : null;
   }
 
   /** Returns the DC operating-point result, or null if no analog backend. */
   getDcOpResult(): import('../core/analog-engine-interface.js').DcOpResult | null {
-    const coord = this._coordinator;
-    if (coord === null) return null;
-    return coord.dcOperatingPoint();
+    return this._coordinator.dcOperatingPoint();
   }
 
   /**
@@ -332,7 +323,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   invalidate(): void {
     this._disposeCurrentEngine();
     this._circuit = null;
-    this._coordinator = null;
+    this._coordinator = new NullSimulationCoordinator();
   }
 
   // =========================================================================
@@ -340,8 +331,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // =========================================================================
 
   private _disposeCurrentEngine(): void {
-    if (this._coordinator === null) return;
     this._coordinator.dispose();
-    this._coordinator = null;
+    this._coordinator = new NullSimulationCoordinator();
   }
 }

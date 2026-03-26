@@ -149,7 +149,6 @@ export function validateDtsDocument(data: unknown): DtsDocument {
     }
   }
 
-  // Normalize legacy 'digb' format tag to 'dts' in the returned document.
   const normalized = { ...doc, format: 'dts' };
   return normalized as unknown as DtsDocument;
 }

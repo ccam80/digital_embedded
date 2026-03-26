@@ -17,7 +17,7 @@ import { describe, it, expect, vi } from "vitest";
 import { executeTests } from "../executor.js";
 import type { ParsedTestData, ParsedVector, TestValue } from "../executor.js";
 import type { SimulatorFacade } from "@/headless/facade";
-import type { SimulationEngine } from "@/core/engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { Circuit } from "@/core/circuit";
 
 // ---------------------------------------------------------------------------
@@ -35,13 +35,13 @@ function makeMockFacade(outputValues: Record<string, number> = {}): {
   const calls = { setInput: [] as Array<[string, number]>, runToStable: 0 };
 
   const facade = {
-    setInput: vi.fn((_engine: SimulationEngine, label: string, value: number) => {
+    setInput: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
       calls.setInput.push([label, value]);
     }),
-    readOutput: vi.fn((_engine: SimulationEngine, label: string): number => {
+    readOutput: vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
       return outputValues[label] ?? 0;
     }),
-    runToStable: vi.fn((_engine: SimulationEngine) => {
+    runToStable: vi.fn((_coordinator: SimulationCoordinator) => {
       calls.runToStable++;
     }),
     // Unused facade methods — present to satisfy the interface
@@ -61,8 +61,8 @@ function makeMockFacade(outputValues: Record<string, number> = {}): {
   return { facade, calls };
 }
 
-/** A stub engine — the executor only passes it through to the facade. */
-const stubEngine = {} as SimulationEngine;
+/** A stub coordinator — the executor only passes it through to the facade. */
+const stubEngine = {} as SimulationCoordinator;
 
 /** A stub circuit — unused by the executor logic. */
 const stubCircuit = {} as Circuit;
@@ -123,11 +123,11 @@ describe("executeTests", () => {
     let lastB = 0;
     const andFacade = {
       ...facade,
-      setInput: vi.fn((_engine: SimulationEngine, label: string, value: number) => {
+      setInput: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
         if (label === "A") lastA = value;
         if (label === "B") lastB = value;
       }),
-      readOutput: vi.fn((_engine: SimulationEngine, _label: string): number => {
+      readOutput: vi.fn((_coordinator: SimulationCoordinator, _label: string): number => {
         return lastA & lastB;
       }),
       runToStable: vi.fn(),

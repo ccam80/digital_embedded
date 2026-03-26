@@ -51,6 +51,10 @@ export class PropertyPanel {
   private _collapsed = false;
   /** Currently shown inputs, keyed by property key. */
   private _inputs: Map<string, PropertyInput> = new Map();
+  /** The element whose properties are being edited (needed for commit). */
+  private _element: CircuitElement | null = null;
+  /** Property definitions for the current element (needed for commit). */
+  private _definitions: PropertyDefinition[] = [];
 
   constructor(container: HTMLElement) {
     this._container = container;
@@ -69,6 +73,8 @@ export class PropertyPanel {
     definitions: PropertyDefinition[],
   ): void {
     this._clear();
+    this._element = element;
+    this._definitions = definitions;
 
     const bag = element.getProperties();
     /** Rows with conditional visibility, keyed by the property they depend on. */
@@ -95,16 +101,9 @@ export class PropertyPanel {
         row.style.display = def.visibleWhen.values.includes(depValue as PropertyValue) ? "" : "none";
       }
 
-      // Capture oldValue at callback registration time.
+      // Capture key at callback registration time.
       const capturedKey = def.key;
       input.onChange((newValue) => {
-        const oldValue = bag.has(capturedKey)
-          ? bag.get(capturedKey)
-          : def.defaultValue;
-        bag.set(capturedKey, newValue);
-        for (const cb of this._changeCallbacks) {
-          cb(capturedKey, oldValue, newValue);
-        }
         // Update conditional visibility of dependent rows
         const deps = conditionalRows.get(capturedKey);
         if (deps) {
@@ -126,6 +125,33 @@ export class PropertyPanel {
    */
   onPropertyChange(callback: PropertyChangeCallback): void {
     this._changeCallbacks.push(callback);
+  }
+
+  /**
+   * Read every input widget's current DOM value and commit any that differ
+   * from the element's PropertyBag. Returns true if at least one value changed.
+   * Fires _changeCallbacks once per changed key so undo integration works.
+   */
+  commitAll(): boolean {
+    if (!this._element) return false;
+    const bag = this._element.getProperties();
+    let anyChanged = false;
+
+    for (const [key, input] of this._inputs) {
+      const newValue = input.getValue();
+      const def = this._definitions.find(d => d.key === key);
+      const oldValue = bag.has(key) ? bag.get(key) : def?.defaultValue;
+
+      if (!_valuesEqual(oldValue, newValue)) {
+        bag.set(key, newValue);
+        anyChanged = true;
+        for (const cb of this._changeCallbacks) {
+          cb(key, oldValue ?? newValue, newValue);
+        }
+      }
+    }
+
+    return anyChanged;
   }
 
   // ---------------------------------------------------------------------------
@@ -391,6 +417,8 @@ export class PropertyPanel {
   private _clear(): void {
     this._container.innerHTML = "";
     this._inputs.clear();
+    this._element = null;
+    this._definitions = [];
   }
 
   private _buildRow(label: string, inputEl: HTMLElement): HTMLElement {
@@ -405,4 +433,19 @@ export class PropertyPanel {
     row.appendChild(inputEl);
     return row;
   }
+}
+
+/** Shallow equality for PropertyValue, handling number[] arrays. */
+function _valuesEqual(a: PropertyValue | undefined, b: PropertyValue | undefined): boolean {
+  if (a === b) return true;
+  if (a === undefined || b === undefined) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+  // eslint-disable-next-line eqeqeq
+  return a == b;
 }

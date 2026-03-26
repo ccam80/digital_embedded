@@ -149,6 +149,12 @@ export interface CircuitElement {
    * undefined if not present.
    */
   getAttribute(name: string): PropertyValue | undefined;
+
+  /**
+   * Map-like property write used by interactive toggling (In, Switch, etc.)
+   * during simulation.
+   */
+  setAttribute(name: string, value: PropertyValue): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +205,10 @@ export abstract class AbstractCircuitElement implements CircuitElement {
       return this._properties.get(name);
     }
     return undefined;
+  }
+
+  setAttribute(name: string, value: PropertyValue): void {
+    this._properties.set(name, value);
   }
 
   serialize(): SerializedElement {

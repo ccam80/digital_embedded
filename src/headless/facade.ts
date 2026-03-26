@@ -8,7 +8,6 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
-import type { SimulationEngine } from '../core/engine-interface.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition } from '../core/registry.js';
@@ -96,59 +95,59 @@ export interface SimulatorFacade {
    * Execute one propagation cycle of the engine
    * Evaluates all components once in topological order, updates net states.
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    */
-  step(coordinator: SimulationCoordinator | SimulationEngine): void;
+  step(coordinator: SimulationCoordinator): void;
 
   /**
    * Execute N propagation cycles
    * Useful for settling combinational logic or advancing state machines.
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    * @param cycles - Number of cycles to execute
    */
-  run(coordinator: SimulationCoordinator | SimulationEngine, cycles: number): void;
+  run(coordinator: SimulationCoordinator, cycles: number): void;
 
   /**
    * Execute cycles until the circuit reaches a stable state
    * (all signals unchanged for a full cycle).
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    * @param maxIterations - Safety limit (default 10000); throws if exceeded
    * @throws FacadeError if circuit oscillates and exceeds maxIterations
    */
-  runToStable(coordinator: SimulationCoordinator | SimulationEngine, maxIterations?: number): void;
+  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
 
   /**
    * Drive an input pin to a specific value
    * Typically called before step() to set switch/input pin states.
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    * @param label - Component label (e.g. "SW0", "Clk")
    * @param value - Numeric value to set
    * @throws FacadeError if label not found or is not an input component
    */
-  setInput(coordinator: SimulationCoordinator | SimulationEngine, label: string, value: number): void;
+  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
 
   /**
    * Read the current value of an output pin
    * Returns the last computed value. Call step() first to update.
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    * @param label - Component label
    * @returns The numeric value
    * @throws FacadeError if label not found or is not an output component
    */
-  readOutput(coordinator: SimulationCoordinator | SimulationEngine, label: string): number;
+  readOutput(coordinator: SimulationCoordinator, label: string): number;
 
   /**
    * Snapshot all signal values in the circuit
    * For diagnostics, saving/restoring state, and test assertions.
    *
-   * @param coordinator - The compiled coordinator (or legacy SimulationEngine)
+   * @param coordinator - The compiled coordinator
    * @returns Map of net label (or ID string) to current value
    */
-  readAllSignals(coordinator: SimulationCoordinator | SimulationEngine): Record<string, number>;
+  readAllSignals(coordinator: SimulationCoordinator): Record<string, number>;
 
   // ============================================
   // Testing: Run automated test vectors
@@ -160,13 +159,13 @@ export interface SimulatorFacade {
    * If testData is provided, it is used as the test vector source instead of
    * the circuit's embedded Testcase components.
    *
-   * @param engine - The compiled engine
+   * @param coordinator - The compiled coordinator
    * @param circuit - The circuit (searched for Testcase components when testData is absent)
    * @param testData - Optional external test vector string in Digital test format
    * @returns TestResults with pass/fail counts and per-vector details
    * @throws FacadeError if no test data is available from either source
    */
-  runTests(coordinator: SimulationCoordinator | SimulationEngine, circuit: Circuit, testData?: string): TestResults;
+  runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): TestResults;
 
   // ============================================
   // File I/O: Load and save circuits

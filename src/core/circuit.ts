@@ -241,7 +241,7 @@ export class Circuit {
    * hand-edited or externally-generated files may not.  Call this after
    * loading a .dig file to normalise the wire list.
    */
-  splitWiresAtJunctions(): void {
+  splitWiresAtJunctions(extraPoints?: ReadonlySet<string>): void {
     // Collect all "interesting" points: wire endpoints + pin world positions
     const points = new Set<string>();
     for (const wire of this.wires) {
@@ -253,6 +253,11 @@ export class Circuit {
         const wp = pinWorldPosition(el, pin);
         points.add(`${wp.x},${wp.y}`);
       }
+    }
+    // Include caller-supplied points (e.g. pre-merge junction points that
+    // mergeCollinearWires() may have absorbed into wire interiors).
+    if (extraPoints) {
+      for (const p of extraPoints) points.add(p);
     }
 
     // For each wire, check if any point lies strictly on its interior.
@@ -309,6 +314,37 @@ export class Circuit {
         }
       }
     }
+  }
+
+  /**
+   * Normalize wires: merge collinear segments, then split at junctions.
+   *
+   * Before merging, snapshots all junction points (where 3+ wire endpoints
+   * coincide). After merging absorbs those points into wire interiors, the
+   * split pass re-introduces them via the extraPoints parameter.
+   */
+  normalizeWires(): void {
+    // 1. Snapshot junction points: any point where 3+ wire endpoints meet.
+    const endpointCount = new Map<string, number>();
+    for (const wire of this.wires) {
+      const sk = `${wire.start.x},${wire.start.y}`;
+      const ek = `${wire.end.x},${wire.end.y}`;
+      endpointCount.set(sk, (endpointCount.get(sk) ?? 0) + 1);
+      endpointCount.set(ek, (endpointCount.get(ek) ?? 0) + 1);
+    }
+    const junctionPoints = new Set<string>();
+    for (const [key, count] of endpointCount) {
+      if (count >= 3) junctionPoints.add(key);
+    }
+
+    // 2. Merge collinear/overlapping/duplicate wire segments.
+    this.mergeCollinearWires();
+
+    // 3. Split at junctions, including the pre-merge junction points.
+    this.splitWiresAtJunctions(junctionPoints);
+
+    // 4. Clean up any zero-length artifacts.
+    this.removeZeroLengthWires();
   }
 
   /**

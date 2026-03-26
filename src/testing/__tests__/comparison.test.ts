@@ -16,7 +16,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { compareCircuits } from "../comparison.js";
 import type { ComparatorFacade } from "../comparison.js";
-import type { SimulationEngine } from "@/core/engine-interface";
+import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { Circuit, CircuitMetadata } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
@@ -104,12 +104,12 @@ function makeFacade(
   readOutputFn: (engineTag: "ref" | "stu", label: string) => number
 ): ComparatorFacade {
   let engineCount = 0;
-  const engineTags = new WeakMap<SimulationEngine, "ref" | "stu">();
+  const engineTags = new WeakMap<SimulationCoordinator, "ref" | "stu">();
 
-  const compile = vi.fn((_circuit: Circuit): SimulationEngine => {
+  const compile = vi.fn((_circuit: Circuit): SimulationCoordinator => {
     engineCount++;
     const tag: "ref" | "stu" = engineCount === 1 ? "ref" : "stu";
-    const eng = {} as SimulationEngine;
+    const eng = {} as SimulationCoordinator;
     engineTags.set(eng, tag);
     return eng;
   });
@@ -117,8 +117,8 @@ function makeFacade(
   const setInput = vi.fn();
   const runToStable = vi.fn();
 
-  const readOutput = vi.fn((_engine: SimulationEngine, label: string): number => {
-    const tag = engineTags.get(_engine) ?? "ref";
+  const readOutput = vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
+    const tag = engineTags.get(_coordinator) ?? "ref";
     return readOutputFn(tag, label);
   });
 

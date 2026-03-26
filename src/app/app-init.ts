@@ -65,14 +65,14 @@ import type { Point } from '../core/renderer-interface.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
-import { TimingDiagramPanel } from '../runtime/timing-diagram.js';
+// TimingDiagramPanel removed — unified into ScopePanel
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
 import { SliderPanel } from '../editor/slider-panel.js';
 import { SliderEngineBridge } from '../editor/slider-engine-bridge.js';
-import { AnalogScopePanel } from '../runtime/analog-scope-panel.js';
+import { ScopePanel } from '../runtime/analog-scope-panel.js';
 import type { AcParams } from '../solver/analog/ac-analysis.js';
 import { BodePlotRenderer } from '../runtime/bode-plot.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
@@ -90,6 +90,7 @@ import { exprToString } from '../analysis/expression.js';
 import { findCriticalPath } from '../analysis/path-analysis.js';
 import { analyseSequential } from '../analysis/state-transition.js';
 import type { SequentialAnalysisFacade, SignalSpec } from '../analysis/state-transition.js';
+import type { SignalAddress } from '../compile/types.js';
 
 /** Component type names that are togglable during simulation — skip property popup on dblclick. */
 const TOGGLABLE_TYPES = new Set(["In", "Clock", "Button", "Switch", "SwitchDT", "DipSwitch"]);
@@ -318,35 +319,20 @@ export function initApp(search?: string): void {
     ACTIVE: "Active",
   };
 
-  /** Category keys in digital-first order. */
-  const INSERT_ORDER_DIGITAL = [
-    "IO", "WIRING", "LOGIC", "SWITCHING", "FLIP_FLOPS", "MEMORY",
-    "ARITHMETIC", "PLD", "MISC", "GRAPHICS", "TERMINAL", "74XX",
-    "PASSIVES", "SEMICONDUCTORS", "SOURCES", "ACTIVE",
-  ];
-  /** Category keys in analog-first order. */
+  /** Category keys for the Insert menu. */
   const INSERT_ORDER_ANALOG = [
     "PASSIVES", "SEMICONDUCTORS", "SOURCES", "ACTIVE",
     "IO", "WIRING", "LOGIC", "SWITCHING", "FLIP_FLOPS", "MEMORY",
     "ARITHMETIC", "PLD", "MISC", "GRAPHICS", "TERMINAL", "74XX",
   ];
 
-  /** Rebuild the Insert menu, filtering by engine type. */
+  /** Rebuild the Insert menu. */
   function rebuildInsertMenu(): void {
     if (!insertMenuDropdown) return;
     insertMenuDropdown.innerHTML = '';
     const reg = palette.getRegistry();
-    const engineFilter = palette.getEngineTypeFilter();
-    const isAll = engineFilter === null;
-    const order = (engineFilter === 'analog' || isAll) ? INSERT_ORDER_ANALOG : INSERT_ORDER_DIGITAL;
-    for (const catKey of order) {
-      const allDefs = reg.getByCategory(catKey as any);
-      // Filter by engine type (null = show all)
-      const defs = isAll ? allDefs : allDefs.filter(d => {
-        if (engineFilter === 'digital') return hasDigitalModel(d);
-        if (engineFilter === 'analog') return hasAnalogModel(d);
-        return false;
-      });
+    for (const catKey of INSERT_ORDER_ANALOG) {
+      const defs = reg.getByCategory(catKey as any);
       if (defs.length === 0) continue;
       const sub = document.createElement("div");
       sub.className = "menu-submenu";
@@ -373,32 +359,8 @@ export function initApp(search?: string): void {
   }
   rebuildInsertMenu();
 
-  const propertyContainer = document.getElementById('property-content')!;
-  const propertyPanel = new PropertyPanel(propertyContainer);
-
   selection.onChange(() => {
     const selected = selection.getSelectedElements();
-    if (selected.size === 1) {
-      const element = selected.values().next().value!;
-      const def = registry.get(element.typeId);
-      if (def) {
-        propertyPanel.showProperties(element, def.propertyDefs);
-        if (availableModels(def).length > 1) {
-          propertyPanel.showSimulationModeDropdown(element, def);
-        }
-        if (hasDigitalModel(def)) {
-          const simModel = element.getProperties().has("simulationModel")
-            ? element.getProperties().get("simulationModel") as string
-            : (def.defaultModel ?? "logical");
-          if (simModel === "logical" || simModel === "analog-pins") {
-            const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-            propertyPanel.showPinElectricalOverrides(element, def, family);
-          }
-        }
-      }
-    } else {
-      propertyPanel.clear();
-    }
 
     // --- Populate analog sliders for selected element ---
     if (activeSliderPanel) {
@@ -406,17 +368,15 @@ export function initApp(search?: string): void {
       if (selected.size === 1) {
         const element = selected.values().next().value!;
         const sliderCoordinator = facade.getCoordinator();
-        if (sliderCoordinator) {
-          const sliderProps = sliderCoordinator.getSliderProperties(element);
-          for (const sp of sliderProps) {
-            activeSliderPanel.addSlider(
-              sp.elementIndex,
-              sp.key,
-              sp.label,
-              sp.currentValue,
-              { unit: sp.unit, logScale: sp.logScale },
-            );
-          }
+        const sliderProps = sliderCoordinator.getSliderProperties(element);
+        for (const sp of sliderProps) {
+          activeSliderPanel.addSlider(
+            sp.elementIndex,
+            sp.key,
+            sp.label,
+            sp.currentValue,
+            { unit: sp.unit, logScale: sp.logScale },
+          );
         }
       }
     }
@@ -432,8 +392,7 @@ export function initApp(search?: string): void {
 
   /** True when a simulation is active (any circuit type). */
   function isSimActive(): boolean {
-    const coordinator = facade.getCoordinator();
-    return coordinator !== null && coordinator.getState() === EngineState.RUNNING;
+    return facade.getCoordinator().getState() === EngineState.RUNNING;
   }
 
   /**
@@ -491,20 +450,19 @@ export function initApp(search?: string): void {
     // Clear previous diagnostic overlays — each compile attempt starts fresh.
     diagnosticOverlays = [];
 
-    // Merge any collinear/duplicate wire segments before compiling.
-    // This eliminates redundant wires that create cycles in the wire graph,
-    // which would cause the current resolver to zero-out entire components.
-    circuit.mergeCollinearWires();
+    // Normalize wires: merge collinear/duplicate segments, then split at
+    // junctions.  Preserves 4-way cross-junction topology.
+    circuit.normalizeWires();
 
     if (binding.isBound) {
-      facade.getCoordinator()?.stop?.();
+      facade.getCoordinator().stop();
       binding.unbind();
     }
     disposeAnalog();
 
     try {
       facade.compile(circuit);
-      const coordinator = facade.getCoordinator()!;
+      const coordinator = facade.getCoordinator();
       const unified = coordinator.compiled;
 
       // Check diagnostics from the unified compilation result.
@@ -549,27 +507,22 @@ export function initApp(search?: string): void {
       }
 
       // Bind the editor to the coordinator using unified signal maps.
-      binding.bind(circuit, coordinator, unified.wireSignalMap, unified.labelSignalMap);
+      binding.bind(circuit, coordinator, unified.wireSignalMap, unified.pinSignalMap);
 
       const dcResult = facade.getDcOpResult();
-      if (dcResult && !dcResult.converged) {
-        showStatus('Warning: DC operating point did not converge', true);
-      }
-
       compiledDirty = false;
-      clearStatus();
+      if (dcResult && !dcResult.converged) {
+        showStatus('Warning: DC operating point did not converge — results may be inaccurate', true);
+      } else {
+        clearStatus();
+      }
 
       if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
         for (const sig of watchedSignals) {
           const addr = unified.labelSignalMap.get(sig.name);
           if (addr !== undefined) {
-            if (addr.domain === 'digital') {
-              sig.netId = addr.netId;
-              sig.width = addr.bitWidth;
-            } else {
-              sig.netId = addr.nodeId;
-              sig.width = 1;
-            }
+            sig.addr = addr;
+            sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
           }
         }
         rebuildViewers();
@@ -589,7 +542,7 @@ export function initApp(search?: string): void {
   function invalidateCompiled(): void {
     compiledDirty = true;
     const eng = facade.getCoordinator();
-    if (eng?.getState() === EngineState.RUNNING) eng?.stop?.();
+    if (eng.getState() === EngineState.RUNNING) eng.stop();
     if (binding.isBound) binding.unbind();
     disposeAnalog();
     // Dispose viewer panels — they hold stale net IDs
@@ -600,18 +553,13 @@ export function initApp(search?: string): void {
   const wireSignalAccessAdapter: WireSignalAccess = {
     getWireValue(wire: Wire): { raw: number; width: number } | { voltage: number } | undefined {
       const coordinator = facade.getCoordinator();
-      if (!coordinator) return undefined;
       const addr = coordinator.compiled.wireSignalMap.get(wire);
       if (addr === undefined) return undefined;
-      try {
-        const sv = coordinator.readSignal(addr);
-        if (sv.type === "analog") {
-          return { voltage: sv.voltage };
-        }
-        return { raw: sv.value, width: addr.domain === 'digital' ? addr.bitWidth : 1 };
-      } catch {
-        return undefined;
+      const sv = coordinator.readSignal(addr);
+      if (sv.type === "analog") {
+        return { voltage: sv.voltage };
       }
+      return { raw: sv.value, width: addr.domain === 'digital' ? addr.bitWidth : 1 };
     },
   };
 
@@ -948,38 +896,46 @@ export function initApp(search?: string): void {
 
     // During simulation, only allow toggling interactive components (In, Clock, etc.)
     if (isSimActive()) {
-      if (facade.getCoordinator()?.timingModel !== 'discrete') {
+      if (facade.getCoordinator().timingModel !== 'discrete') {
         // During analog/mixed simulation, allow element selection (for slider panel)
         const elementHit = hitTestElements(worldPt, circuit.elements, hitMargin);
         if (elementHit) {
           selection.clear();
           selection.select(elementHit);
 
-          // Switch toggle during analog simulation — recompile to update conductance
+          // Interactive toggle during analog simulation — recompile to update state
           if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
             const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
-            try {
-              if (momentary) {
-                elementHit.setAttribute('closed', true);
-                const onPointerUp = (): void => {
-                  elementHit.setAttribute('closed', false);
-                  compiledDirty = true;
-                  if (compileAndBind()) {
-                    startSimulation();
-                  }
-                  scheduleRender();
-                };
-                document.addEventListener('pointerup', onPointerUp, { once: true });
-              } else {
-                const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
-                elementHit.setAttribute('closed', !current);
-              }
-              compiledDirty = true;
-              if (compileAndBind()) {
-                startSimulation();
-              }
-            } catch {
-              // ignore toggle errors
+            if (momentary) {
+              elementHit.setAttribute('closed', true);
+              const onPointerUp = (): void => {
+                elementHit.setAttribute('closed', false);
+                compiledDirty = true;
+                if (compileAndBind()) {
+                  startSimulation();
+                }
+                scheduleRender();
+              };
+              document.addEventListener('pointerup', onPointerUp, { once: true });
+            } else {
+              const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+              elementHit.setAttribute('closed', !current);
+            }
+            compiledDirty = true;
+            if (compileAndBind()) {
+              startSimulation();
+            }
+          } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock') {
+            // In/Clock toggle during analog/mixed sim — change defaultValue and recompile
+            const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
+            const current = (elementHit.getAttribute('defaultValue') as number | undefined) ?? 0;
+            const newVal = bitWidth === 1
+              ? (current === 0 ? 1 : 0)
+              : ((current + 1) & ((1 << bitWidth) - 1));
+            elementHit.setAttribute('defaultValue', newVal);
+            compiledDirty = true;
+            if (compileAndBind()) {
+              startSimulation();
             }
           }
         } else {
@@ -992,51 +948,43 @@ export function initApp(search?: string): void {
       const elementHit = hitTestElements(worldPt, circuit.elements, hitMargin);
       if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock')) {
         const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
-        try {
-          const current = binding.getPinValue(elementHit, 'out');
-          const newVal = bitWidth === 1
-            ? (current === 0 ? 1 : 0)
-            : ((current + 1) & ((1 << bitWidth) - 1));
-          binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          const eng = facade.getCoordinator();
-          if (eng?.getState() !== EngineState.RUNNING) {
-            facade.step(eng!, { clockAdvance: elementHit.typeId !== 'Clock' });
-          }
-          scheduleRender();
-        } catch {
-          scheduleRender();
+        const current = binding.getPinValue(elementHit, 'out');
+        const newVal = bitWidth === 1
+          ? (current === 0 ? 1 : 0)
+          : ((current + 1) & ((1 << bitWidth) - 1));
+        binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
+        const eng = facade.getCoordinator();
+        if (eng.getState() !== EngineState.RUNNING) {
+          facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' });
         }
+        scheduleRender();
       }
 
       // Switch toggle: Switch (SPST) and SwitchDT (SPDT) clicked during simulation
       if (elementHit && (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT')) {
         const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
-        try {
-          if (momentary) {
-            // Momentary: set closed=true on pointerdown, release on pointerup
-            elementHit.setAttribute('closed', true);
-            const onPointerUp = (): void => {
-              elementHit.setAttribute('closed', false);
-              const eng = facade.getCoordinator();
-              if (eng?.getState() !== EngineState.RUNNING) {
-                facade.step(eng!, { clockAdvance: true });
-              }
-              scheduleRender();
-            };
-            document.addEventListener('pointerup', onPointerUp, { once: true });
-          } else {
-            // Latching: toggle closed property
-            const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
-            elementHit.setAttribute('closed', !current);
-          }
-          const eng = facade.getCoordinator();
-          if (eng?.getState() !== EngineState.RUNNING) {
-            facade.step(eng!, { clockAdvance: true });
-          }
-          scheduleRender();
-        } catch {
-          scheduleRender();
+        if (momentary) {
+          // Momentary: set closed=true on pointerdown, release on pointerup
+          elementHit.setAttribute('closed', true);
+          const onPointerUp = (): void => {
+            elementHit.setAttribute('closed', false);
+            const eng = facade.getCoordinator();
+            if (eng.getState() !== EngineState.RUNNING) {
+              facade.step(eng, { clockAdvance: true });
+            }
+            scheduleRender();
+          };
+          document.addEventListener('pointerup', onPointerUp, { once: true });
+        } else {
+          // Latching: toggle closed property
+          const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+          elementHit.setAttribute('closed', !current);
         }
+        const eng = facade.getCoordinator();
+        if (eng.getState() !== EngineState.RUNNING) {
+          facade.step(eng, { clockAdvance: true });
+        }
+        scheduleRender();
       }
       return;
     }
@@ -1115,6 +1063,14 @@ export function initApp(search?: string): void {
     if (wireHit) {
       if (e.shiftKey) {
         selection.toggleSelect(wireHit);
+        scheduleRender();
+        return;
+      }
+      // If the clicked point is a wire endpoint (junction), start wire-drawing
+      // from that point instead of dragging the wire segment.
+      const snappedPt = snapToGrid(worldPt, 1);
+      if (isWireEndpoint(snappedPt, circuit)) {
+        wireDrawing.startFromPoint(snappedPt);
         scheduleRender();
         return;
       }
@@ -1341,9 +1297,22 @@ export function initApp(search?: string): void {
   // -------------------------------------------------------------------------
 
   let activePopup: HTMLElement | null = null;
+  let activePopupPanel: PropertyPanel | null = null;
 
   function closePopup(): void {
     if (activePopup) {
+      if (activePopupPanel?.commitAll()) {
+        if (facade.getCoordinator().timingModel !== 'discrete' && isSimActive()) {
+          compiledDirty = true;
+          if (compileAndBind()) {
+            startSimulation();
+          }
+        } else {
+          invalidateCompiled();
+        }
+        scheduleRender();
+      }
+      activePopupPanel = null;
       activePopup.remove();
       activePopup = null;
     }
@@ -1464,10 +1433,10 @@ export function initApp(search?: string): void {
 
     const propsContainer = document.createElement('div');
     popup.appendChild(propsContainer);
-    const tempPanel = new PropertyPanel(propsContainer);
-    tempPanel.showProperties(elementHit, def.propertyDefs);
+    const propertyPopup = new PropertyPanel(propsContainer);
+    propertyPopup.showProperties(elementHit, def.propertyDefs);
     if (availableModels(def).length > 1) {
-      tempPanel.showSimulationModeDropdown(elementHit, def);
+      propertyPopup.showSimulationModeDropdown(elementHit, def);
     }
     if (hasDigitalModel(def)) {
       const simModel = elementHit.getProperties().has("simulationModel")
@@ -1475,21 +1444,10 @@ export function initApp(search?: string): void {
         : (def.defaultModel ?? "logical");
       if (simModel === "logical" || simModel === "analog-pins") {
         const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-        tempPanel.showPinElectricalOverrides(elementHit, def, family);
+        propertyPopup.showPinElectricalOverrides(elementHit, def, family);
       }
     }
-    tempPanel.onPropertyChange(() => {
-      if (facade.getCoordinator()?.timingModel !== 'discrete' && isSimActive()) {
-        // Seamlessly recompile — don't hard-stop the analog simulation
-        compiledDirty = true;
-        if (compileAndBind()) {
-          startSimulation();
-        }
-      } else {
-        invalidateCompiled();
-      }
-      scheduleRender();
-    });
+    activePopupPanel = propertyPopup;
 
     const screenPt = canvasToScreen(e);
     const container = canvas.parentElement!;
@@ -1790,25 +1748,24 @@ export function initApp(search?: string): void {
   const speedUnitEl = document.querySelector('.speed-unit') as HTMLElement | null;
 
   function updateSpeedDisplay(): void {
-    const coordinator = facade.getCoordinator();
-    if (!coordinator || !speedInput) return;
-    const fmt = coordinator.formatSpeed();
-    speedInput.value = fmt.value;
+    if (!speedInput) return;
+    const fmt = facade.getCoordinator().formatSpeed();
+    speedInput.value = String(facade.getCoordinator().speed);
     if (speedUnitEl) speedUnitEl.textContent = fmt.unit;
   }
 
   document.getElementById('btn-speed-down')?.addEventListener('click', () => {
-    facade.getCoordinator()?.adjustSpeed(0.1);
+    facade.getCoordinator().adjustSpeed(0.1);
     updateSpeedDisplay();
   });
 
   document.getElementById('btn-speed-up')?.addEventListener('click', () => {
-    facade.getCoordinator()?.adjustSpeed(10);
+    facade.getCoordinator().adjustSpeed(10);
     updateSpeedDisplay();
   });
 
   speedInput?.addEventListener('change', () => {
-    facade.getCoordinator()?.parseSpeed(speedInput.value);
+    facade.getCoordinator().parseSpeed(speedInput.value);
     updateSpeedDisplay();
   });
 
@@ -1825,7 +1782,6 @@ export function initApp(search?: string): void {
 
   function startSimulation(): void {
     const coordinator = facade.getCoordinator();
-    if (!coordinator) return;
     if (coordinator.getState() === EngineState.RUNNING) return;
 
     selection.clear();
@@ -1947,7 +1903,7 @@ export function initApp(search?: string): void {
       cancelAnimationFrame(runRafHandle);
       runRafHandle = -1;
     }
-    facade.getCoordinator()?.stop();
+    facade.getCoordinator().stop();
     scheduleRender();
   }
 
@@ -1958,7 +1914,6 @@ export function initApp(search?: string): void {
   document.getElementById('btn-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
-    if (!coordinator) return;
     if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
     try {
       facade.step(coordinator);
@@ -1987,7 +1942,6 @@ export function initApp(search?: string): void {
   document.getElementById('btn-micro-step')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
-    if (!coordinator) return;
     if (coordinator.supportsMicroStep()) {
       if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
       try { coordinator.microStep(); clearStatus(); } catch (err) {
@@ -2005,7 +1959,7 @@ export function initApp(search?: string): void {
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (compiledDirty && !compileAndBind()) return;
     const coordinator = facade.getCoordinator();
-    if (!coordinator?.supportsRunToBreak()) {
+    if (!coordinator.supportsRunToBreak()) {
       showStatus('Run-to-break is not available for this circuit type');
       return;
     }
@@ -2043,41 +1997,35 @@ export function initApp(search?: string): void {
   const viewerValuesContainer = document.getElementById('viewer-values');
   const viewerTabs = viewerPanel?.querySelectorAll('.viewer-tab');
 
-  let activeTimingPanel: TimingDiagramPanel | null = null;
   let activeDataTable: DataTablePanel | null = null;
 
   /** Watched signals — persisted across recompilations by name. */
   interface WatchedSignal {
     name: string;
-    netId: number;
+    addr: SignalAddress;
     width: number;
     group: SignalGroup;
     panelIndex: number;
   }
   const watchedSignals: WatchedSignal[] = [];
 
-  /** Multi-panel scope state. Each panel has its own canvas and AnalogScopePanel. */
+  /** Multi-panel scope state. Each panel has its own canvas and ScopePanel. */
   interface ScopePanelEntry {
     canvas: HTMLCanvasElement;
-    panel: AnalogScopePanel;
+    panel: ScopePanel;
   }
   const scopePanels: ScopePanelEntry[] = [];
 
   /** Tear down any active viewer panels and unregister observers. */
   function disposeViewers(): void {
-    const eng = facade.getCoordinator();
-    if (activeTimingPanel) {
-      (eng as unknown as { removeMeasurementObserver(o: unknown): void } | null)?.removeMeasurementObserver(activeTimingPanel);
-      activeTimingPanel.dispose();
-      activeTimingPanel = null;
-    }
+    const coordinator = facade.getCoordinator();
     for (const entry of scopePanels) {
       entry.panel.dispose();
       entry.canvas.remove();
     }
     scopePanels.length = 0;
     if (activeDataTable) {
-      (eng as unknown as { removeMeasurementObserver(o: unknown): void } | null)?.removeMeasurementObserver(activeDataTable);
+      coordinator.removeMeasurementObserver(activeDataTable);
       activeDataTable.dispose();
       activeDataTable = null;
     }
@@ -2098,63 +2046,42 @@ export function initApp(search?: string): void {
   function rebuildViewers(): void {
     disposeViewers();
     const coordinator = facade.getCoordinator();
-    if (!coordinator || watchedSignals.length === 0) return;
-
-    const isAnalog = coordinator.timingModel !== 'discrete';
+    if (watchedSignals.length === 0) return;
 
     if (viewerTimingContainer) {
-      if (isAnalog) {
-        // Group signals by panelIndex for multi-panel scope view
-        const panelGroups = new Map<number, WatchedSignal[]>();
-        for (const s of watchedSignals) {
-          const idx = s.panelIndex ?? 0;
-          if (!panelGroups.has(idx)) panelGroups.set(idx, []);
-          panelGroups.get(idx)!.push(s);
-        }
+      // Group signals by panelIndex for multi-panel scope view
+      const panelGroups = new Map<number, WatchedSignal[]>();
+      for (const s of watchedSignals) {
+        const idx = s.panelIndex ?? 0;
+        if (!panelGroups.has(idx)) panelGroups.set(idx, []);
+        panelGroups.get(idx)!.push(s);
+      }
 
-        // Create a canvas + AnalogScopePanel per panel group
-        const sortedIndices = [...panelGroups.keys()].sort((a, b) => a - b);
-        for (const idx of sortedIndices) {
-          const signals = panelGroups.get(idx)!;
-          const cvs = document.createElement('canvas');
-          viewerTimingContainer.appendChild(cvs);
-          // Size after DOM insertion so clientWidth/Height are available
-          requestAnimationFrame(() => sizeCanvasInContainer(cvs));
-          const panel = new AnalogScopePanel(cvs, coordinator);
-          for (const s of signals) {
-            panel.addVoltageChannel(
-              { domain: 'analog' as const, nodeId: s.netId },
-              s.name,
-            );
-          }
-          _attachScopeContextMenu(cvs, panel, signals);
-          scopePanels.push({ canvas: cvs, panel });
-        }
-      } else {
+      // Create a canvas + ScopePanel per panel group
+      const sortedIndices = [...panelGroups.keys()].sort((a, b) => a - b);
+      for (const idx of sortedIndices) {
+        const signals = panelGroups.get(idx)!;
         const cvs = document.createElement('canvas');
         viewerTimingContainer.appendChild(cvs);
+        // Size after DOM insertion so clientWidth/Height are available
         requestAnimationFrame(() => sizeCanvasInContainer(cvs));
-        const channels = watchedSignals.map(s => ({
-          name: s.name,
-          addr: coordinator.compiled.labelSignalMap.get(s.name)
-            ?? { domain: 'digital' as const, netId: s.netId, bitWidth: s.width },
-          width: s.width,
-        }));
-        activeTimingPanel = new TimingDiagramPanel(cvs, coordinator, channels, {
-          snapshotInterval: 0,
-          stepsPerSecond: coordinator.speed,
-        });
-        coordinator.addMeasurementObserver(activeTimingPanel);
+        const panel = new ScopePanel(cvs, coordinator);
+        for (const s of signals) {
+          if (s.addr.domain === 'analog') {
+            panel.addVoltageChannel(s.addr, s.name);
+          } else {
+            panel.addDigitalChannel(s.addr, s.name);
+          }
+        }
+        _attachScopeContextMenu(cvs, panel, signals);
+        scopePanels.push({ canvas: cvs, panel });
       }
     }
 
     if (viewerValuesContainer) {
       const signals: SignalDescriptor[] = watchedSignals.map(s => ({
         name: s.name,
-        addr: isAnalog
-          ? { domain: 'analog' as const, nodeId: s.netId }
-          : (coordinator.compiled.labelSignalMap.get(s.name)
-              ?? { domain: 'digital' as const, netId: s.netId, bitWidth: s.width }),
+        addr: s.addr,
         width: s.width,
         group: s.group,
       }));
@@ -2187,22 +2114,21 @@ export function initApp(search?: string): void {
   /** Add a wire's net to the watched signals and rebuild viewers. */
   function addWireToViewer(wire: Wire, panelIndex?: number): void {
     const coordinator = facade.getCoordinator();
-    if (!coordinator) return;
     const addr = coordinator.compiled.wireSignalMap.get(wire);
     if (addr === undefined) return;
 
     if (addr.domain === 'analog') {
       const nodeId = addr.nodeId;
-      if (watchedSignals.some(s => s.netId === nodeId)) return;
+      if (watchedSignals.some(s => s.addr.domain === 'analog' && s.addr.nodeId === nodeId)) return;
       let name = `node${nodeId}`;
       for (const [label, a] of coordinator.compiled.labelSignalMap) {
         if (a.domain === 'analog' && a.nodeId === nodeId) { name = label; break; }
       }
       const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
-      watchedSignals.push({ name, netId: nodeId, width: 1, group: 'probe', panelIndex: idx });
+      watchedSignals.push({ name, addr: { domain: 'analog', nodeId }, width: 1, group: 'probe', panelIndex: idx });
     } else {
       const netId = addr.netId;
-      if (watchedSignals.some(s => s.netId === netId)) return;
+      if (watchedSignals.some(s => s.addr.domain === 'digital' && s.addr.netId === netId)) return;
       let name = `net${netId}`;
       let width = addr.bitWidth;
       let group: SignalGroup = 'probe';
@@ -2210,7 +2136,7 @@ export function initApp(search?: string): void {
         if (a.domain === 'digital' && a.netId === netId) { name = label; break; }
       }
       const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
-      watchedSignals.push({ name, netId, width, group, panelIndex: idx });
+      watchedSignals.push({ name, addr: { domain: 'digital', netId, bitWidth: width }, width, group, panelIndex: idx });
     }
 
     viewerPanel?.classList.add('open');
@@ -2220,7 +2146,7 @@ export function initApp(search?: string): void {
 
   /** Remove a signal by net ID and rebuild viewers. */
   function removeSignalFromViewer(netId: number): void {
-    const idx = watchedSignals.findIndex(s => s.netId === netId);
+    const idx = watchedSignals.findIndex(s => s.addr.domain === 'digital' && s.addr.netId === netId);
     if (idx >= 0) watchedSignals.splice(idx, 1);
     if (watchedSignals.length === 0) {
       closeViewer();
@@ -2241,7 +2167,7 @@ export function initApp(search?: string): void {
     if (compiledDirty && !compileAndBind()) return;
     viewerPanel?.classList.add('open');
     showViewerTab(tabName);
-    if (watchedSignals.length > 0 && !activeTimingPanel && scopePanels.length === 0 && !activeDataTable) {
+    if (watchedSignals.length > 0 && scopePanels.length === 0 && !activeDataTable) {
       rebuildViewers();
     }
   }
@@ -2280,7 +2206,7 @@ export function initApp(search?: string): void {
   const bodeRenderer = new BodePlotRenderer();
 
   document.getElementById('btn-ac-sweep')?.addEventListener('click', () => {
-    if (!facade.getCoordinator()?.supportsAcSweep()) {
+    if (!facade.getCoordinator().supportsAcSweep()) {
       showStatus('AC Sweep requires a circuit with analog components', true);
       return;
     }
@@ -2295,7 +2221,7 @@ export function initApp(search?: string): void {
     if (acSweepDialog) acSweepDialog.style.display = 'none';
 
     const coordinator = facade.getCoordinator();
-    if (!coordinator?.supportsAcSweep()) {
+    if (!coordinator.supportsAcSweep()) {
       showStatus('AC Sweep requires a circuit with analog components', true);
       return;
     }
@@ -2407,24 +2333,7 @@ export function initApp(search?: string): void {
       if (!locked) {
         items.push(
           { label: 'Properties\u2026', action: () => {
-            // Force property panel open even if already selected
-            const def = registry.get(elementHit.typeId);
-            if (def) {
-              selection.select(elementHit);
-              propertyPanel.showProperties(elementHit, def.propertyDefs);
-              if (availableModels(def).length > 1) {
-                propertyPanel.showSimulationModeDropdown(elementHit, def);
-              }
-              if (hasDigitalModel(def)) {
-                const simModel = elementHit.getProperties().has("simulationModel")
-                  ? elementHit.getProperties().get("simulationModel") as string
-                  : (def.defaultModel ?? "logical");
-                if (simModel === "logical" || simModel === "analog-pins") {
-                  const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-                  propertyPanel.showPinElectricalOverrides(elementHit, def, family);
-                }
-              }
-            }
+            selection.select(elementHit);
           }, enabled: true },
           { label: 'Rotate', shortcut: 'R', action: () => {
             const cmd = rotateSelection([...selection.getSelectedElements()]);
@@ -2590,7 +2499,7 @@ export function initApp(search?: string): void {
       }
     }
 
-    const isWatched = watchedSignals.some(s => s.netId === netId);
+    const isWatched = watchedSignals.some(s => s.addr.domain === 'digital' && s.addr.netId === netId);
     const capturedNetId = netId;
 
     if (!isWatched) {
@@ -2673,7 +2582,7 @@ export function initApp(search?: string): void {
               );
               scopePanels[0].panel.render();
             } else {
-              watchedSignals.push({ name: `${label}.${pinLabel}`, netId: nodeId!, width: 1, group: 'probe', panelIndex: panelIdx });
+              watchedSignals.push({ name: `${label}.${pinLabel}`, addr: { domain: 'analog', nodeId: nodeId! }, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
             }
             viewerPanel?.classList.add('open');
@@ -2694,7 +2603,7 @@ export function initApp(search?: string): void {
             const panelIdx = nextPanelIndex();
             const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
             if (pinNodeIds.length > 0) {
-              watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, netId: pinNodeIds[0]!, width: 1, group: 'probe', panelIndex: panelIdx });
+              watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, addr: { domain: 'analog', nodeId: pinNodeIds[0]! }, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
               if (scopePanels.length > 0) {
                 scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
@@ -2764,7 +2673,7 @@ export function initApp(search?: string): void {
   // Helper: attach right-click context menu to a scope panel canvas
   function _attachScopeContextMenu(
     cvs: HTMLCanvasElement,
-    panel: AnalogScopePanel,
+    panel: ScopePanel,
     signals: WatchedSignal[],
   ): void {
     cvs.addEventListener('contextmenu', (e: MouseEvent) => {
@@ -2834,7 +2743,7 @@ export function initApp(search?: string): void {
           for (let idx = 0; idx < resolverCtx.elements.length; idx++) {
             if (seen.has(idx)) continue;
             const analogEl = resolverCtx.elements[idx];
-            if (!analogEl.pinNodeIds.includes(sig.netId)) continue;
+            if (sig.addr.domain !== 'analog' || !analogEl.pinNodeIds.includes(sig.addr.nodeId)) continue;
             seen.add(idx);
             const ce = resolverCtx.elementToCircuitElement.get(idx);
             const elLabel = ce ? _elementLabel(ce) : `element${idx}`;
@@ -2864,7 +2773,11 @@ export function initApp(search?: string): void {
               panel.removeChannel(ch.label);
               // Also remove from watchedSignals if it's a voltage channel
               const sig = signals.find(s => s.name === ch.label);
-              if (sig) removeSignalFromViewer(sig.netId);
+              if (sig) {
+                const sigIdx = watchedSignals.indexOf(sig);
+                if (sigIdx >= 0) watchedSignals.splice(sigIdx, 1);
+                if (watchedSignals.length === 0) closeViewer(); else rebuildViewers();
+              }
             },
             enabled: true,
           });
@@ -3114,15 +3027,8 @@ export function initApp(search?: string): void {
     for (const el of loaded.elements) circuit.addElement(el);
     for (const w of loaded.wires) circuit.addWire(w);
     circuit.metadata = loaded.metadata;
-    palette.setEngineTypeFilter(
-      circuit.elements.some(el => {
-        const def = registry.get(el.typeId);
-        return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
-      }) ? 'analog' : null
-    );
     paletteUI.render();
     rebuildInsertMenu();
-    updateCircuitModeLabel();
     selection.clear();
     viewport.fitToContent(circuit.elements, {
       width: canvas.clientWidth,
@@ -3146,7 +3052,6 @@ export function initApp(search?: string): void {
         } else {
           const firstChar = text.replace(/^\s+/, '').charAt(0);
           if (firstChar === '{' || firstChar === '[') {
-            // JSON — distinguish .dts format from legacy .digj
             const parsed = JSON.parse(text);
             if (parsed.format === 'dts' || parsed.format === 'digb') {
               const result = deserializeDts(text, registry);
@@ -3156,12 +3061,7 @@ export function initApp(search?: string): void {
             }
           } else {
             // Use async subcircuit-aware loader to handle embedded subcircuit references
-            try {
-              loaded = await loadWithSubcircuits(text, httpResolver, registry);
-            } catch {
-              // Fall back to simple loader if async loading fails
-              loaded = loadDig(text, registry);
-            }
+            loaded = await loadWithSubcircuits(text, httpResolver, registry);
           }
         }
         applyLoadedCircuit(loaded);
@@ -4200,26 +4100,6 @@ export function initApp(search?: string): void {
   // Edit menu: Auto-Connect Power Supplies
   // -------------------------------------------------------------------------
 
-  function updateCircuitModeLabel(): void {
-    const label = document.getElementById('circuit-mode-label');
-    if (label) {
-      const f = palette.getEngineTypeFilter();
-      label.textContent = f === 'analog' ? 'Analog' : f === 'digital' ? 'Digital' : 'Auto';
-    }
-  }
-
-  document.getElementById('btn-circuit-mode')?.addEventListener('click', () => {
-    const current = palette.getEngineTypeFilter();
-    // Cycle: null (auto) → digital → analog → null (auto)
-    const next: "digital" | "analog" | null =
-      current === null ? 'digital' : current === 'digital' ? 'analog' : null;
-    palette.setEngineTypeFilter(next === 'analog' ? 'analog' : next === 'digital' ? 'digital' : null);
-    paletteUI.render();
-    rebuildInsertMenu();
-    updateCircuitModeLabel();
-    invalidateCompiled();
-  });
-
   document.getElementById('btn-auto-power')?.addEventListener('click', () => {
     if (params.locked) return;
     const cmd = autoConnectPower(circuit);
@@ -4962,12 +4842,9 @@ export function initApp(search?: string): void {
 
   async function loadCircuitFromXml(xml: string): Promise<void> {
     let loaded: Circuit;
-    try {
-      loaded = await loadWithSubcircuits(xml, httpResolver, registry);
-    } catch {
-      loaded = loadDig(xml, registry);
-    }
+    loaded = await loadWithSubcircuits(xml, httpResolver, registry);
     applyLoadedCircuit(loaded);
+    facade.compile(circuit);
   }
 
   function renderMarkdownToHtml(markdown: string): string {
@@ -4994,27 +4871,25 @@ export function initApp(search?: string): void {
       serializeCircuit: () => serializeCircuitToDig(circuit, registry),
       getFacade: () => facade,
       step: () => {
-        const engine = facade.getCoordinator();
-        if (engine) {
-          facade.step(engine);
-          scheduleRender();
-        }
+        const engine = facade.getActiveCoordinator();
+        if (!engine) throw new Error('No circuit loaded');
+        facade.step(engine);
+        scheduleRender();
       },
       setInput: (label: string, value: number) => {
-        const engine = facade.getCoordinator();
-        if (engine) {
-          facade.setInput(engine, label, value);
-          scheduleRender();
-        }
+        const engine = facade.getActiveCoordinator();
+        if (!engine) throw new Error('No circuit loaded');
+        facade.setInput(engine, label, value);
+        scheduleRender();
       },
       readOutput: (label: string) => {
-        const engine = facade.getCoordinator();
-        if (!engine) throw new Error('No simulation running');
+        const engine = facade.getActiveCoordinator();
+        if (!engine) throw new Error('No circuit loaded');
         return facade.readOutput(engine, label);
       },
       readAllSignals: () => {
-        const engine = facade.getCoordinator();
-        if (!engine) throw new Error('No simulation running');
+        const engine = facade.getActiveCoordinator();
+        if (!engine) throw new Error('No circuit loaded');
         return facade.readAllSignals(engine);
       },
       setBasePath: (basePath: string) => { params.base = basePath; },
@@ -5211,7 +5086,7 @@ export function initApp(search?: string): void {
 
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
     (window as unknown as Record<string, unknown>).__test = createTestBridge(
-      circuit, viewport, canvas, palette, registry, facade.getCoordinator() ?? null,
+      circuit, viewport, canvas, palette, registry, () => facade.getCoordinator(),
     );
   }
 

@@ -261,7 +261,7 @@ function buildDigitalCoordinator() {
 describe('snapshotSignals and signalCount — digital-only coordinator', () => {
   it('signalCount equals digital netCount', () => {
     const { coordinator } = buildDigitalCoordinator();
-    expect(coordinator.signalCount).toBeGreaterThan(0);
+    expect(coordinator.signalCount).toBe(3);
     coordinator.dispose();
   });
 

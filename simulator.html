@@ -403,9 +403,6 @@
       cursor: default;
       touch-action: manipulation;
     }
-    #property-panel {
-      display: none;
-    }
     /* ---- Resize handles ---- */
     .resize-handle {
       flex-shrink: 0;
@@ -835,8 +832,7 @@
       opacity: 0.6;
       line-height: 1.4;
     }
-    .panels-none #palette-panel,
-    .panels-none #property-panel {
+    .panels-none #palette-panel {
       display: none;
     }
     /* ---- Analysis dialog ---- */
@@ -1686,7 +1682,6 @@
     /* ---- Presentation mode ---- */
     .presentation-mode #menubar,
     .presentation-mode #palette-panel,
-    .presentation-mode #property-panel,
     .presentation-mode #status-bar,
     .presentation-mode #palette-resize-handle,
     .presentation-mode #slider-panel,
@@ -1885,8 +1880,6 @@
           <div class="menu-action" id="btn-delete">Delete<span class="menu-shortcut">Del</span></div>
           <div class="menu-action" id="btn-select-all">Select All<span class="menu-shortcut">Ctrl+A</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-action" id="btn-circuit-mode">Circuit Mode: <span id="circuit-mode-label">Digital</span></div>
-          <div class="menu-separator"></div>
           <div class="menu-action" id="btn-auto-power">Auto-Connect Power Supplies</div>
           <div class="menu-action" id="btn-tests">Tests...</div>
           <div class="menu-separator"></div>
@@ -2031,10 +2024,7 @@
           <button id="search-close" title="Close (Esc)">&times;</button>
         </div>
       </div>
-      <div id="property-panel">
-        <div class="panel-header">Properties</div>
-        <div id="property-content"></div>
-      </div>
+
     </div>
     <div id="slider-panel" style="display: none;"></div>
     <div id="viewer-resize-handle" class="resize-handle resize-handle--horizontal" title="Drag to resize viewer"></div>

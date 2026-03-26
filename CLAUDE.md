@@ -500,10 +500,8 @@ All runtime panels implement `MeasurementObserver` (`onStep()`, `onReset()`).
 
 | Command | Purpose |
 |---------|---------|
-| `npm test` | Run all Vitest unit/integration tests |
-| `npm run test:watch` | Vitest watch mode |
-| `npm run test:e2e` | Playwright E2E tests (auto-launches Vite on port 5173) |
-| `npm run test:all` | Both Vitest and Playwright sequentially |
+| `npm test` | Run all tests (Vitest unit/integration + Playwright E2E) |
+| `npm run test:watch` | Vitest watch mode (unit/integration only) |
 
 ### Three-Surface Testing Rule
 

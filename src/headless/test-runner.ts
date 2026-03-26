@@ -14,7 +14,7 @@
  */
 
 import type { Circuit } from "../core/circuit.js";
-import type { SimulationEngine } from "../core/engine-interface.js";
+import type { SimulationCoordinator } from "../solver/coordinator-types.js";
 import type { TestResults } from "./types.js";
 import { FacadeError } from "./types.js";
 import { TestcaseElement } from "../components/misc/testcase.js";
@@ -55,7 +55,7 @@ export class TestRunner {
    * @throws FacadeError if no test data is available.
    */
   runTests(
-    engine: SimulationEngine,
+    coordinator: SimulationCoordinator,
     circuit: Circuit,
     testData?: string,
   ): TestResults {
@@ -98,7 +98,7 @@ export class TestRunner {
     }
 
     const parsed = parseTestData(resolvedData, inputCount);
-    return executeTests(this._runner, engine, circuit, parsed);
+    return executeTests(this._runner, coordinator, circuit, parsed);
   }
 }
 

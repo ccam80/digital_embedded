@@ -28,7 +28,7 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
       <pos x="140" y="200"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogResistor</elementName>
+      <elementName>Resistor</elementName>
       <elementAttributes>
         <entry><string>Label</string><string>R1</string></entry>
         <entry><string>resistance</string><int>1000</int></entry>
@@ -36,7 +36,7 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
       <pos x="300" y="200"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogCapacitor</elementName>
+      <elementName>Capacitor</elementName>
       <elementAttributes>
         <entry><string>Label</string><string>C1</string></entry>
         <entry><string>capacitance</string><double>1.0E-6</double></entry>
@@ -84,8 +84,6 @@ async function clickIframeButton(harness: SimulatorHarness, buttonId: string): P
 /** Load the RC circuit via postMessage and trigger compilation via a step click. */
 async function buildAndCompileRc(harness: SimulatorHarness): Promise<void> {
   await harness.loadDigXml(ANALOG_RC_XML);
-  // Switch to analog mode if needed
-  await clickIframeButton(harness, 'btn-circuit-mode');
   // Trigger compilation by stepping once
   await clickIframeButton(harness, 'btn-step');
   await harness.page.waitForTimeout(300);
@@ -248,10 +246,6 @@ test.describe('Analog UI fixes', () => {
       window.postMessage({ type: 'digital-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
-
-    // Switch to analog mode
-    await page.locator('#btn-circuit-mode').click();
-    await page.waitForTimeout(200);
 
     // Get C1 body center and canvas rect, then click on it with Playwright mouse
     // The capacitor body is 2 grid units wide, so center is at origin + 1 grid unit

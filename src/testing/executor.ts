@@ -10,8 +10,8 @@
  *
  */
 
-import type { SimulationEngine } from '../core/engine-interface.js';
 import type { Circuit } from '../core/circuit.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { TestResults, TestVector } from '../headless/types.js';
 import type { ParsedTestData, ParsedVector } from './parser.js';
 
@@ -29,9 +29,9 @@ export type { TestValue } from './parser.js';
  * Defined here to avoid circular imports between executor.ts and test-runner.ts.
  */
 export interface RunnerFacade {
-  setInput(engine: SimulationEngine, label: string, value: number): void;
-  readOutput(engine: SimulationEngine, label: string): number;
-  runToStable(engine: SimulationEngine, maxIterations?: number): void;
+  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
+  readOutput(coordinator: SimulationCoordinator, label: string): number;
+  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ const HIGH_Z_SENTINEL = 0xFFFFFFFF;
  */
 export function executeTests(
   facade: RunnerFacade,
-  engine: SimulationEngine,
+  coordinator: SimulationCoordinator,
   _circuit: Circuit,
   testData: ParsedTestData,
 ): TestResults {
@@ -76,7 +76,7 @@ export function executeTests(
   let failed = 0;
 
   for (const vector of testData.vectors) {
-    const result = executeVector(facade, engine, testData, vector);
+    const result = executeVector(facade, coordinator, testData, vector);
     vectorResults.push(result);
     if (result.passed) {
       passed++;
@@ -102,7 +102,7 @@ export function executeTests(
  */
 function executeVector(
   facade: RunnerFacade,
-  engine: SimulationEngine,
+  coordinator: SimulationCoordinator,
   testData: ParsedTestData,
   vector: ParsedVector,
 ): TestVector {
@@ -133,33 +133,33 @@ function executeVector(
     }
     if (val.kind === 'highZ') {
       // Setting HIGH_Z on an input — use HIGH_Z_SENTINEL
-      facade.setInput(engine, name, HIGH_Z_SENTINEL);
+      facade.setInput(coordinator, name, HIGH_Z_SENTINEL);
       inputRecord[name] = HIGH_Z_SENTINEL;
       continue;
     }
     // kind === 'value' or 'clock' — clock inputs handled above via regularInputs list
     const numericValue = val.kind === 'value' ? Number(val.value) : 0;
-    facade.setInput(engine, name, numericValue);
+    facade.setInput(coordinator, name, numericValue);
     inputRecord[name] = numericValue;
   }
 
   // Propagate regular inputs so combinational paths (decoders, enables,
   // muxes) settle before any clock edge arrives.  Without this, sequential
   // components' sampleFns would see stale enable/data signals.
-  facade.runToStable(engine);
+  facade.runToStable(coordinator);
 
   // Handle clock inputs: toggle high → stable → low → stable
   if (clockInputs.length > 0) {
     for (const name of clockInputs) {
-      facade.setInput(engine, name, 1);
+      facade.setInput(coordinator, name, 1);
       inputRecord[name] = 1;
     }
-    facade.runToStable(engine);
+    facade.runToStable(coordinator);
 
     for (const name of clockInputs) {
-      facade.setInput(engine, name, 0);
+      facade.setInput(coordinator, name, 0);
     }
-    facade.runToStable(engine);
+    facade.runToStable(coordinator);
   }
 
   // Read all outputs and compare
@@ -167,7 +167,7 @@ function executeVector(
 
   for (const name of testData.outputNames) {
     const expected = vector.outputs.get(name);
-    const actual = facade.readOutput(engine, name);
+    const actual = facade.readOutput(coordinator, name);
     actualOutputs[name] = actual;
 
     if (expected === undefined || expected.kind === 'dontCare') {

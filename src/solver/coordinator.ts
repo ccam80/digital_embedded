@@ -99,6 +99,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _voltageMin: number = Infinity;
   private _voltageMax: number = -Infinity;
   private readonly _registry: ComponentRegistry | null;
+  private _cachedDcOpResult: DcOpResult | null = null;
 
   constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
     this._registry = registry ?? null;
@@ -117,7 +118,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (compiled.analog !== null) {
       const engine = new MNAEngine();
       engine.init(compiled.analog);
-      engine.dcOperatingPoint();
+      this._cachedDcOpResult = engine.dcOperatingPoint();
       this._analog = engine;
 
       const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
@@ -501,8 +502,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   dcOperatingPoint(): DcOpResult | null {
-    if (this._analog === null) return null;
-    return this._analog.dcOperatingPoint();
+    return this._cachedDcOpResult;
   }
 
   acAnalysis(params: AcParams): AcResult | null {
@@ -604,7 +604,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     const clampedDt = Math.min(wallDtSeconds, 0.1);
     if (this._timingModel === 'discrete') {
       return {
-        steps: Math.round(this._speedControl.speed * clampedDt),
+        steps: Math.max(1, Math.round(this._speedControl.speed * clampedDt)),
         simTimeGoal: null,
         budgetMs: Infinity,
         missed: false,
@@ -674,7 +674,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       wireToNodeId: compiledAnalog.wireToNodeId,
       elements: compiledAnalog.elements,
       elementToCircuitElement: compiledAnalog.elementToCircuitElement,
-      circuitElements: [...compiledAnalog.elementToCircuitElement.values()],
+      circuitElements: this._compiled.allCircuitElements,
       elementPinVertices: compiledAnalog.elementPinVertices,
       elementResolvedPins: compiledAnalog.elementResolvedPins,
       getElementPinCurrents(elementIndex: number): number[] {

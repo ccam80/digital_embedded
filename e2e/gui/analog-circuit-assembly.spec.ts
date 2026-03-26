@@ -119,10 +119,10 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('RC lowpass: steady-state amplitude matches analytical', async () => {
       await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 17, 8, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 19, 14, 'G2');
+      await builder.placeLabeled('Resistor', 10, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 17, 8, 'C1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 19, 14, 'G2');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vs', 'frequency', 100);
@@ -160,10 +160,10 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('voltage divider: Vout equals Vin × R2/(R1+R2)', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 6, 'R1');
-      await builder.placeLabeled('AnalogResistor', 10, 12, 'R2');
-      await builder.placeLabeled('AnalogGround', 6, 16, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 16, 'G2');
+      await builder.placeLabeled('Resistor', 10, 6, 'R1');
+      await builder.placeLabeled('Resistor', 10, 12, 'R2');
+      await builder.placeLabeled('Ground', 6, 16, 'G1');
+      await builder.placeLabeled('Ground', 14, 16, 'G2');
       await builder.placeLabeled('Probe', 18, 9, 'P1');
 
       await builder.drawWire('Vs', 'pos', 'R1', 'A');
@@ -192,10 +192,10 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('RL circuit: current rise with time constant L/R', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'R1');
-      await builder.placeLabeled('AnalogInductor', 17, 8, 'L1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 19, 14, 'G2');
+      await builder.placeLabeled('Resistor', 10, 8, 'R1');
+      await builder.placeLabeled('Inductor', 17, 8, 'L1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 19, 14, 'G2');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.drawWire('Vs', 'pos', 'R1', 'A');
@@ -226,11 +226,11 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('RLC series: resonance frequency f0 = 1/(2pi*sqrt(LC))', async () => {
       await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'R1');
-      await builder.placeLabeled('AnalogInductor', 17, 8, 'L1');
-      await builder.placeLabeled('AnalogCapacitor', 24, 8, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 26, 14, 'G2');
+      await builder.placeLabeled('Resistor', 10, 8, 'R1');
+      await builder.placeLabeled('Inductor', 17, 8, 'L1');
+      await builder.placeLabeled('Capacitor', 24, 8, 'C1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 26, 14, 'G2');
       await builder.placeLabeled('Probe', 28, 8, 'P1');
 
       // Drive at resonance frequency
@@ -267,11 +267,11 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('RLC parallel: anti-resonance behavior', async () => {
       await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 12, 5, 'R1');
-      await builder.placeLabeled('AnalogInductor', 12, 11, 'L1');
-      await builder.placeLabeled('AnalogCapacitor', 19, 11, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 16, 'G1');
-      await builder.placeLabeled('AnalogGround', 24, 16, 'G2');
+      await builder.placeLabeled('Resistor', 12, 5, 'R1');
+      await builder.placeLabeled('Inductor', 12, 11, 'L1');
+      await builder.placeLabeled('Capacitor', 19, 11, 'C1');
+      await builder.placeLabeled('Ground', 6, 16, 'G1');
+      await builder.placeLabeled('Ground', 24, 16, 'G2');
       await builder.placeLabeled('Probe', 26, 8, 'P1');
 
       await builder.setComponentProperty('Vs', 'frequency', 5033);
@@ -313,11 +313,11 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('diode rectifier: output near Vpeak minus Vf with ripple', async () => {
       await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogDiode', 10, 8, 'D1');
-      await builder.placeLabeled('AnalogResistor', 18, 6, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 18, 12, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 22, 14, 'G2');
+      await builder.placeLabeled('Diode', 10, 8, 'D1');
+      await builder.placeLabeled('Resistor', 18, 6, 'R1');
+      await builder.placeLabeled('Capacitor', 18, 12, 'C1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 22, 14, 'G2');
       await builder.placeLabeled('Probe', 24, 8, 'P1');
 
       await builder.setComponentProperty('Vs', 'frequency', 60);
@@ -352,10 +352,10 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('zener regulator: output clamps at Vz', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'R1');
-      await builder.placeLabeled('AnalogZener', 17, 8, 'Z1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 19, 14, 'G2');
+      await builder.placeLabeled('Resistor', 10, 8, 'R1');
+      await builder.placeLabeled('ZenerDiode', 17, 8, 'Z1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 19, 14, 'G2');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vs', 'voltage', 10);
@@ -390,13 +390,13 @@ test.describe('Analog circuit assembly via UI', () => {
     test('BJT common-emitter: DC bias point Vce > 0, Ic > 0', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 15, 'Vin');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rc');
-      await builder.placeLabeled('AnalogResistor', 10, 12, 'Rb');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rc');
+      await builder.placeLabeled('Resistor', 10, 12, 'Rb');
       await builder.placeLabeled('NpnBJT', 16, 10, 'Q1');
-      await builder.placeLabeled('AnalogResistor', 16, 16, 'Re');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 20, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 10, 'G3');
+      await builder.placeLabeled('Resistor', 16, 16, 'Re');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 18, 20, 'G2');
+      await builder.placeLabeled('Ground', 6, 10, 'G3');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -443,15 +443,15 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 3, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 10, 'V1');
       await builder.placeLabeled('DcVoltageSource', 3, 17, 'V2');
-      await builder.placeLabeled('AnalogResistor', 10, 3, 'Rc1');
-      await builder.placeLabeled('AnalogResistor', 22, 3, 'Rc2');
+      await builder.placeLabeled('Resistor', 10, 3, 'Rc1');
+      await builder.placeLabeled('Resistor', 22, 3, 'Rc2');
       await builder.placeLabeled('NpnBJT', 14, 9, 'Q1');
       await builder.placeLabeled('NpnBJT', 18, 9, 'Q2');
-      await builder.placeLabeled('AnalogResistor', 16, 16, 'Re');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 21, 'G4');
+      await builder.placeLabeled('Resistor', 16, 16, 'Re');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 18, 22, 'G2');
+      await builder.placeLabeled('Ground', 6, 14, 'G3');
+      await builder.placeLabeled('Ground', 6, 21, 'G4');
       await builder.placeLabeled('Probe', 26, 6, 'P1');
       await builder.placeLabeled('Probe', 26, 10, 'P2');
 
@@ -500,14 +500,14 @@ test.describe('Analog circuit assembly via UI', () => {
     test('BJT Darlington pair: high current gain', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vin');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rc');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rb');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rc');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rb');
       await builder.placeLabeled('NpnBJT', 16, 8, 'Q1');
       await builder.placeLabeled('NpnBJT', 16, 14, 'Q2');
-      await builder.placeLabeled('AnalogResistor', 16, 20, 'Re');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 24, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Resistor', 16, 20, 'Re');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 18, 24, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -550,11 +550,11 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 11, 'Vin');
       await builder.placeLabeled('NpnBJT', 14, 7, 'Q1');
       await builder.placeLabeled('PnpBJT', 14, 15, 'Q2');
-      await builder.placeLabeled('AnalogResistor', 20, 11, 'Rload');
-      await builder.placeLabeled('AnalogGround', 6, 8, 'G1');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 15, 'G3');
-      await builder.placeLabeled('AnalogGround', 22, 16, 'G4');
+      await builder.placeLabeled('Resistor', 20, 11, 'Rload');
+      await builder.placeLabeled('Ground', 6, 8, 'G1');
+      await builder.placeLabeled('Ground', 6, 22, 'G2');
+      await builder.placeLabeled('Ground', 6, 15, 'G3');
+      await builder.placeLabeled('Ground', 22, 16, 'G4');
       await builder.placeLabeled('Probe', 24, 11, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -605,13 +605,13 @@ test.describe('Analog circuit assembly via UI', () => {
     test('MOSFET common-source: DC bias Vds > Vgs-Vth', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vdd');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vg');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rd');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rg');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rd');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rg');
       await builder.placeLabeled('NMOS', 16, 10, 'M1');
-      await builder.placeLabeled('AnalogResistor', 16, 16, 'Rs');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 20, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Resistor', 16, 16, 'Rs');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 18, 20, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
@@ -652,9 +652,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vin');
       await builder.placeLabeled('PMOS', 14, 6, 'Mp');
       await builder.placeLabeled('NMOS', 14, 14, 'Mn');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 16, 20, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 16, 20, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 22, 10, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 5);
@@ -697,10 +697,10 @@ test.describe('Analog circuit assembly via UI', () => {
       // Series NMOS
       await builder.placeLabeled('NMOS', 16, 12, 'Mn1');
       await builder.placeLabeled('NMOS', 16, 18, 'Mn2');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 21, 'G4');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 18, 22, 'G2');
+      await builder.placeLabeled('Ground', 6, 14, 'G3');
+      await builder.placeLabeled('Ground', 6, 21, 'G4');
       await builder.placeLabeled('Probe', 24, 8, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 5);
@@ -745,13 +745,13 @@ test.describe('Analog circuit assembly via UI', () => {
     test('JFET amplifier: pinch-off region operation', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vdd');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vg');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rd');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rg');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rd');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rg');
       await builder.placeLabeled('NJFET', 16, 10, 'J1');
-      await builder.placeLabeled('AnalogResistor', 16, 16, 'Rs');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 20, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Resistor', 16, 16, 'Rs');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 18, 20, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 15);
@@ -797,15 +797,15 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 3, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 12, 'Vin');
       await builder.placeLabeled('DcVoltageSource', 3, 19, 'Vbias');
-      await builder.placeLabeled('AnalogResistor', 10, 3, 'Rc');
+      await builder.placeLabeled('Resistor', 10, 3, 'Rc');
       await builder.placeLabeled('NpnBJT', 14, 7, 'Q2');
       await builder.placeLabeled('NpnBJT', 14, 14, 'Q1');
-      await builder.placeLabeled('AnalogResistor', 10, 12, 'Rb');
-      await builder.placeLabeled('AnalogResistor', 14, 20, 'Re');
-      await builder.placeLabeled('AnalogGround', 6, 24, 'G1');
-      await builder.placeLabeled('AnalogGround', 16, 24, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 16, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 23, 'G4');
+      await builder.placeLabeled('Resistor', 10, 12, 'Rb');
+      await builder.placeLabeled('Resistor', 14, 20, 'Re');
+      await builder.placeLabeled('Ground', 6, 24, 'G1');
+      await builder.placeLabeled('Ground', 16, 24, 'G2');
+      await builder.placeLabeled('Ground', 6, 16, 'G3');
+      await builder.placeLabeled('Ground', 6, 23, 'G4');
       await builder.placeLabeled('Probe', 20, 5, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -851,13 +851,13 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('Wilson current mirror: output current tracks reference', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rref');
-      await builder.placeLabeled('AnalogResistor', 20, 5, 'Rload');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rref');
+      await builder.placeLabeled('Resistor', 20, 5, 'Rload');
       await builder.placeLabeled('NpnBJT', 13, 12, 'Q1');
       await builder.placeLabeled('NpnBJT', 17, 12, 'Q2');
       await builder.placeLabeled('NpnBJT', 15, 18, 'Q3');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 17, 22, 'G2');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 17, 22, 'G2');
       await builder.placeLabeled('Probe', 24, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -901,14 +901,14 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('Widlar current source: low current output', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rref');
-      await builder.placeLabeled('AnalogResistor', 20, 5, 'Rload');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rref');
+      await builder.placeLabeled('Resistor', 20, 5, 'Rload');
       await builder.placeLabeled('NpnBJT', 13, 12, 'Q1');
       await builder.placeLabeled('NpnBJT', 18, 12, 'Q2');
-      await builder.placeLabeled('AnalogResistor', 20, 18, 'Re');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 15, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 22, 22, 'G3');
+      await builder.placeLabeled('Resistor', 20, 18, 'Re');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 15, 22, 'G2');
+      await builder.placeLabeled('Ground', 22, 22, 'G3');
       await builder.placeLabeled('Probe', 24, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -958,12 +958,12 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('PMOS', 20, 5, 'Mp2');
       await builder.placeLabeled('NMOS', 12, 17, 'Mn1');
       await builder.placeLabeled('NMOS', 20, 17, 'Mn2');
-      await builder.placeLabeled('AnalogResistor', 16, 11, 'Rload');
-      await builder.placeLabeled('AnalogGround', 6, 26, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 22, 22, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G4');
-      await builder.placeLabeled('AnalogGround', 6, 26, 'G5');
+      await builder.placeLabeled('Resistor', 16, 11, 'Rload');
+      await builder.placeLabeled('Ground', 6, 26, 'G1');
+      await builder.placeLabeled('Ground', 14, 22, 'G2');
+      await builder.placeLabeled('Ground', 22, 22, 'G3');
+      await builder.placeLabeled('Ground', 6, 20, 'G4');
+      await builder.placeLabeled('Ground', 6, 26, 'G5');
       await builder.placeLabeled('Probe', 26, 11, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
@@ -1014,15 +1014,15 @@ test.describe('Analog circuit assembly via UI', () => {
     test('BJT+MOSFET mixed driver: NPN drives NMOS gate', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vdd');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vin');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rc');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rb');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rc');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rb');
       await builder.placeLabeled('NpnBJT', 14, 10, 'Q1');
       await builder.placeLabeled('NMOS', 20, 10, 'M1');
-      await builder.placeLabeled('AnalogResistor', 20, 5, 'Rd');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 16, 16, 'G2');
-      await builder.placeLabeled('AnalogGround', 22, 16, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G4');
+      await builder.placeLabeled('Resistor', 20, 5, 'Rd');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 16, 16, 'G2');
+      await builder.placeLabeled('Ground', 22, 16, 'G3');
+      await builder.placeLabeled('Ground', 6, 18, 'G4');
       await builder.placeLabeled('Probe', 26, 8, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
@@ -1069,28 +1069,28 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 20, 'Vin');
 
       // Stage 1
-      await builder.placeLabeled('AnalogResistor', 9, 3, 'Rc1');
-      await builder.placeLabeled('AnalogResistor', 9, 10, 'Rb1');
+      await builder.placeLabeled('Resistor', 9, 3, 'Rc1');
+      await builder.placeLabeled('Resistor', 9, 10, 'Rb1');
       await builder.placeLabeled('NpnBJT', 12, 7, 'Q1');
-      await builder.placeLabeled('AnalogResistor', 12, 13, 'Re1');
+      await builder.placeLabeled('Resistor', 12, 13, 'Re1');
 
       // Stage 2
-      await builder.placeLabeled('AnalogResistor', 17, 3, 'Rc2');
-      await builder.placeLabeled('AnalogResistor', 17, 10, 'Rb2');
+      await builder.placeLabeled('Resistor', 17, 3, 'Rc2');
+      await builder.placeLabeled('Resistor', 17, 10, 'Rb2');
       await builder.placeLabeled('NpnBJT', 20, 7, 'Q2');
-      await builder.placeLabeled('AnalogResistor', 20, 13, 'Re2');
+      await builder.placeLabeled('Resistor', 20, 13, 'Re2');
 
       // Stage 3
-      await builder.placeLabeled('AnalogResistor', 25, 3, 'Rc3');
-      await builder.placeLabeled('AnalogResistor', 25, 10, 'Rb3');
+      await builder.placeLabeled('Resistor', 25, 3, 'Rc3');
+      await builder.placeLabeled('Resistor', 25, 10, 'Rb3');
       await builder.placeLabeled('NpnBJT', 28, 7, 'Q3');
-      await builder.placeLabeled('AnalogResistor', 28, 13, 'Re3');
+      await builder.placeLabeled('Resistor', 28, 13, 'Re3');
 
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 17, 'G2');
-      await builder.placeLabeled('AnalogGround', 22, 17, 'G3');
-      await builder.placeLabeled('AnalogGround', 30, 17, 'G4');
-      await builder.placeLabeled('AnalogGround', 6, 24, 'G5');
+      await builder.placeLabeled('Ground', 6, 18, 'G1');
+      await builder.placeLabeled('Ground', 14, 17, 'G2');
+      await builder.placeLabeled('Ground', 22, 17, 'G3');
+      await builder.placeLabeled('Ground', 30, 17, 'G4');
+      await builder.placeLabeled('Ground', 6, 24, 'G5');
       await builder.placeLabeled('Probe', 32, 5, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -1162,10 +1162,10 @@ test.describe('Analog circuit assembly via UI', () => {
     test('switched RC: charge on close, discharge on open', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
       await builder.placeLabeled('Switch', 10, 8, 'SW');
-      await builder.placeLabeled('AnalogResistor', 16, 8, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 22, 8, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 24, 14, 'G2');
+      await builder.placeLabeled('Resistor', 16, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 22, 8, 'C1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 24, 14, 'G2');
       await builder.placeLabeled('Probe', 26, 8, 'P1');
 
       await builder.drawWire('Vs', 'pos', 'SW', 'A1');
@@ -1198,11 +1198,11 @@ test.describe('Analog circuit assembly via UI', () => {
     test('LRC with switch: damped oscillation after closing', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
       await builder.placeLabeled('Switch', 10, 8, 'SW');
-      await builder.placeLabeled('AnalogInductor', 16, 8, 'L1');
-      await builder.placeLabeled('AnalogResistor', 22, 8, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 28, 8, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 30, 14, 'G2');
+      await builder.placeLabeled('Inductor', 16, 8, 'L1');
+      await builder.placeLabeled('Resistor', 22, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 28, 8, 'C1');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 30, 14, 'G2');
       await builder.placeLabeled('Probe', 32, 8, 'P1');
 
       await builder.setComponentProperty('R1', 'resistance', 100);
@@ -1235,13 +1235,13 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcoil');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vsig');
       await builder.placeLabeled('Relay', 12, 8, 'RL');
-      await builder.placeLabeled('AnalogInductor', 20, 5, 'L1');
-      await builder.placeLabeled('AnalogCapacitor', 26, 5, 'C1');
-      await builder.placeLabeled('AnalogResistor', 20, 14, 'R1');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 6, 10, 'G2');
-      await builder.placeLabeled('AnalogGround', 28, 10, 'G3');
-      await builder.placeLabeled('AnalogGround', 22, 18, 'G4');
+      await builder.placeLabeled('Inductor', 20, 5, 'L1');
+      await builder.placeLabeled('Capacitor', 26, 5, 'C1');
+      await builder.placeLabeled('Resistor', 20, 14, 'R1');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 6, 10, 'G2');
+      await builder.placeLabeled('Ground', 28, 10, 'G3');
+      await builder.placeLabeled('Ground', 22, 18, 'G4');
       await builder.placeLabeled('Probe', 30, 8, 'P1');
 
       await builder.setComponentProperty('Vcoil', 'voltage', 5);
@@ -1282,14 +1282,14 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('Clock', 3, 18, 'CLK');
       await builder.placeLabeled('AnalogSwitchSPST', 12, 8, 'S1');
       await builder.placeLabeled('AnalogSwitchSPST', 20, 8, 'S2');
-      await builder.placeLabeled('AnalogCapacitor', 16, 12, 'C1');
-      await builder.placeLabeled('AnalogCapacitor', 24, 12, 'C2');
-      await builder.placeLabeled('AnalogResistor', 28, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 16, 12, 'C1');
+      await builder.placeLabeled('Capacitor', 24, 12, 'C2');
+      await builder.placeLabeled('Resistor', 28, 8, 'R1');
       await builder.placeLabeled('OpAmp', 32, 10, 'OA');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 16, 'G2');
-      await builder.placeLabeled('AnalogGround', 26, 16, 'G3');
-      await builder.placeLabeled('AnalogGround', 6, 16, 'G4');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 18, 16, 'G2');
+      await builder.placeLabeled('Ground', 26, 16, 'G3');
+      await builder.placeLabeled('Ground', 6, 16, 'G4');
       await builder.placeLabeled('Probe', 36, 10, 'P1');
 
       // Switches controlled by clock
@@ -1328,11 +1328,11 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'V1');
       await builder.placeLabeled('DcVoltageSource', 3, 15, 'V2');
       await builder.placeLabeled('SwitchDT', 12, 10, 'SW');
-      await builder.placeLabeled('AnalogResistor', 18, 10, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 24, 10, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 6, 10, 'G2');
-      await builder.placeLabeled('AnalogGround', 26, 15, 'G3');
+      await builder.placeLabeled('Resistor', 18, 10, 'R1');
+      await builder.placeLabeled('Capacitor', 24, 10, 'C1');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 6, 10, 'G2');
+      await builder.placeLabeled('Ground', 26, 15, 'G3');
       await builder.placeLabeled('Probe', 28, 10, 'P1');
 
       await builder.setComponentProperty('V1', 'voltage', 3);
@@ -1371,13 +1371,13 @@ test.describe('Analog circuit assembly via UI', () => {
     test('BJT switch with flyback diode: clamps inductive kick', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vin');
-      await builder.placeLabeled('AnalogInductor', 12, 5, 'L1');
-      await builder.placeLabeled('AnalogDiode', 16, 8, 'D1');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rb');
+      await builder.placeLabeled('Inductor', 12, 5, 'L1');
+      await builder.placeLabeled('Diode', 16, 8, 'D1');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rb');
       await builder.placeLabeled('NpnBJT', 14, 12, 'Q1');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 16, 18, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 16, 18, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 20, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -1414,12 +1414,12 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vdd');
       await builder.placeLabeled('Clock', 3, 14, 'CLK');
       await builder.placeLabeled('NMOS', 12, 10, 'M1');
-      await builder.placeLabeled('AnalogInductor', 18, 8, 'L1');
-      await builder.placeLabeled('AnalogResistor', 24, 8, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 30, 8, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 16, 'G2');
-      await builder.placeLabeled('AnalogGround', 32, 14, 'G3');
+      await builder.placeLabeled('Inductor', 18, 8, 'L1');
+      await builder.placeLabeled('Resistor', 24, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 30, 8, 'C1');
+      await builder.placeLabeled('Ground', 6, 18, 'G1');
+      await builder.placeLabeled('Ground', 14, 16, 'G2');
+      await builder.placeLabeled('Ground', 32, 14, 'G3');
       await builder.placeLabeled('Probe', 34, 8, 'P1');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
@@ -1451,14 +1451,14 @@ test.describe('Analog circuit assembly via UI', () => {
     test('crystal oscillator: oscillation builds at crystal frequency', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('NpnBJT', 14, 10, 'Q1');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Rc');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rb');
+      await builder.placeLabeled('Resistor', 10, 5, 'Rc');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rb');
       await builder.placeLabeled('QuartzCrystal', 20, 10, 'X1');
-      await builder.placeLabeled('AnalogCapacitor', 18, 16, 'C1');
-      await builder.placeLabeled('AnalogCapacitor', 24, 16, 'C2');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 20, 20, 'G2');
-      await builder.placeLabeled('AnalogGround', 26, 20, 'G3');
+      await builder.placeLabeled('Capacitor', 18, 16, 'C1');
+      await builder.placeLabeled('Capacitor', 24, 16, 'C2');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 20, 20, 'G2');
+      await builder.placeLabeled('Ground', 26, 20, 'G3');
       await builder.placeLabeled('Probe', 28, 10, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 5);
@@ -1503,11 +1503,11 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('op-amp inverting: gain equals -Rf/Rin', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vin');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'Rin');
+      await builder.placeLabeled('Resistor', 10, 8, 'Rin');
       await builder.placeLabeled('OpAmp', 18, 10, 'OA');
-      await builder.placeLabeled('AnalogResistor', 18, 5, 'Rf');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 14, 'G2');
+      await builder.placeLabeled('Resistor', 18, 5, 'Rf');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 14, 14, 'G2');
       await builder.placeLabeled('Probe', 26, 10, 'P1');
 
       await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -1544,11 +1544,11 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('op-amp integrator: ramp output for DC input', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vin');
-      await builder.placeLabeled('AnalogResistor', 10, 8, 'R1');
+      await builder.placeLabeled('Resistor', 10, 8, 'R1');
       await builder.placeLabeled('OpAmp', 18, 10, 'OA');
-      await builder.placeLabeled('AnalogCapacitor', 18, 5, 'Cf');
-      await builder.placeLabeled('AnalogGround', 6, 14, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 14, 'G2');
+      await builder.placeLabeled('Capacitor', 18, 5, 'Cf');
+      await builder.placeLabeled('Ground', 6, 14, 'G1');
+      await builder.placeLabeled('Ground', 14, 14, 'G2');
       await builder.placeLabeled('Probe', 26, 10, 'P1');
 
       await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -1588,12 +1588,12 @@ test.describe('Analog circuit assembly via UI', () => {
     test('555 astable: oscillation at expected frequency', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('Timer555', 16, 10, 'U1');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'Ra');
-      await builder.placeLabeled('AnalogResistor', 10, 12, 'Rb');
-      await builder.placeLabeled('AnalogCapacitor', 10, 18, 'C1');
-      await builder.placeLabeled('AnalogGround', 6, 22, 'G1');
-      await builder.placeLabeled('AnalogGround', 12, 22, 'G2');
-      await builder.placeLabeled('AnalogGround', 18, 18, 'G3');
+      await builder.placeLabeled('Resistor', 10, 5, 'Ra');
+      await builder.placeLabeled('Resistor', 10, 12, 'Rb');
+      await builder.placeLabeled('Capacitor', 10, 18, 'C1');
+      await builder.placeLabeled('Ground', 6, 22, 'G1');
+      await builder.placeLabeled('Ground', 12, 22, 'G2');
+      await builder.placeLabeled('Ground', 18, 18, 'G3');
       await builder.placeLabeled('Probe', 24, 10, 'P1');
 
       await builder.setComponentProperty('Ra', 'resistance', 1000);
@@ -1637,13 +1637,13 @@ test.describe('Analog circuit assembly via UI', () => {
     test('SCR latch: trigger on and stays latched', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vtrig');
-      await builder.placeLabeled('AnalogResistor', 10, 5, 'R1');
-      await builder.placeLabeled('AnalogResistor', 10, 14, 'Rg');
+      await builder.placeLabeled('Resistor', 10, 5, 'R1');
+      await builder.placeLabeled('Resistor', 10, 14, 'Rg');
       await builder.placeLabeled('SCR', 16, 10, 'T1');
       await builder.placeLabeled('Switch', 7, 14, 'SW');
-      await builder.placeLabeled('AnalogGround', 6, 20, 'G1');
-      await builder.placeLabeled('AnalogGround', 18, 16, 'G2');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G3');
+      await builder.placeLabeled('Ground', 6, 20, 'G1');
+      await builder.placeLabeled('Ground', 18, 16, 'G2');
+      await builder.placeLabeled('Ground', 6, 18, 'G3');
       await builder.placeLabeled('Probe', 22, 8, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
@@ -1686,12 +1686,12 @@ test.describe('Analog circuit assembly via UI', () => {
     test('triac dimmer: phase-angle AC control', async () => {
       await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
       await builder.placeLabeled('Triac', 14, 8, 'TR');
-      await builder.placeLabeled('AnalogResistor', 8, 14, 'R1');
-      await builder.placeLabeled('AnalogCapacitor', 14, 14, 'C1');
+      await builder.placeLabeled('Resistor', 8, 14, 'R1');
+      await builder.placeLabeled('Capacitor', 14, 14, 'C1');
       await builder.placeLabeled('Diac', 10, 10, 'DC');
-      await builder.placeLabeled('AnalogResistor', 20, 8, 'Rload');
-      await builder.placeLabeled('AnalogGround', 6, 18, 'G1');
-      await builder.placeLabeled('AnalogGround', 22, 14, 'G2');
+      await builder.placeLabeled('Resistor', 20, 8, 'Rload');
+      await builder.placeLabeled('Ground', 6, 18, 'G1');
+      await builder.placeLabeled('Ground', 22, 14, 'G2');
       await builder.placeLabeled('Probe', 24, 8, 'P1');
 
       await builder.setComponentProperty('Vs', 'amplitude', 170);
@@ -1730,10 +1730,10 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('LDR voltage divider: output varies with light level', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('AnalogResistor', 10, 6, 'R1');
+      await builder.placeLabeled('Resistor', 10, 6, 'R1');
       await builder.placeLabeled('LDR', 10, 12, 'LDR1');
-      await builder.placeLabeled('AnalogGround', 6, 16, 'G1');
-      await builder.placeLabeled('AnalogGround', 14, 16, 'G2');
+      await builder.placeLabeled('Ground', 6, 16, 'G1');
+      await builder.placeLabeled('Ground', 14, 16, 'G2');
       await builder.placeLabeled('Probe', 18, 9, 'P1');
 
       // R1=10kΩ, LDR with default lux=500 (R ≈ R_dark * (500/100)^-0.7)

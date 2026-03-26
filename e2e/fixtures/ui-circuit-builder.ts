@@ -443,11 +443,6 @@ export class UICircuitBuilder {
     await this.page.locator('#btn-tb-stop').click();
   }
 
-  /** Switch between digital and analog engine modes via the toolbar button. */
-  async switchEngineMode(): Promise<void> {
-    await this.page.locator('#btn-circuit-mode').click();
-  }
-
   /** Set the simulation speed via the speed input field. */
   async setSpeed(stepsPerSec: number): Promise<void> {
     const speedInput = this.page.locator('#speed-input');
@@ -1068,15 +1063,22 @@ export class UICircuitBuilder {
    * clicks it, then clears the search to restore the full palette.
    */
   private async _clickPaletteItem(typeName: string): Promise<void> {
+    // Resolve aliases (e.g. "AnalogResistor" → "Resistor") to canonical names
+    // shown in the palette. Falls back to the original name if not an alias.
+    const displayName: string = await this.page.evaluate((name) => {
+      const b = (window as any).__test;
+      return b?.resolveComponentName?.(name) ?? name;
+    }, typeName);
+
     const searchInput = this.page.locator('.palette-search-input');
-    await searchInput.fill(typeName);
+    await searchInput.fill(displayName);
 
     const item = this.page.locator(
-      `.palette-component-item:has(.palette-component-name:text-is("${typeName}"))`,
+      `.palette-component-item:has(.palette-component-name:text-is("${displayName}"))`,
     );
     await expect(
       item.first(),
-      `Palette item "${typeName}" not found — is the correct engine mode set?`,
+      `Palette item "${typeName}" (display: "${displayName}") not found — is the correct engine mode set?`,
     ).toBeVisible({ timeout: 5000 });
     await item.first().click();
 

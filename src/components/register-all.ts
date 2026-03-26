@@ -345,27 +345,20 @@ export function createDefaultRegistry(
 
   // Analog passives
   registry.register(ResistorDefinition);
-  registry.registerAlias("AnalogResistor", "Resistor");
   registry.register(CapacitorDefinition);
-  registry.registerAlias("AnalogCapacitor", "Capacitor");
   registry.register(InductorDefinition);
-  registry.registerAlias("AnalogInductor", "Inductor");
 
   registry.register(PotentiometerDefinition);
-  registry.registerAlias("AnalogPotentiometer", "Potentiometer");
   registry.register(TransformerDefinition);
   registry.register(TappedTransformerDefinition);
   registry.register(CrystalDefinition);
   registry.register(MemristorDefinition);
   registry.register(PolarizedCapDefinition);
   registry.register(TransmissionLineDefinition);
-  registry.registerAlias("AnalogTransmissionLine", "TransmissionLine");
 
   // Semiconductors
   registry.register(DiodeDefinition);
-  registry.registerAlias("AnalogDiode", "Diode");
   registry.register(ZenerDiodeDefinition);
-  registry.registerAlias("AnalogZener", "ZenerDiode");
   registry.register(NpnBjtDefinition);
   registry.register(PnpBjtDefinition);
   registry.register(NmosfetDefinition);
@@ -380,7 +373,6 @@ export function createDefaultRegistry(
   registry.register(TriodeDefinition);
 
   // Analog sources
-  registry.registerAlias("AnalogGround", "Ground");
   registry.register(DcVoltageSourceDefinition);
   registry.register(CurrentSourceDefinition);
   registry.register(AcVoltageSourceDefinition);
@@ -388,7 +380,6 @@ export function createDefaultRegistry(
 
   // Analog active
   registry.register(VoltageComparatorDefinition);
-  registry.registerAlias("AnalogComparator", "VoltageComparator");
   registry.register(Timer555Definition);
   registry.register(RealOpAmpDefinition);
   registry.register(OTADefinition);
@@ -403,9 +394,7 @@ export function createDefaultRegistry(
   registry.register(SchmittInvertingDefinition);
   registry.register(SchmittNonInvertingDefinition);
   registry.register(SwitchSPSTDefinition);
-  registry.registerAlias("AnalogSwitchSPST", "SwitchSPST");
   registry.register(SwitchSPDTDefinition);
-  registry.registerAlias("AnalogSwitchSPDT", "SwitchSPDT");
 
   // Sensors (analog)
   registry.register(LDRDefinition);

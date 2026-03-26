@@ -7,7 +7,7 @@
  */
 
 import type { ComponentDefinition } from "@/core/registry";
-import { ComponentCategory, ComponentRegistry, hasDigitalModel, hasAnalogModel } from "@/core/registry";
+import { ComponentCategory, ComponentRegistry } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // PaletteNode — one category tree node
@@ -44,28 +44,7 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   [ComponentCategory.ACTIVE]: "Active",
 };
 
-/** Digital-first category order (default). */
-const CATEGORIES_DIGITAL: readonly ComponentCategory[] = [
-  ComponentCategory.IO,
-  ComponentCategory.WIRING,
-  ComponentCategory.LOGIC,
-  ComponentCategory.SWITCHING,
-  ComponentCategory.FLIP_FLOPS,
-  ComponentCategory.MEMORY,
-  ComponentCategory.ARITHMETIC,
-  ComponentCategory.PLD,
-  ComponentCategory.MISC,
-  ComponentCategory.GRAPHICS,
-  ComponentCategory.TERMINAL,
-  ComponentCategory.SEVENTY_FOUR_XX,
-  ComponentCategory.SUBCIRCUIT,
-  ComponentCategory.PASSIVES,
-  ComponentCategory.SEMICONDUCTORS,
-  ComponentCategory.SOURCES,
-  ComponentCategory.ACTIVE,
-];
-
-/** Analog-first category order — analog categories promoted, digital demoted. */
+/** Category order — analog categories promoted for unified palette. */
 const CATEGORIES_ANALOG: readonly ComponentCategory[] = [
   ComponentCategory.PASSIVES,
   ComponentCategory.SEMICONDUCTORS,
@@ -86,8 +65,8 @@ const CATEGORIES_ANALOG: readonly ComponentCategory[] = [
   ComponentCategory.SUBCIRCUIT,
 ];
 
-/** All categories for initialization (superset). */
-const ALL_CATEGORIES = CATEGORIES_DIGITAL;
+/** All categories for initialization. */
+const ALL_CATEGORIES = CATEGORIES_ANALOG;
 
 /**
  * Default palette inclusion set per category. When no allowlist is active,
@@ -114,24 +93,8 @@ const MAX_RECENT_HISTORY = 10;
  * Palette state: tree of categories, search filter, recent history, and
  * collapsed flag for iframe-embedded mode.
  */
-/** Categories hidden from the sidebar palette when in digital mode (available via Insert menu). */
-const PALETTE_HIDDEN_CATEGORIES_DIGITAL: ReadonlySet<ComponentCategory> = new Set([
-  ComponentCategory.ARITHMETIC,
-  ComponentCategory.GRAPHICS,
-  ComponentCategory.TERMINAL,
-  ComponentCategory.PLD,
-  ComponentCategory.SEVENTY_FOUR_XX,
-  ComponentCategory.MISC,
-  ComponentCategory.SUBCIRCUIT,
-  // Analog-only categories hidden in digital mode
-  ComponentCategory.PASSIVES,
-  ComponentCategory.SEMICONDUCTORS,
-  ComponentCategory.SOURCES,
-  ComponentCategory.ACTIVE,
-]);
-
-/** Categories hidden from the sidebar palette when in analog mode. */
-const PALETTE_HIDDEN_CATEGORIES_ANALOG: ReadonlySet<ComponentCategory> = new Set([
+/** Categories hidden from the sidebar palette (available via Insert menu). */
+const PALETTE_HIDDEN_CATEGORIES: ReadonlySet<ComponentCategory> = new Set([
   ComponentCategory.ARITHMETIC,
   ComponentCategory.GRAPHICS,
   ComponentCategory.TERMINAL,
@@ -153,11 +116,6 @@ export class ComponentPalette {
    * in the palette. Null means show everything (default behavior).
    */
   private _allowlist: Set<string> | null = null;
-  /**
-   * Engine type filter. When set, only components targeting this engine type
-   * appear in the palette. Null means show all (backward-compatible default).
-   */
-  private _engineTypeFilter: "digital" | "analog" | null = null;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -193,37 +151,10 @@ export class ComponentPalette {
     return this._allowlist !== null ? Array.from(this._allowlist) : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // Engine type filter
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Set engine type filter. When set, only components matching this engine
-   * type are shown. Pass null or "auto" to show all components (additive).
-   */
-  setEngineTypeFilter(engineType: "digital" | "analog" | "auto" | null): void {
-    this._engineTypeFilter = engineType === "auto" ? null : engineType;
-  }
-
-  /** Returns the current engine type filter, or null if not active. */
-  getEngineTypeFilter(): "digital" | "analog" | null {
-    return this._engineTypeFilter;
-  }
-
   /** Apply the allowlist filter to a list of component definitions. */
   private _applyAllowlist(defs: ComponentDefinition[]): ComponentDefinition[] {
     if (this._allowlist === null) return defs;
     return defs.filter((d) => this._allowlist!.has(d.name));
-  }
-
-  /** Apply the engine type filter to a list of component definitions. */
-  private _applyEngineTypeFilter(defs: ComponentDefinition[]): ComponentDefinition[] {
-    if (this._engineTypeFilter === null) return defs;
-    return defs.filter((d) => {
-      if (this._engineTypeFilter === "digital") return hasDigitalModel(d);
-      if (this._engineTypeFilter === "analog") return hasAnalogModel(d);
-      return false;
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -237,23 +168,13 @@ export class ComponentPalette {
    */
   getTree(): PaletteNode[] {
     const nodes: PaletteNode[] = [];
-    const isAnalog = this._engineTypeFilter === "analog";
-    const isAll = this._engineTypeFilter === null;
-    // Auto/null mode: use analog order (superset of both) with no engine-specific hiding.
-    // Only hide the "always hidden" categories (arithmetic, graphics, etc.).
-    const categoryOrder = (isAnalog || isAll) ? CATEGORIES_ANALOG : CATEGORIES_DIGITAL;
-    const hiddenSet = isAll
-      ? PALETTE_HIDDEN_CATEGORIES_ANALOG  // analog hidden set doesn't hide PASSIVES/SEMICONDUCTORS/etc.
-      : isAnalog
-        ? PALETTE_HIDDEN_CATEGORIES_ANALOG
-        : PALETTE_HIDDEN_CATEGORIES_DIGITAL;
 
-    for (const category of categoryOrder) {
+    for (const category of CATEGORIES_ANALOG) {
       // When an allowlist is active, show all categories that have matching
       // components — don't hide the default-hidden categories since the
       // allowlist is the explicit override.
-      if (this._allowlist === null && hiddenSet.has(category)) continue;
-      const all = this._applyEngineTypeFilter(this._registry.getByCategory(category));
+      if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
+      const all = this._registry.getByCategory(category);
       let children: ComponentDefinition[];
       if (this._allowlist !== null) {
         children = this._applyAllowlist(all);
@@ -299,11 +220,10 @@ export class ComponentPalette {
 
     const lowerQuery = query.toLowerCase();
     const nodes: PaletteNode[] = [];
-    const categoryOrder = this._engineTypeFilter === "analog" ? CATEGORIES_ANALOG : CATEGORIES_DIGITAL;
 
-    for (const category of categoryOrder) {
+    for (const category of CATEGORIES_ANALOG) {
       const cat = category as ComponentCategory;
-      const all = this._applyAllowlist(this._applyEngineTypeFilter(this._registry.getByCategory(cat)));
+      const all = this._applyAllowlist(this._registry.getByCategory(cat));
       const matched = all.filter((def) =>
         def.name.toLowerCase().includes(lowerQuery),
       );

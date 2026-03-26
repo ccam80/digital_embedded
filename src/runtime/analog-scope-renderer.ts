@@ -1,5 +1,5 @@
 /**
- * Analog scope renderer — drawing utilities for the AnalogScopePanel.
+ * Scope renderer — drawing utilities for the ScopePanel.
  *
  * All functions draw onto a CanvasRenderingContext2D directly. The scope
  * panel is a standalone runtime panel (not an editor-canvas overlay), so

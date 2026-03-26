@@ -326,7 +326,8 @@ export class PostMessageAdapter {
       this._hooks.setInput(label, value);
     } else {
       this._ensureFacade();
-      this._facade!.setInput(this._facade!.getCoordinator()!, label, value);
+      const facade = this._facade!;
+      facade.setInput(facade.getCoordinator(), label, value);
     }
   }
 
@@ -335,8 +336,8 @@ export class PostMessageAdapter {
       this._hooks.step();
     } else {
       this._ensureFacade();
-      const engine = this._facade!.getCoordinator();
-      if (engine) this._facade!.step(engine);
+      const facade = this._facade!;
+      facade.step(facade.getCoordinator());
     }
   }
 
@@ -347,7 +348,8 @@ export class PostMessageAdapter {
       value = this._hooks.readOutput(label);
     } else {
       this._ensureFacade();
-      value = this._facade!.readOutput(this._facade!.getCoordinator()!, label);
+      const facade = this._facade!;
+      value = facade.readOutput(facade.getCoordinator(), label);
     }
     this._post({ type: 'digital-output', label, value });
   }
@@ -358,7 +360,8 @@ export class PostMessageAdapter {
       signals = this._hooks.readAllSignals();
     } else {
       this._ensureFacade();
-      signals = this._facade!.readAllSignals(this._facade!.getCoordinator()!);
+      const facade = this._facade!;
+      signals = facade.readAllSignals(facade.getCoordinator());
     }
     this._post({ type: 'digital-signals', signals });
   }
@@ -375,12 +378,12 @@ export class PostMessageAdapter {
     const circuit = this._getCircuit();
     const testDataStr = msg.testData != null ? String(msg.testData) : undefined;
     const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
-    const engine = facade.compile(circuit);
+    const coordinator = facade.compile(circuit);
 
     if (testDataStr) {
       const inputCount = detectInputCount(circuit, this._registry, testDataStr);
       const parsed = parseTestData(testDataStr, inputCount);
-      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     } else {
       const testcaseEl = circuit.elements.find(el => el.typeId === 'Testcase');
@@ -396,7 +399,7 @@ export class PostMessageAdapter {
       }
       const inputCount = detectInputCount(circuit, this._registry, embedded);
       const parsed = parseTestData(embedded, inputCount);
-      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     }
   }
@@ -445,7 +448,7 @@ export class PostMessageAdapter {
 
     try {
       const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
-      const engine = facade.compile(circuit);
+      const coordinator = facade.compile(circuit);
       let detectedInputCount = 0;
       for (const n of hdrNames) {
         if (circuitInputLabels.has(n)) detectedInputCount++;
@@ -455,7 +458,7 @@ export class PostMessageAdapter {
         testDataStr,
         detectedInputCount > 0 ? detectedInputCount : undefined,
       );
-      const results = executeTests(facade as RunnerFacade, engine, circuit, parsed);
+      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -519,8 +522,8 @@ export class PostMessageAdapter {
     }
 
     const hookFacade = this._hooks.getFacade?.();
-    const engine = (hookFacade as unknown as { getCoordinator?(): import('../solver/coordinator.js').DefaultSimulationCoordinator | null } | undefined)?.getCoordinator?.()
-      ?? this._facade?.getCoordinator();
+    const engine = (hookFacade as unknown as { getActiveCoordinator?(): import('../solver/coordinator.js').DefaultSimulationCoordinator | null } | undefined)?.getActiveCoordinator?.()
+      ?? this._facade?.getActiveCoordinator();
     if (engine && typeof (engine as unknown as { loadMemory?: unknown }).loadMemory === 'function') {
       (engine as unknown as { loadMemory(l: string, d: string, f: string): void })
         .loadMemory(label, String(msg.data ?? ''), String(msg.format ?? 'hex'));
@@ -609,7 +612,7 @@ export class PostMessageAdapter {
 
   /** Ensure own facade exists and has a compiled engine. */
   private _ensureFacade(): void {
-    if (!this._facade?.getCoordinator()) {
+    if (!this._facade?.getActiveCoordinator()) {
       throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
     }
   }

@@ -236,7 +236,7 @@ export interface SimulationCoordinator {
   setComponentProperty(element: CircuitElement, key: string, value: number): void;
 
   // -------------------------------------------------------------------------
-  // §1.8 Measurement signal reading (for AnalogScopePanel / TimingDiagramPanel)
+  // §1.8 Measurement signal reading (for ScopePanel)
   // -------------------------------------------------------------------------
 
   /**

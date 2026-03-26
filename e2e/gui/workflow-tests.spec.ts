@@ -31,7 +31,7 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
       <pos x="140" y="200"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogResistor</elementName>
+      <elementName>Resistor</elementName>
       <elementAttributes>
         <entry><string>Label</string><string>R1</string></entry>
         <entry><string>resistance</string><int>1000</int></entry>
@@ -39,7 +39,7 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
       <pos x="300" y="200"/>
     </visualElement>
     <visualElement>
-      <elementName>AnalogCapacitor</elementName>
+      <elementName>Capacitor</elementName>
       <elementAttributes>
         <entry><string>Label</string><string>C1</string></entry>
         <entry><string>capacitance</string><double>1.0E-6</double></entry>
@@ -478,17 +478,9 @@ test.describe('Workflow: analog mode', () => {
     await page.waitForTimeout(500);
   });
 
-  test('toggle analog mode and verify palette changes', async ({ page }) => {
-    // Initially digital
-    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('digital');
-
-    // Toggle to analog via programmatic click (menu item is inside dropdown)
-    await menuAction(page, 'btn-circuit-mode');
-    await page.waitForTimeout(300);
-
-    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('analog');
-
-    // Palette should now show analog components — expand all categories
+  test('palette shows analog components without mode switching', async ({ page }) => {
+    // The palette always shows all components — no mode switch needed.
+    // Expand all categories to make analog items visible.
     const categories = page.locator('.palette-category-header');
     const catCount = await categories.count();
     for (let i = 0; i < catCount; i++) {
@@ -499,16 +491,10 @@ test.describe('Workflow: analog mode', () => {
       }
     }
 
-    const resistor = page.locator('.palette-component-name:text-is("AnalogResistor")');
-    const capacitor = page.locator('.palette-component-name:text-is("AnalogCapacitor")');
+    const resistor = page.locator('.palette-component-name:text-is("Resistor")');
+    const capacitor = page.locator('.palette-component-name:text-is("Capacitor")');
     const total = await resistor.count() + await capacitor.count();
     expect(total).toBeGreaterThan(0);
-
-    // Toggle back to digital
-    await menuAction(page, 'btn-circuit-mode');
-    await page.waitForTimeout(300);
-
-    expect(await bridge<string>(page, 'bridge.getCircuitDomain()')).toBe('digital');
   });
 });
 

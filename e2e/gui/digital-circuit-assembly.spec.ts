@@ -870,13 +870,13 @@ test.describe('Digital circuit assembly via UI', () => {
   test('Bus splitter: 8-bit to 4+4 nibbles', async () => {
     await builder.placeLabeled('In', 3, 7, 'D');
     // Splitter has no Label property — use placeComponent and configure via type index
-    await builder.placeComponent('Splitter', 10, 7);
+    await builder.placeComponent('BusSplitter', 10, 7);
     await builder.placeLabeled('Out', 18, 5, 'Lo');
     await builder.placeLabeled('Out', 18, 10, 'Hi');
 
     // Configure splitter: left=8-bit input, right=4,4 output
-    await builder.setPropertyByTypeIndex('Splitter', 0, 'Input Splitting', '8');
-    await builder.setPropertyByTypeIndex('Splitter', 0, 'Output Splitting', '4,4');
+    await builder.setPropertyByTypeIndex('BusSplitter', 0, 'Input Splitting', '8');
+    await builder.setPropertyByTypeIndex('BusSplitter', 0, 'Output Splitting', '4,4');
 
     // Set In to 8-bit, Outs to 4-bit
     await builder.setComponentProperty('D', 'Bits', 8);
@@ -884,9 +884,9 @@ test.describe('Digital circuit assembly via UI', () => {
     await builder.setComponentProperty('Hi', 'Bits', 4);
 
     // Wire by getting splitter pin positions via type index
-    const splIn = await builder.getPinPagePositionByTypeIndex('Splitter', 0, '0-7');
-    const splLo = await builder.getPinPagePositionByTypeIndex('Splitter', 0, '0-3');
-    const splHi = await builder.getPinPagePositionByTypeIndex('Splitter', 0, '4-7');
+    const splIn = await builder.getPinPagePositionByTypeIndex('BusSplitter', 0, '0-7');
+    const splLo = await builder.getPinPagePositionByTypeIndex('BusSplitter', 0, '0-3');
+    const splHi = await builder.getPinPagePositionByTypeIndex('BusSplitter', 0, '4-7');
     const dOut = await builder.getPinPagePosition('D', 'out');
     const loIn = await builder.getPinPagePosition('Lo', 'in');
     const hiIn = await builder.getPinPagePosition('Hi', 'in');

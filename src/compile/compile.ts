@@ -244,6 +244,7 @@ export function compileUnified(
   // -------------------------------------------------------------------------
 
   const wireSignalMap = new Map<Wire, SignalAddress>();
+  const pinSignalMap = new Map<string, SignalAddress>();
 
   // Build two coordinate-keyed lookups:
   //   coordToSignalAddr — keyed by "x,y" for any pin world position in a group
@@ -283,6 +284,11 @@ export function compileUnified(
       for (const pin of group.pins) {
         const pk = `${pin.worldPosition.x},${pin.worldPosition.y}`;
         pinPosToSignalAddr.set(pk, addr);
+        // Build pinSignalMap: "instanceId:pinLabel" → signal address
+        const el = circuit.elements[pin.elementIndex];
+        if (el) {
+          pinSignalMap.set(`${el.instanceId}:${pin.pinLabel}`, addr);
+        }
       }
     }
   }
@@ -362,7 +368,7 @@ export function compileUnified(
       diagnostics.push({
         severity: d.severity === "error" ? "error" : "warning",
         code: d.code,
-        message: d.message,
+        message: d.summary,
       });
     }
   }
@@ -373,6 +379,8 @@ export function compileUnified(
     bridges,
     wireSignalMap,
     labelSignalMap,
+    pinSignalMap,
     diagnostics,
+    allCircuitElements: circuit.elements,
   };
 }

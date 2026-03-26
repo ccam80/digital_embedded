@@ -9,9 +9,9 @@ import { describe, it, expect } from "vitest";
 import { createTestBridge } from "../test-bridge.js";
 import type { TestBridge } from "../test-bridge.js";
 import { Circuit } from "@/core/circuit";
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { SignalValue } from "@/compile/types";
 import { MockCoordinator } from "@/test-utils/mock-coordinator";
+import { NullSimulationCoordinator } from "@/solver/null-coordinator";
 import type { ComponentRegistry } from "@/core/registry";
 import type { ComponentPalette } from "@/editor/palette";
 import type { Viewport } from "@/editor/viewport";
@@ -59,7 +59,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       expect(bridge.getCircuitDomain()).toBe('digital');
@@ -75,7 +75,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       expect(bridge.getCircuitDomain()).toBe('digital');
@@ -91,7 +91,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       expect(typeof bridge.getCircuitDomain).toBe('function');
@@ -104,7 +104,7 @@ describe("createTestBridge", () => {
   // -------------------------------------------------------------------------
 
   describe("getAnalogState", () => {
-    it("returns null when coordinator is null", () => {
+    it("returns null when no circuit is compiled (NullSimulationCoordinator)", () => {
       const circuit = new Circuit();
 
       const bridge: TestBridge = createTestBridge(
@@ -113,7 +113,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        null,
+        () => new NullSimulationCoordinator(),
       );
 
       expect(bridge.getAnalogState()).toBeNull();
@@ -129,7 +129,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       expect(bridge.getAnalogState()).toBeNull();
@@ -140,7 +140,7 @@ describe("createTestBridge", () => {
 
       class AnalogCoordinator extends MockCoordinator {
         private _simTime = 0.001;
-        private _signals = new Map<string, SignalValue>([
+        private _analogSignals = new Map<string, SignalValue>([
           ['V_out', { type: 'analog', voltage: 5.0 }],
           ['V_in', { type: 'analog', voltage: 3.3 }],
         ]);
@@ -150,7 +150,7 @@ describe("createTestBridge", () => {
         }
 
         override readAllSignals(): Map<string, SignalValue> {
-          return this._signals;
+          return this._analogSignals;
         }
       }
 
@@ -162,7 +162,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       const state = bridge.getAnalogState();
@@ -177,7 +177,7 @@ describe("createTestBridge", () => {
       const circuit = new Circuit();
 
       class MixedCoordinator extends MockCoordinator {
-        private _signals = new Map<string, SignalValue>([
+        private _mixedSignals = new Map<string, SignalValue>([
           ['clk', { type: 'digital', value: 1 }],
         ]);
 
@@ -186,7 +186,7 @@ describe("createTestBridge", () => {
         }
 
         override readAllSignals(): Map<string, SignalValue> {
-          return this._signals;
+          return this._mixedSignals;
         }
       }
 
@@ -198,7 +198,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        coordinator,
+        () => coordinator,
       );
 
       const state = bridge.getAnalogState();
@@ -222,7 +222,7 @@ describe("createTestBridge", () => {
         makeCanvas(),
         makePalette(),
         makeRegistry(),
-        null,
+        () => new NullSimulationCoordinator(),
       );
 
       const { x, y } = bridge.worldToScreen(2, 3);

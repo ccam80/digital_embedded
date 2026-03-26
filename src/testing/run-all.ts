@@ -9,7 +9,7 @@
  */
 
 import type { Circuit } from '../core/circuit.js';
-import type { SimulationEngine } from '../core/engine-interface.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { TestResults } from '../headless/types.js';
 import { TestcaseElement } from '../components/misc/testcase.js';
 import { parseTestData } from './parser.js';
@@ -87,7 +87,7 @@ export interface AggregateTestResults {
  */
 export function runAllTests(
   facade: RunnerFacade,
-  engine: SimulationEngine,
+  coordinator: SimulationCoordinator,
   circuit: Circuit,
 ): AggregateTestResults {
   const perTestcase: TestcaseResult[] = [];
@@ -102,7 +102,7 @@ export function runAllTests(
 
     const inputCount = countInputs(circuit);
     const parsed = parseTestData(raw, inputCount > 0 ? inputCount : undefined);
-    const results = executeTests(facade, engine, circuit, parsed);
+    const results = executeTests(facade, coordinator, circuit, parsed);
 
     perTestcase.push({ testcase: element, results });
     totalPassed += results.passed;

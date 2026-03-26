@@ -1,14 +1,15 @@
 /**
- * AnalogScopePanel — analog oscilloscope panel.
+ * ScopePanel — unified oscilloscope panel for both analog and digital signals.
  *
- * Captures voltage and current waveforms at every accepted timestep from the
- * simulation coordinator and renders them on a dedicated HTMLCanvasElement.
+ * Captures voltage, current, and digital waveforms at every accepted timestep
+ * from the simulation coordinator and renders them on a dedicated
+ * HTMLCanvasElement. Digital signals are mapped to VDD/0 voltage levels.
  * Supports multiple channels, Y-axis auto-ranging, zoom/pan, and an optional
  * FFT spectrum view (Task 3.3.3).
  *
- * The panel renders to its own canvas using CanvasRenderingContext2D directly,
- * consistent with TimingDiagramPanel. It does not use the engine-agnostic
- * RenderContext abstraction (which is for the circuit editor canvas only).
+ * The panel renders to its own canvas using CanvasRenderingContext2D directly.
+ * It does not use the engine-agnostic RenderContext abstraction (which is for
+ * the circuit editor canvas only).
  */
 
 import type { MeasurementObserver } from "@/core/engine-interface.js";
@@ -29,7 +30,7 @@ import { drawSpectrum, drawFrequencyAxis } from "./fft-renderer.js";
 // Channel descriptors
 // ---------------------------------------------------------------------------
 
-type ChannelKind = "voltage" | "current" | "elementCurrent";
+type ChannelKind = "voltage" | "current" | "elementCurrent" | "digital";
 
 /** Which statistical overlays to draw for a channel. */
 export type OverlayKind = "min" | "max" | "mean" | "rms";
@@ -49,6 +50,8 @@ interface ScopeChannel {
   yMax: number;
   /** Active stat overlays. */
   overlays: Set<OverlayKind>;
+  /** VDD level for digital channels (null for analog channels). */
+  vdd: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,23 +80,28 @@ const BOTTOM_MARGIN = 30;
 const ENVELOPE_THRESHOLD = 1000;
 
 // ---------------------------------------------------------------------------
-// AnalogScopePanel
+// ScopePanel
 // ---------------------------------------------------------------------------
 
 /**
- * Analog oscilloscope panel.
+ * Unified oscilloscope panel for analog and digital signals.
  *
  * Auto-registers itself as a `MeasurementObserver` on construction by calling
  * `coordinator.addMeasurementObserver(this)`. Call `dispose()` to deregister
  * when the panel is no longer needed.
  *
+ * Digital signals are mapped to VDD/0 voltage levels (default VDD = 5.0).
+ * When the coordinator has no continuous simTime (pure digital circuits),
+ * the panel uses step counts as the time axis.
+ *
  * Usage:
- *   const panel = new AnalogScopePanel(canvas, coordinator);
+ *   const panel = new ScopePanel(canvas, coordinator);
  *   panel.addVoltageChannel({ domain: 'analog', nodeId: 1 }, "Vout", "#4488ff");
+ *   panel.addDigitalChannel({ domain: 'digital', netId: 0, bitWidth: 1 }, "CLK");
  *   // ... later ...
  *   panel.dispose();
  */
-export class AnalogScopePanel implements MeasurementObserver {
+export class ScopePanel implements MeasurementObserver {
   private readonly _canvas: HTMLCanvasElement | null;
   private readonly _coordinator: SimulationCoordinator;
   private readonly _channels: ScopeChannel[] = [];
@@ -102,6 +110,9 @@ export class AnalogScopePanel implements MeasurementObserver {
   private _viewDuration: number = 0.01; // 10 ms default
   private _viewEnd: number = 0.01;
   private _hasData = false;
+
+  /** True when coordinator.simTime is null (pure digital circuits). */
+  private _discreteMode = false;
 
   // FFT state (Task 3.3.3)
   private _fftEnabled = false;
@@ -145,6 +156,7 @@ export class AnalogScopePanel implements MeasurementObserver {
     }));
   }
 
+  isDiscreteMode(): boolean { return this._discreteMode; }
   isFftEnabled(): boolean { return this._fftEnabled; }
   getFftChannelLabel(): string | null { return this._fftChannelLabel; }
 
@@ -160,6 +172,12 @@ export class AnalogScopePanel implements MeasurementObserver {
 
   addElementCurrentChannel(elementIndex: number, label: string, color?: string): void {
     const ch = this._makeChannel(label, "elementCurrent", null, elementIndex, color);
+    this._channels.push(ch);
+  }
+
+  addDigitalChannel(addr: SignalAddress, label: string, opts?: { vdd?: number; color?: string }): void {
+    const ch = this._makeChannel(label, "digital", addr, 0, opts?.color);
+    ch.vdd = opts?.vdd ?? 5.0;
     this._channels.push(ch);
   }
 
@@ -188,6 +206,7 @@ export class AnalogScopePanel implements MeasurementObserver {
       yMin: -1,
       yMax: 1,
       overlays: new Set<OverlayKind>(),
+      vdd: null,
     };
   }
 
@@ -195,14 +214,29 @@ export class AnalogScopePanel implements MeasurementObserver {
   // MeasurementObserver
   // -------------------------------------------------------------------------
 
-  onStep(_stepCount: number): void {
-    const t = this._coordinator.simTime ?? 0;
+  onStep(stepCount: number): void {
+    const rawTime = this._coordinator.simTime;
+
+    // Detect discrete mode on first step
+    if (!this._hasData && rawTime === null) {
+      this._discreteMode = true;
+      // Use step-count-scale defaults for the time axis
+      this._viewDuration = 100;
+      this._viewEnd = 100;
+    }
+
+    const t = this._discreteMode ? stepCount : (rawTime ?? 0);
 
     for (const ch of this._channels) {
       let value: number;
       if (ch.kind === "voltage") {
         const sv = this._coordinator.readSignal(ch.addr!);
-        value = sv.type === "analog" ? sv.voltage : 0;
+        value = sv.type === "analog" ? sv.voltage : (sv.value !== 0 ? (ch.vdd ?? 5.0) : 0);
+      } else if (ch.kind === "digital") {
+        const sv = this._coordinator.readSignal(ch.addr!);
+        value = sv.type === "digital"
+          ? (sv.value !== 0 ? (ch.vdd ?? 5.0) : 0)
+          : sv.voltage;
       } else if (ch.kind === "elementCurrent") {
         value = this._coordinator.readElementCurrent(ch.index) ?? 0;
       } else {
@@ -360,7 +394,9 @@ export class AnalogScopePanel implements MeasurementObserver {
 
     // Single shared Y-axis
     const hasCurrent = this._channels.some(c => c.kind === "current" || c.kind === "elementCurrent");
-    const unit = hasCurrent ? "V/A" : "V";
+    const hasAnalog = this._channels.some(c => c.kind === "voltage");
+    const hasDigital = this._channels.some(c => c.kind === "digital");
+    const unit = hasCurrent ? "V/A" : (hasAnalog || hasDigital) ? "V" : "";
     drawYAxis(ctx, [sharedRange.yMin, sharedRange.yMax], sharedVp, unit, "left");
 
     // Channel legend
@@ -593,7 +629,7 @@ export class AnalogScopePanel implements MeasurementObserver {
     const start = Math.ceil(tStart / interval) * interval;
     for (let t = start; t <= tEnd + interval * 0.5; t += interval) {
       const px = x + ((t - tStart) / span) * w;
-      ctx.fillText(formatTime(t), px, y + 4);
+      ctx.fillText(this._discreteMode ? formatStepCount(t) : formatTime(t), px, y + 4);
     }
     ctx.restore();
   }
@@ -683,3 +719,11 @@ function formatTime(t: number): string {
   if (abs >= 1e-6) return `${(t * 1e6).toPrecision(3)} µs`;
   return `${(t * 1e9).toPrecision(3)} ns`;
 }
+
+function formatStepCount(t: number): string {
+  return Math.round(t).toLocaleString();
+}
+
+// Backward-compatibility alias
+/** @deprecated Use `ScopePanel` instead. */
+export { ScopePanel as AnalogScopePanel };

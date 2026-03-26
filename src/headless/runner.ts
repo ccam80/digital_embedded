@@ -98,25 +98,25 @@ export class SimulationRunner {
   /**
    * Execute one propagation cycle.
    */
-  step(engine: SimulationEngine): void {
-    const record = this._records.get(engine);
+  step(coordinator: SimulationCoordinator): void {
+    const record = this._records.get(coordinator);
     if (record !== undefined) {
       record.coordinator.step();
     } else {
-      engine.step();
+      coordinator.step();
     }
   }
 
   /**
    * Execute N propagation cycles.
    */
-  run(engine: SimulationEngine, cycles: number): void {
-    const record = this._records.get(engine);
+  run(coordinator: SimulationCoordinator, cycles: number): void {
+    const record = this._records.get(coordinator);
     for (let i = 0; i < cycles; i++) {
       if (record !== undefined) {
         record.coordinator.step();
       } else {
-        engine.step();
+        coordinator.step();
       }
     }
   }
@@ -132,8 +132,8 @@ export class SimulationRunner {
    * @param maxIterations   Maximum steps before declaring oscillation. Default: 1000.
    * @throws OscillationError if the circuit has not stabilized within maxIterations.
    */
-  runToStable(engine: SimulationEngine, maxIterations = 1000): void {
-    const record = this._records.get(engine);
+  runToStable(coordinator: SimulationCoordinator, maxIterations = 1000): void {
+    const record = this._records.get(coordinator);
 
     if (record !== undefined) {
       const coord = record.coordinator;
@@ -168,11 +168,11 @@ export class SimulationRunner {
    *
    * @throws FacadeError if label is not found in the compiled circuit.
    */
-  setInput(engine: SimulationEngine, label: string, value: number): void {
-    const record = this._records.get(engine);
+  setInput(coordinator: SimulationCoordinator, label: string, value: number): void {
+    const record = this._records.get(coordinator);
     if (record === undefined) {
       throw new FacadeError(
-        `Engine was not compiled by this runner or has been disposed. Label: "${label}"`,
+        `Coordinator was not compiled by this runner or has been disposed. Label: "${label}"`,
       );
     }
 
@@ -194,11 +194,11 @@ export class SimulationRunner {
    *
    * @throws FacadeError if label is not found in the compiled circuit.
    */
-  readOutput(engine: SimulationEngine, label: string): number {
-    const record = this._records.get(engine);
+  readOutput(coordinator: SimulationCoordinator, label: string): number {
+    const record = this._records.get(coordinator);
     if (record === undefined) {
       throw new FacadeError(
-        `Engine was not compiled by this runner or has been disposed. Label: "${label}"`,
+        `Coordinator was not compiled by this runner or has been disposed. Label: "${label}"`,
       );
     }
 
@@ -219,8 +219,8 @@ export class SimulationRunner {
    *
    * Returns a Map of label → numeric value (raw digital or analog voltage).
    */
-  readAllSignals(engine: SimulationEngine): Map<string, number> {
-    const record = this._records.get(engine);
+  readAllSignals(coordinator: SimulationCoordinator): Map<string, number> {
+    const record = this._records.get(coordinator);
     const result = new Map<string, number>();
 
     if (record === undefined) return result;

@@ -14,7 +14,7 @@ import type { AggregateTestResults } from '../run-all.js';
 import { TestcaseElement } from '../../components/misc/testcase.js';
 import { PropertyBag } from '../../core/properties.js';
 import { Circuit } from '../../core/circuit.js';
-import type { SimulationEngine } from '../../core/engine-interface.js';
+import type { SimulationCoordinator } from '../../solver/coordinator-types.js';
 import type { RunnerFacade } from '../executor.js';
 
 // ---------------------------------------------------------------------------
@@ -88,21 +88,21 @@ function makeFacade(outputValues: Record<string, number> = {}): RunnerFacade {
   const lastInputs: Record<string, number> = {};
 
   return {
-    setInput(_engine: SimulationEngine, label: string, value: number): void {
+    setInput(_coordinator: SimulationCoordinator, label: string, value: number): void {
       lastInputs[label] = value;
     },
-    readOutput(_engine: SimulationEngine, label: string): number {
+    readOutput(_coordinator: SimulationCoordinator, label: string): number {
       // Return pre-defined value or fall back to what was last set on input
       return outputValues[label] ?? lastInputs[label] ?? 0;
     },
-    runToStable(_engine: SimulationEngine): void {
+    runToStable(_coordinator: SimulationCoordinator): void {
       // no-op
     },
   };
 }
 
-/** Stub engine — run-all passes it through to executeTests but never calls it directly. */
-const stubEngine = {} as SimulationEngine;
+/** Stub coordinator — run-all passes it through to executeTests but never calls it directly. */
+const stubEngine = {} as SimulationCoordinator;
 
 // ---------------------------------------------------------------------------
 // Test data strings

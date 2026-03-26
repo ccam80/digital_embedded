@@ -98,18 +98,9 @@ export function loadDigCircuit(
     circuit.addWire(createWireFromDig(dw));
   }
 
-  // Merge collinear overlapping/duplicate/reversed wire segments FIRST.
-  // .dig files (especially hand-edited ones) often contain redundant wires
-  // that create cycles in the wire graph, breaking current visualization.
-  // This must run before splitWiresAtJunctions — otherwise the merge would
-  // re-fuse segments that were intentionally split at T-junction points.
-  circuit.mergeCollinearWires();
-
-  // Split wires at T-junctions so endpoint-based net resolution sees the
-  // connection.  Digital's Java editor always splits wires at junctions,
-  // but hand-edited or externally-generated .dig files may not.
-  circuit.splitWiresAtJunctions();
-  circuit.removeZeroLengthWires();
+  // Normalize wires: merge collinear/duplicate segments, then split at
+  // junctions.  Preserves 4-way cross-junction topology.
+  circuit.normalizeWires();
 
   propagateWireBitWidths(circuit);
 

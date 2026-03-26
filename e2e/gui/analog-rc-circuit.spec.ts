@@ -1,107 +1,80 @@
 /**
  * E2E tests — analog RC circuit via GUI interactions.
  *
- * Tests the full pipeline: mode switch → circuit loading → simulation stepping
- * → voltage reading, all through real browser interactions (clicks, keyboard).
+ * Tests the full pipeline: circuit building via palette clicks → compilation
+ * (domain auto-detected as analog from component models) → simulation stepping
+ * → voltage reading.
  *
  * Circuit: AC Source (5V, 100Hz) → R (1kΩ) → C (1µF) → GND
  * Analytical: |H(100Hz)| = 1/√(1 + (2π·100·1e-3)²) ≈ 0.847
  *   → output amplitude ≈ 4.23V (source amplitude = 5V)
+ *
+ * No explicit mode switching — the compiler auto-detects analog from the
+ * component models (AcVoltageSource, Resistor, Capacitor).
  */
 import { test, expect } from '@playwright/test';
-import { SimulatorHarness } from '../fixtures/simulator-harness';
-
-// ---------------------------------------------------------------------------
-// Analog RC circuit as .dig XML
-// ---------------------------------------------------------------------------
-
-// Pin positions (pixel coords = element pos + pin offset * 20):
-//   AC Source at (140, 200): pos=(100,200), neg=(220,200)
-//   Resistor at (300, 200):  A=(300,200),   B=(380,200)
-//   Capacitor at (460, 200): A=(460,200),   B=(500,200)
-//   Ground1 at (220, 300):   gnd=(220,300)
-//   Ground2 at (500, 300):   gnd=(500,300)
-const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry><string>romContent</string><romList><roms/></romList></entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>AcVoltageSource</elementName>
-      <elementAttributes>
-        <entry><string>Label</string><string>Vs</string></entry>
-        <entry><string>Amplitude</string><int>5</int></entry>
-        <entry><string>Frequency</string><int>100</int></entry>
-      </elementAttributes>
-      <pos x="140" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>AnalogResistor</elementName>
-      <elementAttributes>
-        <entry><string>Label</string><string>R1</string></entry>
-        <entry><string>resistance</string><int>1000</int></entry>
-      </elementAttributes>
-      <pos x="300" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>AnalogCapacitor</elementName>
-      <elementAttributes>
-        <entry><string>Label</string><string>C1</string></entry>
-        <entry><string>capacitance</string><double>1.0E-6</double></entry>
-      </elementAttributes>
-      <pos x="460" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes/>
-      <pos x="220" y="300"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes/>
-      <pos x="500" y="300"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire><p1 x="100" y="200"/><p2 x="300" y="200"/></wire>
-    <wire><p1 x="380" y="200"/><p2 x="460" y="200"/></wire>
-    <wire><p1 x="500" y="200"/><p2 x="500" y="300"/></wire>
-    <wire><p1 x="220" y="200"/><p2 x="220" y="300"/></wire>
-  </wires>
-</circuit>`;
+import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Access the test bridge inside the simulator iframe. */
-function bridgeEval<T>(harness: SimulatorHarness, fn: string): Promise<T> {
-  return harness.page.evaluate((code) => {
-    const iframe = document.getElementById('sim') as HTMLIFrameElement;
-    const bridge = (iframe.contentWindow as any).__test;
-    return new Function('bridge', `return ${code}`)(bridge);
-  }, fn) as Promise<T>;
+/**
+ * Step N times via toolbar clicks and return the final analog engine state.
+ */
+async function stepAndRead(
+  builder: UICircuitBuilder,
+  steps: number,
+): Promise<{
+  simTime: number;
+  nodeVoltages: Record<string, number>;
+  nodeCount: number;
+} | null> {
+  return builder.stepAndReadAnalog(steps);
 }
 
 /**
- * Load the analog RC lowpass circuit via postMessage and switch to analog mode.
- * Uses ANALOG_RC_XML and the harness loadDigXml API, then clicks the mode button.
+ * Step N times via toolbar clicks, sampling every step to find peak/trough
+ * voltage per node. Used for AC steady-state amplitude verification.
  */
-async function loadAnalogRcCircuit(harness: SimulatorHarness): Promise<void> {
-  await harness.loadDigXml(ANALOG_RC_XML);
-  // Loading overwrites engine metadata — switch to analog mode after load
-  await clickIframeButton(harness, 'btn-circuit-mode');
-  await harness.page.waitForTimeout(200);
+async function measurePeaks(
+  builder: UICircuitBuilder,
+  steps: number,
+): Promise<{
+  amplitudes: number[];
+  peaks: number[];
+  troughs: number[];
+  nodeCount: number;
+} | null> {
+  return builder.measureAnalogPeaks(steps);
 }
 
-/** Click a button inside the simulator iframe by its DOM id. */
-async function clickIframeButton(harness: SimulatorHarness, buttonId: string): Promise<void> {
-  await harness.page.evaluate((id) => {
-    const iframe = document.getElementById('sim') as HTMLIFrameElement;
-    iframe.contentWindow!.document.getElementById(id)?.click();
-  }, buttonId);
+/**
+ * Build an RC lowpass circuit using UICircuitBuilder palette clicks and wire
+ * drawing. Returns after all components are placed and wired but before any
+ * simulation step.
+ *
+ * Topology:
+ *   Vs(pos) → R1(A) → R1(B) → C1(pos) → C1(neg) → G2(gnd)
+ *   Vs(neg) → G1(gnd)
+ *   C1(pos) → P1(in)   [probe for output measurement]
+ */
+async function buildRcCircuit(builder: UICircuitBuilder): Promise<void> {
+  await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
+  await builder.placeLabeled('Resistor', 10, 8, 'R1');
+  await builder.placeLabeled('Capacitor', 17, 8, 'C1');
+  await builder.placeLabeled('Ground', 6, 14, 'G1');
+  await builder.placeLabeled('Ground', 19, 14, 'G2');
+  await builder.placeLabeled('Probe', 22, 8, 'P1');
+
+  // Default AcVoltageSource amplitude is 5V; set frequency to 100 Hz
+  await builder.setComponentProperty('Vs', 'frequency', 100);
+
+  await builder.drawWire('Vs', 'pos', 'R1', 'A');
+  await builder.drawWire('R1', 'B', 'C1', 'pos');
+  await builder.drawWire('C1', 'neg', 'G2', 'gnd');
+  await builder.drawWire('Vs', 'neg', 'G1', 'gnd');
+  await builder.drawWire('C1', 'pos', 'P1', 'in');
 }
 
 // ---------------------------------------------------------------------------
@@ -109,216 +82,131 @@ async function clickIframeButton(harness: SimulatorHarness, buttonId: string): P
 // ---------------------------------------------------------------------------
 
 test.describe('GUI: analog RC circuit', () => {
-  let harness: SimulatorHarness;
+  let builder: UICircuitBuilder;
 
   test.beforeEach(async ({ page }) => {
-    harness = new SimulatorHarness(page);
-    await harness.load();
-    await harness.iframe.locator('#sim-canvas').waitFor({ state: 'visible' });
-    await page.waitForTimeout(500);
+    builder = new UICircuitBuilder(page);
+    await builder.load();
+    // Default engine mode is "auto" — all components (digital + analog) are
+    // available in the palette. The engine auto-detects analog from placed
+    // components. No explicit mode switch needed.
   });
 
-  test('switch to analog mode via GUI click', async () => {
-    // Initial mode should be Digital
-    const initialMode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
-    expect(initialMode).toBe('digital');
+  test('analog palette contains analog component types', async () => {
+    // All palette items are available without any mode switch. Verify that
+    // the palette exposes the analog component types we will use.
+    const hasResistor = await builder['page'].locator('[data-type="Resistor"]').count();
+    const hasCapacitor = await builder['page'].locator('[data-type="Capacitor"]').count();
+    const hasAcSource = await builder['page'].locator('[data-type="AcVoltageSource"]').count();
 
-    // Click the Circuit Mode button
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(200);
-
-    // Mode should now be Analog
-    const newMode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
-    expect(newMode).toBe('analog');
-
-    // The mode label should update in the UI
-    const labelText = await harness.iframe.locator('#circuit-mode-label').textContent();
-    expect(labelText).toBe('Analog');
-  });
-
-  test('switch to analog mode and back', async () => {
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(100);
-    expect(await bridgeEval<string>(harness, 'bridge.getCircuitDomain()')).toBe('analog');
-
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(100);
-    expect(await bridgeEval<string>(harness, 'bridge.getCircuitDomain()')).toBe('digital');
-  });
-
-  test('analog palette shows analog components after mode switch', async () => {
-    // Switch to analog mode
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(300);
-
-    // Palette should now contain analog components
-    const hasResistor = await harness.iframe.locator('[data-type="AnalogResistor"]').count();
-    const hasCapacitor = await harness.iframe.locator('[data-type="AnalogCapacitor"]').count();
-    const hasAcSource = await harness.iframe.locator('[data-type="AcVoltageSource"]').count();
-
-    // At least one of these should be visible in the palette
-    // (they might be in different categories or under Insert menu)
     const totalAnalog = hasResistor + hasCapacitor + hasAcSource;
-    // If none are in the palette tree, check via the bridge
-    if (totalAnalog === 0) {
-      // Verify at least that the engine type is analog
-      const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
-      expect(mode).toBe('analog');
-    } else {
-      expect(totalAnalog).toBeGreaterThan(0);
-    }
+    expect(totalAnalog).toBeGreaterThan(0);
   });
 
-  test('load analog RC circuit and verify elements', async () => {
-    // Load circuit via postMessage (this resets engineType to "digital")
-    await harness.loadDigXml(ANALOG_RC_XML);
+  test('circuit domain is auto-derived as analog after placing analog components', async () => {
+    // Place a single analog component — domain derivation reads component models
+    await builder.placeLabeled('Resistor', 5, 5, 'R1');
 
-    // Switch to analog mode AFTER loading (loading overwrites metadata)
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(200);
+    const domain = await builder.getCircuitDomain();
+    expect(domain).toBe('analog');
+  });
 
-    // Verify the circuit loaded with correct element count
-    const info = await harness.page.evaluate(() => {
-      const iframe = document.getElementById('sim') as HTMLIFrameElement;
-      return (iframe.contentWindow as any).__test.getCircuitInfo();
-    });
+  test('empty circuit has digital domain (no analog components)', async () => {
+    // Before placing any components the circuit is empty — defaults to digital
+    const domain = await builder.getCircuitDomain();
+    expect(domain).toBe('digital');
+  });
 
-    // 5 elements: AC source + resistor + capacitor + 2 grounds
-    expect(info.elementCount).toBe(5);
-    // Wire count may be higher than 4 due to splitWiresAtJunctions
-    expect(info.wireCount).toBeGreaterThanOrEqual(4);
+  test('build RC circuit via UI and verify all elements are present', async () => {
+    await buildRcCircuit(builder);
 
-    // Verify labeled elements
-    const labels = info.elements
-      .map((e: { label: string }) => e.label)
-      .filter(Boolean);
+    // After placing analog components the domain should be auto-detected
+    const domain = await builder.getCircuitDomain();
+    expect(domain).toBe('analog');
+
+    // Verify element count: AC source + resistor + capacitor + 2 grounds + probe = 6
+    const info = await builder.getCircuitInfo();
+    expect(info.elementCount).toBe(6);
+
+    const labels = info.elements.map(e => e.label).filter(Boolean);
     expect(labels).toContain('Vs');
     expect(labels).toContain('R1');
     expect(labels).toContain('C1');
-
-    // Verify engine type is analog
-    const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
-    expect(mode).toBe('analog');
   });
 
-  test('compile and step analog circuit via GUI', async () => {
-    // Load circuit via postMessage and switch to analog mode
-    await loadAnalogRcCircuit(harness);
+  test('compile and step analog RC circuit — simTime advances', async () => {
+    await buildRcCircuit(builder);
 
-    // Verify analog engine is active
-    const state0 = await bridgeEval<any>(harness, 'bridge.getAnalogState()');
+    // First step triggers compilation; compiler auto-detects analog from models
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
+
+    // Analog state should now be available
+    const state0 = await builder.getAnalogState();
     expect(state0).not.toBeNull();
-    expect(state0.nodeCount).toBe(2);
+    expect(state0!.simTime).toBeGreaterThan(0);
+    expect(state0!.nodeCount).toBeGreaterThanOrEqual(2);
 
-    // Step 10 times via GUI button (first click auto-compiles)
-    for (let i = 0; i < 10; i++) {
-      await clickIframeButton(harness, 'btn-step');
-    }
-    await harness.page.waitForTimeout(200);
+    // Step further and verify time advances
+    const timeBefore = state0!.simTime;
+    await builder.stepViaUI(10);
+    const state1 = await builder.getAnalogState();
+    expect(state1).not.toBeNull();
+    expect(state1!.simTime).toBeGreaterThan(timeBefore);
+  });
 
-    // Verify engine advanced
-    const state1 = await bridgeEval<any>(harness, 'bridge.getAnalogState()');
-    expect(state1.simTime).toBeGreaterThan(0);
+  test('node voltages change during transient simulation', async () => {
+    await buildRcCircuit(builder);
 
-    // Verify one more Step button click advances time further
-    const timeBefore = state1.simTime;
-    await clickIframeButton(harness, 'btn-step');
-    await harness.page.waitForTimeout(200);
-    const state2 = await bridgeEval<any>(harness, 'bridge.getAnalogState()');
-    expect(state2.simTime).toBeGreaterThan(timeBefore);
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
+
+    // Record voltages after 1 step
+    const state0 = await builder.getAnalogState();
+    expect(state0).not.toBeNull();
+
+    // Step 50 more times — voltages must change (AC source is driving the circuit)
+    await builder.stepViaUI(50);
+    const state1 = await builder.getAnalogState();
+    expect(state1).not.toBeNull();
+
+    // At least one node voltage should differ between the two snapshots
+    const keys = Object.keys(state0!.nodeVoltages);
+    expect(keys.length).toBeGreaterThan(0);
+    const anyChanged = keys.some(
+      k => Math.abs((state1!.nodeVoltages[k] ?? 0) - (state0!.nodeVoltages[k] ?? 0)) > 1e-9,
+    );
+    expect(anyChanged, 'No node voltages changed after 50 steps').toBe(true);
   });
 
   test('RC lowpass steady-state amplitude matches analytical', async () => {
-    // Load circuit via postMessage and switch to analog mode
-    await loadAnalogRcCircuit(harness);
+    await buildRcCircuit(builder);
 
-    // Run through transient (5τ = 5ms). Use btn-run for a fixed wall-clock
-    // duration rather than clicking btn-step thousands of times.
-    await clickIframeButton(harness, 'btn-run');
-    await harness.page.waitForTimeout(600); // allow ~5ms simulated time to elapse
-    await clickIframeButton(harness, 'btn-stop');
-    await harness.page.waitForTimeout(100);
+    // First step triggers compilation
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
 
-    const postTransient = await bridgeEval<any>(harness, 'bridge.getAnalogState()');
-    expect(postTransient).not.toBeNull();
-    expect(postTransient.simTime).toBeGreaterThan(0);
+    // Step past transient (5τ = 5ms at τ = RC = 1kΩ × 1µF = 1ms)
+    await stepAndRead(builder, 2000);
 
-    // Sample one full period (10ms at 100Hz) by stepping and reading state.
-    // We step in small batches, reading nodeVoltages after each step, until
-    // one full period has elapsed.
-    const nodeCount: number = postTransient.nodeCount;
-    const periodDuration = 0.01; // 1/100Hz = 10ms
-    const startTime: number = postTransient.simTime;
-    const periodEnd = startTime + periodDuration;
+    // Sample one full period (10ms at 100Hz) for peak/trough measurement
+    const result = await measurePeaks(builder, 3000);
+    expect(result).not.toBeNull();
+    expect(result!.nodeCount).toBeGreaterThanOrEqual(2);
 
-    const peaks: number[] = new Array(nodeCount).fill(-Infinity);
-    const troughs: number[] = new Array(nodeCount).fill(Infinity);
-    let steps = 0;
-    const maxSteps = 3000;
+    const amps = [...result!.amplitudes].sort((a, b) => b - a);
 
-    while (steps < maxSteps) {
-      await clickIframeButton(harness, 'btn-step');
-      const st = await bridgeEval<any>(harness, 'bridge.getAnalogState()');
-      if (!st) break;
-      for (let i = 0; i < nodeCount; i++) {
-        const v: number = st.nodeVoltages[`node_${i}`];
-        if (v > peaks[i]) peaks[i] = v;
-        if (v < troughs[i]) troughs[i] = v;
-      }
-      steps++;
-      if (st.simTime >= periodEnd) break;
-    }
-
-    expect(steps).toBeGreaterThan(0);
-
-    const amplitudes = peaks.map((p, i) => (p - troughs[i]) / 2);
-    const sorted = [...amplitudes].sort((a, b) => b - a);
-
-    // Analytical values
-    const R = 1000, C_val = 1e-6, freq = 100, amp = 5;
+    // Analytical: |H(100Hz)| = 1/√(1 + (2π·100·1kΩ·1µF)²) ≈ 0.847
+    // Source amplitude = 5V → output amplitude ≈ 4.234V
+    const R = 1000, C_val = 1e-6, freq = 100, srcAmp = 5;
     const omegaRC = 2 * Math.PI * freq * R * C_val;
     const hMag = 1 / Math.sqrt(1 + omegaRC * omegaRC);
-    const expectedOutputAmp = amp * hMag; // ≈ 4.234V
+    const expectedOutputAmp = srcAmp * hMag; // ≈ 4.234V
 
-    // Source node amplitude ≈ 5V
-    expect(sorted[0]).toBeGreaterThan(amp * 0.9);
-    // Output node amplitude matches analytical within 10%
-    expect(sorted[1]).toBeGreaterThan(expectedOutputAmp * 0.9);
-    expect(sorted[1]).toBeLessThan(expectedOutputAmp * 1.1);
-  });
-
-  test('place analog component from palette', async () => {
-    // Switch to analog mode
-    await clickIframeButton(harness, 'btn-circuit-mode');
-    await harness.page.waitForTimeout(300);
-
-    // Try to click on a resistor in the palette
-    const resistorItem = harness.iframe.locator('[data-type="AnalogResistor"]');
-    const resistorVisible = await resistorItem.count();
-
-    if (resistorVisible > 0) {
-      await resistorItem.click();
-
-      // Click on canvas to place
-      const canvasBox = await harness.iframe.locator('#sim-canvas').boundingBox();
-      expect(canvasBox).not.toBeNull();
-      await harness.page.mouse.click(
-        canvasBox!.x + canvasBox!.width / 2,
-        canvasBox!.y + canvasBox!.height / 2,
-      );
-      await harness.page.keyboard.press('Escape');
-
-      // Verify element was placed
-      const info = await bridgeEval<{ elementCount: number }>(
-        harness,
-        'bridge.getCircuitInfo()',
-      );
-      expect(info.elementCount).toBe(1);
-    } else {
-      // Analog components might be in the Insert menu rather than palette tree
-      // Just verify mode is correct
-      const mode = await bridgeEval<string>(harness, 'bridge.getCircuitDomain()');
-      expect(mode).toBe('analog');
-    }
+    // Source node amplitude ≈ 5V (within 10%)
+    expect(amps[0]).toBeGreaterThan(srcAmp * 0.9);
+    // Output node amplitude matches analytical within ±0.1% (ngspice-validated)
+    expect(amps[1]).toBeGreaterThan(expectedOutputAmp * 0.999);
+    expect(amps[1]).toBeLessThan(expectedOutputAmp * 1.001);
   });
 });

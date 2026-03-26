@@ -12,7 +12,7 @@ import type { CircuitElement } from '../core/element.js';
 import { FacadeError } from './types.js';
 import type { CircuitBuildOptions, TestResults } from './types.js';
 import { loadDig as loadDigFromXml } from '../io/dig-loader.js';
-import type { SimulationEngine } from '../core/engine-interface.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import { SimulationRunner } from './runner.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
@@ -302,14 +302,14 @@ export class CircuitBuilder {
    * Otherwise test data is extracted from Testcase components in the circuit.
    * Throws FacadeError if no test data is available from either source.
    *
-   * @param engine    The compiled SimulationEngine.
+   * @param coordinator    The compiled SimulationCoordinator.
    * @param circuit   The circuit (searched for Testcase components when testData absent).
    * @param testData  Optional external test vector string in Digital test format.
    * @returns         TestResults with per-vector pass/fail details.
    * @throws FacadeError if no test data is available.
    */
   runTests(
-    engine: SimulationEngine,
+    coordinator: SimulationCoordinator,
     circuit: Circuit,
     testData?: string,
   ): TestResults {
@@ -323,7 +323,7 @@ export class CircuitBuilder {
 
     const parsed = parseTestData(resolvedData);
     const runner = new SimulationRunner(this.registry);
-    return executeTests(runner, engine, circuit, parsed);
+    return executeTests(runner, coordinator, circuit, parsed);
   }
 
   // ---------------------------------------------------------------------------

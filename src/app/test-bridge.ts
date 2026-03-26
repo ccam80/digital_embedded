@@ -93,7 +93,7 @@ export function createTestBridge(
   canvas: HTMLCanvasElement,
   _palette: ComponentPalette,
   registry: ComponentRegistry,
-  coordinator: SimulationCoordinator | null,
+  coordinatorGetter: () => SimulationCoordinator,
 ): TestBridge {
   function worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
     return {
@@ -183,6 +183,11 @@ export function createTestBridge(
       return { zoom: viewport.zoom, panX: viewport.pan.x, panY: viewport.pan.y };
     },
 
+    resolveComponentName(nameOrAlias: string): string | null {
+      const def = registry.get(nameOrAlias);
+      return def ? def.name : null;
+    },
+
     getCircuitDomain() {
       const hasAnalogOnly = circuit.elements.some(el => {
         const def = registry.get(el.typeId);
@@ -193,7 +198,7 @@ export function createTestBridge(
     },
 
     getAnalogState() {
-      if (!coordinator) return null;
+      const coordinator = coordinatorGetter();
       const simTime = coordinator.simTime;
       if (simTime === null) return null;
 

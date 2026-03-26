@@ -224,7 +224,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (continuous)', () =>
   });
   it('simTimeGoal equals simTime plus speed times wallDt', () => {
     coord.speed = 1e-3;
-    const simTimeBefore = (coord as any)._analog.simTime as number;
+    const simTimeBefore = coord.simTime as number;
     const result = coord.computeFrameSteps(0.016);
     expect(result.simTimeGoal).toBeCloseTo(simTimeBefore + 1e-3 * 0.016, 15);
   });
@@ -236,7 +236,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (continuous)', () =>
   });
   it('clamps wallDt to 0.1s for continuous', () => {
     coord.speed = 1e-3;
-    const simTimeBefore = (coord as any)._analog.simTime as number;
+    const simTimeBefore = coord.simTime as number;
     expect(coord.computeFrameSteps(10.0).simTimeGoal).toBeCloseTo(simTimeBefore + 1e-3 * 0.1, 15);
   });
 });

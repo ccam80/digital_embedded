@@ -165,6 +165,14 @@ export interface CompiledCircuitUnified {
   wireSignalMap: Map<Wire, SignalAddress>;
   /** Map from component label → signal address for label-based I/O. */
   labelSignalMap: Map<string, SignalAddress>;
+  /** Map from "instanceId:pinLabel" → signal address for pin-level I/O (editor binding). */
+  pinSignalMap: Map<string, SignalAddress>;
   /** Diagnostics collected during compilation. */
   diagnostics: Diagnostic[];
+  /**
+   * All visual CircuitElements from the (flattened) circuit, including
+   * structural elements such as Tunnels that are not stamped by any domain
+   * compiler. Used by WireCurrentResolver for tunnel-vertex detection.
+   */
+  allCircuitElements: readonly CircuitElement[];
 }

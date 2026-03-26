@@ -330,9 +330,9 @@ async function cmdCompile(filePath: string): Promise<void> {
 async function cmdTest(filePath: string): Promise<void> {
   const circuit = await loadCircuit(filePath);
 
-  let engine;
+  let coordinator;
   try {
-    engine = facade.compile(circuit);
+    coordinator = facade.compile(circuit);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`Compile error: ${msg}`);
@@ -347,7 +347,7 @@ async function cmdTest(filePath: string): Promise<void> {
       process.exit(1);
     }
     const parsed = parseTestData(testData);
-    results = executeTests(facade, engine, circuit, parsed);
+    results = executeTests(facade, coordinator, circuit, parsed);
   } catch (err) {
     if (err instanceof FacadeError) {
       console.error(`Test error: ${err.message}`);

@@ -14,8 +14,8 @@
  *
  */
 
-import type { SimulationEngine } from '../core/engine-interface.js';
 import type { Circuit } from '../core/circuit.js';
+import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { ParsedTestData } from './parser.js';
 
 // ---------------------------------------------------------------------------
@@ -28,10 +28,10 @@ import type { ParsedTestData } from './parser.js';
  * Both SimulatorFacade and SimulationRunner satisfy this interface structurally.
  */
 export interface ComparatorFacade {
-  compile(circuit: Circuit): SimulationEngine;
-  setInput(engine: SimulationEngine, label: string, value: number): void;
-  readOutput(engine: SimulationEngine, label: string): number;
-  runToStable(engine: SimulationEngine, maxIterations?: number): void;
+  compile(circuit: Circuit): SimulationCoordinator;
+  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
+  readOutput(coordinator: SimulationCoordinator, label: string): number;
+  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,11 +137,11 @@ export function compareCircuits(
   studentCircuit: Circuit,
   testData?: ParsedTestData,
 ): ComparisonResult {
-  const refEngine = facade.compile(referenceCircuit);
-  const stuEngine = facade.compile(studentCircuit);
+  const refCoord = facade.compile(referenceCircuit);
+  const stuCoord = facade.compile(studentCircuit);
 
   if (testData !== undefined) {
-    return runTestBased(facade, refEngine, stuEngine, testData);
+    return runTestBased(facade, refCoord, stuCoord, testData);
   }
 
   const inventory = deriveSignalInventory(referenceCircuit);
@@ -153,7 +153,7 @@ export function compareCircuits(
     );
   }
 
-  return runExhaustive(facade, refEngine, stuEngine, inventory);
+  return runExhaustive(facade, refCoord, stuCoord, inventory);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +162,8 @@ export function compareCircuits(
 
 function runTestBased(
   facade: ComparatorFacade,
-  refEngine: SimulationEngine,
-  stuEngine: SimulationEngine,
+  refEngine: SimulationCoordinator,
+  stuEngine: SimulationCoordinator,
   testData: ParsedTestData,
 ): ComparisonResult {
   const mismatches: ComparisonMismatch[] = [];
@@ -213,8 +213,8 @@ function runTestBased(
 
 function runExhaustive(
   facade: ComparatorFacade,
-  refEngine: SimulationEngine,
-  stuEngine: SimulationEngine,
+  refEngine: SimulationCoordinator,
+  stuEngine: SimulationCoordinator,
   inventory: SignalInventory,
 ): ComparisonResult {
   const { inputNames, inputBitWidths, outputNames, totalInputBits } = inventory;
@@ -258,8 +258,8 @@ function runExhaustive(
 
 function runOneBoth(
   facade: ComparatorFacade,
-  refEngine: SimulationEngine,
-  stuEngine: SimulationEngine,
+  refEngine: SimulationCoordinator,
+  stuEngine: SimulationCoordinator,
   inputNames: string[],
   outputNames: string[],
   inputValues: Record<string, number>,

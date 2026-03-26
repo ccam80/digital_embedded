@@ -1,9 +1,10 @@
 /**
- * Tests for AnalogScopePanel — channel capture, reset, Y-axis ranging, FFT.
+ * Tests for ScopePanel — channel capture, reset, Y-axis ranging, FFT,
+ * digital channels, and discrete time mode.
  */
 
 import { describe, it, expect } from "vitest";
-import { AnalogScopePanel } from "../analog-scope-panel.js";
+import { ScopePanel } from "../analog-scope-panel.js";
 import { AnalogScopeBuffer } from "../analog-scope-buffer.js";
 import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
 import type { SignalAddress } from "@/compile/types.js";
@@ -14,6 +15,7 @@ import type { SignalAddress } from "@/compile/types.js";
 
 const VOLTAGE_ADDR: SignalAddress = { domain: "analog", nodeId: 3 };
 const VOLTAGE_ADDR2: SignalAddress = { domain: "analog", nodeId: 5 };
+const DIGITAL_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1 };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,15 +65,15 @@ function buildCoordinator(opts: {
   };
 }
 
-function makePanel(coordinator: MockCoordinator): AnalogScopePanel {
-  return new AnalogScopePanel(null, coordinator);
+function makePanel(coordinator: MockCoordinator): ScopePanel {
+  return new ScopePanel(null, coordinator);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("AnalogScope", () => {
+describe("ScopePanel", () => {
   it("captures_voltage_on_step", () => {
     const { coordinator, setSimTime } = buildCoordinator({ voltage: 4.2 });
     const panel = makePanel(coordinator);
@@ -290,5 +292,89 @@ describe("AnalogScope", () => {
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
     const samples = ch.buffer.getSamplesInRange(0, 1);
     expect(samples.time[0]).toBeCloseTo(5e-3);
+  });
+
+  it("digital_channel_maps_high_to_vdd", () => {
+    const coord = new MockCoordinator();
+    coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
+    let currentSimTime: number | null = 1e-6;
+    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+
+    const panel = makePanel(coord);
+    panel.addDigitalChannel(DIGITAL_ADDR, "CLK");
+
+    panel.onStep(1);
+
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels[0]!;
+    expect(ch.kind).toBe("digital");
+    const samples = ch.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(5.0); // default VDD
+  });
+
+  it("digital_channel_maps_low_to_zero", () => {
+    const coord = new MockCoordinator();
+    coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 0 });
+    let currentSimTime: number | null = 1e-6;
+    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+
+    const panel = makePanel(coord);
+    panel.addDigitalChannel(DIGITAL_ADDR, "CLK");
+
+    panel.onStep(1);
+
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
+    const samples = ch.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(0);
+  });
+
+  it("digital_channel_custom_vdd", () => {
+    const coord = new MockCoordinator();
+    coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
+    let currentSimTime: number | null = 1e-6;
+    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+
+    const panel = makePanel(coord);
+    panel.addDigitalChannel(DIGITAL_ADDR, "CLK", { vdd: 3.3 });
+
+    panel.onStep(1);
+
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
+    const samples = ch.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(3.3);
+  });
+
+  it("discrete_mode_uses_stepcount_as_time", () => {
+    const coord = new MockCoordinator();
+    // simTime is null by default in MockCoordinator — pure digital
+    coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
+
+    const panel = makePanel(coord);
+    panel.addDigitalChannel(DIGITAL_ADDR, "D0");
+
+    panel.onStep(42);
+
+    expect(panel.isDiscreteMode()).toBe(true);
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
+    const samples = ch.buffer.getSamplesInRange(0, 100);
+    expect(samples.time[0]).toBeCloseTo(42);
+  });
+
+  it("voltage_channel_maps_digital_signal_to_vdd", () => {
+    // When a voltage channel reads a digital signal (mixed circuits),
+    // it should map nonzero → VDD instead of 0
+    const coord = new MockCoordinator();
+    const mixedAddr: SignalAddress = { domain: "analog", nodeId: 10 };
+    coord.setSignal(mixedAddr, { type: "digital", value: 1 });
+    let currentSimTime: number | null = 1e-6;
+    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+
+    const panel = makePanel(coord);
+    panel.addVoltageChannel(mixedAddr, "Vmixed");
+
+    panel.onStep(1);
+
+    const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
+    const samples = ch.buffer.getSamplesInRange(0, 1);
+    expect(samples.value[0]).toBeCloseTo(5.0); // VDD default
   });
 });

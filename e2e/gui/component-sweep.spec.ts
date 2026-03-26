@@ -60,28 +60,28 @@ const SWITCHING = [
 const PLD = ['Diode', 'DiodeForward', 'DiodeBackward', 'PullUp', 'PullDown'];
 
 const PASSIVES = [
-  'AnalogResistor', 'AnalogCapacitor', 'AnalogInductor',
-  'AnalogPotentiometer', 'Transformer', 'TappedTransformer',
+  'Resistor', 'Capacitor', 'Inductor',
+  'Potentiometer', 'Transformer', 'TappedTransformer',
   'QuartzCrystal', 'Memristor', 'PolarizedCap',
-  'AnalogTransmissionLine', 'LDR', 'NTCThermistor', 'SparkGap',
+  'TransmissionLine', 'LDR', 'NTCThermistor', 'SparkGap',
 ];
 
 const SEMICONDUCTORS = [
-  'AnalogDiode', 'AnalogZener', 'NpnBJT', 'PnpBJT',
+  'Diode', 'ZenerDiode', 'NpnBJT', 'PnpBJT',
   'NMOS', 'PMOS', 'NJFET', 'PJFET',
   'SCR', 'Triac', 'Diac', 'TunnelDiode', 'VaractorDiode', 'Triode',
 ];
 
 const SOURCES = [
   'AcVoltageSource', 'DcVoltageSource', 'CurrentSource',
-  'AnalogGround', 'VariableRail',
+  'Ground', 'VariableRail',
 ];
 
 const ACTIVE = [
   'OpAmp', 'RealOpAmp', 'OTA', 'Timer555',
-  'AnalogComparator', 'SchmittInverting', 'SchmittNonInverting',
+  'VoltageComparator', 'SchmittInverting', 'SchmittNonInverting',
   'DAC', 'ADC', 'Optocoupler',
-  'AnalogSwitchSPST', 'AnalogSwitchSPDT',
+  'SwitchSPST', 'SwitchSPDT',
   'VCVS', 'VCCS', 'CCVS', 'CCCS',
 ];
 
@@ -278,7 +278,7 @@ const DUAL_ENGINE_TYPES: DualEngineEntry[] = [
   { type: 'JK_FF', modes: ['digital', 'analog'] },
   { type: 'RS_FF', modes: ['digital', 'analog'] },
   { type: 'T_FF', modes: ['digital', 'analog'] },
-  { type: 'AnalogComparator', modes: ['analog', 'mixed'] },
+  { type: 'VoltageComparator', modes: ['analog', 'mixed'] },
   { type: 'DAC', modes: ['mixed'] },
   { type: 'ADC', modes: ['mixed'] },
 ];
