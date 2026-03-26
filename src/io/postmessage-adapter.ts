@@ -49,7 +49,6 @@ import { deserializeDts } from './dts-deserializer.js';
 import { serializeCircuitToDig } from './dig-serializer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
-import type { SimulationEngine } from '../core/engine-interface.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
@@ -327,7 +326,7 @@ export class PostMessageAdapter {
       this._hooks.setInput(label, value);
     } else {
       this._ensureFacade();
-      this._facade!.setInput(this._facade!.getEngine()!, label, value);
+      this._facade!.setInput(this._facade!.getCoordinator()!, label, value);
     }
   }
 
@@ -336,7 +335,7 @@ export class PostMessageAdapter {
       this._hooks.step();
     } else {
       this._ensureFacade();
-      const engine = this._facade!.getEngine();
+      const engine = this._facade!.getCoordinator();
       if (engine) this._facade!.step(engine);
     }
   }
@@ -348,7 +347,7 @@ export class PostMessageAdapter {
       value = this._hooks.readOutput(label);
     } else {
       this._ensureFacade();
-      value = this._facade!.readOutput(this._facade!.getEngine()!, label);
+      value = this._facade!.readOutput(this._facade!.getCoordinator()!, label);
     }
     this._post({ type: 'digital-output', label, value });
   }
@@ -359,7 +358,7 @@ export class PostMessageAdapter {
       signals = this._hooks.readAllSignals();
     } else {
       this._ensureFacade();
-      signals = this._facade!.readAllSignals(this._facade!.getEngine()!);
+      signals = this._facade!.readAllSignals(this._facade!.getCoordinator()!);
     }
     this._post({ type: 'digital-signals', signals });
   }
@@ -520,8 +519,8 @@ export class PostMessageAdapter {
     }
 
     const hookFacade = this._hooks.getFacade?.();
-    const engine = (hookFacade as unknown as { getEngine?(): SimulationEngine | null } | undefined)?.getEngine?.()
-      ?? this._facade?.getEngine();
+    const engine = (hookFacade as unknown as { getCoordinator?(): import('../solver/coordinator.js').DefaultSimulationCoordinator | null } | undefined)?.getCoordinator?.()
+      ?? this._facade?.getCoordinator();
     if (engine && typeof (engine as unknown as { loadMemory?: unknown }).loadMemory === 'function') {
       (engine as unknown as { loadMemory(l: string, d: string, f: string): void })
         .loadMemory(label, String(msg.data ?? ''), String(msg.format ?? 'hex'));
@@ -610,7 +609,7 @@ export class PostMessageAdapter {
 
   /** Ensure own facade exists and has a compiled engine. */
   private _ensureFacade(): void {
-    if (!this._facade?.getEngine()) {
+    if (!this._facade?.getCoordinator()) {
       throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
     }
   }

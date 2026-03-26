@@ -497,7 +497,7 @@ export function initApp(search?: string): void {
     circuit.mergeCollinearWires();
 
     if (binding.isBound) {
-      facade.getEngine()?.stop?.();
+      facade.getCoordinator()?.stop?.();
       binding.unbind();
     }
     disposeAnalog();
@@ -588,8 +588,8 @@ export function initApp(search?: string): void {
 
   function invalidateCompiled(): void {
     compiledDirty = true;
-    const eng = facade.getEngine();
-    if ((eng as import("../core/engine-interface.js").SimulationEngine | null)?.getState?.() === EngineState.RUNNING) eng?.stop?.();
+    const eng = facade.getCoordinator();
+    if (eng?.getState() === EngineState.RUNNING) eng?.stop?.();
     if (binding.isBound) binding.unbind();
     disposeAnalog();
     // Dispose viewer panels — they hold stale net IDs
@@ -998,8 +998,8 @@ export function initApp(search?: string): void {
             ? (current === 0 ? 1 : 0)
             : ((current + 1) & ((1 << bitWidth) - 1));
           binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          const eng = facade.getEngine();
-          if (eng?.getState?.() !== EngineState.RUNNING) {
+          const eng = facade.getCoordinator();
+          if (eng?.getState() !== EngineState.RUNNING) {
             facade.step(eng!, { clockAdvance: elementHit.typeId !== 'Clock' });
           }
           scheduleRender();
@@ -1017,8 +1017,8 @@ export function initApp(search?: string): void {
             elementHit.setAttribute('closed', true);
             const onPointerUp = (): void => {
               elementHit.setAttribute('closed', false);
-              const eng = facade.getEngine();
-              if (eng?.getState?.() !== EngineState.RUNNING) {
+              const eng = facade.getCoordinator();
+              if (eng?.getState() !== EngineState.RUNNING) {
                 facade.step(eng!, { clockAdvance: true });
               }
               scheduleRender();
@@ -1029,8 +1029,8 @@ export function initApp(search?: string): void {
             const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
             elementHit.setAttribute('closed', !current);
           }
-          const eng = facade.getEngine();
-          if (eng?.getState?.() !== EngineState.RUNNING) {
+          const eng = facade.getCoordinator();
+          if (eng?.getState() !== EngineState.RUNNING) {
             facade.step(eng!, { clockAdvance: true });
           }
           scheduleRender();
@@ -1947,12 +1947,7 @@ export function initApp(search?: string): void {
       cancelAnimationFrame(runRafHandle);
       runRafHandle = -1;
     }
-    const coordinator = facade.getCoordinator();
-    if (coordinator) {
-      coordinator.stop();
-    } else {
-      facade.getEngine()?.stop?.();
-    }
+    facade.getCoordinator()?.stop();
     scheduleRender();
   }
 
@@ -2070,7 +2065,7 @@ export function initApp(search?: string): void {
 
   /** Tear down any active viewer panels and unregister observers. */
   function disposeViewers(): void {
-    const eng = facade.getEngine();
+    const eng = facade.getCoordinator();
     if (activeTimingPanel) {
       (eng as unknown as { removeMeasurementObserver(o: unknown): void } | null)?.removeMeasurementObserver(activeTimingPanel);
       activeTimingPanel.dispose();
@@ -2942,8 +2937,8 @@ export function initApp(search?: string): void {
     const editor = new MemoryEditorDialog(dataField, body);
     editor.render();
 
-    const memEng = facade.getEngine();
-    if (memEng?.getState?.() === EngineState.RUNNING) {
+    const memEng = facade.getCoordinator();
+    if (memEng?.getState() === EngineState.RUNNING) {
       editor.enableLiveUpdate(memEng);
     }
 
@@ -3586,8 +3581,8 @@ export function initApp(search?: string): void {
 
   const gifMenuItem = document.getElementById('btn-export-gif');
   document.getElementById('btn-export-gif')?.addEventListener('click', () => {
-    const gifEng = facade.getEngine();
-    if (!gifEng || gifEng.getState?.() === EngineState.STOPPED) return;
+    const gifEng = facade.getCoordinator();
+    if (!gifEng || gifEng.getState() === EngineState.STOPPED) return;
     exportGif(circuit, gifEng).then(blob => {
       downloadBlob(blob, `${circuitBaseName()}.gif`);
     }).catch((err: unknown) => {
@@ -3597,8 +3592,8 @@ export function initApp(search?: string): void {
 
   function updateGifMenuState(): void {
     if (gifMenuItem) {
-      const gifEng = facade.getEngine();
-      const stopped = !gifEng || gifEng.getState?.() === EngineState.STOPPED;
+      const gifEng = facade.getCoordinator();
+      const stopped = !gifEng || gifEng.getState() === EngineState.STOPPED;
       gifMenuItem.style.opacity = stopped ? '0.4' : '';
       gifMenuItem.style.pointerEvents = stopped ? 'none' : '';
     }
@@ -4022,7 +4017,7 @@ export function initApp(search?: string): void {
 
   // Apply saved settings on startup
   const initialEngineSettings = loadEngineSettings();
-  (facade.getEngine() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
+  (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
 
   const settingsOverlay = document.getElementById('settings-overlay');
   const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
@@ -4087,7 +4082,7 @@ export function initApp(search?: string): void {
     const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
     const newSettings: EngineSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
     saveEngineSettings(newSettings);
-    (facade.getEngine() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
+    (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
     applyCurrentVizSettings(newSettings);
     // Apply logic family to circuit metadata (only invalidate if changed)
     if (logicFamilySelect) {
@@ -4715,7 +4710,7 @@ export function initApp(search?: string): void {
             return el.typeId === typeId && lbl === name;
           });
 
-        const seqEng = facade.getEngine();
+        const seqEng = facade.getCoordinator();
         const seqFacade: SequentialAnalysisFacade = {
           setStateValue(name: string, value: bigint): void {
             const el = circuit.elements.find(e => {
@@ -4999,26 +4994,26 @@ export function initApp(search?: string): void {
       serializeCircuit: () => serializeCircuitToDig(circuit, registry),
       getFacade: () => facade,
       step: () => {
-        const engine = facade.getEngine();
+        const engine = facade.getCoordinator();
         if (engine) {
           facade.step(engine);
           scheduleRender();
         }
       },
       setInput: (label: string, value: number) => {
-        const engine = facade.getEngine();
+        const engine = facade.getCoordinator();
         if (engine) {
           facade.setInput(engine, label, value);
           scheduleRender();
         }
       },
       readOutput: (label: string) => {
-        const engine = facade.getEngine();
+        const engine = facade.getCoordinator();
         if (!engine) throw new Error('No simulation running');
         return facade.readOutput(engine, label);
       },
       readAllSignals: () => {
-        const engine = facade.getEngine();
+        const engine = facade.getCoordinator();
         if (!engine) throw new Error('No simulation running');
         return facade.readAllSignals(engine);
       },

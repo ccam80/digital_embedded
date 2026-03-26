@@ -298,11 +298,6 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Session accessors (not on SimulatorFacade interface)
   // =========================================================================
 
-  /** Returns the coordinator as the union type expected by callers that accept either interface. */
-  getEngine(): SimulationCoordinator | SimulationEngine | null {
-    return this._coordinator;
-  }
-
   /** Returns the currently active DefaultSimulationCoordinator, or null if none compiled yet. */
   getCoordinator(): DefaultSimulationCoordinator | null {
     return this._coordinator;

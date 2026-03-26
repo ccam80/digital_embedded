@@ -994,3 +994,14 @@ Import `BitsException` from `../../core/errors.js`.
 - **Files modified**: none
 - **Tests**: 7655/7659 passing (4 pre-existing ENOENT failures — ref/Digital submodule not initialised)
 - **Summary**: Full Vitest suite runs clean. 336 test files pass (2 fail with ENOENT on ref/Digital paths, pre-existing per test-baseline). No regressions introduced by P5b-28/P5b-29 changes.
+
+## Task P5b-getengine-cleanup: Migrate getEngine() to getCoordinator() and remove shim
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**:
+  - `src/headless/default-facade.ts` — removed `getEngine()` method entirely
+  - `src/headless/__tests__/default-facade.test.ts` — replaced 4 `getEngine()` calls with `getCoordinator()`
+  - `src/io/postmessage-adapter.ts` — replaced 6 `getEngine()` call sites with `getCoordinator()`, removed unused `SimulationEngine` import
+  - `src/app/app-init.ts` — replaced 17 `getEngine()` call sites with `getCoordinator()`, updated `.getState?.()` optional-chain calls to `.getState()` direct calls (coordinator has non-optional getState)
+- **Tests**: 7655/7659 passing (4 pre-existing submodule ENOENT failures, unchanged from baseline)

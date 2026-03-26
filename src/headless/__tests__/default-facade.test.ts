@@ -74,7 +74,7 @@ describe('DefaultSimulatorFacade', () => {
     const circuit = buildAndGate(facade);
 
     const engine = facade.compile(circuit);
-    expect(facade.getEngine()).toBe(engine);
+    expect(facade.getCoordinator()).toBe(engine);
 
     // A=1, B=1 → Y should be 1 after propagation
     facade.setInput(engine, 'A', 1);
@@ -223,7 +223,7 @@ describe('DefaultSimulatorFacade', () => {
 
     const coordinator = facade.compile(circuit);
 
-    expect(facade.getEngine()).toBe(coordinator);
+    expect(facade.getCoordinator()).toBe(coordinator);
     // Digital-only circuit: getCompiledUnified() is populated with a digital partition, no analog partition
     const compiledUnified = facade.getCompiledUnified();
     expect(compiledUnified).not.toBeNull();
@@ -240,10 +240,10 @@ describe('DefaultSimulatorFacade', () => {
     const circuit = buildAndGate(facade);
 
     const engine1 = facade.compile(circuit);
-    expect(facade.getEngine()).toBe(engine1);
+    expect(facade.getCoordinator()).toBe(engine1);
 
     const engine2 = facade.compile(circuit);
-    expect(facade.getEngine()).toBe(engine2);
+    expect(facade.getCoordinator()).toBe(engine2);
     expect(engine2).not.toBe(engine1);
   });
 
