@@ -13,6 +13,8 @@ import type { ModuleConfig } from './url-params.js';
 import type { AppContext } from './app-context.js';
 import { initRenderPipeline } from './render-pipeline.js';
 import type { RenderPipeline } from './render-pipeline.js';
+import { initSimulationController } from './simulation-controller.js';
+import type { SimulationController } from './simulation-controller.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
@@ -69,12 +71,6 @@ import type { Point } from '../core/renderer-interface.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 // TimingDiagramPanel removed — unified into ScopePanel
-import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
-import { CurrentFlowAnimator } from '../editor/current-animation.js';
-import { VoltageRangeTracker } from '../editor/voltage-range.js';
-import { voltageToColor } from '../editor/voltage-color.js';
-import { SliderPanel } from '../editor/slider-panel.js';
-import { SliderEngineBridge } from '../editor/slider-engine-bridge.js';
 import { ScopePanel } from '../runtime/analog-scope-panel.js';
 import type { AcParams } from '../solver/analog/ac-analysis.js';
 import { BodePlotRenderer } from '../runtime/bode-plot.js';
@@ -331,14 +327,15 @@ export function initApp(search?: string): void {
     const selected = selection.getSelectedElements();
 
     // --- Populate analog sliders for selected element ---
-    if (activeSliderPanel) {
-      activeSliderPanel.removeUnpinned();
+    const sliderPanel = simController?.activeSliderPanel;
+    if (sliderPanel) {
+      sliderPanel.removeUnpinned();
       if (selected.size === 1) {
         const element = selected.values().next().value!;
         const sliderCoordinator = facade.getCoordinator();
         const sliderProps = sliderCoordinator.getSliderProperties(element);
         for (const sp of sliderProps) {
-          activeSliderPanel.addSlider(
+          sliderPanel.addSlider(
             sp.elementIndex,
             sp.key,
             sp.label,
@@ -358,160 +355,7 @@ export function initApp(search?: string): void {
   const binding = createEditorBinding();
   let compiledDirty = true;
 
-  /** True when a simulation is active (any circuit type). */
-  function isSimActive(): boolean {
-    return facade.getCoordinator().getState() === EngineState.RUNNING;
-  }
-
-  /**
-   * Translate raw JS error messages from the analog pipeline into
-   * plain-language descriptions that help the user locate the problem.
-   */
-  function _friendlyAnalogError(raw: string, circ: import("../core/circuit.js").Circuit): string {
-    // Pattern: "Cannot read properties of undefined (reading 'X')"
-    // This typically means a component's pin didn't connect to any wire,
-    // producing an invalid node index that cascaded into the solver.
-    if (raw.includes('Cannot read properties of undefined')) {
-      const componentNames = circ.elements
-        .map(el => {
-          const props = el.getProperties();
-          const label = props.has('label') ? props.get<string>('label') : '';
-          return label || el.typeId;
-        })
-        .filter(n => n.length > 0);
-      const list = componentNames.length > 0
-        ? ` Components in circuit: ${componentNames.join(', ')}.`
-        : '';
-      return `A component has an unconnected pin — check that every pin sits exactly ` +
-        `on a wire endpoint. Rotated or moved components often leave pins dangling.${list}`;
-    }
-
-    // Pattern: unknown component type
-    if (raw.includes('unknown component type')) {
-      const match = raw.match(/"([^"]+)"/);
-      const typeName = match ? match[1] : 'unknown';
-      return `Couldn't find the component type "${typeName}" — check that it's ` +
-        `registered and spelled correctly.`;
-    }
-
-    // Pattern: digital-only component in analog circuit
-    if (raw.includes('digital-only')) {
-      const match = raw.match(/"([^"]+)"/);
-      const typeName = match ? match[1] : 'unknown';
-      return `"${typeName}" is a digital-only component and can't be used in an analog circuit. ` +
-        `Replace it with an analog equivalent or switch to digital mode.`;
-    }
-
-    // Fallback: return the raw message
-    return raw;
-  }
-
-  /** Dispose the analog engine and clear analog state. */
-  function disposeAnalog(): void {
-    _deactivateAnalogVisualization();
-    facade.invalidate();
-  }
-
-
-
-  function compileAndBind(): boolean {
-    // Clear previous diagnostic overlays — each compile attempt starts fresh.
-    renderPipeline.clearDiagnosticOverlays();
-
-    // Normalize wires: merge collinear/duplicate segments, then split at
-    // junctions.  Preserves 4-way cross-junction topology.
-    circuit.normalizeWires();
-
-    if (binding.isBound) {
-      facade.getCoordinator().stop();
-      binding.unbind();
-    }
-    disposeAnalog();
-
-    try {
-      facade.compile(circuit);
-      const coordinator = facade.getCoordinator();
-      const unified = coordinator.compiled;
-
-      // Single-pass diagnostic handling (D4): build wireToNodeId once,
-      // then populate overlays for all diagnostics in one loop.
-      const compileErrors = unified.diagnostics.filter(d => d.severity === 'error');
-      const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
-
-      if (compileErrors.length > 0) {
-        const combined = compileErrors.map(d => d.message).join(' | ');
-        console.error('Compilation diagnostics:', compileErrors);
-        showStatus(`Circuit problem: ${combined}`, true);
-      }
-
-      // Populate analog-domain overlays for all diagnostics in one pass.
-      const allDiags = [...compileErrors, ...compileWarnings];
-      if (allDiags.length > 0) {
-        if (compileWarnings.length > 0) {
-          console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
-        }
-        const resolverCtx = coordinator.getCurrentResolverContext();
-        if (resolverCtx !== null) {
-          const wireToNodeId = new Map<Wire, number>();
-          for (const [wire, addr] of unified.wireSignalMap) {
-            if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
-          }
-          renderPipeline.populateDiagnosticOverlays(
-            allDiags as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
-            wireToNodeId,
-          );
-        }
-        renderPipeline.scheduleRender();
-      }
-
-      if (compileErrors.length > 0) {
-        facade.invalidate();
-        return false;
-      }
-
-      // Bind the editor to the coordinator using unified signal maps.
-      binding.bind(circuit, coordinator, unified.wireSignalMap, unified.pinSignalMap);
-
-      const dcResult = facade.getDcOpResult();
-      compiledDirty = false;
-      if (dcResult && !dcResult.converged) {
-        showStatus('Warning: DC operating point did not converge — results may be inaccurate', true);
-      } else {
-        clearStatus();
-      }
-
-      if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
-        for (const sig of watchedSignals) {
-          const addr = unified.labelSignalMap.get(sig.name);
-          if (addr !== undefined) {
-            sig.addr = addr;
-            sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
-          }
-        }
-        rebuildViewers();
-      }
-
-      return true;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('Compilation failed:', msg, err);
-      const friendly = _friendlyAnalogError(msg, circuit);
-      showStatus(`Compilation error: ${friendly}`, true);
-      facade.invalidate();
-      return false;
-    }
-  }
-
-  function invalidateCompiled(): void {
-    compiledDirty = true;
-    const eng = facade.getCoordinator();
-    if (eng.getState() === EngineState.RUNNING) eng.stop();
-    if (binding.isBound) binding.unbind();
-    disposeAnalog();
-    // Dispose viewer panels — they hold stale net IDs
-    disposeViewers();
-    renderPipeline.scheduleRender();
-  }
+  // isSimActive, compileAndBind, invalidateCompiled — delegated to simController (set up below)
 
   // -------------------------------------------------------------------------
   // Render pipeline — canvas sizing, render loop, coordinate helpers
@@ -1519,251 +1363,8 @@ export function initApp(search?: string): void {
     }
   });
 
-  // -------------------------------------------------------------------------
-  // Speed control UI
-  // -------------------------------------------------------------------------
-
-  const speedInput = document.getElementById('speed-input') as HTMLInputElement | null;
-  const speedUnitEl = document.querySelector('.speed-unit') as HTMLElement | null;
-
-  function updateSpeedDisplay(): void {
-    if (!speedInput) return;
-    const fmt = facade.getCoordinator().formatSpeed();
-    speedInput.value = String(facade.getCoordinator().speed);
-    if (speedUnitEl) speedUnitEl.textContent = fmt.unit;
-  }
-
-  document.getElementById('btn-speed-down')?.addEventListener('click', () => {
-    facade.getCoordinator().adjustSpeed(0.1);
-    updateSpeedDisplay();
-  });
-
-  document.getElementById('btn-speed-up')?.addEventListener('click', () => {
-    facade.getCoordinator().adjustSpeed(10);
-    updateSpeedDisplay();
-  });
-
-  speedInput?.addEventListener('change', () => {
-    facade.getCoordinator().parseSpeed(speedInput.value);
-    updateSpeedDisplay();
-  });
-
-  // -------------------------------------------------------------------------
-  // Unified simulation loop — uses coordinator.step() for all circuit types
-  // -------------------------------------------------------------------------
-
-  let runRafHandle = -1;
-
-  // renderPipeline.state.currentFlowAnimator lives in renderPipeline.state.renderPipeline.state.currentFlowAnimator (set up below)
-  let _wireCurrentResolver: WireCurrentResolver | null = null;
-  const analogVoltageTracker = new VoltageRangeTracker();
-  let activeSliderPanel: SliderPanel | null = null;
-
-  function startSimulation(): void {
-    const coordinator = facade.getCoordinator();
-    if (coordinator.getState() === EngineState.RUNNING) return;
-
-    selection.clear();
-    coordinator.start();
-
-    if (coordinator.timingModel !== 'discrete') {
-      _activateAnalogVisualization(coordinator);
-    }
-
-    _startRenderLoop(coordinator);
-  }
-
-  function _startRenderLoop(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator): void {
-    let lastTime = performance.now();
-
-    const tick = (now: number): void => {
-      if (coordinator.getState() !== EngineState.RUNNING) {
-        runRafHandle = -1;
-        renderPipeline.scheduleRender();
-        return;
-      }
-
-      const wallDt = (now - lastTime) / 1000;
-      lastTime = now;
-      const frame = coordinator.computeFrameSteps(wallDt);
-
-      try {
-        if (frame.simTimeGoal !== null) {
-          const stepStart = performance.now();
-          facade.step(coordinator);
-          while (coordinator.simTime! < frame.simTimeGoal) {
-            if (performance.now() - stepStart > frame.budgetMs) break;
-            facade.step(coordinator);
-            if (coordinator.getState() === EngineState.ERROR) {
-              showStatus('Simulation error: solver failed to converge', true);
-              stopSimulation();
-              return;
-            }
-          }
-        } else {
-          for (let i = 0; i < frame.steps; i++) {
-            facade.step(coordinator);
-          }
-        }
-      } catch (err) {
-        showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
-        stopSimulation();
-        return;
-      }
-
-      if (coordinator.timingModel !== 'discrete') {
-        _updateAnalogVisualization(coordinator, wallDt);
-      }
-
-      renderPipeline.scheduleRender();
-      runRafHandle = requestAnimationFrame(tick);
-    };
-    runRafHandle = requestAnimationFrame(tick);
-  }
-
-  function _activateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator): void {
-    analogVoltageTracker.reset();
-    _wireCurrentResolver = new WireCurrentResolver();
-    renderPipeline.state.currentFlowAnimator = new CurrentFlowAnimator(_wireCurrentResolver);
-    renderPipeline.state.currentFlowAnimator.setEnabled(true);
-    applyCurrentVizSettings(loadEngineSettings());
-    wireRenderer.setVoltageTracker(analogVoltageTracker);
-
-    elementRenderer.setAnalogContext((element) => {
-      const pinVoltages = coordinator.getPinVoltages(element);
-      if (!pinVoltages) return undefined;
-      const tracker = analogVoltageTracker;
-      const scheme = colorSchemeManager.getActive();
-      return {
-        getPinVoltage: (pinLabel: string) => pinVoltages.get(pinLabel),
-        voltageColor: (voltage: number) => voltageToColor(voltage, tracker, scheme),
-      };
-    });
-
-    const sliderContainer = document.getElementById('slider-panel');
-    if (sliderContainer) {
-      sliderContainer.style.display = '';
-      activeSliderPanel = new SliderPanel(sliderContainer);
-      new SliderEngineBridge(activeSliderPanel, coordinator);
-    }
-  }
-
-  function _updateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator, wallDt: number): void {
-    if (renderPipeline.state.currentFlowAnimator && _wireCurrentResolver) {
-      const resolverCtx = coordinator.getCurrentResolverContext();
-      if (resolverCtx) _wireCurrentResolver.resolve(resolverCtx);
-      renderPipeline.state.currentFlowAnimator.update(wallDt, circuit);
-    }
-    coordinator.updateVoltageTracking();
-    const vRange = coordinator.voltageRange;
-    if (vRange !== null) {
-      analogVoltageTracker.update(vRange.min, vRange.max);
-    }
-  }
-
-  function _deactivateAnalogVisualization(): void {
-    if (renderPipeline.state.currentFlowAnimator) {
-      renderPipeline.state.currentFlowAnimator.setEnabled(false);
-      renderPipeline.state.currentFlowAnimator = null;
-    }
-    _wireCurrentResolver = null;
-    wireRenderer.setVoltageTracker(null);
-    elementRenderer.setAnalogContext(null);
-    if (activeSliderPanel) {
-      activeSliderPanel.dispose();
-      activeSliderPanel = null;
-    }
-    const sliderContainer = document.getElementById('slider-panel');
-    if (sliderContainer) sliderContainer.style.display = 'none';
-  }
-
-  function stopSimulation(): void {
-    if (runRafHandle !== -1) {
-      cancelAnimationFrame(runRafHandle);
-      runRafHandle = -1;
-    }
-    facade.getCoordinator().stop();
-    renderPipeline.scheduleRender();
-  }
-
-  // -------------------------------------------------------------------------
-  // Toolbar: Step / Run / Stop
-  // -------------------------------------------------------------------------
-
-  document.getElementById('btn-step')?.addEventListener('click', () => {
-    if (!ctx.ensureCompiled()) return;
-    const coordinator = facade.getCoordinator();
-    if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
-    try {
-      facade.step(coordinator);
-      clearStatus();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showStatus(`Simulation error: ${msg}`, true);
-    }
-    renderPipeline.scheduleRender();
-  });
-
-  document.getElementById('btn-run')?.addEventListener('click', () => {
-    if (!ctx.ensureCompiled()) return;
-    startSimulation();
-  });
-
-  document.getElementById('btn-stop')?.addEventListener('click', () => {
-    if (!isSimActive()) return;
-    stopSimulation();
-    binding.unbind();
-    facade.invalidate();
-    compiledDirty = true;
-    renderPipeline.scheduleRender();
-  });
-
-  document.getElementById('btn-micro-step')?.addEventListener('click', () => {
-    if (!ctx.ensureCompiled()) return;
-    const coordinator = facade.getCoordinator();
-    if (coordinator.supportsMicroStep()) {
-      if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
-      try { coordinator.microStep(); clearStatus(); } catch (err) {
-        showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
-      }
-    } else {
-      try { facade.step(coordinator); clearStatus(); } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showStatus(`Simulation error: ${msg}`, true);
-      }
-    }
-    renderPipeline.scheduleRender();
-  });
-
-  document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
-    if (!ctx.ensureCompiled()) return;
-    const coordinator = facade.getCoordinator();
-    if (!coordinator.supportsRunToBreak()) {
-      showStatus('Run-to-break is not available for this circuit type');
-      return;
-    }
-    if (coordinator.getState() === EngineState.RUNNING) return;
-    try {
-      coordinator.runToBreak();
-      clearStatus();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showStatus(`Simulation error: ${msg}`, true);
-    }
-    renderPipeline.scheduleRender();
-  });
-
-  // Toolbar Start/Step/Stop buttons (mirror the menu actions)
-  document.getElementById('btn-tb-step')?.addEventListener('click', () => {
-    document.getElementById('btn-step')?.click();
-  });
-  document.getElementById('btn-tb-run')?.addEventListener('click', () => {
-    document.getElementById('btn-run')?.click();
-  });
-  document.getElementById('btn-tb-stop')?.addEventListener('click', () => {
-    document.getElementById('btn-stop')?.click();
-  });
-
+  // Speed control, simulation loop, and toolbar sim buttons are now owned by
+  // SimulationController (initSimulationController, set up below after ctx).
 
   // -------------------------------------------------------------------------
   // Viewer panels (Timing Diagram + Values Table)
@@ -2126,7 +1727,7 @@ export function initApp(search?: string): void {
         );
 
         // "Add Slider" — for components with FLOAT properties during analog sim
-        if (activeSliderPanel && isSimActive()) {
+        if (simController.activeSliderPanel && simController.isSimActive()) {
           const sliderCoord = facade.getCoordinator();
           if (sliderCoord) {
             const sliderProps = sliderCoord.getSliderProperties(elementHit);
@@ -2136,7 +1737,7 @@ export function initApp(search?: string): void {
                 items.push({
                   label: `Add Slider: ${sp.label}`,
                   action: () => {
-                    activeSliderPanel!.addSlider(sp.elementIndex, sp.key, sp.label, sp.currentValue, { unit: sp.unit, logScale: sp.logScale });
+                    simController.activeSliderPanel!.addSlider(sp.elementIndex, sp.key, sp.label, sp.currentValue, { unit: sp.unit, logScale: sp.logScale });
                   },
                   enabled: true,
                 });
@@ -2782,6 +2383,22 @@ export function initApp(search?: string): void {
   }
 
   // ---------------------------------------------------------------------------
+  // SimulationController forward declaration — initialized after renderPipeline.
+  // ctx methods delegate to it via these closures.
+  // Local shim functions allow the rest of the file to call invalidateCompiled()
+  // etc. directly — they forward to simController at call time.
+  // ---------------------------------------------------------------------------
+
+  let simController: SimulationController = null!;
+
+  function invalidateCompiled(): void { simController.invalidateCompiled(); }
+  function compileAndBind(): boolean { return simController.compileAndBind(); }
+  function isSimActive(): boolean { return simController.isSimActive(); }
+  function startSimulation(): void { simController.startSimulation(); }
+  function stopSimulation(): void { simController.stopSimulation(); }
+  function updateSpeedDisplay(): void { simController.updateSpeedDisplay(); }
+
+  // ---------------------------------------------------------------------------
   // AppContext — shared state object passed to extracted sub-modules
   // ---------------------------------------------------------------------------
 
@@ -2827,6 +2444,7 @@ export function initApp(search?: string): void {
 
     // Helper methods
     scheduleRender(): void { renderPipeline.scheduleRender(); },
+    // invalidateCompiled, compileAndBind, isSimActive delegate via local shims
     invalidateCompiled,
     compileAndBind,
     ensureCompiled(): boolean {
@@ -2847,6 +2465,101 @@ export function initApp(search?: string): void {
   // Initialize render pipeline — must happen after ctx is built so the
   // pipeline can reference ctx.facade, ctx.viewport, etc.
   renderPipeline = initRenderPipeline(ctx, search);
+
+  // Initialize simulation controller — must happen after renderPipeline is built.
+  simController = initSimulationController(ctx, renderPipeline, {
+    disposeViewers(): void { disposeViewers(); },
+    rebuildViewersIfOpen(): void {
+      if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
+        for (const sig of watchedSignals) {
+          const unified = facade.getCoordinator().compiled;
+          const addr = unified.labelSignalMap.get(sig.name);
+          if (addr !== undefined) {
+            sig.addr = addr;
+            sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
+          }
+        }
+        rebuildViewers();
+      }
+    },
+  });
+
+  // Wire up settings dialog (uses simController.loadEngineSettings etc.)
+  {
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
+    const oscillationLimitInput = document.getElementById('setting-oscillation-limit') as HTMLInputElement | null;
+    const currentSpeedInput = document.getElementById('setting-current-speed') as HTMLInputElement | null;
+    const currentScaleSelect = document.getElementById('setting-current-scale') as HTMLSelectElement | null;
+    const logicFamilySelect = document.getElementById('setting-logic-family') as HTMLSelectElement | null;
+    const logicFamilyDetails = document.getElementById('logic-family-details') as HTMLElement | null;
+
+    function updateLogicFamilyDetails(key: string): void {
+      if (!logicFamilyDetails) return;
+      const preset = getLogicFamilyPreset(key);
+      if (!preset) { logicFamilyDetails.textContent = ''; return; }
+      logicFamilyDetails.innerHTML =
+        `<span>V<sub>OH</sub>: ${preset.vOH}V</span><span>V<sub>OL</sub>: ${preset.vOL}V</span>` +
+        `<span>V<sub>IH</sub>: ${preset.vIH}V</span><span>V<sub>IL</sub>: ${preset.vIL}V</span>` +
+        `<span>R<sub>out</sub>: ${preset.rOut}Ω</span><span>R<sub>in</sub>: ${(preset.rIn / 1e6).toFixed(0)}MΩ</span>`;
+    }
+
+    logicFamilySelect?.addEventListener('change', () => {
+      updateLogicFamilyDetails(logicFamilySelect.value);
+    });
+
+    function openSettingsDialog(): void {
+      const s = simController.loadEngineSettings();
+      if (snapshotBudgetInput) snapshotBudgetInput.value = String(s.snapshotBudgetMb);
+      if (oscillationLimitInput) oscillationLimitInput.value = String(s.oscillationLimit);
+      if (currentSpeedInput) currentSpeedInput.value = String(s.currentSpeedScale);
+      if (currentScaleSelect) currentScaleSelect.value = s.currentScaleMode;
+      if (logicFamilySelect) {
+        const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
+        const matchKey = Object.entries(LOGIC_FAMILY_PRESETS).find(
+          ([, v]) => v.name === family.name,
+        )?.[0] ?? 'cmos-3v3';
+        logicFamilySelect.value = matchKey;
+        updateLogicFamilyDetails(matchKey);
+      }
+      if (settingsOverlay) settingsOverlay.style.display = 'flex';
+    }
+
+    function closeSettingsDialog(): void {
+      if (settingsOverlay) settingsOverlay.style.display = 'none';
+    }
+
+    document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
+    document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
+    document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
+    document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
+
+    document.getElementById('btn-settings-save')?.addEventListener('click', () => {
+      const budgetMb = Math.max(1, Math.min(256, parseInt(snapshotBudgetInput?.value ?? '64', 10) || 64));
+      const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
+      const speedScale = Math.max(0.1, Math.min(100000, parseFloat(currentSpeedInput?.value ?? '200') || 200));
+      const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
+      const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
+      simController.saveEngineSettings(newSettings);
+      (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
+      simController.applyCurrentVizSettings(newSettings);
+      if (logicFamilySelect) {
+        const preset = getLogicFamilyPreset(logicFamilySelect.value);
+        if (preset) {
+          const prev = circuit.metadata.logicFamily;
+          const changed = !prev || prev.name !== preset.name;
+          circuit.metadata.logicFamily = preset;
+          if (changed) simController.invalidateCompiled();
+        }
+      }
+      closeSettingsDialog();
+      showStatus(`Settings saved.`);
+    });
+
+    settingsOverlay?.addEventListener('click', (e) => {
+      if (e.target === settingsOverlay) closeSettingsDialog();
+    });
+  }
 
   fileInput?.addEventListener('change', () => {
     const file = fileInput?.files?.[0];
@@ -3653,124 +3366,10 @@ export function initApp(search?: string): void {
 
   // -------------------------------------------------------------------------
   // Settings dialog (Task 8.4-8.5)
+  // loadEngineSettings/saveEngineSettings/applyCurrentVizSettings are now
+  // owned by SimulationController. The dialog UI wires up below after simController
+  // is available (see the initSimulationController call near the bottom).
   // -------------------------------------------------------------------------
-
-  const SETTINGS_STORAGE_KEY = 'digital-js:engine-settings';
-
-  interface EngineSettings {
-    snapshotBudgetMb: number;
-    oscillationLimit: number;
-    currentSpeedScale: number;
-    currentScaleMode: 'linear' | 'logarithmic';
-  }
-
-  function loadEngineSettings(): EngineSettings {
-    try {
-      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<EngineSettings>;
-        return {
-          snapshotBudgetMb: typeof parsed.snapshotBudgetMb === 'number' ? parsed.snapshotBudgetMb : 64,
-          oscillationLimit: typeof parsed.oscillationLimit === 'number' ? parsed.oscillationLimit : 1000,
-          currentSpeedScale: typeof parsed.currentSpeedScale === 'number' ? parsed.currentSpeedScale : 200,
-          currentScaleMode: parsed.currentScaleMode === 'logarithmic' ? 'logarithmic' : 'linear',
-        };
-      }
-    } catch { /* ignore */ }
-    return { snapshotBudgetMb: 64, oscillationLimit: 1000, currentSpeedScale: 200, currentScaleMode: 'linear' };
-  }
-
-  function saveEngineSettings(settings: EngineSettings): void {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  }
-
-  // Apply saved settings on startup
-  const initialEngineSettings = loadEngineSettings();
-  (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
-
-  const settingsOverlay = document.getElementById('settings-overlay');
-  const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
-  const oscillationLimitInput = document.getElementById('setting-oscillation-limit') as HTMLInputElement | null;
-  const currentSpeedInput = document.getElementById('setting-current-speed') as HTMLInputElement | null;
-  const currentScaleSelect = document.getElementById('setting-current-scale') as HTMLSelectElement | null;
-  const logicFamilySelect = document.getElementById('setting-logic-family') as HTMLSelectElement | null;
-  const logicFamilyDetails = document.getElementById('logic-family-details') as HTMLElement | null;
-
-  function updateLogicFamilyDetails(key: string): void {
-    if (!logicFamilyDetails) return;
-    const preset = getLogicFamilyPreset(key);
-    if (!preset) { logicFamilyDetails.textContent = ''; return; }
-    logicFamilyDetails.innerHTML =
-      `<span>V<sub>OH</sub>: ${preset.vOH}V</span><span>V<sub>OL</sub>: ${preset.vOL}V</span>` +
-      `<span>V<sub>IH</sub>: ${preset.vIH}V</span><span>V<sub>IL</sub>: ${preset.vIL}V</span>` +
-      `<span>R<sub>out</sub>: ${preset.rOut}Ω</span><span>R<sub>in</sub>: ${(preset.rIn / 1e6).toFixed(0)}MΩ</span>`;
-  }
-
-  logicFamilySelect?.addEventListener('change', () => {
-    updateLogicFamilyDetails(logicFamilySelect.value);
-  });
-
-  function applyCurrentVizSettings(s: EngineSettings): void {
-    if (renderPipeline.state.currentFlowAnimator) {
-      renderPipeline.state.currentFlowAnimator.setSpeedScale(s.currentSpeedScale);
-      renderPipeline.state.currentFlowAnimator.setScaleMode(s.currentScaleMode);
-    }
-  }
-
-  function openSettingsDialog(): void {
-    const s = loadEngineSettings();
-    if (snapshotBudgetInput) snapshotBudgetInput.value = String(s.snapshotBudgetMb);
-    if (oscillationLimitInput) oscillationLimitInput.value = String(s.oscillationLimit);
-    if (currentSpeedInput) currentSpeedInput.value = String(s.currentSpeedScale);
-    if (currentScaleSelect) currentScaleSelect.value = s.currentScaleMode;
-    // Logic family: find which preset matches the current circuit config
-    if (logicFamilySelect) {
-      const family = circuit.metadata.logicFamily ?? defaultLogicFamily();
-      const matchKey = Object.entries(LOGIC_FAMILY_PRESETS).find(
-        ([, v]) => v.name === family.name,
-      )?.[0] ?? 'cmos-3v3';
-      logicFamilySelect.value = matchKey;
-      updateLogicFamilyDetails(matchKey);
-    }
-    if (settingsOverlay) settingsOverlay.style.display = 'flex';
-  }
-
-  function closeSettingsDialog(): void {
-    if (settingsOverlay) settingsOverlay.style.display = 'none';
-  }
-
-  document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
-  document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
-  document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
-  document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
-
-  document.getElementById('btn-settings-save')?.addEventListener('click', () => {
-    const budgetMb = Math.max(1, Math.min(256, parseInt(snapshotBudgetInput?.value ?? '64', 10) || 64));
-    const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
-    const speedScale = Math.max(0.1, Math.min(100000, parseFloat(currentSpeedInput?.value ?? '200') || 200));
-    const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
-    const newSettings: EngineSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
-    saveEngineSettings(newSettings);
-    (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
-    applyCurrentVizSettings(newSettings);
-    // Apply logic family to circuit metadata (only invalidate if changed)
-    if (logicFamilySelect) {
-      const preset = getLogicFamilyPreset(logicFamilySelect.value);
-      if (preset) {
-        const prev = circuit.metadata.logicFamily;
-        const changed = !prev || prev.name !== preset.name;
-        circuit.metadata.logicFamily = preset;
-        if (changed) invalidateCompiled();
-      }
-    }
-    closeSettingsDialog();
-    showStatus(`Settings saved.`);
-  });
-
-  // Close settings on overlay backdrop click
-  settingsOverlay?.addEventListener('click', (e) => {
-    if (e.target === settingsOverlay) closeSettingsDialog();
-  });
 
   document.getElementById('btn-undo')?.addEventListener('click', () => {
     undoStack.undo();
