@@ -11,6 +11,8 @@
 import { parseUrlParams, loadModuleConfig, applyModuleConfig } from './url-params.js';
 import type { ModuleConfig } from './url-params.js';
 import type { AppContext } from './app-context.js';
+import { initRenderPipeline } from './render-pipeline.js';
+import type { RenderPipeline } from './render-pipeline.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
@@ -36,7 +38,7 @@ import { UndoRedoStack } from '../editor/undo-redo.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { LockedModeGuard } from '../editor/locked-mode.js';
 import { ColorSchemeManager, buildColorMap } from '../editor/color-scheme.js';
-import { screenToWorld, snapToGrid, GRID_SPACING } from '../editor/coordinates.js';
+import { snapToGrid } from '../editor/coordinates.js';
 import { hitTestElements, hitTestWires, hitTestPins } from '../editor/hit-test.js';
 import { TouchGestureTracker } from '../editor/touch-gestures.js';
 import { splitWiresAtPoint, isWireEndpoint } from '../editor/wire-drawing.js';
@@ -64,7 +66,6 @@ import { PropertyBag } from '../core/properties.js';
 import { pinWorldPosition } from '../core/pin.js';
 import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
-import type { WireSignalAccess } from '../editor/wire-signal-access.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 // TimingDiagramPanel removed — unified into ScopePanel
@@ -211,13 +212,6 @@ export function initApp(search?: string): void {
   const colorSchemeManager = new ColorSchemeManager(useDark ? 'default' : 'light');
   const contextMenu = new ContextMenu(document.body);
 
-  /**
-   * World-space positions of diagnostic errors/warnings to highlight on the
-   * canvas. Populated by compileAndBind() when diagnostics carry
-   * involvedNodes; cleared on successful compile or circuit edit.
-   */
-  let diagnosticOverlays: Array<{ x: number; y: number; severity: 'error' | 'warning' }> = [];
-
   // Sync: any colorSchemeManager change updates renderers automatically
   colorSchemeManager.onChange(() => {
     const active = colorSchemeManager.getActive();
@@ -246,34 +240,6 @@ export function initApp(search?: string): void {
     statusBar.classList.remove('error');
   }
 
-  /**
-   * Populate diagnosticOverlays from solver diagnostics that carry involvedNodes.
-   * Reverse-lookups wireToNodeId to find world-space positions for each node.
-   */
-  function populateDiagnosticOverlays(
-    diags: import('../core/analog-engine-interface.js').SolverDiagnostic[],
-    wireToNodeId: Map<Wire, number>,
-  ): void {
-    // Build reverse map: nodeId → first wire endpoint position (world coords)
-    const nodeIdToPosition = new Map<number, { x: number; y: number }>();
-    for (const [wire, nodeId] of wireToNodeId) {
-      if (!nodeIdToPosition.has(nodeId)) {
-        nodeIdToPosition.set(nodeId, { x: wire.start.x, y: wire.start.y });
-      }
-    }
-
-    for (const diag of diags) {
-      if (!diag.involvedNodes || diag.involvedNodes.length === 0) continue;
-      const severity = diag.severity === 'error' ? 'error' as const : 'warning' as const;
-      for (const nodeId of diag.involvedNodes) {
-        const pos = nodeIdToPosition.get(nodeId);
-        if (pos) {
-          diagnosticOverlays.push({ x: pos.x, y: pos.y, severity });
-        }
-      }
-    }
-  }
-
   statusDismiss.addEventListener('click', clearStatus);
 
   const palette = new ComponentPalette(registry);
@@ -292,7 +258,7 @@ export function initApp(search?: string): void {
     element.position = worldPt;
     circuit.addElement(element);
     invalidateCompiled();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
   paletteUI.render();
   paletteUI.setCanvas(canvas, viewport);
@@ -450,7 +416,7 @@ export function initApp(search?: string): void {
 
   function compileAndBind(): boolean {
     // Clear previous diagnostic overlays — each compile attempt starts fresh.
-    diagnosticOverlays = [];
+    renderPipeline.clearDiagnosticOverlays();
 
     // Normalize wires: merge collinear/duplicate segments, then split at
     // junctions.  Preserves 4-way cross-junction topology.
@@ -467,45 +433,40 @@ export function initApp(search?: string): void {
       const coordinator = facade.getCoordinator();
       const unified = coordinator.compiled;
 
-      // Check diagnostics from the unified compilation result.
+      // Single-pass diagnostic handling (D4): build wireToNodeId once,
+      // then populate overlays for all diagnostics in one loop.
       const compileErrors = unified.diagnostics.filter(d => d.severity === 'error');
+      const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
+
       if (compileErrors.length > 0) {
-        const friendlyMessages = compileErrors.map(d => d.message);
-        const combined = friendlyMessages.join(' | ');
+        const combined = compileErrors.map(d => d.message).join(' | ');
         console.error('Compilation diagnostics:', compileErrors);
         showStatus(`Circuit problem: ${combined}`, true);
-        // Populate analog-domain overlays only when a resolver context is available.
-        const resolverCtx = coordinator.getCurrentResolverContext();
-        if (resolverCtx !== null) {
-          const wireToNodeId = new Map<Wire, number>();
-          for (const [wire, addr] of unified.wireSignalMap) {
-            if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
-          }
-          populateDiagnosticOverlays(
-            compileErrors as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
-            wireToNodeId,
-          );
-        }
-        scheduleRender();
-        facade.invalidate();
-        return false;
       }
 
-      const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
-      if (compileWarnings.length > 0) {
-        console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
+      // Populate analog-domain overlays for all diagnostics in one pass.
+      const allDiags = [...compileErrors, ...compileWarnings];
+      if (allDiags.length > 0) {
+        if (compileWarnings.length > 0) {
+          console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
+        }
         const resolverCtx = coordinator.getCurrentResolverContext();
         if (resolverCtx !== null) {
           const wireToNodeId = new Map<Wire, number>();
           for (const [wire, addr] of unified.wireSignalMap) {
             if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
           }
-          populateDiagnosticOverlays(
-            compileWarnings as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
+          renderPipeline.populateDiagnosticOverlays(
+            allDiags as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
             wireToNodeId,
           );
         }
-        scheduleRender();
+        renderPipeline.scheduleRender();
+      }
+
+      if (compileErrors.length > 0) {
+        facade.invalidate();
+        return false;
       }
 
       // Bind the editor to the coordinator using unified signal maps.
@@ -549,251 +510,17 @@ export function initApp(search?: string): void {
     disposeAnalog();
     // Dispose viewer panels — they hold stale net IDs
     disposeViewers();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
-
-  const wireSignalAccessAdapter: WireSignalAccess = {
-    getWireValue(wire: Wire): { raw: number; width: number } | { voltage: number } | undefined {
-      const coordinator = facade.getCoordinator();
-      const addr = coordinator.compiled.wireSignalMap.get(wire);
-      if (addr === undefined) return undefined;
-      const sv = coordinator.readSignal(addr);
-      if (sv.type === "analog") {
-        return { voltage: sv.voltage };
-      }
-      return { raw: sv.value, width: addr.domain === 'digital' ? addr.bitWidth : 1 };
-    },
-  };
 
   // -------------------------------------------------------------------------
-  // Canvas sizing
+  // Render pipeline — canvas sizing, render loop, coordinate helpers
   // -------------------------------------------------------------------------
 
-  // Cached canvas dimensions — avoids forced synchronous layout reflow
-  // from reading clientWidth/clientHeight on every render frame.
-  let _canvasW = 0;
-  let _canvasH = 0;
-
-  function resizeCanvas(): void {
-    const container = canvas.parentElement!;
-    const dpr = window.devicePixelRatio || 1;
-    _canvasW = container.clientWidth;
-    _canvasH = container.clientHeight;
-    canvas.width = _canvasW * dpr;
-    canvas.height = _canvasH * dpr;
-    canvas.style.width = `${_canvasW}px`;
-    canvas.style.height = `${_canvasH}px`;
-    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  resizeCanvas();
-  window.addEventListener('resize', () => {
-    invalidateCanvasRect();
-    resizeCanvas();
-    scheduleRender();
-  });
-
-  // -------------------------------------------------------------------------
-  // Render loop
-  // -------------------------------------------------------------------------
-
-  let renderScheduled = false;
-
-  function scheduleRender(): void {
-    if (!renderScheduled) {
-      renderScheduled = true;
-      requestAnimationFrame(renderFrame);
-    }
-  }
-
-  // Frame profiling — enabled via ?profile query param or console: _enableFrameProfile()
-  let _frameProfileEnabled = search?.includes('profile') ?? false;
-  let _frameProfileSamples: number[] = [];
-  (window as any)._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
-  (window as any)._disableFrameProfile = () => {
-    _frameProfileEnabled = false;
-    if (_frameProfileSamples.length > 0) {
-      const sorted = _frameProfileSamples.slice().sort((a, b) => a - b);
-      const avg = sorted.reduce((s, v) => s + v, 0) / sorted.length;
-      const p50 = sorted[Math.floor(sorted.length * 0.5)];
-      const p95 = sorted[Math.floor(sorted.length * 0.95)];
-      const p99 = sorted[Math.floor(sorted.length * 0.99)];
-      console.log(`Frame profile (${sorted.length} frames): avg=${avg.toFixed(1)}ms p50=${p50!.toFixed(1)}ms p95=${p95!.toFixed(1)}ms p99=${p99!.toFixed(1)}ms max=${sorted[sorted.length-1]!.toFixed(1)}ms`);
-    }
-    _frameProfileSamples = [];
-  };
-
-  function renderFrame(): void {
-    renderScheduled = false;
-    const _t0 = _frameProfileEnabled ? performance.now() : 0;
-    const dpr = window.devicePixelRatio || 1;
-    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Use cached dimensions — avoids forced synchronous layout reflow.
-    const w = _canvasW;
-    const h = _canvasH;
-
-    ctx2d.clearRect(0, 0, w, h);
-
-    const screenRect = { x: 0, y: 0, width: w, height: h };
-    gridRenderer.render(canvasRenderer, screenRect, viewport.zoom, viewport.pan);
-
-    ctx2d.save();
-    ctx2d.translate(viewport.pan.x, viewport.pan.y);
-    const gridScale = viewport.zoom * GRID_SPACING;
-    ctx2d.scale(gridScale, gridScale);
-    canvasRenderer.setGridScale(gridScale);
-
-    const worldRect = viewport.getVisibleWorldRect({ width: w, height: h });
-    elementRenderer.render(canvasRenderer, circuit, selection.getSelectedElements(), worldRect);
-
-    wireRenderer.render(
-      canvasRenderer,
-      circuit.wires,
-      selection.getSelectedWires(),
-      isSimActive() ? wireSignalAccessAdapter : undefined,
-    );
-    wireRenderer.renderJunctionDots(canvasRenderer, circuit.wires);
-    wireRenderer.renderBusWidthMarkers(canvasRenderer, circuit.wires);
-
-    if (currentFlowAnimator !== null) {
-      currentFlowAnimator.render(canvasRenderer, circuit);
-    }
-
-    const ghosts = placement.getGhosts();
-    for (const ghost of ghosts) {
-      ctx2d.save();
-      ctx2d.globalAlpha = 0.5;
-      ctx2d.translate(ghost.position.x, ghost.position.y);
-      if (ghost.rotation !== 0) {
-        // Negate the angle to match ElementRenderer's convention:
-        // rotatePoint uses (x,y)→(y,-x) for rot=1, which corresponds
-        // to rotate(-PI/2) in Canvas2D coordinates.
-        ctx2d.rotate(-(ghost.rotation * Math.PI) / 2);
-      }
-      if (ghost.mirror) {
-        // Mirror negates Y in local space, matching ElementRenderer.
-        ctx2d.scale(1, -1);
-      }
-      ghost.element.draw(canvasRenderer);
-      ctx2d.restore();
-    }
-    const pasteWires = placement.getPasteWireGhosts();
-    if (pasteWires.length > 0) {
-      ctx2d.save();
-      ctx2d.globalAlpha = 0.5;
-      canvasRenderer.setColor('WIRE');
-      canvasRenderer.setLineWidth(2);
-      for (const w of pasteWires) {
-        canvasRenderer.drawLine(w.start.x, w.start.y, w.end.x, w.end.y);
-      }
-      ctx2d.restore();
-    }
-
-    if (wireDrawing.isActive()) {
-      const preview = wireDrawing.getPreviewSegments();
-      if (preview) {
-        canvasRenderer.setColor('WIRE');
-        canvasRenderer.setLineWidth(2);
-        for (const seg of preview) {
-          canvasRenderer.drawLine(seg.start.x, seg.start.y, seg.end.x, seg.end.y);
-        }
-      }
-    }
-
-    if (wireDrag.isActive()) {
-      const doglegs = wireDrag.getDoglegs();
-      canvasRenderer.setColor('WIRE');
-      canvasRenderer.setLineWidth(2);
-      for (const dw of doglegs) {
-        canvasRenderer.drawLine(dw.start.x, dw.start.y, dw.end.x, dw.end.y);
-      }
-    }
-
-    // Render diagnostic overlays (error/warning location circles)
-    if (diagnosticOverlays.length > 0) {
-      ctx2d.save();
-      for (const overlay of diagnosticOverlays) {
-        const isError = overlay.severity === 'error';
-        ctx2d.fillStyle = isError
-          ? 'rgba(220, 38, 38, 0.25)'   // red for errors
-          : 'rgba(234, 179, 8, 0.25)';   // yellow for warnings
-        ctx2d.strokeStyle = isError
-          ? 'rgba(220, 38, 38, 0.8)'
-          : 'rgba(234, 179, 8, 0.8)';
-        ctx2d.lineWidth = 2 / gridScale;
-        const radius = 1.5; // grid units
-        ctx2d.beginPath();
-        ctx2d.arc(overlay.x, overlay.y, radius, 0, Math.PI * 2);
-        ctx2d.fill();
-        ctx2d.stroke();
-      }
-      ctx2d.restore();
-    }
-
-    canvasRenderer.setGridScale(1);
-    ctx2d.restore();
-
-    if (boxSelect.active) {
-      ctx2d.save();
-      ctx2d.strokeStyle = 'rgba(86, 156, 214, 0.8)';
-      ctx2d.fillStyle = 'rgba(86, 156, 214, 0.1)';
-      ctx2d.lineWidth = 1;
-      const bx = Math.min(boxSelect.startScreen.x, boxSelect.currentScreen.x);
-      const by = Math.min(boxSelect.startScreen.y, boxSelect.currentScreen.y);
-      const bw = Math.abs(boxSelect.currentScreen.x - boxSelect.startScreen.x);
-      const bh = Math.abs(boxSelect.currentScreen.y - boxSelect.startScreen.y);
-      ctx2d.fillRect(bx, by, bw, bh);
-      ctx2d.strokeRect(bx, by, bw, bh);
-      ctx2d.restore();
-    }
-
-    // Render scope panels when simulation is running (new data from onStep)
-    // or when resized. Skip during idle zoom/pan to avoid expensive redraws.
-    const simRunning = isSimActive();
-    for (const sp of scopePanels) {
-      const resized = sizeCanvasInContainer(sp.canvas);
-      if (resized || simRunning) {
-        sp.panel.render();
-      }
-    }
-
-    if (_frameProfileEnabled) {
-      const dt = performance.now() - _t0;
-      _frameProfileSamples.push(dt);
-      if (_frameProfileSamples.length % 60 === 0) {
-        console.log(`Frame: ${dt.toFixed(1)}ms (${_frameProfileSamples.length} samples)`);
-      }
-    }
-  }
-
-  scheduleRender();
-
-  // -------------------------------------------------------------------------
-  // Coordinate helpers
-  // -------------------------------------------------------------------------
-
-  // Cache canvas bounding rect to avoid forcing synchronous layout reflow on
-  // every mouse/wheel event. Invalidated on resize and scroll.
-  let _canvasRect: DOMRect | null = null;
-  function getCanvasRect(): DOMRect {
-    if (_canvasRect === null) _canvasRect = canvas.getBoundingClientRect();
-    return _canvasRect;
-  }
-  function invalidateCanvasRect(): void { _canvasRect = null; }
-  window.addEventListener('resize', invalidateCanvasRect);
-  window.addEventListener('scroll', invalidateCanvasRect, true);
-
-  function canvasToWorld(e: { clientX: number; clientY: number }): Point {
-    const rect = getCanvasRect();
-    const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    return screenToWorld(screenPt, viewport.zoom, viewport.pan);
-  }
-
-  function canvasToScreen(e: { clientX: number; clientY: number }): Point {
-    const rect = getCanvasRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
+  // renderPipeline is initialized after the AppContext object is built below.
+  // We use a mutable reference so compileAndBind (defined above) can call
+  // scheduleRender via the ctx.scheduleRender shim set up after ctx is built.
+  let renderPipeline!: RenderPipeline;
 
   // -------------------------------------------------------------------------
   // Interaction state
@@ -809,11 +536,7 @@ export function initApp(search?: string): void {
   let clipboard: ClipboardData = { entries: [], wires: [] };
   let lastWorldPt: Point = { x: 0, y: 0 };
 
-  const boxSelect = {
-    active: false,
-    startScreen: { x: 0, y: 0 },
-    currentScreen: { x: 0, y: 0 },
-  };
+  // boxSelect lives in renderPipeline.state.boxSelect (set up below)
 
   // -------------------------------------------------------------------------
   // Pointer events
@@ -853,7 +576,7 @@ export function initApp(search?: string): void {
 
     // Touch pointers are handled by the gesture tracker (supports multi-touch).
     if (e.pointerType === 'touch') {
-      const worldPt = canvasToWorld(e);
+      const worldPt = renderPipeline.canvasToWorld(e);
       const hitThreshold = TOUCH_HIT_THRESHOLD;
       const hitMargin = TOUCH_HIT_MARGIN;
       const pinHit = hitTestPins(worldPt, circuit.elements, hitThreshold);
@@ -894,8 +617,8 @@ export function initApp(search?: string): void {
       activePointerId = e.pointerId;
     }
 
-    const worldPt = canvasToWorld(e);
-    const screenPt = canvasToScreen(e);
+    const worldPt = renderPipeline.canvasToWorld(e);
+    const screenPt = renderPipeline.canvasToScreen(e);
     const isTouch = e.pointerType === 'touch';
     const hitThreshold = isTouch ? TOUCH_HIT_THRESHOLD : HIT_THRESHOLD;
     const hitMargin = isTouch ? TOUCH_HIT_MARGIN : 0;
@@ -930,14 +653,14 @@ export function initApp(search?: string): void {
         if (pinHit || elemHit) {
           placement.cancel();
           invalidateCompiled();
-          scheduleRender();
+          renderPipeline.scheduleRender();
           if (pinHit) {
             wireDrawing.startFromPin(pinHit.element, pinHit.pin);
           } else {
             selection.clear();
             selection.select(lastPlaced);
           }
-          scheduleRender();
+          renderPipeline.scheduleRender();
           return;
         }
       }
@@ -968,7 +691,7 @@ export function initApp(search?: string): void {
                 if (compileAndBind()) {
                   startSimulation();
                 }
-                scheduleRender();
+                renderPipeline.scheduleRender();
               };
               document.addEventListener('pointerup', onPointerUp, { once: true });
             } else {
@@ -995,7 +718,7 @@ export function initApp(search?: string): void {
         } else {
           selection.clear();
         }
-        scheduleRender();
+        renderPipeline.scheduleRender();
         return;
       }
 
@@ -1011,7 +734,7 @@ export function initApp(search?: string): void {
         if (eng.getState() !== EngineState.RUNNING) {
           facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' });
         }
-        scheduleRender();
+        renderPipeline.scheduleRender();
       }
 
       // Switch toggle: Switch (SPST) and SwitchDT (SPDT) clicked during simulation
@@ -1026,7 +749,7 @@ export function initApp(search?: string): void {
             if (eng.getState() !== EngineState.RUNNING) {
               facade.step(eng, { clockAdvance: true });
             }
-            scheduleRender();
+            renderPipeline.scheduleRender();
           };
           document.addEventListener('pointerup', onPointerUp, { once: true });
         } else {
@@ -1038,7 +761,7 @@ export function initApp(search?: string): void {
         if (eng.getState() !== EngineState.RUNNING) {
           facade.step(eng, { clockAdvance: true });
         }
-        scheduleRender();
+        renderPipeline.scheduleRender();
       }
       return;
     }
@@ -1089,14 +812,14 @@ export function initApp(search?: string): void {
           wireDrawing.addWaypoint();
         }
       }
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
     const pinHit = hitTestPins(worldPt, circuit.elements, hitThreshold);
     if (pinHit) {
       wireDrawing.startFromPin(pinHit.element, pinHit.pin);
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1109,7 +832,7 @@ export function initApp(search?: string): void {
       }
       dragMode = 'select-drag';
       dragStart = worldPt;
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1117,7 +840,7 @@ export function initApp(search?: string): void {
     if (wireHit) {
       if (e.shiftKey) {
         selection.toggleSelect(wireHit);
-        scheduleRender();
+        renderPipeline.scheduleRender();
         return;
       }
       // If the clicked point is a wire endpoint (junction), start wire-drawing
@@ -1125,7 +848,7 @@ export function initApp(search?: string): void {
       const snappedPt = snapToGrid(worldPt, 1);
       if (isWireEndpoint(snappedPt, circuit)) {
         wireDrawing.startFromPoint(snappedPt);
-        scheduleRender();
+        renderPipeline.scheduleRender();
         return;
       }
       // If the clicked wire is already part of a multi-wire selection,
@@ -1140,7 +863,7 @@ export function initApp(search?: string): void {
       );
       dragMode = 'wire-drag';
       dragStart = worldPt;
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1148,10 +871,10 @@ export function initApp(search?: string): void {
       selection.clear();
     }
     dragMode = 'box-select';
-    boxSelect.active = true;
-    boxSelect.startScreen = screenPt;
-    boxSelect.currentScreen = screenPt;
-    scheduleRender();
+    renderPipeline.state.boxSelect.active = true;
+    renderPipeline.state.boxSelect.startScreen = screenPt;
+    renderPipeline.state.boxSelect.currentScreen = screenPt;
+    renderPipeline.scheduleRender();
   });
 
   canvas.addEventListener('pointermove', (e: PointerEvent) => {
@@ -1168,12 +891,12 @@ export function initApp(search?: string): void {
           longPressClientY = e.clientY;
         }
       }
-      if (touchGestures.onPointerMove(e, canvas, viewport, scheduleRender)) return;
+      if (touchGestures.onPointerMove(e, canvas, viewport, () => renderPipeline.scheduleRender())) return;
     } else {
       if (activePointerId !== null && e.pointerId !== activePointerId) return;
     }
-    const worldPt = canvasToWorld(e);
-    const screenPt = canvasToScreen(e);
+    const worldPt = renderPipeline.canvasToWorld(e);
+    const screenPt = renderPipeline.canvasToScreen(e);
     lastWorldPt = worldPt;
 
     // Update cursor grid coordinates in status bar
@@ -1183,13 +906,13 @@ export function initApp(search?: string): void {
 
     if (placement.isActive()) {
       placement.updateCursor(worldPt);
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
     if (wireDrawing.isActive()) {
       wireDrawing.updateCursor(worldPt);
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1198,7 +921,7 @@ export function initApp(search?: string): void {
       const dy = screenPt.y - dragStartScreen.y;
       viewport.panBy({ x: dx, y: dy });
       dragStartScreen = screenPt;
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1259,8 +982,8 @@ export function initApp(search?: string): void {
     }
 
     if (dragMode === 'box-select') {
-      boxSelect.currentScreen = screenPt;
-      scheduleRender();
+      renderPipeline.state.boxSelect.currentScreen = screenPt;
+      renderPipeline.scheduleRender();
       return;
     }
   });
@@ -1269,17 +992,17 @@ export function initApp(search?: string): void {
     if (dragMode === 'wire-drag') {
       wireDrag.finish(circuit);
       invalidateCompiled();
-      scheduleRender();
+      renderPipeline.scheduleRender();
     }
 
     if (dragMode === 'box-select') {
-      const topLeft = canvasToWorld({
-        clientX: Math.min(boxSelect.startScreen.x, boxSelect.currentScreen.x) + canvas.getBoundingClientRect().left,
-        clientY: Math.min(boxSelect.startScreen.y, boxSelect.currentScreen.y) + canvas.getBoundingClientRect().top,
+      const topLeft = renderPipeline.canvasToWorld({
+        clientX: Math.min(renderPipeline.state.boxSelect.startScreen.x, renderPipeline.state.boxSelect.currentScreen.x) + canvas.getBoundingClientRect().left,
+        clientY: Math.min(renderPipeline.state.boxSelect.startScreen.y, renderPipeline.state.boxSelect.currentScreen.y) + canvas.getBoundingClientRect().top,
       });
-      const bottomRight = canvasToWorld({
-        clientX: Math.max(boxSelect.startScreen.x, boxSelect.currentScreen.x) + canvas.getBoundingClientRect().left,
-        clientY: Math.max(boxSelect.startScreen.y, boxSelect.currentScreen.y) + canvas.getBoundingClientRect().top,
+      const bottomRight = renderPipeline.canvasToWorld({
+        clientX: Math.max(renderPipeline.state.boxSelect.startScreen.x, renderPipeline.state.boxSelect.currentScreen.x) + canvas.getBoundingClientRect().left,
+        clientY: Math.max(renderPipeline.state.boxSelect.startScreen.y, renderPipeline.state.boxSelect.currentScreen.y) + canvas.getBoundingClientRect().top,
       });
 
       const boxedElements = circuit.elements.filter((el) => {
@@ -1296,8 +1019,8 @@ export function initApp(search?: string): void {
         selection.boxSelect(boxedElements, boxedWires);
       }
 
-      boxSelect.active = false;
-      scheduleRender();
+      renderPipeline.state.boxSelect.active = false;
+      renderPipeline.scheduleRender();
     }
 
     dragMode = 'none';
@@ -1324,8 +1047,8 @@ export function initApp(search?: string): void {
       touchGestures.onPointerUp(e);
       touchGestures.reset();
       dragMode = 'none';
-      boxSelect.active = false;
-      scheduleRender();
+      renderPipeline.state.boxSelect.active = false;
+      renderPipeline.scheduleRender();
       return;
     }
     if (activePointerId !== null && e.pointerId !== activePointerId) return;
@@ -1333,19 +1056,19 @@ export function initApp(search?: string): void {
     // Reset drag state on cancel
     dragMode = 'none';
     wireDrawing.cancel();
-    boxSelect.active = false;
+    renderPipeline.state.boxSelect.active = false;
     wireDrag.cancel();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // passive: true lets the browser compositor run without waiting for JS.
   // Scroll prevention is handled by CSS (html/body overflow:hidden,
   // canvas touch-action:none, overscroll-behavior:contain).
   canvas.addEventListener('wheel', (e: WheelEvent) => {
-    const screenPt = canvasToScreen(e);
+    const screenPt = renderPipeline.canvasToScreen(e);
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     viewport.zoomAt(screenPt, factor);
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }, { passive: true });
 
   // -------------------------------------------------------------------------
@@ -1366,7 +1089,7 @@ export function initApp(search?: string): void {
         } else {
           invalidateCompiled();
         }
-        scheduleRender();
+        renderPipeline.scheduleRender();
       }
       activePopupPanel = null;
       activePopup.remove();
@@ -1429,7 +1152,7 @@ export function initApp(search?: string): void {
     selection.clear();
     closePopup();
     updateBreadcrumb();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   function navigateBack(): void {
@@ -1442,11 +1165,11 @@ export function initApp(search?: string): void {
     selection.clear();
     closePopup();
     updateBreadcrumb();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   canvas.addEventListener('dblclick', (e: MouseEvent) => {
-    const worldPt = canvasToWorld(e);
+    const worldPt = renderPipeline.canvasToWorld(e);
     const elementHit = hitTestElements(worldPt, circuit.elements);
     if (!elementHit) return;
 
@@ -1505,7 +1228,7 @@ export function initApp(search?: string): void {
     }
     activePopupPanel = propertyPopup;
 
-    const screenPt = canvasToScreen(e);
+    const screenPt = renderPipeline.canvasToScreen(e);
     const container = canvas.parentElement!;
     popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
     popup.style.top = `${Math.min(screenPt.y + 10, container.clientHeight - 200)}px`;
@@ -1582,15 +1305,15 @@ export function initApp(search?: string): void {
     if (e.key === 'Escape') {
       if (placement.isActive()) {
         placement.cancel();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else if (wireDrawing.isActive()) {
         wireDrawing.cancel();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else if (wireDrag.isActive()) {
         wireDrag.cancel();
         dragMode = 'none';
         invalidateCompiled();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else if (circuitStack.length > 0) {
         navigateBack();
       }
@@ -1604,7 +1327,7 @@ export function initApp(search?: string): void {
         binding.unbind();
         facade.invalidate();
         compiledDirty = true;
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else {
         if (!ctx.ensureCompiled()) return;
         startSimulation();
@@ -1619,55 +1342,55 @@ export function initApp(search?: string): void {
     if (!e.ctrlKey && !e.metaKey) {
       if (e.key === 'i' || e.key === 'I') {
         const def = registry.get('In');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 'o' || e.key === 'O') {
         const def = registry.get('Out');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 'c' || e.key === 'C') {
         const def = registry.get('Capacitor');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === '1') {
         const def = registry.get('Const');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 'v' || e.key === 'V') {
         const def = registry.get('VoltageSource');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === '+') {
         const def = registry.get('VDD');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 'l' || e.key === 'L') {
         const def = registry.get('Inductor');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 't' || e.key === 'T') {
         const def = registry.get('Tunnel');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
       if (e.key === 'g' || e.key === 'G') {
         const def = registry.get('Ground');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
 
@@ -1675,13 +1398,13 @@ export function initApp(search?: string): void {
         if (placement.isActive()) placement.cancel();
         const snapped = snapToGrid(lastWorldPt, 1);
         wireDrawing.startFromPoint(snapped);
-        scheduleRender();
+        renderPipeline.scheduleRender();
         return;
       }
 
       if (e.key === 'R') {
         const def = registry.get('Resistor');
-        if (def) { placement.start(def); scheduleRender(); }
+        if (def) { placement.start(def); renderPipeline.scheduleRender(); }
         return;
       }
     }
@@ -1689,7 +1412,7 @@ export function initApp(search?: string): void {
     if (e.key === 'r') {
       if (placement.isActive()) {
         placement.rotate();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else if (!selection.isEmpty()) {
         const elements = [...selection.getSelectedElements()];
         if (elements.length > 0) {
@@ -1704,7 +1427,7 @@ export function initApp(search?: string): void {
     if (e.key === 'm' || e.key === 'M') {
       if (placement.isActive()) {
         placement.mirror();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       } else if (!selection.isEmpty()) {
         const elements = [...selection.getSelectedElements()];
         if (elements.length > 0) {
@@ -1775,7 +1498,7 @@ export function initApp(search?: string): void {
       if (clipboard.entries.length > 0 || clipboard.wires.length > 0) {
         placement.startPaste(clipboard);
         placement.updateCursor(lastWorldPt);
-        scheduleRender();
+        renderPipeline.scheduleRender();
       }
       return;
     }
@@ -1783,7 +1506,7 @@ export function initApp(search?: string): void {
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
       selection.selectAll(circuit);
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -1791,7 +1514,7 @@ export function initApp(search?: string): void {
       e.preventDefault();
       ctx.fitViewport();
       updateZoomDisplay();
-      scheduleRender();
+      renderPipeline.scheduleRender();
       return;
     }
   });
@@ -1831,7 +1554,7 @@ export function initApp(search?: string): void {
 
   let runRafHandle = -1;
 
-  let currentFlowAnimator: CurrentFlowAnimator | null = null;
+  // renderPipeline.state.currentFlowAnimator lives in renderPipeline.state.renderPipeline.state.currentFlowAnimator (set up below)
   let _wireCurrentResolver: WireCurrentResolver | null = null;
   const analogVoltageTracker = new VoltageRangeTracker();
   let activeSliderPanel: SliderPanel | null = null;
@@ -1856,7 +1579,7 @@ export function initApp(search?: string): void {
     const tick = (now: number): void => {
       if (coordinator.getState() !== EngineState.RUNNING) {
         runRafHandle = -1;
-        scheduleRender();
+        renderPipeline.scheduleRender();
         return;
       }
 
@@ -1892,7 +1615,7 @@ export function initApp(search?: string): void {
         _updateAnalogVisualization(coordinator, wallDt);
       }
 
-      scheduleRender();
+      renderPipeline.scheduleRender();
       runRafHandle = requestAnimationFrame(tick);
     };
     runRafHandle = requestAnimationFrame(tick);
@@ -1901,8 +1624,8 @@ export function initApp(search?: string): void {
   function _activateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator): void {
     analogVoltageTracker.reset();
     _wireCurrentResolver = new WireCurrentResolver();
-    currentFlowAnimator = new CurrentFlowAnimator(_wireCurrentResolver);
-    currentFlowAnimator.setEnabled(true);
+    renderPipeline.state.currentFlowAnimator = new CurrentFlowAnimator(_wireCurrentResolver);
+    renderPipeline.state.currentFlowAnimator.setEnabled(true);
     applyCurrentVizSettings(loadEngineSettings());
     wireRenderer.setVoltageTracker(analogVoltageTracker);
 
@@ -1926,10 +1649,10 @@ export function initApp(search?: string): void {
   }
 
   function _updateAnalogVisualization(coordinator: import('../solver/coordinator-types.js').SimulationCoordinator, wallDt: number): void {
-    if (currentFlowAnimator && _wireCurrentResolver) {
+    if (renderPipeline.state.currentFlowAnimator && _wireCurrentResolver) {
       const resolverCtx = coordinator.getCurrentResolverContext();
       if (resolverCtx) _wireCurrentResolver.resolve(resolverCtx);
-      currentFlowAnimator.update(wallDt, circuit);
+      renderPipeline.state.currentFlowAnimator.update(wallDt, circuit);
     }
     coordinator.updateVoltageTracking();
     const vRange = coordinator.voltageRange;
@@ -1939,9 +1662,9 @@ export function initApp(search?: string): void {
   }
 
   function _deactivateAnalogVisualization(): void {
-    if (currentFlowAnimator) {
-      currentFlowAnimator.setEnabled(false);
-      currentFlowAnimator = null;
+    if (renderPipeline.state.currentFlowAnimator) {
+      renderPipeline.state.currentFlowAnimator.setEnabled(false);
+      renderPipeline.state.currentFlowAnimator = null;
     }
     _wireCurrentResolver = null;
     wireRenderer.setVoltageTracker(null);
@@ -1960,7 +1683,7 @@ export function initApp(search?: string): void {
       runRafHandle = -1;
     }
     facade.getCoordinator().stop();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   // -------------------------------------------------------------------------
@@ -1978,7 +1701,7 @@ export function initApp(search?: string): void {
       const msg = err instanceof Error ? err.message : String(err);
       showStatus(`Simulation error: ${msg}`, true);
     }
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   document.getElementById('btn-run')?.addEventListener('click', () => {
@@ -1992,7 +1715,7 @@ export function initApp(search?: string): void {
     binding.unbind();
     facade.invalidate();
     compiledDirty = true;
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   document.getElementById('btn-micro-step')?.addEventListener('click', () => {
@@ -2009,7 +1732,7 @@ export function initApp(search?: string): void {
         showStatus(`Simulation error: ${msg}`, true);
       }
     }
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
@@ -2027,7 +1750,7 @@ export function initApp(search?: string): void {
       const msg = err instanceof Error ? err.message : String(err);
       showStatus(`Simulation error: ${msg}`, true);
     }
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // Toolbar Start/Step/Stop buttons (mirror the menu actions)
@@ -2065,43 +1788,21 @@ export function initApp(search?: string): void {
   }
   const watchedSignals: WatchedSignal[] = [];
 
-  /** Multi-panel scope state. Each panel has its own canvas and ScopePanel. */
-  interface ScopePanelEntry {
-    canvas: HTMLCanvasElement;
-    panel: ScopePanel;
-  }
-  const scopePanels: ScopePanelEntry[] = [];
+  // renderPipeline.state.scopePanels lives in renderPipeline.state.renderPipeline.state.scopePanels (set up below)
 
   /** Tear down any active viewer panels and unregister observers. */
   function disposeViewers(): void {
     const coordinator = facade.getCoordinator();
-    for (const entry of scopePanels) {
+    for (const entry of renderPipeline.state.scopePanels) {
       entry.panel.dispose();
       entry.canvas.remove();
     }
-    scopePanels.length = 0;
+    renderPipeline.state.scopePanels.length = 0;
     if (activeDataTable) {
       coordinator.removeMeasurementObserver(activeDataTable);
       activeDataTable.dispose();
       activeDataTable = null;
     }
-  }
-
-  /** Size a canvas to fill its share of the container at device pixel ratio. */
-  function sizeCanvasInContainer(cvs: HTMLCanvasElement): boolean {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cvs.clientWidth;
-    const h = cvs.clientHeight;
-    const targetW = Math.round(w * dpr);
-    const targetH = Math.round(h * dpr);
-    // Only resize when dimensions actually changed — setting canvas.width/height
-    // resets the entire canvas context and forces GPU reallocation.
-    if (targetW > 0 && targetH > 0 && (cvs.width !== targetW || cvs.height !== targetH)) {
-      cvs.width = targetW;
-      cvs.height = targetH;
-      return true; // resized
-    }
-    return false;
   }
 
   /** Rebuild viewer panels from the current watchedSignals list. */
@@ -2126,7 +1827,7 @@ export function initApp(search?: string): void {
         const cvs = document.createElement('canvas');
         viewerTimingContainer.appendChild(cvs);
         // Size after DOM insertion so clientWidth/Height are available
-        requestAnimationFrame(() => sizeCanvasInContainer(cvs));
+        requestAnimationFrame(() => renderPipeline.sizeCanvasInContainer(cvs));
         const panel = new ScopePanel(cvs, coordinator);
         for (const s of signals) {
           if (s.addr.domain === 'analog') {
@@ -2136,7 +1837,7 @@ export function initApp(search?: string): void {
           }
         }
         _attachScopeContextMenu(cvs, panel, signals);
-        scopePanels.push({ canvas: cvs, panel });
+        renderPipeline.state.scopePanels.push({ canvas: cvs, panel });
       }
     }
 
@@ -2229,7 +1930,7 @@ export function initApp(search?: string): void {
     if (!ctx.ensureCompiled()) return;
     viewerPanel?.classList.add('open');
     showViewerTab(tabName);
-    if (watchedSignals.length > 0 && scopePanels.length === 0 && !activeDataTable) {
+    if (watchedSignals.length > 0 && renderPipeline.state.scopePanels.length === 0 && !activeDataTable) {
       rebuildViewers();
     }
   }
@@ -2322,7 +2023,7 @@ export function initApp(search?: string): void {
       // Show Bode plot
       if (bodePanel && bodeCanvas) {
         bodePanel.style.display = 'block';
-        sizeCanvasInContainer(bodeCanvas);
+        renderPipeline.sizeCanvasInContainer(bodeCanvas);
         const ctx = bodeCanvas.getContext('2d');
         if (ctx) {
           // Compute viewport from data ranges
@@ -2378,7 +2079,7 @@ export function initApp(search?: string): void {
     // Remove wire-context-menu from the DOM
     document.getElementById('wire-context-menu')?.remove();
 
-    const worldPt = canvasToWorld(e);
+    const worldPt = renderPipeline.canvasToWorld(e);
     const locked = lockedModeGuard.isLocked();
     const items: MenuItem[] = [];
 
@@ -2637,12 +2338,12 @@ export function initApp(search?: string): void {
           label: `Trace Voltage: ${label}.${pinLabel}`,
           action: () => {
             const panelIdx = nextPanelIndex();
-            if (scopePanels.length > 0) {
-              scopePanels[0].panel.addVoltageChannel(
+            if (renderPipeline.state.scopePanels.length > 0) {
+              renderPipeline.state.scopePanels[0].panel.addVoltageChannel(
                 { domain: 'analog' as const, nodeId: nodeId! },
                 `${label}.${pinLabel}`,
               );
-              scopePanels[0].panel.render();
+              renderPipeline.state.scopePanels[0].panel.render();
             } else {
               watchedSignals.push({ name: `${label}.${pinLabel}`, addr: { domain: 'analog', nodeId: nodeId! }, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
@@ -2658,17 +2359,17 @@ export function initApp(search?: string): void {
       items.push({
         label: `Trace Current: ${label}`,
         action: () => {
-          if (scopePanels.length > 0) {
-            scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
-            scopePanels[0].panel.render();
+          if (renderPipeline.state.scopePanels.length > 0) {
+            renderPipeline.state.scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
+            renderPipeline.state.scopePanels[0].panel.render();
           } else {
             const panelIdx = nextPanelIndex();
             const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
             if (pinNodeIds.length > 0) {
               watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, addr: { domain: 'analog', nodeId: pinNodeIds[0]! }, width: 1, group: 'probe', panelIndex: panelIdx });
               rebuildViewers();
-              if (scopePanels.length > 0) {
-                scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
+              if (renderPipeline.state.scopePanels.length > 0) {
+                renderPipeline.state.scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
               }
             }
           }
@@ -2981,7 +2682,7 @@ export function initApp(search?: string): void {
     searchResults = [];
     searchCursor = -1;
     if (searchCount) searchCount.textContent = '';
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   function runSearch(): void {
@@ -3007,7 +2708,7 @@ export function initApp(search?: string): void {
         : query ? 'No results' : '';
     }
     if (searchCursor >= 0) _navigateToResult(searchCursor);
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   function _navigateToResult(idx: number): void {
@@ -3018,7 +2719,7 @@ export function initApp(search?: string): void {
       circuitSearchInstance.navigateTo(result, viewport);
       selection.clear();
       selection.select(result.element);
-      scheduleRender();
+      renderPipeline.scheduleRender();
     }
     if (searchCount) {
       searchCount.textContent = `${searchCursor + 1} / ${searchResults.length}`;
@@ -3125,7 +2826,7 @@ export function initApp(search?: string): void {
     httpResolver,
 
     // Helper methods
-    scheduleRender,
+    scheduleRender(): void { renderPipeline.scheduleRender(); },
     invalidateCompiled,
     compileAndBind,
     ensureCompiled(): boolean {
@@ -3142,6 +2843,10 @@ export function initApp(search?: string): void {
     setCircuit(c: Circuit): void { circuit = c; },
     getCircuit(): Circuit { return circuit; },
   };
+
+  // Initialize render pipeline — must happen after ctx is built so the
+  // pipeline can reference ctx.facade, ctx.viewport, etc.
+  renderPipeline = initRenderPipeline(ctx, search);
 
   fileInput?.addEventListener('change', () => {
     const file = fileInput?.files?.[0];
@@ -3624,7 +3329,7 @@ export function initApp(search?: string): void {
     }
     updateDarkModeIcon();
     paletteUI.setColorScheme(goingLight ? lightColorScheme : darkColorScheme);
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // -------------------------------------------------------------------------
@@ -3662,7 +3367,7 @@ export function initApp(search?: string): void {
         viewport.setZoom(parseFloat(val));
       }
       updateZoomDisplay();
-      scheduleRender();
+      renderPipeline.scheduleRender();
       zoomDropdown?.classList.remove('open');
     });
   });
@@ -3670,13 +3375,13 @@ export function initApp(search?: string): void {
   document.getElementById('btn-fit-content')?.addEventListener('click', () => {
     ctx.fitViewport();
     updateZoomDisplay();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   document.getElementById('btn-tb-fit')?.addEventListener('click', () => {
     ctx.fitViewport();
     updateZoomDisplay();
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // -------------------------------------------------------------------------
@@ -3755,7 +3460,7 @@ export function initApp(search?: string): void {
     colorSchemeManager.setGateShapeStyle(gateStyleIec ? 'iec' : 'ieee');
     const check = document.getElementById('gate-style-check');
     if (check) check.textContent = gateStyleIec ? '✓' : '';
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // Color scheme dialog
@@ -3787,7 +3492,7 @@ export function initApp(search?: string): void {
     schemeSelect.addEventListener('change', () => {
       colorSchemeManager.setActive(schemeSelect.value);
       updateColorGrid();
-      scheduleRender();
+      renderPipeline.scheduleRender();
     });
     selectRow.appendChild(selectLabel);
     selectRow.appendChild(schemeSelect);
@@ -3854,7 +3559,7 @@ export function initApp(search?: string): void {
       colorSchemeManager.setActive('default');
       schemeSelect.value = 'default';
       updateColorGrid();
-      scheduleRender();
+      renderPipeline.scheduleRender();
     });
 
     const saveBtn = document.createElement('button');
@@ -3872,7 +3577,7 @@ export function initApp(search?: string): void {
       opt.textContent = name.trim();
       opt.selected = true;
       schemeSelect.appendChild(opt);
-      scheduleRender();
+      renderPipeline.scheduleRender();
     });
 
     footer.appendChild(resetBtn);
@@ -3895,13 +3600,13 @@ export function initApp(search?: string): void {
   function enterPresentation(): void {
     presentationMode = true;
     appEl?.classList.add('presentation-mode');
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   function exitPresentation(): void {
     presentationMode = false;
     appEl?.classList.remove('presentation-mode');
-    scheduleRender();
+    renderPipeline.scheduleRender();
   }
 
   function togglePresentation(): void {
@@ -3938,7 +3643,7 @@ export function initApp(search?: string): void {
   function updateTabletModeUI(): void {
     if (tabletModeCheck) tabletModeCheck.textContent = tabletMode ? '\u2713' : '';
     appEl?.classList.toggle('tablet-mode', tabletMode);
-    resizeCanvas();
+    renderPipeline.resizeCanvas();
   }
 
   document.getElementById('btn-tablet-mode')?.addEventListener('click', () => {
@@ -4006,9 +3711,9 @@ export function initApp(search?: string): void {
   });
 
   function applyCurrentVizSettings(s: EngineSettings): void {
-    if (currentFlowAnimator) {
-      currentFlowAnimator.setSpeedScale(s.currentSpeedScale);
-      currentFlowAnimator.setScaleMode(s.currentScaleMode);
+    if (renderPipeline.state.currentFlowAnimator) {
+      renderPipeline.state.currentFlowAnimator.setSpeedScale(s.currentSpeedScale);
+      renderPipeline.state.currentFlowAnimator.setScaleMode(s.currentScaleMode);
     }
   }
 
@@ -4090,7 +3795,7 @@ export function initApp(search?: string): void {
 
   document.getElementById('btn-select-all')?.addEventListener('click', () => {
     selection.selectAll(circuit);
-    scheduleRender();
+    renderPipeline.scheduleRender();
   });
 
   // -------------------------------------------------------------------------
@@ -4170,7 +3875,7 @@ export function initApp(search?: string): void {
     cmd.execute();
     undoStack.push(cmd);
     invalidateCompiled();
-    scheduleRender();
+    renderPipeline.scheduleRender();
     showStatus(`Auto-power: added supplies`);
   });
 
@@ -4870,13 +4575,13 @@ export function initApp(search?: string): void {
         const engine = facade.getActiveCoordinator();
         if (!engine) throw new Error('No circuit loaded');
         facade.step(engine);
-        scheduleRender();
+        renderPipeline.scheduleRender();
       },
       setInput: (label: string, value: number) => {
         const engine = facade.getActiveCoordinator();
         if (!engine) throw new Error('No circuit loaded');
         facade.setInput(engine, label, value);
-        scheduleRender();
+        renderPipeline.scheduleRender();
       },
       readOutput: (label: string) => {
         const engine = facade.getActiveCoordinator();
@@ -4900,17 +4605,17 @@ export function initApp(search?: string): void {
           (el) => labelSet.has(String(el.getProperties().get('label') ?? '')),
         );
         selection.boxSelect(toSelect, []);
-        scheduleRender();
+        renderPipeline.scheduleRender();
         if (durationMs > 0) {
           setTimeout(() => {
             selection.clear();
-            scheduleRender();
+            renderPipeline.scheduleRender();
           }, durationMs);
         }
       },
       clearHighlight: () => {
         selection.clear();
-        scheduleRender();
+        renderPipeline.scheduleRender();
       },
       setReadonlyComponents: (labels: string[] | null) => {
         if (labels === null) {
@@ -5015,7 +4720,7 @@ export function initApp(search?: string): void {
     const stopPaletteResize = (): void => {
       resizingPalette = false;
       paletteResizeHandle.classList.remove('dragging');
-      scheduleRender();
+      renderPipeline.scheduleRender();
     };
 
     paletteResizeHandle.addEventListener('pointerup', stopPaletteResize);
@@ -5062,10 +4767,10 @@ export function initApp(search?: string): void {
       resizingViewer = false;
       viewerResizeHandle.classList.remove('dragging');
       // Resize all scope canvases to fill new height
-      for (const sp of scopePanels) {
-        sizeCanvasInContainer(sp.canvas);
+      for (const sp of renderPipeline.state.scopePanels) {
+        renderPipeline.sizeCanvasInContainer(sp.canvas);
       }
-      scheduleRender();
+      renderPipeline.scheduleRender();
     };
 
     viewerResizeHandle.addEventListener('pointerup', stopViewerResize);
