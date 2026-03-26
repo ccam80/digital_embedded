@@ -9,7 +9,6 @@
  */
 
 import { parseUrlParams, loadModuleConfig, applyModuleConfig } from './url-params.js';
-import type { ModuleConfig } from './url-params.js';
 import type { AppContext } from './app-context.js';
 import { initRenderPipeline } from './render-pipeline.js';
 import type { RenderPipeline } from './render-pipeline.js';
@@ -17,10 +16,7 @@ import { initSimulationController } from './simulation-controller.js';
 import type { SimulationController } from './simulation-controller.js';
 import { initKeyboardHandler } from './keyboard-handler.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
-import { exportSvg } from '../export/svg.js';
-import { exportPng } from '../export/png.js';
-import { exportGif } from '../export/gif.js';
-import { exportZip } from '../export/zip.js';
+import { initFileIOController } from './file-io-controller.js';
 
 import { createDefaultRegistry } from '../components/register-all.js';
 import { hasDigitalModel, hasAnalogModel, availableModels } from '../core/registry.js';
@@ -49,16 +45,8 @@ import { ContextMenu, separator } from '../editor/context-menu.js';
 import type { MenuItem } from '../editor/context-menu.js';
 import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard, pasteFromClipboard, placeComponent } from '../editor/edit-operations.js';
 import type { ClipboardData } from '../editor/edit-operations.js';
-import { loadDig } from '../io/dig-loader.js';
-import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
-import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
-import { deserializeCircuit } from '../io/load.js';
-import { parseCtzCircuitFromText } from '../io/ctz-parser.js';
-import { createModal } from './dialog-manager.js';
-import { serializeCircuit } from '../io/save.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
-import { deserializeDts } from '../io/dts-deserializer.js';
-import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
+import { createModal } from './dialog-manager.js';
 import { PostMessageAdapter } from '../io/postmessage-adapter.js';
 import { createTestBridge } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
@@ -187,8 +175,6 @@ export function initApp(search?: string): void {
   );
   let circuit = new Circuit();
 
-  /** Current save format: 'dig' (Digital XML) or 'digj' (native JSON). */
-  let saveFormat: 'dig' | 'digj' = 'dig';
   const colorScheme = useDark ? darkColorScheme : lightColorScheme;
 
   const canvas = document.getElementById('sim-canvas') as HTMLCanvasElement;
@@ -1652,46 +1638,7 @@ export function initApp(search?: string): void {
     openSearchBar();
   });
 
-  // -------------------------------------------------------------------------
-  // File I/O
-  // -------------------------------------------------------------------------
-
-  const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
-
-  document.getElementById('btn-open')?.addEventListener('click', () => {
-    fileInput?.click();
-  });
-
-  document.getElementById('btn-import-ctz')?.addEventListener('click', () => {
-    if (fileInput) {
-      fileInput.accept = '.ctz';
-      fileInput.click();
-      fileInput.addEventListener('change', () => {
-        fileInput.accept = '.dig,.dts,.json,.digj,.ctz';
-      }, { once: true });
-    }
-  });
-
-  /** HTTP resolver for subcircuit .dig file resolution. */
-  const httpResolver = new HttpResolver(params.base || './');
-
-  /** Replace circuit contents from a loaded Circuit object. */
-  function applyLoadedCircuit(loaded: Circuit): void {
-    circuit.elements.length = 0;
-    circuit.wires.length = 0;
-    for (const el of loaded.elements) circuit.addElement(el);
-    for (const w of loaded.wires) circuit.addWire(w);
-    circuit.metadata = loaded.metadata;
-    paletteUI.render();
-    rebuildInsertMenu();
-    selection.clear();
-    viewport.fitToContent(circuit.elements, {
-      width: canvas.clientWidth,
-      height: canvas.clientHeight,
-    });
-    invalidateCompiled();
-    updateCircuitName();
-  }
+  // (File I/O, folder management, and exports are handled by FileIOController — initialized below)
 
   // ---------------------------------------------------------------------------
   // SimulationController forward declaration — initialized after renderPipeline.
@@ -1706,7 +1653,6 @@ export function initApp(search?: string): void {
   function compileAndBind(): boolean { return simController.compileAndBind(); }
   function isSimActive(): boolean { return simController.isSimActive(); }
   function startSimulation(): void { simController.startSimulation(); }
-  function stopSimulation(): void { simController.stopSimulation(); }
   function updateSpeedDisplay(): void { simController.updateSpeedDisplay(); }
 
   // ---------------------------------------------------------------------------
@@ -1751,7 +1697,8 @@ export function initApp(search?: string): void {
     // URL params & environment
     params,
     isIframe,
-    httpResolver,
+    // httpResolver is set on ctx by initFileIOController after ctx is built
+    get httpResolver() { return fileIOController.httpResolver; },
 
     // Helper methods
     scheduleRender(): void { renderPipeline.scheduleRender(); },
@@ -1768,7 +1715,10 @@ export function initApp(search?: string): void {
     fitViewport(): void {
       viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
     },
-    applyLoadedCircuit,
+    // applyLoadedCircuit is replaced by initFileIOController after ctx is built
+    applyLoadedCircuit(loaded: Circuit): void {
+      fileIOController.applyLoadedCircuit(loaded);
+    },
     setCircuit(c: Circuit): void { circuit = c; },
     getCircuit(): Circuit { return circuit; },
   };
@@ -1789,6 +1739,11 @@ export function initApp(search?: string): void {
     },
   });
 
+  // Initialize file I/O controller — must happen after ctx is built.
+  let fileIOController = initFileIOController(ctx, {
+    onCircuitLoaded(): void { rebuildInsertMenu(); },
+  });
+
   // Register all keyboard shortcuts (merges the three former keydown listeners).
   initKeyboardHandler(ctx, {
     startSimulation(): void { simController.startSimulation(); },
@@ -1802,7 +1757,7 @@ export function initApp(search?: string): void {
     navigateBack(): boolean { navigateBack(); return circuitStack.length >= 0; },
     updateZoomDisplay,
     clearDragMode(): void { dragMode = 'none'; },
-    fileInput,
+    fileInput: document.getElementById('file-input') as HTMLInputElement | null,
   });
 
   // Wire up settings dialog (uses simController.loadEngineSettings etc.)
@@ -1881,455 +1836,6 @@ export function initApp(search?: string): void {
       if (e.target === settingsOverlay) closeSettingsDialog();
     });
   }
-
-  fileInput?.addEventListener('change', () => {
-    const file = fileInput?.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const text = reader.result as string;
-        let loaded: Circuit;
-        if (file.name.endsWith('.ctz')) {
-          // CircuitJS CTZ format — decompressed text parsed directly
-          loaded = parseCtzCircuitFromText(text, registry);
-        } else {
-          const firstChar = text.replace(/^\s+/, '').charAt(0);
-          if (firstChar === '{' || firstChar === '[') {
-            const parsed = JSON.parse(text);
-            if (parsed.format === 'dts' || parsed.format === 'digb') {
-              const result = deserializeDts(text, registry);
-              loaded = result.circuit;
-            } else {
-              loaded = deserializeCircuit(text, registry);
-            }
-          } else {
-            // Use async subcircuit-aware loader to handle embedded subcircuit references
-            loaded = await loadWithSubcircuits(text, httpResolver, registry);
-          }
-        }
-        applyLoadedCircuit(loaded);
-        if (isIframe) {
-          window.parent.postMessage({ type: 'digital-loaded' }, '*');
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('Failed to load circuit:', msg);
-        showStatus(`Load error: ${msg}`, true);
-        if (isIframe) {
-          window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
-        }
-      }
-    };
-    reader.readAsText(file);
-  });
-
-  // -------------------------------------------------------------------------
-  // Open Folder — read all .dig files from a directory for subcircuit resolution
-  // -------------------------------------------------------------------------
-
-  const folderInput = document.getElementById('folder-input') as HTMLInputElement | null;
-
-  document.getElementById('btn-open-folder')?.addEventListener('click', () => {
-    folderInput?.click();
-  });
-
-  // Track the currently-loaded folder's file contents (name→XML text).
-  // Populated on folder upload or IndexedDB restore.
-  let currentFolderFiles: Map<string, string> | null = null;
-  let currentFolderName = '';
-
-  const browseFolderMenu = document.getElementById('browse-folder-menu');
-  const folderSubmenu = document.getElementById('folder-submenu');
-  const closeFolderBtn = document.getElementById('btn-close-folder');
-
-  /** A directory tree node: files at this level + child directories. */
-  interface DirNode {
-    files: string[];          // base names (no extension) of .dig files here
-    children: Map<string, DirNode>;
-  }
-
-  /** Build the Browse Folder submenu from the current folder file map. */
-  function buildFolderSubmenu(files: Map<string, string>): void {
-    if (!folderSubmenu || !browseFolderMenu || !closeFolderBtn) return;
-    folderSubmenu.innerHTML = '';
-
-    // Build a nested tree from file keys (which may contain '/' separators)
-    const root: DirNode = { files: [], children: new Map() };
-    for (const key of files.keys()) {
-      if (key.endsWith('.dig')) continue; // skip .dig-suffixed duplicates
-      const parts = key.split('/');
-      const fileName = parts.pop()!;
-      let node = root;
-      for (const segment of parts) {
-        if (!node.children.has(segment)) {
-          node.children.set(segment, { files: [], children: new Map() });
-        }
-        node = node.children.get(segment)!;
-      }
-      node.files.push(fileName);
-    }
-
-    // Recursively populate a dropdown element from a DirNode
-    function populateDropdown(container: HTMLElement, node: DirNode, pathPrefix: string): void {
-      // Sort and add subdirectory submenus first
-      const sortedDirs = [...node.children.keys()].sort();
-      for (const dirName of sortedDirs) {
-        const childNode = node.children.get(dirName)!;
-        const sub = document.createElement('div');
-        sub.className = 'menu-submenu';
-
-        const label = document.createElement('div');
-        label.className = 'menu-action';
-        label.textContent = dirName;
-        sub.appendChild(label);
-
-        const dropdown = document.createElement('div');
-        dropdown.className = 'menu-dropdown';
-        populateDropdown(dropdown, childNode, pathPrefix ? `${pathPrefix}/${dirName}` : dirName);
-        sub.appendChild(dropdown);
-
-        // Open/close submenu on hover
-        sub.addEventListener('pointerenter', () => sub.classList.add('open'));
-        sub.addEventListener('pointerleave', () => sub.classList.remove('open'));
-
-        container.appendChild(sub);
-      }
-
-      // Then add .dig file items sorted
-      const sortedFiles = [...node.files].sort();
-      if (sortedDirs.length > 0 && sortedFiles.length > 0) {
-        const sep = document.createElement('div');
-        sep.className = 'menu-separator';
-        container.appendChild(sep);
-      }
-      for (const name of sortedFiles) {
-        const fullKey = pathPrefix ? `${pathPrefix}/${name}` : name;
-        const item = document.createElement('div');
-        item.className = 'menu-action';
-        item.textContent = name + '.dig';
-        item.addEventListener('click', () => {
-          openFromStoredFolder(fullKey);
-        });
-        container.appendChild(item);
-      }
-    }
-
-    populateDropdown(folderSubmenu, root, '');
-
-    browseFolderMenu.style.display = '';
-    closeFolderBtn.style.display = '';
-  }
-
-  /** Hide the Browse Folder submenu and clear folder state. */
-  function hideFolderSubmenu(): void {
-    if (browseFolderMenu) browseFolderMenu.style.display = 'none';
-    if (closeFolderBtn) closeFolderBtn.style.display = 'none';
-    if (folderSubmenu) folderSubmenu.innerHTML = '';
-    currentFolderFiles = null;
-    currentFolderName = '';
-  }
-
-  /** Open a circuit by name from the current in-memory folder. */
-  async function openFromStoredFolder(name: string): Promise<void> {
-    if (!currentFolderFiles) return;
-    const xml = currentFolderFiles.get(name);
-    if (!xml) {
-      showStatus(`File "${name}.dig" not found in folder`, true);
-      return;
-    }
-    try {
-      // Build resolver from all OTHER files in the folder
-      const siblingMap = new Map<string, string>();
-      for (const [k, v] of currentFolderFiles) {
-        if (k !== name) {
-          siblingMap.set(k, v);
-          if (!k.endsWith('.dig')) siblingMap.set(k + '.dig', v);
-        }
-      }
-      const folderResolver = new ChainResolver([
-        new EmbeddedResolver(siblingMap),
-        httpResolver,
-      ]);
-      const loaded = await loadWithSubcircuits(xml, folderResolver, registry);
-      applyLoadedCircuit(loaded);
-      circuit.metadata.name = name.split('/').pop() || name;
-      updateCircuitName();
-      const scCount = siblingMap.size / 2; // each file registered twice
-      showStatus(`Loaded ${name}.dig (${scCount} subcircuit file${scCount !== 1 ? 's' : ''} available)`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('Failed to load circuit from folder:', msg);
-      showStatus(`Load error: ${msg}`, true);
-    }
-  }
-
-  /** Show a modal dialog listing .dig files in the folder for the user to pick one. */
-  function showCircuitPickerDialog(files: Map<string, string>, folderName: string): void {
-    // Build sorted list grouped by directory
-    const sortedKeys = [...files.keys()].sort();
-
-    const { overlay, dialog, body: list } = createModal({
-      title: `Open circuit — ${folderName}`,
-      className: 'circuit-picker',
-      overlayClassName: 'circuit-picker-overlay',
-    });
-    list.className = 'circuit-picker-list';
-
-    let lastDir = '';
-    for (const key of sortedKeys) {
-      const parts = key.split('/');
-      const fileName = parts.pop()!;
-      const dir = parts.join('/');
-
-      // Show directory heading when directory changes
-      if (dir !== lastDir) {
-        if (dir) {
-          const dirLabel = document.createElement('div');
-          dirLabel.className = 'circuit-picker-dir';
-          dirLabel.textContent = dir;
-          list.appendChild(dirLabel);
-        }
-        lastDir = dir;
-      }
-
-      const item = document.createElement('div');
-      item.className = 'circuit-picker-item';
-      item.textContent = fileName + '.dig';
-      item.addEventListener('click', () => {
-        overlay.remove();
-        openFromStoredFolder(key);
-      });
-      list.appendChild(item);
-    }
-
-    document.body.appendChild(overlay);
-  }
-
-  folderInput?.addEventListener('change', async () => {
-    const files = folderInput?.files;
-    if (!files || files.length === 0) return;
-
-    // Read all .dig files to text and collect in a map
-    const digFiles = new Map<string, string>();
-    let folderName = '';
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (f.name.endsWith('.dig')) {
-        const name = f.name.replace(/\.dig$/, '');
-        // Use webkitRelativePath for subfolder structure, fall back to name
-        const relPath = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
-        if (relPath && !folderName) {
-          folderName = relPath.split('/')[0] || name;
-        }
-        // Store under just the filename (no extension) for flat folders
-        const content = await f.text();
-        digFiles.set(name, content);
-      }
-    }
-
-    if (digFiles.size === 0) {
-      showStatus('No .dig files found in selected folder', true);
-      return;
-    }
-
-    if (!folderName) folderName = 'Folder';
-
-    // Persist to IndexedDB (single-slot replacement)
-    try {
-      await storeFolder(folderName, digFiles);
-    } catch (e) {
-      console.warn('Failed to persist folder to IndexedDB:', e);
-    }
-
-    // Set in-memory state and build menu
-    currentFolderFiles = digFiles;
-    currentFolderName = folderName;
-    buildFolderSubmenu(digFiles);
-
-    // If only one file, open it directly; otherwise show picker dialog
-    if (digFiles.size === 1) {
-      const [name] = [...digFiles.keys()];
-      await openFromStoredFolder(name);
-    } else {
-      showCircuitPickerDialog(digFiles, folderName);
-    }
-  });
-
-  // Close Folder handler
-  closeFolderBtn?.addEventListener('click', async () => {
-    hideFolderSubmenu();
-    try {
-      await clearFolder();
-    } catch (e) {
-      console.warn('Failed to clear folder from IndexedDB:', e);
-    }
-    showStatus('Folder closed');
-  });
-
-  // Restore folder from IndexedDB on startup
-  loadFolder().then((stored) => {
-    if (!stored) return;
-    const files = new Map(Object.entries(stored.files));
-    currentFolderFiles = files;
-    currentFolderName = stored.name;
-    buildFolderSubmenu(files);
-    showStatus(`Folder "${stored.name}" restored (${files.size} .dig files). Use File → Browse Folder to open a circuit.`);
-  }).catch((e) => {
-    console.warn('Failed to restore folder from IndexedDB:', e);
-  });
-
-  document.getElementById('btn-save')?.addEventListener('click', () => {
-    try {
-      let content: string;
-      let mimeType: string;
-      let ext: string;
-      if (saveFormat === 'dig') {
-        content = serializeCircuitToDig(circuit, registry);
-        mimeType = 'application/xml';
-        ext = '.dig';
-      } else {
-        content = serializeCircuit(circuit);
-        mimeType = 'application/json';
-        ext = '.digj';
-      }
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = (circuit.metadata.name || 'circuit') + ext;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to save:', err);
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Menu: New, Save As, Edit actions, Circuit name
-  // -------------------------------------------------------------------------
-
-  const circuitNameInput = document.getElementById('circuit-name') as HTMLInputElement | null;
-
-  function updateCircuitName(): void {
-    if (circuitNameInput) {
-      circuitNameInput.value = circuit.metadata.name || 'Untitled';
-    }
-  }
-
-  circuitNameInput?.addEventListener('change', () => {
-    circuit.metadata.name = circuitNameInput.value.trim() || 'Untitled';
-  });
-
-  document.getElementById('btn-new')?.addEventListener('click', () => {
-    circuit.elements.length = 0;
-    circuit.wires.length = 0;
-    circuit.metadata = { ...circuit.metadata, name: 'Untitled' };
-    selection.clear();
-    invalidateCompiled();
-    updateCircuitName();
-  });
-
-  document.getElementById('btn-save-as')?.addEventListener('click', () => {
-    const suggested = circuit.metadata.name || 'circuit';
-    const name = prompt('Save as:', suggested);
-    if (name !== null && name.trim() !== '') {
-      circuit.metadata.name = name.trim();
-      updateCircuitName();
-      document.getElementById('btn-save')?.click();
-    }
-  });
-
-  // Save format toggle
-  const formatDigBtn = document.getElementById('btn-format-dig');
-  const formatDigjBtn = document.getElementById('btn-format-digj');
-
-  function updateFormatChecks(): void {
-    const digCheck = formatDigBtn?.querySelector('.format-check');
-    const digjCheck = formatDigjBtn?.querySelector('.format-check');
-    if (digCheck) digCheck.textContent = saveFormat === 'dig' ? '\u2713' : '';
-    if (digjCheck) digjCheck.textContent = saveFormat === 'digj' ? '\u2713' : '';
-  }
-
-  formatDigBtn?.addEventListener('click', () => {
-    saveFormat = 'dig';
-    updateFormatChecks();
-  });
-
-  formatDigjBtn?.addEventListener('click', () => {
-    saveFormat = 'digj';
-    updateFormatChecks();
-  });
-
-  // -------------------------------------------------------------------------
-  // Export menu (Task 6.2)
-  // -------------------------------------------------------------------------
-
-  function downloadBlob(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function circuitBaseName(): string {
-    return (circuit.metadata.name || 'circuit').replace(/[^a-zA-Z0-9_-]/g, '_');
-  }
-
-  document.getElementById('btn-export-svg')?.addEventListener('click', () => {
-    const svg = exportSvg(circuit);
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    downloadBlob(blob, `${circuitBaseName()}.svg`);
-  });
-
-  document.getElementById('btn-export-png')?.addEventListener('click', () => {
-    exportPng(circuit).then(blob => {
-      downloadBlob(blob, `${circuitBaseName()}.png`);
-    }).catch((err: unknown) => {
-      showStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`, true);
-    });
-  });
-
-  document.getElementById('btn-export-png2x')?.addEventListener('click', () => {
-    exportPng(circuit, { scale: 2 }).then(blob => {
-      downloadBlob(blob, `${circuitBaseName()}@2x.png`);
-    }).catch((err: unknown) => {
-      showStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`, true);
-    });
-  });
-
-  const gifMenuItem = document.getElementById('btn-export-gif');
-  document.getElementById('btn-export-gif')?.addEventListener('click', () => {
-    const gifEng = facade.getCoordinator();
-    if (!gifEng || gifEng.getState() === EngineState.STOPPED) return;
-    exportGif(circuit, gifEng).then(blob => {
-      downloadBlob(blob, `${circuitBaseName()}.gif`);
-    }).catch((err: unknown) => {
-      showStatus(`GIF export failed: ${err instanceof Error ? err.message : String(err)}`, true);
-    });
-  });
-
-  function updateGifMenuState(): void {
-    if (gifMenuItem) {
-      const gifEng = facade.getCoordinator();
-      const stopped = !gifEng || gifEng.getState() === EngineState.STOPPED;
-      gifMenuItem.style.opacity = stopped ? '0.4' : '';
-      gifMenuItem.style.pointerEvents = stopped ? 'none' : '';
-    }
-  }
-  // Update GIF state whenever the File menu opens
-  document.querySelector('.menu-item[data-menu="file"]')?.addEventListener('click', updateGifMenuState);
-  updateGifMenuState();
-
-  document.getElementById('btn-export-zip')?.addEventListener('click', () => {
-    exportZip(circuit, new Map()).then(blob => {
-      downloadBlob(blob, `${circuitBaseName()}.zip`);
-    }).catch((err: unknown) => {
-      showStatus(`ZIP export failed: ${err instanceof Error ? err.message : String(err)}`, true);
-    });
-  });
 
   // -------------------------------------------------------------------------
   // Dark mode toggle (Task 6.1)
@@ -3055,7 +2561,7 @@ export function initApp(search?: string): void {
       const exprMap = new Map<string, import('../analysis/expression.js').BoolExpr>([['Y', pr.expr]]);
       try {
         const synth = synthesizeCircuit(exprMap, vars, registry);
-        applyLoadedCircuit(synth);
+        ctx.applyLoadedCircuit(synth);
         container.closest('.analysis-overlay')?.remove();
         showStatus('Circuit synthesized (' + synth.elements.length + ' components)');
       } catch (e) {
@@ -3437,13 +2943,6 @@ export function initApp(search?: string): void {
   // postMessage adapter
   // -------------------------------------------------------------------------
 
-  async function loadCircuitFromXml(xml: string): Promise<void> {
-    let loaded: Circuit;
-    loaded = await loadWithSubcircuits(xml, httpResolver, registry);
-    applyLoadedCircuit(loaded);
-    facade.compile(circuit);
-  }
-
   function renderMarkdownToHtml(markdown: string): string {
     const escaped = markdown
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -3459,11 +2958,11 @@ export function initApp(search?: string): void {
 
   const postMessageAdapter = new PostMessageAdapter({
     registry,
-    resolver: httpResolver,
+    resolver: fileIOController.httpResolver,
     target: window.parent,
     eventSource: window,
     hooks: {
-      loadCircuitXml: loadCircuitFromXml,
+      loadCircuitXml: (xml) => fileIOController.loadCircuitFromXml(xml),
       getCircuit: () => circuit,
       serializeCircuit: () => serializeCircuitToDig(circuit, registry),
       getFacade: () => facade,
@@ -3700,7 +3199,7 @@ export function initApp(search?: string): void {
       const res = await fetch(fileUrl);
       if (!res.ok) throw new Error(`Failed to fetch: ${fileUrl}`);
       const xml = await res.text();
-      await loadCircuitFromXml(xml);
+      await fileIOController.loadCircuitFromXml(xml);
       window.parent.postMessage({ type: 'digital-loaded' }, '*');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
