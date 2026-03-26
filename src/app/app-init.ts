@@ -48,6 +48,7 @@ import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
 import { deserializeCircuit } from '../io/load.js';
 import { parseCtzCircuitFromText } from '../io/ctz-parser.js';
+import { createModal } from './dialog-manager.js';
 import { serializeCircuit } from '../io/save.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { deserializeDts } from '../io/dts-deserializer.js';
@@ -567,20 +568,26 @@ export function initApp(search?: string): void {
   // Canvas sizing
   // -------------------------------------------------------------------------
 
+  // Cached canvas dimensions — avoids forced synchronous layout reflow
+  // from reading clientWidth/clientHeight on every render frame.
+  let _canvasW = 0;
+  let _canvasH = 0;
+
   function resizeCanvas(): void {
     const container = canvas.parentElement!;
     const dpr = window.devicePixelRatio || 1;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
+    _canvasW = container.clientWidth;
+    _canvasH = container.clientHeight;
+    canvas.width = _canvasW * dpr;
+    canvas.height = _canvasH * dpr;
+    canvas.style.width = `${_canvasW}px`;
+    canvas.style.height = `${_canvasH}px`;
     ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   resizeCanvas();
   window.addEventListener('resize', () => {
+    invalidateCanvasRect();
     resizeCanvas();
     scheduleRender();
   });
@@ -598,13 +605,32 @@ export function initApp(search?: string): void {
     }
   }
 
+  // Frame profiling — enabled via ?profile query param or console: _enableFrameProfile()
+  let _frameProfileEnabled = search?.includes('profile') ?? false;
+  let _frameProfileSamples: number[] = [];
+  (window as any)._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
+  (window as any)._disableFrameProfile = () => {
+    _frameProfileEnabled = false;
+    if (_frameProfileSamples.length > 0) {
+      const sorted = _frameProfileSamples.slice().sort((a, b) => a - b);
+      const avg = sorted.reduce((s, v) => s + v, 0) / sorted.length;
+      const p50 = sorted[Math.floor(sorted.length * 0.5)];
+      const p95 = sorted[Math.floor(sorted.length * 0.95)];
+      const p99 = sorted[Math.floor(sorted.length * 0.99)];
+      console.log(`Frame profile (${sorted.length} frames): avg=${avg.toFixed(1)}ms p50=${p50!.toFixed(1)}ms p95=${p95!.toFixed(1)}ms p99=${p99!.toFixed(1)}ms max=${sorted[sorted.length-1]!.toFixed(1)}ms`);
+    }
+    _frameProfileSamples = [];
+  };
+
   function renderFrame(): void {
     renderScheduled = false;
+    const _t0 = _frameProfileEnabled ? performance.now() : 0;
     const dpr = window.devicePixelRatio || 1;
     ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+    // Use cached dimensions — avoids forced synchronous layout reflow.
+    const w = _canvasW;
+    const h = _canvasH;
 
     ctx2d.clearRect(0, 0, w, h);
 
@@ -639,10 +665,14 @@ export function initApp(search?: string): void {
       ctx2d.globalAlpha = 0.5;
       ctx2d.translate(ghost.position.x, ghost.position.y);
       if (ghost.rotation !== 0) {
-        ctx2d.rotate((ghost.rotation * Math.PI) / 2);
+        // Negate the angle to match ElementRenderer's convention:
+        // rotatePoint uses (x,y)→(y,-x) for rot=1, which corresponds
+        // to rotate(-PI/2) in Canvas2D coordinates.
+        ctx2d.rotate(-(ghost.rotation * Math.PI) / 2);
       }
       if (ghost.mirror) {
-        ctx2d.scale(-1, 1);
+        // Mirror negates Y in local space, matching ElementRenderer.
+        ctx2d.scale(1, -1);
       }
       ghost.element.draw(canvasRenderer);
       ctx2d.restore();
@@ -717,10 +747,22 @@ export function initApp(search?: string): void {
       ctx2d.restore();
     }
 
-    // Render scope panels in sync with the main canvas frame
+    // Render scope panels when simulation is running (new data from onStep)
+    // or when resized. Skip during idle zoom/pan to avoid expensive redraws.
+    const simRunning = isSimActive();
     for (const sp of scopePanels) {
-      sizeCanvasInContainer(sp.canvas);
-      sp.panel.render();
+      const resized = sizeCanvasInContainer(sp.canvas);
+      if (resized || simRunning) {
+        sp.panel.render();
+      }
+    }
+
+    if (_frameProfileEnabled) {
+      const dt = performance.now() - _t0;
+      _frameProfileSamples.push(dt);
+      if (_frameProfileSamples.length % 60 === 0) {
+        console.log(`Frame: ${dt.toFixed(1)}ms (${_frameProfileSamples.length} samples)`);
+      }
     }
   }
 
@@ -730,14 +772,25 @@ export function initApp(search?: string): void {
   // Coordinate helpers
   // -------------------------------------------------------------------------
 
+  // Cache canvas bounding rect to avoid forcing synchronous layout reflow on
+  // every mouse/wheel event. Invalidated on resize and scroll.
+  let _canvasRect: DOMRect | null = null;
+  function getCanvasRect(): DOMRect {
+    if (_canvasRect === null) _canvasRect = canvas.getBoundingClientRect();
+    return _canvasRect;
+  }
+  function invalidateCanvasRect(): void { _canvasRect = null; }
+  window.addEventListener('resize', invalidateCanvasRect);
+  window.addEventListener('scroll', invalidateCanvasRect, true);
+
   function canvasToWorld(e: { clientX: number; clientY: number }): Point {
-    const rect = canvas.getBoundingClientRect();
+    const rect = getCanvasRect();
     const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     return screenToWorld(screenPt, viewport.zoom, viewport.pan);
   }
 
   function canvasToScreen(e: { clientX: number; clientY: number }): Point {
-    const rect = canvas.getBoundingClientRect();
+    const rect = getCanvasRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
@@ -1284,13 +1337,15 @@ export function initApp(search?: string): void {
     scheduleRender();
   });
 
+  // passive: true lets the browser compositor run without waiting for JS.
+  // Scroll prevention is handled by CSS (html/body overflow:hidden,
+  // canvas touch-action:none, overscroll-behavior:contain).
   canvas.addEventListener('wheel', (e: WheelEvent) => {
-    e.preventDefault();
     const screenPt = canvasToScreen(e);
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     viewport.zoomAt(screenPt, factor);
     scheduleRender();
-  }, { passive: false });
+  }, { passive: true });
 
   // -------------------------------------------------------------------------
   // Double-click → property popup
@@ -2032,14 +2087,20 @@ export function initApp(search?: string): void {
   }
 
   /** Size a canvas to fill its share of the container at device pixel ratio. */
-  function sizeCanvasInContainer(cvs: HTMLCanvasElement): void {
+  function sizeCanvasInContainer(cvs: HTMLCanvasElement): boolean {
     const dpr = window.devicePixelRatio || 1;
     const w = cvs.clientWidth;
     const h = cvs.clientHeight;
-    if (w > 0 && h > 0) {
-      cvs.width = w * dpr;
-      cvs.height = h * dpr;
+    const targetW = Math.round(w * dpr);
+    const targetH = Math.round(h * dpr);
+    // Only resize when dimensions actually changed — setting canvas.width/height
+    // resets the entire canvas context and forces GPU reallocation.
+    if (targetW > 0 && targetH > 0 && (cvs.width !== targetW || cvs.height !== targetH)) {
+      cvs.width = targetW;
+      cvs.height = targetH;
+      return true; // resized
     }
+    return false;
   }
 
   /** Rebuild viewer panels from the current watchedSignals list. */
@@ -2826,25 +2887,12 @@ export function initApp(search?: string): void {
       ? `${label}: ${typeId} (${size} words × ${width} bits)`
       : `${typeId} (${size} words × ${width} bits)`;
 
-    const overlay = document.createElement('div');
-    overlay.className = 'memory-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'memory-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'memory-dialog-header';
-    const titleEl = document.createElement('span');
-    titleEl.textContent = title;
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'memory-dialog-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', closeMemoryEditor);
-    header.appendChild(titleEl);
-    header.appendChild(closeBtn);
-
-    const body = document.createElement('div');
-    body.className = 'memory-dialog-body';
+    const { overlay, dialog, body } = createModal({
+      title,
+      className: 'memory-dialog',
+      overlayClassName: 'memory-dialog-overlay',
+      onClose: () => { activeMemoryOverlay = null; },
+    });
 
     const { MemoryEditorDialog } = await import('../runtime/memory-editor.js');
     const editor = new MemoryEditorDialog(dataField, body);
@@ -2893,14 +2941,7 @@ export function initApp(search?: string): void {
     footer.appendChild(spacer);
     footer.appendChild(closeBtnFooter);
 
-    dialog.appendChild(header);
-    dialog.appendChild(body);
     dialog.appendChild(footer);
-    overlay.appendChild(dialog);
-
-    overlay.addEventListener('pointerdown', (ev) => {
-      if (ev.target === overlay) closeMemoryEditor();
-    });
 
     document.body.appendChild(overlay);
     activeMemoryOverlay = overlay;
@@ -3225,26 +3266,11 @@ export function initApp(search?: string): void {
     // Build sorted list grouped by directory
     const sortedKeys = [...files.keys()].sort();
 
-    const overlay = document.createElement('div');
-    overlay.className = 'circuit-picker-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'circuit-picker';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'circuit-picker-header';
-    const titleSpan = document.createElement('span');
-    titleSpan.textContent = `Open circuit — ${folderName}`;
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(titleSpan);
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
-
-    // Scrollable list
-    const list = document.createElement('div');
+    const { overlay, dialog, body: list } = createModal({
+      title: `Open circuit — ${folderName}`,
+      className: 'circuit-picker',
+      overlayClassName: 'circuit-picker-overlay',
+    });
     list.className = 'circuit-picker-list';
 
     let lastDir = '';
@@ -3273,14 +3299,6 @@ export function initApp(search?: string): void {
       });
       list.appendChild(item);
     }
-
-    dialog.appendChild(list);
-    overlay.appendChild(dialog);
-
-    // Close on overlay background click
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
 
     document.body.appendChild(overlay);
   }
@@ -3684,24 +3702,11 @@ export function initApp(search?: string): void {
   function openColorSchemeDialog(): void {
     const customColors: Partial<Record<string, string>> = {};
 
-    const overlay = document.createElement('div');
-    overlay.className = 'scheme-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'scheme-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'scheme-dialog-header';
-    header.innerHTML = '<span>Color Scheme</span>';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'scheme-dialog-body';
+    const { overlay, dialog, body } = createModal({
+      title: 'Color Scheme',
+      className: 'scheme-dialog',
+      overlayClassName: 'scheme-dialog-overlay',
+    });
 
     const selectRow = document.createElement('div');
     selectRow.className = 'scheme-select-row';
@@ -3810,12 +3815,7 @@ export function initApp(search?: string): void {
     footer.appendChild(saveBtn);
     dialog.appendChild(footer);
 
-    overlay.appendChild(dialog);
     document.body.appendChild(overlay);
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
   }
 
 
@@ -4119,23 +4119,11 @@ export function initApp(search?: string): void {
     const flipFlopNames = new Set(flipFlopDefs.map((d: { name: string }) => d.name));
     const hasFlipFlop = circuit.elements.some(el => flipFlopNames.has(el.typeId));
 
-    const overlay = document.createElement('div');
-    overlay.className = 'analysis-overlay';
-    const dialog = document.createElement('div');
-    dialog.className = 'analysis-dialog';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'analysis-dialog-header';
-    const titleSpan = document.createElement('span');
-    titleSpan.textContent = 'Circuit Analysis';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(titleSpan);
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
+    const { overlay, dialog } = createModal({
+      title: 'Circuit Analysis',
+      className: 'analysis-dialog',
+      overlayClassName: 'analysis-overlay',
+    });
 
     if (hasFlipFlop) {
       const errDiv = document.createElement('div');
@@ -4212,8 +4200,6 @@ export function initApp(search?: string): void {
       showAnalysisTab(0);
     }
 
-    overlay.appendChild(dialog);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
   }
 
@@ -4452,26 +4438,11 @@ export function initApp(search?: string): void {
       return;
     }
 
-    const overlay = document.createElement('div');
-    overlay.className = 'cp-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'cp-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'cp-dialog-header';
-    const title = document.createElement('span');
-    title.textContent = 'Critical Path Analysis';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(title);
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'cp-dialog-body';
+    const { overlay, dialog, body } = createModal({
+      title: 'Critical Path Analysis',
+      className: 'cp-dialog',
+      overlayClassName: 'cp-dialog-overlay',
+    });
 
     const stats = [
       ['Path Length', `${result.pathLength} ns`],
@@ -4514,9 +4485,6 @@ export function initApp(search?: string): void {
       body.appendChild(empty);
     }
 
-    dialog.appendChild(body);
-    overlay.appendChild(dialog);
-    overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
   });
 
@@ -4551,26 +4519,11 @@ export function initApp(search?: string): void {
       }
     }
 
-    const overlay = document.createElement('div');
-    overlay.className = 'st-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'st-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'st-dialog-header';
-    const title = document.createElement('span');
-    title.textContent = 'State Transition Table';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(title);
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'st-dialog-body';
+    const { overlay, dialog, body } = createModal({
+      title: 'State Transition Table',
+      className: 'st-dialog',
+      overlayClassName: 'st-dialog-overlay',
+    });
 
     if (stateVarSpecs.length === 0) {
       const errDiv = document.createElement('div');
@@ -4641,9 +4594,6 @@ export function initApp(search?: string): void {
         errDiv.className = 'analysis-error';
         errDiv.textContent = 'Analysis failed: ' + (err instanceof Error ? err.message : String(err));
         body.appendChild(errDiv);
-        dialog.appendChild(body);
-        overlay.appendChild(dialog);
-        overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) overlay.remove(); });
         document.body.appendChild(overlay);
         return;
       }
@@ -4705,9 +4655,6 @@ export function initApp(search?: string): void {
       body.appendChild(table);
     }
 
-    dialog.appendChild(body);
-    overlay.appendChild(dialog);
-    overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
   });
 
@@ -4724,21 +4671,11 @@ export function initApp(search?: string): void {
       }
     }
 
-    const overlay = document.createElement('div');
-    overlay.className = 'test-dialog-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'test-dialog';
-
-    const header = document.createElement('div');
-    header.className = 'test-dialog-header';
-    header.innerHTML = '<span>Test Vectors</span>';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'prop-popup-close';
-    closeBtn.textContent = '\u00d7';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    header.appendChild(closeBtn);
-    dialog.appendChild(header);
+    const { overlay, dialog } = createModal({
+      title: 'Test Vectors',
+      className: 'test-dialog',
+      overlayClassName: 'test-dialog-overlay',
+    });
 
     const help = document.createElement('div');
     help.className = 'test-help';
@@ -4811,11 +4748,6 @@ export function initApp(search?: string): void {
     footer.appendChild(cancelBtn);
     footer.appendChild(saveBtn);
     dialog.appendChild(footer);
-
-    overlay.appendChild(dialog);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
 
     document.body.appendChild(overlay);
     textarea.focus();
