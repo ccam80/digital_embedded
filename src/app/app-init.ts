@@ -10,6 +10,7 @@
 
 import { parseUrlParams, loadModuleConfig, applyModuleConfig } from './url-params.js';
 import type { ModuleConfig } from './url-params.js';
+import type { AppContext } from './app-context.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
@@ -1424,7 +1425,7 @@ export function initApp(search?: string): void {
     });
     circuit = subCircuit;
     currentCircuitName = name;
-    viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+    ctx.fitViewport();
     selection.clear();
     closePopup();
     updateBreadcrumb();
@@ -1605,7 +1606,7 @@ export function initApp(search?: string): void {
         compiledDirty = true;
         scheduleRender();
       } else {
-        if (compiledDirty && !compileAndBind()) return;
+        if (!ctx.ensureCompiled()) return;
         startSimulation();
       }
       return;
@@ -1788,7 +1789,7 @@ export function initApp(search?: string): void {
 
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault();
-      viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+      ctx.fitViewport();
       updateZoomDisplay();
       scheduleRender();
       return;
@@ -1967,7 +1968,7 @@ export function initApp(search?: string): void {
   // -------------------------------------------------------------------------
 
   document.getElementById('btn-step')?.addEventListener('click', () => {
-    if (compiledDirty && !compileAndBind()) return;
+    if (!ctx.ensureCompiled()) return;
     const coordinator = facade.getCoordinator();
     if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
     try {
@@ -1981,7 +1982,7 @@ export function initApp(search?: string): void {
   });
 
   document.getElementById('btn-run')?.addEventListener('click', () => {
-    if (compiledDirty && !compileAndBind()) return;
+    if (!ctx.ensureCompiled()) return;
     startSimulation();
   });
 
@@ -1995,7 +1996,7 @@ export function initApp(search?: string): void {
   });
 
   document.getElementById('btn-micro-step')?.addEventListener('click', () => {
-    if (compiledDirty && !compileAndBind()) return;
+    if (!ctx.ensureCompiled()) return;
     const coordinator = facade.getCoordinator();
     if (coordinator.supportsMicroStep()) {
       if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
@@ -2012,7 +2013,7 @@ export function initApp(search?: string): void {
   });
 
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
-    if (compiledDirty && !compileAndBind()) return;
+    if (!ctx.ensureCompiled()) return;
     const coordinator = facade.getCoordinator();
     if (!coordinator.supportsRunToBreak()) {
       showStatus('Run-to-break is not available for this circuit type');
@@ -2225,7 +2226,7 @@ export function initApp(search?: string): void {
   }
 
   function openViewer(tabName: string): void {
-    if (compiledDirty && !compileAndBind()) return;
+    if (!ctx.ensureCompiled()) return;
     viewerPanel?.classList.add('open');
     showViewerTab(tabName);
     if (watchedSignals.length > 0 && scopePanels.length === 0 && !activeDataTable) {
@@ -3079,6 +3080,69 @@ export function initApp(search?: string): void {
     updateCircuitName();
   }
 
+  // ---------------------------------------------------------------------------
+  // AppContext — shared state object passed to extracted sub-modules
+  // ---------------------------------------------------------------------------
+
+  const ctx: AppContext = {
+    // Core state
+    get circuit() { return circuit; },
+    set circuit(c) { circuit = c; },
+    registry,
+    facade,
+    binding,
+    analogTypeIds,
+
+    // Editor subsystems
+    canvas,
+    viewport,
+    selection,
+    placement,
+    wireDrawing,
+    wireDrag,
+    undoStack,
+    lockedModeGuard,
+    colorSchemeManager,
+    contextMenu,
+    palette,
+    paletteUI,
+
+    // Renderers
+    canvasRenderer,
+    elementRenderer,
+    wireRenderer,
+    gridRenderer,
+
+    // Mutable flags
+    get compiledDirty() { return compiledDirty; },
+    set compiledDirty(v) { compiledDirty = v; },
+    clipboard: { elements: [], wires: [] } as import('../editor/edit-operations.js').ClipboardData,
+    lastWorldPt: { x: 0, y: 0 },
+
+    // URL params & environment
+    params,
+    isIframe,
+    httpResolver,
+
+    // Helper methods
+    scheduleRender,
+    invalidateCompiled,
+    compileAndBind,
+    ensureCompiled(): boolean {
+      if (compiledDirty && !compileAndBind()) return false;
+      return true;
+    },
+    showStatus,
+    clearStatus,
+    isSimActive,
+    fitViewport(): void {
+      viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+    },
+    applyLoadedCircuit,
+    setCircuit(c: Circuit): void { circuit = c; },
+    getCircuit(): Circuit { return circuit; },
+  };
+
   fileInput?.addEventListener('change', () => {
     const file = fileInput?.files?.[0];
     if (!file) return;
@@ -3593,7 +3657,7 @@ export function initApp(search?: string): void {
     preset.addEventListener('click', () => {
       const val = (preset as HTMLElement).dataset['zoom'];
       if (val === 'fit') {
-        viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+        ctx.fitViewport();
       } else if (val !== undefined) {
         viewport.setZoom(parseFloat(val));
       }
@@ -3604,13 +3668,13 @@ export function initApp(search?: string): void {
   });
 
   document.getElementById('btn-fit-content')?.addEventListener('click', () => {
-    viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+    ctx.fitViewport();
     updateZoomDisplay();
     scheduleRender();
   });
 
   document.getElementById('btn-tb-fit')?.addEventListener('click', () => {
-    viewport.fitToContent(circuit.elements, { width: canvas.clientWidth, height: canvas.clientHeight });
+    ctx.fitViewport();
     updateZoomDisplay();
     scheduleRender();
   });
