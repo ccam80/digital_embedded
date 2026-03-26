@@ -43,6 +43,7 @@ export interface CanvasInteraction {
   closePopup(): void;
   navigateBack(): void;
   openSubcircuit(name: string, subCircuit: Circuit): void;
+  openMemoryEditor(element: import('../core/element.js').CircuitElement): Promise<void>;
   readonly circuitStack: Array<{ name: string; circuit: Circuit; zoom: number; pan: { x: number; y: number } }>;
 }
 
@@ -998,6 +999,7 @@ export function initCanvasInteraction(
     closePopup,
     navigateBack,
     openSubcircuit,
+    openMemoryEditor,
     get circuitStack() { return circuitStack; },
   };
 }
