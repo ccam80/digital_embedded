@@ -5,6 +5,7 @@
 import { readFile, readdir } from "fs/promises";
 import { NodeResolver } from "../../src/io/file-resolver.js";
 import type { Circuit } from "../../src/core/circuit.js";
+import type { SimulationCoordinator } from "../../src/solver/coordinator-types.js";
 
 // ---------------------------------------------------------------------------
 // wrapTool
@@ -58,6 +59,7 @@ export function makeNodeResolver(baseDir: string): NodeResolver {
 export class SessionState {
   readonly circuits = new Map<string, Circuit>();
   readonly circuitSourceDirs = new Map<string, string>();
+  readonly engines = new Map<string, SimulationCoordinator>();
   private handleCounter = 0;
 
   nextHandle(): string {
@@ -72,6 +74,22 @@ export class SessionState {
       );
     }
     return circuit;
+  }
+
+  getEngine(handle: string): SimulationCoordinator {
+    const engine = this.engines.get(handle);
+    if (!engine) {
+      throw new Error(
+        `No compiled engine for handle "${handle}". Use circuit_compile first.`,
+      );
+    }
+    return engine;
+  }
+
+  storeEngine(handle: string, engine: SimulationCoordinator): void {
+    const prev = this.engines.get(handle);
+    if (prev) prev.dispose();
+    this.engines.set(handle, engine);
   }
 
   store(circuit: Circuit, sourceDir?: string): string {
