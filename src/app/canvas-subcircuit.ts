@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * Subcircuit navigation — drill down into subcircuit elements and back.
  *

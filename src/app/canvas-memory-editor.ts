@@ -7,6 +7,7 @@
 
 import type { AppContext } from './app-context.js';
 import { EngineState } from '../core/engine-interface.js';
+import type { SimulationEngine } from '../core/engine-interface.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
 
@@ -65,7 +66,7 @@ export function createMemoryEditorController(
 
     const memEng = ctx.facade.getCoordinator();
     if (memEng?.getState() === EngineState.RUNNING) {
-      editor.enableLiveUpdate(memEng);
+      editor.enableLiveUpdate(memEng as unknown as SimulationEngine);
     }
 
     const footer = document.createElement('div');
