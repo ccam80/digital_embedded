@@ -64,7 +64,7 @@ function makePortElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.BIDIRECTIONAL,
-      position: { x: position.x, y: position.y + 1 },
+      position: { x: 0, y: 1 },
       label: "port",
       bitWidth,
       isNegated: false,
@@ -84,7 +84,7 @@ function makeInElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.OUTPUT,
-      position: { x: position.x + 2, y: position.y + 1 },
+      position: { x: 2, y: 1 },
       label: "out",
       bitWidth: 1,
       isNegated: false,
@@ -104,7 +104,7 @@ function makeOutElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.INPUT,
-      position: { x: position.x, y: position.y + 1 },
+      position: { x: 0, y: 1 },
       label: "in",
       bitWidth: 1,
       isNegated: false,
@@ -127,7 +127,7 @@ function makeLeaf(
   const pins: Pin[] = [
     {
       direction: PinDirection.OUTPUT,
-      position: { x: position.x + 2, y: position.y + 1 },
+      position: { x: 2, y: 1 },
       label: "out",
       bitWidth: 1,
       isNegated: false,
@@ -208,8 +208,8 @@ describe("flattenCircuit — Port interface elements", () => {
     internal.addElement(portEl);
     internal.addElement(gate);
     internal.addWire(new Wire(
-      { x: portEl.getPins()[0].position.x, y: portEl.getPins()[0].position.y },
-      { x: gate.getPins()[0].position.x, y: gate.getPins()[0].position.y },
+      { x: portEl.position.x + portEl.getPins()[0].position.x, y: portEl.position.y + portEl.getPins()[0].position.y },
+      { x: gate.position.x + gate.getPins()[0].position.x, y: gate.position.y + gate.getPins()[0].position.y },
     ));
 
     // Parent circuit: subcircuit instance with a BIDIRECTIONAL pin named "A"
@@ -217,7 +217,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 10, y: 1 },
+        position: { x: 0, y: 1 },
         label: "A",
         bitWidth: 1,
         isNegated: false,
@@ -248,8 +248,8 @@ describe("flattenCircuit — Port interface elements", () => {
     internal.addElement(outEl);
     internal.addElement(gate);
     internal.addWire(new Wire(
-      { x: inEl.getPins()[0].position.x, y: inEl.getPins()[0].position.y },
-      { x: gate.getPins()[0].position.x, y: gate.getPins()[0].position.y },
+      { x: inEl.position.x + inEl.getPins()[0].position.x, y: inEl.position.y + inEl.getPins()[0].position.y },
+      { x: gate.position.x + gate.getPins()[0].position.x, y: gate.position.y + gate.getPins()[0].position.y },
     ));
 
     // Parent circuit with INPUT and OUTPUT pins
@@ -257,7 +257,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.INPUT,
-        position: { x: 20, y: 1 },
+        position: { x: 0, y: 1 },
         label: "X",
         bitWidth: 1,
         isNegated: false,
@@ -265,7 +265,7 @@ describe("flattenCircuit — Port interface elements", () => {
       },
       {
         direction: PinDirection.OUTPUT,
-        position: { x: 26, y: 1 },
+        position: { x: 6, y: 1 },
         label: "Y",
         bitWidth: 1,
         isNegated: false,
@@ -299,7 +299,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 30, y: 1 },
+        position: { x: 0, y: 1 },
         label: "Z",
         bitWidth: 1,
         isNegated: false,
@@ -333,8 +333,8 @@ describe("flattenCircuit — Port interface elements", () => {
     internal.addElement(portEl);
     internal.addElement(gate);
     internal.addWire(new Wire(
-      { x: portEl.getPins()[0].position.x, y: portEl.getPins()[0].position.y },
-      { x: gate.getPins()[0].position.x, y: gate.getPins()[0].position.y },
+      { x: portEl.position.x + portEl.getPins()[0].position.x, y: portEl.position.y + portEl.getPins()[0].position.y },
+      { x: gate.position.x + gate.getPins()[0].position.x, y: gate.position.y + gate.getPins()[0].position.y },
     ));
 
     // Parent with an 8-bit BIDIRECTIONAL pin
@@ -342,7 +342,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 10, y: 1 },
+        position: { x: 0, y: 1 },
         label: "BUS",
         bitWidth: 8,
         isNegated: false,
@@ -371,50 +371,54 @@ describe("flattenCircuit — Port interface elements", () => {
 
   it("bridge wire connects subcircuit pin position to internal Port pin position", () => {
     const portPos = { x: 2, y: 3 };
-    const subcircuitPinPos = { x: 15, y: 5 };
+    // subcircuitPinChip is chip-relative; subEl is at {12,3} → world pin = {12+3, 3+2} = {15,5}
+    const subcircuitPinChip = { x: 3, y: 2 };
+    const subElPos = { x: 12, y: 3 };
+    const expectedSubPinWorld = { x: subElPos.x + subcircuitPinChip.x, y: subElPos.y + subcircuitPinChip.y }; // {15,5}
+    // portEl at {2,3} with chip-relative pin {0,1} → world pin = {2+0, 3+1} = {2,4}
+    const expectedPortPinWorld = { x: portPos.x + 0, y: portPos.y + 1 }; // {2,4}
 
     // Internal circuit with Port at known position
     const internal = new Circuit({ name: "PosSub" });
     const portEl = makePortElement("port-P", "P", portPos);
     internal.addElement(portEl);
 
-    // Parent with subcircuit pin at known position
+    // Parent with subcircuit pin at chip-relative position
     const top = new Circuit({ name: "Top" });
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: subcircuitPinPos,
+        position: subcircuitPinChip,
         label: "P",
         bitWidth: 1,
         isNegated: false,
         isClock: false,
       },
     ];
-    const subEl = new TestSubcircuitElement("PosSub", "sub1", { x: 12, y: 3 }, internal, subcircuitPins);
+    const subEl = new TestSubcircuitElement("PosSub", "sub1", subElPos, internal, subcircuitPins);
     top.addElement(subEl);
 
     const reg = makeRegistry();
     const flat = flattenCircuit(top, reg);
 
-    // Find the bridge wire — one endpoint at subcircuit pin position, other at Port pin position
-    const portPinPos = portEl.getPins()[0].position;
+    // Find the bridge wire — endpoints at world positions: subcircuit pin world and Port pin world
     const bridgeWire = flat.circuit.wires.find((w) =>
-      (w.start.x === subcircuitPinPos.x && w.start.y === subcircuitPinPos.y &&
-       w.end.x === portPinPos.x && w.end.y === portPinPos.y) ||
-      (w.end.x === subcircuitPinPos.x && w.end.y === subcircuitPinPos.y &&
-       w.start.x === portPinPos.x && w.start.y === portPinPos.y),
+      (w.start.x === expectedSubPinWorld.x && w.start.y === expectedSubPinWorld.y &&
+       w.end.x === expectedPortPinWorld.x && w.end.y === expectedPortPinWorld.y) ||
+      (w.end.x === expectedSubPinWorld.x && w.end.y === expectedSubPinWorld.y &&
+       w.start.x === expectedPortPinWorld.x && w.start.y === expectedPortPinWorld.y),
     );
     expect(bridgeWire).toBeDefined();
 
     // Verify the bridge wire connects the expected positions
     const startMatchesSubPin =
-      bridgeWire!.start.x === subcircuitPinPos.x && bridgeWire!.start.y === subcircuitPinPos.y;
+      bridgeWire!.start.x === expectedSubPinWorld.x && bridgeWire!.start.y === expectedSubPinWorld.y;
     const endMatchesSubPin =
-      bridgeWire!.end.x === subcircuitPinPos.x && bridgeWire!.end.y === subcircuitPinPos.y;
+      bridgeWire!.end.x === expectedSubPinWorld.x && bridgeWire!.end.y === expectedSubPinWorld.y;
     const startMatchesPortPin =
-      bridgeWire!.start.x === portPinPos.x && bridgeWire!.start.y === portPinPos.y;
+      bridgeWire!.start.x === expectedPortPinWorld.x && bridgeWire!.start.y === expectedPortPinWorld.y;
     const endMatchesPortPin =
-      bridgeWire!.end.x === portPinPos.x && bridgeWire!.end.y === portPinPos.y;
+      bridgeWire!.end.x === expectedPortPinWorld.x && bridgeWire!.end.y === expectedPortPinWorld.y;
 
     expect(
       (startMatchesSubPin && endMatchesPortPin) ||

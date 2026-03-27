@@ -134,7 +134,7 @@ export class DACElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     const bits = this._properties.getOrDefault<number>("bits", 8);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const halfH = Math.floor(bits / 2) + 1;
 
     ctx.save();

@@ -122,7 +122,7 @@ export class LookUpTableElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "LUT",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -233,8 +233,10 @@ export const LookUpTableDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeLookUpTable,
-      // Schema for default inputCount=2; direction-filter order matches for all inputCounts.
-      inputSchema: ["0", "1"],
+      inputSchema: (props) => {
+        const n = props.getOrDefault<number>("inputCount", 2);
+        return Array.from({ length: n }, (_, i) => String(i));
+      },
       outputSchema: ["out"],
       stateSlotCount: 0,
       defaultDelay: 10,

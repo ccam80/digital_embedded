@@ -349,7 +349,6 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     // Equivalent to NAND gate: Y = NOT(A AND B)
     // Run test vectors directly — this also exercises compilation.
     const result = await builder.runTestVectors('A B Y\n0 0 1\n0 1 1\n1 0 1\n1 1 0');
-    console.log('DEBUG result:', JSON.stringify(result));
     expect(result.passed).toBe(4);
     expect(result.failed).toBe(0);
   });

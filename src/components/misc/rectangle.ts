@@ -63,7 +63,7 @@ export class RectangleElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const rectWidth = this._properties.getOrDefault<number>("rectWidth", DEFAULT_WIDTH);
     const rectHeight = this._properties.getOrDefault<number>("rectHeight", DEFAULT_HEIGHT);
     const lineWidth = this._properties.getOrDefault<number>("lineWidth", 1);

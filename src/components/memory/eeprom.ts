@@ -190,7 +190,7 @@ export class EEPROMElement extends AbstractCircuitElement {
       clockInputIndices: [2],
       componentName: "EEPROM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -353,7 +353,7 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
       clockInputIndices: [3],
       componentName: "EEPROM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

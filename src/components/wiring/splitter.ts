@@ -503,10 +503,14 @@ export const SplitterDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeSplitter,
-      // Schema for default config (input "4,4" → ports "0-3","4-7"; output "8" → port "0-7").
-      // Direction-filter order matches for all configurations.
-      inputSchema: ["0-3", "4-7"],
-      outputSchema: ["0-7"],
+      inputSchema: (props) => {
+        const inputSplitting = props.getOrDefault<string>("input splitting", "4,4");
+        return parsePorts(inputSplitting).map((p) => p.name);
+      },
+      outputSchema: (props) => {
+        const outputSplitting = props.getOrDefault<string>("output splitting", "8");
+        return parsePorts(outputSplitting).map((p) => p.name);
+      },
     },
     analog: {
       factory: createSplitterAnalogElement,

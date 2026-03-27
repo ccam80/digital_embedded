@@ -54,8 +54,76 @@
       </elementAttributes>
       <pos x="360" y="160"/>
     </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="440" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>P1</string>
+        </entry>
+        <entry>
+          <string>simulationModel</string>
+          <string>digital</string>
+        </entry>
+      </elementAttributes>
+      <pos x="480" y="160"/>
+    </visualElement>
   </visualElements>
   <wires>
+    <wire>
+      <p1 x="60" y="120"/>
+      <p2 x="180" y="120"/>
+    </wire>
+    <wire>
+      <p1 x="180" y="120"/>
+      <p2 x="180" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="180" y="160"/>
+      <p2 x="200" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="60" y="200"/>
+      <p2 x="200" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="260" y="180"/>
+      <p2 x="340" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="340" y="160"/>
+      <p2 x="340" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="340" y="160"/>
+      <p2 x="360" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="440" y="160"/>
+      <p2 x="440" y="280"/>
+    </wire>
+    <wire>
+      <p1 x="260" y="140"/>
+      <p2 x="260" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="260" y="140"/>
+      <p2 x="460" y="140"/>
+    </wire>
+    <wire>
+      <p1 x="460" y="140"/>
+      <p2 x="460" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="460" y="160"/>
+      <p2 x="480" y="160"/>
+    </wire>
   </wires>
   <measurementOrdering/>
 </circuit>

@@ -136,7 +136,7 @@ export class TransGateElement extends AbstractCircuitElement {
     // Inversion bubble circle for p2 (bottom gate) at (1,0.75) r=0.2
     ctx.drawCircle(1, 0.75, 0.2, false);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

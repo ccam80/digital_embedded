@@ -329,7 +329,7 @@ function inlineSubcircuit(
   const bridgeWires: Wire[] = [];
 
   // All elements from the flattened internal circuit go into the parent.
-  // In/Out interface elements are included — they are leaf components.
+  // In/Out/Port interface elements are included — they are leaf components.
   for (const internalEl of flatInternal.elements) {
     elements.push(internalEl);
   }

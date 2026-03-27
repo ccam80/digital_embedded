@@ -281,11 +281,18 @@ test.describe('GUI: subcircuit creation', () => {
     const canvasBox = await harness.iframe.locator('#sim-canvas').boundingBox();
     if (!canvasBox) throw new Error('Canvas bounding box not found');
 
-    // Single left-click to select only the And gate
+    // Single left-click to deselect any previous selection, then select all
     await harness.page.mouse.click(
       canvasBox.x + andPos.x,
       canvasBox.y + andPos.y,
     );
+    await harness.page.waitForTimeout(150);
+
+    // Select all via the toolbar button (required: "Make Subcircuit…" needs >= 2 selected)
+    await harness.page.evaluate(() => {
+      const iframe = document.getElementById('sim') as HTMLIFrameElement;
+      iframe.contentWindow!.document.getElementById('btn-select-all')?.click();
+    });
     await harness.page.waitForTimeout(150);
 
     // Right-click on the And gate to open the context menu

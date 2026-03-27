@@ -144,7 +144,7 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const blown = this._properties.getOrDefault<boolean>("blown", false);
     const thermalRatio = this._properties.getOrDefault<number>("_thermalRatio", 0);
 

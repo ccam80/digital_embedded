@@ -111,7 +111,7 @@ export class RgbLedElement extends AbstractCircuitElement {
     // Inner circle (color zone)
     ctx.drawCircle(cx, cy, LED_INNER_RADIUS, false);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });

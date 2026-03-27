@@ -300,8 +300,15 @@ export const MuxDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeMux,
-      // Schema for default selectorBits=1 (2 data inputs); direction-filter order matches for all configs.
-      inputSchema: ["sel", "in_0", "in_1"],
+      inputSchema: (props) => {
+        const selectorBits = props.getOrDefault<number>("selectorBits", 1);
+        const inputCount = 1 << selectorBits;
+        const labels = ["sel"];
+        for (let i = 0; i < inputCount; i++) {
+          labels.push(`in_${i}`);
+        }
+        return labels;
+      },
       outputSchema: ["out"],
     },
     analog: {

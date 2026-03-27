@@ -216,7 +216,7 @@ export class LDRCircuitElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");

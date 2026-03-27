@@ -182,7 +182,7 @@ export class DAsyncElement extends AbstractCircuitElement {
       clockInputIndices: [2],
       componentName: "D-AS",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

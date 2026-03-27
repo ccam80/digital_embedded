@@ -180,7 +180,7 @@ export class TerminalElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawGenericShape(ctx, {
       inputLabels: ["D", "C", "en"],
       outputLabels: [],

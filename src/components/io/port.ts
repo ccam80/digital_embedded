@@ -76,7 +76,7 @@ export class PortElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     ctx.save();
     ctx.setColor("COMPONENT_FILL");

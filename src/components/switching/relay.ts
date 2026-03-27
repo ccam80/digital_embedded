@@ -181,7 +181,7 @@ export class RelayElement extends AbstractCircuitElement {
       }
     }
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

@@ -3,8 +3,6 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import {
   resolveGenericCircuit,
   isGenericCircuit,
@@ -273,12 +271,39 @@ describe("Generic", () => {
   });
 
   it("genAndExample", async () => {
-    // Load genAnd.dig from the reference Digital repository
-    const digPath = join(
-      process.cwd(),
-      "ref/Digital/src/main/dig/generic/modify/genAnd.dig",
-    );
-    const xml = readFileSync(digPath, "utf-8");
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry>
+      <string>isGeneric</string>
+      <boolean>true</boolean>
+    </entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>GenericInitCode</elementName>
+      <elementAttributes>
+        <entry>
+          <string>generic</string>
+          <string>inputs:=8;</string>
+        </entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>generic</string>
+          <string>this.Inputs=args.inputs;</string>
+        </entry>
+      </elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
 
     // Set up registry with all needed components
     const registry = makeRegistry(

@@ -106,7 +106,7 @@ export class PullDownElement extends AbstractCircuitElement {
     ctx.drawLine(-0.5, 2, 0.5, 2);
     ctx.setLineWidth(1);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

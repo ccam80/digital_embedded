@@ -129,7 +129,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
     ctx.drawLine(1.35, 1, 1.35, 0.85);
     ctx.setLineWidth(1);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });

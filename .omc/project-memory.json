@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774514028913,
+  "lastScanned": 1774605927687,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -81,7 +81,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774514028872,
+      "lastAccessed": 1774605927652,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -93,7 +93,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1774514028872,
+      "lastAccessed": 1774605927652,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -106,14 +106,14 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774514028873,
+      "lastAccessed": 1774605927652,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 10,
-      "lastAccessed": 1774514028892,
+      "lastAccessed": 1774605927653,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -126,28 +126,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774514028892,
+      "lastAccessed": 1774605927653,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774514028892,
+      "lastAccessed": 1774605927671,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774514028892,
+      "lastAccessed": 1774605927671,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 12,
-      "lastAccessed": 1774514028893,
+      "lastAccessed": 1774605927671,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
@@ -159,21 +159,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 9,
-      "lastAccessed": 1774514028893,
+      "fileCount": 12,
+      "lastAccessed": 1774605927672,
       "keyFiles": [
         "analog-snapshot-analysis.md",
+        "app-init-modularization.md",
+        "app-modules-test-plan.md",
         "phase-3-unified-netlist.md",
-        "phase-4-simulation-coordinator.md",
-        "phase-5-simplify-consumers.md",
-        "phase-5b-eliminate-domain-branching.md"
+        "phase-4-simulation-coordinator.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774514028894,
+      "lastAccessed": 1774605927672,
       "keyFiles": [
         "main.ts"
       ]
@@ -182,14 +182,14 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774514028894,
+      "lastAccessed": 1774605927672,
       "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774514028895,
+      "lastAccessed": 1774605927673,
       "keyFiles": [
         "index.json"
       ]
@@ -198,18 +198,18 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1774514028895,
+      "lastAccessed": 1774605927673,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
-        "simulator-DO3G50Oe.js"
+        "simulator-DPIijWtq.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 4,
-      "lastAccessed": 1774514028896,
+      "lastAccessed": 1774605927674,
       "keyFiles": [
         "harness.html",
         "simulator-harness.ts",
@@ -219,19 +219,19 @@
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
-      "fileCount": 3,
-      "lastAccessed": 1774514028898,
+      "fileCount": 14,
+      "lastAccessed": 1774605927675,
       "keyFiles": [
-        "app-init.ts",
-        "test-bridge.ts",
-        "url-params.ts"
+        "analysis-dialogs.ts",
+        "app-context.ts",
+        "app-init.ts"
       ]
     },
     "src\\components": {
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 3,
-      "lastAccessed": 1774514028898,
+      "lastAccessed": 1774605927675,
       "keyFiles": [
         "generic-shape.ts",
         "library-74xx.ts",
@@ -242,309 +242,309 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774514028899,
+      "lastAccessed": 1774605927675,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 492,
-      "lastAccessed": 1774589761892,
-      "type": "directory"
-    },
-    {
       "path": "src",
-      "accessCount": 53,
-      "lastAccessed": 1774589434365,
+      "accessCount": 193,
+      "lastAccessed": 1774642711114,
       "type": "directory"
     },
     {
-      "path": "src\\solver\\digital\\flatten.ts",
-      "accessCount": 45,
-      "lastAccessed": 1774589800724,
+      "path": "src\\components",
+      "accessCount": 24,
+      "lastAccessed": 1774642515995,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\component-sweep.spec.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774611441615,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 19,
+      "lastAccessed": 1774613650259,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\simulation-controller.ts",
+      "accessCount": 19,
+      "lastAccessed": 1774613859655,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 17,
+      "lastAccessed": 1774642473438,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 39,
-      "lastAccessed": 1774588928111,
+      "accessCount": 14,
+      "lastAccessed": 1774642690040,
       "type": "directory"
     },
     {
-      "path": "src\\components\\subcircuit\\subcircuit.ts",
-      "accessCount": 35,
-      "lastAccessed": 1774589827688,
+      "path": "src\\components\\io\\ground.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774609035125,
       "type": "file"
     },
     {
-      "path": "src\\editor\\insert-subcircuit.ts",
-      "accessCount": 28,
-      "lastAccessed": 1774589475433,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 26,
-      "lastAccessed": 1774578527553,
+      "path": "src\\app\\test-bridge.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774610921277,
       "type": "directory"
     },
     {
-      "path": "simulator.html",
-      "accessCount": 23,
-      "lastAccessed": 1774584873154,
+      "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774613162221,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\workflow-tests.spec.ts",
+      "accessCount": 10,
+      "lastAccessed": 1774608650433,
+      "type": "file"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 10,
+      "lastAccessed": 1774642516094,
       "type": "directory"
     },
     {
       "path": "src\\app",
-      "accessCount": 21,
-      "lastAccessed": 1774585548477,
+      "accessCount": 10,
+      "lastAccessed": 1774642709173,
       "type": "directory"
     },
     {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 20,
-      "lastAccessed": 1774558946158,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774588665716,
-      "type": "file"
-    },
-    {
       "path": "src\\editor\\property-panel.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774572218347,
+      "accessCount": 9,
+      "lastAccessed": 1774612833717,
       "type": "file"
     },
     {
-      "path": "spec\\app-init-modularization.md",
+      "path": "src\\solver\\coordinator.ts",
       "accessCount": 9,
-      "lastAccessed": 1774529699317,
+      "lastAccessed": 1774613847888,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774642301616,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\menu-toolbar.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774611083625,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\subcircuit-creation.spec.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774608398230,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\library-74xx.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774611073325,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\canvas-interaction.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774611387854,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774642558697,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\flatten.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774613212401,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774642476044,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\analog-rc-circuit.spec.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774610921705,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\vdd.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774613197790,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774613237445,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver",
+      "accessCount": 5,
+      "lastAccessed": 1774642539229,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\io\\clock.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774611432084,
       "type": "file"
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774571569457,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\coordinator-types.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774588807606,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\edit-operations.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774520453959,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\element-renderer.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774524053466,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\wire-current-resolver.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774555805616,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\canvas-renderer.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774571895911,
-      "type": "directory"
-    },
-    {
-      "path": "e2e",
-      "accessCount": 6,
-      "lastAccessed": 1774589003858,
-      "type": "directory"
-    },
-    {
-      "path": "src\\editor\\wire-renderer.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774524269872,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 5,
-      "lastAccessed": 1774555950676,
-      "type": "directory"
-    },
-    {
-      "path": "src\\compile\\types.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774588822088,
-      "type": "file"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 5,
-      "lastAccessed": 1774589030433,
-      "type": "directory"
-    },
-    {
-      "path": "src\\editor\\wire-drawing.ts",
       "accessCount": 4,
-      "lastAccessed": 1774515426671,
+      "lastAccessed": 1774642556979,
       "type": "file"
     },
     {
-      "path": "src\\core\\renderer-interface.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774571907787,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774588790598,
+      "path": "src\\editor\\insert-subcircuit.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774608629346,
       "type": "file"
     },
     {
-      "path": "src\\core",
-      "accessCount": 4,
-      "lastAccessed": 1774589504363,
-      "type": "directory"
-    },
-    {
-      "path": "src/app/app-init.ts",
+      "path": "src\\editor\\placement.ts",
       "accessCount": 3,
-      "lastAccessed": 1774516826789,
-      "type": "directory"
-    },
-    {
-      "path": "src\\editor\\power-overlay.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774521995599,
+      "lastAccessed": 1774608629409,
       "type": "file"
     },
     {
-      "path": "src\\editor\\analog-tooltip.ts",
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
       "accessCount": 3,
-      "lastAccessed": 1774522009968,
+      "lastAccessed": 1774608948971,
       "type": "file"
     },
     {
-      "path": "src\\runtime\\analog-scope-panel.ts",
+      "path": "test-results\\.last-run.json",
       "accessCount": 3,
-      "lastAccessed": 1774522851361,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774555856382,
-      "type": "directory"
-    },
-    {
-      "path": "src\\io\\folder-store.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774571855298,
+      "lastAccessed": 1774609085719,
       "type": "file"
     },
     {
-      "path": "src\\components\\subcircuit",
+      "path": "src\\components\\subcircuit\\subcircuit.ts",
       "accessCount": 3,
-      "lastAccessed": 1774584342469,
-      "type": "directory"
+      "lastAccessed": 1774611034429,
+      "type": "file"
     },
     {
-      "path": "src\\editor\\grid.ts",
+      "path": "src\\editor\\palette-ui.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774611097725,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\in.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774613141109,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-pin-scanner.ts",
       "accessCount": 2,
-      "lastAccessed": 1774524265028,
+      "lastAccessed": 1774608661174,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "path": "src\\app\\dialog-manager.ts",
       "accessCount": 2,
-      "lastAccessed": 1774556090300,
-      "type": "directory"
+      "lastAccessed": 1774608913207,
+      "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\test-elements.ts",
+      "path": "src\\solver\\digital\\__tests__\\flatten-port.test.ts",
       "accessCount": 2,
-      "lastAccessed": 1774556952610,
-      "type": "directory"
+      "lastAccessed": 1774611048851,
+      "type": "file"
     },
     {
-      "path": "src\\io\\dig-loader.ts",
+      "path": "src\\components\\memory\\counter.ts",
       "accessCount": 2,
-      "lastAccessed": 1774588221724,
+      "lastAccessed": 1774611059320,
       "type": "file"
     },
     {
-      "path": "src\\editor\\hit-test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774514260382,
+      "path": "src\\solver\\digital\\bus-resolution.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774611083008,
       "type": "file"
     },
     {
-      "path": "src\\editor\\wire-merge.ts",
+      "path": "playwright.config.ts",
       "accessCount": 1,
-      "lastAccessed": 1774514292227,
+      "lastAccessed": 1774605955015,
       "type": "file"
     },
     {
-      "path": "src\\editor\\wire-drag.ts",
+      "path": "src\\editor\\palette.ts",
       "accessCount": 1,
-      "lastAccessed": 1774515413629,
+      "lastAccessed": 1774607617122,
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\wire-split.test.ts",
+      "path": "src\\integration\\speed-control.ts",
       "accessCount": 1,
-      "lastAccessed": 1774515418889,
+      "lastAccessed": 1774607632765,
       "type": "file"
     },
     {
-      "path": "src\\editor\\property-inputs.ts",
+      "path": "src\\solver\\digital\\__tests__\\flatten.test.ts",
       "accessCount": 1,
-      "lastAccessed": 1774515419050,
+      "lastAccessed": 1774607637590,
       "type": "file"
     },
     {
-      "path": "src\\editor\\slider-engine-bridge.ts",
+      "path": "src\\app\\subcircuit-dialog.ts",
       "accessCount": 1,
-      "lastAccessed": 1774516802778,
+      "lastAccessed": 1774607638808,
       "type": "file"
     },
     {
-      "path": "src\\editor\\slider-panel.ts",
+      "path": "src\\editor\\context-menu.ts",
       "accessCount": 1,
-      "lastAccessed": 1774516802811,
+      "lastAccessed": 1774607652857,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774519608004,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\null-coordinator.ts",
       "accessCount": 1,
-      "lastAccessed": 1774521521755,
+      "lastAccessed": 1774607691514,
       "type": "file"
     },
     {
-      "path": "src\\editor\\viewport.ts",
+      "path": "src\\components\\io\\out.ts",
       "accessCount": 1,
-      "lastAccessed": 1774524633510,
+      "lastAccessed": 1774607934334,
       "type": "file"
     },
     {
-      "path": "src\\editor\\settings.ts",
+      "path": "src\\components\\__tests__\\library-74xx.test.ts",
       "accessCount": 1,
-      "lastAccessed": 1774525452010,
+      "lastAccessed": 1774608363011,
       "type": "file"
     }
   ],

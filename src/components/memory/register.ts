@@ -120,7 +120,7 @@ export class RegisterElement extends AbstractCircuitElement {
       clockInputIndices: [1],
       componentName: "Reg",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

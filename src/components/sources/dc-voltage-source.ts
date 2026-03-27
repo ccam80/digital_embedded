@@ -58,7 +58,7 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const voltage = this._properties.getOrDefault<number>("voltage", 5);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");
 
@@ -91,7 +91,7 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
     ctx.drawLine(2.25, 1, 2.25, -1);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : formatSI(voltage, "V");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(voltage, "V") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 2, 1.25, { horizontal: "center", vertical: "top" });

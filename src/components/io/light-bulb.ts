@@ -101,7 +101,7 @@ export class LightBulbElement extends AbstractCircuitElement {
     ctx.drawLine(-0.55, 1.55, 0.55, 0.45);
 
     // Label text at right side
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.7 });

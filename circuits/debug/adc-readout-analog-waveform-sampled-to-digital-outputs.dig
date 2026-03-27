@@ -36,6 +36,16 @@
       </elementAttributes>
       <pos x="120" y="320"/>
     </visualElement>
+    <visualElement>
+      <elementName>ADC</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>ADC1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="360" y="160"/>
+    </visualElement>
   </visualElements>
   <wires>
   </wires>

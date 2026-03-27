@@ -17,9 +17,6 @@ function readCircuit(name: string): string {
   return readFileSync(join(process.cwd(), "circuits", name), "utf-8");
 }
 
-function readRefCircuit(relPath: string): string {
-  return readFileSync(join(process.cwd(), "ref/Digital/src/main/dig", relPath), "utf-8");
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -113,7 +110,34 @@ describe("DigParser", () => {
   });
 
   it("parsesRotation", () => {
-    const xml = readRefCircuit("combinatorial/mux.dig");
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="3"/>
+        </entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="1"/>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
     const circuit = parseDigXml(xml);
 
     // mux.dig has exactly 2 Not elements; first has rotation 3
@@ -127,7 +151,34 @@ describe("DigParser", () => {
   });
 
   it("resolvesXStreamReference", () => {
-    const xml = readRefCircuit("combinatorial/mux.dig");
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation rotation="3"/>
+        </entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Not</elementName>
+      <elementAttributes>
+        <entry>
+          <string>rotation</string>
+          <rotation reference="../../../../visualElement[1]/elementAttributes/entry/rotation"/>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
     const circuit = parseDigXml(xml);
 
     // mux.dig version 1 → gets migrated to 2, but we check the reference was resolved.
@@ -143,7 +194,54 @@ describe("DigParser", () => {
   });
 
   it("parsesInputCount", () => {
-    const xml = readRefCircuit("combinatorial/mux.dig");
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Inputs</string>
+          <int>3</int>
+        </entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Inputs</string>
+          <int>3</int>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Inputs</string>
+          <int>3</int>
+        </entry>
+      </elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>And</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Inputs</string>
+          <int>3</int>
+        </entry>
+      </elementAttributes>
+      <pos x="400" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires/>
+</circuit>`;
     const circuit = parseDigXml(xml);
 
     // And gates in mux.dig have Inputs: 3

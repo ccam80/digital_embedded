@@ -63,8 +63,8 @@ async function buildRcCircuit(builder: UICircuitBuilder): Promise<void> {
   await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
   await builder.placeLabeled('Resistor', 10, 8, 'R1');
   await builder.placeLabeled('Capacitor', 17, 8, 'C1');
-  await builder.placeLabeled('Ground', 6, 14, 'G1');
-  await builder.placeLabeled('Ground', 19, 14, 'G2');
+  await builder.placeComponent('Ground', 6, 14);
+  await builder.placeComponent('Ground', 19, 14);
   await builder.placeLabeled('Probe', 22, 8, 'P1');
 
   // Default AcVoltageSource amplitude is 5V; set frequency to 100 Hz
@@ -72,8 +72,8 @@ async function buildRcCircuit(builder: UICircuitBuilder): Promise<void> {
 
   await builder.drawWire('Vs', 'pos', 'R1', 'A');
   await builder.drawWire('R1', 'B', 'C1', 'pos');
-  await builder.drawWire('C1', 'neg', 'G2', 'gnd');
-  await builder.drawWire('Vs', 'neg', 'G1', 'gnd');
+  await builder.drawWireFromPin('C1', 'neg', 19, 14);
+  await builder.drawWireFromPin('Vs', 'neg', 6, 14);
   await builder.drawWire('C1', 'pos', 'P1', 'in');
 }
 

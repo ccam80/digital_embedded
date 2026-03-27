@@ -53,6 +53,10 @@
     <visualElement>
       <elementName>DAC</elementName>
       <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>DAC1</string>
+        </entry>
       </elementAttributes>
       <pos x="240" y="160"/>
     </visualElement>

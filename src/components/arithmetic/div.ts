@@ -109,7 +109,7 @@ export class DivElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "Div",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

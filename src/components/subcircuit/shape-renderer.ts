@@ -412,26 +412,26 @@ function drawLayoutPins(
 
     switch (pin.face) {
       case "top":
-        // Pin at chip edge (y=0), matching Java LayoutShape.
-        // Short stub inward; label inside the chip.
+        // Pin at chip edge (y=0), stub inward to y+0.5.
+        // Label anchored at stub end, extending downward into chip.
         ctx.drawLine(pin.position.x, pin.position.y, pin.position.x, pin.position.y + 0.5);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y + 0.2);
+        ctx.translate(pin.position.x, pin.position.y + 0.5);
         ctx.rotate(verticalAngle);
         ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
         ctx.restore();
         break;
 
       case "bottom":
-        // Pin at chip edge (y=height), matching Java LayoutShape.
-        // Short stub inward; label inside the chip.
+        // Pin at chip edge (y=height), stub inward to y-0.5.
+        // Label anchored at stub end, extending upward into chip.
         ctx.drawLine(pin.position.x, pin.position.y, pin.position.x, pin.position.y - 0.5);
         ctx.setColor("TEXT");
         ctx.save();
-        ctx.translate(pin.position.x, pin.position.y - 0.2);
+        ctx.translate(pin.position.x, pin.position.y - 0.5);
         ctx.rotate(verticalAngle);
-        ctx.drawText(pin.label, 0, 0, { horizontal: "right", vertical: "middle" });
+        ctx.drawText(pin.label, 0, 0, { horizontal: "left", vertical: "middle" });
         ctx.restore();
         break;
 

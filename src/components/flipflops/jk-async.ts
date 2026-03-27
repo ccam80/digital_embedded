@@ -141,7 +141,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
       clockInputIndices: [2],
       componentName: "JK-AS",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

@@ -82,7 +82,7 @@ export class ResistorElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const resistance = this._properties.getOrDefault<number>("resistance", 1000);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     ctx.save();
     ctx.setLineWidth(1);
@@ -130,7 +130,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : formatSI(resistance, "Ω");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Ω") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
     ctx.drawText(displayLabel, 2, 0.75, { horizontal: "center", vertical: "top" });

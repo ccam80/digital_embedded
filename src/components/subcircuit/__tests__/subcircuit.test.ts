@@ -340,7 +340,7 @@ describe("shapeTypeEnumProperty", () => {
     const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
     expect(shapeProp.enumValues).toEqual(
-      expect.arrayContaining(["DEFAULT", "SIMPLE", "DIL", "CUSTOM", "LAYOUT", "MINIMIZED"])
+      expect.arrayContaining(["LAYOUT", "DIL", "CUSTOM", "DEFAULT", "SIMPLE", "MINIMIZED"])
     );
     expect(shapeProp.enumValues).toHaveLength(6);
   });
@@ -355,14 +355,14 @@ describe("shapeTypeEnumProperty", () => {
     expect(shapeProp.label).toBe("Shape");
   });
 
-  it("shapeType default value is DEFAULT", () => {
+  it("shapeType default value is LAYOUT", () => {
     const registry = new ComponentRegistry();
     const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
     registerSubcircuit(registry, "TestChip", definition);
 
     const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
-    expect(shapeProp.defaultValue).toBe("DEFAULT");
+    expect(shapeProp.defaultValue).toBe("LAYOUT");
   });
 });
 

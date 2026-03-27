@@ -316,7 +316,7 @@ export function insertAsSubcircuit(
   const definition: SubcircuitDefinition = {
     circuit: subcircuit,
     pinLayout,
-    shapeMode: "DEFAULT",
+    shapeMode: "LAYOUT",
     name: subcircuitName,
   };
 
@@ -330,7 +330,7 @@ export function insertAsSubcircuit(
 
   const instanceProps = new PropertyBag();
   instanceProps.set("label", "");
-  instanceProps.set("shapeType", "DEFAULT");
+  instanceProps.set("shapeType", "LAYOUT");
 
   const instance = new SubcircuitElement(
     `Subcircuit:${subcircuitName}`,

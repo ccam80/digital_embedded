@@ -80,7 +80,7 @@ export class VariableRailElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setLineWidth(1);
     const voltage = this.props.has("voltage") ? this.props.get<number>("voltage") : 5;
-    const label = formatSI(voltage ?? 5, "V");
+    const label = this._shouldShowValue() ? formatSI(voltage ?? 5, "V") : "";
     ctx.drawText(label, 4, 0, { horizontal: "left", vertical: "middle" } as TextAnchor);
 
     ctx.restore();

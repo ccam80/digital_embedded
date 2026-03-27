@@ -263,7 +263,7 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
       clockInputIndices: [2],
       componentName: "RAM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -397,7 +397,7 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "RAM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -521,7 +521,7 @@ export class RAMDualPortElement extends AbstractCircuitElement {
       clockInputIndices: [3],
       componentName: "RAM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -660,7 +660,7 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
       clockInputIndices: [1],
       componentName: "RAM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -790,7 +790,7 @@ export class RAMAsyncElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "RAM, async.",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }
@@ -903,7 +903,7 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
       clockInputIndices: [3],
       componentName: "RAM",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

@@ -91,7 +91,7 @@ export class BarrelShifterElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "Shift",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

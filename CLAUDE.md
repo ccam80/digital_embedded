@@ -2,46 +2,11 @@
 
 ## Project Overview
 
-A browser-based digital logic circuit simulator for embedding in university course tutorials. The project is a **native TypeScript port of [hneemann/Digital](https://github.com/hneemann/Digital)** — purely static files, no server, no licensing dependencies.
-
-**For all design and planning work, read `spec/plan.md` first.** It defines phases, tasks, dependencies, performance architecture, and verification criteria.
-
-**Before writing any code, read `spec/author_instructions.md`.** It defines the TS idiom guide, priority order (architectural consistency > performance > ease), review checkpoints, and the component implementation template.
-
-## Current State
-
-The digital engine, headless facade, editor, and analog engine core are implemented. The codebase is a working circuit simulator with a browser-based editor, postMessage integration, and headless/MCP agent interfaces.
-
-| File/Dir | Purpose |
-|---|---|
-| `spec/plan.md` | Authoritative implementation plan — 12 phases, ~160 tasks |
-| `spec/progress.md` | Task completion tracking |
-| `circuits/*.dig` | Example checkpoint circuits (AND gate, half adder, SR latch) |
-
-## Reference Codebase
-
-**hneemann/Digital** is the sole reference for porting. It is checked in as a git submodule at `ref/Digital/` (pinned to a specific commit for reproducibility). Agents read the Java source and write TypeScript equivalents.
-
-To initialize: `git submodule update --init`
-
-| What | Where to look |
-|---|---|
-| Component simulation behaviour | `ref/Digital/src/main/java/de/neemann/digital/core/` |
-| .dig XML format | Any `.dig` file + Digital's XML serialization annotations |
-| Circuit compilation (ModelCreator) | `ref/Digital/src/main/java/de/neemann/digital/draw/model/` |
-| Test execution | `ref/Digital/src/main/java/de/neemann/digital/testing/` |
-| Component shapes / rendering specs | `ref/Digital/src/main/java/de/neemann/digital/draw/shapes/` |
-| HGS scripting interpreter | `ref/Digital/src/main/java/de/neemann/digital/hdl/hgs/` |
-| Generic circuit resolution | `ref/Digital/src/main/java/de/neemann/digital/draw/library/ResolveGenerics.java` |
-| Bus resolution subsystem | `ref/Digital/src/main/java/de/neemann/digital/core/wiring/bus/` |
-| Analysis & synthesis | `ref/Digital/src/main/java/de/neemann/digital/analyse/` |
-| FSM editor | `ref/Digital/src/main/java/de/neemann/digital/fsm/` |
-| Element library (component registry) | `ref/Digital/src/main/java/de/neemann/digital/draw/library/ElementLibrary.java` |
-| Example circuits (processors, 74xx) | `ref/Digital/src/main/dig/` |
+A browser-based digital logic circuit simulator. Purely static files, no server, no licensing dependencies.
 
 ### Engine-Agnostic Editor (Architectural Constraint)
 
-The editor/renderer/interaction layer MUST be engine-agnostic. The same canvas, grid, component placement, wire routing, selection, undo/redo, and property editing code must work with **any** simulation backend. The immediate backend is an event-driven digital engine. The author also maintains a GWT-compiled CircuitJS fork with an analog MNA engine — the TS editor layer should be reusable as a shared frontend for that analog backend in future, without forking the editor code.
+The editor/renderer/interaction layer MUST be engine-agnostic. The same canvas, grid, component placement, wire routing, selection, undo/redo, and property editing code must work with **any** simulation backend. 
 
 Concretely:
 - No simulation logic in canvas/editor code

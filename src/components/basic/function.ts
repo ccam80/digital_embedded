@@ -257,7 +257,7 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
     // SHAPE_PIN text is not captured in java-shapes.json fixture, so we omit it
     // from draw to avoid pixel/text comparison mismatches.
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

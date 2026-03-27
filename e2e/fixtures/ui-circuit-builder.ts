@@ -327,6 +327,27 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Draw a wire from a labeled pin to a grid coordinate.
+   *
+   * Use this for components that are label-exempt (e.g. Ground, VDD) where
+   * the destination cannot be addressed by label+pin. The destination grid
+   * coordinates should match the component's placement position (Ground pin
+   * is at its placement position).
+   */
+  async drawWireFromPin(
+    fromLabel: string,
+    fromPin: string,
+    toGridX: number,
+    toGridY: number,
+  ): Promise<void> {
+    const fromPage = await this.getPinPagePosition(fromLabel, fromPin);
+    const toPage = await this.getGridPagePosition(toGridX, toGridY);
+    await this.page.mouse.click(fromPage.x, fromPage.y);
+    await this.page.mouse.click(toPage.x, toPage.y);
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
    * Draw a wire between two page-absolute coordinates.
    * Useful when pin positions are already known (e.g. from circuit info).
    */

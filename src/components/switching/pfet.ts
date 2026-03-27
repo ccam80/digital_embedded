@@ -137,7 +137,7 @@ export class PFETElement extends AbstractCircuitElement {
     // P-channel arrow: filled triangle pointing LEFT (toward gate)
     ctx.drawPolygon([{ x: 0.95, y: 1 }, { x: 0.7, y: 0.9 }, { x: 0.7, y: 1.1 }], true);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.6 });

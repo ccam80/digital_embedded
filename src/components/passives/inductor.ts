@@ -85,7 +85,7 @@ export class InductorElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const inductance = this._properties.getOrDefault<number>("inductance", 1e-3);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     ctx.save();
     ctx.setLineWidth(1);
@@ -128,7 +128,7 @@ export class InductorElement extends AbstractCircuitElement {
     }
 
     // Value label above body (matching Falstad reference: pixel (27,-10) = grid (1.6875,-0.625))
-    const displayLabel = label.length > 0 ? label : formatSI(inductance, "H");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(inductance, "H") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 1.6875, -0.625, { horizontal: "center", vertical: "bottom" });

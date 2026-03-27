@@ -23,8 +23,18 @@
     <visualElement>
       <elementName>DcVoltageSource</elementName>
       <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Vs</string>
+        </entry>
       </elementAttributes>
       <pos x="60" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="400"/>
     </visualElement>
   </visualElements>
   <wires>

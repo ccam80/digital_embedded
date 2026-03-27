@@ -82,7 +82,7 @@ export class CapacitorElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const capacitance = this._properties.getOrDefault<number>("capacitance", 1e-6);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     ctx.save();
     ctx.setLineWidth(1);
@@ -110,7 +110,7 @@ export class CapacitorElement extends AbstractCircuitElement {
     ctx.drawLine(2.25, -0.75, 2.25, 0.75);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : formatSI(capacitance, "F");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(capacitance, "F") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 2, 1, { horizontal: "center", vertical: "top" });

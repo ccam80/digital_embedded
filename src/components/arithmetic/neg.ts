@@ -61,7 +61,7 @@ export class NegElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "Neg",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

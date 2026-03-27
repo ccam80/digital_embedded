@@ -530,9 +530,9 @@ export function registerSubcircuit(
       key: "shapeType",
       type: PropertyType.ENUM,
       label: "Shape",
-      defaultValue: "DEFAULT",
+      defaultValue: "LAYOUT",
       description: "Visual shape style for this subcircuit chip",
-      enumValues: ["DEFAULT", "SIMPLE", "DIL", "CUSTOM", "LAYOUT", "MINIMIZED"],
+      enumValues: ["LAYOUT", "DIL", "CUSTOM", "DEFAULT", "SIMPLE", "MINIMIZED"],
     },
   ];
 

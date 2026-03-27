@@ -127,7 +127,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const freq = this._properties.getOrDefault<number>("frequency", 32768);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     ctx.save();
     ctx.setLineWidth(1);
@@ -169,7 +169,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     ctx.drawLine(1.3, -0.3, 1.3, 0.3);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : formatSI(freq, "Hz");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(freq, "Hz") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 1, 0.65, { horizontal: "center", vertical: "top" });

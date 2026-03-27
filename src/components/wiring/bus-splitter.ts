@@ -289,9 +289,15 @@ export const BusSplitterDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeBusSplitter,
-      // Schema for default bitWidth=1; direction-filter order matches for all configs.
       inputSchema: ["OE"],
-      outputSchema: ["D", "D0"],
+      outputSchema: (props) => {
+        const bits = props.getOrDefault<number>("bitWidth", 1);
+        const labels = ["D"];
+        for (let i = 0; i < bits; i++) {
+          labels.push(`D${i}`);
+        }
+        return labels;
+      },
     },
     analog: {
       factory: createSplitterAnalogElement,

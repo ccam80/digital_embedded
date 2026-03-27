@@ -283,7 +283,7 @@ export class DiodeElement extends AbstractCircuitElement {
     const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawDiodeBody(ctx, label);
 
     if (blown) {
@@ -343,7 +343,7 @@ export class DiodeForwardElement extends AbstractCircuitElement {
     const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawDiodeBodyForward(ctx, label);
 
     if (blown) {
@@ -399,7 +399,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     const blown = this._properties.getOrDefault<boolean>("blown", false);
     ctx.save();
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawDiodeBodyBackward(ctx, label);
 
     if (blown) {

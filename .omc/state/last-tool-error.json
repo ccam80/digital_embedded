@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd C:/local_working_projects/digital_in_browser && npx playwright test e2e/gui/subcircuit-workflow.spec.ts -g \\\"subcircuit compiles\\\" --reporter=list 2>&1\",\"timeout\":120000}",
-  "error": "Exit code 1\n\nRunning 1 test using 1 worker\n\n  ✘  1 [chromium] › e2e\\gui\\subcircuit-workflow.spec.ts:337:3 › Subcircuit workflow — full lifecycle › subcircuit compiles and passes test vectors (2.9s)\n\n\n  1) [chromium] › e2e\\gui\\subcircuit-workflow.spec.ts:337:3 › Subcircuit workflow — full lifecycle › subcircuit compiles and passes test vectors \n\n    Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\n    Expected: \u001b[32m4\u001b[39m\n    R...",
-  "timestamp": "2026-03-27T05:25:45.484Z",
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\src\\\\solver\\\\digital\\\\digital-engine.ts\"}",
+  "error": "File content (12198 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-27T12:06:02.376Z",
   "retry_count": 1
 }

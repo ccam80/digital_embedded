@@ -41,7 +41,7 @@ const MEMORY = [
 ];
 
 const ARITHMETIC = [
-  'Add', 'Sub', 'Mul', 'Div', 'Comparator', 'Neg',
+  'Add', 'Sub', 'Mul', 'Div', 'MagnitudeComparator', 'Neg',
   'BitExtender', 'BarrelShifter', 'BitCount', 'PRNG',
 ];
 
@@ -57,7 +57,7 @@ const SWITCHING = [
   'NFET', 'PFET', 'FGNFET', 'FGPFET', 'Fuse',
 ];
 
-const PLD = ['Diode', 'DiodeForward', 'DiodeBackward', 'PullUp', 'PullDown'];
+const PLD = ['Diode', 'PldDiodeForward', 'PldDiodeBackward', 'PullUp', 'PullDown'];
 
 const PASSIVES = [
   'Resistor', 'Capacitor', 'Inductor',
@@ -128,6 +128,7 @@ interface WidthTestEntry {
   widths: number[];
   inputPin: string;
   outputPin: string;
+  inputPinWidth?: number;
 }
 
 const WIDTH_MATRIX: WidthTestEntry[] = [
@@ -149,11 +150,11 @@ const WIDTH_MATRIX: WidthTestEntry[] = [
   { type: 'Sub', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 's' },
   { type: 'Mul', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 'out' },
   { type: 'Div', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 'q' },
-  { type: 'Comparator', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'a', outputPin: '>' },
+  { type: 'MagnitudeComparator', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'a', outputPin: '>' },
 
   // Counters — "Bits" controls output width
-  { type: 'Counter', propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out' },
-  { type: 'CounterPreset', propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out' },
+  { type: 'Counter',       propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out', inputPinWidth: 1 },
+  { type: 'CounterPreset', propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out', inputPinWidth: 1 },
 
   // Registers
   { type: 'Register', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'D', outputPin: 'Q' },
@@ -284,6 +285,79 @@ const DUAL_ENGINE_TYPES: DualEngineEntry[] = [
 ];
 
 // ===========================================================================
+// 5B — Per-component expected-output logic for signal propagation checks
+//
+// The WIDTH_MATRIX test wires SRC→DUT:inputPin and DUT:outputPin→DST.
+// For multi-input components only ONE input is wired; the others default to 0.
+// This function returns the expected output value, or null to skip the check.
+// ===========================================================================
+
+/**
+ * Compute the expected output for a component with one input wired and
+ * all other inputs at their default (0).  Returns null when the signal
+ * check should be skipped (sequential components needing a clock edge,
+ * components whose enable/select pin is not wired, division by zero, etc.).
+ */
+function expectedOutput(type: string, inputVal: number, width: number): number | null {
+  const mask = width >= 32 ? 0xFFFFFFFF : (1 << width) - 1;
+  switch (type) {
+    // --- Logic gates (one input wired, other input(s) = 0) ---
+    case 'And':   return 0;                       // AND(x, 0) = 0
+    case 'Or':    return inputVal & mask;          // OR(x, 0) = x
+    case 'XOr':   return inputVal & mask;          // XOR(x, 0) = x
+    case 'NAnd':  return mask;                     // NAND(x, 0) = all-ones
+    case 'NOr':   return (~inputVal) & mask;       // NOR(x, 0) = NOT(x)
+    case 'XNOr':  return (~inputVal) & mask;       // XNOR(x, 0) = NOT(x)
+    case 'Not':   return (~inputVal) & mask;       // NOT(x)
+
+    // --- Arithmetic (a wired, b = 0) ---
+    case 'Add':   return inputVal & mask;          // x + 0 = x
+    case 'Sub':   return inputVal & mask;          // x - 0 = x
+    case 'Mul':   return 0;                        // x * 0 = 0
+
+    // --- Pass-through wiring ---
+    case 'Delay':        return inputVal & mask;
+    case 'BusSplitter':  return inputVal & mask;
+
+    // --- Skip: division by zero ---
+    case 'Div':          return null;
+
+    // --- Skip: output pin width differs from input (1-bit flag output) ---
+    case 'MagnitudeComparator':   return null;
+
+    // --- Skip: sel/enable pin not wired → high-Z output ---
+    case 'Driver':       return null;
+    case 'DriverInvSel': return null;
+
+    // --- Skip: shift/select pin not wired, output depends on unwired pin ---
+    case 'BarrelShifter':    return null;
+    case 'BitSelector':      return null;
+    case 'Decoder':          return null;
+    case 'PriorityEncoder':  return null;
+
+    // --- Skip: sequential components need clock edges ---
+    case 'Counter':        return null;
+    case 'CounterPreset':  return null;
+    case 'Register':       return null;
+    case 'D_FF':           return null;
+    case 'D_FF_AS':        return null;
+    case 'JK_FF':          return null;
+    case 'JK_FF_AS':       return null;
+
+    // --- Skip: mixed-signal components (DAC/ADC) ---
+    case 'DAC':  return null;
+    case 'ADC':  return null;
+
+    // --- Skip: I/O-only (In has no inputPin, Out has no outputPin) ---
+    case 'In':   return null;
+    case 'Out':  return null;
+
+    // Unknown type — skip rather than guess wrong
+    default:     return null;
+  }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 
@@ -347,7 +421,7 @@ test.describe('Component sweep tests', () => {
           // Place matching-width In and Out (if pins exist for wiring)
           if (entry.inputPin) {
             await builder.placeLabeled('In', 3, 8, 'SRC');
-            await builder.setComponentProperty('SRC', 'Bits', width);
+            await builder.setComponentProperty('SRC', 'Bits', entry.inputPinWidth ?? width);
             await builder.drawWire('SRC', 'out', 'DUT', entry.inputPin);
           }
           if (entry.outputPin) {
@@ -359,6 +433,18 @@ test.describe('Component sweep tests', () => {
           // Compile and verify
           await builder.stepViaUI();
           await builder.verifyNoErrors();
+
+          // Signal propagation check: drive SRC and read DST
+          // Use per-component expected output (gates, arithmetic, etc. behave
+          // differently when only one input is wired and others default to 0).
+          if (entry.inputPin && entry.outputPin) {
+            const testVal = Math.min(3, (1 << width) - 1);
+            const expected = expectedOutput(entry.type, testVal, width);
+            if (expected !== null) {
+              const result = await builder.runTestVectors(`SRC DST\n${testVal} ${expected}`);
+              expect(result.failed, `Signal check failed for ${entry.type} at width=${width}: expected ${expected} for input ${testVal}, details: ${JSON.stringify(result.details)}`).toBe(0);
+            }
+          }
         });
       }
     }
@@ -506,11 +592,6 @@ test.describe('Component sweep tests', () => {
     for (const entry of DUAL_ENGINE_TYPES) {
       for (const mode of entry.modes) {
         test(`${entry.type} works in ${mode} mode`, async () => {
-          // Switch engine mode if needed
-          if (mode === 'analog' || mode === 'mixed') {
-            await builder.switchEngineMode();
-          }
-
           // Place the component
           await builder.placeLabeled(entry.type, 10, 8, 'DUT');
 

@@ -122,7 +122,7 @@ export class MonoflopElement extends AbstractCircuitElement {
       clockInputIndices: [0],
       componentName: "Mono",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

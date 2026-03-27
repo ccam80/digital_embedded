@@ -147,7 +147,7 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
     ctx.setFont({ family: "sans-serif", size: 0.9, weight: "bold" });
     ctx.drawText("PMEM", COMP_WIDTH / 2, COMP_HEIGHT / 2, { horizontal: "center", vertical: "middle" });
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.9 });
       ctx.drawText(label, COMP_WIDTH / 2, -0.5, { horizontal: "center", vertical: "bottom" });

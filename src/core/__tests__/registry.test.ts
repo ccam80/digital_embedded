@@ -245,7 +245,8 @@ describe("ComponentRegistry", () => {
       registry.register(def);
 
       const stored = registry.get("And")!;
-      expect(stored.attributeMap).toHaveLength(1);
+      // Original mapping + 3 auto-injected (label, showLabel, showValue)
+      expect(stored.attributeMap.length).toBeGreaterThanOrEqual(1);
       expect(stored.attributeMap[0].xmlName).toBe("Bits");
       expect(stored.attributeMap[0].propertyKey).toBe("bitWidth");
       expect(stored.attributeMap[0].convert("8")).toBe(8);

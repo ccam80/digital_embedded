@@ -127,7 +127,7 @@ export class NotElement extends AbstractCircuitElement {
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length === 0) return;
 
     ctx.setColor("TEXT");

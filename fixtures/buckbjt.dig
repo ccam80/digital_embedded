@@ -304,6 +304,36 @@
       </elementAttributes>
       <pos x="820" y="480"/>
     </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>V_SWITCH</string>
+        </entry>
+      </elementAttributes>
+      <pos x="620" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>V_OUT</string>
+        </entry>
+      </elementAttributes>
+      <pos x="860" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>V_SUPPLY</string>
+        </entry>
+      </elementAttributes>
+      <pos x="520" y="280"/>
+    </visualElement>
   </visualElements>
   <wires>
     <wire>
@@ -429,6 +459,18 @@
     <wire>
       <p1 x="820" y="480"/>
       <p2 x="820" y="440"/>
+    </wire>
+    <wire>
+      <p1 x="620" y="280"/>
+      <p2 x="620" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="860" y="280"/>
+      <p2 x="860" y="360"/>
+    </wire>
+    <wire>
+      <p1 x="520" y="280"/>
+      <p2 x="520" y="360"/>
     </wire>
   </wires>
   <measurementOrdering/>

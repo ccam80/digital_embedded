@@ -8,6 +8,7 @@
 
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
+import { PropertyType } from "./properties.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElementCore } from "../solver/analog/element.js";
 import type { DeviceType } from "../solver/analog/model-parser.js";
@@ -23,7 +24,15 @@ import type { PinElectricalSpec } from "./pin-electrical.js";
  * These keys are recognized by the property panel and simulation pipeline
  * and receive dedicated UI treatment beyond the generic property editor.
  */
-export const WELL_KNOWN_PROPERTY_KEYS = new Set<string>();
+export const WELL_KNOWN_PROPERTY_KEYS = new Set<string>([
+  "label", "showLabel", "showValue",
+]);
+
+/**
+ * Component types that should NOT receive auto-injected label/showLabel/showValue
+ * properties. These are fixed-symbol components with no user-visible label.
+ */
+const LABEL_EXEMPT_TYPES = new Set<string>(["VDD", "Ground", "NotConnected"]);
 
 // ---------------------------------------------------------------------------
 // ComponentCategory
@@ -162,8 +171,8 @@ export interface DigitalModel {
   stateSlotCount?: number | ((props: PropertyBag) => number);
   defaultDelay?: number;
   switchPins?: [number, number];
-  inputSchema?: string[];
-  outputSchema?: string[];
+  inputSchema?: string[] | ((props: PropertyBag) => string[]);
+  outputSchema?: string[] | ((props: PropertyBag) => string[]);
 }
 
 /**
@@ -287,6 +296,11 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is already registered`);
     }
 
+    // Auto-inject label, showLabel, showValue for non-exempt components
+    if (!LABEL_EXEMPT_TYPES.has(def.name)) {
+      def = _injectBaseProperties(def);
+    }
+
     const assigned: ComponentDefinition = { ...def, typeId: this._nextTypeId++ };
 
     this._byName.set(assigned.name, assigned);
@@ -404,4 +418,99 @@ export class ComponentRegistry {
   get size(): number {
     return this._byName.size;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Base property injection — ensures label/showLabel/showValue on all
+// non-exempt components without requiring each file to declare them.
+// ---------------------------------------------------------------------------
+
+const BASE_LABEL_DEF: PropertyDefinition = {
+  key: "label",
+  type: PropertyType.STRING,
+  label: "Label",
+  defaultValue: "",
+  description: "Label shown on the component",
+};
+
+const BASE_SHOW_LABEL_DEF: PropertyDefinition = {
+  key: "showLabel",
+  type: PropertyType.BOOLEAN,
+  label: "Show label",
+  defaultValue: true,
+  description: "Whether the label is rendered on the canvas",
+};
+
+const BASE_SHOW_VALUE_DEF: PropertyDefinition = {
+  key: "showValue",
+  type: PropertyType.BOOLEAN,
+  label: "Show value",
+  defaultValue: true,
+  description: "Whether component values are rendered on the canvas",
+};
+
+const BASE_LABEL_ATTR: AttributeMapping = {
+  xmlName: "Label",
+  propertyKey: "label",
+  convert: (v) => v,
+};
+
+const BASE_SHOW_LABEL_ATTR: AttributeMapping = {
+  xmlName: "showLabel",
+  propertyKey: "showLabel",
+  convert: (v) => v === "true",
+};
+
+const BASE_SHOW_VALUE_ATTR: AttributeMapping = {
+  xmlName: "showValue",
+  propertyKey: "showValue",
+  convert: (v) => v === "true",
+};
+
+/**
+ * Return a copy of `def` with label, showLabel, showValue injected if missing.
+ * Existing definitions are preserved — this only fills gaps.
+ */
+function _injectBaseProperties(def: ComponentDefinition): ComponentDefinition {
+  const hasKey = (defs: readonly PropertyDefinition[], key: string) =>
+    defs.some((d) => d.key === key);
+  const hasAttr = (maps: readonly AttributeMapping[], key: string) =>
+    maps.some((m) => m.propertyKey === key);
+
+  let propertyDefs = def.propertyDefs;
+  let attributeMap = def.attributeMap;
+  let changed = false;
+
+  // Inject label if missing
+  if (!hasKey(propertyDefs, "label")) {
+    propertyDefs = [...propertyDefs, BASE_LABEL_DEF];
+    changed = true;
+  }
+  if (!hasAttr(attributeMap, "label")) {
+    attributeMap = [...attributeMap, BASE_LABEL_ATTR];
+    changed = true;
+  }
+
+  // Inject showLabel if missing
+  if (!hasKey(propertyDefs, "showLabel")) {
+    propertyDefs = [...propertyDefs, BASE_SHOW_LABEL_DEF];
+    changed = true;
+  }
+  if (!hasAttr(attributeMap, "showLabel")) {
+    attributeMap = [...attributeMap, BASE_SHOW_LABEL_ATTR];
+    changed = true;
+  }
+
+  // Inject showValue if missing
+  if (!hasKey(propertyDefs, "showValue")) {
+    propertyDefs = [...propertyDefs, BASE_SHOW_VALUE_DEF];
+    changed = true;
+  }
+  if (!hasAttr(attributeMap, "showValue")) {
+    attributeMap = [...attributeMap, BASE_SHOW_VALUE_ATTR];
+    changed = true;
+  }
+
+  if (!changed) return def;
+  return { ...def, propertyDefs, attributeMap };
 }

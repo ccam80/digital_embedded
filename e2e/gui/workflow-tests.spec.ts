@@ -54,13 +54,13 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
     <visualElement>
       <elementName>Ground</elementName>
       <elementAttributes/>
-      <pos x="500" y="300"/>
+      <pos x="540" y="300"/>
     </visualElement>
   </visualElements>
   <wires>
-    <wire><p1 x="100" y="200"/><p2 x="300" y="200"/></wire>
+    <wire><p1 x="140" y="200"/><p2 x="300" y="200"/></wire>
     <wire><p1 x="380" y="200"/><p2 x="460" y="200"/></wire>
-    <wire><p1 x="500" y="200"/><p2 x="500" y="300"/></wire>
+    <wire><p1 x="540" y="200"/><p2 x="540" y="300"/></wire>
     <wire><p1 x="220" y="200"/><p2 x="220" y="300"/></wire>
   </wires>
 </circuit>`;
@@ -391,6 +391,32 @@ test.describe('Workflow: undo/redo', () => {
   });
 });
 
+// Minimal digital circuit (In → Out) used to activate a real coordinator.
+const MINIMAL_DIGITAL_XML = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>A</string></entry>
+      </elementAttributes>
+      <pos x="100" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Y</string></entry>
+      </elementAttributes>
+      <pos x="300" y="100"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="140" y="100"/><p2 x="300" y="100"/></wire>
+  </wires>
+</circuit>`;
+
 // ===========================================================================
 // Workflow 4: Speed control
 // ===========================================================================
@@ -400,6 +426,14 @@ test.describe('Workflow: speed control', () => {
     await page.goto('/simulator.html');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
+    // Load and compile a minimal circuit so a real coordinator is active.
+    const b64 = Buffer.from(MINIMAL_DIGITAL_XML).toString('base64');
+    await page.evaluate((data) => {
+      window.postMessage({ type: 'digital-load-data', data }, '*');
+    }, b64);
+    await page.waitForTimeout(300);
+    await menuAction(page, 'btn-step');
+    await page.waitForTimeout(200);
   });
 
   test('speed buttons change the displayed value', async ({ page }) => {

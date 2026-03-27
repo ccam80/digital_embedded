@@ -242,7 +242,7 @@ export class VaractorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
 
     const vA = signals?.getPinVoltage("A");
     const vK = signals?.getPinVoltage("K");

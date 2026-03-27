@@ -131,7 +131,7 @@ export class PRNGElement extends AbstractCircuitElement {
       clockInputIndices: [3],
       componentName: "PRNG",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

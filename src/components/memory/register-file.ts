@@ -161,7 +161,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
       clockInputIndices: [3],
       componentName: "Register",
       width: 4,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

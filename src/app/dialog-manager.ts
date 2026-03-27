@@ -95,6 +95,106 @@ export function createModal(opts: {
     dragging = false;
   });
 
+  // --- Edge-resize support ---
+  const EDGE_ZONE = 8; // px from edge that triggers resize cursor
+  type ResizeEdge = '' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+  let resizeEdge: ResizeEdge = '';
+  let resizing = false;
+  let resizeStartX = 0;
+  let resizeStartY = 0;
+  let resizeStartRect = { left: 0, top: 0, width: 0, height: 0 };
+
+  function hitEdge(ev: PointerEvent): ResizeEdge {
+    const rect = dialog.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+
+    const left = x < EDGE_ZONE;
+    const right = x > w - EDGE_ZONE;
+    const top = y < EDGE_ZONE;
+    const bottom = y > h - EDGE_ZONE;
+
+    if (top && left) return 'nw';
+    if (top && right) return 'ne';
+    if (bottom && left) return 'sw';
+    if (bottom && right) return 'se';
+    if (top) return 'n';
+    if (bottom) return 's';
+    if (left) return 'w';
+    if (right) return 'e';
+    return '';
+  }
+
+  const cursorMap: Record<ResizeEdge, string> = {
+    '': '', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+    ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize',
+  };
+
+  function ensureAbsolutePositioning(): void {
+    if (!dialog.style.position || dialog.style.position !== 'absolute') {
+      const rect = dialog.getBoundingClientRect();
+      dialog.style.position = 'absolute';
+      dialog.style.left = `${rect.left}px`;
+      dialog.style.top = `${rect.top}px`;
+      dialog.style.margin = '0';
+    }
+  }
+
+  dialog.addEventListener('pointermove', (ev: PointerEvent) => {
+    if (resizing || dragging) return;
+    const edge = hitEdge(ev);
+    dialog.style.cursor = cursorMap[edge] || '';
+  });
+
+  dialog.addEventListener('pointerdown', (ev: PointerEvent) => {
+    const edge = hitEdge(ev);
+    if (!edge) return;
+    ev.stopPropagation();
+    resizing = true;
+    resizeEdge = edge;
+    resizeStartX = ev.clientX;
+    resizeStartY = ev.clientY;
+    ensureAbsolutePositioning();
+    const rect = dialog.getBoundingClientRect();
+    resizeStartRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    dialog.setPointerCapture(ev.pointerId);
+  });
+
+  dialog.addEventListener('pointermove', (ev: PointerEvent) => {
+    if (!resizing) return;
+    const dx = ev.clientX - resizeStartX;
+    const dy = ev.clientY - resizeStartY;
+    const MIN_W = 200;
+    const MIN_H = 120;
+
+    let { left, top, width, height } = resizeStartRect;
+
+    if (resizeEdge.includes('e')) width = Math.max(MIN_W, width + dx);
+    if (resizeEdge.includes('w')) {
+      const newW = Math.max(MIN_W, width - dx);
+      left = left + (width - newW);
+      width = newW;
+    }
+    if (resizeEdge.includes('s')) height = Math.max(MIN_H, height + dy);
+    if (resizeEdge.includes('n')) {
+      const newH = Math.max(MIN_H, height - dy);
+      top = top + (height - newH);
+      height = newH;
+    }
+
+    dialog.style.left = `${left}px`;
+    dialog.style.top = `${top}px`;
+    dialog.style.width = `${width}px`;
+    dialog.style.height = `${height}px`;
+  });
+
+  dialog.addEventListener('pointerup', () => {
+    resizing = false;
+    resizeEdge = '';
+  });
+
   function close(): void {
     overlay.remove();
     onClose?.();

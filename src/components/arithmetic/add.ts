@@ -122,7 +122,7 @@ export class AddElement extends AbstractCircuitElement {
       clockInputIndices: [],
       componentName: "Add",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

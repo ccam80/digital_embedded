@@ -136,7 +136,7 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     isLocked: false,
     chipWidth: 3,
     chipHeight: 3,
-    shapeType: "DEFAULT",
+    shapeType: "LAYOUT",
   };
 }
 

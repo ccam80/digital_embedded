@@ -126,7 +126,7 @@ export class JKElement extends AbstractCircuitElement {
       clockInputIndices: [1],
       componentName: "JK",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

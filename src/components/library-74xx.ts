@@ -10,6 +10,7 @@
 
 import type { ComponentRegistry } from '../core/registry.js';
 import { ComponentCategory } from '../core/registry.js';
+import type { ComponentDefinition } from '../core/registry.js';
 import { executeSubcircuit } from './subcircuit/subcircuit.js';
 import { PropertyType } from '../core/properties.js';
 import type { PropertyBag } from '../core/properties.js';
@@ -198,11 +199,14 @@ export function register74xxLibrary(
     const componentDef = {
       name: entry.name,
       typeId: -1 as const,
-      factory: (_props: PropertyBag): SubcircuitElement => {
-        throw new Error(
-          `74xx component "${entry.name}" must be loaded from "${entry.file}" before placement.`,
-        );
-      },
+      factory: Object.assign(
+        (_props: PropertyBag): SubcircuitElement => {
+          throw new Error(
+            `74xx component "${entry.name}" must be loaded from "${entry.file}" before placement.`,
+          );
+        },
+        { __74xxStub: true },
+      ),
       pinLayout: pinMap?.get(entry.name) ?? [],
       propertyDefs: [
         {
@@ -287,4 +291,51 @@ export function register74xxSubcircuit(
   };
 
   registry.registerOrUpdate(componentDef);
+}
+
+/**
+ * Load a 74xx IC from its .dig file and register it into the registry,
+ * replacing the stub entry with a fully functional definition.
+ *
+ * @param registry  The component registry (must already contain the stub).
+ * @param name      The IC name matching a manifest entry (e.g. "7400").
+ * @param basePath  Base URL path to the 74xx library files (default "lib/74xx/").
+ * @returns         The updated ComponentDefinition with real factory and pins.
+ */
+export async function load74xxComponent(
+  registry: ComponentRegistry,
+  name: string,
+  basePath: string = "lib/74xx/",
+): Promise<ComponentDefinition> {
+  const entry = LIBRARY_74XX.find((e) => e.name === name);
+  if (!entry) {
+    throw new Error(`74xx component "${name}" not found in manifest.`);
+  }
+
+  // Dynamic imports keep this module lightweight — loader and resolver are
+  // only pulled in when a 74xx component is actually placed.
+  const [{ loadWithSubcircuits }, { HttpResolver }, { createLiveDefinition }] = await Promise.all([
+    import('../io/subcircuit-loader.js'),
+    import('../io/file-resolver.js'),
+    import('./subcircuit/subcircuit.js'),
+  ]);
+
+  const resolver = new HttpResolver(basePath);
+  const url = `${basePath}${entry.file}`;
+  const response = await globalThis.fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch 74xx file "${entry.file}": HTTP ${response.status}`);
+  }
+  const xml = await response.text();
+
+  const circuit = await loadWithSubcircuits(xml, resolver, registry);
+  const definition = createLiveDefinition(circuit, "DEFAULT", name);
+
+  register74xxSubcircuit(registry, name, definition);
+
+  const updated = registry.get(name);
+  if (!updated) {
+    throw new Error(`Failed to register 74xx component "${name}".`);
+  }
+  return updated;
 }

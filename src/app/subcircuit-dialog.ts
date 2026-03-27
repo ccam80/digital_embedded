@@ -11,7 +11,7 @@
 import { createModal } from './dialog-manager.js';
 import type { BoundaryPort } from '../editor/insert-subcircuit.js';
 import { countPinsByFace } from '../components/subcircuit/pin-derivation.js';
-import { drawDefaultShape } from '../components/subcircuit/shape-renderer.js';
+import { drawDefaultShape, drawDILShape, drawLayoutShape } from '../components/subcircuit/shape-renderer.js';
 import { CanvasRenderer } from '../editor/canvas-renderer.js';
 import { lightColorScheme } from '../core/renderer-interface.js';
 import { PinDirection } from '../core/pin.js';
@@ -31,7 +31,7 @@ export interface SubcircuitDialogPort {
 export interface SubcircuitDialogResult {
   name: string;
   ports: SubcircuitDialogPort[];
-  shapeMode: 'DEFAULT' | 'SIMPLE' | 'DIL' | 'LAYOUT';
+  shapeMode: 'DIL' | 'LAYOUT';
   chipWidth: number;
   chipHeight: number;
 }
@@ -65,27 +65,46 @@ function buildPreviewPins(ports: SubcircuitDialogPort[]): PinDeclaration[] {
 }
 
 /**
- * Compute chip width and height (in grid units) from the port face counts.
+ * Compute chip width and height (in grid units) for the given shape mode.
+ *
+ * DEFAULT/SIMPLE/DIL: width = chipWidth, height = max side pin count.
+ * LAYOUT: width/height are at least chipWidth/chipHeight, expanded if pins need more room.
  */
-function computePreviewDimensions(pins: PinDeclaration[]): { width: number; height: number } {
+function computePreviewDimensions(
+  pins: PinDeclaration[],
+  shapeMode: string,
+  chipWidth: number,
+  chipHeight: number,
+): { width: number; height: number } {
   const counts = countPinsByFace(pins);
-  const sideH = Math.max(counts.left, counts.right, 1);
-  const width = 3;
-  const height = sideH;
-  return { width, height };
+  if (shapeMode === 'LAYOUT') {
+    return {
+      width: Math.max(counts.top + 1, counts.bottom + 1, chipWidth),
+      height: Math.max(counts.left + 1, counts.right + 1, chipHeight),
+    };
+  }
+  // DEFAULT / SIMPLE / DIL — non-right pins go on the left side in the preview
+  const leftSide = counts.left + counts.top + counts.bottom;
+  const sideH = Math.max(leftSide, counts.right, 1);
+  return { width: chipWidth, height: sideH };
 }
 
 /**
- * Assign x/y positions to pins for DEFAULT shape rendering.
+ * Assign x/y positions to pins based on shape mode.
  *
- * Left-face pins are placed at x=0, right-face at x=width.
- * Top/bottom pins are placed on the sides for simplicity in the preview.
+ * DEFAULT/SIMPLE/DIL: inputs on left (x=0), outputs on right (x=width).
+ * LAYOUT: pins distributed evenly across their declared face (all 4 faces).
  */
 function positionPreviewPins(
   pins: PinDeclaration[],
   width: number,
-  _height: number,
+  height: number,
+  shapeMode: string,
 ): PinDeclaration[] {
+  if (shapeMode === 'LAYOUT') {
+    return positionLayoutPins(pins, width, height);
+  }
+  // DEFAULT / SIMPLE / DIL — left/right only
   const leftPins = pins.filter(p => p.face !== 'right');
   const rightPins = pins.filter(p => p.face === 'right');
 
@@ -102,42 +121,125 @@ function positionPreviewPins(
 }
 
 /**
- * Render a chip preview onto the offscreen canvas.
+ * Distribute pins across all four faces for LAYOUT mode.
+ * Matches Digital's LayoutShape.PinList.createPosition() algorithm.
+ */
+function positionLayoutPins(
+  pins: PinDeclaration[],
+  width: number,
+  height: number,
+): PinDeclaration[] {
+  type FaceKey = 'left' | 'right' | 'top' | 'bottom';
+  const groups: Record<FaceKey, PinDeclaration[]> = {
+    left: [], right: [], top: [], bottom: [],
+  };
+  for (const pin of pins) {
+    const face: FaceKey = (pin.face as FaceKey) ??
+      (pin.direction === PinDirection.INPUT ? 'left' : 'right');
+    groups[face].push(pin);
+  }
+
+  function distribute(n: number, length: number): number[] {
+    if (n === 0) return [];
+    if (n === 1) return [Math.floor(length / 2)];
+    const delta = Math.floor((length + 2) / (n + 1));
+    const span = delta * (n - 1);
+    const start = Math.floor((length - span) / 2);
+    return Array.from({ length: n }, (_, i) => start + i * delta);
+  }
+
+  const positioned: PinDeclaration[] = [];
+
+  const leftY = distribute(groups.left.length, height);
+  groups.left.forEach((p, i) => {
+    positioned.push({ ...p, position: { x: 0, y: leftY[i] } });
+  });
+
+  const rightY = distribute(groups.right.length, height);
+  groups.right.forEach((p, i) => {
+    positioned.push({ ...p, position: { x: width, y: rightY[i] } });
+  });
+
+  const topX = distribute(groups.top.length, width);
+  groups.top.forEach((p, i) => {
+    positioned.push({ ...p, face: 'top', position: { x: topX[i], y: 0 } });
+  });
+
+  const bottomX = distribute(groups.bottom.length, width);
+  groups.bottom.forEach((p, i) => {
+    positioned.push({ ...p, face: 'bottom', position: { x: bottomX[i], y: height } });
+  });
+
+  return positioned;
+}
+
+/** Transform state from the last renderPreview call, used for hit-testing pin drags. */
+interface PreviewTransform {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  chipWidth: number;
+  chipHeight: number;
+  positionedPins: PinDeclaration[];
+}
+
+/**
+ * Render a chip preview onto the offscreen canvas using the selected shape mode.
+ * Returns the transform state for hit-testing.
  */
 function renderPreview(
   canvas: HTMLCanvasElement,
   name: string,
   ports: SubcircuitDialogPort[],
-): void {
+  shapeMode: string,
+  chipWidth: number,
+  chipHeight: number,
+): PreviewTransform {
   const ctx2d = canvas.getContext('2d');
-  if (!ctx2d) return;
+  const empty: PreviewTransform = { offsetX: 0, offsetY: 0, scale: 1, chipWidth: 0, chipHeight: 0, positionedPins: [] };
+  if (!ctx2d) return empty;
 
   ctx2d.clearRect(0, 0, canvas.width, canvas.height);
 
   const pins = buildPreviewPins(ports);
-  const { width, height } = computePreviewDimensions(pins);
-  const positionedPins = positionPreviewPins(pins, width, height);
+  const { width, height } = computePreviewDimensions(pins, shapeMode, chipWidth, chipHeight);
+  const positionedPins = positionPreviewPins(pins, width, height, shapeMode);
 
   const renderer = new CanvasRenderer(ctx2d, lightColorScheme);
 
-  // Scale and center: fit (width+2) x (height+1) grid units into the canvas
-  const scaleX = canvas.width / ((width + 2) * PREVIEW_GRID);
-  const scaleY = canvas.height / ((height + 1) * PREVIEW_GRID);
+  // Scale and center: fit (width+2) x (height+2) grid units into the canvas
+  const padX = 2;
+  const padY = shapeMode === 'LAYOUT' ? 2 : 1;
+  const scaleX = canvas.width / ((width + padX) * PREVIEW_GRID);
+  const scaleY = canvas.height / ((height + padY) * PREVIEW_GRID);
   const scale = Math.min(scaleX, scaleY, 1) * PREVIEW_GRID;
 
-  const totalW = (width + 2) * scale;
-  const totalH = (height + 1) * scale;
-  const offsetX = (canvas.width - totalW) / 2 + scale;
-  const offsetY = (canvas.height - totalH) / 2 + 0.5 * scale;
+  const totalW = (width + padX) * scale;
+  const totalH = (height + padY) * scale;
+  const offsetX = (canvas.width - totalW) / 2 + (padX / 2) * scale;
+  const offsetY = (canvas.height - totalH) / 2 + (padY / 2) * scale;
 
   ctx2d.save();
   ctx2d.translate(offsetX, offsetY);
   ctx2d.scale(scale, scale);
   renderer.setGridScale(scale);
 
-  drawDefaultShape(renderer, name || 'Subcircuit', positionedPins, width, height, 0);
+  const displayName = name || 'Subcircuit';
+  switch (shapeMode) {
+    case 'DIL':
+      drawDILShape(renderer, displayName, positionedPins, width, height, 0);
+      break;
+    case 'LAYOUT':
+      drawLayoutShape(renderer, displayName, positionedPins, width, height, 0);
+      break;
+    default:
+      drawDefaultShape(renderer, displayName, positionedPins, width, height, 0);
+      break;
+  }
 
   ctx2d.restore();
+
+  return { offsetX, offsetY, scale, chipWidth: width, chipHeight: height, positionedPins };
 }
 
 // ---------------------------------------------------------------------------
@@ -269,13 +371,13 @@ export function openSubcircuitDialog(
     shapeLabel.style.minWidth = '60px';
     const shapeSelect = document.createElement('select');
     shapeSelect.style.padding = '4px 6px';
-    for (const mode of ['DEFAULT', 'SIMPLE', 'DIL', 'LAYOUT'] as const) {
+    for (const mode of ['LAYOUT', 'DIL'] as const) {
       const opt = document.createElement('option');
       opt.value = mode;
       opt.textContent = mode.charAt(0) + mode.slice(1).toLowerCase();
       shapeSelect.appendChild(opt);
     }
-    shapeSelect.value = 'DEFAULT';
+    shapeSelect.value = 'LAYOUT';
     shapeSelect.addEventListener('change', validateAndUpdate);
     symbolSection.appendChild(shapeLabel);
     symbolSection.appendChild(shapeSelect);
@@ -366,6 +468,11 @@ export function openSubcircuitDialog(
       }));
     }
 
+    // Transform state for pin drag hit-testing (assigned by validateAndUpdate)
+    let lastTransform: PreviewTransform = {
+      offsetX: 0, offsetY: 0, scale: 1, chipWidth: 0, chipHeight: 0, positionedPins: [],
+    };
+
     function validateAndUpdate(): boolean {
       const ports = getCurrentPorts();
 
@@ -409,8 +516,26 @@ export function openSubcircuitDialog(
         }
       }
 
-      // Update preview
-      renderPreview(previewCanvas, name, ports);
+      // Sync width/height inputs to match the pin-derived minimum dimensions
+      const mode = shapeSelect.value;
+      const pins = buildPreviewPins(ports);
+      const counts = countPinsByFace(pins);
+      if (mode === 'LAYOUT') {
+        const minW = Math.max(counts.top + 1, counts.bottom + 1, 2);
+        const minH = Math.max(counts.left + 1, counts.right + 1, 1);
+        const curW = parseInt(chipWidthInput.value, 10) || 2;
+        const curH = parseInt(chipHeightInput.value, 10) || 1;
+        if (curW < minW) chipWidthInput.value = String(minW);
+        if (curH < minH) chipHeightInput.value = String(minH);
+      } else {
+        const minH = Math.max(counts.left, counts.right, 1);
+        chipHeightInput.value = String(minH);
+      }
+
+      // Update preview with current shape settings
+      const cw = Math.max(2, parseInt(chipWidthInput.value, 10) || 3);
+      const ch = Math.max(1, parseInt(chipHeightInput.value, 10) || 3);
+      lastTransform = renderPreview(previewCanvas, name, ports, mode, cw, ch);
 
       return nameValid && portsValid;
     }
@@ -523,6 +648,102 @@ export function openSubcircuitDialog(
     body.appendChild(previewWrapper);
 
     // -----------------------------------------------------------------------
+    // Pin drag interaction on preview canvas
+    // -----------------------------------------------------------------------
+
+    let dragPinIndex = -1;
+    let pinDragging = false;
+
+    /** Convert canvas pixel coords to grid coords using the current preview transform. */
+    function canvasToGrid(canvasX: number, canvasY: number): { gx: number; gy: number } {
+      const { offsetX, offsetY, scale } = lastTransform;
+      return {
+        gx: (canvasX - offsetX) / scale,
+        gy: (canvasY - offsetY) / scale,
+      };
+    }
+
+    /** Find the nearest pin index within a hit radius (in grid units). */
+    function hitTestPin(gx: number, gy: number): number {
+      const HIT_RADIUS = 0.8;
+      let bestDist = HIT_RADIUS;
+      let bestIdx = -1;
+      for (let i = 0; i < lastTransform.positionedPins.length; i++) {
+        const pin = lastTransform.positionedPins[i];
+        const dx = gx - pin.position.x;
+        const dy = gy - pin.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    }
+
+    /** Determine which face a grid point is closest to on the chip rectangle. */
+    function faceFromGridPos(gx: number, gy: number): Face {
+      const { chipWidth: w, chipHeight: h } = lastTransform;
+      // Distances to each edge
+      const dLeft = gx;
+      const dRight = w - gx;
+      const dTop = gy;
+      const dBottom = h - gy;
+      const min = Math.min(dLeft, dRight, dTop, dBottom);
+      if (min === dLeft) return 'left';
+      if (min === dRight) return 'right';
+      if (min === dTop) return 'top';
+      return 'bottom';
+    }
+
+    previewCanvas.style.cursor = 'default';
+    previewCanvas.style.touchAction = 'none';
+
+    previewCanvas.addEventListener('pointerdown', (ev: PointerEvent) => {
+      const rect = previewCanvas.getBoundingClientRect();
+      const cx = (ev.clientX - rect.left) * (previewCanvas.width / rect.width);
+      const cy = (ev.clientY - rect.top) * (previewCanvas.height / rect.height);
+      const { gx, gy } = canvasToGrid(cx, cy);
+
+      const idx = hitTestPin(gx, gy);
+      if (idx < 0) return;
+
+      pinDragging = true;
+      dragPinIndex = idx;
+      previewCanvas.setPointerCapture(ev.pointerId);
+      previewCanvas.style.cursor = 'grabbing';
+    });
+
+    previewCanvas.addEventListener('pointermove', (ev: PointerEvent) => {
+      const rect = previewCanvas.getBoundingClientRect();
+      const cx = (ev.clientX - rect.left) * (previewCanvas.width / rect.width);
+      const cy = (ev.clientY - rect.top) * (previewCanvas.height / rect.height);
+      const { gx, gy } = canvasToGrid(cx, cy);
+
+      if (!pinDragging) {
+        // Hover cursor
+        previewCanvas.style.cursor = hitTestPin(gx, gy) >= 0 ? 'grab' : 'default';
+        return;
+      }
+
+      // Update the face select for the dragged pin
+      if (dragPinIndex >= 0 && dragPinIndex < portRows.length) {
+        const newFace = faceFromGridPos(gx, gy);
+        const row = portRows[dragPinIndex];
+        if (row.faceSelect.value !== newFace) {
+          row.faceSelect.value = newFace;
+          validateAndUpdate();
+        }
+      }
+    });
+
+    previewCanvas.addEventListener('pointerup', () => {
+      pinDragging = false;
+      dragPinIndex = -1;
+      previewCanvas.style.cursor = 'default';
+    });
+
+    // -----------------------------------------------------------------------
     // Buttons
     // -----------------------------------------------------------------------
 
@@ -546,7 +767,7 @@ export function openSubcircuitDialog(
       if (!valid) return;
       const name = nameInput.value.trim();
       const ports = getCurrentPorts();
-      const shapeMode = shapeSelect.value as 'DEFAULT' | 'SIMPLE' | 'DIL' | 'LAYOUT';
+      const shapeMode = shapeSelect.value as 'DIL' | 'LAYOUT';
       const chipWidth = Math.max(2, parseInt(chipWidthInput.value, 10) || 3);
       const chipHeight = Math.max(1, parseInt(chipHeightInput.value, 10) || 3);
       finish({ name, ports, shapeMode, chipWidth, chipHeight });

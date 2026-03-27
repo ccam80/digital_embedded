@@ -228,6 +228,23 @@ export abstract class AbstractCircuitElement implements CircuitElement {
   abstract getHelpText(): string;
 
   /**
+   * Returns the label string if showLabel is true, otherwise empty string.
+   * Components should call this instead of reading "label" directly.
+   */
+  protected _visibleLabel(): string {
+    const show = this._properties.getOrDefault<boolean>("showLabel", true);
+    if (!show) return "";
+    return this._properties.getOrDefault<string>("label", "");
+  }
+
+  /**
+   * Returns true if component values should be rendered on the canvas.
+   */
+  protected _shouldShowValue(): boolean {
+    return this._properties.getOrDefault<boolean>("showValue", true);
+  }
+
+  /**
    * Derive pins from declarations + current properties. Pins are in LOCAL
    * coordinates (rotation=0); pinWorldPosition() applies mirror/rotate/translate.
    *

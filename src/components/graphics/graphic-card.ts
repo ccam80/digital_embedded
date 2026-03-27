@@ -310,7 +310,7 @@ export class GraphicCardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawGenericShape(ctx, {
       inputLabels: ["A", "str", "C", "ld", "B"],
       outputLabels: ["D"],

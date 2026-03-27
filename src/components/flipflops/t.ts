@@ -156,7 +156,7 @@ export class TElement extends AbstractCircuitElement {
         clockInputIndices: [1],
         componentName: "T",
         width: 3,
-        label: this._properties.getOrDefault<string>("label", ""),
+        label: this._visibleLabel(),
       rotation: this.rotation,
       });
     } else {
@@ -166,7 +166,7 @@ export class TElement extends AbstractCircuitElement {
         clockInputIndices: [0],
         componentName: "T",
         width: 3,
-        label: this._properties.getOrDefault<string>("label", ""),
+        label: this._visibleLabel(),
       rotation: this.rotation,
       });
     }

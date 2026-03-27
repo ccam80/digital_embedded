@@ -241,12 +241,12 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const amplitude = this._properties.getOrDefault<number>("amplitude", 5);
     const frequency = this._properties.getOrDefault<number>("frequency", 1000);
     const displayLabel = label.length > 0
       ? label
-      : `${formatSI(amplitude, "V")} ${formatSI(frequency, "Hz")}`;
+      : (this._shouldShowValue() ? `${formatSI(amplitude, "V")} ${formatSI(frequency, "Hz")}` : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText(displayLabel, 2, 1.3, { horizontal: "center", vertical: "top" });

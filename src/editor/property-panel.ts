@@ -11,7 +11,7 @@ import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
 import type { ComponentDefinition } from "@/core/registry";
-import { availableModels } from "@/core/registry";
+import { availableModels, WELL_KNOWN_PROPERTY_KEYS } from "@/core/registry";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
@@ -81,6 +81,11 @@ export class PropertyPanel {
     const conditionalRows: Map<string, { row: HTMLElement; values: PropertyValue[] }[]> = new Map();
 
     for (const def of definitions) {
+      // showLabel and showValue are rendered inline — skip standalone rows
+      if (def.key === "showLabel" || def.key === "showValue") {
+        continue;
+      }
+
       const currentValue = bag.has(def.key)
         ? bag.get(def.key)
         : def.defaultValue;
@@ -88,7 +93,27 @@ export class PropertyPanel {
       const input = createInput(def, currentValue);
       this._inputs.set(def.key, input);
 
-      const row = this._buildRow(def.label, input.element);
+      let row: HTMLElement;
+
+      if (def.key === "label") {
+        // Build label row with inline showLabel checkbox
+        const showLabelVal = bag.has("showLabel") ? bag.get<boolean>("showLabel") : true;
+        row = this._buildRowWithCheckbox(def.label, input.element, showLabelVal, (checked) => {
+          const old = bag.has("showLabel") ? bag.get("showLabel") : true;
+          bag.set("showLabel", checked);
+          for (const cb of this._changeCallbacks) cb("showLabel", old, checked);
+        });
+        // Register a synthetic input so commitAll can read showLabel
+        this._inputs.set("showLabel", {
+          element: row,
+          getValue: () => bag.has("showLabel") ? bag.get("showLabel") : true,
+          setValue: (_v) => { /* managed by checkbox */ },
+          onChange: (_cb) => { /* managed by checkbox */ },
+        });
+      } else {
+        row = this._buildRow(def.label, input.element);
+      }
+
       this._container.appendChild(row);
 
       // Track rows with visibleWhen conditions
@@ -111,6 +136,31 @@ export class PropertyPanel {
             dep.row.style.display = dep.values.includes(newValue) ? "" : "none";
           }
         }
+      });
+    }
+
+    // Add standalone "Show value" checkbox row if the definition set includes it
+    const showValueDef = definitions.find(d => d.key === "showValue");
+    if (showValueDef) {
+      const showValueVal = bag.has("showValue") ? bag.get<boolean>("showValue") : true;
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = Boolean(showValueVal);
+      cb.addEventListener("change", () => {
+        const old = bag.has("showValue") ? bag.get("showValue") : true;
+        bag.set("showValue", cb.checked);
+        for (const ccb of this._changeCallbacks) ccb("showValue", old, cb.checked);
+      });
+      const wrapper = document.createElement("div");
+      wrapper.className = "prop-input prop-boolean";
+      wrapper.appendChild(cb);
+      const row = this._buildRow("Show value", wrapper);
+      this._container.appendChild(row);
+      this._inputs.set("showValue", {
+        element: row,
+        getValue: () => cb.checked,
+        setValue: (v) => { cb.checked = Boolean(v); },
+        onChange: (_ccb) => { /* managed by checkbox */ },
       });
     }
   }
@@ -431,6 +481,48 @@ export class PropertyPanel {
 
     row.appendChild(labelEl);
     row.appendChild(inputEl);
+    return row;
+  }
+
+  /**
+   * Build a property row with an inline checkbox to the right of the input.
+   * Used for the label field where the checkbox controls showLabel visibility.
+   */
+  private _buildRowWithCheckbox(
+    label: string,
+    inputEl: HTMLElement,
+    checked: boolean,
+    onToggle: (checked: boolean) => void,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "prop-row";
+
+    const labelEl = document.createElement("label");
+    labelEl.className = "prop-label";
+    labelEl.textContent = label;
+
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";
+    wrapper.style.gap = "4px";
+    wrapper.style.flex = "1";
+
+    // The main input takes most of the space
+    inputEl.style.flex = "1";
+    inputEl.style.minWidth = "0";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = checked;
+    cb.title = "Show on canvas";
+    cb.style.flexShrink = "0";
+    cb.addEventListener("change", () => onToggle(cb.checked));
+
+    wrapper.appendChild(inputEl);
+    wrapper.appendChild(cb);
+
+    row.appendChild(labelEl);
+    row.appendChild(wrapper);
     return row;
   }
 }

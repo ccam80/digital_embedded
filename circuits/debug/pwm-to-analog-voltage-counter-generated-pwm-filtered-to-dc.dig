@@ -41,6 +41,10 @@
     <visualElement>
       <elementName>Const</elementName>
       <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>THR</string>
+        </entry>
       </elementAttributes>
       <pos x="60" y="240"/>
     </visualElement>

@@ -461,11 +461,37 @@ export function initMenuAndToolbar(
   // Palette setup
   // -------------------------------------------------------------------------
 
-  paletteUI.onPlace((def) => {
-    placement.start(def);
+  paletteUI.onPlace(async (def) => {
+    let activeDef = def;
+    if ((def.factory as { __74xxStub?: boolean }).__74xxStub === true) {
+      try {
+        paletteUI.setLoading(def.name, true);
+        const { load74xxComponent } = await import('../components/library-74xx.js');
+        activeDef = await load74xxComponent(ctx.registry, def.name);
+      } catch (err) {
+        console.error(`Failed to load 74xx component "${def.name}":`, err);
+        return;
+      } finally {
+        paletteUI.setLoading(def.name, false);
+      }
+    }
+    placement.start(activeDef);
   });
-  paletteUI.onTouchDrop((def, worldPt) => {
-    const element = def.factory(new PropertyBag());
+  paletteUI.onTouchDrop(async (def, worldPt) => {
+    let activeDef = def;
+    if ((def.factory as { __74xxStub?: boolean }).__74xxStub === true) {
+      try {
+        paletteUI.setLoading(def.name, true);
+        const { load74xxComponent } = await import('../components/library-74xx.js');
+        activeDef = await load74xxComponent(ctx.registry, def.name);
+      } catch (err) {
+        console.error(`Failed to load 74xx component "${def.name}":`, err);
+        return;
+      } finally {
+        paletteUI.setLoading(def.name, false);
+      }
+    }
+    const element = activeDef.factory(new PropertyBag());
     element.position = worldPt;
     ctx.circuit.addElement(element);
     ctx.invalidateCompiled();

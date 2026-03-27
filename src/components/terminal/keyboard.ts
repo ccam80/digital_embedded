@@ -172,7 +172,7 @@ export class KeyboardElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawGenericShape(ctx, {
       inputLabels: ["C", "en"],
       outputLabels: ["D", "av"],

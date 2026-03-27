@@ -131,7 +131,7 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
     for (let i = 0; i < inputCount; i++) {
       inputLabels.push(`in${i}`);
     }
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     drawGenericShape(ctx, {
       inputLabels,
       outputLabels: ["num", "any"],
@@ -258,8 +258,11 @@ export const PriorityEncoderDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executePriorityEncoder,
-      // Schema for default selectorBits=1 (2 inputs); direction-filter order matches for all configs.
-      inputSchema: ["in0", "in1"],
+      inputSchema: (props) => {
+        const selectorBits = props.getOrDefault<number>("selectorBits", 1);
+        const inputCount = 1 << selectorBits;
+        return Array.from({ length: inputCount }, (_, i) => `in${i}`);
+      },
       outputSchema: ["num", "any"],
     },
   },

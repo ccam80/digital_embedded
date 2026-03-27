@@ -241,9 +241,12 @@ export const DecoderDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeDecoder,
-      // Schema for default selectorBits=1 (2 outputs); direction-filter order matches for all configs.
       inputSchema: ["sel"],
-      outputSchema: ["out_0", "out_1"],
+      outputSchema: (props) => {
+        const selectorBits = props.getOrDefault<number>("selectorBits", 1);
+        const outCount = 1 << selectorBits;
+        return Array.from({ length: outCount }, (_, i) => `out_${i}`);
+      },
     },
     analog: {
       factory: makeBehavioralDecoderAnalogFactory(1),

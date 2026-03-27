@@ -90,6 +90,17 @@ export class PaletteUI {
   }
 
   /**
+   * Toggle a loading indicator on the palette item for the given component name.
+   * Adds or removes the `palette-loading` CSS class on the matching item element.
+   */
+  setLoading(name: string, loading: boolean): void {
+    const item = this._container.querySelector<HTMLElement>(`[data-component="${name}"]`);
+    if (item) {
+      item.classList.toggle('palette-loading', loading);
+    }
+  }
+
+  /**
    * Full initial render. Clears the container and builds the tree.
    */
   render(): void {
@@ -259,6 +270,7 @@ export class PaletteUI {
     item.title = def.helpText;
     item.setAttribute("role", "treeitem");
     item.setAttribute("tabindex", "0");
+    item.dataset["component"] = def.name;
 
     const icon = this._renderComponentIcon(def);
     item.appendChild(icon);

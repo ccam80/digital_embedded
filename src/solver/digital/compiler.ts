@@ -282,6 +282,25 @@ export function compileDigitalPartition(
   }
 
   // -----------------------------------------------------------------------
+  // Step 6b: Build per-component property maps (needed for schema resolution
+  // and state slot allocation in Step 7b)
+  // -----------------------------------------------------------------------
+
+  const componentPropertiesList: ReadonlyMap<string, import("@/core/properties").PropertyValue>[] = [];
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    const propMap = new Map<string, import("@/core/properties").PropertyValue>();
+    const def = registry.get(el.typeId)!;
+    for (const propDef of def.propertyDefs) {
+      const val = el.getAttribute(propDef.key);
+      if (val !== undefined) {
+        propMap.set(propDef.key, val as import("@/core/properties").PropertyValue);
+      }
+    }
+    componentPropertiesList.push(propMap);
+  }
+
+  // -----------------------------------------------------------------------
   // Step 7: Build per-component wiring arrays (input/output net IDs)
   // -----------------------------------------------------------------------
 
@@ -303,63 +322,74 @@ export function compileDigitalPartition(
       // Neutral infrastructure (Port, etc.) — no inputs, no outputs; pure wire identity.
       componentInputNets.push([]);
       componentOutputNets.push([]);
-    } else if (def.models.digital.inputSchema) {
-      const inputs: number[] = [];
-      for (const label of def.models.digital.inputSchema) {
-        const refIdx = refs.findIndex(r => r.pinLabel === label);
-        if (refIdx >= 0) {
-          inputs.push(slotToNetId(i, refIdx));
-        }
-      }
-      componentInputNets.push(inputs);
-
-      if (def.models.digital.outputSchema) {
-        const outputs: number[] = [];
-        for (const label of def.models.digital.outputSchema) {
-          const refIdx = refs.findIndex(r => r.pinLabel === label);
-          if (refIdx >= 0) {
-            outputs.push(slotToNetId(i, refIdx));
-          }
-        }
-        componentOutputNets.push(outputs);
-      } else {
-        const outputs: number[] = [];
-        for (let j = 0; j < refs.length; j++) {
-          const ref = refs[j]!;
-          if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
-            outputs.push(slotToNetId(i, j));
-          }
-        }
-        componentOutputNets.push(outputs);
-      }
     } else {
-      const inputs: number[] = [];
-      for (let j = 0; j < refs.length; j++) {
-        const ref = refs[j]!;
-        if (ref.direction !== PinDirection.OUTPUT && ref.direction !== PinDirection.BIDIRECTIONAL) {
-          inputs.push(slotToNetId(i, j));
-        }
-      }
-      componentInputNets.push(inputs);
+      // Resolve schema — may be a static array or a function of the element's properties.
+      const elProps = new PropertyBag(componentPropertiesList[i]!);
+      const rawInputSchema = def.models.digital.inputSchema;
+      const resolvedInputSchema = typeof rawInputSchema === 'function'
+        ? rawInputSchema(elProps) : rawInputSchema;
+      const rawOutputSchema = def.models.digital.outputSchema;
+      const resolvedOutputSchema = typeof rawOutputSchema === 'function'
+        ? rawOutputSchema(elProps) : rawOutputSchema;
 
-      if (def.models.digital.outputSchema) {
-        const outputs: number[] = [];
-        for (const label of def.models.digital.outputSchema) {
+      if (resolvedInputSchema) {
+        const inputs: number[] = [];
+        for (const label of resolvedInputSchema) {
           const refIdx = refs.findIndex(r => r.pinLabel === label);
           if (refIdx >= 0) {
-            outputs.push(slotToNetId(i, refIdx));
+            inputs.push(slotToNetId(i, refIdx));
           }
         }
-        componentOutputNets.push(outputs);
+        componentInputNets.push(inputs);
+
+        if (resolvedOutputSchema) {
+          const outputs: number[] = [];
+          for (const label of resolvedOutputSchema) {
+            const refIdx = refs.findIndex(r => r.pinLabel === label);
+            if (refIdx >= 0) {
+              outputs.push(slotToNetId(i, refIdx));
+            }
+          }
+          componentOutputNets.push(outputs);
+        } else {
+          const outputs: number[] = [];
+          for (let j = 0; j < refs.length; j++) {
+            const ref = refs[j]!;
+            if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
+              outputs.push(slotToNetId(i, j));
+            }
+          }
+          componentOutputNets.push(outputs);
+        }
       } else {
-        const outputs: number[] = [];
+        const inputs: number[] = [];
         for (let j = 0; j < refs.length; j++) {
           const ref = refs[j]!;
-          if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
-            outputs.push(slotToNetId(i, j));
+          if (ref.direction !== PinDirection.OUTPUT && ref.direction !== PinDirection.BIDIRECTIONAL) {
+            inputs.push(slotToNetId(i, j));
           }
         }
-        componentOutputNets.push(outputs);
+        componentInputNets.push(inputs);
+
+        if (resolvedOutputSchema) {
+          const outputs: number[] = [];
+          for (const label of resolvedOutputSchema) {
+            const refIdx = refs.findIndex(r => r.pinLabel === label);
+            if (refIdx >= 0) {
+              outputs.push(slotToNetId(i, refIdx));
+            }
+          }
+          componentOutputNets.push(outputs);
+        } else {
+          const outputs: number[] = [];
+          for (let j = 0; j < refs.length; j++) {
+            const ref = refs[j]!;
+            if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
+              outputs.push(slotToNetId(i, j));
+            }
+          }
+          componentOutputNets.push(outputs);
+        }
       }
     }
   }
@@ -398,21 +428,6 @@ export function compileDigitalPartition(
     for (let k = 0; k < nets.length; k++) {
       wiringTable[outBase + k] = nets[k]!;
     }
-  }
-
-  // Build per-component property maps
-  const componentPropertiesList: ReadonlyMap<string, import("@/core/properties").PropertyValue>[] = [];
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    const propMap = new Map<string, import("@/core/properties").PropertyValue>();
-    const def = registry.get(el.typeId)!;
-    for (const propDef of def.propertyDefs) {
-      const val = el.getAttribute(propDef.key);
-      if (val !== undefined) {
-        propMap.set(propDef.key, val as import("@/core/properties").PropertyValue);
-      }
-    }
-    componentPropertiesList.push(propMap);
   }
 
   // -----------------------------------------------------------------------

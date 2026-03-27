@@ -299,9 +299,12 @@ export const DemuxDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeDemux,
-      // Schema for default selectorBits=1 (2 outputs); direction-filter order matches for all configs.
       inputSchema: ["sel", "in"],
-      outputSchema: ["out_0", "out_1"],
+      outputSchema: (props) => {
+        const selectorBits = props.getOrDefault<number>("selectorBits", 1);
+        const outputCount = 1 << selectorBits;
+        return Array.from({ length: outputCount }, (_, i) => `out_${i}`);
+      },
     },
     analog: {
       factory: makeBehavioralDemuxAnalogFactory(1),

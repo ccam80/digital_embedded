@@ -177,7 +177,7 @@ export class XOrElement extends AbstractCircuitElement {
   }
 
   private _drawLabel(ctx: RenderContext, w: number): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length === 0) return;
 
     ctx.setColor("TEXT");
@@ -320,7 +320,10 @@ export const XOrDefinition: ComponentDefinition = {
   models: {
     digital: {
       executeFn: executeXOr,
-      inputSchema: ["In_1", "In_2"],
+      inputSchema: (props) => {
+        const n = props.getOrDefault<number>("inputCount", 2);
+        return Array.from({ length: n }, (_, i) => `In_${i + 1}`);
+      },
       outputSchema: ["out"],
     },
     analog: {

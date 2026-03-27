@@ -13,6 +13,10 @@
     <visualElement>
       <elementName>DcVoltageSource</elementName>
       <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Vs</string>
+        </entry>
       </elementAttributes>
       <pos x="60" y="120"/>
     </visualElement>

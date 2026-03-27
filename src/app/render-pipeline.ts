@@ -169,7 +169,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
       ctx.canvasRenderer,
       ctx.circuit.wires,
       ctx.selection.getSelectedWires(),
-      ctx.isSimActive() ? wireSignalAccessAdapter : undefined,
+      !ctx.compiledDirty ? wireSignalAccessAdapter : undefined,
     );
     ctx.wireRenderer.renderJunctionDots(ctx.canvasRenderer, ctx.circuit.wires);
     ctx.wireRenderer.renderBusWidthMarkers(ctx.canvasRenderer, ctx.circuit.wires);

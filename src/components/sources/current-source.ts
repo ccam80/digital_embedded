@@ -56,7 +56,7 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const current = this._properties.getOrDefault<number>("current", 0.01);
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const vNeg = signals?.getPinVoltage("neg");
     const vPos = signals?.getPinVoltage("pos");
 
@@ -96,7 +96,7 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     ], true);
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : formatSI(current, "A");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(current, "A") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(displayLabel, 2, 1, { horizontal: "center", vertical: "top" });

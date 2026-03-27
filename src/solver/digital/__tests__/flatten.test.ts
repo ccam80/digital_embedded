@@ -64,7 +64,7 @@ function makeLeaf(
   const pins: Pin[] = [
     {
       direction: PinDirection.OUTPUT,
-      position: { x: position.x + 2, y: position.y + 1 },
+      position: { x: 2, y: 1 },
       label: "out",
       bitWidth: 1,
       isNegated: false,
@@ -84,7 +84,7 @@ function makeInElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.OUTPUT,
-      position: { x: position.x + 2, y: position.y + 1 },
+      position: { x: 2, y: 1 },
       label: "out",
       bitWidth: 1,
       isNegated: false,
@@ -104,7 +104,7 @@ function makeOutElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.INPUT,
-      position: { x: position.x, y: position.y + 1 },
+      position: { x: 0, y: 1 },
       label: "in",
       bitWidth: 1,
       isNegated: false,
@@ -128,7 +128,7 @@ function makePortElement(
   const pins: Pin[] = [
     {
       direction: PinDirection.BIDIRECTIONAL,
-      position: { x: position.x, y: position.y + 1 },
+      position: { x: 0, y: 1 },
       label: "port",
       bitWidth,
       isNegated: false,
@@ -404,12 +404,12 @@ describe("flattenCircuit", () => {
     internal.addElement(inEl);
     internal.addElement(outEl);
 
-    // Parent circuit: subcircuit with input pin at (20, 6)
+    // Parent circuit: subcircuit with chip-relative input pin {0,1} at element position {20,5} → world (20,6)
     const parent = new Circuit({ name: "Top" });
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.INPUT,
-        position: { x: 20, y: 6 },
+        position: { x: 0, y: 1 },
         label: "A",
         bitWidth: 1,
         isNegated: false,
@@ -417,7 +417,7 @@ describe("flattenCircuit", () => {
       },
       {
         direction: PinDirection.OUTPUT,
-        position: { x: 26, y: 6 },
+        position: { x: 6, y: 1 },
         label: "Y",
         bitWidth: 1,
         isNegated: false,
@@ -508,12 +508,12 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     internal.addElement(andEl);
     internal.addElement(portY);
     internal.addWire(new Wire(
-      { x: portA.getPins()[0]!.position.x, y: portA.getPins()[0]!.position.y },
-      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+      { x: portA.position.x + portA.getPins()[0]!.position.x, y: portA.position.y + portA.getPins()[0]!.position.y },
+      { x: andEl.position.x + andEl.getPins()[0]!.position.x, y: andEl.position.y + andEl.getPins()[0]!.position.y },
     ));
     internal.addWire(new Wire(
-      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
-      { x: portY.getPins()[0]!.position.x, y: portY.getPins()[0]!.position.y },
+      { x: andEl.position.x + andEl.getPins()[0]!.position.x, y: andEl.position.y + andEl.getPins()[0]!.position.y },
+      { x: portY.position.x + portY.getPins()[0]!.position.x, y: portY.position.y + portY.getPins()[0]!.position.y },
     ));
 
     // Parent circuit: subcircuit instance with BIDIRECTIONAL pins
@@ -657,8 +657,8 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     internal.addElement(portBus);
     internal.addElement(andEl);
     internal.addWire(new Wire(
-      { x: portBus.getPins()[0]!.position.x, y: portBus.getPins()[0]!.position.y },
-      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+      { x: portBus.position.x + portBus.getPins()[0]!.position.x, y: portBus.position.y + portBus.getPins()[0]!.position.y },
+      { x: andEl.position.x + andEl.getPins()[0]!.position.x, y: andEl.position.y + andEl.getPins()[0]!.position.y },
     ));
 
     // Parent with an 8-bit BIDIRECTIONAL pin
@@ -666,7 +666,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 10, y: 1 },
+        position: { x: 0, y: 1 },
         label: "BUS",
         bitWidth: 8,
         isNegated: false,
@@ -702,18 +702,18 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     internal.addElement(andEl);
     internal.addElement(orEl);
     internal.addElement(portOut);
-    // Wire the internal chain
+    // Wire the internal chain (using world positions: el.position + chip-relative pin)
     internal.addWire(new Wire(
-      { x: portIn.getPins()[0]!.position.x, y: portIn.getPins()[0]!.position.y },
-      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+      { x: portIn.position.x + portIn.getPins()[0]!.position.x, y: portIn.position.y + portIn.getPins()[0]!.position.y },
+      { x: andEl.position.x + andEl.getPins()[0]!.position.x, y: andEl.position.y + andEl.getPins()[0]!.position.y },
     ));
     internal.addWire(new Wire(
-      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
-      { x: orEl.getPins()[0]!.position.x, y: orEl.getPins()[0]!.position.y },
+      { x: andEl.position.x + andEl.getPins()[0]!.position.x, y: andEl.position.y + andEl.getPins()[0]!.position.y },
+      { x: orEl.position.x + orEl.getPins()[0]!.position.x, y: orEl.position.y + orEl.getPins()[0]!.position.y },
     ));
     internal.addWire(new Wire(
-      { x: orEl.getPins()[0]!.position.x, y: orEl.getPins()[0]!.position.y },
-      { x: portOut.getPins()[0]!.position.x, y: portOut.getPins()[0]!.position.y },
+      { x: orEl.position.x + orEl.getPins()[0]!.position.x, y: orEl.position.y + orEl.getPins()[0]!.position.y },
+      { x: portOut.position.x + portOut.getPins()[0]!.position.x, y: portOut.position.y + portOut.getPins()[0]!.position.y },
     ));
 
     // Parent circuit with BIDIRECTIONAL pins for IN and OUT
@@ -721,7 +721,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     const subcircuitPins: Pin[] = [
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 30, y: 1 },
+        position: { x: 0, y: 1 },
         label: "IN",
         bitWidth: 1,
         isNegated: false,
@@ -729,7 +729,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
       },
       {
         direction: PinDirection.BIDIRECTIONAL,
-        position: { x: 36, y: 1 },
+        position: { x: 6, y: 1 },
         label: "OUT",
         bitWidth: 1,
         isNegated: false,
@@ -754,21 +754,21 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // 3 internal wires + 2 bridge wires (one per subcircuit pin) = 5
     expect(flat.wires.length).toBe(5);
 
-    // Bridge wire for "IN" pin: connects subcircuit pin at (30, 1) to Port("IN") pin
-    const portInPinPos = portIn.getPins()[0]!.position;
+    // Bridge wire for "IN" pin: connects subcircuit world pin at (30, 1) to Port("IN") world pin at (0, 1)
+    // portIn at {0,0} + chip-relative pin {0,1} = world {0,1}; subEl at {30,0} + chip pin {0,1} = world {30,1}
     const bridgeWireIN = flat.wires.find(
       (w) =>
-        (w.start.x === 30 && w.start.y === 1 && w.end.x === portInPinPos.x && w.end.y === portInPinPos.y) ||
-        (w.end.x === 30 && w.end.y === 1 && w.start.x === portInPinPos.x && w.start.y === portInPinPos.y),
+        (w.start.x === 30 && w.start.y === 1 && w.end.x === 0 && w.end.y === 1) ||
+        (w.end.x === 30 && w.end.y === 1 && w.start.x === 0 && w.start.y === 1),
     );
     expect(bridgeWireIN).toBeDefined();
 
-    // Bridge wire for "OUT" pin: connects subcircuit pin at (36, 1) to Port("OUT") pin
-    const portOutPinPos = portOut.getPins()[0]!.position;
+    // Bridge wire for "OUT" pin: connects subcircuit world pin at (36, 1) to Port("OUT") world pin at (15, 1)
+    // portOut at {15,0} + chip-relative pin {0,1} = world {15,1}; subEl at {30,0} + chip pin {6,1} = world {36,1}
     const bridgeWireOUT = flat.wires.find(
       (w) =>
-        (w.start.x === 36 && w.start.y === 1 && w.end.x === portOutPinPos.x && w.end.y === portOutPinPos.y) ||
-        (w.end.x === 36 && w.end.y === 1 && w.start.x === portOutPinPos.x && w.start.y === portOutPinPos.y),
+        (w.start.x === 36 && w.start.y === 1 && w.end.x === 15 && w.end.y === 1) ||
+        (w.end.x === 36 && w.end.y === 1 && w.start.x === 15 && w.start.y === 1),
     );
     expect(bridgeWireOUT).toBeDefined();
   });

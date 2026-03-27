@@ -155,7 +155,7 @@ export class CounterPresetElement extends AbstractCircuitElement {
       clockInputIndices: [1],
       componentName: "Counter",
       width: 3,
-      label: this._properties.getOrDefault<string>("label", ""),
+      label: this._visibleLabel(),
       rotation: this.rotation,
     });
   }

@@ -134,7 +134,7 @@ export class NFETElement extends AbstractCircuitElement {
       { x: 0.85, y: 1.1 },
     ], true);
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

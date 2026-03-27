@@ -139,7 +139,7 @@ export class FGNFETElement extends AbstractCircuitElement {
       ctx.drawLine(1.0, 0.5, 0.5, 1.0);
     }
 
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.8 });

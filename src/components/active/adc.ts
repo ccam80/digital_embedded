@@ -177,7 +177,7 @@ export class ADCElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
-    const label = this._properties.getOrDefault<string>("label", "");
+    const label = this._visibleLabel();
     const bits = this._bits;
 
     ctx.save();
