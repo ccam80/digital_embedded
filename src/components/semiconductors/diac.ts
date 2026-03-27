@@ -17,6 +17,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -216,20 +217,10 @@ export class DiacElement extends AbstractCircuitElement {
     const hs = 1.0;
 
     // A lead
-    if (signals && vA !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vA));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1.5, 0);
+    drawColoredLead(ctx, signals, vA, 0, 0, 1.5, 0);
 
     // B lead
-    if (signals && vB !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.5, 0, 4, 0);
+    drawColoredLead(ctx, signals, vB, 2.5, 0, 4, 0);
 
     // Body (plate bars and triangles) stays COMPONENT color
     ctx.setColor("COMPONENT");

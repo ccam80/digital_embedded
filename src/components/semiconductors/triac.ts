@@ -18,6 +18,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -324,28 +325,13 @@ export class TriacElement extends AbstractCircuitElement {
     ], true);
 
     // MT2 lead: pin 0 at (0,0) → bar1 at (1.5,0)
-    if (signals && vMT2 !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vMT2));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, bar1x, 0);
+    drawColoredLead(ctx, signals, vMT2, 0, 0, bar1x, 0);
 
     // MT1 lead: bar2 at (2.5,0) → pin 1 at (4,0)
-    if (signals && vMT1 !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vMT1));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(bar2x, 0, 4, 0);
+    drawColoredLead(ctx, signals, vMT1, bar2x, 0, 4, 0);
 
     // Gate lead: (2.5,0) → (4,-1.5) → (4,-2) to pin 2
-    if (signals && vG !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vG));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(bar2x, 0, 4, -24 / 16);
+    drawColoredLead(ctx, signals, vG, bar2x, 0, 4, -24 / 16);
     ctx.drawLine(4, -24 / 16, 4, -2);
 
     ctx.restore();

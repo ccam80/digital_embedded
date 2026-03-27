@@ -32,6 +32,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
@@ -138,21 +139,11 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     const hasVoltage = vA !== undefined && vB !== undefined;
 
     // Left lead + plate — colored by pin A voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vA));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 0.6, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 0.6, 0);
     ctx.drawLine(0.6, -0.4, 0.6, 0.4);
 
     // Right lead + plate — colored by pin B voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(1.4, 0, 2, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 1.4, 0, 2, 0);
     ctx.drawLine(1.4, -0.4, 1.4, 0.4);
 
     // Rectangular crystal body between the plates — gradient

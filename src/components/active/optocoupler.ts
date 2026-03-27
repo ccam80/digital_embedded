@@ -76,6 +76,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -331,36 +332,16 @@ export class OptocouplerElement extends AbstractCircuitElement {
     );
 
     // anode lead
-    if (vAnode !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vAnode));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, -1, triTop.x, triTop.y);
+    drawColoredLead(ctx, signals, vAnode, 0, -1, triTop.x, triTop.y);
 
     // cathode lead
-    if (vCathode !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCathode));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 1, triBtm.x, triBtm.y);
+    drawColoredLead(ctx, signals, vCathode, 0, 1, triBtm.x, triBtm.y);
 
     // collector lead
-    if (vCollector !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCollector));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.75, -0.5, 4, -1);
+    drawColoredLead(ctx, signals, vCollector, 2.75, -0.5, 4, -1);
 
     // emitter lead
-    if (vEmitter !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vEmitter));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.75, 0.5, 4, 1);
+    drawColoredLead(ctx, signals, vEmitter, 2.75, 0.5, 4, 1);
 
     ctx.restore();
   }

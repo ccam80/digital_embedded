@@ -9,6 +9,7 @@
 
 import type { PinDirection } from '../core/pin.js';
 import type { PropertyValue } from '../core/properties.js';
+import type { Diagnostic } from '../compile/types.js';
 
 // ===========================================================================
 // Netlist — the read side
@@ -107,51 +108,10 @@ export interface PinDescriptor {
 }
 
 // ===========================================================================
-// Diagnostics — shared by GUI + headless
+// Diagnostics — re-exported from compile/types.ts (canonical home)
 // ===========================================================================
 
-/**
- * Diagnostic codes for pre-compilation and compilation errors/warnings.
- */
-export type DiagnosticCode =
-  | 'width-mismatch'
-  | 'unconnected-input'
-  | 'unconnected-output'
-  | 'multi-driver-no-tristate'
-  | 'missing-subcircuit'
-  | 'label-collision'
-  | 'combinational-loop'
-  | 'missing-property'
-  | 'unknown-component'
-  | 'unsupported-ctz-component';
-
-/**
- * A single diagnostic: an error, warning, or informational note about
- * the circuit structure.
- *
- * Consumed by:
- * - GUI status bar / error panel (human-readable `message`)
- * - Headless facade / LLM agents (structured fields for programmatic use)
- * - postMessage API (serializable to JSON)
- */
-export interface Diagnostic {
-  /** Severity level. */
-  readonly severity: 'error' | 'warning' | 'info';
-  /** Machine-readable diagnostic code. */
-  readonly code: DiagnosticCode;
-  /** Human-readable description. */
-  readonly message: string;
-  /** Net involved, if applicable. */
-  readonly netId?: number;
-  /** Pins involved (e.g. the two sides of a width mismatch). */
-  readonly pins?: NetPin[];
-  /** Which .dig file this relates to (for subcircuit errors). */
-  readonly subcircuitFile?: string;
-  /** Nesting path for subcircuit errors. */
-  readonly hierarchyPath?: readonly string[];
-  /** Suggested fix in plain English. */
-  readonly fix?: string;
-}
+export type { DiagnosticCode, Diagnostic } from '../compile/types.js';
 
 // ===========================================================================
 // Circuit spec — declarative circuit creation (the write side, new circuits)

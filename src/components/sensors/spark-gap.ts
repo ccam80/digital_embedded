@@ -44,6 +44,7 @@ import {
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 
@@ -294,20 +295,10 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
     );
 
     // pos lead
-    if (vPos !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vPos));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1.25, 0);
+    drawColoredLead(ctx, signals, vPos, 0, 0, 1.25, 0);
 
     // neg lead
-    if (vNeg !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vNeg));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.75, 0, 4, 0);
+    drawColoredLead(ctx, signals, vNeg, 2.75, 0, 4, 0);
 
     ctx.restore();
   }

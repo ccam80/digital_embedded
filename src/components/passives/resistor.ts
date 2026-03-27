@@ -8,6 +8,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -93,19 +94,8 @@ export class ResistorElement extends AbstractCircuitElement {
     const hasVoltage = vA !== undefined && vB !== undefined;
 
     // Lead wires — colored by their respective node voltages
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vA));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1, 0);
-
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3, 0, 4, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
     // Zigzag body: 4 iterations producing 8 peaks + start/end
     const hs = 6 / 16; // 0.375 grid units

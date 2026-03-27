@@ -27,6 +27,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { RenderContext, Rect, TextAnchor } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -68,13 +69,8 @@ export class VariableRailElement extends AbstractCircuitElement {
     ctx.save();
 
     // Thick lead line from pin to body (Falstad: 0→47px = 0→2.9375 grid units)
-    if (vPos !== undefined) {
-      ctx.setColor(signals!.voltageColor(vPos));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
     ctx.setLineWidth(2);
-    ctx.drawLine(0, 0, 2.9375, 0);
+    drawColoredLead(ctx, signals, vPos, 0, 0, 2.9375, 0);
 
     // Voltage label at right side
     ctx.setColor("TEXT");

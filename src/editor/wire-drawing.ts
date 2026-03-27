@@ -384,7 +384,7 @@ export class WireDrawingMode {
  * Without a locked axis, the heuristic picks the axis with more displacement
  * (ties default to horizontal-first).
  */
-export function manhattanSegments(
+function manhattanSegments(
   from: Point,
   to: Point,
   lockedAxis?: 'h' | 'v' | null,

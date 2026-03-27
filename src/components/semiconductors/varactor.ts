@@ -17,6 +17,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -238,20 +239,10 @@ export class VaractorElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Anode lead
-    if (signals && vA !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vA));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1.5, 0);
+    drawColoredLead(ctx, signals, vA, 0, 0, 1.5, 0);
 
     // Cathode lead
-    if (signals && vK !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vK));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.5, 0, 4, 0);
+    drawColoredLead(ctx, signals, vK, 2.5, 0, 4, 0);
 
     // Body (triangle, plate bars) stays COMPONENT color
     ctx.setColor("COMPONENT");

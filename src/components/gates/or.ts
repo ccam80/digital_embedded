@@ -26,6 +26,7 @@ import {
   STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   buildStandardGatePropertyDefs,
   drawGateExtensionLines,
+  drawGateLabel,
   drawOrBody,
 } from "./gate-shared.js";
 
@@ -85,7 +86,7 @@ export class OrElement extends AbstractCircuitElement {
     this._drawBodyStubs(ctx, inputCount);
     if (offs > 0) ctx.restore();
 
-    this._drawLabel(ctx, w);
+    drawGateLabel(ctx, this._visibleLabel(), w);
 
     ctx.restore();
   }
@@ -104,14 +105,6 @@ export class OrElement extends AbstractCircuitElement {
     if (center) ctx.drawLine(0, 1, 0.35, 1);
   }
 
-  private _drawLabel(ctx: RenderContext, w: number): void {
-    const label = this._visibleLabel();
-    if (label.length === 0) return;
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, w / 2, -0.5, { horizontal: "center", vertical: "bottom" });
-  }
 
   getHelpText(): string {
     return (

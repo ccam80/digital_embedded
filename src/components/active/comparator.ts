@@ -33,6 +33,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -123,28 +124,13 @@ export class ComparatorElement extends AbstractCircuitElement {
 
     // Input lead in+ (thick)
     ctx.setLineWidth(3);
-    if (vInp !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vInp));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, -1, 0.375, -1);
+    drawColoredLead(ctx, signals, vInp, 0, -1, 0.375, -1);
 
     // Input lead in- (thick)
-    if (vInn !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vInn));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 1, 0.375, 1);
+    drawColoredLead(ctx, signals, vInn, 0, 1, 0.375, 1);
 
     // Output lead (thick)
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.625, 0, 4, 0);
+    drawColoredLead(ctx, signals, vOut, 3.625, 0, 4, 0);
 
     // Text labels — body decoration, stays COMPONENT color
     ctx.setLineWidth(1);

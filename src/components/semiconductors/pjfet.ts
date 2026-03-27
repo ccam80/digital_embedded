@@ -20,6 +20,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -270,29 +271,14 @@ export class PJfetElement extends AbstractCircuitElement {
     ], true);
 
     // Gate lead
-    if (signals && vG !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vG));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, chanX, 0);
+    drawColoredLead(ctx, signals, vG, 0, 0, chanX, 0);
 
     // Drain lead (top)
-    if (signals && vD !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vD));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(chanX, chanTop, 3, chanTop);
+    drawColoredLead(ctx, signals, vD, chanX, chanTop, 3, chanTop);
     ctx.drawLine(3, chanTop, 3, -1.5);
 
     // Source lead (bottom)
-    if (signals && vS !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vS));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(chanX, chanBot, 3, chanBot);
+    drawColoredLead(ctx, signals, vS, chanX, chanBot, 3, chanBot);
     ctx.drawLine(3, chanBot, 3, 1.5);
 
     ctx.restore();

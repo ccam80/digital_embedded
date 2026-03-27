@@ -23,6 +23,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -263,20 +264,10 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Input lead: 0 → triLeft
-    if (vIn !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vIn));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, triLeft, 0);
+    drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
 
     // Output lead: lead2x → 4
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(lead2x, 0, 4, 0);
+    drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
     // Body — triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
@@ -344,20 +335,10 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Input lead: 0 → triLeft
-    if (vIn !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vIn));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, triLeft, 0);
+    drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
 
     // Output lead: lead2x → 4
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(lead2x, 0, 4, 0);
+    drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
     // Body — triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");

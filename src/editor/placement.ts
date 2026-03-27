@@ -24,7 +24,7 @@ import type { ClipboardData } from "@/editor/edit-operations";
 const PLACEMENT_GRID_SIZE = 1;
 
 /** Snapshot of ghost element state, exposed for rendering the overlay. */
-export interface GhostState {
+interface GhostState {
   readonly element: CircuitElement;
   readonly position: Point;
   readonly rotation: Rotation;

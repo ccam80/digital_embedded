@@ -19,6 +19,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -370,28 +371,13 @@ export class NpnBjtElement extends AbstractCircuitElement {
     ], true);
 
     // Base lead
-    if (signals && vB !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 3, 0);
+    drawColoredLead(ctx, signals, vB, 0, 0, 3, 0);
 
     // Collector lead (from bar to collector pin)
-    if (signals && vC !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vC));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.1875, -0.375, 4, -1);
+    drawColoredLead(ctx, signals, vC, 3.1875, -0.375, 4, -1);
 
     // Emitter lead (from bar to emitter pin)
-    if (signals && vE !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vE));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.1875, 0.375, 4, 1);
+    drawColoredLead(ctx, signals, vE, 3.1875, 0.375, 4, 1);
 
     // Arrow on emitter (pointing outward for NPN)
     ctx.setColor("COMPONENT");
@@ -455,28 +441,13 @@ export class PnpBjtElement extends AbstractCircuitElement {
     ], true);
 
     // Base lead
-    if (signals && vB !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 3, 0);
+    drawColoredLead(ctx, signals, vB, 0, 0, 3, 0);
 
     // Lower branch to C pin at (4, 1)
-    if (signals && vC !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vC));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.1875, 0.375, 4, 1);
+    drawColoredLead(ctx, signals, vC, 3.1875, 0.375, 4, 1);
 
     // Upper branch to E pin at (4, -1)
-    if (signals && vE !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vE));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3.1875, -0.375, 4, -1);
+    drawColoredLead(ctx, signals, vE, 3.1875, -0.375, 4, -1);
 
     // Arrow on upper (E) branch pointing inward (PNP)
     ctx.setColor("COMPONENT");

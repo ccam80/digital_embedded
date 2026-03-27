@@ -46,6 +46,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -294,36 +295,16 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.drawLine(1, 3, 1, -1);
 
     // sense+ lead
-    if (vSenseP !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vSenseP));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1, 0);
+    drawColoredLead(ctx, signals, vSenseP, 0, 0, 1, 0);
 
     // sense- lead
-    if (vSenseN !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vSenseN));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 2, 1, 2);
+    drawColoredLead(ctx, signals, vSenseN, 0, 2, 1, 2);
 
     // out+ lead
-    if (vOutP !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOutP));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(6, 0, 5, 0);
+    drawColoredLead(ctx, signals, vOutP, 6, 0, 5, 0);
 
     // out- lead
-    if (vOutN !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOutN));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(6, 2, 5, 2);
+    drawColoredLead(ctx, signals, vOutN, 6, 2, 5, 2);
 
     ctx.restore();
   }

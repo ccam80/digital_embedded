@@ -10,6 +10,7 @@
 
 import type { Circuit } from "@/core/circuit";
 import type { Engine, SimulationEngine, CompiledCircuit } from "@/core/engine-interface";
+type EngineFactory = (compiled: CompiledCircuit) => SimulationEngine;
 import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
 import type { DcOpResult } from "@/core/analog-engine-interface";
 import type { ComponentRegistry } from "@/core/registry";
@@ -18,12 +19,6 @@ import { compileUnified } from "@/compile/compile.js";
 import { getTransistorModels } from "@/solver/analog/default-models.js";
 import { DefaultSimulationCoordinator } from "@/solver/coordinator.js";
 import { FacadeError } from "./types.js";
-
-/**
- * Factory function that creates and initialises a SimulationEngine from a
- * compiled circuit. The default factory creates a DigitalEngine in level mode.
- */
-export type EngineFactory = (compiled: CompiledCircuit) => SimulationEngine;
 
 // ---------------------------------------------------------------------------
 // RunnerRecord — coordinator paired with engine key for label resolution

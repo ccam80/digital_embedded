@@ -18,6 +18,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -206,20 +207,10 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Lead from pos pin to body
-    if (vPos !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vPos));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 15 * PX, 0);
+    drawColoredLead(ctx, signals, vPos, 0, 0, 15 * PX, 0);
 
     // Lead from neg pin to body
-    if (vNeg !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vNeg));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(49 * PX, 0, 4, 0);
+    drawColoredLead(ctx, signals, vNeg, 49 * PX, 0, 4, 0);
 
     // Circle body and sine wave stay COMPONENT color
     ctx.setColor("COMPONENT");

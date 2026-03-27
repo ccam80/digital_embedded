@@ -46,29 +46,3 @@ export interface MicrostepConfig {
 /** Union of all mode configuration records. */
 export type ModeConfig = LevelConfig | TimedConfig | MicrostepConfig;
 
-// ---------------------------------------------------------------------------
-// Default configurations
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_LEVEL_CONFIG: LevelConfig = { kind: "level" };
-
-export const DEFAULT_TIMED_CONFIG: TimedConfig = {
-  kind: "timed",
-  defaultDelay: 10,
-};
-
-export const DEFAULT_MICROSTEP_CONFIG: MicrostepConfig = { kind: "microstep" };
-
-/**
- * Build the default configuration object for a given mode string.
- */
-export function defaultConfigForMode(mode: EvaluationMode): ModeConfig {
-  switch (mode) {
-    case "level":
-      return DEFAULT_LEVEL_CONFIG;
-    case "timed":
-      return DEFAULT_TIMED_CONFIG;
-    case "microstep":
-      return DEFAULT_MICROSTEP_CONFIG;
-  }
-}

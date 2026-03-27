@@ -31,6 +31,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -122,20 +123,10 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     const plateOffset = 28 * PX; // 1.75 — matches Falstad lead length (28px)
 
     // Left lead — colored by pos voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vPos));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, plateOffset, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vPos, 0, 0, plateOffset, 0);
 
     // Right lead — colored by neg voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vNeg));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, 0, 4 - plateOffset, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vNeg, 4, 0, 4 - plateOffset, 0);
 
     // Plate 1 — straight line (positive/anode plate)
     if (hasVoltage && ctx.setLinearGradient) {

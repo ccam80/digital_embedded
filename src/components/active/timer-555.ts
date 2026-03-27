@@ -25,6 +25,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -160,68 +161,28 @@ export class Timer555Element extends AbstractCircuitElement {
     ctx.drawRect(1, -1, 6, 10, false);
 
     // DIS lead (west): pin tip (0,2) → body edge (1,2)
-    if (vDis !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vDis));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 2, 1, 2);
+    drawColoredLead(ctx, signals, vDis, 0, 2, 1, 2);
 
     // TRIG lead (west): pin tip (0,6) → body edge (1,6)
-    if (vTrig !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vTrig));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 6, 1, 6);
+    drawColoredLead(ctx, signals, vTrig, 0, 6, 1, 6);
 
     // THR lead (west): pin tip (0,8) → body edge (1,8)
-    if (vThr !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vThr));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 8, 1, 8);
+    drawColoredLead(ctx, signals, vThr, 0, 8, 1, 8);
 
     // VCC lead (north): pin tip (4,-2) → body edge (4,-1)
-    if (vVcc !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vVcc));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, -2, 4, -1);
+    drawColoredLead(ctx, signals, vVcc, 4, -2, 4, -1);
 
     // CTRL lead (south): pin tip (4,10) → body edge (4,9)
-    if (vCtrl !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCtrl));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, 10, 4, 9);
+    drawColoredLead(ctx, signals, vCtrl, 4, 10, 4, 9);
 
     // OUT lead (east): pin tip (8,4) → body edge (7,4)
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(8, 4, 7, 4);
+    drawColoredLead(ctx, signals, vOut, 8, 4, 7, 4);
 
     // RST lead (east): pin tip (8,2) → body edge (7,2)
-    if (vRst !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vRst));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(8, 2, 7, 2);
+    drawColoredLead(ctx, signals, vRst, 8, 2, 7, 2);
 
     // GND lead (south): pin tip (6,10) → body edge (6,9)
-    if (vGnd !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vGnd));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(6, 10, 6, 9);
+    drawColoredLead(ctx, signals, vGnd, 6, 10, 6, 9);
 
     ctx.restore();
   }

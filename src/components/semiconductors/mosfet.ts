@@ -26,6 +26,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -621,28 +622,13 @@ export class NmosfetElement extends AbstractCircuitElement {
     ], true);
 
     // Gate lead (horizontal from pin to gate bar)
-    if (signals && vG !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vG));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, gateBarX, 0);
+    drawColoredLead(ctx, signals, vG, 0, 0, gateBarX, 0);
 
     // Drain lead (horizontal stub from channel to drain pin)
-    if (signals && vD !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vD));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, -1, chanX, -1);
+    drawColoredLead(ctx, signals, vD, 4, -1, chanX, -1);
 
     // Source lead (horizontal stub + vertical to body + body horizontal)
-    if (signals && vS !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vS));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, 1, chanX, 1);
+    drawColoredLead(ctx, signals, vS, 4, 1, chanX, 1);
     ctx.drawLine(4, 1, 4, 0);
     ctx.drawLine(4, 0, chanX, 0);
 
@@ -695,20 +681,10 @@ export class PmosfetElement extends AbstractCircuitElement {
     const gateBarX = 2.25;
 
     // Line 1: D lead (signal D color)
-    if (signals && vD !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vD));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, 1, chanX, 1);
+    drawColoredLead(ctx, signals, vD, 4, 1, chanX, 1);
 
     // Line 2: S stub horizontal (signal S color)
-    if (signals && vS !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vS));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, -1, chanX, -1);
+    drawColoredLead(ctx, signals, vS, 4, -1, chanX, -1);
 
     // Lines 3-6: channel segments (COMPONENT color)
     ctx.setColor("COMPONENT");
@@ -722,12 +698,7 @@ export class PmosfetElement extends AbstractCircuitElement {
     ctx.drawLine(chanX, -1, chanX, -1.3125);
 
     // Lines 9-10: S body vertical + horizontal (signal S color)
-    if (signals && vS !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vS));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(4, -1, 4, 0);
+    drawColoredLead(ctx, signals, vS, 4, -1, 4, 0);
     ctx.drawLine(4, 0, chanX, 0);
 
     // Line 11: arrow (COMPONENT color)
@@ -739,12 +710,7 @@ export class PmosfetElement extends AbstractCircuitElement {
     ]);
 
     // Line 12: gate lead (signal G color)
-    if (signals && vG !== undefined) {
-      ctx.setRawColor(signals.voltageColor(vG));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, gateBarX, 0);
+    drawColoredLead(ctx, signals, vG, 0, 0, gateBarX, 0);
 
     // Line 13: gate bar (COMPONENT color)
     ctx.setColor("COMPONENT");

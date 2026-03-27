@@ -45,7 +45,7 @@ import { NullSimulationCoordinator } from '../solver/null-coordinator.js';
 // Step options — facade-specific, not on the SimulatorFacade interface
 // ---------------------------------------------------------------------------
 
-export interface StepOptions {
+interface StepOptions {
   /** When false, clocks are not advanced before the engine step. Default: true. */
   clockAdvance?: boolean;
 }

@@ -223,7 +223,7 @@ export function resolvePins(
  * Spacing is 1 grid unit per pin slot. Pins are centred on the face.
  */
 
-export type CardinalFace = "north" | "south" | "east" | "west";
+type CardinalFace = "north" | "south" | "east" | "west";
 
 /**
  * Compute evenly-spaced pin positions along a face of a rectangular component.

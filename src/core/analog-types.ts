@@ -145,3 +145,157 @@ export interface AnalogElementCore {
 
 /** Device type codes recognized in SPICE .MODEL statements. */
 export type DeviceType = "NPN" | "PNP" | "NMOS" | "PMOS" | "NJFET" | "PJFET" | "D";
+
+// ---------------------------------------------------------------------------
+// SolverDiagnosticCode — exhaustive union of all diagnostic codes
+// ---------------------------------------------------------------------------
+
+/**
+ * All diagnostic codes that the analog solver and circuit validator can emit.
+ *
+ * Codes prefixed with solver terms (`singular-matrix`, `convergence-failed`,
+ * etc.) are analog-solver specific. The remaining codes are shared with the
+ * digital netlist validator and appear when the analog compiler processes a
+ * circuit with structural errors.
+ */
+export type SolverDiagnosticCode =
+  | "singular-matrix"
+  | "voltage-source-loop"
+  | "floating-node"
+  | "orphan-node"
+  | "inductor-loop"
+  | "no-ground"
+  | "convergence-failed"
+  | "timestep-too-small"
+  | "dc-op-converged"
+  | "dc-op-gmin"
+  | "dc-op-source-step"
+  | "dc-op-failed"
+  | "width-mismatch"
+  | "unconnected-input"
+  | "unconnected-output"
+  | "multi-driver-no-tristate"
+  | "missing-subcircuit"
+  | "label-collision"
+  | "combinational-loop"
+  | "missing-property"
+  | "unknown-component"
+  | "model-param-ignored"
+  | "model-level-unsupported"
+  | "unsupported-component-in-analog"
+  | "bridge-inner-compile-error"
+  | "bridge-unconnected-pin"
+  | "bridge-missing-inner-pin"
+  | "bridge-indeterminate-input"
+  | "bridge-oscillating-input"
+  | "bridge-impedance-mismatch"
+  | "missing-transistor-model"
+  | "invalid-transistor-model"
+  | "transmission-line-low-segments"
+  | "reverse-biased-cap"
+  | "fuse-blown"
+  | "ndr-convergence-assist"
+  | "rs-flipflop-both-set"
+  | "ac-no-source"
+  | "ac-linearization-failed"
+  | "unsupported-ctz-component"
+  | "monte-carlo-trial-failed"
+  | "unconnected-analog-pin";
+
+// ---------------------------------------------------------------------------
+// DiagnosticSuggestion — actionable fix hint
+// ---------------------------------------------------------------------------
+
+/**
+ * A concrete suggestion attached to a `SolverDiagnostic`.
+ *
+ * When `automatable` is `true`, the editor can apply the fix automatically
+ * using the `patch` field as a circuit patch operation.
+ */
+export interface DiagnosticSuggestion {
+  /** Human-readable description of the suggested fix. */
+  text: string;
+  /** Whether the editor can apply this fix without user intervention. */
+  automatable: boolean;
+  /** Optional patch operation that implements the fix. */
+  patch?: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// SolverDiagnostic — rich diagnostic record
+// ---------------------------------------------------------------------------
+
+/**
+ * A diagnostic record emitted by the analog solver or circuit validator.
+ *
+ * Diagnostics are designed to be pedagogically useful: every solver fallback,
+ * anomaly, or failure produces a plain-language explanation with suggestions.
+ */
+export interface SolverDiagnostic {
+  /** Machine-readable diagnostic code. */
+  code: SolverDiagnosticCode;
+  /** Severity level. */
+  severity: "info" | "warning" | "error";
+  /** One-line summary of the issue. */
+  summary: string;
+  /** Detailed explanation for display in the diagnostics panel. */
+  explanation: string;
+  /** Ordered list of suggested fixes. */
+  suggestions: DiagnosticSuggestion[];
+  /** Node IDs involved in this diagnostic, if applicable. */
+  involvedNodes?: number[];
+  /** Element IDs involved in this diagnostic, if applicable. */
+  involvedElements?: number[];
+  /** Simulation time at which this diagnostic was emitted, in seconds. */
+  simTime?: number;
+  /** Additional detail string for extended context. */
+  detail?: string;
+}
+
+// ---------------------------------------------------------------------------
+// AcParams — frequency sweep configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Parameters for an AC frequency sweep.
+ */
+export interface AcParams {
+  /** Sweep type: linear, decades, or octaves. */
+  type: "lin" | "dec" | "oct";
+  /** Points per sweep unit (points per decade/octave for 'dec'/'oct', total points for 'lin'). */
+  numPoints: number;
+  /** Start frequency in Hz. */
+  fStart: number;
+  /** Stop frequency in Hz. */
+  fStop: number;
+  /** Label of the AC voltage source providing excitation. */
+  sourceLabel: string;
+  /** Labels of nodes to measure (output nodes). */
+  outputNodes: string[];
+}
+
+// ---------------------------------------------------------------------------
+// AcResult — frequency sweep result
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of an AC frequency sweep analysis.
+ *
+ * Imported from core/ so that analog-engine-interface.ts does not depend on
+ * solver/analog internals. The solver/analog/ac-analysis.ts re-exports these
+ * types for backward compatibility.
+ */
+export interface AcResult {
+  /** Frequency points in Hz. */
+  frequencies: Float64Array;
+  /** Magnitude |H(f)| per output node, in dB (20·log10|H|). */
+  magnitude: Map<string, Float64Array>;
+  /** Phase angle ∠H(f) per output node, in degrees. */
+  phase: Map<string, Float64Array>;
+  /** Real part Re{H(f)} per output node. */
+  real: Map<string, Float64Array>;
+  /** Imaginary part Im{H(f)} per output node. */
+  imag: Map<string, Float64Array>;
+  /** Diagnostics emitted during analysis. */
+  diagnostics: SolverDiagnostic[];
+}

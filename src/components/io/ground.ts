@@ -12,6 +12,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -78,12 +79,7 @@ export class GroundElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
     // Vertical stem from pin (y=0) down to first bar
-    if (vPin !== undefined) {
-      ctx.setRawColor!(signals!.voltageColor(vPin));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 0, 0.5);
+    drawColoredLead(ctx, signals, vPin, 0, 0, 0, 0.5);
     // Three decreasing-width horizontal bars
     ctx.setColor("COMPONENT");
     ctx.drawLine(-0.6, 0.5, 0.6, 0.5);

@@ -11,7 +11,7 @@ import { hasDigitalModel, hasAnalogModel, availableModels } from '../core/regist
 import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
-import type { Diagnostic } from '../headless/netlist-types.js';
+import type { Diagnostic } from './types.js';
 import type { PinDirection } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------

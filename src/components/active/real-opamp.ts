@@ -50,6 +50,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -229,20 +230,10 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     );
 
     // Supply rail stubs: Vcc+ stub
-    if (vVccP !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vVccP));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2, -2, 2, -1);
+    drawColoredLead(ctx, signals, vVccP, 2, -2, 2, -1);
 
     // Supply rail stubs: Vcc- stub
-    if (vVccN !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vVccN));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2, 2, 2, 1);
+    drawColoredLead(ctx, signals, vVccN, 2, 2, 2, 1);
 
     // +/- signs — body decoration, stays COMPONENT color
     ctx.setColor("COMPONENT");

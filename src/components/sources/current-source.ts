@@ -12,6 +12,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import { PinDirection, type Pin, type PinDeclaration, type Rotation } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -64,20 +65,10 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Lead from neg pin (x=0) to body — thick
-    if (vNeg !== undefined) {
-      ctx.setColor(signals!.voltageColor(vNeg));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1.1875, 0);
+    drawColoredLead(ctx, signals, vNeg, 0, 0, 1.1875, 0);
 
     // Lead from pos pin (x=4) to body — thick
-    if (vPos !== undefined) {
-      ctx.setColor(signals!.voltageColor(vPos));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2.8125, 0, 4, 0);
+    drawColoredLead(ctx, signals, vPos, 2.8125, 0, 4, 0);
 
     // Body (circle and arrow) stays COMPONENT color
     ctx.setColor("COMPONENT");

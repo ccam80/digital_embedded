@@ -31,48 +31,11 @@ import type { SolverDiagnostic, SimulationParams } from "../../core/analog-engin
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// AcParams — frequency sweep configuration
+// AcParams, AcResult — canonical home is core/analog-types.ts; re-exported here
 // ---------------------------------------------------------------------------
 
-/**
- * Parameters for an AC frequency sweep.
- */
-export interface AcParams {
-  /** Sweep type: linear, decades, or octaves. */
-  type: "lin" | "dec" | "oct";
-  /** Points per sweep unit (points per decade/octave for 'dec'/'oct', total points for 'lin'). */
-  numPoints: number;
-  /** Start frequency in Hz. */
-  fStart: number;
-  /** Stop frequency in Hz. */
-  fStop: number;
-  /** Label of the AC voltage source providing excitation. */
-  sourceLabel: string;
-  /** Labels of nodes to measure (output nodes). */
-  outputNodes: string[];
-}
-
-// ---------------------------------------------------------------------------
-// AcResult — frequency sweep result
-// ---------------------------------------------------------------------------
-
-/**
- * Result of an AC frequency sweep analysis.
- */
-export interface AcResult {
-  /** Frequency points in Hz. */
-  frequencies: Float64Array;
-  /** Magnitude |H(f)| per output node, in dB (20·log10|H|). */
-  magnitude: Map<string, Float64Array>;
-  /** Phase angle ∠H(f) per output node, in degrees. */
-  phase: Map<string, Float64Array>;
-  /** Real part Re{H(f)} per output node. */
-  real: Map<string, Float64Array>;
-  /** Imaginary part Im{H(f)} per output node. */
-  imag: Map<string, Float64Array>;
-  /** Diagnostics emitted during analysis. */
-  diagnostics: SolverDiagnostic[];
-}
+import type { AcParams, AcResult } from "../../core/analog-types.js";
+export type { AcParams, AcResult };
 
 // ---------------------------------------------------------------------------
 // AcAnalysis

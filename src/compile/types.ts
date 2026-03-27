@@ -13,9 +13,54 @@ import type { ComponentRegistry } from "../core/registry.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
-import type { Diagnostic } from "../headless/netlist-types.js";
+import type { NetPin } from "../headless/netlist-types.js";
 
-export type { Diagnostic };
+// ---------------------------------------------------------------------------
+// Diagnostic and DiagnosticCode — canonical definitions (moved from headless)
+// ---------------------------------------------------------------------------
+
+/**
+ * Diagnostic codes for pre-compilation and compilation errors/warnings.
+ */
+export type DiagnosticCode =
+  | 'width-mismatch'
+  | 'unconnected-input'
+  | 'unconnected-output'
+  | 'multi-driver-no-tristate'
+  | 'missing-subcircuit'
+  | 'label-collision'
+  | 'combinational-loop'
+  | 'missing-property'
+  | 'unknown-component'
+  | 'unsupported-ctz-component';
+
+/**
+ * A single diagnostic: an error, warning, or informational note about
+ * the circuit structure.
+ *
+ * Consumed by:
+ * - GUI status bar / error panel (human-readable `message`)
+ * - Headless facade / LLM agents (structured fields for programmatic use)
+ * - postMessage API (serializable to JSON)
+ */
+export interface Diagnostic {
+  /** Severity level. */
+  readonly severity: 'error' | 'warning' | 'info';
+  /** Machine-readable diagnostic code. */
+  readonly code: DiagnosticCode;
+  /** Human-readable description. */
+  readonly message: string;
+  /** Net involved, if applicable. */
+  readonly netId?: number;
+  /** Pins involved (e.g. the two sides of a width mismatch). */
+  readonly pins?: NetPin[];
+  /** Which .dig file this relates to (for subcircuit errors). */
+  readonly subcircuitFile?: string;
+  /** Nesting path for subcircuit errors. */
+  readonly hierarchyPath?: readonly string[];
+  /** Suggested fix in plain English. */
+  readonly fix?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Re-export imported types for downstream consumers of this module

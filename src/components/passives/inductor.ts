@@ -10,6 +10,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -95,20 +96,10 @@ export class InductorElement extends AbstractCircuitElement {
     const hasVoltage = vA !== undefined && vB !== undefined;
 
     // Left lead — colored by pin A voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vA));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
 
     // Right lead — colored by pin B voltage
-    if (hasVoltage && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vB));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3, 0, 4, 0);
+    drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
     // Coil body: 3 semicircular arcs from PI to 2*PI — gradient from vA to vB
     const loopCt = 3;

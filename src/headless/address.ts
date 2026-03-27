@@ -38,7 +38,7 @@ export interface ResolvedPin {
  * "gate:A" → { component: "gate", pin: "A" }
  * "gate"   → { component: "gate", pin: undefined }
  */
-export function parseAddress(address: string): { component: string; pin: string | undefined } {
+function parseAddress(address: string): { component: string; pin: string | undefined } {
   const colonIdx = address.indexOf(':');
   if (colonIdx === -1) {
     return { component: address, pin: undefined };
@@ -47,29 +47,6 @@ export function parseAddress(address: string): { component: string; pin: string 
     component: address.slice(0, colonIdx),
     pin: address.slice(colonIdx + 1),
   };
-}
-
-// ---------------------------------------------------------------------------
-// buildLabelIndex
-// ---------------------------------------------------------------------------
-
-/**
- * Build a label → element index map for efficient repeated lookups.
- * Keys are user labels (via getComponentLabel), values are element indices.
- * Falls back to instanceId for unlabeled components.
- */
-export function buildLabelIndex(circuit: Circuit): Map<string, number> {
-  const index = new Map<string, number>();
-  for (let i = 0; i < circuit.elements.length; i++) {
-    const el = circuit.elements[i];
-    const label = getComponentLabel(el);
-    if (label !== undefined) {
-      index.set(label, i);
-    } else {
-      index.set(el.instanceId, i);
-    }
-  }
-  return index;
 }
 
 // ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ import type {
   ConnectivityGroup,
   DigitalCompilerFn,
 } from "./types.js";
-import type { Diagnostic } from "../headless/netlist-types.js";
+import type { Diagnostic } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // compileUnified — public entry point

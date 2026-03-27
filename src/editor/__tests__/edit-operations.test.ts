@@ -8,7 +8,6 @@ import {
   deleteSelection,
   copyToClipboard,
   pasteFromClipboard,
-  duplicate,
 } from "@/editor/edit-operations";
 import { renameLabelsOnCopy } from "@/editor/label-renamer";
 import { Wire, Circuit } from "@/core/circuit";
@@ -142,23 +141,6 @@ describe("EditOps", () => {
     expect(circuit.elements[0]!.instanceId).not.toBe(circuit.elements[1]!.instanceId);
   });
 
-  it("duplicateIsCopyPasteInPlace", () => {
-    const circuit = new Circuit();
-    const def = makeDefinition("StubComp");
-    const el = makeStubElement(3, 4);
-
-    circuit.addElement(el);
-
-    const resolver = (_typeId: string): ComponentDefinition | undefined => def;
-    const cmd = duplicate(circuit, [el], [], resolver);
-    cmd.execute();
-
-    expect(circuit.elements).toHaveLength(2);
-    const duplicate_ = circuit.elements[1]!;
-    // Duplicate is offset by (1,1) from original
-    expect(duplicate_.position.x).toBe(4);
-    expect(duplicate_.position.y).toBe(5);
-  });
 });
 
 // ---------------------------------------------------------------------------

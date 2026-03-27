@@ -22,6 +22,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -300,28 +301,13 @@ export class SwitchSPSTElement extends AbstractCircuitElement {
     ctx.drawLine(1, 0, 3, 0);
 
     // in lead
-    if (vIn !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vIn));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1, 0);
+    drawColoredLead(ctx, signals, vIn, 0, 0, 1, 0);
 
     // out lead
-    if (vOut !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vOut));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3, 0, 4, 0);
+    drawColoredLead(ctx, signals, vOut, 3, 0, 4, 0);
 
     // ctrl lead
-    if (vCtrl !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCtrl));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(2, 1, 2, 0.5);
+    drawColoredLead(ctx, signals, vCtrl, 2, 1, 2, 0.5);
 
     ctx.restore();
   }
@@ -365,28 +351,13 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
     ctx.drawLine(1, 0, 3, -1);
 
     // COM lead
-    if (vCom !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vCom));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(0, 0, 1, 0);
+    drawColoredLead(ctx, signals, vCom, 0, 0, 1, 0);
 
     // NO lead
-    if (vNo !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vNo));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3, -1, 4, -1);
+    drawColoredLead(ctx, signals, vNo, 3, -1, 4, -1);
 
     // NC lead
-    if (vNc !== undefined && ctx.setRawColor) {
-      ctx.setRawColor(signals!.voltageColor(vNc));
-    } else {
-      ctx.setColor("COMPONENT");
-    }
-    ctx.drawLine(3, 1, 4, 1);
+    drawColoredLead(ctx, signals, vNc, 3, 1, 4, 1);
 
     ctx.restore();
   }
