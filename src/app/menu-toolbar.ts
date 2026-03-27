@@ -18,6 +18,8 @@ import { createModal } from './dialog-manager.js';
 import { separator } from '../editor/context-menu.js';
 import type { MenuItem } from '../editor/context-menu.js';
 import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard } from '../editor/edit-operations.js';
+import { analyzeBoundary, insertAsSubcircuit } from '../editor/insert-subcircuit.js';
+import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import type { Wire } from '../core/circuit.js';
 import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
@@ -216,6 +218,35 @@ export function initMenuAndToolbar(
             undoStack.push(cmd);
             selection.clear();
           }, enabled: true },
+          separator(),
+          {
+            label: 'Make Subcircuit\u2026',
+            enabled: selection.getSelectedElements().size >= 2 && !ctx.isSimActive(),
+            action: () => {
+              const selectedElements = [...selection.getSelectedElements()];
+              const selectedWires = [...selection.getSelectedWires()];
+              const { boundaryPorts } = analyzeBoundary(ctx.circuit, selectedElements, selectedWires);
+              void openSubcircuitDialog(boundaryPorts, registry).then((result) => {
+                if (!result) return;
+                const { subcircuit: _sc, command, instance: _inst } = insertAsSubcircuit(
+                  ctx.circuit,
+                  selectedElements,
+                  selectedWires,
+                  registry,
+                  result.name,
+                );
+                undoStack.push(command);
+                selection.clear();
+                ctx.invalidateCompiled();
+
+                const portCount = result.ports.length;
+                const statusBar = document.getElementById('status-bar');
+                if (statusBar) {
+                  statusBar.textContent = `Created subcircuit "${result.name}" (${portCount} port${portCount !== 1 ? 's' : ''})`;
+                }
+              });
+            },
+          },
         );
 
         // "Add Slider" — for components with FLOAT properties during analog sim
