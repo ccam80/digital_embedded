@@ -19,7 +19,7 @@
 import type { TutorialCircuitSpec, PaletteSpec } from './types.js';
 import { isTutorialManifest, isUrlSafeId } from './types.js';
 import { PALETTE_PRESETS } from './presets.js';
-import type { ComponentRegistry } from '../core/registry.js';
+import type { ComponentRegistry } from '../../core/registry.js';
 
 // ---------------------------------------------------------------------------
 // Diagnostic types
@@ -154,6 +154,17 @@ export function validateManifest(
         code: 'missing-goal',
         message: `${stepLabel}: validation is "equivalence" but no goalCircuit is provided.`,
         fix: 'Add a goalCircuit field with a CircuitSpec or .dig file path.',
+      });
+    }
+
+    // Explore mode without goalCircuit — "Show Solution" button won't work
+    if (step.mode === 'explore' && !step.goalCircuit) {
+      diagnostics.push({
+        severity: 'warning',
+        stepId: step.id,
+        code: 'explore-no-goal',
+        message: `${stepLabel}: mode is "explore" but no goalCircuit is provided. The "Show Solution" button will be hidden.`,
+        fix: 'Add a goalCircuit field if you want students to be able to view a reference solution.',
       });
     }
 

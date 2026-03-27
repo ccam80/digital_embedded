@@ -11,7 +11,7 @@ import {
   standardGatePinLayout,
   gateBodyMetrics,
 } from "../../core/pin.js";
-import { PropertyType } from "../../core/properties.js";
+import { PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import type { AttributeMapping } from "../../core/registry.js";
 
@@ -139,13 +139,7 @@ export function buildStandardGatePropertyDefs(wideShapeDescription: string): Pro
       defaultValue: "",
       description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
     },
-    {
-      key: "label",
-      type: PropertyType.STRING,
-      label: "Label",
-      defaultValue: "",
-      description: "Optional label shown above the component",
-    },
+    LABEL_PROPERTY_DEF,
   ];
 }
 

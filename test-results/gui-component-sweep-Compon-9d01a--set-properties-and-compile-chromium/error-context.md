@@ -254,31 +254,32 @@
                 - generic [ref=e338]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e339] [cursor=pointer]:
                 - generic [ref=e341]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e342]
-    - generic [ref=e343]:
-      - generic "Circuit editor canvas" [ref=e344]
-      - generic [ref=e345]:
-        - generic [ref=e346]:
-          - generic [ref=e347]: BitExtender
-          - button "×" [ref=e348] [cursor=pointer]
-        - generic [ref=e349]:
-          - generic [ref=e350]:
-            - generic [ref=e351]: Input bits
-            - spinbutton [ref=e353]: "4"
-          - generic [ref=e354]:
-            - generic [ref=e355]: Output bits
-            - spinbutton [ref=e357]: "8"
-          - generic [ref=e358]:
-            - generic [ref=e359]: Label
-            - generic [ref=e360]:
-              - textbox [ref=e361]: DUT
-              - checkbox "Show on canvas" [checked] [ref=e362]
-          - generic [ref=e363]:
-            - generic [ref=e364]: Show value
-            - checkbox [checked] [ref=e366]
-          - generic [ref=e368] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e369]:
-    - generic [ref=e370]: Ready
-    - button "100%" [ref=e372] [cursor=pointer]
-    - generic [ref=e373]: 11.5, 8
+      - button "‹" [ref=e342] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e343]
+    - generic [ref=e344]:
+      - generic "Circuit editor canvas" [ref=e345]
+      - generic [ref=e346]:
+        - generic [ref=e347]:
+          - generic [ref=e348]: BitExtender
+          - button "×" [ref=e349] [cursor=pointer]
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: Input bits
+            - spinbutton [ref=e354]: "4"
+          - generic [ref=e355]:
+            - generic [ref=e356]: Output bits
+            - spinbutton [ref=e358]: "8"
+          - generic [ref=e359]:
+            - generic [ref=e360]: Label
+            - generic [ref=e361]:
+              - textbox [ref=e362]: DUT
+              - checkbox "Show on canvas" [checked] [ref=e363]
+          - generic [ref=e364]:
+            - generic [ref=e365]: Show value
+            - checkbox [checked] [ref=e367]
+          - generic [ref=e369] [cursor=pointer]: ▶ Pin Electrical
+  - generic [ref=e370]:
+    - generic [ref=e371]: Ready
+    - button "100%" [ref=e373] [cursor=pointer]
+    - generic [ref=e374]: 11.5, 8
 ```

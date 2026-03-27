@@ -44,6 +44,11 @@ import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { loadAllSubcircuits } from '../io/subcircuit-store.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { PostMessageAdapter } from '../io/postmessage-adapter.js';
+import { TutorialRunner } from './tutorial/tutorial-runner.js';
+import { TutorialBar } from './tutorial/tutorial-bar.js';
+import { TutorialShelf } from './tutorial/tutorial-shelf.js';
+import { isTutorialManifest } from './tutorial/types.js';
+import type { TutorialManifest } from './tutorial/types.js';
 import { createTestBridge } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
@@ -148,6 +153,11 @@ export function initApp(search?: string): void {
   const facade = new DefaultSimulatorFacade(registry);
   const binding = createEditorBinding();
   let compiledDirty = true;
+
+  // Tutorial runner state (created on digital-load-tutorial)
+  let activeTutorialRunner: TutorialRunner | null = null;
+  let activeTutorialBar: TutorialBar | null = null;
+  let activeTutorialShelf: TutorialShelf | null = null;
 
   // isSimActive, compileAndBind, invalidateCompiled — delegated to simController (set up below)
 
@@ -520,6 +530,197 @@ export function initApp(search?: string): void {
           instructionsPanel.style.display = '';
           toggleBtn.style.display = '';
           instructionsPanel.innerHTML = renderMarkdownToHtml(markdown);
+        }
+      },
+
+      // --- Embedded tutorial runner ---
+      loadTutorial: (raw: unknown) => {
+        if (!isTutorialManifest(raw)) {
+          window.parent.postMessage({ type: 'digital-error', error: 'Invalid tutorial manifest' }, '*');
+          return;
+        }
+        const manifest = raw as TutorialManifest;
+
+        // Dispose previous tutorial runner if any
+        if (activeTutorialRunner) {
+          activeTutorialRunner.dispose();
+          activeTutorialBar?.dispose();
+          activeTutorialShelf?.dispose();
+        }
+
+        const canvasContainer = document.getElementById('canvas-container')!;
+        const workspace = document.getElementById('workspace')!;
+
+        const bar = new TutorialBar(canvasContainer);
+        const shelf = new TutorialShelf(workspace, canvasContainer);
+
+        const runner = new TutorialRunner(manifest, {
+          setPalette: (components) => {
+            palette.setAllowlist(components);
+            paletteUI.render();
+          },
+          loadCircuitXml: (xml) => fileIOController.loadCircuitFromXml(xml),
+          loadEmptyCircuit: () => {
+            circuit = new Circuit();
+            fileIOController.loadCircuitFromXml(serializeCircuitToDig(circuit, registry));
+          },
+          getCircuitSnapshot: () => {
+            return btoa(serializeCircuitToDig(circuit, registry));
+          },
+          setReadonlyComponents: (labels) => {
+            if (labels === null) {
+              for (const el of circuit.elements) {
+                (el as unknown as Record<string, unknown>)['_readonly'] = false;
+              }
+            } else {
+              const readonlySet = new Set(labels);
+              for (const el of circuit.elements) {
+                const label = String(el.getProperties().get('label') ?? '');
+                (el as unknown as Record<string, unknown>)['_readonly'] = readonlySet.has(label);
+              }
+            }
+          },
+          highlight: (labels, durationMs) => {
+            const labelSet = new Set(labels);
+            const toSelect = circuit.elements.filter(
+              (el) => labelSet.has(String(el.getProperties().get('label') ?? '')),
+            );
+            selection.boxSelect(toSelect, []);
+            renderPipeline.scheduleRender();
+            if (durationMs > 0) {
+              setTimeout(() => { selection.clear(); renderPipeline.scheduleRender(); }, durationMs);
+            }
+          },
+          runTests: async (testData) => {
+            try {
+              const coordinator = facade.compile(circuit);
+              const { parseTestData } = await import('../testing/parser.js');
+              const { executeTests } = await import('../testing/executor.js');
+              const { detectInputCount } = await import('../testing/detect-input-count.js');
+              const inputCount = detectInputCount(circuit, registry, testData);
+              const parsed = parseTestData(testData, inputCount);
+              const results = executeTests(facade as import('../testing/executor.js').RunnerFacade, coordinator, circuit, parsed);
+              return { passed: results.passed, failed: results.failed, total: results.total };
+            } catch (err) {
+              return { passed: 0, failed: 1, total: 1, message: err instanceof Error ? err.message : String(err) };
+            }
+          },
+          precheck: (testData) => {
+            // Compile the circuit and verify that signal labels from test header exist
+            try {
+              facade.compile(circuit);
+            } catch (err) {
+              return { ok: false, error: `Compilation failed: ${err instanceof Error ? err.message : String(err)}` };
+            }
+            // Extract expected labels from test data header
+            const hdrLine = testData.split('\n').find(
+              (l: string) => l.trim().length > 0 && !l.trim().startsWith('#'),
+            ) ?? '';
+            const hdrNames = hdrLine.trim().split(/\s+/).filter((n: string) => n.length > 0);
+            // Collect circuit labels
+            const circuitLabels = new Set<string>();
+            for (const el of circuit.elements) {
+              const lbl = el.getProperties().getOrDefault('label', '') as string;
+              if (lbl) circuitLabels.add(lbl);
+            }
+            const missing = hdrNames.filter((n: string) => !circuitLabels.has(n));
+            if (missing.length > 0) {
+              return { ok: false, error: `Missing labels: ${missing.join(', ')}. Double-click a component to set its label.` };
+            }
+            return { ok: true };
+          },
+          compile: () => {
+            try {
+              facade.compile(circuit);
+              return { ok: true };
+            } catch (err) {
+              return { ok: false, error: err instanceof Error ? err.message : String(err) };
+            }
+          },
+          loadSolution: async (goalCircuit) => {
+            if (typeof goalCircuit === 'string') {
+              // .dig file path — would need fetch; not supported in-iframe yet
+              return;
+            }
+            // TutorialCircuitSpec — build via facade
+            const built = facade.build(goalCircuit as import('../headless/netlist-types.js').CircuitSpec);
+            const xml = serializeCircuitToDig(built, registry);
+            await fileIOController.loadCircuitFromXml(xml);
+            renderPipeline.scheduleRender();
+          },
+          postToParent: (msg) => { window.parent.postMessage(msg, '*'); },
+        });
+
+        activeTutorialRunner = runner;
+        activeTutorialBar = bar;
+        activeTutorialShelf = shelf;
+
+        // Wire bar actions → runner
+        bar.onAction(async (action) => {
+          switch (action) {
+            case 'prev': await runner.prev(); break;
+            case 'next': await runner.next(); break;
+            case 'check': {
+              bar.setCheckState('running');
+              const result = await runner.check();
+              bar.setCheckState(result.passed ? 'pass' : 'fail');
+              // Re-update bar to reflect new completion state
+              const sp = runner.progress.steps[runner.currentStepIndex];
+              if (sp) bar.update(runner.currentStep, runner.currentStepIndex, runner.stepCount, sp);
+              break;
+            }
+            case 'precheck': {
+              const result = runner.precheck();
+              if (result.ok) {
+                showStatus(result.message);
+              } else {
+                showStatus(result.message, true);
+              }
+              break;
+            }
+            case 'solution': {
+              const loaded = await runner.loadSolution();
+              if (loaded) bar.setSolutionLoaded();
+              break;
+            }
+          }
+        });
+
+        // Wire hint requests from shelf → runner → shelf
+        shelf.onHintRequest(() => {
+          const content = runner.revealHint();
+          if (content !== null) {
+            const sp = runner.progress.steps[runner.currentStepIndex];
+            shelf.revealHint((sp?.hintsRevealed ?? 1) - 1, content);
+          }
+        });
+
+        // Update UI on step changes — override goToStep to hook in
+        const origGoToStep = runner.goToStep.bind(runner);
+        runner.goToStep = async (index: number) => {
+          await origGoToStep(index);
+          const step = runner.currentStep;
+          const sp = runner.progress.steps[runner.currentStepIndex];
+          if (sp) {
+            bar.update(step, runner.currentStepIndex, runner.stepCount, sp);
+            shelf.setContent(step.instructions, step.hints, sp.hintsRevealed);
+          }
+          renderPipeline.scheduleRender();
+        };
+
+        // Load first step (or resume from saved progress)
+        const startIndex = runner.progress.currentStepIndex;
+        void runner.goToStep(startIndex);
+
+        window.parent.postMessage({
+          type: 'digital-tutorial-loaded',
+          tutorialId: manifest.id,
+          totalSteps: manifest.steps.length,
+        }, '*');
+      },
+      tutorialGoto: (stepIndex: number) => {
+        if (activeTutorialRunner) {
+          void activeTutorialRunner.goToStep(stepIndex);
         }
       },
     },

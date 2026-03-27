@@ -11,12 +11,6 @@
   </attributes>
   <visualElements>
     <visualElement>
-      <elementName>VDD</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="60" y="60"/>
-    </visualElement>
-    <visualElement>
       <elementName>Clock</elementName>
       <elementAttributes>
         <entry>
@@ -126,42 +120,46 @@
       </elementAttributes>
       <pos x="360" y="400"/>
     </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="300"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Const</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="400"/>
+    </visualElement>
   </visualElements>
   <wires>
     <wire>
-      <p1 x="60" y="60"/>
-      <p2 x="200" y="60"/>
-    </wire>
-    <wire>
-      <p1 x="200" y="60"/>
+      <p1 x="120" y="100"/>
       <p2 x="200" y="100"/>
     </wire>
     <wire>
-      <p1 x="200" y="100"/>
-      <p2 x="200" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="200" y="120"/>
+      <p1 x="120" y="200"/>
       <p2 x="200" y="200"/>
     </wire>
     <wire>
-      <p1 x="60" y="60"/>
-      <p2 x="60" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="140"/>
-      <p2 x="60" y="300"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="300"/>
-      <p2 x="60" y="400"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="300"/>
+      <p1 x="120" y="300"/>
       <p2 x="200" y="300"/>
     </wire>
     <wire>
-      <p1 x="60" y="400"/>
+      <p1 x="120" y="400"/>
       <p2 x="200" y="400"/>
     </wire>
     <wire>

@@ -33,14 +33,14 @@
         - generic [ref=e33]:
           - generic [ref=e34] [cursor=pointer]: Recent
           - list [ref=e35]:
-            - treeitem "Out" [ref=e36] [cursor=pointer]:
-              - generic [ref=e38]: Out
-            - treeitem "T_FF" [ref=e39] [cursor=pointer]:
-              - generic [ref=e41]: T_FF
-            - treeitem "Clock" [ref=e42] [cursor=pointer]:
-              - generic [ref=e44]: Clock
-            - treeitem "VDD" [ref=e45] [cursor=pointer]:
-              - generic [ref=e47]: VDD
+            - treeitem "Const" [ref=e36] [cursor=pointer]:
+              - generic [ref=e38]: Const
+            - treeitem "Out" [ref=e39] [cursor=pointer]:
+              - generic [ref=e41]: Out
+            - treeitem "T_FF" [ref=e42] [cursor=pointer]:
+              - generic [ref=e44]: T_FF
+            - treeitem "Clock" [ref=e45] [cursor=pointer]:
+              - generic [ref=e47]: Clock
         - tree [ref=e48]:
           - generic [ref=e49]:
             - generic [ref=e50] [cursor=pointer]:
@@ -260,12 +260,11 @@
                 - generic [ref=e347]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e348] [cursor=pointer]:
                 - generic [ref=e350]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e351]
-    - generic "Circuit editor canvas" [ref=e353]
-  - generic [ref=e354]:
-    - generic [ref=e355]: ⚠️
-    - generic [ref=e356]: "Simulation error: Bus conflict on net 0: conflicting drivers"
-    - button "×" [ref=e357] [cursor=pointer]
-    - button "100%" [ref=e359] [cursor=pointer]
-    - generic [ref=e360]: 18, 20
+      - button "‹" [ref=e351] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e352]
+    - generic "Circuit editor canvas" [ref=e354]
+  - generic [ref=e355]:
+    - generic [ref=e356]: Ready
+    - button "100%" [ref=e358] [cursor=pointer]
+    - generic [ref=e359]: 18, 20
 ```

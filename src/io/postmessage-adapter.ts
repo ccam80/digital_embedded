@@ -32,6 +32,8 @@
  *     digital-clear-highlight         — clear all highlights
  *     digital-set-readonly-components — lock specific components
  *     digital-set-instructions        — show/hide instructions panel
+ *     digital-load-tutorial           — load a TutorialManifest and start embedded runner
+ *     digital-tutorial-goto           — jump to a specific tutorial step by index
  *
  * Simulator → Parent response types:
  *     digital-ready        — sent once on init
@@ -41,6 +43,9 @@
  *     digital-signals      — response to digital-read-all-signals
  *     digital-test-result  — response to digital-test / digital-run-tests
  *     digital-circuit-data — response to digital-get-circuit
+ *     digital-tutorial-loaded       — tutorial manifest accepted, runner active
+ *     digital-tutorial-step-changed — step navigation occurred
+ *     digital-tutorial-check-result — validation result for a step
  */
 
 import type { FileResolver } from './file-resolver.js';
@@ -98,6 +103,12 @@ export interface PostMessageHooks {
 
   /** Show/hide the instructions panel (null = hide). */
   setInstructions?(markdown: string | null): void;
+
+  /** Load a tutorial manifest and start the embedded tutorial runner. */
+  loadTutorial?(manifest: unknown): void;
+
+  /** Jump to a specific tutorial step by index. */
+  tutorialGoto?(stepIndex: number): void;
 
   /** Update the base path for file resolution. */
   setBasePath?(basePath: string): void;
@@ -263,6 +274,14 @@ export class PostMessageAdapter {
           break;
         case 'digital-set-instructions':
           this._handleSetInstructions(msg);
+          break;
+
+        // --- Tutorial runner ---
+        case 'digital-load-tutorial':
+          this._hooks.loadTutorial?.(msg.manifest);
+          break;
+        case 'digital-tutorial-goto':
+          this._hooks.tutorialGoto?.(Number(msg.stepIndex ?? 0));
           break;
 
         default:

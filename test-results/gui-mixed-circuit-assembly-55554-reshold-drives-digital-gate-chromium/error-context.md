@@ -31,10 +31,11 @@
           - textbox "Search components…" [active] [ref=e31]: AnalogPotentiometer
           - button "⚙" [ref=e32] [cursor=pointer]
         - tree
-    - generic "Drag to resize palette" [ref=e33]
-    - generic "Circuit editor canvas" [ref=e35]
-  - generic [ref=e36]:
-    - generic [ref=e37]: Ready
-    - button "100%" [ref=e39] [cursor=pointer]
-    - generic [ref=e40]: 5, 6
+      - button "‹" [ref=e33] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e34]
+    - generic "Circuit editor canvas" [ref=e36]
+  - generic [ref=e37]:
+    - generic [ref=e38]: Ready
+    - button "100%" [ref=e40] [cursor=pointer]
+    - generic [ref=e41]: 5, 6
 ```

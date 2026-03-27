@@ -7,6 +7,7 @@
   "steps": [
     {
       "id": "step-1-adder",
+      "mode": "explore",
       "title": "8-bit Adder",
       "instructions": "# 8-bit Adder\n\nEvery CPU needs arithmetic. Build an 8-bit adder with carry-in and carry-out.\n\n## Goal\n\nConnect two 8-bit inputs **A** and **B** and a 1-bit **Cin** through an `Add` component to produce an 8-bit sum **S** and a 1-bit carry-out **Cout**.\n\n## Hints\n\n- Use the `Add` component with `bitWidth = 8`\n- The carry-in allows chaining adders for wider arithmetic\n- Verify: 1 + 1 = 2, and 255 + 1 = 0 with carry",
       "palette": {
@@ -119,6 +120,7 @@
     },
     {
       "id": "step-2-alu",
+      "mode": "explore",
       "title": "8-bit ALU",
       "instructions": "# 8-bit ALU\n\nAn ALU performs different operations based on an opcode. Build one that supports ADD, SUB, AND, and OR.\n\n## Goal\n\nRoute two 8-bit inputs **A** and **B** through four parallel operations (Add, Sub, And, Or), then use a 4-input multiplexer selected by a 2-bit **Op** to choose the result.\n\n## Operation Table\n\n| Op | Operation |\n|----|-----------|\n| 0  | A + B     |\n| 1  | A - B     |\n| 2  | A AND B   |\n| 3  | A OR B    |\n\n## Hints\n\n- All four operations compute in parallel — the mux just selects which result to output\n- Tie the carry-in pins on Add and Sub to a `Const(0)` to ground them\n- The carry-out from the Add is useful for the flags register later",
       "palette": {
@@ -341,6 +343,7 @@
     },
     {
       "id": "step-3-register-file",
+      "mode": "explore",
       "title": "4x8 Register File",
       "instructions": "# Register File\n\nRegisters are the CPU's fast local storage. Build a register file with 4 registers, each 8 bits wide, with dual read ports and a single write port.\n\n## Architecture\n\n1. **Write path:** A 2-to-4 decoder selects which register to write. AND gates combine the decoder outputs with a write-enable signal. Each register's `en` pin is driven by its AND gate.\n2. **Read paths:** Two 4-input multiplexers select which register to read on port A and port B.\n3. **All registers** share the same data input (Din) and clock.\n\n## Hints\n\n- Use `Register` components (bitWidth=8) — these are edge-triggered D flip-flop banks\n- The `Decoder` with selectorBits=2 produces 4 one-hot outputs\n- Each AND gate combines one decoder output with the WE signal\n- Both muxes read from the same 4 register outputs but with independent select lines",
       "palette": {
@@ -720,6 +723,7 @@
     },
     {
       "id": "step-4-ram",
+      "mode": "explore",
       "title": "256x8 RAM",
       "instructions": "# RAM\n\nThe CPU needs main memory for storing data. Build a 256-byte RAM with an 8-bit address bus.\n\n## Interface\n\n| Signal | Width | Direction | Purpose |\n|--------|-------|-----------|---------|\n| Addr   | 8-bit | Input     | Memory address |\n| Din    | 8-bit | Input     | Data to write |\n| WE     | 1-bit | Input     | Write enable (store on clock edge) |\n| OE     | 1-bit | Input     | Output enable (read) |\n| CLK    | 1-bit | Input     | Clock |\n| Dout   | 8-bit | Output    | Data read from memory |\n\n## Hints\n\n- Use `RAMDualPort` — it has separate Din and D (output) pins\n- Write: set Addr, Din, WE=1, clock edge\n- Read: set Addr, OE=1 → Dout shows memory contents",
       "palette": {
@@ -845,6 +849,7 @@
     },
     {
       "id": "step-5-data-bus",
+      "mode": "explore",
       "title": "Data Bus",
       "instructions": "# Data Bus\n\nMultiple sources need to share a single data path. Build a mux-based bus that selects between ALU output, RAM output, and an immediate value.\n\n## Bus Select\n\n| BusSel | Source |\n|--------|--------|\n| 0      | ALU    |\n| 1      | RAM    |\n| 2      | IMM    |\n\n## Hints\n\n- Use a `Multiplexer` with selectorBits=2 and bitWidth=8\n- In a real CPU, tristate drivers would be used — here we use a mux for simplicity\n- The 4th mux input (sel=3) is unused; tie it to `Const(0)`",
       "palette": {
@@ -973,6 +978,7 @@
     },
     {
       "id": "step-6-control-unit",
+      "mode": "explore",
       "title": "Control Unit",
       "instructions": "# Control Unit\n\nThe control unit decodes instructions into control signals that drive the rest of the CPU.\n\n## Inputs\n\n- **Opcode** (2-bit): selects the ALU operation (ADD/SUB/AND/OR)\n- **Mode** (2-bit): selects the operation type\n\n## Mode Decode\n\n| Mode | RegWE | RAM_WE | ALU_OE | RAM_OE | BusSel |\n|------|-------|--------|--------|--------|--------|\n| 0    | 1     | 0      | 1      | 0      | 0 (ALU)|\n| 1    | 0     | 1      | 0      | 0      | 1 (RAM)|\n| 2    | 0     | 0      | 0      | 1      | 2 (RAM)|\n| 3    | 0     | 0      | 0      | 0      | 3      |\n\n## Hints\n\n- Opcode passes straight through to ALU_Op\n- Use a `Decoder` (selectorBits=2) on the Mode input\n- Each decoder output directly drives a control signal",
       "palette": {
@@ -1126,6 +1132,7 @@
     },
     {
       "id": "step-7-flags",
+      "mode": "explore",
       "title": "Flags Register",
       "instructions": "# Flags Register\n\nCPU flags record the outcome of the last ALU operation. Build a flags register that captures:\n\n- **Z (Zero):** 1 when the ALU result is 0x00\n- **C (Carry):** 1 when the ALU produced a carry-out\n\n## Architecture\n\n1. **Zero detection:** Compare the 8-bit ALU result against `Const(0)` using a `Comparator`. The `=` output is the zero flag.\n2. **Flag storage:** Two 1-bit `Register` components (ZF and CF) capture the flags on the clock edge when `Flag_WE = 1`.\n\n## Hints\n\n- The Comparator's `=` output is 1 when both inputs are equal\n- Set `Flag_WE = 0` to hold the previous flags (e.g., during non-ALU operations)",
       "palette": {
@@ -1310,6 +1317,7 @@
     },
     {
       "id": "step-8-pc-program-memory",
+      "mode": "explore",
       "title": "Program Counter & Program Memory",
       "instructions": "# Program Counter & Program Memory\n\nThe final piece: a program counter that steps through instructions stored in ROM.\n\n## Architecture\n\n1. **Program Counter (PC):** An 8-bit `Counter` that increments on each clock edge when enabled. A reset input clears it to 0.\n2. **Program Memory:** A `ROM` (256x8) addressed by the PC. The ROM's `sel` pin is tied high so it always outputs the instruction at the current address.\n\n## Outputs\n\n- **PC_out:** current program counter value\n- **Instr:** the instruction byte from ROM at address PC\n- **PC_ovf:** overflow flag (PC wrapped around)\n\n## Hints\n\n- Wire the Counter's `out` to both the ROM's `A` (address) input and the PC_out display\n- Tie `Const(1)` to the ROM's `sel` pin\n- Use `PC_en` to pause execution, `Reset` to restart from address 0",
       "palette": {

@@ -23,13 +23,7 @@ import { CacheResolver, ResolverNotFoundError } from "./file-resolver.js";
 
 import { registerSubcircuit, createLiveDefinition } from "../components/subcircuit/subcircuit.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Maximum subcircuit nesting depth (matching Digital's limit). */
-const MAX_DEPTH = 30;
+import { MAX_DEPTH } from "../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // SubcircuitCache

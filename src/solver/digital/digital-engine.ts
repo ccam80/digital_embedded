@@ -37,6 +37,7 @@ import { DataField, registerBackingStore, clearBackingStores } from "@/component
 import type { BusResolver } from "./bus-resolution.js";
 import { OscillationError } from "@/core/errors.js";
 import { OscillationDetector, COLLECTION_STEPS } from "./oscillation.js";
+import { MAX_STEPS } from "@/core/constants";
 
 // ---------------------------------------------------------------------------
 // EvaluationGroup — one group in the topological evaluation order
@@ -396,7 +397,6 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       }
     }
 
-    const MAX_STEPS = 100_000;
     for (let i = 0; i < MAX_STEPS; i++) {
       this.step();
 

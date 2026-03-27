@@ -266,29 +266,30 @@
                 - generic [ref=e356]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e357] [cursor=pointer]:
                 - generic [ref=e359]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e360]
-    - generic [ref=e361]:
-      - generic "Circuit editor canvas" [ref=e362]
-      - generic [ref=e363]:
-        - generic [ref=e364]:
-          - generic [ref=e365]: AcVoltageSource
-          - button "×" [ref=e366] [cursor=pointer]
-        - generic [ref=e367]:
-          - generic [ref=e368]:
-            - generic [ref=e369]: Amplitude (V)
-            - spinbutton [ref=e371]: "5"
-          - generic [ref=e372]:
-            - generic [ref=e373]: Frequency (Hz)
-            - spinbutton [ref=e375]: "1000"
-          - generic [ref=e376]:
-            - generic [ref=e377]: Phase (rad)
-            - spinbutton [ref=e379]: "0"
-          - generic [ref=e380]:
-            - generic [ref=e381]: DC Offset (V)
-            - spinbutton [ref=e383]: "0"
-          - generic [ref=e384]:
-            - generic [ref=e385]: Waveform
-            - combobox [ref=e387]:
+      - button "‹" [ref=e360] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e361]
+    - generic [ref=e362]:
+      - generic "Circuit editor canvas" [ref=e363]
+      - generic [ref=e364]:
+        - generic [ref=e365]:
+          - generic [ref=e366]: AcVoltageSource
+          - button "×" [ref=e367] [cursor=pointer]
+        - generic [ref=e368]:
+          - generic [ref=e369]:
+            - generic [ref=e370]: Amplitude (V)
+            - spinbutton [ref=e372]: "5"
+          - generic [ref=e373]:
+            - generic [ref=e374]: Frequency (Hz)
+            - spinbutton [ref=e376]: "1000"
+          - generic [ref=e377]:
+            - generic [ref=e378]: Phase (rad)
+            - spinbutton [ref=e380]: "0"
+          - generic [ref=e381]:
+            - generic [ref=e382]: DC Offset (V)
+            - spinbutton [ref=e384]: "0"
+          - generic [ref=e385]:
+            - generic [ref=e386]: Waveform
+            - combobox [ref=e388]:
               - option "sine" [selected]
               - option "square"
               - option "triangle"
@@ -298,16 +299,16 @@
               - option "am"
               - option "fm"
               - option "noise"
-          - generic [ref=e388]:
-            - generic [ref=e389]: Label
-            - generic [ref=e390]:
-              - textbox [ref=e391]: Vs
-              - checkbox "Show on canvas" [checked] [ref=e392]
-          - generic [ref=e393]:
-            - generic [ref=e394]: Show value
-            - checkbox [checked] [ref=e396]
-  - generic [ref=e397]:
-    - generic [ref=e398]: Ready
-    - button "100%" [ref=e400] [cursor=pointer]
-    - generic [ref=e401]: 5, 8
+          - generic [ref=e389]:
+            - generic [ref=e390]: Label
+            - generic [ref=e391]:
+              - textbox [ref=e392]: Vs
+              - checkbox "Show on canvas" [checked] [ref=e393]
+          - generic [ref=e394]:
+            - generic [ref=e395]: Show value
+            - checkbox [checked] [ref=e397]
+  - generic [ref=e398]:
+    - generic [ref=e399]: Ready
+    - button "100%" [ref=e401] [cursor=pointer]
+    - generic [ref=e402]: 5, 8
 ```

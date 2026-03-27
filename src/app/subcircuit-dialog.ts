@@ -17,6 +17,7 @@ import { lightColorScheme } from '../core/renderer-interface.js';
 import { PinDirection } from '../core/pin.js';
 import type { PinDeclaration } from '../core/pin.js';
 import type { ComponentRegistry } from '../core/registry.js';
+import { GRID_SPACING } from '../editor/coordinates.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,7 +42,6 @@ export interface SubcircuitDialogResult {
 // ---------------------------------------------------------------------------
 
 const PREVIEW_CANVAS_SIZE = 240;
-const PREVIEW_GRID = 20; // pixels per grid unit
 
 /**
  * Build PinDeclaration[] from the dialog's current port rows for preview.
@@ -210,9 +210,9 @@ function renderPreview(
   // Scale and center: fit (width+2) x (height+2) grid units into the canvas
   const padX = 2;
   const padY = shapeMode === 'LAYOUT' ? 2 : 1;
-  const scaleX = canvas.width / ((width + padX) * PREVIEW_GRID);
-  const scaleY = canvas.height / ((height + padY) * PREVIEW_GRID);
-  const scale = Math.min(scaleX, scaleY, 1) * PREVIEW_GRID;
+  const scaleX = canvas.width / ((width + padX) * GRID_SPACING);
+  const scaleY = canvas.height / ((height + padY) * GRID_SPACING);
+  const scale = Math.min(scaleX, scaleY, 1) * GRID_SPACING;
 
   const totalW = (width + padX) * scale;
   const totalH = (height + padY) * scale;

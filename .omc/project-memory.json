@@ -249,14 +249,14 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 193,
-      "lastAccessed": 1774642711114,
+      "accessCount": 213,
+      "lastAccessed": 1774650674158,
       "type": "directory"
     },
     {
       "path": "src\\components",
-      "accessCount": 24,
-      "lastAccessed": 1774642515995,
+      "accessCount": 30,
+      "lastAccessed": 1774649822951,
       "type": "directory"
     },
     {
@@ -266,34 +266,58 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774613650259,
+      "path": "src\\app\\menu-toolbar.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774650114124,
       "type": "file"
     },
     {
       "path": "src\\app\\simulation-controller.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774613859655,
+      "accessCount": 22,
+      "lastAccessed": 1774647241317,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774647220812,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774642473438,
+      "accessCount": 20,
+      "lastAccessed": 1774648016630,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774650471397,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 14,
-      "lastAccessed": 1774642690040,
+      "accessCount": 20,
+      "lastAccessed": 1774650667121,
       "type": "directory"
     },
     {
       "path": "src\\components\\io\\ground.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774609035125,
+      "accessCount": 18,
+      "lastAccessed": 1774650236387,
       "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774647906208,
+      "type": "file"
+    },
+    {
+      "path": "src\\app",
+      "accessCount": 14,
+      "lastAccessed": 1774649380580,
+      "type": "directory"
     },
     {
       "path": "src\\app\\test-bridge.ts",
@@ -303,8 +327,14 @@
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774649829260,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
       "accessCount": 11,
-      "lastAccessed": 1774613162221,
+      "lastAccessed": 1774650013462,
       "type": "file"
     },
     {
@@ -320,12 +350,6 @@
       "type": "directory"
     },
     {
-      "path": "src\\app",
-      "accessCount": 10,
-      "lastAccessed": 1774642709173,
-      "type": "directory"
-    },
-    {
       "path": "src\\editor\\property-panel.ts",
       "accessCount": 9,
       "lastAccessed": 1774612833717,
@@ -338,15 +362,15 @@
       "type": "directory"
     },
     {
-      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
+      "path": "src\\app\\canvas-interaction.ts",
       "accessCount": 9,
-      "lastAccessed": 1774642301616,
+      "lastAccessed": 1774648503199,
       "type": "file"
     },
     {
-      "path": "src\\app\\menu-toolbar.ts",
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
       "accessCount": 8,
-      "lastAccessed": 1774611083625,
+      "lastAccessed": 1774650228779,
       "type": "file"
     },
     {
@@ -362,27 +386,15 @@
       "type": "file"
     },
     {
-      "path": "src\\app\\canvas-interaction.ts",
+      "path": "src\\core\\circuit.ts",
       "accessCount": 7,
-      "lastAccessed": 1774611387854,
-      "type": "file"
-    },
-    {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774642558697,
+      "lastAccessed": 1774649772577,
       "type": "file"
     },
     {
       "path": "src\\solver\\digital\\flatten.ts",
       "accessCount": 6,
       "lastAccessed": 1774613212401,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774642476044,
       "type": "file"
     },
     {
@@ -410,15 +422,21 @@
       "type": "directory"
     },
     {
+      "path": "src\\app\\subcircuit-dialog.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774650689337,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\io\\clock.ts",
       "accessCount": 4,
       "lastAccessed": 1774611432084,
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
+      "path": "src\\solver\\digital\\bus-resolution.ts",
       "accessCount": 4,
-      "lastAccessed": 1774642556979,
+      "lastAccessed": 1774647236507,
       "type": "file"
     },
     {
@@ -431,12 +449,6 @@
       "path": "src\\editor\\placement.ts",
       "accessCount": 3,
       "lastAccessed": 1774608629409,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\sources\\dc-voltage-source.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774608948971,
       "type": "file"
     },
     {
@@ -488,9 +500,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\bus-resolution.ts",
+      "path": "src\\integration\\speed-control.ts",
       "accessCount": 2,
-      "lastAccessed": 1774611083008,
+      "lastAccessed": 1774647208266,
       "type": "file"
     },
     {
@@ -506,21 +518,9 @@
       "type": "file"
     },
     {
-      "path": "src\\integration\\speed-control.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774607632765,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\digital\\__tests__\\flatten.test.ts",
       "accessCount": 1,
       "lastAccessed": 1774607637590,
-      "type": "file"
-    },
-    {
-      "path": "src\\app\\subcircuit-dialog.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774607638808,
       "type": "file"
     },
     {

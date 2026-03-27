@@ -22,11 +22,12 @@ import { analyzeBoundary, insertAsSubcircuit, type PortOverride } from '../edito
 import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
-import { Circuit, type Wire } from '../core/circuit.js';
+import { Circuit, Wire } from '../core/circuit.js';
 import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';
+import { snapToGrid } from '../editor/coordinates.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
 import { PropertyBag } from '../core/properties.js';
 import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
@@ -372,6 +373,59 @@ export function initMenuAndToolbar(
             selection.clear();
           }, enabled: true },
         );
+
+        // "Remove Junction" — merge collinear wire pairs at a junction point
+        // so that crossing wires pass through without connecting.
+        const snappedPt = snapToGrid(worldPt, 1);
+        const jKey = `${snappedPt.x},${snappedPt.y}`;
+        let junctionCount = 0;
+        for (const w of ctx.circuit.wires) {
+          if (`${w.start.x},${w.start.y}` === jKey) junctionCount++;
+          if (`${w.end.x},${w.end.y}` === jKey) junctionCount++;
+        }
+        if (junctionCount >= 3) {
+          items.push({
+            label: 'Remove Junction', action: () => {
+              const wiresAtJunction = ctx.circuit.wires.filter(w =>
+                `${w.start.x},${w.start.y}` === jKey ||
+                `${w.end.x},${w.end.y}` === jKey,
+              );
+              const horizontal: Wire[] = [];
+              const vertical: Wire[] = [];
+              for (const w of wiresAtJunction) {
+                const other = `${w.start.x},${w.start.y}` === jKey ? w.end : w.start;
+                if (other.y === snappedPt.y && other.x !== snappedPt.x) horizontal.push(w);
+                else if (other.x === snappedPt.x && other.y !== snappedPt.y) vertical.push(w);
+              }
+              const removedWires: Wire[] = [];
+              const addedWires: Wire[] = [];
+              const mergeGroup = (group: Wire[]): void => {
+                if (group.length !== 2) return;
+                const [w1, w2] = group as [Wire, Wire];
+                const end1 = `${w1.start.x},${w1.start.y}` === jKey ? w1.end : w1.start;
+                const end2 = `${w2.start.x},${w2.start.y}` === jKey ? w2.end : w2.start;
+                removedWires.push(w1, w2);
+                addedWires.push(new Wire(end1, end2, Math.max(w1.bitWidth, w2.bitWidth)));
+              };
+              mergeGroup(horizontal);
+              mergeGroup(vertical);
+              if (removedWires.length === 0) return;
+              const cmd = {
+                description: 'Remove Junction',
+                execute() {
+                  for (const w of removedWires) ctx.circuit.removeWire(w);
+                  for (const w of addedWires) ctx.circuit.addWire(w);
+                },
+                undo() {
+                  for (const w of addedWires) ctx.circuit.removeWire(w);
+                  for (const w of removedWires) ctx.circuit.addWire(w);
+                },
+              };
+              undoStack.push(cmd);
+              ctx.invalidateCompiled();
+            }, enabled: true,
+          });
+        }
       }
 
       if (ctx.isSimActive()) {
@@ -1030,11 +1084,13 @@ export function initMenuAndToolbar(
   });
 
   // -------------------------------------------------------------------------
-  // Palette toggle (narrow screens)
+  // Palette toggle (narrow screens) + collapse (all breakpoints)
   // -------------------------------------------------------------------------
 
   const palettePanel = document.getElementById('palette-panel');
   const paletteToggleBtn = document.getElementById('btn-palette-toggle');
+  const paletteCollapseBtn = document.getElementById('btn-palette-collapse');
+  const paletteExpandBtn = document.getElementById('btn-palette-expand');
 
   function togglePalette(): void {
     palettePanel?.classList.toggle('palette-visible');
@@ -1044,7 +1100,17 @@ export function initMenuAndToolbar(
     palettePanel?.classList.remove('palette-visible');
   }
 
+  function collapsePalette(): void {
+    palettePanel?.classList.add('palette-collapsed');
+  }
+
+  function expandPalette(): void {
+    palettePanel?.classList.remove('palette-collapsed');
+  }
+
   paletteToggleBtn?.addEventListener('click', togglePalette);
+  paletteCollapseBtn?.addEventListener('click', collapsePalette);
+  paletteExpandBtn?.addEventListener('click', expandPalette);
 
   canvas.addEventListener('pointerdown', () => {
     if (window.matchMedia('(max-width: 600px)').matches) {

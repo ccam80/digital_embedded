@@ -10,9 +10,9 @@ import type { DefaultSimulatorFacade } from "../../src/headless/default-facade.j
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { SessionState } from "./tool-helpers.js";
 import { serializeCircuitToDig } from "../../src/io/dig-serializer.js";
-import type { TutorialManifest } from "../../src/tutorial/types.js";
-import { validateManifest } from "../../src/tutorial/validate.js";
-import { listPresets, resolvePaletteSpec } from "../../src/tutorial/presets.js";
+import type { TutorialManifest } from "../../src/app/tutorial/types.js";
+import { validateManifest } from "../../src/app/tutorial/validate.js";
+import { listPresets, resolvePaletteSpec } from "../../src/app/tutorial/presets.js";
 import type { CircuitSpec } from "../../src/headless/netlist-types.js";
 
 export function registerTutorialTools(
@@ -137,6 +137,7 @@ export function registerTutorialTools(
         '  "difficulty": "beginner",\n' +
         '  "steps": [{\n' +
         '    "id": "step-1",\n' +
+        '    "mode": "guided",\n' +
         '    "title": "Step 1",\n' +
         '    "instructions": "# Step 1\\nDo this...",\n' +
         '    "palette": "basic-gates",\n' +
@@ -145,7 +146,10 @@ export function registerTutorialTools(
         '    "validation": "test-vectors",\n' +
         '    "testData": "A B | Y\\n0 0 | 0\\n..."\n' +
         '  }]\n' +
-        '}',
+        '}\n\n' +
+        'Step modes:\n' +
+        '  "guided" (default) — student must pass validation before advancing. Shows Pre-check + Check buttons.\n' +
+        '  "explore" — free navigation, optional checking. Shows Show Solution button if goalCircuit is provided.',
       inputSchema: {
         manifest: z
           .record(z.unknown())
@@ -196,7 +200,8 @@ export function registerTutorialTools(
       // Step 3: Build and verify each step's circuits
       for (let i = 0; i < m.steps.length; i++) {
         const step = m.steps[i]!;
-        lines.push(`Step ${i + 1}: "${step.title}" (${step.id})`);
+        const stepMode = step.mode ?? 'guided';
+        lines.push(`Step ${i + 1}: "${step.title}" (${step.id}) [${stepMode}]`);
 
         // Build goal circuit if it's a CircuitSpec
         if (step.goalCircuit && typeof step.goalCircuit !== "string") {

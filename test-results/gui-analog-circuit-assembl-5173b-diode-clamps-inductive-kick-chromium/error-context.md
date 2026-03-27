@@ -266,29 +266,30 @@
                 - generic [ref=e356]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e357] [cursor=pointer]:
                 - generic [ref=e359]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e360]
-    - generic [ref=e361]:
-      - generic "Circuit editor canvas" [ref=e362]
-      - generic [ref=e363]:
-        - generic [ref=e364]:
-          - generic [ref=e365]: DcVoltageSource
-          - button "×" [ref=e366] [cursor=pointer]
-        - generic [ref=e367]:
-          - generic [ref=e368]:
-            - generic [ref=e369]: Voltage (V)
-            - generic [ref=e370]:
-              - textbox [ref=e371]: "5.00"
-              - generic [ref=e372]: V
-          - generic [ref=e373]:
-            - generic [ref=e374]: Label
-            - generic [ref=e375]:
-              - textbox [ref=e376]: Vcc
-              - checkbox "Show on canvas" [checked] [ref=e377]
-          - generic [ref=e378]:
-            - generic [ref=e379]: Show value
-            - checkbox [checked] [ref=e381]
-  - generic [ref=e382]:
-    - generic [ref=e383]: Ready
-    - button "100%" [ref=e385] [cursor=pointer]
-    - generic [ref=e386]: 5, 5
+      - button "‹" [ref=e360] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e361]
+    - generic [ref=e362]:
+      - generic "Circuit editor canvas" [ref=e363]
+      - generic [ref=e364]:
+        - generic [ref=e365]:
+          - generic [ref=e366]: DcVoltageSource
+          - button "×" [ref=e367] [cursor=pointer]
+        - generic [ref=e368]:
+          - generic [ref=e369]:
+            - generic [ref=e370]: Voltage (V)
+            - generic [ref=e371]:
+              - textbox [ref=e372]: "5.00"
+              - generic [ref=e373]: V
+          - generic [ref=e374]:
+            - generic [ref=e375]: Label
+            - generic [ref=e376]:
+              - textbox [ref=e377]: Vcc
+              - checkbox "Show on canvas" [checked] [ref=e378]
+          - generic [ref=e379]:
+            - generic [ref=e380]: Show value
+            - checkbox [checked] [ref=e382]
+  - generic [ref=e383]:
+    - generic [ref=e384]: Ready
+    - button "100%" [ref=e386] [cursor=pointer]
+    - generic [ref=e387]: 5, 5
 ```

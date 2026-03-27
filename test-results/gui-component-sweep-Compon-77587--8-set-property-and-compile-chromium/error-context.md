@@ -254,28 +254,29 @@
                 - generic [ref=e338]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e339] [cursor=pointer]:
                 - generic [ref=e341]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e342]
-    - generic [ref=e343]:
-      - generic "Circuit editor canvas" [ref=e344]
-      - generic [ref=e345]:
-        - generic [ref=e346]:
-          - generic [ref=e347]: PriorityEncoder
-          - button "×" [ref=e348] [cursor=pointer]
-        - generic [ref=e349]:
-          - generic [ref=e350]:
-            - generic [ref=e351]: Selector Bits
-            - spinbutton [ref=e353]: "1"
-          - generic [ref=e354]:
-            - generic [ref=e355]: Label
-            - generic [ref=e356]:
-              - textbox [ref=e357]: DUT
-              - checkbox "Show on canvas" [checked] [ref=e358]
-          - generic [ref=e359]:
-            - generic [ref=e360]: Show value
-            - checkbox [checked] [ref=e362]
-          - generic [ref=e364] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e365]:
-    - generic [ref=e366]: Ready
-    - button "100%" [ref=e368] [cursor=pointer]
-    - generic [ref=e369]: 12, 8.5
+      - button "‹" [ref=e342] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e343]
+    - generic [ref=e344]:
+      - generic "Circuit editor canvas" [ref=e345]
+      - generic [ref=e346]:
+        - generic [ref=e347]:
+          - generic [ref=e348]: PriorityEncoder
+          - button "×" [ref=e349] [cursor=pointer]
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: Selector Bits
+            - spinbutton [ref=e354]: "1"
+          - generic [ref=e355]:
+            - generic [ref=e356]: Label
+            - generic [ref=e357]:
+              - textbox [ref=e358]: DUT
+              - checkbox "Show on canvas" [checked] [ref=e359]
+          - generic [ref=e360]:
+            - generic [ref=e361]: Show value
+            - checkbox [checked] [ref=e363]
+          - generic [ref=e365] [cursor=pointer]: ▶ Pin Electrical
+  - generic [ref=e366]:
+    - generic [ref=e367]: Ready
+    - button "100%" [ref=e369] [cursor=pointer]
+    - generic [ref=e370]: 12, 8.5
 ```

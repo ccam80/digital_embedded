@@ -9,6 +9,7 @@
 import type { CircuitElement } from "@/core/element";
 import { Wire } from "@/core/circuit";
 import type { Circuit } from "@/core/circuit";
+import { pinWorldPosition } from "@/core/pin";
 
 export type ChangeListener = () => void;
 
@@ -101,6 +102,50 @@ export class SelectionModel {
 
   getSelectedWires(): ReadonlySet<Wire> {
     return this._wires;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expansion
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Expand wire selection to adjacent wires sharing endpoints.
+   * Stops at component pin positions (doesn't cross into other nets).
+   * Press repeatedly to grow the selection progressively.
+   */
+  expandWireSelection(circuit: Circuit): void {
+    if (this._wires.size === 0) return;
+
+    // Collect pin positions — these are expansion boundaries
+    const pinPositions = new Set<string>();
+    for (const el of circuit.elements) {
+      for (const pin of el.getPins()) {
+        const wp = pinWorldPosition(el, pin);
+        pinPositions.add(`${wp.x},${wp.y}`);
+      }
+    }
+
+    // Collect endpoints of currently selected wires
+    const endpoints = new Set<string>();
+    for (const w of this._wires) {
+      endpoints.add(`${w.start.x},${w.start.y}`);
+      endpoints.add(`${w.end.x},${w.end.y}`);
+    }
+
+    // Add unselected wires that share a non-pin endpoint
+    let changed = false;
+    for (const w of circuit.wires) {
+      if (this._wires.has(w)) continue;
+      const sk = `${w.start.x},${w.start.y}`;
+      const ek = `${w.end.x},${w.end.y}`;
+      if ((endpoints.has(sk) && !pinPositions.has(sk)) ||
+          (endpoints.has(ek) && !pinPositions.has(ek))) {
+        this._wires.add(w);
+        changed = true;
+      }
+    }
+
+    if (changed) this._notify();
   }
 
   // ---------------------------------------------------------------------------

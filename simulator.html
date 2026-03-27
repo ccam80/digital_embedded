@@ -376,9 +376,15 @@
       border-right: 1px solid var(--panel-border);
       overflow-y: auto;
       flex-shrink: 0;
-      transition: width 0.2s ease, transform 0.2s ease;
+      transition: width 0.15s ease;
       overscroll-behavior-x: none;
       touch-action: pan-y;
+      position: relative;
+    }
+    #palette-panel.palette-collapsed {
+      width: 0;
+      overflow: hidden;
+      border-right: none;
     }
     #palette-panel .panel-header {
       padding: 6px 8px;
@@ -390,6 +396,53 @@
       color: var(--fg);
       opacity: 0.7;
     }
+    .palette-collapse-toggle {
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 48px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-left: none;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--fg);
+      opacity: 0.6;
+      z-index: 20;
+      padding: 0;
+    }
+    .palette-collapse-toggle:hover { opacity: 1; }
+    #palette-panel.palette-collapsed + #palette-resize-handle { display: none; }
+    /* When palette is collapsed, show an expand tab on the left edge of workspace */
+    .palette-expand-tab {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 48px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-left: none;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--fg);
+      opacity: 0.6;
+      z-index: 20;
+      padding: 0;
+    }
+    .palette-expand-tab:hover { opacity: 1; }
+    #palette-panel.palette-collapsed ~ #canvas-container .palette-expand-tab { display: flex; }
     #canvas-container {
       flex: 1;
       position: relative;
@@ -932,7 +985,7 @@
     .tt-output-cell { cursor: pointer; }
     .tt-output-cell:hover { background: var(--accent); color: #fff; }
 
-    /* ---- Tutorial instructions panel ---- */
+    /* ---- Tutorial instructions panel (legacy, kept for setInstructions hook) ---- */
     .tutorial-instructions-panel {
       width: 280px;
       background: var(--panel-bg);
@@ -991,6 +1044,175 @@
       }
       .tutorial-toggle-btn {
         display: block;
+      }
+    }
+
+    /* ---- Tutorial shelf (new embedded tutorial system) ---- */
+    #tutorial-shelf {
+      width: 280px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--panel-border);
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.15s ease;
+      color: var(--fg);
+    }
+    #tutorial-shelf.tutorial-shelf-collapsed {
+      width: 0;
+      overflow: hidden;
+      border-right: none;
+    }
+    .tutorial-shelf-header {
+      padding: 8px 12px;
+      font-weight: 600;
+      font-size: 12px;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .tutorial-shelf-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tutorial-shelf-collapse {
+      background: none;
+      border: none;
+      color: var(--fg);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      opacity: 0.6;
+      flex-shrink: 0;
+    }
+    .tutorial-shelf-collapse:hover { opacity: 1; }
+    .tutorial-shelf-body {
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .tutorial-shelf-body h1 { font-size: 16px; margin: 0 0 8px; }
+    .tutorial-shelf-body h2 { font-size: 14px; margin: 12px 0 6px; }
+    .tutorial-shelf-body h3 { font-size: 13px; margin: 10px 0 4px; }
+    .tutorial-shelf-body p { margin: 6px 0; }
+    .tutorial-shelf-body code {
+      background: var(--bg);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-size: 12px;
+    }
+    .tutorial-shelf-body ul { padding-left: 18px; margin: 4px 0; }
+    .tutorial-shelf-body li { margin: 2px 0; }
+    .tutorial-shelf-hints {
+      padding: 8px 14px;
+      border-top: 1px solid var(--panel-border);
+      flex-shrink: 0;
+    }
+    .tutorial-shelf-hints:empty { display: none; }
+    .tutorial-shelf-hint-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .tutorial-shelf-hint-btn:hover { opacity: 0.9; }
+    .tutorial-shelf-hint-btn:disabled { opacity: 0.4; cursor: default; }
+    .tutorial-shelf-hint-content {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .tutorial-shelf-hint-content + .tutorial-shelf-hint-content { margin-top: 4px; }
+
+    /* ---- Tutorial bottom bar ---- */
+    #tutorial-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 36px;
+      background: var(--panel-bg);
+      border-top: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      z-index: 50;
+      font-size: 12px;
+      color: var(--fg);
+    }
+    #canvas-container.has-tutorial-bar #sim-canvas {
+      bottom: 36px;
+    }
+    #canvas-container.has-tutorial-bar #search-bar {
+      bottom: 44px;
+    }
+    .tutorial-bar-btn {
+      background: none;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      color: var(--fg);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tutorial-bar-btn:hover:not(:disabled) { background: var(--panel-border); }
+    .tutorial-bar-btn:disabled { opacity: 0.3; cursor: default; }
+    .tutorial-bar-check { font-weight: 600; }
+    .tutorial-bar-precheck {
+      background: rgba(74,106,74,0.3);
+      border-color: #4a6a4a;
+      color: #aca;
+    }
+    .tutorial-bar-precheck:hover:not(:disabled) { background: rgba(74,106,74,0.5); }
+    .tutorial-bar-solution {
+      background: rgba(68,68,68,0.4);
+      color: #aaa;
+    }
+    .tutorial-bar-solution:hover:not(:disabled) { background: rgba(85,85,85,0.5); color: #ccc; }
+    .tutorial-bar-solution.loaded { border-color: #668; color: #99b; }
+    .tutorial-bar-check.pass {
+      background: #2d8a4e;
+      color: #fff;
+      border-color: #2d8a4e;
+    }
+    .tutorial-bar-check.fail {
+      background: #c74e50;
+      color: #fff;
+      border-color: #c74e50;
+    }
+    .tutorial-bar-check.running { opacity: 0.6; }
+    .tutorial-bar-step {
+      opacity: 0.6;
+      white-space: nowrap;
+    }
+    .tutorial-bar-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @media (max-width: 768px) {
+      #tutorial-shelf {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        z-index: 155;
+        width: 280px;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+      }
+      #tutorial-shelf.tutorial-shelf-collapsed {
+        width: 0;
+        box-shadow: none;
       }
     }
     /* ---- Memory editor modal ---- */
@@ -2085,9 +2307,11 @@
       <div id="palette-panel">
         <div class="panel-header">Components</div>
         <div id="palette-content" role="tree"></div>
+        <button class="palette-collapse-toggle" id="btn-palette-collapse" title="Collapse palette">&lsaquo;</button>
       </div>
       <div id="palette-resize-handle" class="resize-handle resize-handle--vertical" title="Drag to resize palette"></div>
       <div id="canvas-container">
+        <button class="palette-expand-tab" id="btn-palette-expand" title="Show palette">&rsaquo;</button>
         <div id="lock-banner"></div>
         <canvas id="sim-canvas" aria-label="Circuit editor canvas"></canvas>
         <div id="search-bar">

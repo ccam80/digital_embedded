@@ -379,8 +379,6 @@ test.describe('Digital circuit assembly via UI', () => {
   // =========================================================================
 
   test('T flip-flop 4-bit ripple counter', async () => {
-    // VDD to tie T inputs high (no Label property — use placeComponent)
-    await builder.placeComponent('VDD', 3, 3);
     await builder.placeLabeled('Clock', 3, 7, 'CLK');
 
     // Four T_FFs spaced vertically
@@ -395,16 +393,27 @@ test.describe('Digital circuit assembly via UI', () => {
     await builder.placeLabeled('Out', 18, 15, 'Q2');
     await builder.placeLabeled('Out', 18, 20, 'Q3');
 
-    // VDD → all T inputs (fan-out) — wire via coordinates since VDD has no label
-    const vddOut = await builder.getPinPagePositionByTypeIndex('VDD', 0, 'out');
+    // Place individual Const(=1) components next to each T_FF's T input.
+    // Const has no Label property, so we use placeComponent and wire by
+    // coordinates. Default value is 1, so no property change needed.
+    await builder.placeComponent('Const', 6, 5);
+    await builder.placeComponent('Const', 6, 10);
+    await builder.placeComponent('Const', 6, 15);
+    await builder.placeComponent('Const', 6, 20);
+
+    // Wire each Const out → T_FF T input (short horizontal wires, no crossing)
+    const c1Out = await builder.getPinPagePositionByTypeIndex('Const', 0, 'out');
+    const c2Out = await builder.getPinPagePositionByTypeIndex('Const', 1, 'out');
+    const c3Out = await builder.getPinPagePositionByTypeIndex('Const', 2, 'out');
+    const c4Out = await builder.getPinPagePositionByTypeIndex('Const', 3, 'out');
     const t1T = await builder.getPinPagePosition('T1', 'T');
     const t2T = await builder.getPinPagePosition('T2', 'T');
     const t3T = await builder.getPinPagePosition('T3', 'T');
     const t4T = await builder.getPinPagePosition('T4', 'T');
-    await builder.drawWireBetweenPoints(vddOut, t1T);
-    await builder.drawWireBetweenPoints(vddOut, t2T);
-    await builder.drawWireBetweenPoints(vddOut, t3T);
-    await builder.drawWireBetweenPoints(vddOut, t4T);
+    await builder.drawWireBetweenPoints(c1Out, t1T);
+    await builder.drawWireBetweenPoints(c2Out, t2T);
+    await builder.drawWireBetweenPoints(c3Out, t3T);
+    await builder.drawWireBetweenPoints(c4Out, t4T);
 
     // Clock chain
     await builder.drawWire('CLK', 'out', 'T1', 'C');

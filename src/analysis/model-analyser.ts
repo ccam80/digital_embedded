@@ -17,6 +17,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SimulatorFacade } from '../headless/facade.js';
 import { detectCycles } from './cycle-detector.js';
+import { MAX_INPUT_BITS } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -50,12 +51,6 @@ export interface TruthTable {
   outputs: SignalSpec[];
   rows: TruthTableRow[];
 }
-
-// ---------------------------------------------------------------------------
-// Maximum input bit count
-// ---------------------------------------------------------------------------
-
-const MAX_INPUT_BITS = 20;
 
 // ---------------------------------------------------------------------------
 // analyseCircuit — public API

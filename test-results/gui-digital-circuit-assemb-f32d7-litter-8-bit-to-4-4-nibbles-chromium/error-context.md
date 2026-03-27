@@ -258,35 +258,36 @@
                 - generic [ref=e344]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e345] [cursor=pointer]:
                 - generic [ref=e347]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e348]
-    - generic [ref=e349]:
-      - generic "Circuit editor canvas" [ref=e350]
-      - generic [ref=e351]:
-        - generic [ref=e352]:
-          - generic [ref=e353]: BusSplitter
-          - button "×" [ref=e354] [cursor=pointer]
-        - generic [ref=e355]:
-          - generic [ref=e356]:
-            - generic [ref=e357]: Bits
-            - spinbutton [ref=e359]: "1"
-          - generic [ref=e360]:
-            - generic [ref=e361]: Spreading
-            - spinbutton [ref=e363]: "1"
-          - generic [ref=e364]:
-            - generic [ref=e365]: Label
-            - generic [ref=e366]:
-              - textbox [ref=e367]
-              - checkbox "Show on canvas" [checked] [ref=e368]
-          - generic [ref=e369]:
-            - generic [ref=e370]: Show value
-            - checkbox [checked] [ref=e372]
-          - generic [ref=e373]:
-            - generic [ref=e374]: Mode
-            - combobox [ref=e375]:
+      - button "‹" [ref=e348] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e349]
+    - generic [ref=e350]:
+      - generic "Circuit editor canvas" [ref=e351]
+      - generic [ref=e352]:
+        - generic [ref=e353]:
+          - generic [ref=e354]: BusSplitter
+          - button "×" [ref=e355] [cursor=pointer]
+        - generic [ref=e356]:
+          - generic [ref=e357]:
+            - generic [ref=e358]: Bits
+            - spinbutton [ref=e360]: "1"
+          - generic [ref=e361]:
+            - generic [ref=e362]: Spreading
+            - spinbutton [ref=e364]: "1"
+          - generic [ref=e365]:
+            - generic [ref=e366]: Label
+            - generic [ref=e367]:
+              - textbox [ref=e368]
+              - checkbox "Show on canvas" [checked] [ref=e369]
+          - generic [ref=e370]:
+            - generic [ref=e371]: Show value
+            - checkbox [checked] [ref=e373]
+          - generic [ref=e374]:
+            - generic [ref=e375]: Mode
+            - combobox [ref=e376]:
               - option "digital" [selected]
               - option "analog"
-  - generic [ref=e376]:
-    - generic [ref=e377]: Ready
-    - button "100%" [ref=e379] [cursor=pointer]
-    - generic [ref=e380]: 10.5, 7.9
+  - generic [ref=e377]:
+    - generic [ref=e378]: Ready
+    - button "100%" [ref=e380] [cursor=pointer]
+    - generic [ref=e381]: 10.5, 7.9
 ```

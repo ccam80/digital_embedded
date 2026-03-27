@@ -260,40 +260,41 @@
                 - generic [ref=e347]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e348] [cursor=pointer]:
                 - generic [ref=e350]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e351]
-    - generic [ref=e352]:
-      - generic "Circuit editor canvas" [ref=e353]
-      - generic [ref=e354]:
-        - generic [ref=e355]:
-          - generic [ref=e356]: ROM
-          - button "×" [ref=e357] [cursor=pointer]
-        - generic [ref=e358]:
-          - generic [ref=e359]:
-            - generic [ref=e360]: Address bits
-            - spinbutton [ref=e362]: "2"
-          - generic [ref=e363]:
-            - generic [ref=e364]: Data bits
-            - spinbutton [ref=e366]: "8"
-          - generic [ref=e367]:
-            - generic [ref=e368]: Label
-            - generic [ref=e369]:
-              - textbox [ref=e370]: ROM
-              - checkbox "Show on canvas" [checked] [ref=e371]
-          - generic [ref=e372]:
-            - generic [ref=e373]: Is program memory
-            - checkbox [ref=e375]
-          - generic [ref=e376]:
-            - generic [ref=e377]: Auto-reload
-            - checkbox [ref=e379]
-          - generic [ref=e380]:
-            - generic [ref=e381]: Data
-            - textbox [ref=e383]
-          - generic [ref=e384]:
-            - generic [ref=e385]: Show value
-            - checkbox [checked] [ref=e387]
-          - generic [ref=e389] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e390]:
-    - generic [ref=e391]: Ready
-    - button "100%" [ref=e393] [cursor=pointer]
-    - generic [ref=e394]: 11.5, 8
+      - button "‹" [ref=e351] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e352]
+    - generic [ref=e353]:
+      - generic "Circuit editor canvas" [ref=e354]
+      - generic [ref=e355]:
+        - generic [ref=e356]:
+          - generic [ref=e357]: ROM
+          - button "×" [ref=e358] [cursor=pointer]
+        - generic [ref=e359]:
+          - generic [ref=e360]:
+            - generic [ref=e361]: Address bits
+            - spinbutton [ref=e363]: "2"
+          - generic [ref=e364]:
+            - generic [ref=e365]: Data bits
+            - spinbutton [ref=e367]: "8"
+          - generic [ref=e368]:
+            - generic [ref=e369]: Label
+            - generic [ref=e370]:
+              - textbox [ref=e371]: ROM
+              - checkbox "Show on canvas" [checked] [ref=e372]
+          - generic [ref=e373]:
+            - generic [ref=e374]: Is program memory
+            - checkbox [ref=e376]
+          - generic [ref=e377]:
+            - generic [ref=e378]: Auto-reload
+            - checkbox [ref=e380]
+          - generic [ref=e381]:
+            - generic [ref=e382]: Data
+            - textbox [ref=e384]
+          - generic [ref=e385]:
+            - generic [ref=e386]: Show value
+            - checkbox [checked] [ref=e388]
+          - generic [ref=e390] [cursor=pointer]: ▶ Pin Electrical
+  - generic [ref=e391]:
+    - generic [ref=e392]: Ready
+    - button "100%" [ref=e394] [cursor=pointer]
+    - generic [ref=e395]: 11.5, 8
 ```

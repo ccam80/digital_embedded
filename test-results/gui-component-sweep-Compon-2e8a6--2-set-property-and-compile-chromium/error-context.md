@@ -258,10 +258,11 @@
                 - generic [ref=e344]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e345] [cursor=pointer]:
                 - generic [ref=e347]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e348]
-    - generic "Circuit editor canvas" [ref=e350]
-  - generic [ref=e351]:
-    - generic [ref=e352]: Ready
-    - button "100%" [ref=e354] [cursor=pointer]
-    - generic [ref=e355]: 18, 8
+      - button "‹" [ref=e348] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e349]
+    - generic "Circuit editor canvas" [ref=e351]
+  - generic [ref=e352]:
+    - generic [ref=e353]: Ready
+    - button "100%" [ref=e355] [cursor=pointer]
+    - generic [ref=e356]: 18, 8
 ```

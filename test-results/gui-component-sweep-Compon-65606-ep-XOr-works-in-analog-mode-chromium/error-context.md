@@ -254,41 +254,42 @@
                 - generic [ref=e338]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e339] [cursor=pointer]:
                 - generic [ref=e341]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e342]
-    - generic [ref=e343]:
-      - generic "Circuit editor canvas" [ref=e344]
-      - generic [ref=e345]:
-        - generic [ref=e346]:
-          - generic [ref=e347]: XOr
-          - button "×" [ref=e348] [cursor=pointer]
-        - generic [ref=e349]:
-          - generic [ref=e350]:
-            - generic [ref=e351]: Inputs
-            - spinbutton [ref=e353]: "2"
-          - generic [ref=e354]:
-            - generic [ref=e355]: Bits
-            - spinbutton [ref=e357]: "1"
-          - generic [ref=e358]:
-            - generic [ref=e359]: Wide shape
-            - checkbox [ref=e361]
-          - generic [ref=e362]:
-            - generic [ref=e363]: Invert inputs
-            - textbox [ref=e365]
-          - generic [ref=e366]:
-            - generic [ref=e367]: Label
-            - generic [ref=e368]:
-              - textbox [ref=e369]: DUT
-              - checkbox "Show on canvas" [checked] [ref=e370]
-          - generic [ref=e371]:
-            - generic [ref=e372]: Show value
-            - checkbox [checked] [ref=e374]
-          - generic [ref=e375]:
-            - generic [ref=e376]: Mode
-            - combobox [ref=e377]:
+      - button "‹" [ref=e342] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e343]
+    - generic [ref=e344]:
+      - generic "Circuit editor canvas" [ref=e345]
+      - generic [ref=e346]:
+        - generic [ref=e347]:
+          - generic [ref=e348]: XOr
+          - button "×" [ref=e349] [cursor=pointer]
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: Inputs
+            - spinbutton [ref=e354]: "2"
+          - generic [ref=e355]:
+            - generic [ref=e356]: Bits
+            - spinbutton [ref=e358]: "1"
+          - generic [ref=e359]:
+            - generic [ref=e360]: Wide shape
+            - checkbox [ref=e362]
+          - generic [ref=e363]:
+            - generic [ref=e364]: Invert inputs
+            - textbox [ref=e366]
+          - generic [ref=e367]:
+            - generic [ref=e368]: Label
+            - generic [ref=e369]:
+              - textbox [ref=e370]: DUT
+              - checkbox "Show on canvas" [checked] [ref=e371]
+          - generic [ref=e372]:
+            - generic [ref=e373]: Show value
+            - checkbox [checked] [ref=e375]
+          - generic [ref=e376]:
+            - generic [ref=e377]: Mode
+            - combobox [ref=e378]:
               - option "digital" [selected]
               - option "analog"
-  - generic [ref=e378]:
-    - generic [ref=e379]: Ready
-    - button "100%" [ref=e381] [cursor=pointer]
-    - generic [ref=e382]: 11.5, 9
+  - generic [ref=e379]:
+    - generic [ref=e380]: Ready
+    - button "100%" [ref=e382] [cursor=pointer]
+    - generic [ref=e383]: 11.5, 9
 ```

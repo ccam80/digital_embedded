@@ -250,11 +250,12 @@
                   - generic [ref=f1e332]: LookUpTable
                 - treeitem "RAMSinglePort" [ref=f1e333] [cursor=pointer]:
                   - generic [ref=f1e335]: RAMSinglePort
-      - generic "Drag to resize palette" [ref=f1e336]
-      - generic "Circuit editor canvas" [ref=f1e338]
-    - generic [ref=f1e339]:
-      - generic [ref=f1e340]: ⚠️
-      - generic [ref=f1e341]: "Simulation error: solver failed to converge"
-      - button "×" [ref=f1e342] [cursor=pointer]
-      - button "100%" [ref=f1e344] [cursor=pointer]
+        - button "‹" [ref=f1e336] [cursor=pointer]
+      - generic "Drag to resize palette" [ref=f1e337]
+      - generic "Circuit editor canvas" [ref=f1e339]
+    - generic [ref=f1e340]:
+      - generic [ref=f1e341]: ⚠️
+      - generic [ref=f1e342]: "Simulation error: solver failed to converge"
+      - button "×" [ref=f1e343] [cursor=pointer]
+      - button "100%" [ref=f1e345] [cursor=pointer]
 ```

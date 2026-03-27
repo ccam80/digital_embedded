@@ -260,36 +260,37 @@
                 - generic [ref=e347]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e348] [cursor=pointer]:
                 - generic [ref=e350]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e351]
-    - generic [ref=e352]:
-      - generic "Circuit editor canvas" [ref=e353]
-      - generic [ref=e354]:
-        - generic [ref=e355]:
-          - generic [ref=e356]: ADC
-          - button "×" [ref=e357] [cursor=pointer]
-        - generic [ref=e358]:
-          - generic [ref=e359]:
-            - generic [ref=e360]: Resolution (bits)
-            - spinbutton [ref=e362]: "8"
-          - generic [ref=e363]:
-            - generic [ref=e364]: Reference voltage (V)
-            - spinbutton [ref=e366]: "5"
-          - generic [ref=e367]:
-            - generic [ref=e368]: Conversion mode
-            - textbox [ref=e370]: unipolar
-          - generic [ref=e371]:
-            - generic [ref=e372]: Conversion type
-            - textbox [ref=e374]: instant
-          - generic [ref=e375]:
-            - generic [ref=e376]: Label
-            - generic [ref=e377]:
-              - textbox [ref=e378]: ADC1
-              - checkbox "Show on canvas" [checked] [ref=e379]
-          - generic [ref=e380]:
-            - generic [ref=e381]: Show value
-            - checkbox [checked] [ref=e383]
-  - generic [ref=e384]:
-    - generic [ref=e385]: Ready
-    - button "100%" [ref=e387] [cursor=pointer]
-    - generic [ref=e388]: 20, 13
+      - button "‹" [ref=e351] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e352]
+    - generic [ref=e353]:
+      - generic "Circuit editor canvas" [ref=e354]
+      - generic [ref=e355]:
+        - generic [ref=e356]:
+          - generic [ref=e357]: ADC
+          - button "×" [ref=e358] [cursor=pointer]
+        - generic [ref=e359]:
+          - generic [ref=e360]:
+            - generic [ref=e361]: Resolution (bits)
+            - spinbutton [ref=e363]: "8"
+          - generic [ref=e364]:
+            - generic [ref=e365]: Reference voltage (V)
+            - spinbutton [ref=e367]: "5"
+          - generic [ref=e368]:
+            - generic [ref=e369]: Conversion mode
+            - textbox [ref=e371]: unipolar
+          - generic [ref=e372]:
+            - generic [ref=e373]: Conversion type
+            - textbox [ref=e375]: instant
+          - generic [ref=e376]:
+            - generic [ref=e377]: Label
+            - generic [ref=e378]:
+              - textbox [ref=e379]: ADC1
+              - checkbox "Show on canvas" [checked] [ref=e380]
+          - generic [ref=e381]:
+            - generic [ref=e382]: Show value
+            - checkbox [checked] [ref=e384]
+  - generic [ref=e385]:
+    - generic [ref=e386]: Ready
+    - button "100%" [ref=e388] [cursor=pointer]
+    - generic [ref=e389]: 20, 13
 ```

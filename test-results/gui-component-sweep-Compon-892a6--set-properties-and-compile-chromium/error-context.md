@@ -254,12 +254,13 @@
                 - generic [ref=e338]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e339] [cursor=pointer]:
                 - generic [ref=e341]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e342]
-    - generic "Circuit editor canvas" [ref=e344]
-  - generic [ref=e345]:
-    - generic [ref=e346]: ⚠️
-    - generic [ref=e347]: "Circuit problem: Node 3 is orphan (no element terminals connected) | Node 4 is orphan (no element terminals connected)"
-    - button "×" [ref=e348] [cursor=pointer]
-    - button "100%" [ref=e350] [cursor=pointer]
-    - generic [ref=e351]: 10.5, 9.5
+      - button "‹" [ref=e342] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e343]
+    - generic "Circuit editor canvas" [ref=e345]
+  - generic [ref=e346]:
+    - generic [ref=e347]: ⚠️
+    - generic [ref=e348]: "Circuit problem: Node 3 is orphan (no element terminals connected) | Node 4 is orphan (no element terminals connected)"
+    - button "×" [ref=e349] [cursor=pointer]
+    - button "100%" [ref=e351] [cursor=pointer]
+    - generic [ref=e352]: 10.5, 9.5
 ```

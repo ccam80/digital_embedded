@@ -178,6 +178,11 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
+      if (e.key === 'u' || e.key === 'U') {
+        ctx.selection.expandWireSelection(ctx.circuit);
+        ctx.scheduleRender();
+        return;
+      }
     }
 
     // --- r: rotate placement ghost or selection ---

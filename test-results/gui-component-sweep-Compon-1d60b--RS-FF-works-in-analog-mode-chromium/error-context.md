@@ -254,29 +254,30 @@
                 - generic [ref=e338]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e339] [cursor=pointer]:
                 - generic [ref=e341]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e342]
-    - generic [ref=e343]:
-      - generic "Circuit editor canvas" [ref=e344]
-      - generic [ref=e345]:
-        - generic [ref=e346]:
-          - generic [ref=e347]: RS_FF
-          - button "×" [ref=e348] [cursor=pointer]
-        - generic [ref=e349]:
-          - generic [ref=e350]:
-            - generic [ref=e351]: Label
-            - generic [ref=e352]:
-              - textbox [ref=e353]: DUT
-              - checkbox "Show on canvas" [checked] [ref=e354]
-          - generic [ref=e355]:
-            - generic [ref=e356]: Show value
-            - checkbox [checked] [ref=e358]
-          - generic [ref=e359]:
-            - generic [ref=e360]: Mode
-            - combobox [ref=e361]:
+      - button "‹" [ref=e342] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e343]
+    - generic [ref=e344]:
+      - generic "Circuit editor canvas" [ref=e345]
+      - generic [ref=e346]:
+        - generic [ref=e347]:
+          - generic [ref=e348]: RS_FF
+          - button "×" [ref=e349] [cursor=pointer]
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: Label
+            - generic [ref=e353]:
+              - textbox [ref=e354]: DUT
+              - checkbox "Show on canvas" [checked] [ref=e355]
+          - generic [ref=e356]:
+            - generic [ref=e357]: Show value
+            - checkbox [checked] [ref=e359]
+          - generic [ref=e360]:
+            - generic [ref=e361]: Mode
+            - combobox [ref=e362]:
               - option "digital" [selected]
               - option "analog"
-  - generic [ref=e362]:
-    - generic [ref=e363]: Ready
-    - button "100%" [ref=e365] [cursor=pointer]
-    - generic [ref=e366]: 11.5, 9
+  - generic [ref=e363]:
+    - generic [ref=e364]: Ready
+    - button "100%" [ref=e366] [cursor=pointer]
+    - generic [ref=e367]: 11.5, 9
 ```

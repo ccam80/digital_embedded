@@ -172,6 +172,22 @@ export function propertyBagToJson(bag: PropertyBag): SerializedPropertyBag {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Shared property definition constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Standard label property definition shared by all components that show an
+ * optional user-supplied label above the component body.
+ */
+export const LABEL_PROPERTY_DEF: PropertyDefinition = {
+  key: "label",
+  type: PropertyType.STRING,
+  label: "Label",
+  defaultValue: "",
+  description: "Optional label shown above the component",
+};
+
 /**
  * Schema for a PropertyDefinition as stored in JSON (e.g. component library
  * metadata). Only used when definitions are serialized externally.

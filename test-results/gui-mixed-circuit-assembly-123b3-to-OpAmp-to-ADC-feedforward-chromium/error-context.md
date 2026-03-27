@@ -258,31 +258,32 @@
                 - generic [ref=e344]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e345] [cursor=pointer]:
                 - generic [ref=e347]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e348]
-    - generic [ref=e349]:
-      - generic "Circuit editor canvas" [ref=e350]
-      - generic [ref=e351]:
-        - generic [ref=e352]:
-          - generic [ref=e353]: Const
-          - button "×" [ref=e354] [cursor=pointer]
-        - generic [ref=e355]:
-          - generic [ref=e356]:
-            - generic [ref=e357]: Bits
-            - spinbutton [ref=e359]: "1"
-          - generic [ref=e360]:
-            - generic [ref=e361]: Value
-            - spinbutton [ref=e363]: "1"
-          - generic [ref=e364]:
-            - generic [ref=e365]: Label
-            - generic [ref=e366]:
-              - textbox [ref=e367]: D0
-              - checkbox "Show on canvas" [checked] [ref=e368]
-          - generic [ref=e369]:
-            - generic [ref=e370]: Show value
-            - checkbox [checked] [ref=e372]
-          - generic [ref=e374] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e375]:
-    - generic [ref=e376]: Ready
-    - button "100%" [ref=e378] [cursor=pointer]
-    - generic [ref=e379]: 3.75, 3.25
+      - button "‹" [ref=e348] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e349]
+    - generic [ref=e350]:
+      - generic "Circuit editor canvas" [ref=e351]
+      - generic [ref=e352]:
+        - generic [ref=e353]:
+          - generic [ref=e354]: Const
+          - button "×" [ref=e355] [cursor=pointer]
+        - generic [ref=e356]:
+          - generic [ref=e357]:
+            - generic [ref=e358]: Bits
+            - spinbutton [ref=e360]: "1"
+          - generic [ref=e361]:
+            - generic [ref=e362]: Value
+            - spinbutton [ref=e364]: "1"
+          - generic [ref=e365]:
+            - generic [ref=e366]: Label
+            - generic [ref=e367]:
+              - textbox [ref=e368]: D0
+              - checkbox "Show on canvas" [checked] [ref=e369]
+          - generic [ref=e370]:
+            - generic [ref=e371]: Show value
+            - checkbox [checked] [ref=e373]
+          - generic [ref=e375] [cursor=pointer]: ▶ Pin Electrical
+  - generic [ref=e376]:
+    - generic [ref=e377]: Ready
+    - button "100%" [ref=e379] [cursor=pointer]
+    - generic [ref=e380]: 3.75, 3.25
 ```

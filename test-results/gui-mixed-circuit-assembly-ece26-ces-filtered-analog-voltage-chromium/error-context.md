@@ -256,39 +256,40 @@
                 - generic [ref=e341]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e342] [cursor=pointer]:
                 - generic [ref=e344]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e345]
-    - generic [ref=e346]:
-      - generic "Circuit editor canvas" [ref=e347]
-      - generic [ref=e348]:
-        - generic [ref=e349]:
-          - generic [ref=e350]: DAC
-          - button "×" [ref=e351] [cursor=pointer]
-        - generic [ref=e352]:
-          - generic [ref=e353]:
-            - generic [ref=e354]: Resolution (bits)
-            - spinbutton [ref=e356]: "8"
-          - generic [ref=e357]:
-            - generic [ref=e358]: Reference voltage V_ref (V)
-            - spinbutton [ref=e360]: "5"
-          - generic [ref=e361]:
-            - generic [ref=e362]: Mode
-            - textbox [ref=e364]: unipolar
-          - generic [ref=e365]:
-            - generic [ref=e366]: Output resistance R_out (Ω)
-            - spinbutton [ref=e368]: "100"
-          - generic [ref=e369]:
-            - generic [ref=e370]: Settling time (s)
-            - spinbutton [ref=e372]: "0.000001"
-          - generic [ref=e373]:
-            - generic [ref=e374]: Label
-            - generic [ref=e375]:
-              - textbox [ref=e376]: DAC1
-              - checkbox "Show on canvas" [checked] [ref=e377]
-          - generic [ref=e378]:
-            - generic [ref=e379]: Show value
-            - checkbox [checked] [ref=e381]
-  - generic [ref=e382]:
-    - generic [ref=e383]: Ready
-    - button "100%" [ref=e385] [cursor=pointer]
-    - generic [ref=e386]: 14, 8
+      - button "‹" [ref=e345] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e346]
+    - generic [ref=e347]:
+      - generic "Circuit editor canvas" [ref=e348]
+      - generic [ref=e349]:
+        - generic [ref=e350]:
+          - generic [ref=e351]: DAC
+          - button "×" [ref=e352] [cursor=pointer]
+        - generic [ref=e353]:
+          - generic [ref=e354]:
+            - generic [ref=e355]: Resolution (bits)
+            - spinbutton [ref=e357]: "8"
+          - generic [ref=e358]:
+            - generic [ref=e359]: Reference voltage V_ref (V)
+            - spinbutton [ref=e361]: "5"
+          - generic [ref=e362]:
+            - generic [ref=e363]: Mode
+            - textbox [ref=e365]: unipolar
+          - generic [ref=e366]:
+            - generic [ref=e367]: Output resistance R_out (Ω)
+            - spinbutton [ref=e369]: "100"
+          - generic [ref=e370]:
+            - generic [ref=e371]: Settling time (s)
+            - spinbutton [ref=e373]: "0.000001"
+          - generic [ref=e374]:
+            - generic [ref=e375]: Label
+            - generic [ref=e376]:
+              - textbox [ref=e377]: DAC1
+              - checkbox "Show on canvas" [checked] [ref=e378]
+          - generic [ref=e379]:
+            - generic [ref=e380]: Show value
+            - checkbox [checked] [ref=e382]
+  - generic [ref=e383]:
+    - generic [ref=e384]: Ready
+    - button "100%" [ref=e386] [cursor=pointer]
+    - generic [ref=e387]: 14, 8
 ```

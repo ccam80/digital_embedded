@@ -258,12 +258,13 @@
                 - generic [ref=e344]: LookUpTable
               - treeitem "RAMSinglePort" [ref=e345] [cursor=pointer]:
                 - generic [ref=e347]: RAMSinglePort
-    - generic "Drag to resize palette" [ref=e348]
-    - generic "Circuit editor canvas" [ref=e350]
-  - generic [ref=e351]:
-    - generic [ref=e352]: ⚠️
-    - generic [ref=e353]: "Circuit problem: Net 2: connected digital pins have mismatched bit widths: 1, 16 | Bit width mismatch on net 2: pin \">\" has 1 bits but pin \"in\" has 16 bits"
-    - button "×" [ref=e354] [cursor=pointer]
-    - button "100%" [ref=e356] [cursor=pointer]
-    - generic [ref=e357]: 18, 8
+      - button "‹" [ref=e348] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e349]
+    - generic "Circuit editor canvas" [ref=e351]
+  - generic [ref=e352]:
+    - generic [ref=e353]: ⚠️
+    - generic [ref=e354]: "Circuit problem: Net 2: connected digital pins have mismatched bit widths: 1, 16 | Bit width mismatch on net 2: pin \">\" has 1 bits but pin \"in\" has 16 bits"
+    - button "×" [ref=e355] [cursor=pointer]
+    - button "100%" [ref=e357] [cursor=pointer]
+    - generic [ref=e358]: 18, 8
 ```
