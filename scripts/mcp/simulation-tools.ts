@@ -268,17 +268,34 @@ export function registerSimulationTools(
           .int()
           .min(2)
           .optional()
-          .describe("Number of frequency points (default: 50)"),
+          .describe("Points per sweep unit (default: 50). For 'dec'/'oct' this is points per decade/octave; for 'lin' this is total points."),
+        sweepType: z
+          .enum(["lin", "dec", "oct"])
+          .optional()
+          .describe("Sweep type: 'lin' (linear), 'dec' (decades, default), 'oct' (octaves)"),
+        sourceLabel: z
+          .string()
+          .describe("Label of the AC voltage source providing excitation (e.g. 'V1')"),
+        outputNodes: z
+          .array(z.string())
+          .describe("Labels of output nodes to measure (e.g. ['Vout', 'V2'])"),
       },
     },
-    wrapTool<{ handle: string; fStart: number; fStop: number; points?: number }>(
+    wrapTool<{ handle: string; fStart: number; fStop: number; points?: number; sweepType?: "lin" | "dec" | "oct"; sourceLabel: string; outputNodes: string[] }>(
       "circuit_ac_sweep error",
-      ({ handle, fStart, fStop, points = 50 }) => {
+      ({ handle, fStart, fStop, points = 50, sweepType = "dec", sourceLabel, outputNodes }) => {
         const coordinator = ensureEngine(handle, facade, session);
         if (!coordinator.supportsAcSweep()) {
           return "AC analysis not available (no analog domain)";
         }
-        const result = coordinator.acAnalysis({ fStart, fStop, numPoints: points });
+        const result = coordinator.acAnalysis({
+          type: sweepType,
+          fStart,
+          fStop,
+          numPoints: points,
+          sourceLabel,
+          outputNodes,
+        });
         if (!result) {
           return "AC analysis not available (no analog domain)";
         }

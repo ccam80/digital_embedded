@@ -6,7 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readFile, writeFile, readdir } from "fs/promises";
 import { dirname } from "path";
-import type { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
+import { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
 import type { CircuitSpec, PatchOp, ComponentDescriptor } from "../../src/headless/netlist-types.js";
@@ -661,8 +661,16 @@ export function registerCircuitTools(
             "No test data available: circuit contains no Testcase components and no external test data was provided.",
           );
         }
-        const engine = facade.compile(circuit);
-        const results = facade.runTests(engine, circuit, resolvedData);
+        // Use a dedicated facade for test compilation to avoid corrupting
+        // the shared facade's internal coordinator state and leaking engines.
+        const testFacade = new DefaultSimulatorFacade(registry);
+        const engine = testFacade.compile(circuit);
+        let results;
+        try {
+          results = testFacade.runTests(engine, circuit, resolvedData);
+        } finally {
+          testFacade.invalidate();
+        }
 
         const lines: string[] = [
           `Test Results:`,
