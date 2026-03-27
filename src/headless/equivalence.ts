@@ -52,10 +52,15 @@ export function testEquivalence(
   const limit = Math.min(maxInputBits ?? 16, 20);
 
   if (totalBits > limit) {
-    throw new Error(
-      `Total input bits (${totalBits}) exceeds limit (${limit}). ` +
+    return {
+      equivalent: false,
+      totalCombinations: 0,
+      inputLabels,
+      outputLabels,
+      mismatches: -1,
+      firstMismatch: `Total input bits (${totalBits}) exceeds limit (${limit}). ` +
         `Exhaustive equivalence testing is impractical. Use test vectors instead.`,
-    );
+    };
   }
 
   const totalCombinations = 1 << totalBits;

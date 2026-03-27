@@ -871,7 +871,18 @@ export function registerCircuitTools(
 
         const result = testEquivalence(circuitA, circuitB, registry, maxInputBits);
 
-        if (result.equivalent) {
+        if (result.mismatches === -1) {
+          // Limit exceeded — not an equivalence result, just a bounds error
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: result.firstMismatch ?? "Input bit limit exceeded.",
+              },
+            ],
+            isError: true as const,
+          };
+        } else if (result.equivalent) {
           return {
             content: [
               {
