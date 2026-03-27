@@ -41,6 +41,7 @@ import { MidiDefinition } from "./io/midi.js";
 import { RotaryEncoderDefinition } from "./io/rotary-encoder.js";
 import { StepperMotorBipolarDefinition, StepperMotorUnipolarDefinition } from "./io/stepper-motor.js";
 import { PowerSupplyDefinition } from "./io/power-supply.js";
+import { PortDefinition } from "./io/port.js";
 
 // Flip-flops
 import { DDefinition } from "./flipflops/d.js";
@@ -243,6 +244,7 @@ export function createDefaultRegistry(
   registry.register(StepperMotorBipolarDefinition);
   registry.register(StepperMotorUnipolarDefinition);
   registry.register(PowerSupplyDefinition);
+  registry.register(PortDefinition);
 
   // Flip-flops
   registry.register(DDefinition);

@@ -111,6 +111,19 @@ export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
         direction: PinDirection.OUTPUT,
         sortPos,
       });
+    } else if (element.typeId === "Port") {
+      const label = element.getProperties().getOrDefault<string>("label", "");
+      const bitWidth = element.getProperties().getOrDefault<number>("bitWidth", 1);
+      const face = element.getProperties().getOrDefault<string>("face", "left") as Face;
+      const sortPos = element.getProperties().getOrDefault<number>("sortOrder", 0);
+
+      facedPins.push({
+        face,
+        label: label || `port${facedPins.length}`,
+        bitWidth,
+        direction: PinDirection.BIDIRECTIONAL,
+        sortPos,
+      });
     }
   }
 

@@ -20,7 +20,7 @@ import type { PinDirection } from '../core/pin.js';
 
 const INFRASTRUCTURE_TYPES = new Set([
   'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe',
-  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
 ]);
 
 // ---------------------------------------------------------------------------
