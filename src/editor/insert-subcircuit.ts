@@ -13,7 +13,11 @@ import { pinWorldPosition } from "@/core/pin.js";
 import type { Point } from "@/core/renderer-interface.js";
 import type { EditCommand } from "./undo-redo.js";
 import type { ComponentRegistry } from "@/core/registry.js";
-import { registerSubcircuit, type SubcircuitDefinition } from "@/components/subcircuit/subcircuit.js";
+import {
+  SubcircuitElement,
+  registerSubcircuit,
+  type SubcircuitDefinition,
+} from "@/components/subcircuit/subcircuit.js";
 import { deriveInterfacePins } from "@/components/subcircuit/pin-derivation.js";
 import { PortElement } from "@/components/io/port.js";
 import { PropertyBag } from "@/core/properties.js";
@@ -249,6 +253,17 @@ export function extractSubcircuit(
 }
 
 // ---------------------------------------------------------------------------
+// Grid snapping helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Snap a position to the nearest integer grid unit.
+ */
+function snapToGrid(p: Point): Point {
+  return { x: Math.round(p.x), y: Math.round(p.y) };
+}
+
+// ---------------------------------------------------------------------------
 // insertAsSubcircuit
 // ---------------------------------------------------------------------------
 
@@ -260,8 +275,12 @@ export function extractSubcircuit(
  *   2. Extract a new Circuit containing the selected items + Port elements.
  *   3. Derive interface pins from Port elements in the extracted circuit.
  *   4. Register the subcircuit in the registry.
+ *   5. Create a SubcircuitElement at the selection centroid and reconnect
+ *      boundary wires to its pins.
  *
- * Returns the extracted subcircuit Circuit and an EditCommand for undo support.
+ * Returns the extracted subcircuit Circuit and an atomic EditCommand for
+ * undo/redo. Undo restores the original elements and wires; redo replaces
+ * them with the subcircuit instance.
  */
 export function insertAsSubcircuit(
   circuit: Circuit,
@@ -269,7 +288,7 @@ export function insertAsSubcircuit(
   selectedWires: Wire[],
   registry?: ComponentRegistry,
   name?: string,
-): { subcircuit: Circuit; command: EditCommand } {
+): { subcircuit: Circuit; command: EditCommand; instance: SubcircuitElement } {
   const { boundaryPorts, internalWires } = analyzeBoundary(circuit, selectedElements, selectedWires);
 
   const subcircuit = extractSubcircuit(selectedElements, internalWires, boundaryPorts);
@@ -288,6 +307,46 @@ export function insertAsSubcircuit(
     registerSubcircuit(registry, subcircuitName, definition);
   }
 
+  // Create the SubcircuitElement instance at the selection centroid.
+  const centroid = selectionCentroid(selectedElements);
+  const instancePosition = snapToGrid(centroid);
+
+  const instanceProps = new PropertyBag();
+  instanceProps.set("label", "");
+  instanceProps.set("shapeType", "DEFAULT");
+
+  const instance = new SubcircuitElement(
+    `Subcircuit:${subcircuitName}`,
+    crypto.randomUUID(),
+    instancePosition,
+    0,
+    false,
+    instanceProps,
+    definition,
+  );
+
+  // Build reconnected wires: for each boundary port, find the matching pin on
+  // the subcircuit instance by label and wire from the external endpoint to
+  // the pin's world position.
+  const reconnectedWires: Wire[] = [];
+  const instancePins = instance.getPins();
+
+  for (const bp of boundaryPorts) {
+    const matchPin = instancePins.find(p => p.label === bp.label);
+    if (!matchPin) continue;
+
+    const pinWorld = pinWorldPosition(instance, matchPin);
+
+    // The external endpoint is the endpoint of the boundary wire that does NOT
+    // touch the selected elements (i.e., the opposite end from bp.position).
+    const externalEndpoint =
+      (bp.wire.start.x === bp.position.x && bp.wire.start.y === bp.position.y)
+        ? bp.wire.end
+        : bp.wire.start;
+
+    reconnectedWires.push(new Wire(externalEndpoint, pinWorld, bp.bitWidth));
+  }
+
   // Capture state for undo
   const removedElements = [...selectedElements];
   const removedWires = [...selectedWires, ...internalWires];
@@ -303,8 +362,16 @@ export function insertAsSubcircuit(
       for (const w of [...removedWires, ...removedBoundaryWires]) {
         circuit.removeWire(w);
       }
+      circuit.addElement(instance);
+      for (const w of reconnectedWires) {
+        circuit.addWire(w);
+      }
     },
     undo(): void {
+      circuit.elements.splice(circuit.elements.indexOf(instance), 1);
+      for (const w of reconnectedWires) {
+        circuit.removeWire(w);
+      }
       for (const el of removedElements) {
         circuit.addElement(el);
       }
@@ -314,5 +381,5 @@ export function insertAsSubcircuit(
     },
   };
 
-  return { subcircuit, command };
+  return { subcircuit, command, instance };
 }

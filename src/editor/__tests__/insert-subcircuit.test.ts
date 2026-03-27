@@ -17,6 +17,7 @@ import {
   extractSubcircuit,
   insertAsSubcircuit,
 } from "../insert-subcircuit";
+import { SubcircuitElement } from "@/components/subcircuit/subcircuit";
 
 // ---------------------------------------------------------------------------
 // Minimal test element
@@ -284,5 +285,136 @@ describe("InsertSubcircuit", () => {
     command.undo();
     expect(circuit.elements).toContain(elementA);
     expect(circuit.wires).toContain(boundaryWire);
+  });
+
+  // ---------------------------------------------------------------------------
+  // SE-5: Instance placement tests
+  // ---------------------------------------------------------------------------
+
+  it("instancePlacement_returnsSubcircuitElementWithCorrectTypeId", () => {
+    // elementA at (0,0) has an output pin at (4,1); elementB is external.
+    const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
+    const pinB = makePin("A", PinDirection.INPUT, 6, 1);
+    const elementA = makeTestElement("el-A", [pinA]);
+    const elementB = makeTestElement("el-B", [pinB]);
+
+    const circuit = new Circuit();
+    circuit.addElement(elementA);
+    circuit.addElement(elementB);
+    circuit.addWire(new Wire({ x: 4, y: 1 }, { x: 6, y: 1 }));
+
+    const result = insertAsSubcircuit(circuit, [elementA], [], undefined, "MyAdder");
+
+    // The returned instance must be a SubcircuitElement.
+    expect(result.instance).toBeInstanceOf(SubcircuitElement);
+
+    // typeId must follow "Subcircuit:{name}" format.
+    expect(result.instance.typeId).toBe("Subcircuit:MyAdder");
+  });
+
+  it("instancePlacement_execute_addsSubcircuitElementToCircuit", () => {
+    const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
+    const pinB = makePin("A", PinDirection.INPUT, 6, 1);
+    const elementA = makeTestElement("el-A", [pinA]);
+    const elementB = makeTestElement("el-B", [pinB]);
+
+    const circuit = new Circuit();
+    circuit.addElement(elementA);
+    circuit.addElement(elementB);
+    circuit.addWire(new Wire({ x: 4, y: 1 }, { x: 6, y: 1 }));
+
+    const { command, instance } = insertAsSubcircuit(circuit, [elementA], [], undefined, "TestSC");
+
+    command.execute();
+
+    // Original element removed, subcircuit instance added.
+    expect(circuit.elements).not.toContain(elementA);
+    expect(circuit.elements).toContain(instance);
+  });
+
+  it("instancePlacement_undo_removesInstanceAndRestoresOriginals", () => {
+    const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
+    const pinB = makePin("A", PinDirection.INPUT, 6, 1);
+    const elementA = makeTestElement("el-A", [pinA]);
+    const elementB = makeTestElement("el-B", [pinB]);
+
+    const circuit = new Circuit();
+    circuit.addElement(elementA);
+    circuit.addElement(elementB);
+
+    const boundaryWire = new Wire({ x: 4, y: 1 }, { x: 6, y: 1 });
+    circuit.addWire(boundaryWire);
+
+    const { command, instance } = insertAsSubcircuit(circuit, [elementA], [], undefined, "TestSC");
+
+    command.execute();
+    command.undo();
+
+    // Original element and wire restored.
+    expect(circuit.elements).toContain(elementA);
+    expect(circuit.wires).toContain(boundaryWire);
+
+    // Subcircuit instance no longer present.
+    expect(circuit.elements).not.toContain(instance);
+  });
+
+  it("instancePlacement_boundaryWiresReconnectedToSubcircuitPins", () => {
+    // elementA at (0,0) with output pin at (4,1).
+    // elementB at (8,0) with input pin at (6,1) — external.
+    // Boundary wire: (4,1) → (6,1).
+    // After execute(), the reconnected wire must connect the external endpoint
+    // (6,1) to the subcircuit instance's pin for label "Y".
+    const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
+    const pinB = makePin("A", PinDirection.INPUT, 6, 1);
+    const elementA = makeTestElement("el-A", [pinA]);
+    const elementB = makeTestElement("el-B", [pinB]);
+
+    const circuit = new Circuit();
+    circuit.addElement(elementA);
+    circuit.addElement(elementB);
+    circuit.addWire(new Wire({ x: 4, y: 1 }, { x: 6, y: 1 }));
+
+    const { command } = insertAsSubcircuit(circuit, [elementA], [], undefined, "SC");
+
+    command.execute();
+
+    // The original boundary wire is gone.
+    const origWire = circuit.wires.find(
+      w => w.start.x === 4 && w.start.y === 1 && w.end.x === 6 && w.end.y === 1
+    );
+    expect(origWire).toBeUndefined();
+
+    // A new reconnected wire must exist connecting to the external endpoint (6,1).
+    const reconnectedWire = circuit.wires.find(
+      w =>
+        (w.start.x === 6 && w.start.y === 1) ||
+        (w.end.x === 6 && w.end.y === 1)
+    );
+    expect(reconnectedWire).toBeDefined();
+  });
+
+  it("instancePlacement_positionedAtCentroidOfSelection", () => {
+    // Two elements at (0,0) and (4,0) — centroid is (2,0).
+    const pinA = makePin("out", PinDirection.OUTPUT, 2, 0);
+    const pinC = makePin("in", PinDirection.INPUT, 8, 0);
+    const elementA = makeTestElement("el-A", [pinA]);
+    const elementA2 = makeTestElement("el-A2", [makePin("X", PinDirection.INPUT, 0, 0)]);
+
+    // Position elementA at (0,0), elementA2 at (4,0)
+    (elementA as { position: { x: number; y: number } }).position = { x: 0, y: 0 };
+    (elementA2 as { position: { x: number; y: number } }).position = { x: 4, y: 0 };
+
+    const elementC = makeTestElement("el-C", [pinC]);
+
+    const circuit = new Circuit();
+    circuit.addElement(elementA);
+    circuit.addElement(elementA2);
+    circuit.addElement(elementC);
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
+
+    const { instance } = insertAsSubcircuit(circuit, [elementA, elementA2], [], undefined, "SC2");
+
+    // Centroid of (0,0) and (4,0) is (2,0) — grid-snapped stays (2,0).
+    expect(instance.position).toEqual({ x: 2, y: 0 });
   });
 });
