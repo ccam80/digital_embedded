@@ -12,7 +12,7 @@
  */
 
 import type { Point, Rect, RenderContext } from "./renderer-interface.js";
-import type { PinVoltageAccess } from "../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "./pin-voltage-access.js";
 import type { Pin, PinDeclaration } from "./pin.js";
 import type { Rotation } from "./pin.js";
 import {

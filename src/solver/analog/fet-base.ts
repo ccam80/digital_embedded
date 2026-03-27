@@ -18,6 +18,7 @@
 
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { SparseSolver } from "./sparse-solver.js";
+import { stampG, stampRHS } from "./stamp-helpers.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -44,17 +45,6 @@ export interface FetCapacitances {
 // Stamp helpers — node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
-function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
-
-function stampRHS(solver: SparseSolver, row: number, val: number): void {
-  if (row !== 0) {
-    solver.stampRHS(row - 1, val);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // AbstractFetElement

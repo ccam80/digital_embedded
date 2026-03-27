@@ -14,7 +14,7 @@ import type { Pin } from "@/core/pin";
 import { pinWorldPosition } from "@/core/pin";
 import { Wire, Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
-import { mergeCollinearSegments } from "@/editor/wire-merge";
+import { mergeCollinearSegments } from "@/core/wire-utils";
 import { checkWireConsistency } from "@/editor/wire-consistency";
 // ---------------------------------------------------------------------------
 // Wire-tap helpers
@@ -76,6 +76,52 @@ export function isWireEndpoint(point: Point, circuit: Circuit): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Targeted junction split for newly drawn wire paths.
+ *
+ * Unlike the blanket `circuit.splitWiresAtJunctions()`, this only considers
+ * the path's start and end points (plus existing wire endpoints and pin
+ * positions) as potential split points — NOT intermediate routing corners
+ * of the new wire. This prevents false junctions when a Manhattan-routed
+ * wire path crosses an existing wire at an intermediate corner.
+ */
+export function targetedJunctionSplit(
+  circuit: Circuit,
+  newWires: Wire[],
+  pathStart: Point,
+  pathEnd: Point,
+): void {
+  const newWireSet = new Set(newWires);
+  const pathStartKey = `${pathStart.x},${pathStart.y}`;
+  const pathEndKey = `${pathEnd.x},${pathEnd.y}`;
+
+  const points = new Set<string>();
+
+  // Include all existing wire endpoints (not from the new wires)
+  for (const w of circuit.wires) {
+    if (newWireSet.has(w)) {
+      // For new wires, only include the path start/end, not intermediate corners
+      const sk = `${w.start.x},${w.start.y}`;
+      const ek = `${w.end.x},${w.end.y}`;
+      if (sk === pathStartKey || sk === pathEndKey) points.add(sk);
+      if (ek === pathStartKey || ek === pathEndKey) points.add(ek);
+    } else {
+      points.add(`${w.start.x},${w.start.y}`);
+      points.add(`${w.end.x},${w.end.y}`);
+    }
+  }
+
+  // Include all pin positions
+  for (const el of circuit.elements) {
+    for (const pin of el.getPins()) {
+      const wp = pinWorldPosition(el, pin);
+      points.add(`${wp.x},${wp.y}`);
+    }
+  }
+
+  circuit.splitWiresAtPoints(points);
 }
 
 /** Grid size for snapping wire endpoints. */
@@ -212,10 +258,9 @@ export class WireDrawingMode {
       circuit.addWire(wire);
     }
 
-    // Split wires at T-junctions created by the new wire segments.
-    // A new wire may cross through an existing wire endpoint or pin, or
-    // an existing wire may pass through one of the new wire's endpoints.
-    circuit.splitWiresAtJunctions();
+    // Split wires at T-junctions, excluding intermediate routing corners
+    // of the new path to avoid false junctions when crossing existing wires.
+    targetedJunctionSplit(circuit, merged, this._waypoints[0]!, endPos);
 
     this._active = false;
     return merged;
@@ -247,8 +292,8 @@ export class WireDrawingMode {
       circuit.addWire(wire);
     }
 
-    // Split wires at T-junctions created by the new wire segments.
-    circuit.splitWiresAtJunctions();
+    // Split wires at T-junctions, excluding intermediate routing corners.
+    targetedJunctionSplit(circuit, merged, this._waypoints[0]!, endPos);
 
     this._active = false;
     return merged;

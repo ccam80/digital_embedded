@@ -11,7 +11,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,

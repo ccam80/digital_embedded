@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { WireDrawingMode, isPointOnSegmentInterior, splitWiresAtPoint } from "@/editor/wire-drawing";
-import { mergeCollinearSegments } from "@/editor/wire-merge";
+import { mergeCollinearSegments } from "@/core/wire-utils";
 import { checkWireConsistency } from "@/editor/wire-consistency";
 import { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";

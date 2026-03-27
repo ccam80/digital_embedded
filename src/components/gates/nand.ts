@@ -11,51 +11,24 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import {
-  standardGatePinLayout,
-  gateBodyMetrics,
-} from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
-import type { PropertyDefinition } from "../../core/properties.js";
+import type { Pin, Rotation } from "../../core/pin.js";
+import { gateBodyMetrics } from "../../core/pin.js";
+import { PropertyBag } from "../../core/properties.js";
 import {
   ComponentCategory,
-  type AttributeMapping,
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeNandAnalogFactory } from "../../solver/analog/behavioral-gate.js";
-
-// ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
-
-/** Gate width: 3 grid units (narrow/IEC) or 4 (wide/IEEE), matching Java GenericShape. */
-function compWidth(wideShape: boolean): number { return wideShape ? 4 : 3; }
-
-function componentHeight(inputCount: number): number {
-  return gateBodyMetrics(inputCount).bodyHeight;
-}
-
-// ---------------------------------------------------------------------------
-// Pin layout helpers
-// ---------------------------------------------------------------------------
-
-function buildInputLabels(inputCount: number): string[] {
-  const labels: string[] = [];
-  for (let i = 0; i < inputCount; i++) {
-    labels.push(`In_${i + 1}`);
-  }
-  return labels;
-}
-
-/** Output pin 1 grid unit past body edge (matching Java GenericShape inverted dx=SIZE). */
-const OUTPUT_BUBBLE_OFFSET = 1;
-
-function buildPinDeclarations(inputCount: number, bitWidth: number, wideShape: boolean = true): PinDeclaration[] {
-  const h = componentHeight(inputCount);
-  return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth, OUTPUT_BUBBLE_OFFSET);
-}
+import {
+  compWidth,
+  buildInvertedPinDeclarations,
+  STANDARD_GATE_ATTRIBUTE_MAPPINGS,
+  buildStandardGatePropertyDefs,
+  drawGateLabel,
+  drawGateExtensionLines,
+  drawAndBody,
+} from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
 // NAndElement — CircuitElement implementation
@@ -76,7 +49,7 @@ export class NAndElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
-    const decls = buildPinDeclarations(inputCount, bitWidth, wideShape);
+    const decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
     return this.derivePins(decls, []);
   }
 
@@ -103,19 +76,12 @@ export class NAndElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Java IEEEGenericShape: vertical extension lines for >2 inputs
-    if (offs > 0) {
-      const h = Math.floor(inputCount / 2) * 2;
-      ctx.setColor("COMPONENT");
-      ctx.setLineWidth(1);
-      ctx.drawLine(0.05, 0, 0.05, offs - 0.55);
-      ctx.drawLine(0.05, h, 0.05, h - offs + 0.55);
-    }
+    drawGateExtensionLines(ctx, inputCount);
 
     // Draw body translated to center position
     if (offs > 0) ctx.save();
     if (offs > 0) ctx.translate(0, offs);
-    this._drawIEEE(ctx, w);
+    drawAndBody(ctx, w);
     if (offs > 0) ctx.restore();
 
     // Inversion bubble at output pin position (untranslated)
@@ -123,42 +89,9 @@ export class NAndElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawCircle(w + 0.5, outputY, BUBBLE_RADIUS, false);
 
-    this._drawLabel(ctx, w);
+    drawGateLabel(ctx, this._visibleLabel(), w);
 
     ctx.restore();
-  }
-
-  /**
-   * IEEE/US shape: AND gate body (fixed 2-input base shape, output at y=1).
-   * For >2 inputs the body is translated by IEEEGenericShape scaling in draw().
-   */
-  private _drawIEEE(ctx: RenderContext, w: number): void {
-    const midX = w === 3 ? 1.5 : 2.5;
-
-    const ops = [
-      { op: "moveTo" as const, x: midX, y: 2.5 },
-      { op: "lineTo" as const, x: 0.05, y: 2.5 },
-      { op: "lineTo" as const, x: 0.05, y: -0.5 },
-      { op: "lineTo" as const, x: midX, y: -0.5 },
-      { op: "curveTo" as const, cp1x: midX + 0.5, cp1y: -0.5, cp2x: w - 0.05, cp2y: 0, x: w - 0.05, y: 1.0 },
-      { op: "curveTo" as const, cp1x: w - 0.05, cp1y: 2.0, cp2x: midX + 0.5, cp2y: 2.5, x: midX, y: 2.5 },
-      { op: "closePath" as const },
-    ];
-
-    ctx.setColor("COMPONENT_FILL");
-    ctx.drawPath({ operations: ops }, true);
-    ctx.setColor("COMPONENT");
-    ctx.setLineWidth(1);
-    ctx.drawPath({ operations: ops }, false);
-  }
-
-  private _drawLabel(ctx: RenderContext, w: number): void {
-    const label = this._visibleLabel();
-    if (label.length === 0) return;
-
-    ctx.setColor("TEXT");
-    ctx.setFont({ family: "sans-serif", size: 1.0 });
-    ctx.drawText(label, w / 2, -0.5, { horizontal: "center", vertical: "bottom" });
   }
 
   getHelpText(): string {
@@ -191,84 +124,6 @@ export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Ar
 }
 
 // ---------------------------------------------------------------------------
-// NAND_ATTRIBUTE_MAPPINGS
-// ---------------------------------------------------------------------------
-
-export const NAND_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  {
-    xmlName: "Inputs",
-    propertyKey: "inputCount",
-    convert: (v) => parseInt(v, 10),
-  },
-  {
-    xmlName: "Bits",
-    propertyKey: "bitWidth",
-    convert: (v) => parseInt(v, 10),
-  },
-  {
-    xmlName: "wideShape",
-    propertyKey: "wideShape",
-    convert: (v) => v === "true",
-  },
-  {
-    xmlName: "inverterConfig",
-    propertyKey: "_inverterLabels",
-    convert: (v) => v,
-  },
-  {
-    xmlName: "Label",
-    propertyKey: "label",
-    convert: (v) => v,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Property definitions
-// ---------------------------------------------------------------------------
-
-const NAND_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "inputCount",
-    type: PropertyType.INT,
-    label: "Inputs",
-    defaultValue: 2,
-    min: 2,
-    max: 5,
-    description: "Number of input pins (2–5)",
-  },
-  {
-    key: "bitWidth",
-    type: PropertyType.BIT_WIDTH,
-    label: "Bits",
-    defaultValue: 1,
-    min: 1,
-    max: 32,
-    description: "Bit width of each signal",
-  },
-  {
-    key: "wideShape",
-    type: PropertyType.BOOLEAN,
-    label: "Wide shape",
-    defaultValue: false,
-    description: "Use IEEE/US (curved with bubble) shape instead of IEC/DIN (rectangular)",
-  },
-  {
-    key: "_inverterLabels",
-    type: PropertyType.STRING,
-    label: "Invert inputs",
-    defaultValue: "",
-    description: "Comma-separated inputs to invert: pin labels (e.g. \"In_1,In_3\") or 1-indexed numbers (e.g. \"1,3\")",
-  },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
-];
-
-// ---------------------------------------------------------------------------
 // NAndDefinition
 // ---------------------------------------------------------------------------
 
@@ -286,9 +141,9 @@ export const NAndDefinition: ComponentDefinition = {
   name: "NAnd",
   typeId: -1,
   factory: nandFactory,
-  pinLayout: buildPinDeclarations(2, 1, false),
-  propertyDefs: NAND_PROPERTY_DEFS,
-  attributeMap: NAND_ATTRIBUTE_MAPPINGS,
+  pinLayout: buildInvertedPinDeclarations(2, 1, false),
+  propertyDefs: buildStandardGatePropertyDefs("Use IEEE/US (curved with bubble) shape instead of IEC/DIN (rectangular)"),
+  attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
     "NAnd gate — performs bitwise NOT(AND) of all inputs.\n" +

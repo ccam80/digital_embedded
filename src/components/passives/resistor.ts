@@ -7,7 +7,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -20,6 +20,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampG } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Minimum resistance clamp — prevents G → ∞ for degenerate values
@@ -150,12 +151,6 @@ export class ResistorElement extends AbstractCircuitElement {
 // createResistorElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
-// Stamp helper — node 0 is ground (skipped), 1-based → 0-based solver index
-function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
 
 function createResistorElement(
   pinNodes: ReadonlyMap<string, number>,

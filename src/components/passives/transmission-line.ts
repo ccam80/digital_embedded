@@ -39,7 +39,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -51,6 +51,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampG } from "../../solver/analog/stamp-helpers.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -69,12 +70,6 @@ const SHORT_CIRCUIT_CONDUCTANCE = 1e9;
 // Stamp helpers — node 0 is ground (skipped), 1-based → 0-based solver index
 // ---------------------------------------------------------------------------
 
-/** Stamp a conductance value into G-sub-matrix position (row, col). */
-function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Pin layout

@@ -37,7 +37,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { createAnalogFuseElement } from "../passives/analog-fuse.js";
 
 // ---------------------------------------------------------------------------

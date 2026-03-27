@@ -28,7 +28,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -40,6 +40,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -55,17 +56,6 @@ const VGK_MAX_STEP = 1.0;
 // Stamp helpers — node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
-function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
-
-function stampRHS(solver: SparseSolver, row: number, val: number): void {
-  if (row !== 0) {
-    solver.stampRHS(row - 1, val);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Koren model operating-point computation

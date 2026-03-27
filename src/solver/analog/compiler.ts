@@ -38,14 +38,12 @@ import type { FlattenResult, SubcircuitHost, InternalDigitalPartition, InternalC
 import type { CrossEngineBoundary } from "../digital/cross-engine-boundary.js";
 import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
-import { compileUnified } from "../../compile/compile.js";
 import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
-import type { SolverPartition, PartitionedComponent } from "../../compile/types.js";
+import type { SolverPartition, PartitionedComponent, DigitalCompilerFn } from "../../compile/types.js";
 
-function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry): CompiledCircuitImpl {
-  const unified = compileUnified(circuit, registry);
-  return unified.digital! as CompiledCircuitImpl;
+function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
+  return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
 }
 
 // ---------------------------------------------------------------------------
@@ -668,6 +666,7 @@ function compileAnalogCircuit(
   circuitOrResult: Circuit | FlattenResult,
   registry: ComponentRegistry,
   transistorModels?: TransistorModelRegistry,
+  digitalCompiler?: DigitalCompilerFn,
 ): ConcreteCompiledAnalogCircuit {
   // Unwrap: accept either a raw Circuit or a FlattenResult
   let circuit: Circuit;
@@ -1063,7 +1062,7 @@ function compileAnalogCircuit(
         const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
         let compiledInner: CompiledCircuitImpl;
         try {
-          compiledInner = compileInnerDigitalCircuit(innerCircuit, registry);
+          compiledInner = compileInnerDigitalCircuit(innerCircuit, registry, digitalCompiler!);
         } catch (err) {
           diagnostics.push(
             makeDiagnostic(
@@ -1498,6 +1497,7 @@ function compileAnalogCircuit(
       circuitFamily,
       registry,
       diagnostics,
+      digitalCompiler!,
     );
     if (bridgeInstance !== null) {
       // Add bridge adapters to the analog element list so the MNA assembler
@@ -1517,7 +1517,7 @@ function compileAnalogCircuit(
   for (const partition of mixedModePartitions) {
     let compiledInner: CompiledCircuitImpl;
     try {
-      compiledInner = compileInnerDigitalCircuit(partition.internalCircuit, registry);
+      compiledInner = compileInnerDigitalCircuit(partition.internalCircuit, registry, digitalCompiler!);
     } catch (err) {
       diagnostics.push(
         makeDiagnostic(
@@ -1776,6 +1776,7 @@ export function compileAnalogPartition(
   transistorModels?: TransistorModelRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
+  digitalCompiler?: DigitalCompilerFn,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
@@ -2052,7 +2053,7 @@ export function compileAnalogPartition(
         const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
         let compiledInner: CompiledCircuitImpl;
         try {
-          compiledInner = compileInnerDigitalCircuit(innerCircuit, registry);
+          compiledInner = compileInnerDigitalCircuit(innerCircuit, registry, digitalCompiler!);
         } catch (err) {
           diagnostics.push(
             makeDiagnostic(
@@ -2418,6 +2419,7 @@ export function compileAnalogPartition(
         circuitFamily,
         registry,
         diagnostics,
+        digitalCompiler!,
       );
       if (bridgeInstance !== null) {
         for (const adapter of bridgeInstance.outputAdapters) {
@@ -2636,11 +2638,12 @@ function compileBridgeInstance(
   circuitFamily: LogicFamilyConfig,
   registry: ComponentRegistry,
   diagnostics: SolverDiagnostic[],
+  digitalCompiler: DigitalCompilerFn,
 ): BridgeInstance | null {
   // Step 1: Compile the inner digital circuit.
   let compiledInner: CompiledCircuitImpl;
   try {
-    compiledInner = compileInnerDigitalCircuit(boundary.internalCircuit, registry);
+    compiledInner = compileInnerDigitalCircuit(boundary.internalCircuit, registry, digitalCompiler);
   } catch (err) {
     diagnostics.push(
       makeDiagnostic(

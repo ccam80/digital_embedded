@@ -9,7 +9,7 @@
 
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../editor/pin-voltage-access.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -22,6 +22,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -130,18 +131,6 @@ export class CapacitorElement extends AbstractCircuitElement {
 // AnalogCapacitorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-// Stamp helpers — node 0 is ground (skipped), 1-based → 0-based solver index
-function capStampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
-
-function capStampRHS(solver: SparseSolver, row: number, val: number): void {
-  if (row !== 0) {
-    solver.stampRHS(row - 1, val);
-  }
-}
 
 class AnalogCapacitorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -163,13 +152,13 @@ class AnalogCapacitorElement implements AnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
 
-    capStampG(solver, n0, n0, this.geq);
-    capStampG(solver, n0, n1, -this.geq);
-    capStampG(solver, n1, n0, -this.geq);
-    capStampG(solver, n1, n1, this.geq);
+    stampG(solver, n0, n0, this.geq);
+    stampG(solver, n0, n1, -this.geq);
+    stampG(solver, n1, n0, -this.geq);
+    stampG(solver, n1, n1, this.geq);
 
-    capStampRHS(solver, n0, -this.ieq);
-    capStampRHS(solver, n1, this.ieq);
+    stampRHS(solver, n0, -this.ieq);
+    stampRHS(solver, n1, this.ieq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

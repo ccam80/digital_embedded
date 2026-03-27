@@ -12,7 +12,7 @@ import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
 import { pinWorldPosition, rotatePoint } from "@/core/pin";
 import { worldBoundingBox } from "./hit-test.js";
-import type { PinVoltageAccess } from "./pin-voltage-access.js";
+import type { PinVoltageAccess } from "../core/pin-voltage-access.js";
 
 /** Factory that creates a PinVoltageAccess for a given element, or undefined. */
 export type PinVoltageAccessFactory = (element: CircuitElement) => PinVoltageAccess | undefined;

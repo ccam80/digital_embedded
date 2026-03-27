@@ -229,78 +229,67 @@ Analog-native components (`led.ts`, `mosfet.ts`, `scr.ts`, etc.) directly import
 | `drawCursors` | `src/runtime/scope-cursor-renderer.ts:20` |
 | `drawMeasurementPanel` | `src/runtime/scope-cursor-renderer.ts:77` |
 
-### 4c. TEST-ONLY — potential dead code (user to triage: delete vs surface in UI)
+### 4c. TEST-ONLY — triaged
 
-#### Headless / Core
+Investigation notes:
+- `BacktrackException`, `NodeException`, `PinException` are **never thrown** anywhere in production. Only `BitsException`, `BurnException`, `OscillationError` are actually used. These three are pure clutter.
+- K-map: `KarnaughMapTab` IS wired into the Analysis dialog (`analysis-dialogs.ts:124`). `grayCodeSequence`, `cycleValue`, `KMapRenderContext` are used by it. Only `grayCodeIndex` is orphaned.
+- Expression modifiers (`toNandOnly` etc.): NOT used by `synthesis.ts` or any production path — synthesis builds only basic And/Or/Not gates.
+- `autoConnectPower`: IS wired into Edit menu via `analysis-dialogs.ts` → `btn-auto-power`. User wants it deleted from all levels.
+- `AnalogRateController`: superseded by `SpeedControl` + `coordinator.computeFrameSteps()`.
+- `loadProgram` + `program-formats.ts`: not duplicated elsewhere — unique code path for loading programs into memory components.
 
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `SimulationRunner` (class) | `src/headless/runner.ts:46` | 15+ test files, 2 dev scripts |
-| `TestRunner` (class) | `src/headless/test-runner.ts:37` | `test-runner.test.ts` |
-| `captureTrace` | `src/headless/trace.ts:29` | `trace.test.ts`, `integration.test.ts` |
-| `BacktrackException` | `src/core/errors.ts:80` | `errors.test.ts` (re-exported by `headless/index.ts`) |
-| `NodeException` | `src/core/errors.ts:142` | `errors.test.ts` |
-| `PinException` | `src/core/errors.ts:200` | `errors.test.ts` |
-| `PropertyBagSchema` | `src/core/properties.ts:150` | `properties.test.ts` |
-| `propertyBagFromJson` | `src/core/properties.ts:158` | `properties.test.ts` |
-| `PropertyDefinitionSchema` | `src/core/properties.ts:179` | `properties.test.ts` |
-| `defaultCircuitMetadata` | `src/core/circuit.ts:129` | `circuit.test.ts` |
-| `isPinInverted` | `src/core/pin.ts:73` | `pin.test.ts` |
+#### SURFACE — wire into UI (keep code + tests, add UI integration)
 
-#### Analysis
+| Symbol | File | What to wire |
+|--------|------|--------------|
+| `computeStatistics` | `src/analysis/statistics.ts:54` | Add "Circuit Statistics" panel/dialog |
+| `toNandOnly` / `toNorOnly` / `limitFanIn` / `isNandOnly` / `isNorOnly` | `src/analysis/expression-modifiers.ts` | Wire into synthesis dialog options |
+| `MonteCarloRunner` / `SeededRng` / `computeOutputStatistics` | `src/solver/analog/monte-carlo.ts` | Add Monte Carlo analysis dialog |
+| `ParameterSweepRunner` / `generateSweepValues` | `src/solver/analog/parameter-sweep.ts` | Add Parameter Sweep dialog |
+| `buildFrequencyArray` | `src/solver/analog/ac-analysis.ts:294` | Used by parameter sweep / AC tooling |
+| `captureRuntimeToDefaults` / `restoreAllFuses` | `src/editor/runtime-to-defaults.ts` | Add Edit menu entries |
+| `autoNumberLabels` | `src/editor/label-tools.ts` | Add Edit menu entry |
+| `FileHistory` | `src/editor/file-history.ts:25` | Wire into File menu recent-files list |
+| `loadProgram` + format helpers | `src/runtime/program-loader.ts`, `program-formats.ts` | Wire into memory component context menu |
 
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `analyseDependencies` | `src/analysis/dependency.ts:47` | `dependency.test.ts` |
-| `substituteForAnalysis` | `src/analysis/substitute-library.ts:83` | `substitute-library.test.ts` |
-| `computeStatistics` | `src/analysis/statistics.ts:54` | `statistics.test.ts` |
-| `exprToLatex` | `src/analysis/expression.ts:172` | `expression-gen.test.ts` |
-| `toNandOnly` / `toNorOnly` / `limitFanIn` / `isNandOnly` / `isNorOnly` | `src/analysis/expression-modifiers.ts` | `expression-modifiers.test.ts` |
-| `exportCsv` / `importCsv` / `exportHex` / `exportLatex` / `exportTestCase` / `loadTru` / `saveTru` | `src/analysis/truth-table-io.ts` | `truth-table-io.test.ts` |
-| `grayCodeSequence` / `grayCodeIndex` / `cycleValue` / `KMapRenderContext` | `src/analysis/karnaugh-map.ts` | `karnaugh-map.test.ts` |
+#### DELETE — remove code + tests
 
-#### Solver — Digital
-
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `quickRun` / `speedTest` | `src/solver/digital/quick-run.ts` | `quick-run.test.ts` |
-| `shuffleArray` | `src/solver/digital/noise-mode.ts:27` | `noise-mode.test.ts` |
-| `MicroStepController` | `src/solver/digital/micro-step.ts:52` | `micro-step.test.ts` |
-| `resolveDelays` | `src/solver/digital/delay.ts:32` | `delay.test.ts` |
-| `canUseWorkerEngine` / `createEngine` | `src/solver/digital/worker-detection.ts` | `worker-detection.test.ts` |
-| `WorkerEngine` | `src/solver/digital/worker-engine.ts:92` | `worker-engine.test.ts` |
-
-#### Solver — Analog
-
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `test-elements.ts` (entire file) | `src/solver/analog/test-elements.ts` | 15+ analog test files |
-| `MonteCarloRunner` / `SeededRng` / `computeOutputStatistics` | `src/solver/analog/monte-carlo.ts` | `monte-carlo.test.ts` |
-| `ParameterSweepRunner` / `generateSweepValues` | `src/solver/analog/parameter-sweep.ts` | `monte-carlo.test.ts` |
-| `buildFrequencyArray` | `src/solver/analog/ac-analysis.ts:294` | `ac-analysis.test.ts` |
-
-#### Editor
-
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `captureRuntimeToDefaults` / `restoreAllFuses` | `src/editor/runtime-to-defaults.ts` | `runtime-to-defaults.test.ts` |
-| `autoNumberLabels` / `addLabelPrefix` / `removeLabelPrefix` / `renameTunnel` | `src/editor/label-tools.ts` | `label-tools.test.ts` |
-| `findUnconnectedPowerPins` | `src/editor/auto-power.ts:166` | `auto-power.test.ts` |
-| `distancePointToSegment` | `src/editor/hit-test.ts:172` | `hit-test.test.ts` |
-| `isPointOnSegmentInterior` | `src/editor/wire-drawing.ts:31` | `wire-drawing.test.ts` |
-| `FileHistory` | `src/editor/file-history.ts:25` | `file-history.test.ts` |
-| `PowerOverlay` | `src/editor/power-overlay.ts:39` | `power-overlay.test.ts` |
-
-#### Runtime / Integration
-
-| Symbol | File | Test consumer(s) |
-|--------|------|-------------------|
-| `RecordingContext` | `src/runtime/waveform-renderer.ts:64` | `waveform-renderer.test.ts` |
-| `MeasurementOrderPanel` | `src/runtime/measurement-order.ts:62` | `measurement-order.test.ts` |
-| `SingleValueDialog` | `src/runtime/value-dialog.ts:31` | `value-dialog.test.ts` |
-| `loadProgram` | `src/runtime/program-loader.ts:56` | `program-loader.test.ts` |
-| `detectFormatFromExtension` / `detectFormatFromContent` / `parseCsv` / `parseLogisim` / `parseRawBinary` | `src/runtime/program-formats.ts` | `program-loader.test.ts` |
-| `AnalogRateController` / `FrameTarget` / `FrameResult` / `AnalogRateConfig` | `src/integration/analog-rate-controller.ts` | `analog-rate-controller.test.ts` |
+| Symbol | File | Reason |
+|--------|------|--------|
+| `SimulationRunner` (class) | `src/headless/runner.ts:46` | Superseded by `DefaultSimulatorFacade`; migrate 15 test files |
+| `TestRunner` (class) | `src/headless/test-runner.ts:37` | Superseded by facade's `runTests()` |
+| `captureTrace` | `src/headless/trace.ts:29` | Test-only debug utility |
+| `BacktrackException` | `src/core/errors.ts:80` | Never thrown anywhere |
+| `NodeException` | `src/core/errors.ts:142` | Never thrown anywhere |
+| `PinException` | `src/core/errors.ts:200` | Never thrown anywhere |
+| `PropertyBagSchema` | `src/core/properties.ts:150` | Test-only Zod schema |
+| `propertyBagFromJson` | `src/core/properties.ts:158` | Test-only deserializer |
+| `PropertyDefinitionSchema` | `src/core/properties.ts:179` | Test-only Zod schema |
+| `defaultCircuitMetadata` | `src/core/circuit.ts:129` | Test-only helper |
+| `isPinInverted` | `src/core/pin.ts:73` | Test-only helper |
+| `analyseDependencies` | `src/analysis/dependency.ts:47` | Unused analysis |
+| `substituteForAnalysis` | `src/analysis/substitute-library.ts:83` | Unused analysis |
+| `exprToLatex` | `src/analysis/expression.ts:172` | Unused formatter |
+| `exportCsv` / `importCsv` / `exportHex` / `exportLatex` / `exportTestCase` / `loadTru` / `saveTru` | `src/analysis/truth-table-io.ts` | Not wired to any UI |
+| `grayCodeIndex` | `src/analysis/karnaugh-map.ts:44` | Orphan (other kmap exports are live) |
+| `quickRun` / `speedTest` | `src/solver/digital/quick-run.ts` | Benchmark-only |
+| `shuffleArray` | `src/solver/digital/noise-mode.ts:27` | Test-only |
+| `MicroStepController` | `src/solver/digital/micro-step.ts:52` | Test-only |
+| `resolveDelays` | `src/solver/digital/delay.ts:32` | Test-only |
+| `canUseWorkerEngine` / `createEngine` | `src/solver/digital/worker-detection.ts` | Test-only |
+| `WorkerEngine` | `src/solver/digital/worker-engine.ts:92` | Test-only |
+| `test-elements.ts` (entire file) | `src/solver/analog/test-elements.ts` | Move to test-utils/ (test-only factories) |
+| `addLabelPrefix` / `removeLabelPrefix` / `renameTunnel` | `src/editor/label-tools.ts` | Unused (keep `autoNumberLabels`) |
+| `autoConnectPower` / `findUnconnectedPowerPins` (+ all support) | `src/editor/auto-power.ts` | Delete feature from all levels (UI button, function, tests) |
+| `distancePointToSegment` | `src/editor/hit-test.ts:172` | Test-only |
+| `isPointOnSegmentInterior` | `src/editor/wire-drawing.ts:31` | Test-only |
+| `PowerOverlay` | `src/editor/power-overlay.ts:39` | Test-only |
+| `RecordingContext` | `src/runtime/waveform-renderer.ts:64` | Test-only |
+| `MeasurementOrderPanel` | `src/runtime/measurement-order.ts:62` | Test-only |
+| `SingleValueDialog` | `src/runtime/value-dialog.ts:31` | Test-only |
+| `AnalogRateController` / `FrameTarget` / `FrameResult` / `AnalogRateConfig` | `src/integration/analog-rate-controller.ts` | Superseded by `SpeedControl` + coordinator |
+| `EngineFactory` (type) | `src/headless/runner.ts:26` | Dead type |
 
 ---
 
@@ -341,7 +330,44 @@ Analog-native components (`led.ts`, `mosfet.ts`, `scr.ts`, etc.) directly import
 | F19 | Import `GRID_SPACING` instead of `PREVIEW_GRID` | `subcircuit-dialog.ts` | -1 |
 | F20 | Centralize simulation constants | 4 files + 1 new `core/constants.ts` | ~0 |
 | F21 | Split `behavioral-flipflop-variants.ts` into per-variant files | 1 file → 7 files | ~+30 (imports) |
-| F22 | Triage test-only exports (Section 4c) — surface in UI or mark `@internal` | Per triage decision | varies |
+### Wave 3 — Dead code deletion (from Section 4c DELETE list)
+
+| ID | Task | Files touched | LOC delta |
+|----|------|---------------|-----------|
+| F22 | Delete `BacktrackException`, `NodeException`, `PinException` + tests | `core/errors.ts`, `errors.test.ts`, `headless/index.ts` re-exports | -120 net |
+| F23 | Delete `SimulationRunner` class, migrate 15 test files to `DefaultSimulatorFacade` | `headless/runner.ts` + 15 test files | -200 net |
+| F24 | Delete `TestRunner` class + test | `headless/test-runner.ts` | -80 net |
+| F25 | Delete `captureTrace` + test | `headless/trace.ts` | -60 net |
+| F26 | Delete `PropertyBagSchema`, `propertyBagFromJson`, `PropertyDefinitionSchema` + tests | `core/properties.ts` | -40 net |
+| F27 | Delete `defaultCircuitMetadata`, `isPinInverted` exports + tests | `core/circuit.ts`, `core/pin.ts` | -20 net |
+| F28 | Delete `analyseDependencies` + `substituteForAnalysis` + tests | `analysis/dependency.ts`, `analysis/substitute-library.ts` | -150 net |
+| F29 | Delete `exprToLatex` + test | `analysis/expression.ts` | -30 net |
+| F30 | Delete all `truth-table-io.ts` exports + tests | `analysis/truth-table-io.ts` | -200 net |
+| F31 | Delete `grayCodeIndex` export (keep other kmap exports — they're live) | `analysis/karnaugh-map.ts` | -5 net |
+| F32 | Delete `quickRun`/`speedTest` + test | `solver/digital/quick-run.ts` | -80 net |
+| F33 | Delete `shuffleArray`, `MicroStepController`, `resolveDelays` + tests | `noise-mode.ts`, `micro-step.ts`, `delay.ts` | -100 net |
+| F34 | Delete `WorkerEngine`, `canUseWorkerEngine`, `createEngine` + tests | `worker-engine.ts`, `worker-detection.ts` | -150 net |
+| F35 | Move `test-elements.ts` to `src/solver/analog/__tests__/test-helpers.ts` | 1 file move + 15 test import updates | ~0 |
+| F36 | Delete `addLabelPrefix`, `removeLabelPrefix`, `renameTunnel` + tests (keep `autoNumberLabels`) | `editor/label-tools.ts` | -60 net |
+| F37 | Delete `autoConnectPower` feature from ALL levels: function, `btn-auto-power` UI wiring in `analysis-dialogs.ts`, `auto-power.ts`, tests | `editor/auto-power.ts`, `app/analysis-dialogs.ts` | -200 net |
+| F38 | Delete `distancePointToSegment`, `isPointOnSegmentInterior`, `PowerOverlay` + tests | `hit-test.ts`, `wire-drawing.ts`, `power-overlay.ts` | -80 net |
+| F39 | Delete `RecordingContext`, `MeasurementOrderPanel`, `SingleValueDialog` + tests | `waveform-renderer.ts`, `measurement-order.ts`, `value-dialog.ts` | -120 net |
+| F40 | Delete `AnalogRateController` + all exports + tests | `integration/analog-rate-controller.ts` | -150 net |
+
+### Wave 4 — Surface features (from Section 4c SURFACE list)
+
+These are code paths that exist and are tested but lack UI integration. Each needs a menu entry, dialog, or context-menu hook.
+
+| ID | Task | What to wire | Files touched |
+|----|------|--------------|---------------|
+| F41 | Wire `computeStatistics` into Analysis dialog | "Circuit Statistics" tab or status bar | `analysis-dialogs.ts` |
+| F42 | Wire expression modifiers into synthesis dialog | NAND-only / NOR-only / fan-in-limit options | `analysis-dialogs.ts` or new synthesis UI |
+| F43 | Wire `MonteCarloRunner` into Analysis dialog | Monte Carlo analysis panel | New dialog + `app/` wiring |
+| F44 | Wire `ParameterSweepRunner` + `buildFrequencyArray` | Parameter Sweep dialog | New dialog + `app/` wiring |
+| F45 | Wire `captureRuntimeToDefaults` / `restoreAllFuses` into Edit menu | "Capture Defaults" / "Restore Fuses" menu items | `menu-toolbar.ts` |
+| F46 | Wire `autoNumberLabels` into Edit menu | "Auto-Number Labels" menu item | `menu-toolbar.ts` |
+| F47 | Wire `FileHistory` into File menu | Recent files submenu | `menu-toolbar.ts` |
+| F48 | Wire `loadProgram` + format helpers into memory component context menu | "Load Program..." context menu item | `canvas-interaction.ts` or property panel |
 
 ### Dependency order within waves
 
@@ -350,6 +376,10 @@ Wave 0: F4 before F5 (analog types must exist before compiler refactor). F1-F3, 
 Wave 1: F9-F10 are independent type moves. F11 is independent. F12-F14 are independent of each other. F7-F8 are independent.
 
 Wave 2: All independent.
+
+Wave 3: F23 is the largest (15 test file migrations). F37 touches UI wiring. All others are independent leaf deletions. Do F23 first to avoid conflicts.
+
+Wave 4: All independent. Each is a self-contained UI wiring task.
 
 ---
 
@@ -361,7 +391,8 @@ Wave 2: All independent.
 | Duplicated gate scaffolding LOC | ~750 | ~50 |
 | Core → editor/solver upward imports | 4 | 0 |
 | Circular dependency chains | 2 | 0 |
-| Truly dead exports | 8 | 0 |
+| Truly dead exports | 8 + 30 triaged | 0 |
 | Internal-only exports leaking | 11 | 0 |
 | Functions over 500 lines | 4 | 0 |
-| Net LOC reduction | — | ~-1,200 |
+| Test-only code surfaced as features | 0 | 8 new UI entries |
+| Net LOC reduction (waves 0-3) | — | ~-2,800 |

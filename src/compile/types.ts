@@ -4,11 +4,12 @@
  * Sections 4.3–4.6 of spec/unified-component-architecture.md.
  */
 
-import type { Wire } from "../core/circuit.js";
+import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
 import type { ComponentDefinition, DigitalModel, AnalogModel } from "../core/registry.js";
+import type { ComponentRegistry } from "../core/registry.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
@@ -23,6 +24,24 @@ export type { Diagnostic };
 export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, AnalogModel };
 export type { PinElectricalSpec, CrossEngineBoundary };
 export type { CompiledDigitalDomain, CompiledAnalogDomain };
+
+// ---------------------------------------------------------------------------
+// Callback type for compiling an inner digital sub-circuit.
+//
+// Used to break the circular dependency between compile/compile.ts and
+// solver/analog/compiler.ts: the analog compiler accepts this callback
+// instead of importing compileUnified directly.
+// ---------------------------------------------------------------------------
+
+/**
+ * Compiles a standalone digital Circuit into a CompiledCircuitImpl.
+ * Injected into compileAnalogPartition() by the caller (compile/compile.ts)
+ * to avoid a circular module dependency.
+ */
+export type DigitalCompilerFn = (
+  circuit: Circuit,
+  registry: ComponentRegistry,
+) => CompiledDigitalDomain;
 
 // ---------------------------------------------------------------------------
 // Section 4.3 — Connectivity group types

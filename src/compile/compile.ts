@@ -35,6 +35,7 @@ import type {
   SignalAddress,
   Wire,
   ConnectivityGroup,
+  DigitalCompilerFn,
 } from "./types.js";
 import type { Diagnostic } from "../headless/netlist-types.js";
 
@@ -180,6 +181,8 @@ export function compileUnified(
   // -------------------------------------------------------------------------
 
   const hasAnalog = analogPartition.components.length > 0;
+  const innerDigitalCompiler: DigitalCompilerFn = (innerCircuit, innerRegistry) =>
+    compileUnified(innerCircuit, innerRegistry).digital!;
   const compiledAnalog = hasAnalog
     ? compileAnalogPartition(
         analogPartition,
@@ -187,6 +190,7 @@ export function compileUnified(
         transistorModels,
         circuit.metadata.logicFamily ?? undefined,
         circuit,
+        innerDigitalCompiler,
       )
     : null;
 

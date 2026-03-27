@@ -11,7 +11,7 @@ import type { Pin } from "./pin.js";
 import { pinWorldPosition } from "./pin.js";
 import type { CircuitElement } from "./element.js";
 import type { LogicFamilyConfig } from "./logic-family.js";
-import { mergeCollinearSegments } from "../editor/wire-merge.js";
+import { mergeCollinearSegments } from "./wire-utils.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -259,7 +259,23 @@ export class Circuit {
     if (extraPoints) {
       for (const p of extraPoints) points.add(p);
     }
+    this._splitAtPoints(points);
+  }
 
+  /**
+   * Split wires at an explicit set of points.
+   *
+   * Like splitWiresAtJunctions but uses the caller-provided point set
+   * instead of auto-computing from wire endpoints and pin positions.
+   * Used by wire drawing to avoid false junctions at intermediate
+   * routing corners.
+   */
+  splitWiresAtPoints(points: ReadonlySet<string>): void {
+    this._splitAtPoints(points);
+  }
+
+  /** Internal splitting loop shared by splitWiresAtJunctions and splitWiresAtPoints. */
+  private _splitAtPoints(points: ReadonlySet<string>): void {
     // For each wire, check if any point lies strictly on its interior.
     // If so, split the wire at that point into two segments.
     // Repeat until no more splits are needed (a wire may need multiple splits).

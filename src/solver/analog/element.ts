@@ -7,34 +7,16 @@
  * nonlinear operating-point-dependent terms on every iteration.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
+// Core analog types are defined in core/analog-types.ts to avoid solver→core
+// circular dependency. Re-exported here for backward compatibility.
+export type {
+  AnalogElementCore,
+  ComplexSparseSolver,
+  IntegrationMethod,
+  SparseSolverStamp,
+} from "../../core/analog-types.js";
 
-// ---------------------------------------------------------------------------
-// IntegrationMethod
-// ---------------------------------------------------------------------------
-
-/**
- * Numerical integration method used by companion-model reactive elements.
- *
- * 'trapezoidal' — second-order A-stable (Gear/SPICE default)
- * 'bdf1'        — first-order backward Euler (robust, low accuracy)
- * 'bdf2'        — second-order BDF (good stiffness handling)
- */
-export type IntegrationMethod = "trapezoidal" | "bdf1" | "bdf2";
-
-// ---------------------------------------------------------------------------
-// ComplexSparseSolver — forward reference for AC stamp method
-// ---------------------------------------------------------------------------
-
-/**
- * Opaque forward reference to the ComplexSparseSolver defined in Phase 6.
- * Used only in the `stampAc` optional method signature; no implementation
- * is required in Phase 1.
- */
-export interface ComplexSparseSolver {
-  stamp(row: number, col: number, re: number, im: number): void;
-  stampRHS(row: number, re: number, im: number): void;
-}
+import type { ComplexSparseSolver, IntegrationMethod, SparseSolverStamp } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -51,11 +33,6 @@ export interface ComplexSparseSolver {
  * branch currents) set `branchIndex` to their assigned row offset above the
  * node block. All other elements set `branchIndex` to -1.
  */
-/**
- * The return type of analogFactory — everything except pinNodeIds and allNodeIds.
- */
-export type AnalogElementCore = Omit<AnalogElement, 'pinNodeIds' | 'allNodeIds'>;
-
 export interface AnalogElement {
   /**
    * Pin node IDs in pinLayout order.
@@ -100,7 +77,7 @@ export interface AnalogElement {
    * their contributions here. Nonlinear elements stamp only the
    * topology-constant entries here (e.g. nothing for a diode).
    */
-  stamp(solver: SparseSolver): void;
+  stamp(solver: SparseSolverStamp): void;
 
   /**
    * Stamp linearized nonlinear contributions at the current operating point.
@@ -112,7 +89,7 @@ export interface AnalogElement {
    * (set by `updateOperatingPoint`) and stamp the linearized conductance and
    * current-source equivalent into the solver.
    */
-  stampNonlinear?(solver: SparseSolver): void;
+  stampNonlinear?(solver: SparseSolverStamp): void;
 
   /**
    * Update internal linearization state from the latest NR solution vector.
