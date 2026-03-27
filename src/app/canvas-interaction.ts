@@ -28,6 +28,8 @@ import { EngineState } from '../core/engine-interface.js';
 import { availableModels, hasDigitalModel } from '../core/registry.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
 import type { CircuitElement } from '../core/element.js';
+import { storeSubcircuit } from '../io/subcircuit-store.js';
+import { serializeCircuitToDig } from '../io/dig-serializer.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -237,6 +239,12 @@ export function initCanvasInteraction(
     breadcrumb.style.display = circuitStack.length === 0 ? 'none' : 'flex';
   }
 
+  /**
+   * afterMutate hook installed while inside a subcircuit drill-down.
+   * Saved here so navigateBack() can restore the previous hook.
+   */
+  let _subcircuitAfterMutate: (() => void) | undefined;
+
   function openSubcircuit(name: string, subCircuit: Circuit): void {
     circuitStack.push({
       name: currentCircuitName,
@@ -251,10 +259,28 @@ export function initCanvasInteraction(
     closePopup();
     updateBreadcrumb();
     renderPipeline.scheduleRender();
+
+    // Wire on-edit persistence: re-serialize subcircuit to IndexedDB on every
+    // undo stack mutation (push, undo, redo) while inside the drill-down.
+    const prevAfterMutate = ctx.undoStack.afterMutate;
+    _subcircuitAfterMutate = prevAfterMutate;
+    ctx.undoStack.afterMutate = () => {
+      prevAfterMutate?.();
+      const subcircuitName = currentCircuitName;
+      const xml = serializeCircuitToDig(ctx.circuit, ctx.registry);
+      void storeSubcircuit(subcircuitName, xml).catch((err: unknown) => {
+        console.error('Failed to persist subcircuit on edit:', err);
+        ctx.showStatus(`ERROR: Failed to save subcircuit "${subcircuitName}" — changes may be lost on reload`);
+      });
+    };
   }
 
   function navigateBack(): void {
     if (circuitStack.length === 0) return;
+    // Restore the afterMutate hook that was active before we entered this level.
+    ctx.undoStack.afterMutate = _subcircuitAfterMutate;
+    _subcircuitAfterMutate = undefined;
+
     const prev = circuitStack.pop()!;
     ctx.setCircuit(prev.circuit);
     currentCircuitName = prev.name;

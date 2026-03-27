@@ -590,10 +590,6 @@ export function initApp(search?: string): void {
       console.warn('Failed to load stored subcircuits:', err);
     }
 
-    // TODO(SE-deferred): Wire on-edit persistence — re-serialize subcircuit
-    // to IndexedDB on each UndoRedoStack push within subcircuit drill-down.
-    // Currently subcircuits are only persisted at creation time.
-
     await autoLoadFile();
   }
 
