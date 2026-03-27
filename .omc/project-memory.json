@@ -249,9 +249,27 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 213,
-      "lastAccessed": 1774650674158,
+      "accessCount": 236,
+      "lastAccessed": 1774652747334,
       "type": "directory"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 35,
+      "lastAccessed": 1774651808796,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\menu-toolbar.ts",
+      "accessCount": 34,
+      "lastAccessed": 1774651423587,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\canvas-interaction.ts",
+      "accessCount": 31,
+      "lastAccessed": 1774651644324,
+      "type": "file"
     },
     {
       "path": "src\\components",
@@ -266,16 +284,16 @@
       "type": "file"
     },
     {
-      "path": "src\\app\\menu-toolbar.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774650114124,
-      "type": "file"
-    },
-    {
       "path": "src\\app\\simulation-controller.ts",
       "accessCount": 22,
       "lastAccessed": 1774647241317,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 21,
+      "lastAccessed": 1774651119336,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\digital\\compiler.ts",
@@ -288,18 +306,6 @@
       "accessCount": 20,
       "lastAccessed": 1774648016630,
       "type": "file"
-    },
-    {
-      "path": "src\\app\\app-init.ts",
-      "accessCount": 20,
-      "lastAccessed": 1774650471397,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 20,
-      "lastAccessed": 1774650667121,
-      "type": "directory"
     },
     {
       "path": "src\\components\\io\\ground.ts",
@@ -332,22 +338,22 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774650013462,
-      "type": "file"
-    },
-    {
       "path": "e2e\\gui\\workflow-tests.spec.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774608650433,
+      "accessCount": 13,
+      "lastAccessed": 1774651893371,
       "type": "file"
     },
     {
       "path": "e2e",
-      "accessCount": 10,
-      "lastAccessed": 1774642516094,
+      "accessCount": 13,
+      "lastAccessed": 1774651934230,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774650013462,
+      "type": "file"
     },
     {
       "path": "src\\editor\\property-panel.ts",
@@ -362,15 +368,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\app\\canvas-interaction.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774648503199,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\sources\\dc-voltage-source.ts",
       "accessCount": 8,
       "lastAccessed": 1774650228779,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774652654920,
       "type": "file"
     },
     {
@@ -383,12 +389,6 @@
       "path": "src\\components\\library-74xx.ts",
       "accessCount": 7,
       "lastAccessed": 1774611073325,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774649772577,
       "type": "file"
     },
     {
