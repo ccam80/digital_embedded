@@ -9,7 +9,7 @@ import { dirname } from "path";
 import type { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
-import type { CircuitSpec, PatchOp } from "../../src/headless/netlist-types.js";
+import type { CircuitSpec, PatchOp, ComponentDescriptor } from "../../src/headless/netlist-types.js";
 import { extractEmbeddedTestData } from "../../src/headless/test-runner.js";
 import { serializeCircuitToDig } from "../../src/io/dig-serializer.js";
 import { loadWithSubcircuits } from "../../src/io/subcircuit-loader.js";
@@ -692,6 +692,49 @@ export function registerCircuitTools(
           }
           if (failingVectors.length > 10) {
             lines.push(`  ... and ${failingVectors.length - 10} more.`);
+          }
+
+          // Driver analysis: trace what drives each failing output one level deep
+          const netlist = facade.netlist(circuit);
+          const compByLabel = new Map<string, ComponentDescriptor>();
+          for (const comp of netlist.components) {
+            if (comp.label) compByLabel.set(comp.label, comp);
+          }
+
+          const failingOutputs = new Set<string>();
+          for (const v of failingVectors) {
+            for (const label of Object.keys(v.expectedOutputs)) {
+              if (v.actualOutputs[label] !== v.expectedOutputs[label]) {
+                failingOutputs.add(label);
+              }
+            }
+          }
+
+          if (failingOutputs.size > 0) {
+            lines.push(`\nDriver analysis for failing outputs:`);
+            for (const outLabel of failingOutputs) {
+              const outComp = compByLabel.get(outLabel);
+              if (!outComp) {
+                lines.push(`  ${outLabel}: component not found in netlist`);
+                continue;
+              }
+              const inPin = outComp.pins.find(p => p.direction === 'INPUT');
+              if (!inPin || inPin.connectedTo.length === 0) {
+                lines.push(`  ${outLabel}: unconnected input`);
+                continue;
+              }
+              const driver = inPin.connectedTo[0]!;
+              const driverComp = netlist.components[driver.componentIndex];
+              const driverInputs = driverComp?.pins
+                .filter(p => p.direction === 'INPUT' && p.connectedTo.length > 0)
+                .map(p => `${p.label}←${p.connectedTo[0]!.componentLabel}`)
+                .join(', ');
+              lines.push(
+                `  ${outLabel} ← ${driver.componentLabel}:${driver.pinLabel}` +
+                ` (${driverComp?.typeId ?? driver.componentType}` +
+                `${driverInputs ? ', inputs: ' + driverInputs : ''})`,
+              );
+            }
           }
         }
 
