@@ -9,6 +9,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { MockRenderContext } from "../../../test-utils/mock-render-context.js";
 import { deriveInterfacePins } from "../pin-derivation.js";
+import { PropertyType } from "../../../core/properties.js";
 import {
   SubcircuitElement,
   SubcircuitDefinition,
@@ -312,5 +313,55 @@ describe("pinOrderMatchesInOut", () => {
     const outputPins = pins.filter((p) => p.direction === PinDirection.OUTPUT);
     expect(outputPins[0].label).toBe("sum");
     expect(outputPins[1].label).toBe("carry");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shapeTypeEnumProperty
+// ---------------------------------------------------------------------------
+
+describe("shapeTypeEnumProperty", () => {
+  it("registered subcircuit has shapeType property of type ENUM", () => {
+    const registry = new ComponentRegistry();
+    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
+    registerSubcircuit(registry, "TestChip", definition);
+
+    const def = registry.get("TestChip")!;
+    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType");
+    expect(shapeProp).toBeDefined();
+    expect(shapeProp!.type).toBe(PropertyType.ENUM);
+  });
+
+  it("shapeType ENUM includes all six ShapeMode values", () => {
+    const registry = new ComponentRegistry();
+    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
+    registerSubcircuit(registry, "TestChip", definition);
+
+    const def = registry.get("TestChip")!;
+    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
+    expect(shapeProp.enumValues).toEqual(
+      expect.arrayContaining(["DEFAULT", "SIMPLE", "DIL", "CUSTOM", "LAYOUT", "MINIMIZED"])
+    );
+    expect(shapeProp.enumValues).toHaveLength(6);
+  });
+
+  it("shapeType ENUM has label 'Shape'", () => {
+    const registry = new ComponentRegistry();
+    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
+    registerSubcircuit(registry, "TestChip", definition);
+
+    const def = registry.get("TestChip")!;
+    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
+    expect(shapeProp.label).toBe("Shape");
+  });
+
+  it("shapeType default value is DEFAULT", () => {
+    const registry = new ComponentRegistry();
+    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
+    registerSubcircuit(registry, "TestChip", definition);
+
+    const def = registry.get("TestChip")!;
+    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
+    expect(shapeProp.defaultValue).toBe("DEFAULT");
   });
 });

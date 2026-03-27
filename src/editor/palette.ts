@@ -116,6 +116,11 @@ export class ComponentPalette {
    * in the palette. Null means show everything (default behavior).
    */
   private _allowlist: Set<string> | null = null;
+  /**
+   * Categories that are normally hidden but should be force-shown when they
+   * have registered components. Populated by refreshCategories().
+   */
+  private readonly _forceVisibleCategories: Set<ComponentCategory> = new Set();
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -173,7 +178,7 @@ export class ComponentPalette {
       // When an allowlist is active, show all categories that have matching
       // components — don't hide the default-hidden categories since the
       // allowlist is the explicit override.
-      if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category)) continue;
+      if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category) && !this._forceVisibleCategories.has(category)) continue;
       const all = this._registry.getByCategory(category);
       let children: ComponentDefinition[];
       if (this._allowlist !== null) {
@@ -285,6 +290,30 @@ export class ComponentPalette {
   toggleCategory(category: ComponentCategory): void {
     const current = this._expandedCategories.get(category) ?? true;
     this._expandedCategories.set(category, !current);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Category refresh
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Re-reads the SUBCIRCUIT category from the registry and updates palette
+   * visibility. When subcircuits are registered, makes the SUBCIRCUIT category
+   * visible even though it is in PALETTE_HIDDEN_CATEGORIES by default.
+   *
+   * Called after a subcircuit is created or deleted so the category tree picks
+   * up the change on the next getTree() call.
+   */
+  refreshCategories(): void {
+    const subcircuits = this._registry.getByCategory(ComponentCategory.SUBCIRCUIT);
+    if (subcircuits.length > 0) {
+      this._forceVisibleCategories.add(ComponentCategory.SUBCIRCUIT);
+      if (!this._expandedCategories.has(ComponentCategory.SUBCIRCUIT)) {
+        this._expandedCategories.set(ComponentCategory.SUBCIRCUIT, true);
+      }
+    } else {
+      this._forceVisibleCategories.delete(ComponentCategory.SUBCIRCUIT);
+    }
   }
 
   // ---------------------------------------------------------------------------

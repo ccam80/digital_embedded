@@ -41,6 +41,8 @@ import { ColorSchemeManager } from '../editor/color-scheme.js';
 import { ContextMenu } from '../editor/context-menu.js';
 import type { ClipboardData } from '../editor/edit-operations.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
+import { loadAllSubcircuits } from '../io/subcircuit-store.js';
+import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { PostMessageAdapter } from '../io/postmessage-adapter.js';
 import { createTestBridge } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
@@ -571,6 +573,21 @@ export function initApp(search?: string): void {
       } else {
         console.warn(`Module config not found: modules/${params.module}/config.json`);
       }
+    }
+
+    // Load all user-created subcircuits from IndexedDB and register them in
+    // the registry so the palette shows them and circuits referencing them compile.
+    try {
+      const stored = await loadAllSubcircuits();
+      for (const entry of stored) {
+        await loadWithSubcircuits(entry.xml, ctx.httpResolver, registry);
+      }
+      if (stored.length > 0) {
+        palette.refreshCategories();
+        paletteUI.render();
+      }
+    } catch {
+      // IndexedDB may be unavailable (e.g. private browsing). Non-fatal.
     }
 
     await autoLoadFile();

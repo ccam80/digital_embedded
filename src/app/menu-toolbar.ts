@@ -20,6 +20,8 @@ import type { MenuItem } from '../editor/context-menu.js';
 import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard } from '../editor/edit-operations.js';
 import { analyzeBoundary, insertAsSubcircuit } from '../editor/insert-subcircuit.js';
 import { openSubcircuitDialog } from './subcircuit-dialog.js';
+import { storeSubcircuit } from '../io/subcircuit-store.js';
+import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import type { Wire } from '../core/circuit.js';
 import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
@@ -228,7 +230,7 @@ export function initMenuAndToolbar(
               const { boundaryPorts } = analyzeBoundary(ctx.circuit, selectedElements, selectedWires);
               void openSubcircuitDialog(boundaryPorts, registry).then((result) => {
                 if (!result) return;
-                const { subcircuit: _sc, command, instance: _inst } = insertAsSubcircuit(
+                const { subcircuit, command } = insertAsSubcircuit(
                   ctx.circuit,
                   selectedElements,
                   selectedWires,
@@ -239,11 +241,16 @@ export function initMenuAndToolbar(
                 selection.clear();
                 ctx.invalidateCompiled();
 
+                // Persist the extracted subcircuit to IndexedDB.
+                const xml = serializeCircuitToDig(subcircuit, registry);
+                void storeSubcircuit(result.name, xml).catch(() => { /* non-fatal */ });
+
+                // Update the palette so the new subcircuit appears immediately.
+                palette.refreshCategories();
+                paletteUI.render();
+
                 const portCount = result.ports.length;
-                const statusBar = document.getElementById('status-bar');
-                if (statusBar) {
-                  statusBar.textContent = `Created subcircuit "${result.name}" (${portCount} port${portCount !== 1 ? 's' : ''})`;
-                }
+                ctx.showStatus(`Created subcircuit "${result.name}" (${portCount} port${portCount !== 1 ? 's' : ''})`);
               });
             },
           },

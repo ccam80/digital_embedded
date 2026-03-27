@@ -491,10 +491,11 @@ export function registerSubcircuit(
     },
     {
       key: "shapeType",
-      type: PropertyType.STRING,
-      label: "Shape Type",
-      defaultValue: "",
-      description: "Shape mode override: DEFAULT, SIMPLE, DIL, LAYOUT, CUSTOM",
+      type: PropertyType.ENUM,
+      label: "Shape",
+      defaultValue: "DEFAULT",
+      description: "Visual shape style for this subcircuit chip",
+      enumValues: ["DEFAULT", "SIMPLE", "DIL", "CUSTOM", "LAYOUT", "MINIMIZED"],
     },
   ];
 

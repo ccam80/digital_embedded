@@ -155,4 +155,51 @@ describe("Palette", () => {
     palette.setCollapsed(false);
     expect(palette.isCollapsed()).toBe(false);
   });
+
+  it("refreshCategories makes SUBCIRCUIT category appear in getTree after a subcircuit is registered", () => {
+    const palette = new ComponentPalette(registry);
+
+    // Initially no SUBCIRCUIT category (none registered)
+    const treeBefore = palette.getTree();
+    const subcircuitBefore = treeBefore.find(n => n.category === ComponentCategory.SUBCIRCUIT);
+    expect(subcircuitBefore).toBeUndefined();
+
+    // Register a subcircuit component into the registry
+    registerDef(registry, "MyAdder", ComponentCategory.SUBCIRCUIT);
+
+    // refreshCategories ensures getTree picks up the new entry
+    palette.refreshCategories();
+    const treeAfter = palette.getTree();
+    const subcircuitAfter = treeAfter.find(n => n.category === ComponentCategory.SUBCIRCUIT);
+    expect(subcircuitAfter).toBeDefined();
+    expect(subcircuitAfter!.children.some(d => d.name === "MyAdder")).toBe(true);
+  });
+
+  it("refreshCategories is idempotent — calling it twice does not duplicate entries", () => {
+    registerDef(registry, "MyAdder", ComponentCategory.SUBCIRCUIT);
+    const palette = new ComponentPalette(registry);
+
+    palette.refreshCategories();
+    palette.refreshCategories();
+
+    const tree = palette.getTree();
+    const subcircuitNode = tree.find(n => n.category === ComponentCategory.SUBCIRCUIT);
+    expect(subcircuitNode).toBeDefined();
+    expect(subcircuitNode!.children.filter(d => d.name === "MyAdder")).toHaveLength(1);
+  });
+
+  it("refreshCategories after second subcircuit is registered includes both entries", () => {
+    registerDef(registry, "Adder", ComponentCategory.SUBCIRCUIT);
+    const palette = new ComponentPalette(registry);
+    palette.refreshCategories();
+
+    registerDef(registry, "Alu", ComponentCategory.SUBCIRCUIT);
+    palette.refreshCategories();
+
+    const tree = palette.getTree();
+    const subcircuitNode = tree.find(n => n.category === ComponentCategory.SUBCIRCUIT);
+    expect(subcircuitNode).toBeDefined();
+    expect(subcircuitNode!.children.map(d => d.name)).toContain("Adder");
+    expect(subcircuitNode!.children.map(d => d.name)).toContain("Alu");
+  });
 });
