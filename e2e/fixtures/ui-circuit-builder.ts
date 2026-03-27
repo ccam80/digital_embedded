@@ -486,18 +486,18 @@ export class UICircuitBuilder {
         return new Promise<string>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Export timeout')), 5000);
           const handler = (e: MessageEvent) => {
-            if (e.data?.type === 'digital-circuit-data') {
+            if (e.data?.type === 'sim-circuit-data') {
               window.removeEventListener('message', handler);
               clearTimeout(timeout);
               resolve(e.data.data);
-            } else if (e.data?.type === 'digital-error') {
+            } else if (e.data?.type === 'sim-error') {
               window.removeEventListener('message', handler);
               clearTimeout(timeout);
               reject(new Error(e.data.error));
             }
           };
           window.addEventListener('message', handler);
-          window.postMessage({ type: 'digital-get-circuit' }, '*');
+          window.postMessage({ type: 'sim-get-circuit' }, '*');
         });
       });
       return Buffer.from(b64, 'base64').toString('utf-8');
@@ -539,16 +539,16 @@ export class UICircuitBuilder {
     return this.page.evaluate((td) => {
       return new Promise((resolve, reject) => {
         const handler = (e: MessageEvent) => {
-          if (e.data?.type === 'digital-test-result') {
+          if (e.data?.type === 'sim-test-result') {
             window.removeEventListener('message', handler);
             resolve(e.data);
-          } else if (e.data?.type === 'digital-error') {
+          } else if (e.data?.type === 'sim-error') {
             window.removeEventListener('message', handler);
             reject(new Error(`Circuit error: ${e.data.error}`));
           }
         };
         window.addEventListener('message', handler);
-        window.postMessage({ type: 'digital-test', testData: td }, '*');
+        window.postMessage({ type: 'sim-test', testData: td }, '*');
       });
     }, testData) as any;
   }

@@ -429,7 +429,7 @@ test.describe('Workflow: speed control', () => {
     // Load and compile a minimal circuit so a real coordinator is active.
     const b64 = Buffer.from(MINIMAL_DIGITAL_XML).toString('base64');
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(300);
     await menuAction(page, 'btn-step');
@@ -547,7 +547,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
     // Load analog RC circuit via postMessage
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
 
@@ -580,7 +580,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
   test('slider panel lifecycle: created on run, disposed on stop', async ({ page }) => {
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
     await menuAction(page, 'btn-step');
@@ -617,7 +617,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
 
     // Slow run
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
     await menuAction(page, 'btn-step');
@@ -633,7 +633,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
 
     // Fast run
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
     await menuAction(page, 'btn-step');

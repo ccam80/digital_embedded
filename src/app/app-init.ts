@@ -154,7 +154,7 @@ export function initApp(search?: string): void {
   const binding = createEditorBinding();
   let compiledDirty = true;
 
-  // Tutorial runner state (created on digital-load-tutorial)
+  // Tutorial runner state (created on sim-load-tutorial)
   let activeTutorialRunner: TutorialRunner | null = null;
   let activeTutorialBar: TutorialBar | null = null;
   let activeTutorialShelf: TutorialShelf | null = null;
@@ -534,12 +534,13 @@ export function initApp(search?: string): void {
       },
 
       // --- Embedded tutorial runner ---
-      loadTutorial: (raw: unknown) => {
+      loadTutorial: (raw: unknown, basePath?: unknown) => {
         if (!isTutorialManifest(raw)) {
-          window.parent.postMessage({ type: 'digital-error', error: 'Invalid tutorial manifest' }, '*');
+          window.parent.postMessage({ type: 'sim-error', error: 'Invalid tutorial manifest' }, '*');
           return;
         }
         const manifest = raw as TutorialManifest;
+        const tutorialBasePath = typeof basePath === 'string' ? basePath : '';
 
         // Dispose previous tutorial runner if any
         if (activeTutorialRunner) {
@@ -560,6 +561,19 @@ export function initApp(search?: string): void {
             paletteUI.render();
           },
           loadCircuitXml: (xml) => fileIOController.loadCircuitFromXml(xml),
+          loadCircuitFromUrl: async (url) => {
+            const fullUrl = tutorialBasePath ? tutorialBasePath + url : url;
+            const res = await fetch(fullUrl);
+            if (!res.ok) throw new Error(`Failed to fetch circuit: ${fullUrl}`);
+            const xml = await res.text();
+            await fileIOController.loadCircuitFromXml(xml);
+          },
+          loadCircuitSpec: async (spec) => {
+            const built = facade.build(spec as import('../headless/netlist-types.js').CircuitSpec);
+            const xml = serializeCircuitToDig(built, registry);
+            await fileIOController.loadCircuitFromXml(xml);
+            renderPipeline.scheduleRender();
+          },
           loadEmptyCircuit: () => {
             circuit = new Circuit();
             fileIOController.loadCircuitFromXml(serializeCircuitToDig(circuit, registry));
@@ -639,7 +653,12 @@ export function initApp(search?: string): void {
           },
           loadSolution: async (goalCircuit) => {
             if (typeof goalCircuit === 'string') {
-              // .dig file path — would need fetch; not supported in-iframe yet
+              const fullUrl = tutorialBasePath ? tutorialBasePath + goalCircuit : goalCircuit;
+              const res = await fetch(fullUrl);
+              if (!res.ok) throw new Error(`Failed to fetch solution: ${fullUrl}`);
+              const xml = await res.text();
+              await fileIOController.loadCircuitFromXml(xml);
+              renderPipeline.scheduleRender();
               return;
             }
             // TutorialCircuitSpec — build via facade
@@ -713,7 +732,7 @@ export function initApp(search?: string): void {
         void runner.goToStep(startIndex);
 
         window.parent.postMessage({
-          type: 'digital-tutorial-loaded',
+          type: 'sim-tutorial-loaded',
           tutorialId: manifest.id,
           totalSteps: manifest.steps.length,
         }, '*');
@@ -750,10 +769,10 @@ export function initApp(search?: string): void {
       if (!res.ok) throw new Error(`Failed to fetch: ${fileUrl}`);
       const xml = await res.text();
       await fileIOController.loadCircuitFromXml(xml);
-      window.parent.postMessage({ type: 'digital-loaded' }, '*');
+      window.parent.postMessage({ type: 'sim-loaded' }, '*');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
+      window.parent.postMessage({ type: 'sim-error', error: msg }, '*');
     }
   }
 

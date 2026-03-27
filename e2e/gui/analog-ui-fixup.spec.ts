@@ -243,7 +243,7 @@ test.describe('Analog UI fixes', () => {
     // Load the RC circuit via postMessage
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
     await page.evaluate((data) => {
-      window.postMessage({ type: 'digital-load-data', data }, '*');
+      window.postMessage({ type: 'sim-load-data', data }, '*');
     }, b64);
     await page.waitForTimeout(500);
 

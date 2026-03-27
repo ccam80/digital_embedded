@@ -50,7 +50,7 @@ interface DigitalTestState {
 // ---------------------------------------------------------------------------
 
 const parser: StreamParser<DigitalTestState> = {
-  name: 'digital-test',
+  name: 'sim-test',
 
   startState(): DigitalTestState {
     return { onHeaderLine: false, headerSeen: false };

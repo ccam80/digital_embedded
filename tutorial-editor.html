@@ -1105,7 +1105,7 @@
         previewStatus.textContent = 'No test data for this step';
         return;
       }
-      previewIframe.contentWindow.postMessage({ type: 'digital-test', testData: step.testData }, '*');
+      previewIframe.contentWindow.postMessage({ type: 'sim-test', testData: step.testData }, '*');
       previewStatus.textContent = 'Running tests...';
     });
 
@@ -1133,7 +1133,7 @@
             return r.text();
           })
           .then(xml => {
-            previewIframe.contentWindow.postMessage({ type: 'digital-load-data', data: btoa(xml) }, '*');
+            previewIframe.contentWindow.postMessage({ type: 'sim-load-data', data: btoa(xml) }, '*');
             previewStatus.textContent = 'Step applied: ' + (step.title || step.id);
           })
           .catch(err => {
@@ -1145,7 +1145,7 @@
       }
       // No .dig file — load empty circuit
       const emptyDig = '<?xml version="1.0" encoding="utf-8"?><circuit></circuit>';
-      previewIframe.contentWindow.postMessage({ type: 'digital-load-data', data: btoa(emptyDig) }, '*');
+      previewIframe.contentWindow.postMessage({ type: 'sim-load-data', data: btoa(emptyDig) }, '*');
     }
 
     function applyStepToPreview() {
@@ -1154,11 +1154,11 @@
 
       // Set palette
       const palette = resolvePaletteSpec(step.palette);
-      previewIframe.contentWindow.postMessage({ type: 'digital-set-palette', components: palette }, '*');
+      previewIframe.contentWindow.postMessage({ type: 'sim-set-palette', components: palette }, '*');
 
       // Set locked components
       previewIframe.contentWindow.postMessage({
-        type: 'digital-set-readonly-components',
+        type: 'sim-set-readonly-components',
         labels: step.lockedComponents || null
       }, '*');
 
@@ -1169,7 +1169,7 @@
       if (step.highlight && step.highlight.length > 0) {
         setTimeout(() => {
           previewIframe.contentWindow.postMessage({
-            type: 'digital-highlight', labels: step.highlight, duration: 5000
+            type: 'sim-highlight', labels: step.highlight, duration: 5000
           }, '*');
         }, 500);
       }
@@ -1184,7 +1184,7 @@
       if (event.source !== previewIframe.contentWindow) return;
 
       switch (data.type) {
-        case 'digital-ready':
+        case 'sim-ready':
           previewSimReady = true;
           previewStatus.textContent = 'Simulator ready';
           if (previewPendingApply) {
@@ -1192,7 +1192,7 @@
             applyStepToPreview();
           }
           break;
-        case 'digital-test-result':
+        case 'sim-test-result':
           if (data.failed === 0) {
             previewStatus.textContent = `All ${data.total} tests passed`;
             previewStatus.style.color = '#4c4';
@@ -1202,7 +1202,7 @@
           }
           setTimeout(() => { previewStatus.style.color = ''; }, 3000);
           break;
-        case 'digital-error':
+        case 'sim-error':
           previewStatus.textContent = 'Error: ' + data.error;
           previewStatus.style.color = '#c44';
           setTimeout(() => { previewStatus.style.color = ''; }, 3000);

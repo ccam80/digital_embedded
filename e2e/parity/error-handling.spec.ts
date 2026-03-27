@@ -17,17 +17,17 @@ test.describe('Parity: error handling via postMessage', () => {
 
   test('loading invalid base64 data returns error', async () => {
     const badB64 = Buffer.from('not valid xml at all', 'utf-8').toString('base64');
-    await harness.postToSim({ type: 'digital-load-data', data: badB64 });
+    await harness.postToSim({ type: 'sim-load-data', data: badB64 });
     const msg = await harness.waitForMessage<{ type: string; error: string }>(
-      'digital-error',
+      'sim-error',
     );
     expect(msg.error).toBeTruthy();
   });
 
   test('loading empty data returns error', async () => {
-    await harness.postToSim({ type: 'digital-load-data', data: '' });
+    await harness.postToSim({ type: 'sim-load-data', data: '' });
     const msg = await harness.waitForMessage<{ type: string; error: string }>(
-      'digital-error',
+      'sim-error',
     );
     expect(msg.error).toContain('No data provided');
   });
@@ -37,9 +37,9 @@ test.describe('Parity: error handling via postMessage', () => {
     await harness.loadDigUrl('/circuits/and-gate.dig');
 
     // Send digital-test with empty testData
-    await harness.postToSim({ type: 'digital-test', testData: '' });
+    await harness.postToSim({ type: 'sim-test', testData: '' });
     const msg = await harness.waitForMessage<{ type: string; error: string }>(
-      'digital-error',
+      'sim-error',
     );
     expect(msg.error).toContain('No testData provided');
   });
@@ -49,11 +49,11 @@ test.describe('Parity: error handling via postMessage', () => {
 
     // Signal names don't match the circuit's In/Out labels
     await harness.postToSim({
-      type: 'digital-test',
+      type: 'sim-test',
       testData: 'X Z W\n0 0 0',
     });
     const msg = await harness.waitForMessage<{ type: string; error: string }>(
-      'digital-error',
+      'sim-error',
     );
     expect(msg.error).toContain('not found in circuit');
   });

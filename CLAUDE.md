@@ -29,35 +29,35 @@ All postMessage handling is centralized in `src/io/postmessage-adapter.ts` (sing
 
 ~~~
 Parent → iframe (core):
-  { type: 'digital-load-url', url: '<url>' }          — Load a .dig circuit file
-  { type: 'digital-load-data', data: '<base64>' }     — Load inline circuit data (base64 .dig XML)
-  { type: 'digital-load-json', data: '<json>' }       — Load DTS format circuit
-  { type: 'digital-set-input', label, value }          — Drive an input pin by label
-  { type: 'digital-step' }                             — Single propagation step
-  { type: 'digital-read-output', label }               — Read output signal by label
-  { type: 'digital-read-all-signals' }                 — Snapshot all labeled signals
-  { type: 'digital-run-tests', testData? }             — Run test vectors (headless)
-  { type: 'digital-get-circuit' }                      — Export current circuit as base64
-  { type: 'digital-set-base', basePath: '<path>' }    — Set HTTP base path for file resolution
-  { type: 'digital-set-locked', locked: true|false }  — Lock/unlock editor
-  { type: 'digital-load-memory', label, data, format } — Load data into RAM/ROM
-  { type: 'digital-set-palette', components: [...] }  — Restrict palette to listed types (null = show all)
+  { type: 'sim-load-url', url: '<url>' }          — Load a .dig circuit file
+  { type: 'sim-load-data', data: '<base64>' }     — Load inline circuit data (base64 .dig XML)
+  { type: 'sim-load-json', data: '<json>' }       — Load DTS format circuit
+  { type: 'sim-set-input', label, value }          — Drive an input pin by label
+  { type: 'sim-step' }                             — Single propagation step
+  { type: 'sim-read-output', label }               — Read output signal by label
+  { type: 'sim-read-all-signals' }                 — Snapshot all labeled signals
+  { type: 'sim-run-tests', testData? }             — Run test vectors (headless)
+  { type: 'sim-get-circuit' }                      — Export current circuit as base64
+  { type: 'sim-set-base', basePath: '<path>' }    — Set HTTP base path for file resolution
+  { type: 'sim-set-locked', locked: true|false }  — Lock/unlock editor
+  { type: 'sim-load-memory', label, data, format } — Load data into RAM/ROM
+  { type: 'sim-set-palette', components: [...] }  — Restrict palette to listed types (null = show all)
 
 Parent → iframe (tutorial):
-  { type: 'digital-test', testData: '<test vectors>' }              — Run test vectors with label validation
-  { type: 'digital-highlight', labels: [...], duration?: ms }       — Highlight components by label
-  { type: 'digital-clear-highlight' }                                — Clear all highlights
-  { type: 'digital-set-readonly-components', labels: [...] | null } — Lock specific components
-  { type: 'digital-set-instructions', markdown: '...' | null }      — Show/hide instructions panel
+  { type: 'sim-test', testData: '<test vectors>' }              — Run test vectors with label validation
+  { type: 'sim-highlight', labels: [...], duration?: ms }       — Highlight components by label
+  { type: 'sim-clear-highlight' }                                — Clear all highlights
+  { type: 'sim-set-readonly-components', labels: [...] | null } — Lock specific components
+  { type: 'sim-set-instructions', markdown: '...' | null }      — Show/hide instructions panel
 
 Iframe → parent:
-  { type: 'digital-ready' }                        — Simulator initialized
-  { type: 'digital-loaded' }                       — Circuit/setting applied
-  { type: 'digital-error', error: '...' }          — Error occurred
-  { type: 'digital-test-result', passed, failed, total, details: [...] }  — Test results
-  { type: 'digital-output', label, value }         — Response to digital-read-output
-  { type: 'digital-signals', signals: {...} }      — Response to digital-read-all-signals
-  { type: 'digital-circuit-data', data: '<base64>', format: 'dig-xml-base64' }  — Circuit export
+  { type: 'sim-ready' }                        — Simulator initialized
+  { type: 'sim-loaded' }                       — Circuit/setting applied
+  { type: 'sim-error', error: '...' }          — Error occurred
+  { type: 'sim-test-result', passed, failed, total, details: [...] }  — Test results
+  { type: 'sim-output', label, value }         — Response to sim-read-output
+  { type: 'sim-signals', signals: {...} }      — Response to sim-read-all-signals
+  { type: 'sim-circuit-data', data: '<base64>', format: 'dig-xml-base64' }  — Circuit export
 ~~~
 
 ## Tutorial System
@@ -68,10 +68,10 @@ Structured tutorial authoring and runtime for step-by-step circuit-building exer
 
 | File | Purpose |
 |------|---------|
-| `src/tutorial/types.ts` | Tutorial data model — `TutorialManifest`, `TutorialStep`, type guards |
-| `src/tutorial/validate.ts` | Manifest validation against registry |
-| `src/tutorial/presets.ts` | Named palette presets (`basic-gates`, `sequential-intro`, etc.) |
-| `src/tutorial/tutorial-host.ts` | Tutorial host page manager |
+| `src/app/tutorial/types.ts` | Tutorial data model — `TutorialManifest`, `TutorialStep`, type guards |
+| `src/app/tutorial/validate.ts` | Manifest validation against registry |
+| `src/app/tutorial/presets.ts` | Named palette presets (`basic-gates`, `sequential-intro`, etc.) |
+| `src/app/tutorial/tutorial-host.ts` | Tutorial host page manager |
 
 ### MCP Tools
 
@@ -86,7 +86,7 @@ Structured tutorial authoring and runtime for step-by-step circuit-building exer
 
 1. Use `tutorial_list_presets` to pick palette presets for each step
 2. Use `circuit_build` + `circuit_test` to develop and verify goal circuits
-3. Assemble a `TutorialManifest` JSON (see template in `src/tutorial/types.ts`)
+3. Assemble a `TutorialManifest` JSON (see template in `src/app/tutorial/types.ts`)
 4. Use `tutorial_validate` to check for errors
 5. Use `tutorial_create` to generate the tutorial package (manifest.json + .dig files)
 

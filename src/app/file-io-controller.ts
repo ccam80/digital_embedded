@@ -170,14 +170,14 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         }
         applyLoadedCircuit(loaded);
         if (isIframe) {
-          window.parent.postMessage({ type: 'digital-loaded' }, '*');
+          window.parent.postMessage({ type: 'sim-loaded' }, '*');
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('Failed to load circuit:', msg);
         ctx.showStatus(`Load error: ${msg}`, true);
         if (isIframe) {
-          window.parent.postMessage({ type: 'digital-error', error: msg }, '*');
+          window.parent.postMessage({ type: 'sim-error', error: msg }, '*');
         }
       }
     };

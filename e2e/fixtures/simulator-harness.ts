@@ -3,20 +3,20 @@
  * via the postMessage API through the harness.html iframe wrapper.
  *
  * IMPORTANT: The actual postMessage API in app-init.ts uses these types:
- *   - digital-load-url, digital-load-data → digital-loaded
- *   - digital-test (with testData field) → digital-test-result
- *   - digital-get-circuit → digital-circuit-data
- *   - digital-set-base, digital-set-locked, digital-set-palette → digital-loaded
- *   - digital-highlight, digital-clear-highlight
- *   - digital-set-readonly-components, digital-set-instructions
+ *   - sim-load-url, sim-load-data → sim-loaded
+ *   - sim-test (with testData field) → sim-test-result
+ *   - sim-get-circuit → sim-circuit-data
+ *   - sim-set-base, sim-set-locked, sim-set-palette → sim-loaded
+ *   - sim-highlight, sim-clear-highlight
+ *   - sim-set-readonly-components, sim-set-instructions
  *
- * NOTE: digital-set-input, digital-step, digital-read-output, digital-read-all-signals
+ * NOTE: sim-set-input, sim-step, sim-read-output, sim-read-all-signals
  * are defined in PostMessageAdapter but NOT wired in app-init.ts.
  */
 import type { Page } from '@playwright/test';
 
 export interface TestResultMessage {
-  type: 'digital-test-result';
+  type: 'sim-test-result';
   passed: number;
   failed: number;
   total: number;
@@ -38,7 +38,7 @@ export class SimulatorHarness {
       () => document.getElementById('sim') !== null,
       { timeout: 10_000 },
     );
-    await this.waitForMessage('digital-ready');
+    await this.waitForMessage('sim-ready');
   }
 
   /** Send a postMessage to the simulator iframe. */
@@ -62,33 +62,33 @@ export class SimulatorHarness {
   /** Load a .dig XML string into the simulator via base64 encoding. */
   async loadDigXml(xml: string): Promise<void> {
     const b64 = Buffer.from(xml, 'utf-8').toString('base64');
-    await this.postToSim({ type: 'digital-load-data', data: b64 });
-    await this.waitForMessage('digital-loaded');
+    await this.postToSim({ type: 'sim-load-data', data: b64 });
+    await this.waitForMessage('sim-loaded');
   }
 
   /** Load a circuit from a URL (relative to the server root). */
   async loadDigUrl(url: string): Promise<void> {
-    await this.postToSim({ type: 'digital-load-url', url });
-    await this.waitForMessage('digital-loaded');
+    await this.postToSim({ type: 'sim-load-url', url });
+    await this.waitForMessage('sim-loaded');
   }
 
   /**
    * Run test vectors against the loaded circuit.
-   * Uses the actual `digital-test` message type (not `digital-run-tests`).
+   * Uses the actual `sim-test` message type (not `sim-run-tests`).
    */
   async runTests(testData: string): Promise<TestResultMessage> {
-    await this.postToSim({ type: 'digital-test', testData });
-    return this.waitForMessage<TestResultMessage>('digital-test-result');
+    await this.postToSim({ type: 'sim-test', testData });
+    return this.waitForMessage<TestResultMessage>('sim-test-result');
   }
 
   /** Export the current circuit as base64-encoded .dig XML. */
   async getCircuit(): Promise<string> {
-    await this.postToSim({ type: 'digital-get-circuit' });
+    await this.postToSim({ type: 'sim-get-circuit' });
     const msg = await this.waitForMessage<{
-      type: 'digital-circuit-data';
+      type: 'sim-circuit-data';
       data: string;
       format: string;
-    }>('digital-circuit-data');
+    }>('sim-circuit-data');
     return msg.data;
   }
 

@@ -86,21 +86,21 @@ The simulator is designed for iframe embedding. It communicates with the host pa
 const iframe = document.getElementById('sim');
 
 window.addEventListener('message', (e) => {
-  if (e.data.type === 'digital-ready') {
+  if (e.data.type === 'sim-ready') {
     // Load a circuit
     iframe.contentWindow.postMessage({
-      type: 'digital-load-url',
+      type: 'sim-load-url',
       url: 'https://<user>.github.io/<repo>/circuits/half-adder.dig'
     }, '*');
 
     // Lock editing
     iframe.contentWindow.postMessage({
-      type: 'digital-set-locked', locked: true
+      type: 'sim-set-locked', locked: true
     }, '*');
 
     // Restrict palette
     iframe.contentWindow.postMessage({
-      type: 'digital-set-palette',
+      type: 'sim-set-palette',
       components: ['And', 'Or', 'Not', 'In', 'Out']
     }, '*');
   }
@@ -236,7 +236,7 @@ circuits/
 
 Load any hosted circuit via URL: `simulator.html?file=circuits/half-adder.dig`
 
-Or via postMessage: `{ type: 'digital-load-url', url: 'circuits/half-adder.dig' }`
+Or via postMessage: `{ type: 'sim-load-url', url: 'circuits/half-adder.dig' }`
 
 ## Testing
 

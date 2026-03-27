@@ -73,27 +73,30 @@
       if (!data || typeof data !== 'object') return;
 
       switch (data.type) {
-        case 'digital-ready':
+        case 'sim-ready':
           if (manifest) {
+            // Attach base path so the runner can resolve relative .dig file paths
+            const basePath = manifestUrl.substring(0, manifestUrl.lastIndexOf('/') + 1);
             iframe.contentWindow.postMessage({
-              type: 'digital-load-tutorial',
+              type: 'sim-load-tutorial',
               manifest: manifest,
+              basePath: basePath,
             }, '*');
           }
           break;
 
-        case 'digital-tutorial-loaded':
+        case 'sim-tutorial-loaded':
           // Tutorial runner is active inside the iframe
           break;
 
-        case 'digital-tutorial-step-changed':
+        case 'sim-tutorial-step-changed':
           // Update page title with step info
           if (manifest) {
             document.title = `${data.title} — ${manifest.title}`;
           }
           break;
 
-        case 'digital-tutorial-check-result':
+        case 'sim-tutorial-check-result':
           // Could show a toast or update the top bar — for now just log
           break;
       }

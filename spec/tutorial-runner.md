@@ -11,26 +11,26 @@ The simulator has a full tutorial authoring pipeline (manifests, presets, valida
 Parent sends one message:
 
 ```
-{ type: 'digital-load-tutorial', manifest: TutorialManifest }
+{ type: 'sim-load-tutorial', manifest: TutorialManifest }
 ```
 
 The simulator responds with:
 
 ```
-{ type: 'digital-tutorial-loaded', tutorialId: string, totalSteps: number }
+{ type: 'sim-tutorial-loaded', tutorialId: string, totalSteps: number }
 ```
 
 Optional parent-driven navigation:
 
 ```
-{ type: 'digital-tutorial-goto', stepIndex: number }
+{ type: 'sim-tutorial-goto', stepIndex: number }
 ```
 
 Step change / validation notifications back to parent:
 
 ```
-{ type: 'digital-tutorial-step-changed', stepIndex: number, stepId: string, title: string }
-{ type: 'digital-tutorial-check-result', stepIndex: number, passed: boolean, message: string }
+{ type: 'sim-tutorial-step-changed', stepIndex: number, stepId: string, title: string }
+{ type: 'sim-tutorial-check-result', stepIndex: number, passed: boolean, message: string }
 ```
 
 ### UI Layout (tutorial active)
@@ -144,7 +144,7 @@ Structure:
 
 ### `src/io/postmessage-adapter.ts`
 
-- Add `digital-load-tutorial` and `digital-tutorial-goto` to switch/dispatch
+- Add `sim-load-tutorial` and `sim-tutorial-goto` to switch/dispatch
 - Add `loadTutorial?(manifest: TutorialManifest): void` to `PostMessageHooks`
 - Add `tutorialGoto?(stepIndex: number): void` to `PostMessageHooks`
 

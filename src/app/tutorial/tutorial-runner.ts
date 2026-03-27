@@ -31,7 +31,12 @@ export interface TestResult {
 
 export interface TutorialCallbacks {
   setPalette(components: string[] | null): void;
+  /** Load a circuit from raw XML string. */
   loadCircuitXml(xml: string): Promise<void> | void;
+  /** Load a circuit from a URL (relative to tutorial base path). */
+  loadCircuitFromUrl(url: string): Promise<void> | void;
+  /** Build and load a circuit from a TutorialCircuitSpec. */
+  loadCircuitSpec(spec: import('./types.js').TutorialCircuitSpec): Promise<void> | void;
   loadEmptyCircuit(): void;
   /** Returns the current circuit state as base64 dig XML. */
   getCircuitSnapshot(): string;
@@ -185,7 +190,7 @@ export class TutorialRunner {
 
     // 5. Notify parent
     cb.postToParent({
-      type: 'digital-tutorial-step-changed',
+      type: 'sim-tutorial-step-changed',
       stepIndex: index,
       stepId: step.id,
       title: step.title,
@@ -289,7 +294,7 @@ export class TutorialRunner {
     }
 
     this._callbacks.postToParent({
-      type: 'digital-tutorial-check-result',
+      type: 'sim-tutorial-check-result',
       stepIndex: this._progress.currentStepIndex,
       passed: result.passed,
       message: result.message,
@@ -378,11 +383,9 @@ export class TutorialRunner {
    * Load the start circuit for a step.
    *
    * - `null` / `undefined` → empty canvas
-   * - `"carry-forward"` → load previous step's snapshot (or empty if none)
-   * - `TutorialCircuitSpec` → not handled here (spec-to-XML build is caller's
-   *   responsibility); stored in step definition, skipped with empty load
-   * - `string` ending in `.dig` → path-based load, not handled in-runner
-   *   (would require an HTTP fetch); loads empty canvas as fallback
+   * - `"carry-forward"` → load previous step's snapshot (base64 → XML, or empty)
+   * - `TutorialCircuitSpec` → build via loadCircuitSpec callback
+   * - `string` → file path, fetch via loadCircuitFromUrl callback
    */
   private async _loadStartCircuit(step: TutorialStep, stepIndex: number): Promise<void> {
     const sc = step.startCircuit;
@@ -394,13 +397,14 @@ export class TutorialRunner {
     }
 
     if (sc === 'carry-forward') {
-      // Look for a snapshot from the previous step
       const prevIndex = stepIndex - 1;
       const prevSnapshot = prevIndex >= 0
         ? this._progress.steps[prevIndex]?.circuitSnapshot
         : null;
       if (prevSnapshot) {
-        await cb.loadCircuitXml(prevSnapshot);
+        // Snapshot is base64-encoded .dig XML
+        const xml = atob(prevSnapshot);
+        await cb.loadCircuitXml(xml);
       } else {
         cb.loadEmptyCircuit();
       }
@@ -408,16 +412,12 @@ export class TutorialRunner {
     }
 
     if (typeof sc === 'string') {
-      // .dig file path — not resolvable in the runner (no fetch/fs access)
-      // The caller (app-init wiring) should handle this via the loadCircuitXml
-      // callback with the fetched XML. Fall back to empty canvas.
-      cb.loadEmptyCircuit();
+      // .dig file path — delegate to URL-based loader
+      await cb.loadCircuitFromUrl(sc);
       return;
     }
 
-    // TutorialCircuitSpec object — building requires the circuit builder,
-    // which lives outside this pure-logic module. Fall back to empty canvas.
-    // The hosting layer is responsible for intercepting this case if needed.
-    cb.loadEmptyCircuit();
+    // TutorialCircuitSpec object — build and load
+    await cb.loadCircuitSpec(sc);
   }
 }

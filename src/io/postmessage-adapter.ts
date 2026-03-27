@@ -12,40 +12,40 @@
  * Parent → Simulator message types:
  *
  *   Core:
- *     digital-load-url          — fetch URL then load circuit
- *     digital-load-data         — base64-decode then load circuit
- *     digital-load-json         — deserialize DTS then load circuit
- *     digital-set-input         — drive an input pin by label
- *     digital-step              — single propagation step
- *     digital-run-tests         — run test vectors (headless runner)
- *     digital-test              — run test vectors (tutorial-style, with label validation)
- *     digital-read-output       — read output signal by label
- *     digital-read-all-signals  — snapshot all labeled signals
- *     digital-get-circuit       — export current circuit as base64 .dig XML
- *     digital-set-base          — update resolver base path
- *     digital-set-locked        — enable / disable locked mode
- *     digital-load-memory       — load hex/binary data into RAM/ROM
+ *     sim-load-url          — fetch URL then load circuit
+ *     sim-load-data         — base64-decode then load circuit
+ *     sim-load-json         — deserialize DTS then load circuit
+ *     sim-set-input         — drive an input pin by label
+ *     sim-step              — single propagation step
+ *     sim-run-tests         — run test vectors (headless runner)
+ *     sim-test              — run test vectors (tutorial-style, with label validation)
+ *     sim-read-output       — read output signal by label
+ *     sim-read-all-signals  — snapshot all labeled signals
+ *     sim-get-circuit       — export current circuit as base64 .dig XML
+ *     sim-set-base          — update resolver base path
+ *     sim-set-locked        — enable / disable locked mode
+ *     sim-load-memory       — load hex/binary data into RAM/ROM
  *
  *   Tutorial / UI:
- *     digital-set-palette             — restrict component palette
- *     digital-highlight               — highlight components by label
- *     digital-clear-highlight         — clear all highlights
- *     digital-set-readonly-components — lock specific components
- *     digital-set-instructions        — show/hide instructions panel
- *     digital-load-tutorial           — load a TutorialManifest and start embedded runner
- *     digital-tutorial-goto           — jump to a specific tutorial step by index
+ *     sim-set-palette             — restrict component palette
+ *     sim-highlight               — highlight components by label
+ *     sim-clear-highlight         — clear all highlights
+ *     sim-set-readonly-components — lock specific components
+ *     sim-set-instructions        — show/hide instructions panel
+ *     sim-load-tutorial           — load a TutorialManifest and start embedded runner
+ *     sim-tutorial-goto           — jump to a specific tutorial step by index
  *
  * Simulator → Parent response types:
- *     digital-ready        — sent once on init
- *     digital-loaded       — circuit/setting applied
- *     digital-error        — error occurred
- *     digital-output       — response to digital-read-output
- *     digital-signals      — response to digital-read-all-signals
- *     digital-test-result  — response to digital-test / digital-run-tests
- *     digital-circuit-data — response to digital-get-circuit
- *     digital-tutorial-loaded       — tutorial manifest accepted, runner active
- *     digital-tutorial-step-changed — step navigation occurred
- *     digital-tutorial-check-result — validation result for a step
+ *     sim-ready        — sent once on init
+ *     sim-loaded       — circuit/setting applied
+ *     sim-error        — error occurred
+ *     sim-output       — response to sim-read-output
+ *     sim-signals      — response to sim-read-all-signals
+ *     sim-test-result  — response to sim-test / sim-run-tests
+ *     sim-circuit-data — response to sim-get-circuit
+ *     sim-tutorial-loaded       — tutorial manifest accepted, runner active
+ *     sim-tutorial-step-changed — step navigation occurred
+ *     sim-tutorial-check-result — validation result for a step
  */
 
 import type { FileResolver } from './file-resolver.js';
@@ -105,7 +105,7 @@ export interface PostMessageHooks {
   setInstructions?(markdown: string | null): void;
 
   /** Load a tutorial manifest and start the embedded tutorial runner. */
-  loadTutorial?(manifest: unknown): void;
+  loadTutorial?(manifest: unknown, basePath?: unknown): void;
 
   /** Jump to a specific tutorial step by index. */
   tutorialGoto?(stepIndex: number): void;
@@ -188,9 +188,9 @@ export class PostMessageAdapter {
     });
   }
 
-  /** Send the initial `digital-ready` message. Call once after init. */
+  /** Send the initial `sim-ready` message. Call once after init. */
   init(): void {
-    this._post({ type: 'digital-ready' });
+    this._post({ type: 'sim-ready' });
   }
 
   /** Read the current locked state. */
@@ -211,76 +211,76 @@ export class PostMessageAdapter {
     try {
       switch (msg.type) {
         // --- Core: circuit loading ---
-        case 'digital-load-url':
+        case 'sim-load-url':
           await this._handleLoadUrl(msg);
           break;
-        case 'digital-load-data':
+        case 'sim-load-data':
           await this._handleLoadData(msg);
           break;
-        case 'digital-load-json':
+        case 'sim-load-json':
           await this._handleLoadJson(msg);
           break;
 
         // --- Core: headless simulation ---
-        case 'digital-set-input':
+        case 'sim-set-input':
           this._handleSetInput(msg);
           break;
-        case 'digital-step':
+        case 'sim-step':
           this._handleStep();
           break;
-        case 'digital-read-output':
+        case 'sim-read-output':
           this._handleReadOutput(msg);
           break;
-        case 'digital-read-all-signals':
+        case 'sim-read-all-signals':
           this._handleReadAllSignals();
           break;
 
         // --- Core: testing ---
-        case 'digital-test':
+        case 'sim-test':
           this._handleTestTutorial(msg);
           break;
-        case 'digital-run-tests':
+        case 'sim-run-tests':
           this._handleRunTests(msg);
           break;
 
         // --- Core: circuit export ---
-        case 'digital-get-circuit':
+        case 'sim-get-circuit':
           this._handleGetCircuit();
           break;
 
         // --- Core: configuration ---
-        case 'digital-set-base':
+        case 'sim-set-base':
           this._handleSetBase(msg);
           break;
-        case 'digital-set-locked':
+        case 'sim-set-locked':
           this._handleSetLocked(msg);
           break;
-        case 'digital-load-memory':
+        case 'sim-load-memory':
           this._handleLoadMemory(msg);
           break;
 
         // --- Tutorial / UI ---
-        case 'digital-set-palette':
+        case 'sim-set-palette':
           this._handleSetPalette(msg);
           break;
-        case 'digital-highlight':
+        case 'sim-highlight':
           this._handleHighlight(msg);
           break;
-        case 'digital-clear-highlight':
+        case 'sim-clear-highlight':
           this._hooks.clearHighlight?.();
           break;
-        case 'digital-set-readonly-components':
+        case 'sim-set-readonly-components':
           this._handleSetReadonlyComponents(msg);
           break;
-        case 'digital-set-instructions':
+        case 'sim-set-instructions':
           this._handleSetInstructions(msg);
           break;
 
         // --- Tutorial runner ---
-        case 'digital-load-tutorial':
-          this._hooks.loadTutorial?.(msg.manifest);
+        case 'sim-load-tutorial':
+          this._hooks.loadTutorial?.(msg.manifest, msg.basePath);
           break;
-        case 'digital-tutorial-goto':
+        case 'sim-tutorial-goto':
           this._hooks.tutorialGoto?.(Number(msg.stepIndex ?? 0));
           break;
 
@@ -289,7 +289,7 @@ export class PostMessageAdapter {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._post({ type: 'digital-error', error: message });
+      this._post({ type: 'sim-error', error: message });
     }
   }
 
@@ -300,7 +300,7 @@ export class PostMessageAdapter {
   private async _handleLoadUrl(msg: { url?: unknown }): Promise<void> {
     const url = String(msg.url ?? '');
     if (!url) {
-      this._post({ type: 'digital-error', error: 'No URL provided' });
+      this._post({ type: 'sim-error', error: 'No URL provided' });
       return;
     }
     const response = await this._fetchFn(url);
@@ -309,18 +309,18 @@ export class PostMessageAdapter {
     }
     const xml = await response.text();
     await this._loadCircuit(xml);
-    this._post({ type: 'digital-loaded' });
+    this._post({ type: 'sim-loaded' });
   }
 
   private async _handleLoadData(msg: { data?: unknown }): Promise<void> {
     const encoded = String(msg.data ?? '');
     if (!encoded) {
-      this._post({ type: 'digital-error', error: 'No data provided' });
+      this._post({ type: 'sim-error', error: 'No data provided' });
       return;
     }
     const xml = atob(encoded);
     await this._loadCircuit(xml);
-    this._post({ type: 'digital-loaded' });
+    this._post({ type: 'sim-loaded' });
   }
 
   private async _handleLoadJson(msg: { data?: unknown }): Promise<void> {
@@ -331,7 +331,7 @@ export class PostMessageAdapter {
     } else {
       this._getOwnFacade().compile(circuit);
     }
-    this._post({ type: 'digital-loaded' });
+    this._post({ type: 'sim-loaded' });
   }
 
   // -------------------------------------------------------------------------
@@ -370,7 +370,7 @@ export class PostMessageAdapter {
       const facade = this._facade!;
       value = facade.readOutput(facade.getCoordinator(), label);
     }
-    this._post({ type: 'digital-output', label, value });
+    this._post({ type: 'sim-output', label, value });
   }
 
   private _handleReadAllSignals(): void {
@@ -382,7 +382,7 @@ export class PostMessageAdapter {
       const facade = this._facade!;
       signals = facade.readAllSignals(facade.getCoordinator());
     }
-    this._post({ type: 'digital-signals', signals });
+    this._post({ type: 'sim-signals', signals });
   }
 
   // -------------------------------------------------------------------------
@@ -390,7 +390,7 @@ export class PostMessageAdapter {
   // -------------------------------------------------------------------------
 
   /**
-   * `digital-run-tests` — headless test execution via SimulationRunner.
+   * `sim-run-tests` — headless test execution via SimulationRunner.
    * Uses facade.runTests pattern: recompiles, runs all test vectors.
    */
   private _handleRunTests(msg: { testData?: unknown }): void {
@@ -424,13 +424,13 @@ export class PostMessageAdapter {
   }
 
   /**
-   * `digital-test` — tutorial-style test execution with label validation
+   * `sim-test` — tutorial-style test execution with label validation
    * and user-friendly error messages.
    */
   private _handleTestTutorial(msg: { testData?: unknown }): void {
     const testDataStr = String(msg.testData ?? '');
     if (!testDataStr) {
-      this._post({ type: 'digital-error', error: 'No testData provided' });
+      this._post({ type: 'sim-error', error: 'No testData provided' });
       return;
     }
 
@@ -461,7 +461,7 @@ export class PostMessageAdapter {
         `Test signals not found in circuit: ${missingLabels.join(', ')}. ` +
         `Make sure your In/Out components have labels that match the test vector signal names ` +
         `(${hdrNames.join(', ')}). Double-click a component to set its label.`;
-      this._post({ type: 'digital-error', error: errorMsg });
+      this._post({ type: 'sim-error', error: errorMsg });
       return;
     }
 
@@ -492,7 +492,7 @@ export class PostMessageAdapter {
       } else {
         userMsg = `Test error: ${errMsg}`;
       }
-      this._post({ type: 'digital-error', error: userMsg });
+      this._post({ type: 'sim-error', error: userMsg });
     }
   }
 
@@ -507,7 +507,7 @@ export class PostMessageAdapter {
     const xml = this._hooks.serializeCircuit();
     const encoded = btoa(xml);
     this._post({
-      type: 'digital-circuit-data',
+      type: 'sim-circuit-data',
       data: encoded,
       format: 'dig-xml-base64',
     });
@@ -522,7 +522,7 @@ export class PostMessageAdapter {
     this._clearCaches();
     this._updateResolverBasePath(basePath);
     this._hooks.setBasePath?.(basePath);
-    this._post({ type: 'digital-loaded' });
+    this._post({ type: 'sim-loaded' });
   }
 
   private _handleSetLocked(msg: { locked?: unknown }): void {
@@ -564,13 +564,13 @@ export class PostMessageAdapter {
     } else {
       this._hooks.setPalette?.(null);
     }
-    this._post({ type: 'digital-loaded' });
+    this._post({ type: 'sim-loaded' });
   }
 
   private _handleHighlight(msg: { labels?: unknown; duration?: unknown }): void {
     const labels = msg.labels;
     if (!Array.isArray(labels)) {
-      this._post({ type: 'digital-error', error: 'highlight requires labels array' });
+      this._post({ type: 'sim-error', error: 'highlight requires labels array' });
       return;
     }
     const duration = typeof msg.duration === 'number' ? msg.duration : 3000;
@@ -618,7 +618,7 @@ export class PostMessageAdapter {
     if (this._hooks.getCircuit) {
       return this._hooks.getCircuit();
     }
-    throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
+    throw new Error('No circuit loaded. Send sim-load-url or sim-load-data first.');
   }
 
   /** Get or create the adapter's own facade (headless-only mode). */
@@ -632,14 +632,14 @@ export class PostMessageAdapter {
   /** Ensure own facade exists and has a compiled engine. */
   private _ensureFacade(): void {
     if (!this._facade?.getActiveCoordinator()) {
-      throw new Error('No circuit loaded. Send digital-load-url or digital-load-data first.');
+      throw new Error('No circuit loaded. Send sim-load-url or sim-load-data first.');
     }
   }
 
   /** Post a test result in the canonical format. */
   private _postTestResult(results: { passed: number; failed: number; total: number; vectors: Array<{ passed: boolean; inputs: Record<string, number>; expectedOutputs: Record<string, number>; actualOutputs: Record<string, number> }> }): void {
     this._post({
-      type: 'digital-test-result',
+      type: 'sim-test-result',
       passed: results.passed,
       failed: results.failed,
       total: results.total,

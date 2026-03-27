@@ -70,8 +70,8 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(b64.length).toBeGreaterThan(0);
 
     // Reimport the exported circuit
-    await harness.postToSim({ type: 'digital-load-data', data: b64 });
-    await harness.waitForMessage('digital-loaded');
+    await harness.postToSim({ type: 'sim-load-data', data: b64 });
+    await harness.waitForMessage('sim-loaded');
 
     // Run tests on reimported circuit — should still work
     const result = await harness.runTests('A B Y\n0 0 0\n0 1 0\n1 0 0\n1 1 1');

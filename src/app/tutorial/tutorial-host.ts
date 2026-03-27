@@ -175,7 +175,7 @@ export class TutorialHost {
     for (const iframe of this.iframes) {
       // Send postMessage to each iframe to update base path
       const message = {
-        type: 'digital-set-base',
+        type: 'sim-set-base',
         basePath: basePath,
       };
       iframe.contentWindow?.postMessage(message, '*');
