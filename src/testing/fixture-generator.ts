@@ -27,13 +27,13 @@ const PARTIAL_ROW_COUNT = 8;
 /**
  * Extract input signal labels from the circuit.
  *
- * Finds all elements with typeId 'In' and returns their label properties.
+ * Finds all elements with typeId 'In' or 'Port' and returns their label properties.
  * Falls back to a generated name ("in0", "in1", ...) if no label is set.
  */
 function extractInputNames(circuit: Circuit): string[] {
   const names: string[] = [];
   for (const element of circuit.elements) {
-    if (element.typeId === 'In') {
+    if (element.typeId === 'In' || element.typeId === 'Port') {
       const label = element.getAttribute('label');
       if (typeof label === 'string' && label.trim().length > 0) {
         names.push(label.trim());
@@ -48,13 +48,13 @@ function extractInputNames(circuit: Circuit): string[] {
 /**
  * Extract output signal labels from the circuit.
  *
- * Finds all elements with typeId 'Out' and returns their label properties.
+ * Finds all elements with typeId 'Out' or 'Port' and returns their label properties.
  * Falls back to a generated name ("out0", "out1", ...) if no label is set.
  */
 function extractOutputNames(circuit: Circuit): string[] {
   const names: string[] = [];
   for (const element of circuit.elements) {
-    if (element.typeId === 'Out') {
+    if (element.typeId === 'Out' || element.typeId === 'Port') {
       const label = element.getAttribute('label');
       if (typeof label === 'string' && label.trim().length > 0) {
         names.push(label.trim());

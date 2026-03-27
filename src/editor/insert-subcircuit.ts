@@ -1,53 +1,40 @@
 /**
  * Insert-as-subcircuit: boundary analysis, circuit extraction, and stub insertion.
  *
- * Analyzes the selection boundary to identify wires that cross it, determines
- * pin directions from the crossed pins, builds PinDeclaration objects for the
+ * Analyzes the selection boundary to identify wires that cross it, derives
+ * domain-agnostic port labels and bit widths, builds Port elements for the
  * interface, and copies the selected elements and internal wires into a new
  * Circuit that can become a reusable subcircuit definition.
- *
- * The final replacement step (removing the selection and placing a subcircuit
- * instance) is a stub that throws FacadeError until Phase 6 provides the
- * SubcircuitComponent type.
  */
 
 import { Circuit, Wire } from "@/core/circuit.js";
 import type { CircuitElement } from "@/core/element.js";
-import { PinDirection, pinWorldPosition } from "@/core/pin.js";
-import type { PinDeclaration } from "@/core/pin.js";
+import { pinWorldPosition } from "@/core/pin.js";
+import type { Point } from "@/core/renderer-interface.js";
 import type { EditCommand } from "./undo-redo.js";
 import type { ComponentRegistry } from "@/core/registry.js";
 import { registerSubcircuit, type SubcircuitDefinition } from "@/components/subcircuit/subcircuit.js";
 import { deriveInterfacePins } from "@/components/subcircuit/pin-derivation.js";
+import { PortElement } from "@/components/io/port.js";
+import { PropertyBag } from "@/core/properties.js";
 
 // ---------------------------------------------------------------------------
-// BoundaryWireInfo — one wire crossing the selection boundary
+// BoundaryPort — one wire crossing the selection boundary
 // ---------------------------------------------------------------------------
 
 /**
  * Describes a single wire that crosses the boundary between the selected
- * elements and the rest of the circuit.
+ * elements and the rest of the circuit. Domain-agnostic: no direction field.
  *
- * direction — from the perspective of the subcircuit interface:
- *   OUTPUT means a signal leaves the selection (wire driven by a selected output).
- *   INPUT  means a signal enters the selection (wire driven by an external output).
+ * label    — derived from pin label + element label, deduplicated across ports
+ * bitWidth — from the pin declaration on the selected element
+ * position — world coordinate of the selected-element-side wire endpoint
  */
-export interface BoundaryWireInfo {
+export interface BoundaryPort {
   wire: Wire;
-  direction: PinDirection;
-  pinLabel: string;
+  label: string;
   bitWidth: number;
-}
-
-// ---------------------------------------------------------------------------
-// BoundaryAnalysis — result of analyzeBoundary()
-// ---------------------------------------------------------------------------
-
-export interface BoundaryAnalysis {
-  /** Wires that cross the selection boundary, with interface metadata. */
-  boundaryWires: BoundaryWireInfo[];
-  /** Wires whose both endpoints touch only selected elements. */
-  internalWires: Wire[];
+  position: Point;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,20 +44,19 @@ export interface BoundaryAnalysis {
 /**
  * Determine whether a point lies on a pin of one of the given elements.
  *
- * Returns the matching pin (or undefined).
+ * Returns the matching pin info (or undefined).
  */
 function findPinAtPoint(
   elements: CircuitElement[],
   x: number,
   y: number,
-): { element: CircuitElement; pinDirection: PinDirection; label: string; bitWidth: number } | undefined {
+): { element: CircuitElement; label: string; bitWidth: number } | undefined {
   for (const el of elements) {
     for (const pin of el.getPins()) {
       const wp = pinWorldPosition(el, pin);
       if (wp.x === x && wp.y === y) {
         return {
           element: el,
-          pinDirection: pin.direction,
           label: pin.label,
           bitWidth: pin.bitWidth,
         };
@@ -81,12 +67,60 @@ function findPinAtPoint(
 }
 
 /**
- * Check whether BOTH endpoints of a wire touch the selection.
+ * Derive a port label from a pin label and element label.
+ * Prefers the pin label; falls back to element label or "port".
  */
-function wireIsInternal(wire: Wire, selectedElements: CircuitElement[]): boolean {
-  const startPin = findPinAtPoint(selectedElements, wire.start.x, wire.start.y);
-  const endPin = findPinAtPoint(selectedElements, wire.end.x, wire.end.y);
-  return startPin !== undefined && endPin !== undefined;
+function deriveBaseLabel(pinLabel: string, elementLabel: string): string {
+  if (pinLabel && pinLabel.length > 0) return pinLabel;
+  if (elementLabel && elementLabel.length > 0) return elementLabel;
+  return "port";
+}
+
+/**
+ * Deduplicate a candidate label against an already-used set.
+ * First occurrence keeps the base label; subsequent occurrences get _2, _3, etc.
+ */
+function deduplicateLabel(base: string, used: Set<string>): string {
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  let n = 2;
+  while (used.has(`${base}_${n}`)) {
+    n++;
+  }
+  const unique = `${base}_${n}`;
+  used.add(unique);
+  return unique;
+}
+
+/**
+ * Determine which face a position belongs to relative to a selection centroid.
+ */
+function assignFace(
+  position: Point,
+  centroid: Point,
+): "left" | "right" | "top" | "bottom" {
+  const dx = position.x - centroid.x;
+  const dy = position.y - centroid.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? "right" : "left";
+  }
+  return dy >= 0 ? "bottom" : "top";
+}
+
+/**
+ * Compute the centroid of a set of elements.
+ */
+function selectionCentroid(elements: CircuitElement[]): Point {
+  if (elements.length === 0) return { x: 0, y: 0 };
+  let sumX = 0;
+  let sumY = 0;
+  for (const el of elements) {
+    sumX += el.position.x;
+    sumY += el.position.y;
+  }
+  return { x: sumX / elements.length, y: sumY / elements.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -94,24 +128,24 @@ function wireIsInternal(wire: Wire, selectedElements: CircuitElement[]): boolean
 // ---------------------------------------------------------------------------
 
 /**
- * Identify wires crossing the selection boundary and classify them.
+ * Identify wires crossing the selection boundary without classifying direction.
  *
  * A wire crosses the boundary when exactly one of its endpoints coincides with
  * a pin of a selected element. Internal wires have both endpoints on selected
  * elements.
  *
- * Direction semantics (subcircuit perspective):
- *   - A wire driven by a selected OUTPUT pin → OUTPUT (the subcircuit drives it).
- *   - A wire driven by an external OUTPUT pin → INPUT (the subcircuit receives it).
- *   - Bidirectional pins → BIDIRECTIONAL.
+ * Labels are derived from the connected pin's label and deduplicated: if two
+ * boundary wires touch pins both labeled "out", the ports are labeled "out"
+ * and "out_2".
  */
 export function analyzeBoundary(
   circuit: Circuit,
   selectedElements: CircuitElement[],
   selectedWires: Wire[],
-): BoundaryAnalysis {
-  const boundaryWires: BoundaryWireInfo[] = [];
+): { boundaryPorts: BoundaryPort[]; internalWires: Wire[] } {
+  const boundaryPorts: BoundaryPort[] = [];
   const internalWires: Wire[] = [];
+  const usedLabels = new Set<string>();
 
   for (const wire of circuit.wires) {
     const startPin = findPinAtPoint(selectedElements, wire.start.x, wire.start.y);
@@ -131,39 +165,32 @@ export function analyzeBoundary(
 
     // Exactly one endpoint touches a selected element — this is a boundary wire.
     const selectedPin = startSelected ? startPin! : endPin!;
+    const position = startSelected ? wire.start : wire.end;
 
-    let direction: PinDirection;
-    if (selectedPin.pinDirection === PinDirection.OUTPUT) {
-      direction = PinDirection.OUTPUT;
-    } else if (selectedPin.pinDirection === PinDirection.INPUT) {
-      direction = PinDirection.INPUT;
-    } else {
-      direction = PinDirection.BIDIRECTIONAL;
-    }
+    const elementLabel = selectedPin.element.getProperties().getOrDefault<string>("label", "");
+    const baseLabel = deriveBaseLabel(selectedPin.label, elementLabel);
+    const label = deduplicateLabel(baseLabel, usedLabels);
 
-    // Deduplicate: a wire with the same label at the same position may appear
-    // once. Use a unique label based on pin label + position to avoid clashes.
-    const label = `${selectedPin.label}_${selectedPin.element.instanceId}`;
-
-    boundaryWires.push({
+    boundaryPorts.push({
       wire,
-      direction,
-      pinLabel: label,
+      label,
       bitWidth: selectedPin.bitWidth,
+      position,
     });
   }
 
   // Also include selectedWires that are internal (both endpoints in selection)
   for (const wire of selectedWires) {
     if (!circuit.wires.includes(wire)) {
-      // Wire is not in the circuit's wires list — treat it as internal context.
-      if (wireIsInternal(wire, selectedElements)) {
+      const startPin = findPinAtPoint(selectedElements, wire.start.x, wire.start.y);
+      const endPin = findPinAtPoint(selectedElements, wire.end.x, wire.end.y);
+      if (startPin !== undefined && endPin !== undefined) {
         internalWires.push(wire);
       }
     }
   }
 
-  return { boundaryWires, internalWires };
+  return { boundaryPorts, internalWires };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,24 +198,22 @@ export function analyzeBoundary(
 // ---------------------------------------------------------------------------
 
 /**
- * Create a new Circuit from the selected elements, internal wires, and the
- * boundary interface pins.
+ * Create a new Circuit from the selected elements, internal wires, and Port
+ * elements at each boundary crossing position.
  *
- * Each boundary pin becomes an "In" or "Out" interface element placeholder
- * represented as a PinDeclaration embedded in the circuit's metadata name.
- * The actual component instances for In/Out pins are recorded via the
- * circuit's metadata description as a JSON-encoded boundary descriptor —
- * Phase 6 reads this to wire up the interface.
+ * Each boundary port becomes a Port element positioned at the selected-element-
+ * side endpoint of the boundary wire. Face is assigned based on the port's
+ * position relative to the selection centroid.
  *
  * The new circuit contains:
  *   - All selected elements (by reference — callers clone if needed).
  *   - All internal wires.
- *   - Metadata describing the boundary pins for Phase 6 consumption.
+ *   - One Port element per boundary crossing.
  */
 export function extractSubcircuit(
   selectedElements: CircuitElement[],
   internalWires: Wire[],
-  boundaryPins: PinDeclaration[],
+  boundaryPorts: BoundaryPort[],
 ): Circuit {
   const subcircuit = new Circuit({ name: "Subcircuit" });
 
@@ -200,18 +225,25 @@ export function extractSubcircuit(
     subcircuit.addWire(wire);
   }
 
-  // Encode boundary pin declarations into the description field so Phase 6
-  // can retrieve the interface without needing runtime component instances.
-  subcircuit.metadata.description = JSON.stringify(
-    boundaryPins.map((p) => ({
-      direction: p.direction,
-      label: p.label,
-      defaultBitWidth: p.defaultBitWidth,
-      position: p.position,
-      isNegatable: p.isNegatable,
-      isClockCapable: p.isClockCapable,
-    })),
-  );
+  const centroid = selectionCentroid(selectedElements);
+
+  for (const bp of boundaryPorts) {
+    const face = assignFace(bp.position, centroid);
+    const props = new PropertyBag();
+    props.set("label", bp.label);
+    props.set("bitWidth", bp.bitWidth);
+    props.set("face", face);
+    props.set("sortOrder", 0);
+
+    const portEl = new PortElement(
+      crypto.randomUUID(),
+      bp.position,
+      0,
+      false,
+      props,
+    );
+    subcircuit.addElement(portEl);
+  }
 
   return subcircuit;
 }
@@ -224,11 +256,10 @@ export function extractSubcircuit(
  * Orchestrate the full "insert selection as subcircuit" workflow.
  *
  * Steps:
- *   1. Analyze the boundary to find crossing wires and classify them.
- *   2. Build PinDeclarations from the boundary wire metadata.
- *   3. Extract a new Circuit containing the selected items + interface pins.
- *   4. Register the subcircuit in the registry and replace the selection with
- *      a subcircuit component instance.
+ *   1. Analyze the boundary to find crossing wires (domain-agnostic).
+ *   2. Extract a new Circuit containing the selected items + Port elements.
+ *   3. Derive interface pins from Port elements in the extracted circuit.
+ *   4. Register the subcircuit in the registry.
  *
  * Returns the extracted subcircuit Circuit and an EditCommand for undo support.
  */
@@ -239,44 +270,32 @@ export function insertAsSubcircuit(
   registry?: ComponentRegistry,
   name?: string,
 ): { subcircuit: Circuit; command: EditCommand } {
-  const analysis = analyzeBoundary(circuit, selectedElements, selectedWires);
+  const { boundaryPorts, internalWires } = analyzeBoundary(circuit, selectedElements, selectedWires);
 
-  const boundaryPins: PinDeclaration[] = analysis.boundaryWires.map((bw) => ({
-    direction: bw.direction,
-    label: bw.pinLabel,
-    defaultBitWidth: bw.bitWidth,
-    position: bw.wire.start,
-    isNegatable: false,
-    isClockCapable: false,
-  }));
-
-  const subcircuit = extractSubcircuit(selectedElements, analysis.internalWires, boundaryPins);
+  const subcircuit = extractSubcircuit(selectedElements, internalWires, boundaryPorts);
   const subcircuitName = name ?? `Subcircuit_${Date.now()}`;
 
-  // Derive interface pins from In/Out components inside the subcircuit
   const pinLayout = deriveInterfacePins(subcircuit);
 
   const definition: SubcircuitDefinition = {
     circuit: subcircuit,
-    pinLayout: pinLayout.length > 0 ? pinLayout : boundaryPins,
+    pinLayout,
     shapeMode: "DEFAULT",
     name: subcircuitName,
   };
 
-  // Register the subcircuit if a registry is provided
   if (registry) {
     registerSubcircuit(registry, subcircuitName, definition);
   }
 
   // Capture state for undo
   const removedElements = [...selectedElements];
-  const removedWires = [...selectedWires, ...analysis.internalWires];
-  const removedBoundaryWires = analysis.boundaryWires.map(bw => bw.wire);
+  const removedWires = [...selectedWires, ...internalWires];
+  const removedBoundaryWires = boundaryPorts.map(bp => bp.wire);
 
   const command: EditCommand = {
     description: "Insert selection as subcircuit",
     execute(): void {
-      // Remove selected elements and wires
       for (const el of removedElements) {
         const idx = circuit.elements.indexOf(el);
         if (idx >= 0) circuit.elements.splice(idx, 1);
@@ -286,7 +305,6 @@ export function insertAsSubcircuit(
       }
     },
     undo(): void {
-      // Re-add removed elements and wires
       for (const el of removedElements) {
         circuit.addElement(el);
       }

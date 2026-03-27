@@ -95,7 +95,7 @@ function deriveSignalInventory(circuit: Circuit): SignalInventory {
 
   for (const element of circuit.elements) {
     const props = element.getProperties();
-    if (element.typeId === "In") {
+    if (element.typeId === "In" || element.typeId === "Port") {
       const label = props.getOrDefault<string>("label", "");
       const bitWidth = props.getOrDefault<number>("bitWidth", 1);
       if (label.length > 0) {
@@ -103,7 +103,7 @@ function deriveSignalInventory(circuit: Circuit): SignalInventory {
         inputBitWidths.push(bitWidth);
         totalInputBits += bitWidth;
       }
-    } else if (element.typeId === "Out") {
+    } else if (element.typeId === "Out" || element.typeId === "Port") {
       const label = props.getOrDefault<string>("label", "");
       if (label.length > 0) {
         outputNames.push(label);

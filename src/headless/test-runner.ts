@@ -73,7 +73,7 @@ export class TestRunner {
     if (!resolvedData.includes('|')) {
       const inputLabels = new Set<string>();
       for (const el of circuit.elements) {
-        if (el.typeId === 'In' || el.typeId === 'Clock') {
+        if (el.typeId === 'In' || el.typeId === 'Clock' || el.typeId === 'Port') {
           const label = el.getProperties().getOrDefault<string>('label', '');
           if (label) inputLabels.add(label);
         }

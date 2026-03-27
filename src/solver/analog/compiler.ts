@@ -618,7 +618,7 @@ function buildAnalogNodeMap(
 
   // Step 6: Build labelToNodeId
   const labelToNodeId = new Map<string, number>();
-  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe"]);
+  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe", "Port"]);
   for (const el of elements) {
     if (!labelTypes.has(el.typeId)) continue;
     let label: string | undefined;

@@ -404,19 +404,31 @@ function buildPinMappings(el: SubcircuitHost): BoundaryPinMapping[] {
 }
 
 /**
- * Find the internal In or Out element whose label matches the given interface
+ * Find the internal interface element whose label matches the given interface
  * pin label and whose direction corresponds to the pin direction.
  *
- * INPUT pin on the subcircuit interface → In element inside the subcircuit.
- * OUTPUT pin on the subcircuit interface → Out element inside the subcircuit.
+ * Port elements (domain-agnostic) are tried first for all directions.
+ * For INPUT/OUTPUT directions, falls back to In/Out (legacy subcircuits).
+ * For BIDIRECTIONAL direction, returns undefined if no Port matches.
  */
 function findInterfaceElement(
   flatCircuit: Circuit,
   label: string,
   direction: PinDirection,
 ): CircuitElement | undefined {
-  const targetTypeId = direction === PinDirection.INPUT ? "In" : "Out";
+  // First try Port (domain-agnostic, preferred for new subcircuits)
+  for (const el of flatCircuit.elements) {
+    if (el.typeId === "Port") {
+      const elLabel = el.getAttribute("label");
+      if (typeof elLabel === "string" && elLabel === label) return el;
+    }
+  }
 
+  // BIDIRECTIONAL pins should have matched Port above; don't fall through to In/Out.
+  if (direction === PinDirection.BIDIRECTIONAL) return undefined;
+
+  // Fall back to In/Out (legacy subcircuits)
+  const targetTypeId = direction === PinDirection.INPUT ? "In" : "Out";
   for (const el of flatCircuit.elements) {
     if (el.typeId !== targetTypeId) continue;
     const elLabel = el.getAttribute("label");

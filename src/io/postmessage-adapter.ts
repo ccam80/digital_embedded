@@ -425,8 +425,8 @@ export class PostMessageAdapter {
       if (!def) continue;
       const lbl = el.getProperties().getOrDefault('label', '') as string;
       if (!lbl) continue;
-      if (def.name === 'In' || def.name === 'Clock') circuitInputLabels.add(lbl);
-      else if (def.name === 'Out') circuitOutputLabels.add(lbl);
+      if (def.name === 'In' || def.name === 'Clock' || def.name === 'Port') circuitInputLabels.add(lbl);
+      else if (def.name === 'Out' || def.name === 'Port') circuitOutputLabels.add(lbl);
     }
 
     // Validate signal names

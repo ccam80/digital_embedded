@@ -682,7 +682,7 @@ export function compileDigitalPartition(
   // -----------------------------------------------------------------------
 
   const labelToNetId = new Map<string, number>();
-  const LABELED_TYPES = new Set(["In", "Out", "Probe", "Measurement", "Clock"]);
+  const LABELED_TYPES = new Set(["In", "Out", "Probe", "Measurement", "Clock", "Port"]);
 
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;

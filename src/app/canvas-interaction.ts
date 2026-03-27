@@ -547,8 +547,8 @@ export function initCanvasInteraction(
             if (deps.compileAndBind()) {
               deps.startSimulation();
             }
-          } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock') {
-            // In/Clock toggle during analog/mixed sim — change defaultValue and recompile
+          } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port') {
+            // In/Clock/Port toggle during analog/mixed sim — change defaultValue and recompile
             const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
             const current = (elementHit.getAttribute('defaultValue') as number | undefined) ?? 0;
             const newVal = bitWidth === 1
@@ -568,7 +568,7 @@ export function initCanvasInteraction(
       }
 
       const elementHit = hitTestElements(worldPt, ctx.circuit.elements, hitMargin);
-      if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock')) {
+      if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port')) {
         const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
         const current = ctx.binding.getPinValue(elementHit, 'out');
         const newVal = bitWidth === 1
@@ -577,7 +577,7 @@ export function initCanvasInteraction(
         ctx.binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
         const eng = ctx.facade.getCoordinator();
         if (eng.getState() !== EngineState.RUNNING) {
-          ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' });
+          ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' && elementHit.typeId !== 'Port' });
         }
         renderPipeline.scheduleRender();
       }
