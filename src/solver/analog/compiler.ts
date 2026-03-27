@@ -106,7 +106,7 @@ function makeVddSource(
  */
 function resolveElementNodes(
   el: CircuitElement,
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
   circuit: Circuit,
   vertexOut?: Array<{ x: number; y: number } | null>,
   positionToNodeId?: Map<string, number>,
@@ -315,7 +315,7 @@ class PositionUnionFind {
 }
 
 interface PartitionPinInfo {
-  element: import("../core/element.js").CircuitElement;
+  element: import("../../core/element.js").CircuitElement;
   pinLabel: string;
   direction: PinDirection;
   worldPos: { x: number; y: number };
@@ -327,8 +327,8 @@ function extractDigitalSubcircuit(
   circuit: Circuit,
   registry: ComponentRegistry,
 ): { analogCircuit: Circuit; partition: InternalDigitalPartition } {
-  const digitalElements = new Set<import("../core/element.js").CircuitElement>();
-  const analogElements = new Set<import("../core/element.js").CircuitElement>();
+  const digitalElements = new Set<import("../../core/element.js").CircuitElement>();
+  const analogElements = new Set<import("../../core/element.js").CircuitElement>();
 
   for (const el of circuit.elements) {
     const def = registry.get(el.typeId);
@@ -645,6 +645,531 @@ function buildAnalogNodeMap(
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline stage helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Unwrap a `Circuit | FlattenResult` into its constituent parts.
+ *
+ * When a raw Circuit is provided, detects mixed-mode circuits (containing both
+ * digital-only and analog-only components) and partitions them automatically.
+ * Returns the analog circuit, cross-engine boundaries, and mixed-mode partitions.
+ */
+function resolveCircuitInput(
+  circuitOrResult: Circuit | FlattenResult,
+  registry: ComponentRegistry,
+): {
+  circuit: Circuit;
+  crossEngineBoundaries: CrossEngineBoundary[];
+  mixedModePartitions: InternalDigitalPartition[];
+} {
+  if ("crossEngineBoundaries" in circuitOrResult) {
+    return {
+      circuit: circuitOrResult.circuit,
+      crossEngineBoundaries: circuitOrResult.crossEngineBoundaries,
+      mixedModePartitions: circuitOrResult.mixedModePartitions ?? [],
+    };
+  }
+
+  const rawCircuit = circuitOrResult;
+  const crossEngineBoundaries: CrossEngineBoundary[] = [];
+
+  // Detect truly mixed-mode: partition only when BOTH digital-only AND
+  // analog-only components are present. If only digital-only components
+  // exist (no analog), let the per-element check below emit diagnostics.
+  const neutralTypes = new Set([
+    'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
+    'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+  ]);
+  let hasDigitalOnlyEl = false;
+  let hasAnalogOnlyEl = false;
+  for (const el of rawCircuit.elements) {
+    if (neutralTypes.has(el.typeId)) continue;
+    const def = registry.get(el.typeId);
+    if (!def) continue;
+    if (hasDigitalModel(def) && def.models?.analog === undefined) hasDigitalOnlyEl = true;
+    if (def.models?.analog !== undefined && !hasDigitalModel(def)) hasAnalogOnlyEl = true;
+  }
+
+  if (hasDigitalOnlyEl && hasAnalogOnlyEl) {
+    const { analogCircuit, partition } = extractDigitalSubcircuit(rawCircuit, registry);
+    return { circuit: analogCircuit, crossEngineBoundaries, mixedModePartitions: [partition] };
+  }
+
+  return { circuit: rawCircuit, crossEngineBoundaries, mixedModePartitions: [] };
+}
+
+/**
+ * Resolve the circuit's logic family from its metadata.
+ *
+ * Checks `metadata.logicFamily` first (direct object), then
+ * `metadata.logicFamilyKey` (string preset key), then falls back to the
+ * default logic family.
+ */
+function resolveLogicFamily(
+  circuit: Circuit,
+): import("../../core/logic-family.js").LogicFamilyConfig {
+  return circuit.metadata.logicFamily
+    ? circuit.metadata.logicFamily
+    : (circuit.metadata as Record<string, unknown>)["logicFamilyKey"] !== undefined
+      ? (getLogicFamilyPreset((circuit.metadata as Record<string, unknown>)["logicFamilyKey"] as string) ?? defaultLogicFamily())
+      : defaultLogicFamily();
+}
+
+/**
+ * Populate a ModelLibrary from a circuit's `metadata.models` Map.
+ *
+ * Converts `DeviceModel` entries (which may use `Map<string,number>` for
+ * params) into the flat `Record<string,number>` format the library expects.
+ * No-ops when the metadata has no `models` key or it is not a Map.
+ */
+function populateModelLibrary(
+  modelLibrary: ModelLibrary,
+  metadataSource: Record<string, unknown>,
+): void {
+  if (!(metadataSource["models"] instanceof Map)) return;
+  const circuitModels = metadataSource["models"] as Map<string, DeviceModel>;
+  for (const model of circuitModels.values()) {
+    const params: Record<string, number> =
+      model.params instanceof Map
+        ? Object.fromEntries(model.params.entries())
+        : (model.params as unknown as Record<string, number>);
+    modelLibrary.add({
+      name: model.name,
+      type: model.type as import("./model-parser.js").DeviceType,
+      level: 1,
+      params,
+    });
+  }
+}
+
+/** Per-element metadata produced by Pass A and consumed by Pass B. */
+type CircuitElementMeta = {
+  el: CircuitElement;
+  branchIdx: number;          // -1 or 0-based index within the branch block
+  internalNodeOffset: number; // first internal node ID, or -1 if none
+  internalNodeCount: number;
+};
+
+/** Result returned by `runPassA_circuit`. */
+type PassACircuitResult = {
+  elementMeta: CircuitElementMeta[];
+  branchCount: number;
+  nextInternalNode: number;   // next available internal node ID after Pass A
+  vddNodeId: number;          // -1 until a transistor-mode component is found
+  vddBranchIdx: number;       // -1 until a transistor-mode component is found
+};
+
+/**
+ * Pass A for `compileAnalogCircuit`: iterate over circuit elements and assign
+ * branch indices and internal node IDs.
+ *
+ * Does NOT create any AnalogElement instances — only collects the metadata
+ * needed to compute absolute matrix row indices in Pass B.
+ *
+ * Emits "unsupported-component-in-analog" diagnostics for digital-only
+ * components and throws for unknown component types.
+ */
+function runPassA_circuit(
+  circuit: Circuit,
+  registry: ComponentRegistry,
+  crossEnginePlaceholders: Set<CircuitElement>,
+  externalNodeCount: number,
+  diagnostics: SolverDiagnostic[],
+): PassACircuitResult {
+  let nextInternalNode = externalNodeCount + 1;
+  let branchCount = 0;
+  let vddNodeId = -1;
+  let vddBranchIdx = -1;
+  const elementMeta: CircuitElementMeta[] = [];
+
+  for (const el of circuit.elements) {
+    // Skip cross-engine placeholder elements — handled via bridge instances.
+    if (crossEnginePlaceholders.has(el)) continue;
+
+    // Ground and Tunnel elements are structural only — no analog factory needed.
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
+      elementMeta.push({ el, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    const def = registry.get(el.typeId);
+    if (!def) {
+      throw new Error(
+        `compileAnalogCircuit: unknown component type "${el.typeId}" — ` +
+          `not registered in the provided registry`,
+      );
+    }
+
+    const hasAnalog = def.models?.analog !== undefined;
+    const hasBoth = def.models?.digital !== undefined && hasAnalog;
+    if (!hasAnalog) {
+      diagnostics.push(
+        makeDiagnostic(
+          "unsupported-component-in-analog",
+          "error",
+          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+          {
+            explanation:
+              `Component "${el.typeId}" has no analog model. ` +
+              `Only components with an analog model ` +
+              `can be placed in analog circuits.`,
+            suggestions: [
+              {
+                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+      elementMeta.push({ el, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    // Transistor-mode and logical-mode components are handled in Pass B —
+    // skip branch/node allocation here.
+    if (hasBoth) {
+      const passAProps = el.getProperties();
+      const passAMode = passAProps.has("simulationMode")
+        ? (passAProps.get("simulationMode") as string)
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
+      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
+        elementMeta.push({ el, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        continue;
+      }
+    }
+
+    // Assign branch index for components that require a branch row.
+    let branchIdx = -1;
+    if (def.models?.analog?.requiresBranchRow) {
+      branchIdx = branchCount++;
+    }
+
+    // Allocate internal nodes.
+    const props = el.getProperties();
+    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
+    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
+    nextInternalNode += internalCount;
+
+    elementMeta.push({ el, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
+  }
+
+  return { elementMeta, branchCount, nextInternalNode, vddNodeId, vddBranchIdx };
+}
+
+/** Per-element metadata produced by Pass A for `compileAnalogPartition`. */
+type PartitionElementMeta = {
+  pc: PartitionedComponent;
+  branchIdx: number;
+  internalNodeOffset: number;
+  internalNodeCount: number;
+};
+
+/** Result returned by `runPassA_partition`. */
+type PassAPartitionResult = {
+  elementMeta: PartitionElementMeta[];
+  branchCount: number;
+  nextInternalNode: number;
+  vddNodeId: number;
+  vddBranchIdx: number;
+};
+
+/**
+ * Pass A for `compileAnalogPartition`: iterate over partition components and
+ * assign branch indices and internal node IDs.
+ *
+ * Mirror of `runPassA_circuit` but operates on `PartitionedComponent` entries
+ * (which already carry a resolved `ComponentDefinition`) rather than raw
+ * `CircuitElement` entries.
+ */
+function runPassA_partition(
+  partition: SolverPartition,
+  crossEnginePlaceholderIds: Set<string>,
+  externalNodeCount: number,
+  diagnostics: SolverDiagnostic[],
+): PassAPartitionResult {
+  let nextInternalNode = externalNodeCount + 1;
+  let branchCount = 0;
+  let vddNodeId = -1;
+  let vddBranchIdx = -1;
+  const elementMeta: PartitionElementMeta[] = [];
+
+  for (const pc of partition.components) {
+    const el = pc.element;
+
+    if (crossEnginePlaceholderIds.has(el.instanceId)) continue;
+
+    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    const def = pc.definition;
+    const hasAnalog = def.models?.analog !== undefined;
+    const hasBoth = def.models?.digital !== undefined && hasAnalog;
+
+    if (!hasAnalog) {
+      diagnostics.push(
+        makeDiagnostic(
+          "unsupported-component-in-analog",
+          "error",
+          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
+          {
+            explanation:
+              `Component "${el.typeId}" has no analog model. ` +
+              `Only components with an analog model can be placed in analog circuits.`,
+            suggestions: [
+              {
+                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+
+    if (hasBoth) {
+      const passAProps = el.getProperties();
+      const passAMode = passAProps.has("simulationMode")
+        ? (passAProps.get("simulationMode") as string)
+        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
+      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
+        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        continue;
+      }
+    }
+
+    let branchIdx = -1;
+    if (def.models?.analog?.requiresBranchRow) {
+      branchIdx = branchCount++;
+    }
+
+    const props = el.getProperties();
+    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
+    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
+    nextInternalNode += internalCount;
+
+    elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
+  }
+
+  return { elementMeta, branchCount, nextInternalNode, vddNodeId, vddBranchIdx };
+}
+
+/**
+ * Run topology validation on the assembled element list and append any
+ * resulting diagnostics.
+ *
+ * Checks for:
+ *  - Orphan nodes (zero element terminals → singular MNA matrix)
+ *  - Floating nodes (one element terminal → ill-conditioned system)
+ *  - Voltage-source loops (contradictory KVL constraints)
+ *  - Inductor loops (degenerate branch equations)
+ */
+function validateTopologyAndEmitDiagnostics(
+  topologyInfo: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
+  totalNodeCount: number,
+  diagnostics: SolverDiagnostic[],
+): void {
+  if (totalNodeCount > 0) {
+    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
+
+    for (const nodeId of weakNodes.orphan) {
+      diagnostics.push(
+        makeDiagnostic(
+          "orphan-node",
+          "error",
+          `Node ${nodeId} is orphan (no element terminals connected)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has no element terminals connected to it. ` +
+              `This typically results from a degenerate wire (zero-length or ` +
+              `disconnected from all components). The orphan node creates a ` +
+              `zero row in the MNA matrix, making it singular.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Remove the disconnected wire or wire fragment at this location.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+
+    for (const nodeId of weakNodes.floating) {
+      diagnostics.push(
+        makeDiagnostic(
+          "floating-node",
+          "warning",
+          `Node ${nodeId} is floating (connected to only one element terminal)`,
+          {
+            explanation:
+              `MNA node ${nodeId} has only one element terminal connected to it. ` +
+              `A floating node has no complete current path, which makes the ` +
+              `MNA system ill-conditioned or unsolvable.`,
+            involvedNodes: [nodeId],
+            suggestions: [
+              {
+                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
+    }
+  }
+
+  if (detectVoltageSourceLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "voltage-source-loop",
+        "error",
+        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal voltage sources with no resistive elements creates " +
+            "contradictory KVL constraints. The MNA matrix will be singular and " +
+            "cannot be solved. Add a series resistance to break the loop.",
+          suggestions: [
+            {
+              text: "Add a small series resistance (e.g. 1 mΩ) to one of the voltage source branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  if (detectInductorLoops(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "inductor-loop",
+        "error",
+        "Inductor loop detected — inductors form a loop with no resistance",
+        {
+          explanation:
+            "A loop of ideal inductors with no resistive elements creates a " +
+            "degenerate branch equation system. The MNA matrix will be singular " +
+            "at DC and during transient initialization. Add series resistance.",
+          suggestions: [
+            {
+              text: "Add a small series resistance (e.g. 1 mΩ) to one of the inductor branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+}
+
+/**
+ * Process mixed-mode partitions (step 7b of `compileAnalogCircuit`).
+ *
+ * Compiles the inner digital circuit for each partition, resolves cut-point
+ * positions to outer MNA node IDs, and builds bridge adapters. Appends the
+ * resulting adapter elements to `analogElements` and bridge instances to
+ * `bridges`.
+ */
+function processMixedModePartitions(
+  mixedModePartitions: InternalDigitalPartition[],
+  nodeMap: ReturnType<typeof buildAnalogNodeMap>,
+  circuit: Circuit,
+  circuitFamily: import("../../core/logic-family.js").LogicFamilyConfig,
+  registry: ComponentRegistry,
+  digitalCompiler: DigitalCompilerFn,
+  analogElements: import("./element.js").AnalogElement[],
+  bridges: BridgeInstance[],
+  diagnostics: SolverDiagnostic[],
+): void {
+  for (const partition of mixedModePartitions) {
+    let compiledInner: CompiledCircuitImpl;
+    try {
+      compiledInner = compileInnerDigitalCircuit(partition.internalCircuit, registry, digitalCompiler);
+    } catch (err) {
+      diagnostics.push(
+        makeDiagnostic(
+          "bridge-inner-compile-error",
+          "error",
+          `Failed to compile inner digital partition "${partition.instanceName}": ${String(err)}`,
+          {},
+        ),
+      );
+      continue;
+    }
+
+    const outputAdapters: BridgeOutputAdapter[] = [];
+    const inputAdapters: BridgeInputAdapter[] = [];
+    const outputPinNetIds: number[] = [];
+    const inputPinNetIds: number[] = [];
+
+    for (const cp of partition.cutPoints) {
+      const outerNodeId = resolvePositionToNodeId(cp.position, nodeMap.wireToNodeId, circuit);
+
+      if (outerNodeId < 0) {
+        diagnostics.push(
+          makeDiagnostic(
+            "bridge-unconnected-pin",
+            "warning",
+            `Mixed-mode cut point "${cp.label}" at (${cp.position.x}, ${cp.position.y}) ` +
+              `is not connected to any wire in the analog circuit`,
+            {},
+          ),
+        );
+        continue;
+      }
+
+      const innerNetId = compiledInner.labelToNetId.get(cp.innerLabel) ?? -1;
+      if (innerNetId < 0) {
+        diagnostics.push(
+          makeDiagnostic(
+            "bridge-missing-inner-pin",
+            "warning",
+            `Mixed-mode: inner digital circuit has no net for cut-point label "${cp.innerLabel}"`,
+            {},
+          ),
+        );
+        continue;
+      }
+
+      const spec = resolvePinElectrical(circuitFamily);
+
+      if (cp.direction === "out") {
+        const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
+        adapter.label = `${partition.instanceName}:${cp.label}`;
+        outputAdapters.push(adapter);
+        outputPinNetIds.push(innerNetId);
+      } else {
+        const adapter = makeBridgeInputAdapter(spec, outerNodeId);
+        adapter.label = `${partition.instanceName}:${cp.label}`;
+        inputAdapters.push(adapter);
+        inputPinNetIds.push(innerNetId);
+      }
+    }
+
+    if (outputAdapters.length > 0 || inputAdapters.length > 0) {
+      for (const adapter of outputAdapters) analogElements.push(adapter);
+      for (const adapter of inputAdapters) analogElements.push(adapter);
+      bridges.push({
+        compiledInner,
+        outputAdapters,
+        inputAdapters,
+        outputPinNetIds,
+        inputPinNetIds,
+        instanceName: partition.instanceName,
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main compiler entry point
 // ---------------------------------------------------------------------------
 
@@ -668,79 +1193,22 @@ function compileAnalogCircuit(
   transistorModels?: TransistorModelRegistry,
   digitalCompiler?: DigitalCompilerFn,
 ): ConcreteCompiledAnalogCircuit {
-  // Unwrap: accept either a raw Circuit or a FlattenResult
-  let circuit: Circuit;
-  let crossEngineBoundaries: CrossEngineBoundary[];
-  let mixedModePartitions: InternalDigitalPartition[];
-  if ("crossEngineBoundaries" in circuitOrResult) {
-    circuit = circuitOrResult.circuit;
-    crossEngineBoundaries = circuitOrResult.crossEngineBoundaries;
-    mixedModePartitions = circuitOrResult.mixedModePartitions ?? [];
-  } else {
-    const rawCircuit = circuitOrResult;
-    crossEngineBoundaries = [];
+  // Stage 1: Unwrap input — extract circuit, boundaries, and mixed-mode partitions
+  const { circuit, crossEngineBoundaries, mixedModePartitions } =
+    resolveCircuitInput(circuitOrResult, registry);
 
-    // Detect truly mixed-mode: partition only when BOTH digital-only AND
-    // analog-only components are present. If only digital-only components
-    // exist (no analog), let the per-element check below emit diagnostics.
-    const neutralTypes = new Set([
-      'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
-      'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
-    ]);
-    let hasDigitalOnlyEl = false;
-    let hasAnalogOnlyEl = false;
-    for (const el of rawCircuit.elements) {
-      if (neutralTypes.has(el.typeId)) continue;
-      const def = registry.get(el.typeId);
-      if (!def) continue;
-      if (hasDigitalModel(def) && def.models?.analog === undefined) hasDigitalOnlyEl = true;
-      if (def.models?.analog !== undefined && !hasDigitalModel(def)) hasAnalogOnlyEl = true;
-    }
-
-    if (hasDigitalOnlyEl && hasAnalogOnlyEl) {
-      const { analogCircuit, partition } = extractDigitalSubcircuit(rawCircuit, registry);
-      circuit = analogCircuit;
-      mixedModePartitions = [partition];
-    } else {
-      circuit = rawCircuit;
-      mixedModePartitions = [];
-    }
-  }
-
-  // Step 1: Verify that the circuit has at least one analog component.
-  // The unified compiler only routes here when analog components are present.
-
-  // Step 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
+  // Stage 2: Build node map — assigns wire groups to MNA node IDs, ground = 0
   const nodeMap = buildAnalogNodeMap(circuit);
 
-  // Resolve the circuit's logic family (used for _pinElectrical injection)
-  const circuitFamily = circuit.metadata.logicFamily
-    ? circuit.metadata.logicFamily
-    : (circuit.metadata as Record<string, unknown>)["logicFamilyKey"] !== undefined
-      ? (getLogicFamilyPreset((circuit.metadata as Record<string, unknown>)["logicFamilyKey"] as string) ?? defaultLogicFamily())
-      : defaultLogicFamily();
+  // Stage 3: Resolve logic family (used for _pinElectrical injection)
+  const circuitFamily = resolveLogicFamily(circuit);
 
   // Collect all diagnostics from compilation
   const diagnostics: SolverDiagnostic[] = [...nodeMap.diagnostics];
 
-  // Model library: starts empty; populated from circuit.metadata.models when present
+  // Stage 4: Build model library from circuit metadata
   const modelLibrary = new ModelLibrary();
-  if ((circuit.metadata as Record<string, unknown>)["models"] instanceof Map) {
-    const circuitModels = (circuit.metadata as Record<string, unknown>)["models"] as Map<string, DeviceModel>;
-    for (const model of circuitModels.values()) {
-      // Convert DeviceModel (which uses Map<string,number>) to the model-library format
-      const params: Record<string, number> =
-        model.params instanceof Map
-          ? Object.fromEntries(model.params.entries())
-          : (model.params as unknown as Record<string, number>);
-      modelLibrary.add({
-        name: model.name,
-        type: model.type as import("./model-parser.js").DeviceType,
-        level: 1,
-        params,
-      });
-    }
-  }
+  populateModelLibrary(modelLibrary, circuit.metadata as Record<string, unknown>);
 
   // Build a set of cross-engine placeholder elements so Pass A and Pass B can
   // skip them. These elements are left in the flat circuit as opaque placeholders
@@ -749,144 +1217,28 @@ function compileAnalogCircuit(
     crossEngineBoundaries.map((b) => b.subcircuitElement as CircuitElement),
   );
 
-  // Step 3: Determine branch indices for voltage sources / inductors, and
-  //         allocate internal nodes via getInternalNodeCount.
+  // Stage 5 (Pass A): Determine branch indices and allocate internal nodes.
   //
   // We need two passes:
   //   Pass A: collect branch counts and internal node counts
   //   Pass B: build elements with correct absolute branch row indices
+  const passA = runPassA_circuit(
+    circuit,
+    registry,
+    crossEnginePlaceholders,
+    nodeMap.nodeCount,
+    diagnostics,
+  );
 
-  // The branch row block starts immediately after the external nodes.
-  // nodeMap.nodeCount = number of external (wire group) non-ground nodes.
-  // Internal nodes (from getInternalNodeCount) are appended after external nodes.
-
-  let nextInternalNode = nodeMap.nodeCount + 1; // 1-based, after external nodes
-  let branchCount = 0;
-
-  // VDD node and branch tracking for transistor expansion (Phase 4c).
-  // vddNodeId is -1 until the first transistor-mode component is encountered;
-  // the compiler allocates a single shared VDD node and voltage source for the circuit.
-  let vddNodeId = -1;
-  let vddBranchIdx = -1;
-
-  // Per-element metadata collected in Pass A, consumed in Pass B
-  const elementMeta: Array<{
-    el: CircuitElement;
-    branchIdx: number;         // -1 or absolute 0-based branch index
-    internalNodeOffset: number; // first internal node ID for this element
-    internalNodeCount: number;
-  }> = [];
-
-  for (const el of circuit.elements) {
-    // Skip cross-engine placeholder elements — they are handled via bridge instances.
-    if (crossEnginePlaceholders.has(el)) {
-      continue;
-    }
-
-    // Ground and Tunnel elements do not need an analog factory — they are structural.
-    // Tunnel nets are merged by label during node-map construction; no stamping needed.
-    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
-      elementMeta.push({
-        el,
-        branchIdx: -1,
-        internalNodeOffset: -1,
-        internalNodeCount: 0,
-      });
-      continue;
-    }
-
-    const def = registry.get(el.typeId);
-    if (!def) {
-      throw new Error(
-        `compileAnalogCircuit: unknown component type "${el.typeId}" — ` +
-          `not registered in the provided registry`,
-      );
-    }
-
-    // Reject digital-only components — emit diagnostic instead of throwing
-    const hasAnalog = def.models?.analog !== undefined;
-    const hasBoth = def.models?.digital !== undefined && hasAnalog;
-    if (!hasAnalog) {
-      diagnostics.push(
-        makeDiagnostic(
-          "unsupported-component-in-analog",
-          "error",
-          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-          {
-            explanation:
-              `Component "${el.typeId}" has no analog model. ` +
-              `Only components with an analog model ` +
-              `can be placed in analog circuits.`,
-            suggestions: [
-              {
-                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-      elementMeta.push({
-        el,
-        branchIdx: -1,
-        internalNodeOffset: -1,
-        internalNodeCount: 0,
-      });
-      continue;
-    }
-
-    // Transistor-mode and digital-mode components are handled in Pass B —
-    // skip branch/node allocation here.
-    if (hasBoth) {
-      const passAProps = el.getProperties();
-      const passAMode = passAProps.has("simulationMode")
-        ? (passAProps.get("simulationMode") as string)
-        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
-        elementMeta.push({
-          el,
-          branchIdx: -1,
-          internalNodeOffset: -1,
-          internalNodeCount: 0,
-        });
-        continue;
-      }
-    }
-
-    // Assign branch index
-    let branchIdx = -1;
-    if (def.models?.analog?.requiresBranchRow) {
-      // The actual matrix row = nodeCount + branchIdx (0-based within branch block)
-      // We store the absolute branch index here; the matrix row is computed
-      // as nodeCount_total + branchIdx when building the matrix.
-      branchIdx = branchCount++;
-    }
-
-    // Allocate internal nodes
-    const props = el.getProperties();
-    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
-    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
-    nextInternalNode += internalCount;
-
-    elementMeta.push({
-      el,
-      branchIdx,
-      internalNodeOffset,
-      internalNodeCount: internalCount,
-    });
-  }
+  const elementMeta = passA.elementMeta;
+  let branchCount = passA.branchCount;
+  let nextInternalNode = passA.nextInternalNode;
+  let vddNodeId = passA.vddNodeId;
+  let vddBranchIdx = passA.vddBranchIdx;
 
   // Total node count including internal nodes from Pass A.
   // Updated again after Pass B completes (transistor expansion allocates more nodes).
   let totalNodeCount = nextInternalNode - 1;
-
-  // The MNA matrix dimension: totalNodeCount + branchCount
-  // Branch rows are indexed as: nodeCount + branchIdx (0-based)
-  // For consistency with test-elements.ts, the absolute branch row index
-  // passed to analogFactory is: totalNodeCount + branchIdx
-  // However, the spec says branchIdx is 0-based within the branch block,
-  // and the MNA matrix size = nodeCount + branchCount. We keep branchIdx
-  // as 0-based — the assembler adds nodeCount to get the absolute row.
 
   // Inline bridges created for flat "logical" simulationMode components.
   // Collected here and merged into the main bridges array after Step 7.
@@ -1261,7 +1613,7 @@ function compileAnalogCircuit(
           componentOverride,
         );
       }
-      props.set("_pinElectrical", pinElectricalMap as unknown as import("../core/properties.js").PropertyValue);
+      props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     // Model binding: semiconductor components get resolved model parameters
@@ -1278,7 +1630,7 @@ function compileAnalogCircuit(
 
       // Inject resolved model params into the PropertyBag directly rather
       // than spreading (spreading PropertyBag loses _map contents).
-      props.set("_modelParams", resolvedModel.params as unknown as import("../core/properties.js").PropertyValue);
+      props.set("_modelParams", resolvedModel.params as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     // Call the analog factory — returns AnalogElementCore (no pinNodeIds).
@@ -1336,8 +1688,7 @@ function compileAnalogCircuit(
   // After Pass B: recompute totalNodeCount to include all transistor-expansion nodes.
   totalNodeCount = nextInternalNode - 1;
 
-  // If any transistor-mode component was expanded, inject the shared VDD voltage source.
-  // This single DC source supplies all expanded transistor models in the circuit.
+  // Stage 7: Inject shared VDD voltage source for transistor-expanded components.
   if (vddNodeId >= 0 && vddBranchIdx >= 0) {
     const vdd = circuitFamily.vdd;
     const absoluteVddBranch = totalNodeCount + vddBranchIdx;
@@ -1350,118 +1701,14 @@ function compileAnalogCircuit(
     });
   }
 
-  // Step 6: Topology validation
-
-  // Check for orphan and floating nodes (only meaningful if we have external nodes)
-  if (totalNodeCount > 0) {
-    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
-
-    // Orphan nodes: zero element terminals — completely disconnected wire
-    // groups (e.g. degenerate zero-length wires). These make the MNA matrix
-    // singular and must block compilation.
-    for (const nodeId of weakNodes.orphan) {
-      diagnostics.push(
-        makeDiagnostic(
-          "orphan-node",
-          "error",
-          `Node ${nodeId} is orphan (no element terminals connected)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has no element terminals connected to it. ` +
-              `This typically results from a degenerate wire (zero-length or ` +
-              `disconnected from all components). The orphan node creates a ` +
-              `zero row in the MNA matrix, making it singular.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Remove the disconnected wire or wire fragment at this location.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-
-    // Floating nodes: one element terminal — no complete current path.
-    // Warning severity; the circuit may still converge with gmin stepping.
-    for (const nodeId of weakNodes.floating) {
-      diagnostics.push(
-        makeDiagnostic(
-          "floating-node",
-          "warning",
-          `Node ${nodeId} is floating (connected to only one element terminal)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has only one element terminal connected to it. ` +
-              `A floating node has no complete current path, which makes the ` +
-              `MNA system ill-conditioned or unsolvable.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-  }
-
-  // Check for voltage-source loops
-  if (detectVoltageSourceLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "voltage-source-loop",
-        "error",
-        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal voltage sources with no resistive elements creates " +
-            "contradictory KVL constraints. The MNA matrix will be singular and " +
-            "cannot be solved. Add a series resistance to break the loop.",
-          suggestions: [
-            {
-              text: "Add a small series resistance (e.g. 1 mΩ) to one of the voltage source branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-
-  // Check for inductor loops
-  if (detectInductorLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "inductor-loop",
-        "error",
-        "Inductor loop detected — inductors form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal inductors with no resistive elements creates a " +
-            "degenerate branch equation system. The MNA matrix will be singular " +
-            "at DC and during transient initialization. Add series resistance.",
-          suggestions: [
-            {
-              text: "Add a small series resistance (e.g. 1 mΩ) to one of the inductor branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
+  // Stage 8: Topology validation — orphan/floating nodes, source loops.
+  validateTopologyAndEmitDiagnostics(topologyInfo, totalNodeCount, diagnostics);
 
   // Re-check missing ground. If the node-map builder already emitted a
   // no-ground diagnostic, don't duplicate it.
   const hasGroundDiag = nodeMap.diagnostics.some((d) => d.code === "no-ground");
   if (!hasGroundDiag) {
-    const hasGround = circuit.elements.some(
-      (el) => el.typeId === "Ground",
-    );
+    const hasGround = circuit.elements.some((el) => el.typeId === "Ground");
     if (!hasGround) {
       diagnostics.push(
         makeDiagnostic(
@@ -1484,8 +1731,8 @@ function compileAnalogCircuit(
     }
   }
 
-  // Step 7: Process cross-engine boundaries — compile inner digital circuits
-  //          and create bridge adapter elements.
+  // Stage 9: Process cross-engine boundaries — compile inner digital circuits
+  //           and create bridge adapter elements.
   const bridges: BridgeInstance[] = [];
 
   for (const boundary of crossEngineBoundaries) {
@@ -1500,8 +1747,6 @@ function compileAnalogCircuit(
       digitalCompiler!,
     );
     if (bridgeInstance !== null) {
-      // Add bridge adapters to the analog element list so the MNA assembler
-      // stamps them into the matrix.
       for (const adapter of bridgeInstance.outputAdapters) {
         analogElements.push(adapter);
       }
@@ -1512,96 +1757,21 @@ function compileAnalogCircuit(
     }
   }
 
-  // Step 7b: Process mixed-mode partitions — compile inner digital circuits
-  //           and create bridge adapter elements at cut-point positions.
-  for (const partition of mixedModePartitions) {
-    let compiledInner: CompiledCircuitImpl;
-    try {
-      compiledInner = compileInnerDigitalCircuit(partition.internalCircuit, registry, digitalCompiler!);
-    } catch (err) {
-      diagnostics.push(
-        makeDiagnostic(
-          "bridge-inner-compile-error",
-          "error",
-          `Failed to compile inner digital partition "${partition.instanceName}": ${String(err)}`,
-          {},
-        ),
-      );
-      continue;
-    }
+  // Stage 9b: Process mixed-mode partitions — compile inner digital circuits
+  //            and create bridge adapters at cut-point positions.
+  processMixedModePartitions(
+    mixedModePartitions,
+    nodeMap,
+    circuit,
+    circuitFamily,
+    registry,
+    digitalCompiler!,
+    analogElements,
+    bridges,
+    diagnostics,
+  );
 
-    const outputAdapters: BridgeOutputAdapter[] = [];
-    const inputAdapters: BridgeInputAdapter[] = [];
-    const outputPinNetIds: number[] = [];
-    const inputPinNetIds: number[] = [];
-
-    for (const cp of partition.cutPoints) {
-      // Resolve outer MNA node ID by matching cut-point position to wire endpoints
-      const outerNodeId = resolvePositionToNodeId(
-        cp.position,
-        nodeMap.wireToNodeId,
-        circuit,
-      );
-
-      if (outerNodeId < 0) {
-        diagnostics.push(
-          makeDiagnostic(
-            "bridge-unconnected-pin",
-            "warning",
-            `Mixed-mode cut point "${cp.label}" at (${cp.position.x}, ${cp.position.y}) ` +
-              `is not connected to any wire in the analog circuit`,
-            {},
-          ),
-        );
-        continue;
-      }
-
-      // Resolve inner net ID from the compiled digital circuit
-      const innerNetId = compiledInner.labelToNetId.get(cp.innerLabel) ?? -1;
-      if (innerNetId < 0) {
-        diagnostics.push(
-          makeDiagnostic(
-            "bridge-missing-inner-pin",
-            "warning",
-            `Mixed-mode: inner digital circuit has no net for cut-point label "${cp.innerLabel}"`,
-            {},
-          ),
-        );
-        continue;
-      }
-
-      const spec = resolvePinElectrical(circuitFamily);
-
-      if (cp.direction === "out") {
-        // Digital drives analog
-        const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
-        adapter.label = `${partition.instanceName}:${cp.label}`;
-        outputAdapters.push(adapter);
-        outputPinNetIds.push(innerNetId);
-      } else {
-        // Analog drives digital
-        const adapter = makeBridgeInputAdapter(spec, outerNodeId);
-        adapter.label = `${partition.instanceName}:${cp.label}`;
-        inputAdapters.push(adapter);
-        inputPinNetIds.push(innerNetId);
-      }
-    }
-
-    if (outputAdapters.length > 0 || inputAdapters.length > 0) {
-      for (const adapter of outputAdapters) analogElements.push(adapter);
-      for (const adapter of inputAdapters) analogElements.push(adapter);
-      bridges.push({
-        compiledInner,
-        outputAdapters,
-        inputAdapters,
-        outputPinNetIds,
-        inputPinNetIds,
-        instanceName: partition.instanceName,
-      });
-    }
-  }
-
-  // Step 7c: Merge inline bridges (from flat "logical" simulationMode components).
+  // Stage 9c: Merge inline bridges (from flat "logical" simulationMode components).
   bridges.push(...inlineBridges);
 
   // Step 8: Build and return ConcreteCompiledAnalogCircuit
@@ -1640,7 +1810,7 @@ function buildAnalogNodeMapFromPartition(
 ): {
   nodeCount: number;
   groupToNodeId: Map<number, number>;
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>;
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>;
   labelToNodeId: Map<string, number>;
   positionToNodeId: Map<string, number>;
 } {
@@ -1716,7 +1886,7 @@ function buildAnalogNodeMapFromPartition(
   const nodeCount = nextNodeId - 1;
 
   // Build wireToNodeId
-  const wireToNodeId = new Map<import("../core/circuit.js").Wire, number>();
+  const wireToNodeId = new Map<import("../../core/circuit.js").Wire, number>();
   for (const g of groups) {
     const nodeId = groupToNodeId.get(g.groupId) ?? 0;
     for (const w of g.wires) {
@@ -1792,22 +1962,10 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
+  // Stage 2: Build model library from outer circuit metadata (if provided).
   const modelLibrary = new ModelLibrary();
-  if (outerCircuit !== undefined &&
-      (outerCircuit.metadata as Record<string, unknown>)["models"] instanceof Map) {
-    const circuitModels = (outerCircuit.metadata as Record<string, unknown>)["models"] as Map<string, DeviceModel>;
-    for (const model of circuitModels.values()) {
-      const params: Record<string, number> =
-        model.params instanceof Map
-          ? Object.fromEntries(model.params.entries())
-          : (model.params as unknown as Record<string, number>);
-      modelLibrary.add({
-        name: model.name,
-        type: model.type as import("./model-parser.js").DeviceType,
-        level: 1,
-        params,
-      });
-    }
+  if (outerCircuit !== undefined) {
+    populateModelLibrary(modelLibrary, outerCircuit.metadata as Record<string, unknown>);
   }
 
   // Build set of cross-engine placeholder elements (from bridgeStubs)
@@ -1815,82 +1973,14 @@ export function compileAnalogPartition(
     partition.crossEngineBoundaries.map((b) => (b.subcircuitElement as CircuitElement).instanceId),
   );
 
-  // Pass A: collect branch counts and internal node counts
-  let nextInternalNode = externalNodeCount + 1;
-  let branchCount = 0;
-  let vddNodeId = -1;
-  let vddBranchIdx = -1;
+  // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
+  const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics);
 
-  const elementMeta: Array<{
-    pc: PartitionedComponent;
-    branchIdx: number;
-    internalNodeOffset: number;
-    internalNodeCount: number;
-  }> = [];
-
-  for (const pc of partition.components) {
-    const el = pc.element;
-
-    // Skip cross-engine placeholder elements
-    if (crossEnginePlaceholderIds.has(el.instanceId)) {
-      continue;
-    }
-
-    if (el.typeId === "Ground" || el.typeId === "Tunnel") {
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-      continue;
-    }
-
-    const def = pc.definition;
-
-    const hasAnalog = def.models?.analog !== undefined;
-    const hasBoth = def.models?.digital !== undefined && hasAnalog;
-    if (!hasAnalog) {
-      diagnostics.push(
-        makeDiagnostic(
-          "unsupported-component-in-analog",
-          "error",
-          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-          {
-            explanation:
-              `Component "${el.typeId}" has no analog model. ` +
-              `Only components with an analog model can be placed in analog circuits.`,
-            suggestions: [
-              {
-                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-      continue;
-    }
-
-    if (hasBoth) {
-      const passAProps = el.getProperties();
-      const passAMode = passAProps.has("simulationMode")
-        ? (passAProps.get("simulationMode") as string)
-        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
-        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-        continue;
-      }
-    }
-
-    let branchIdx = -1;
-    if (def.models?.analog?.requiresBranchRow) {
-      branchIdx = branchCount++;
-    }
-
-    const props = el.getProperties();
-    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
-    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
-    nextInternalNode += internalCount;
-
-    elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
-  }
+  const elementMeta = passA.elementMeta;
+  let branchCount = passA.branchCount;
+  let nextInternalNode = passA.nextInternalNode;
+  let vddNodeId = passA.vddNodeId;
+  let vddBranchIdx = passA.vddBranchIdx;
 
   let totalNodeCount = nextInternalNode - 1;
 
@@ -1901,7 +1991,7 @@ export function compileAnalogPartition(
   // where circuit is used for circuit.wires iteration.
   // We collect all wires from the partition's groups.
   const allWires = partition.groups.flatMap((g) => g.wires);
-  const partitionCircuitStub = { wires: allWires } as import("../core/circuit.js").Circuit;
+  const partitionCircuitStub = { wires: allWires } as import("../../core/circuit.js").Circuit;
 
   const inlineBridges: BridgeInstance[] = [];
   const analogElements: import("./element.js").AnalogElement[] = [];
@@ -2218,7 +2308,7 @@ export function compileAnalogPartition(
           componentOverride,
         );
       }
-      props.set("_pinElectrical", pinElectricalMap as unknown as import("../core/properties.js").PropertyValue);
+      props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     if (def.models?.analog?.deviceType !== undefined) {
@@ -2229,7 +2319,7 @@ export function compileAnalogPartition(
 
       const modelDiags = validateModel(resolvedModel);
       diagnostics.push(...modelDiags);
-      props.set("_modelParams", resolvedModel.params as unknown as import("../core/properties.js").PropertyValue);
+      props.set("_modelParams", resolvedModel.params as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     const analogFactory = def.models!.analog!.factory;
@@ -2279,6 +2369,7 @@ export function compileAnalogPartition(
   // After Pass B: recompute totalNodeCount to include transistor-expansion nodes
   totalNodeCount = nextInternalNode - 1;
 
+  // Stage 6: Inject shared VDD voltage source for transistor-expanded components.
   if (vddNodeId >= 0 && vddBranchIdx >= 0) {
     const vdd = circuitFamily.vdd;
     const absoluteVddBranch = totalNodeCount + vddBranchIdx;
@@ -2291,96 +2382,10 @@ export function compileAnalogPartition(
     });
   }
 
-  // Topology validation
-  if (totalNodeCount > 0) {
-    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
+  // Stage 7: Topology validation — orphan/floating nodes, source loops.
+  validateTopologyAndEmitDiagnostics(topologyInfo, totalNodeCount, diagnostics);
 
-    for (const nodeId of weakNodes.orphan) {
-      diagnostics.push(
-        makeDiagnostic(
-          "orphan-node",
-          "error",
-          `Node ${nodeId} is orphan (no element terminals connected)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has no element terminals connected to it. ` +
-              `This creates a zero row in the MNA matrix, making it singular.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Remove the disconnected wire or wire fragment at this location.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-
-    for (const nodeId of weakNodes.floating) {
-      diagnostics.push(
-        makeDiagnostic(
-          "floating-node",
-          "warning",
-          `Node ${nodeId} is floating (connected to only one element terminal)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has only one element terminal connected to it. ` +
-              `A floating node has no complete current path.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-  }
-
-  if (detectVoltageSourceLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "voltage-source-loop",
-        "error",
-        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal voltage sources creates contradictory KVL constraints.",
-          suggestions: [
-            {
-              text: "Add a small series resistance to one of the voltage source branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-
-  if (detectInductorLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "inductor-loop",
-        "error",
-        "Inductor loop detected — inductors form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal inductors creates a degenerate branch equation system.",
-          suggestions: [
-            {
-              text: "Add a small series resistance to one of the inductor branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-
-  // Check for ground
+  // Check for ground.
   const hasGround = partition.components.some((pc) => pc.element.typeId === "Ground");
   if (!hasGround) {
     const alreadyHasGroundDiag = diagnostics.some((d) => d.code === "no-ground");
@@ -2406,8 +2411,8 @@ export function compileAnalogPartition(
     }
   }
 
-  // Process cross-engine boundaries into BridgeInstances when an outer circuit
-  // is provided (supplies the wire-endpoint geometry needed for node resolution).
+  // Stage 8: Process cross-engine boundaries into BridgeInstances when an outer
+  // circuit is provided (supplies wire-endpoint geometry for node resolution).
   const bridges: BridgeInstance[] = [...inlineBridges];
   if (outerCircuit !== undefined) {
     for (const boundary of partition.crossEngineBoundaries) {
@@ -2473,7 +2478,7 @@ export function compileAnalogPartition(
 function detectHighSourceImpedance(
   targetNodeId: number,
   outerCircuit: Circuit,
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
   registry: ComponentRegistry,
 ): number | null {
   let maxResistance: number | null = null;
@@ -2542,7 +2547,7 @@ function detectHighSourceImpedance(
  */
 function synthesizeDigitalCircuit(
   el: CircuitElement,
-  def: import("../core/registry.js").ComponentDefinition,
+  def: import("../../core/registry.js").ComponentDefinition,
   registry: ComponentRegistry,
 ): Circuit {
   const inner = new Circuit({ name: el.typeId });
@@ -2632,7 +2637,7 @@ function synthesizeDigitalCircuit(
  */
 function compileBridgeInstance(
   boundary: CrossEngineBoundary,
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
   outerCircuit: Circuit,
   _totalNodeCount: number,
   circuitFamily: LogicFamilyConfig,
@@ -2772,7 +2777,7 @@ function compileBridgeInstance(
  */
 function resolvePositionToNodeId(
   pos: { x: number; y: number },
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
   outerCircuit: Circuit,
 ): number {
   for (const wire of outerCircuit.wires) {
@@ -2800,7 +2805,7 @@ function resolvePositionToNodeId(
 function resolveSubcircuitPinNode(
   subcircuitEl: SubcircuitHost,
   pinLabel: string,
-  wireToNodeId: Map<import("../core/circuit.js").Wire, number>,
+  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
   outerCircuit: Circuit,
 ): number {
   const pins = subcircuitEl.getPins();

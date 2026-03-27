@@ -14,7 +14,7 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -283,13 +283,7 @@ const ZENER_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: "",
     description: "SPICE model name (blank = use built-in defaults)",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------

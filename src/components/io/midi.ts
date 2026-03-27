@@ -39,7 +39,7 @@ import {
   resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -332,13 +332,7 @@ export const MIDI_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 const MIDI_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
   {
     key: "midiChannel",
     type: PropertyType.INT,

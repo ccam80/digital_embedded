@@ -24,7 +24,7 @@ import {
   PinDirection,
 } from "../../core/pin.js";
 import { drawGenericShape } from "../generic-shape.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -253,13 +253,7 @@ const T_FF_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: true,
     description: "Add T (toggle enable) input pin",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------

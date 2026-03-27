@@ -37,7 +37,7 @@ import {
   createInverterConfig,
   resolvePins,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -169,14 +169,6 @@ const DATA_BITS_DEF: PropertyDefinition = {
   min: 1,
   max: 32,
   description: "Bit width of each memory word",
-};
-
-const LABEL_DEF: PropertyDefinition = {
-  key: "label",
-  type: PropertyType.STRING,
-  label: "Label",
-  defaultValue: "",
-  description: "Optional label shown above the component",
 };
 
 const IS_PROGRAM_MEMORY_DEF: PropertyDefinition = {
@@ -318,7 +310,7 @@ export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs:
 export const RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_SINGLE_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramSinglePortFactory(props: PropertyBag): RAMSinglePortElement {
@@ -442,7 +434,7 @@ export function executeRAMSinglePortSel(index: number, state: Uint32Array, _high
 export const RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_SINGLE_PORT_SEL_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramSinglePortSelFactory(props: PropertyBag): RAMSinglePortSelElement {
@@ -577,7 +569,7 @@ export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: U
 export const RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramDualPortFactory(props: PropertyBag): RAMDualPortElement {
@@ -714,7 +706,7 @@ export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs:
 export const RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_DUAL_ACCESS_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramDualAccessFactory(props: PropertyBag): RAMDualAccessElement {
@@ -823,7 +815,7 @@ export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint
 export const RAM_ASYNC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const RAM_ASYNC_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function ramAsyncFactory(props: PropertyBag): RAMAsyncElement {
@@ -951,7 +943,7 @@ export function executeBlockRAMDualPort(index: number, state: Uint32Array, _high
 export const BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];
 
 const BLOCK_RAM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
-  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
+  ADDR_BITS_DEF, DATA_BITS_DEF, LABEL_PROPERTY_DEF, IS_PROGRAM_MEMORY_DEF, DATA_DEF,
 ];
 
 function blockRAMDualPortFactory(props: PropertyBag): BlockRAMDualPortElement {

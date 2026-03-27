@@ -79,33 +79,30 @@ const INSERT_ORDER_ANALOG = [
 const MEMORY_TYPES = new Set(['RAM', 'ROM', 'EEPROM', 'RegisterFile']);
 
 // ---------------------------------------------------------------------------
-// initMenuAndToolbar
+// Shared dependencies type
 // ---------------------------------------------------------------------------
 
-export function initMenuAndToolbar(
-  ctx: AppContext,
-  simController: SimulationController,
-  viewerController: ViewerController,
-  canvasInteraction: CanvasInteraction,
-  renderPipeline: RenderPipeline,
-  appSettings: AppSettings,
-): MenuToolbarController {
+interface MTDeps {
+  simController: SimulationController;
+  viewerController: ViewerController;
+  canvasInteraction: CanvasInteraction;
+  renderPipeline: RenderPipeline;
+  appSettings: AppSettings;
+}
 
-  const {
-    canvas, viewport, selection, placement, undoStack, lockedModeGuard,
-    colorSchemeManager, contextMenu, palette, paletteUI, registry, facade,
-  } = ctx;
+// ---------------------------------------------------------------------------
+// Builder: Insert menu
+// ---------------------------------------------------------------------------
 
-  // -------------------------------------------------------------------------
-  // Insert menu
-  // -------------------------------------------------------------------------
-
+function buildInsertMenu(ctx: AppContext, deps: MTDeps): () => void {
+  const { placement } = ctx;
+  const { renderPipeline: _rp } = deps; // unused but kept for signature consistency
   const insertMenuDropdown = document.getElementById('insert-menu-dropdown');
 
   function rebuildInsertMenu(): void {
     if (!insertMenuDropdown) return;
     insertMenuDropdown.innerHTML = '';
-    const reg = palette.getRegistry();
+    const reg = ctx.palette.getRegistry();
     for (const catKey of INSERT_ORDER_ANALOG) {
       const defs = reg.getByCategory(catKey as any);
       if (defs.length === 0) continue;
@@ -134,10 +131,19 @@ export function initMenuAndToolbar(
   }
 
   rebuildInsertMenu();
+  return rebuildInsertMenu;
+}
 
-  // -------------------------------------------------------------------------
-  // Context menu
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Context menu
+// ---------------------------------------------------------------------------
+
+function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
+  const { simController, viewerController, canvasInteraction, renderPipeline } = deps;
+  const {
+    canvas, selection, placement, undoStack, lockedModeGuard,
+    contextMenu, palette, paletteUI, registry, facade,
+  } = ctx;
 
   function _appendInsertItems(items: MenuItem[]): void {
     const QUICK_INSERT: Array<{ label: string; type: string }> = [
@@ -484,10 +490,15 @@ export function initMenuAndToolbar(
       contextMenu.showItems(e.clientX, e.clientY, items);
     }
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Selection onChange — populate analog sliders
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Selection onChange — populate analog sliders
+// ---------------------------------------------------------------------------
+
+function buildSelectionSliderSync(ctx: AppContext, deps: MTDeps): void {
+  const { simController } = deps;
+  const { selection, facade } = ctx;
 
   selection.onChange(() => {
     const selected = selection.getSelectedElements();
@@ -510,10 +521,15 @@ export function initMenuAndToolbar(
       }
     }
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Palette setup
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Palette setup
+// ---------------------------------------------------------------------------
+
+function buildPaletteHandlers(ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
+  const { canvas, viewport, paletteUI, placement } = ctx;
 
   paletteUI.onPlace(async (def) => {
     let activeDef = def;
@@ -553,10 +569,15 @@ export function initMenuAndToolbar(
   });
   paletteUI.render();
   paletteUI.setCanvas(canvas, viewport);
+}
 
-  // -------------------------------------------------------------------------
-  // Dark mode toggle
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Dark mode toggle
+// ---------------------------------------------------------------------------
+
+function buildDarkModeToggle(ctx: AppContext, deps: MTDeps): void {
+  const { appSettings, renderPipeline } = deps;
+  const { colorSchemeManager, paletteUI } = ctx;
 
   const darkModeBtn = document.getElementById('btn-dark-mode');
 
@@ -580,10 +601,15 @@ export function initMenuAndToolbar(
     paletteUI.setColorScheme(goingLight ? lightColorScheme : darkColorScheme);
     renderPipeline.scheduleRender();
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Zoom display
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Zoom display + controls
+// ---------------------------------------------------------------------------
+
+function buildZoomControls(ctx: AppContext, deps: MTDeps): () => void {
+  const { renderPipeline } = deps;
+  const { viewport } = ctx;
 
   const zoomPctBtn = document.getElementById('btn-zoom-pct');
   const zoomDropdown = document.getElementById('zoom-dropdown');
@@ -633,9 +659,15 @@ export function initMenuAndToolbar(
     renderPipeline.scheduleRender();
   });
 
-  // -------------------------------------------------------------------------
-  // Lock toggle
-  // -------------------------------------------------------------------------
+  return updateZoomDisplay;
+}
+
+// ---------------------------------------------------------------------------
+// Builder: Lock toggle
+// ---------------------------------------------------------------------------
+
+function buildLockToggle(ctx: AppContext, _deps: MTDeps): void {
+  const { lockedModeGuard } = ctx;
 
   const lockBanner = document.getElementById('lock-banner');
   const lockCheck = document.getElementById('lock-check');
@@ -656,10 +688,14 @@ export function initMenuAndToolbar(
     lockedModeGuard.setLocked(!lockedModeGuard.isLocked());
     updateLockUI();
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Undo/Redo toolbar buttons
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Undo/Redo toolbar buttons
+// ---------------------------------------------------------------------------
+
+function buildUndoRedoButtons(ctx: AppContext, _deps: MTDeps): void {
+  const { undoStack } = ctx;
 
   const tbUndoBtn = document.getElementById('btn-tb-undo') as HTMLButtonElement | null;
   const tbRedoBtn = document.getElementById('btn-tb-redo') as HTMLButtonElement | null;
@@ -688,10 +724,17 @@ export function initMenuAndToolbar(
     ctx.invalidateCompiled();
     updateUndoRedoButtons();
   });
+}
 
-  // -------------------------------------------------------------------------
-  // View menu items
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: View menu items
+// ---------------------------------------------------------------------------
+
+function buildViewMenuItems(ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
+  const { colorSchemeManager } = ctx;
+
+  const darkModeBtn = document.getElementById('btn-dark-mode');
 
   document.getElementById('btn-menu-dark-mode')?.addEventListener('click', () => {
     darkModeBtn?.click();
@@ -710,135 +753,148 @@ export function initMenuAndToolbar(
   });
 
   document.getElementById('btn-color-scheme')?.addEventListener('click', () => {
-    openColorSchemeDialog();
+    openColorSchemeDialog(ctx, deps);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Builder: Color scheme dialog
+// ---------------------------------------------------------------------------
+
+function openColorSchemeDialog(ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
+  const { colorSchemeManager } = ctx;
+
+  const customColors: Partial<Record<string, string>> = {};
+
+  const { overlay, dialog, body } = createModal({
+    title: 'Color Scheme',
+    className: 'scheme-dialog',
+    overlayClassName: 'scheme-dialog-overlay',
   });
 
-  // -------------------------------------------------------------------------
-  // Color scheme dialog
-  // -------------------------------------------------------------------------
+  const selectRow = document.createElement('div');
+  selectRow.className = 'scheme-select-row';
+  const selectLabel = document.createElement('label');
+  selectLabel.textContent = 'Active scheme:';
+  const schemeSelect = document.createElement('select');
+  colorSchemeManager.getSchemeNames().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if (name === colorSchemeManager.getActiveName()) opt.selected = true;
+    schemeSelect.appendChild(opt);
+  });
+  schemeSelect.addEventListener('change', () => {
+    colorSchemeManager.setActive(schemeSelect.value);
+    updateColorGrid();
+    renderPipeline.scheduleRender();
+  });
+  selectRow.appendChild(selectLabel);
+  selectRow.appendChild(schemeSelect);
+  body.appendChild(selectRow);
 
-  function openColorSchemeDialog(): void {
-    const customColors: Partial<Record<string, string>> = {};
+  const colorGrid = document.createElement('div');
+  colorGrid.className = 'color-grid';
 
-    const { overlay, dialog, body } = createModal({
-      title: 'Color Scheme',
-      className: 'scheme-dialog',
-      overlayClassName: 'scheme-dialog-overlay',
-    });
+  ['Color', 'Preview', 'Custom'].forEach(h => {
+    const hdr = document.createElement('div');
+    hdr.className = 'color-grid-header';
+    hdr.textContent = h;
+    colorGrid.appendChild(hdr);
+  });
 
-    const selectRow = document.createElement('div');
-    selectRow.className = 'scheme-select-row';
-    const selectLabel = document.createElement('label');
-    selectLabel.textContent = 'Active scheme:';
-    const schemeSelect = document.createElement('select');
-    colorSchemeManager.getSchemeNames().forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      if (name === colorSchemeManager.getActiveName()) opt.selected = true;
-      schemeSelect.appendChild(opt);
-    });
-    schemeSelect.addEventListener('change', () => {
-      colorSchemeManager.setActive(schemeSelect.value);
-      updateColorGrid();
-      renderPipeline.scheduleRender();
-    });
-    selectRow.appendChild(selectLabel);
-    selectRow.appendChild(schemeSelect);
-    body.appendChild(selectRow);
+  const pickerMap = new Map<string, { swatch: HTMLDivElement; picker: HTMLInputElement }>();
 
-    const colorGrid = document.createElement('div');
-    colorGrid.className = 'color-grid';
-
-    ['Color', 'Preview', 'Custom'].forEach(h => {
-      const hdr = document.createElement('div');
-      hdr.className = 'color-grid-header';
-      hdr.textContent = h;
-      colorGrid.appendChild(hdr);
-    });
-
-    const pickerMap = new Map<string, { swatch: HTMLDivElement; picker: HTMLInputElement }>();
-
-    function updateColorGrid(): void {
-      const activeScheme = colorSchemeManager.getActive();
-      for (const color of THEME_COLORS) {
-        const entry = pickerMap.get(color);
-        if (entry) {
-          const resolved = (customColors[color] as string | undefined) ?? activeScheme.resolve(color);
-          entry.swatch.style.background = resolved;
-          entry.picker.value = /^#[0-9a-fA-F]{6}$/.test(resolved) ? resolved : '#888888';
-        }
+  function updateColorGrid(): void {
+    const activeScheme = colorSchemeManager.getActive();
+    for (const color of THEME_COLORS) {
+      const entry = pickerMap.get(color);
+      if (entry) {
+        const resolved = (customColors[color] as string | undefined) ?? activeScheme.resolve(color);
+        entry.swatch.style.background = resolved;
+        entry.picker.value = /^#[0-9a-fA-F]{6}$/.test(resolved) ? resolved : '#888888';
       }
     }
-
-    for (const color of THEME_COLORS) {
-      const nameEl = document.createElement('div');
-      nameEl.className = 'color-name';
-      nameEl.textContent = color;
-
-      const swatch = document.createElement('div');
-      swatch.className = 'color-swatch';
-
-      const picker = document.createElement('input');
-      picker.type = 'color';
-      picker.className = 'color-picker-input';
-      picker.title = 'Override ' + color;
-      picker.addEventListener('input', () => {
-        customColors[color] = picker.value;
-        swatch.style.background = picker.value;
-      });
-
-      pickerMap.set(color, { swatch, picker });
-      colorGrid.appendChild(nameEl);
-      colorGrid.appendChild(swatch);
-      colorGrid.appendChild(picker);
-    }
-
-    body.appendChild(colorGrid);
-    dialog.appendChild(body);
-    updateColorGrid();
-
-    const footer = document.createElement('div');
-    footer.className = 'scheme-dialog-footer';
-
-    const resetBtn = document.createElement('button');
-    resetBtn.textContent = 'Reset to Default';
-    resetBtn.addEventListener('click', () => {
-      for (const k of Object.keys(customColors)) delete customColors[k];
-      colorSchemeManager.setActive('default');
-      schemeSelect.value = 'default';
-      updateColorGrid();
-      renderPipeline.scheduleRender();
-    });
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'primary';
-    saveBtn.textContent = 'Save Custom...';
-    saveBtn.addEventListener('click', () => {
-      const name = prompt('Custom scheme name:', 'my-scheme');
-      if (!name || !name.trim()) return;
-      const baseScheme = colorSchemeManager.getActive();
-      const fullMap = buildColorMap(baseScheme, customColors as Partial<Record<import('../core/renderer-interface.js').ThemeColor, string>>);
-      colorSchemeManager.createCustomScheme(name.trim(), fullMap);
-      colorSchemeManager.setActive(name.trim());
-      const opt = document.createElement('option');
-      opt.value = name.trim();
-      opt.textContent = name.trim();
-      opt.selected = true;
-      schemeSelect.appendChild(opt);
-      renderPipeline.scheduleRender();
-    });
-
-    footer.appendChild(resetBtn);
-    footer.appendChild(saveBtn);
-    dialog.appendChild(footer);
-
-    document.body.appendChild(overlay);
   }
 
-  // -------------------------------------------------------------------------
-  // Presentation mode
-  // -------------------------------------------------------------------------
+  for (const color of THEME_COLORS) {
+    const nameEl = document.createElement('div');
+    nameEl.className = 'color-name';
+    nameEl.textContent = color;
+
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.className = 'color-picker-input';
+    picker.title = 'Override ' + color;
+    picker.addEventListener('input', () => {
+      customColors[color] = picker.value;
+      swatch.style.background = picker.value;
+    });
+
+    pickerMap.set(color, { swatch, picker });
+    colorGrid.appendChild(nameEl);
+    colorGrid.appendChild(swatch);
+    colorGrid.appendChild(picker);
+  }
+
+  body.appendChild(colorGrid);
+  dialog.appendChild(body);
+  updateColorGrid();
+
+  const footer = document.createElement('div');
+  footer.className = 'scheme-dialog-footer';
+
+  const resetBtn = document.createElement('button');
+  resetBtn.textContent = 'Reset to Default';
+  resetBtn.addEventListener('click', () => {
+    for (const k of Object.keys(customColors)) delete customColors[k];
+    colorSchemeManager.setActive('default');
+    schemeSelect.value = 'default';
+    updateColorGrid();
+    renderPipeline.scheduleRender();
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'primary';
+  saveBtn.textContent = 'Save Custom...';
+  saveBtn.addEventListener('click', () => {
+    const name = prompt('Custom scheme name:', 'my-scheme');
+    if (!name || !name.trim()) return;
+    const baseScheme = colorSchemeManager.getActive();
+    const fullMap = buildColorMap(baseScheme, customColors as Partial<Record<import('../core/renderer-interface.js').ThemeColor, string>>);
+    colorSchemeManager.createCustomScheme(name.trim(), fullMap);
+    colorSchemeManager.setActive(name.trim());
+    const opt = document.createElement('option');
+    opt.value = name.trim();
+    opt.textContent = name.trim();
+    opt.selected = true;
+    schemeSelect.appendChild(opt);
+    renderPipeline.scheduleRender();
+  });
+
+  footer.appendChild(resetBtn);
+  footer.appendChild(saveBtn);
+  dialog.appendChild(footer);
+
+  document.body.appendChild(overlay);
+}
+
+// ---------------------------------------------------------------------------
+// Builder: Presentation mode
+// ---------------------------------------------------------------------------
+
+interface PresentationControls {
+  togglePresentation(): void;
+  exitPresentation(): void;
+  isPresentationMode(): boolean;
+}
+
+function buildPresentationMode(_ctx: AppContext, deps: MTDeps): PresentationControls {
+  const { renderPipeline } = deps;
 
   const appEl = document.getElementById('app');
   const exitPresentationBtn = document.getElementById('btn-exit-presentation');
@@ -868,10 +924,21 @@ export function initMenuAndToolbar(
   document.getElementById('btn-presentation-mode')?.addEventListener('click', togglePresentation);
   exitPresentationBtn?.addEventListener('click', exitPresentation);
 
-  // -------------------------------------------------------------------------
-  // Tablet mode
-  // -------------------------------------------------------------------------
+  return {
+    togglePresentation,
+    exitPresentation,
+    isPresentationMode(): boolean { return presentationMode; },
+  };
+}
 
+// ---------------------------------------------------------------------------
+// Builder: Tablet mode
+// ---------------------------------------------------------------------------
+
+function buildTabletMode(_ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
+
+  const appEl = document.getElementById('app');
   let tabletMode = false;
   const tabletModeCheck = document.getElementById('tablet-mode-check');
 
@@ -885,90 +952,98 @@ export function initMenuAndToolbar(
     tabletMode = !tabletMode;
     updateTabletModeUI();
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Settings dialog
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Settings dialog
+// ---------------------------------------------------------------------------
 
-  {
-    const settingsOverlay = document.getElementById('settings-overlay');
-    const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
-    const oscillationLimitInput = document.getElementById('setting-oscillation-limit') as HTMLInputElement | null;
-    const currentSpeedInput = document.getElementById('setting-current-speed') as HTMLInputElement | null;
-    const currentScaleSelect = document.getElementById('setting-current-scale') as HTMLSelectElement | null;
-    const logicFamilySelect = document.getElementById('setting-logic-family') as HTMLSelectElement | null;
-    const logicFamilyDetails = document.getElementById('logic-family-details') as HTMLElement | null;
+function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
+  const { simController } = deps;
+  const { facade } = ctx;
 
-    function updateLogicFamilyDetails(key: string): void {
-      if (!logicFamilyDetails) return;
-      const preset = getLogicFamilyPreset(key);
-      if (!preset) { logicFamilyDetails.textContent = ''; return; }
-      logicFamilyDetails.innerHTML =
-        `<span>V<sub>OH</sub>: ${preset.vOH}V</span><span>V<sub>OL</sub>: ${preset.vOL}V</span>` +
-        `<span>V<sub>IH</sub>: ${preset.vIH}V</span><span>V<sub>IL</sub>: ${preset.vIL}V</span>` +
-        `<span>R<sub>out</sub>: ${preset.rOut}Ω</span><span>R<sub>in</sub>: ${(preset.rIn / 1e6).toFixed(0)}MΩ</span>`;
-    }
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const snapshotBudgetInput = document.getElementById('setting-snapshot-budget') as HTMLInputElement | null;
+  const oscillationLimitInput = document.getElementById('setting-oscillation-limit') as HTMLInputElement | null;
+  const currentSpeedInput = document.getElementById('setting-current-speed') as HTMLInputElement | null;
+  const currentScaleSelect = document.getElementById('setting-current-scale') as HTMLSelectElement | null;
+  const logicFamilySelect = document.getElementById('setting-logic-family') as HTMLSelectElement | null;
+  const logicFamilyDetails = document.getElementById('logic-family-details') as HTMLElement | null;
 
-    logicFamilySelect?.addEventListener('change', () => {
-      updateLogicFamilyDetails(logicFamilySelect.value);
-    });
-
-    function openSettingsDialog(): void {
-      const s = simController.loadEngineSettings();
-      if (snapshotBudgetInput) snapshotBudgetInput.value = String(s.snapshotBudgetMb);
-      if (oscillationLimitInput) oscillationLimitInput.value = String(s.oscillationLimit);
-      if (currentSpeedInput) currentSpeedInput.value = String(s.currentSpeedScale);
-      if (currentScaleSelect) currentScaleSelect.value = s.currentScaleMode;
-      if (logicFamilySelect) {
-        const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
-        const matchKey = Object.entries(LOGIC_FAMILY_PRESETS).find(
-          ([, v]) => v.name === family.name,
-        )?.[0] ?? 'cmos-3v3';
-        logicFamilySelect.value = matchKey;
-        updateLogicFamilyDetails(matchKey);
-      }
-      if (settingsOverlay) settingsOverlay.style.display = 'flex';
-    }
-
-    function closeSettingsDialog(): void {
-      if (settingsOverlay) settingsOverlay.style.display = 'none';
-    }
-
-    document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
-    document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
-    document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
-    document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
-
-    document.getElementById('btn-settings-save')?.addEventListener('click', () => {
-      const budgetMb = Math.max(1, Math.min(256, parseInt(snapshotBudgetInput?.value ?? '64', 10) || 64));
-      const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
-      const speedScale = Math.max(0.1, Math.min(100000, parseFloat(currentSpeedInput?.value ?? '200') || 200));
-      const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
-      const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
-      simController.saveEngineSettings(newSettings);
-      (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
-      simController.applyCurrentVizSettings(newSettings);
-      if (logicFamilySelect) {
-        const preset = getLogicFamilyPreset(logicFamilySelect.value);
-        if (preset) {
-          const prev = ctx.circuit.metadata.logicFamily;
-          const changed = !prev || prev.name !== preset.name;
-          ctx.circuit.metadata.logicFamily = preset;
-          if (changed) simController.invalidateCompiled();
-        }
-      }
-      closeSettingsDialog();
-      ctx.showStatus('Settings saved.');
-    });
-
-    settingsOverlay?.addEventListener('click', (e) => {
-      if (e.target === settingsOverlay) closeSettingsDialog();
-    });
+  function updateLogicFamilyDetails(key: string): void {
+    if (!logicFamilyDetails) return;
+    const preset = getLogicFamilyPreset(key);
+    if (!preset) { logicFamilyDetails.textContent = ''; return; }
+    logicFamilyDetails.innerHTML =
+      `<span>V<sub>OH</sub>: ${preset.vOH}V</span><span>V<sub>OL</sub>: ${preset.vOL}V</span>` +
+      `<span>V<sub>IH</sub>: ${preset.vIH}V</span><span>V<sub>IL</sub>: ${preset.vIL}V</span>` +
+      `<span>R<sub>out</sub>: ${preset.rOut}Ω</span><span>R<sub>in</sub>: ${(preset.rIn / 1e6).toFixed(0)}MΩ</span>`;
   }
 
-  // -------------------------------------------------------------------------
-  // Menu undo/redo/delete/select-all
-  // -------------------------------------------------------------------------
+  logicFamilySelect?.addEventListener('change', () => {
+    updateLogicFamilyDetails(logicFamilySelect.value);
+  });
+
+  function openSettingsDialog(): void {
+    const s = simController.loadEngineSettings();
+    if (snapshotBudgetInput) snapshotBudgetInput.value = String(s.snapshotBudgetMb);
+    if (oscillationLimitInput) oscillationLimitInput.value = String(s.oscillationLimit);
+    if (currentSpeedInput) currentSpeedInput.value = String(s.currentSpeedScale);
+    if (currentScaleSelect) currentScaleSelect.value = s.currentScaleMode;
+    if (logicFamilySelect) {
+      const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
+      const matchKey = Object.entries(LOGIC_FAMILY_PRESETS).find(
+        ([, v]) => v.name === family.name,
+      )?.[0] ?? 'cmos-3v3';
+      logicFamilySelect.value = matchKey;
+      updateLogicFamilyDetails(matchKey);
+    }
+    if (settingsOverlay) settingsOverlay.style.display = 'flex';
+  }
+
+  function closeSettingsDialog(): void {
+    if (settingsOverlay) settingsOverlay.style.display = 'none';
+  }
+
+  document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
+  document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
+  document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
+  document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
+
+  document.getElementById('btn-settings-save')?.addEventListener('click', () => {
+    const budgetMb = Math.max(1, Math.min(256, parseInt(snapshotBudgetInput?.value ?? '64', 10) || 64));
+    const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
+    const speedScale = Math.max(0.1, Math.min(100000, parseFloat(currentSpeedInput?.value ?? '200') || 200));
+    const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
+    const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
+    simController.saveEngineSettings(newSettings);
+    (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
+    simController.applyCurrentVizSettings(newSettings);
+    if (logicFamilySelect) {
+      const preset = getLogicFamilyPreset(logicFamilySelect.value);
+      if (preset) {
+        const prev = ctx.circuit.metadata.logicFamily;
+        const changed = !prev || prev.name !== preset.name;
+        ctx.circuit.metadata.logicFamily = preset;
+        if (changed) simController.invalidateCompiled();
+      }
+    }
+    closeSettingsDialog();
+    ctx.showStatus('Settings saved.');
+  });
+
+  settingsOverlay?.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) closeSettingsDialog();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Builder: Menu undo/redo/delete/select-all
+// ---------------------------------------------------------------------------
+
+function buildMenuEditActions(ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
+  const { undoStack, selection } = ctx;
 
   document.getElementById('btn-undo')?.addEventListener('click', () => {
     undoStack.undo();
@@ -995,10 +1070,15 @@ export function initMenuAndToolbar(
     selection.selectAll(ctx.circuit);
     renderPipeline.scheduleRender();
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Search bar
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Search bar
+// ---------------------------------------------------------------------------
+
+function buildSearchBar(ctx: AppContext, deps: MTDeps): () => void {
+  const { renderPipeline } = deps;
+  const { viewport, selection } = ctx;
 
   const searchBar = document.getElementById('search-bar');
   const searchInput = document.getElementById('search-input') as HTMLInputElement | null;
@@ -1083,9 +1163,15 @@ export function initMenuAndToolbar(
     openSearchBar();
   });
 
-  // -------------------------------------------------------------------------
-  // Palette toggle (narrow screens) + collapse (all breakpoints)
-  // -------------------------------------------------------------------------
+  return openSearchBar;
+}
+
+// ---------------------------------------------------------------------------
+// Builder: Palette toggle (narrow screens) + collapse (all breakpoints)
+// ---------------------------------------------------------------------------
+
+function buildPaletteToggle(ctx: AppContext, _deps: MTDeps): void {
+  const { canvas } = ctx;
 
   const palettePanel = document.getElementById('palette-panel');
   const paletteToggleBtn = document.getElementById('btn-palette-toggle');
@@ -1117,12 +1203,17 @@ export function initMenuAndToolbar(
       closePaletteOverlay();
     }
   });
+}
 
-  // -------------------------------------------------------------------------
-  // Panel resize handles
-  // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Builder: Panel resize handles
+// ---------------------------------------------------------------------------
+
+function buildPanelResizeHandles(_ctx: AppContext, deps: MTDeps): void {
+  const { renderPipeline } = deps;
 
   // Palette width resize
+  const palettePanel = document.getElementById('palette-panel');
   const paletteResizeHandle = document.getElementById('palette-resize-handle');
   if (paletteResizeHandle && palettePanel) {
     let resizingPalette = false;
@@ -1201,14 +1292,47 @@ export function initMenuAndToolbar(
     viewerResizeHandle.addEventListener('pointerup', stopViewerResize);
     viewerResizeHandle.addEventListener('pointercancel', stopViewerResize);
   }
+}
+
+// ---------------------------------------------------------------------------
+// initMenuAndToolbar
+// ---------------------------------------------------------------------------
+
+export function initMenuAndToolbar(
+  ctx: AppContext,
+  simController: SimulationController,
+  viewerController: ViewerController,
+  canvasInteraction: CanvasInteraction,
+  renderPipeline: RenderPipeline,
+  appSettings: AppSettings,
+): MenuToolbarController {
+
+  const deps: MTDeps = { simController, viewerController, canvasInteraction, renderPipeline, appSettings };
+
+  const rebuildInsertMenu = buildInsertMenu(ctx, deps);
+  buildContextMenu(ctx, deps);
+  buildSelectionSliderSync(ctx, deps);
+  buildPaletteHandlers(ctx, deps);
+  buildDarkModeToggle(ctx, deps);
+  const updateZoomDisplay = buildZoomControls(ctx, deps);
+  buildLockToggle(ctx, deps);
+  buildUndoRedoButtons(ctx, deps);
+  buildViewMenuItems(ctx, deps);
+  const presentation = buildPresentationMode(ctx, deps);
+  buildTabletMode(ctx, deps);
+  buildSettingsDialog(ctx, deps);
+  buildMenuEditActions(ctx, deps);
+  const openSearchBar = buildSearchBar(ctx, deps);
+  buildPaletteToggle(ctx, deps);
+  buildPanelResizeHandles(ctx, deps);
 
   return {
     rebuildInsertMenu,
     updateZoomDisplay,
     openSearchBar,
-    togglePresentation,
-    exitPresentation,
-    isPresentationMode(): boolean { return presentationMode; },
+    togglePresentation: presentation.togglePresentation,
+    exitPresentation: presentation.exitPresentation,
+    isPresentationMode: presentation.isPresentationMode,
   };
 }
 

@@ -19,7 +19,7 @@ import {
   standardGatePinLayout,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -200,13 +200,7 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: false,
     description: "Use IEEE/US (triangle with bubble) shape instead of IEC/DIN (rectangular)",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------

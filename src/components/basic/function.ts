@@ -37,7 +37,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -402,13 +402,7 @@ const BOOLEAN_FUNCTION_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: [] as number[],
     description: "Output values indexed by input combination. -1 = don't-care.",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ import {
   createInverterConfig,
   resolvePins,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -81,14 +81,6 @@ const DATA_BITS_DEF: PropertyDefinition = {
   min: 1,
   max: 32,
   description: "Bit width of each memory word",
-};
-
-const LABEL_DEF: PropertyDefinition = {
-  key: "label",
-  type: PropertyType.STRING,
-  label: "Label",
-  defaultValue: "",
-  description: "Optional label shown above the component",
 };
 
 const IS_PROGRAM_MEMORY_DEF: PropertyDefinition = {
@@ -261,7 +253,7 @@ export const EEPROM_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUT
 const EEPROM_PROPERTY_DEFS: PropertyDefinition[] = [
   ADDR_BITS_DEF,
   DATA_BITS_DEF,
-  LABEL_DEF,
+  LABEL_PROPERTY_DEF,
   IS_PROGRAM_MEMORY_DEF,
   DATA_DEF,
 ];
@@ -416,7 +408,7 @@ export const EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARE
 const EEPROM_DUAL_PORT_PROPERTY_DEFS: PropertyDefinition[] = [
   ADDR_BITS_DEF,
   DATA_BITS_DEF,
-  LABEL_DEF,
+  LABEL_PROPERTY_DEF,
   IS_PROGRAM_MEMORY_DEF,
   DATA_DEF,
 ];

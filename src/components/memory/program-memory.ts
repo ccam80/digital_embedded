@@ -32,7 +32,7 @@ import {
   resolvePins,
   layoutPinsOnFace,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -261,13 +261,7 @@ const PROGRAM_MEMORY_PROPERTY_DEFS: PropertyDefinition[] = [
     max: 32,
     description: "Bit width of each memory word (instruction width)",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
   {
     key: "isProgramMemory",
     type: PropertyType.BOOLEAN,

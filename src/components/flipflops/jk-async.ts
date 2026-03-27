@@ -19,7 +19,7 @@ import {
   PinDirection,
 } from "../../core/pin.js";
 import { drawGenericShape } from "../generic-shape.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -217,13 +217,7 @@ export const JK_FF_AS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 const JK_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------

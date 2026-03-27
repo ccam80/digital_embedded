@@ -543,13 +543,7 @@ const BJT_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: "",
     description: "SPICE model name (blank = use built-in defaults)",
   },
-  {
-    key: "label",
-    type: PropertyType.STRING,
-    label: "Label",
-    defaultValue: "",
-    description: "Optional label shown above the component",
-  },
+  LABEL_PROPERTY_DEF,
 ];
 
 // ---------------------------------------------------------------------------
