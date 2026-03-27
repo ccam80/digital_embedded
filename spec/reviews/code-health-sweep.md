@@ -295,45 +295,46 @@ Investigation notes:
 
 ## 5. Fix Spec — Ordered by Priority
 
-### Wave 0 — Architectural violations (P0, do first)
+### Wave 0 — Architectural violations (P0) — DONE (30d838e)
+
+| ID | Task | Status |
+|----|------|--------|
+| F1 | Extract `stampG`/`stampRHS` to `src/solver/analog/stamp-helpers.ts` | done — 19 files |
+| F2 | Move `mergeCollinearSegments` to `src/core/wire-utils.ts` | done |
+| F3 | Move `PinVoltageAccess` to `src/core/pin-voltage-access.ts` | done — 46 imports |
+| F4 | Move `AnalogElementCore`, `DeviceType` to `src/core/analog-types.ts` | done |
+| F5 | Break `compile ↔ solver/analog/compiler` cycle — `DigitalCompilerFn` callback | done |
+| F6 | Create `src/components/gates/gate-shared.ts` with shared helpers + constants | done — 6 gate files |
+
+### Wave 1 — Maintenance burden (P1) — DONE (49a141d)
+
+| ID | Task | Status |
+|----|------|--------|
+| F7 | Extract `drawColoredLead()` to `src/components/draw-helpers.ts` | done — 33 files |
+| F8 | Fix `makeExecuteAdd`/`executeAdd` duplication (and sub) | done |
+| F9 | Move `AcParams`/`AcResult` to `src/core/analog-types.ts` | done |
+| F10 | Move `Diagnostic`/`DiagnosticCode` to `compile/types.ts` | done |
+| F12 | Split `initCanvasInteraction` into 7 focused handler modules | done — 76-line coordinator (87f8d0b) |
+| F13 | Split `compileAnalogCircuit` into pipeline functions | done — 8 extracted stages |
+| F14 | Split `initMenuAndToolbar` into 16 builder functions | done — 28-line coordinator |
+| F15 | Delete truly dead code (Section 4a) | done — 2 files deleted |
+| F16 | Unexport internal-only symbols (Section 4b) | done — 5 symbols |
+
+### Wave 2 — Papercuts (P2) — DONE (9e269f7)
+
+| ID | Task | Status |
+|----|------|--------|
+| F17 | Extract shared `LABEL_PROPERTY_DEF` constant | done — 44 instances |
+| F19 | Import `GRID_SPACING` instead of `PREVIEW_GRID` | done |
+| F20 | Centralize simulation constants in `core/constants.ts` | done |
+| F21 | Split `behavioral-flipflop-variants.ts` into per-variant files | done — 6 variant files |
+
+### Wave 3 — Remaining cleanup + dead code deletion
 
 | ID | Task | Files touched | LOC delta |
 |----|------|---------------|-----------|
-| F1 | Extract `stampG`/`stampRHS` to `src/solver/analog/stamp-helpers.ts` | 18 component files + 1 new | -80 net |
-| F2 | Move `mergeCollinearSegments` to `src/core/wire-utils.ts` | `core/circuit.ts`, `editor/wire-merge.ts` → `core/wire-utils.ts` | ~0 |
-| F3 | Move `PinVoltageAccess` to `src/core/pin-voltage-access.ts` | `core/element.ts` + 46 import updates | ~0 |
-| F4 | Move `AnalogElementCore`, `DeviceType` to `src/core/analog-types.ts` | `core/registry.ts`, solver/analog files | ~0 |
-| F5 | Break `compile ↔ solver/analog/compiler` cycle — inject digital-compiler callback | `compile/compile.ts`, `solver/analog/compiler.ts` | ~+10 |
-| F6 | Create `src/components/gates/gate-shared.ts` with shared helpers + constants | 7 gate files + 1 new | -500 net |
-
-### Wave 1 — Maintenance burden (P1)
-
-| ID | Task | Files touched | LOC delta |
-|----|------|---------------|-----------|
-| F7 | Extract `drawColoredLead()` helper | 11 semiconductor + passive files + 1 new | -120 net |
-| F8 | Fix `makeExecuteAdd`/`executeAdd` duplication (and sub) | `add.ts`, `sub.ts` | -40 net |
-| F9 | Move `AcParams`/`AcResult` to `src/core/analog-types.ts` | `core/analog-engine-interface.ts`, `solver/analog/ac-analysis.ts` | ~0 |
-| F10 | Move `Diagnostic`/`DiagnosticCode` to `src/core/diagnostic.ts` | `compile/types.ts`, `headless/netlist-types.ts` + consumers | ~0 |
 | F11 | Scope RAM backing stores per engine | `ram.ts`, `digital-engine.ts` | ~+30 |
-| F12 | Split `initCanvasInteraction` into focused handlers | `canvas-interaction.ts` → 5 files | ~+40 (imports) |
-| F13 | Split `compileAnalogCircuit` into pipeline functions | `solver/analog/compiler.ts` | ~+20 (signatures) |
-| F14 | Split `initMenuAndToolbar` into builder functions | `menu-toolbar.ts` → 4-5 files | ~+30 (imports) |
-| F15 | Delete truly dead code (Section 4a) | 5 files | -60 net |
-| F16 | Unexport internal-only symbols (Section 4b) | 8 files | ~0 |
-
-### Wave 2 — Papercuts (P2)
-
-| ID | Task | Files touched | LOC delta |
-|----|------|---------------|-----------|
-| F17 | Extract shared `LABEL_PROPERTY_DEF` constant | `core/properties.ts` + 130 component files | -260 net |
 | F18 | Eliminate `getHelpText()`/`helpText` duplication | Component base class + 130 files | -260 net |
-| F19 | Import `GRID_SPACING` instead of `PREVIEW_GRID` | `subcircuit-dialog.ts` | -1 |
-| F20 | Centralize simulation constants | 4 files + 1 new `core/constants.ts` | ~0 |
-| F21 | Split `behavioral-flipflop-variants.ts` into per-variant files | 1 file → 7 files | ~+30 (imports) |
-### Wave 3 — Dead code deletion (from Section 4c DELETE list)
-
-| ID | Task | Files touched | LOC delta |
-|----|------|---------------|-----------|
 | F22 | Delete `BacktrackException`, `NodeException`, `PinException` + tests | `core/errors.ts`, `errors.test.ts`, `headless/index.ts` re-exports | -120 net |
 | F23 | Delete `SimulationRunner` class, migrate 15 test files to `DefaultSimulatorFacade` | `headless/runner.ts` + 15 test files | -200 net |
 | F24 | Delete `TestRunner` class + test | `headless/test-runner.ts` | -80 net |
@@ -383,16 +384,28 @@ Wave 4: All independent. Each is a self-contained UI wiring task.
 
 ---
 
-## Estimated Total Impact
+## Progress
 
-| Metric | Before | After (all waves) |
-|--------|--------|--------------------|
+### Completed (Waves 0-2)
+
+| Metric | Before | After |
+|--------|--------|-------|
 | Duplicated stamp helper copies | 21 | 1 |
 | Duplicated gate scaffolding LOC | ~750 | ~50 |
 | Core → editor/solver upward imports | 4 | 0 |
 | Circular dependency chains | 2 | 0 |
-| Truly dead exports | 8 + 30 triaged | 0 |
-| Internal-only exports leaking | 11 | 0 |
-| Functions over 500 lines | 4 | 0 |
-| Test-only code surfaced as features | 0 | 8 new UI entries |
-| Net LOC reduction (waves 0-3) | — | ~-2,800 |
+| Dead exports removed | 0 | 6 symbols + 2 files |
+| Internal-only exports fixed | 0 | 5 unexported |
+| God functions split | 0 | 3 (canvas 918→76, menu 1070→28, compiler pipeline) |
+| Net LOC reduction | — | ~-1,353 |
+
+Commits: `30d838e` (Wave 0), `49a141d` (Wave 1), `9e269f7` (Wave 2), `87f8d0b` (F12 completion)
+
+### Remaining (Wave 3-4)
+
+| Metric | Estimated |
+|--------|-----------|
+| Dead code to delete (Wave 3) | ~19 tasks, ~-1,500 LOC |
+| Features to surface (Wave 4) | 8 UI wiring tasks |
+| F11 RAM backing store scoping | Runtime API change |
+| F18 getHelpText dedup | ~130 component files |
