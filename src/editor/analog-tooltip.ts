@@ -25,6 +25,14 @@ export class AnalogTooltip {
   private readonly _coordinator: SimulationCoordinator;
   private readonly _resolver: WireCurrentResolver;
 
+  /**
+   * Cached inverted map: CircuitElement → element index.
+   * Rebuilt lazily when the resolver context reference changes.
+   */
+  private _elementIndexCache: Map<CircuitElement, number> | null = null;
+  /** The resolver context whose entries populate `_elementIndexCache`. */
+  private _cachedResolverCtx: ReturnType<SimulationCoordinator["getCurrentResolverContext"]> = null;
+
   /** The pending or active tooltip text (empty = not visible). */
   private _text: string = "";
 
@@ -197,10 +205,18 @@ export class AnalogTooltip {
   private _textForElement(element: CircuitElement): string {
     const ctx = this._coordinator.getCurrentResolverContext();
     if (ctx === null) return "";
-    let eIdx = -1;
-    for (const [idx, el] of ctx.elementToCircuitElement) {
-      if (el === element) { eIdx = idx; break; }
+
+    // Rebuild the inverted cache when the resolver context reference changes.
+    if (ctx !== this._cachedResolverCtx) {
+      this._cachedResolverCtx = ctx;
+      const cache = new Map<CircuitElement, number>();
+      for (const [idx, el] of ctx.elementToCircuitElement) {
+        cache.set(el, idx);
+      }
+      this._elementIndexCache = cache;
     }
+
+    const eIdx = this._elementIndexCache!.get(element) ?? -1;
     if (eIdx === -1) return "";
     const current = this._coordinator.readElementCurrent(eIdx);
     const power = this._coordinator.readElementPower(eIdx);

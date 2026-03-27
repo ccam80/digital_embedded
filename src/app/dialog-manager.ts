@@ -55,6 +55,46 @@ export function createModal(opts: {
     if (ev.target === overlay) close();
   });
 
+  // --- Drag support: header acts as drag handle ---
+  header.style.cursor = 'move';
+  header.style.userSelect = 'none';
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dialogStartX = 0;
+  let dialogStartY = 0;
+  let dragging = false;
+
+  header.addEventListener('pointerdown', (ev: PointerEvent) => {
+    // Don't start drag if clicking the close button
+    if ((ev.target as HTMLElement).tagName === 'BUTTON') return;
+    dragging = true;
+    dragStartX = ev.clientX;
+    dragStartY = ev.clientY;
+    const rect = dialog.getBoundingClientRect();
+    dialogStartX = rect.left;
+    dialogStartY = rect.top;
+    // Switch to absolute positioning on first drag
+    if (!dialog.style.position || dialog.style.position !== 'absolute') {
+      dialog.style.position = 'absolute';
+      dialog.style.left = `${dialogStartX}px`;
+      dialog.style.top = `${dialogStartY}px`;
+      dialog.style.margin = '0';
+    }
+    header.setPointerCapture(ev.pointerId);
+  });
+
+  header.addEventListener('pointermove', (ev: PointerEvent) => {
+    if (!dragging) return;
+    const dx = ev.clientX - dragStartX;
+    const dy = ev.clientY - dragStartY;
+    dialog.style.left = `${dialogStartX + dx}px`;
+    dialog.style.top = `${dialogStartY + dy}px`;
+  });
+
+  header.addEventListener('pointerup', () => {
+    dragging = false;
+  });
+
   function close(): void {
     overlay.remove();
     onClose?.();

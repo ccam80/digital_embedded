@@ -238,9 +238,9 @@ describe("flattenCircuit — Port interface elements", () => {
     expect(flat.circuit.wires.length).toBe(2);
   });
 
-  it("falls back to In/Out for INPUT/OUTPUT direction (legacy subcircuits)", () => {
+  it("matches In/Out elements for INPUT/OUTPUT direction", () => {
     // Internal circuit: In("X") → And gate → Out("Y")
-    const internal = new Circuit({ name: "LegacySub" });
+    const internal = new Circuit({ name: "InOutSub" });
     const inEl = makeInElement("in1", "X", { x: 0, y: 0 });
     const outEl = makeOutElement("out1", "Y", { x: 10, y: 0 });
     const gate = makeLeaf("And", "and1", { x: 5, y: 0 });
@@ -272,7 +272,7 @@ describe("flattenCircuit — Port interface elements", () => {
         isClock: false,
       },
     ];
-    const subEl = new TestSubcircuitElement("LegacySub", "sub1", { x: 20, y: 0 }, internal, subcircuitPins);
+    const subEl = new TestSubcircuitElement("InOutSub", "sub1", { x: 20, y: 0 }, internal, subcircuitPins);
     top.addElement(subEl);
 
     const reg = makeRegistry("And");
@@ -286,7 +286,7 @@ describe("flattenCircuit — Port interface elements", () => {
     expect(flat.circuit.wires.length).toBe(3);
   });
 
-  it("returns undefined for BIDIRECTIONAL when no Port matches — does not fall through to Out", () => {
+  it("returns undefined for BIDIRECTIONAL when no Port matches — does not match Out", () => {
     // Internal circuit has an Out("Z") but NO Port("Z")
     const internal = new Circuit({ name: "MismatchSub" });
     const outEl = makeOutElement("out1", "Z", { x: 10, y: 0 });
@@ -405,5 +405,20 @@ describe("flattenCircuit — Port interface elements", () => {
        w.start.x === portPinPos.x && w.start.y === portPinPos.y),
     );
     expect(bridgeWire).toBeDefined();
+
+    // Verify the bridge wire connects the expected positions
+    const startMatchesSubPin =
+      bridgeWire!.start.x === subcircuitPinPos.x && bridgeWire!.start.y === subcircuitPinPos.y;
+    const endMatchesSubPin =
+      bridgeWire!.end.x === subcircuitPinPos.x && bridgeWire!.end.y === subcircuitPinPos.y;
+    const startMatchesPortPin =
+      bridgeWire!.start.x === portPinPos.x && bridgeWire!.start.y === portPinPos.y;
+    const endMatchesPortPin =
+      bridgeWire!.end.x === portPinPos.x && bridgeWire!.end.y === portPinPos.y;
+
+    expect(
+      (startMatchesSubPin && endMatchesPortPin) ||
+      (startMatchesPortPin && endMatchesSubPin),
+    ).toBe(true);
   });
 });

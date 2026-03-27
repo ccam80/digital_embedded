@@ -32,6 +32,7 @@ const WIRE_WIDTH_BUS = 3;
 export class WireRenderer {
   private _colorScheme: ColorScheme = defaultColorScheme;
   private _voltageTracker: VoltageRangeTracker | null = null;
+  private _junctionCountMap = new Map<string, number>();
 
   /**
    * Set the active color scheme. Used to resolve voltage gradient endpoint colors.
@@ -103,7 +104,8 @@ export class WireRenderer {
    * endpoints coincide. A two-wire pass-through does not get a dot.
    */
   renderJunctionDots(ctx: RenderContext, wires: readonly Wire[]): void {
-    const counts = new Map<string, number>();
+    const counts = this._junctionCountMap;
+    counts.clear();
 
     for (const wire of wires) {
       const startKey = this._pointKey(wire.start.x, wire.start.y);

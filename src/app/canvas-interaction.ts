@@ -253,6 +253,10 @@ export function initCanvasInteraction(
       pan: { x: ctx.viewport.pan.x, y: ctx.viewport.pan.y },
     });
     ctx.setCircuit(subCircuit);
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      const tb = (window as unknown as Record<string, unknown>).__test as { setCircuit?: (c: Circuit) => void } | undefined;
+      tb?.setCircuit?.(subCircuit);
+    }
     currentCircuitName = name;
     ctx.fitViewport();
     ctx.selection.clear();
@@ -283,6 +287,10 @@ export function initCanvasInteraction(
 
     const prev = circuitStack.pop()!;
     ctx.setCircuit(prev.circuit);
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      const tb = (window as unknown as Record<string, unknown>).__test as { setCircuit?: (c: Circuit) => void } | undefined;
+      tb?.setCircuit?.(prev.circuit);
+    }
     currentCircuitName = prev.name;
     ctx.viewport.zoom = prev.zoom;
     ctx.viewport.pan = prev.pan;

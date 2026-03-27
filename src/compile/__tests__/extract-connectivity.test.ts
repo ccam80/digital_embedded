@@ -80,6 +80,17 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
   };
 }
 
+function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclaration {
+  return {
+    direction: PinDirection.BIDIRECTIONAL,
+    label,
+    defaultBitWidth: bitWidth,
+    position: { x, y },
+    isNegatable: false,
+    isClockCapable: false,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Registry helpers
 // ---------------------------------------------------------------------------
@@ -106,6 +117,7 @@ function buildDigitalRegistry(): ComponentRegistry {
   r.register(makeBaseDef('Out', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('And', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Tunnel', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
+  r.register(makeBaseDef('Port', {}) as ComponentDefinition);
   r.register(makeBaseDef('Ground', { analog: {} }) as ComponentDefinition);
   return r;
 }
@@ -389,6 +401,74 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
 
     // Both tunnels have no label — they stay separate
     expect(groups).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractConnectivityGroups — Port label-merge
+// ---------------------------------------------------------------------------
+
+describe('extractConnectivityGroups — Port label-merge', () => {
+  it('Ports with same label are merged into one group', () => {
+    const registry = buildDigitalRegistry();
+
+    const propsA = new PropertyBag(new Map([['label', 'sig']]));
+    const propsB = new PropertyBag(new Map([['label', 'sig']]));
+    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], propsA);
+    const pB = new TestElement('Port', 'pB', { x: 100, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
+
+    const elements: CircuitElement[] = [pA, pB];
+    const assignments = resolveModelAssignments(elements, registry);
+    const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
+
+    expect(diags).toHaveLength(0);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.pins).toHaveLength(2);
+  });
+
+  it('Ports with different labels stay separate', () => {
+    const registry = buildDigitalRegistry();
+
+    const propsA = new PropertyBag(new Map([['label', 'A']]));
+    const propsB = new PropertyBag(new Map([['label', 'B']]));
+    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], propsA);
+    const pB = new TestElement('Port', 'pB', { x: 10, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
+
+    const elements: CircuitElement[] = [pA, pB];
+    const assignments = resolveModelAssignments(elements, registry);
+    const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it('Port with no label is not merged', () => {
+    const registry = buildDigitalRegistry();
+
+    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')]);
+    const pB = new TestElement('Port', 'pB', { x: 5, y: 0 }, [bidiPin(0, 0, 'port')]);
+
+    const elements: CircuitElement[] = [pA, pB];
+    const assignments = resolveModelAssignments(elements, registry);
+    const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it('Port and Tunnel with same label are merged', () => {
+    const registry = buildDigitalRegistry();
+
+    const portProps = new PropertyBag(new Map([['label', 'net1']]));
+    const tunProps = new PropertyBag(new Map([['label', 'net1']]));
+    const port = new TestElement('Port', 'p1', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], portProps);
+    const tunnel = new TestElement('Tunnel', 't1', { x: 50, y: 0 }, [outputPin(0, 0, 'p')], tunProps);
+
+    const elements: CircuitElement[] = [port, tunnel];
+    const assignments = resolveModelAssignments(elements, registry);
+    const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
+
+    expect(diags).toHaveLength(0);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.pins).toHaveLength(2);
   });
 });
 

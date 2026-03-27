@@ -15,7 +15,7 @@ import { PropertyBag } from "@/core/properties";
 import { snapToGrid } from "@/editor/coordinates";
 import { renameLabelsOnCopy } from "@/editor/label-renamer";
 import type { EditCommand } from "@/editor/undo-redo";
-import { pinWorldPosition } from "@/core/pin";
+
 
 export type { EditCommand };
 
@@ -158,7 +158,7 @@ export function mirrorSelection(elements: CircuitElement[]): EditCommand {
 
 /**
  * Remove selected elements and wires from the circuit.
- * Also removes wires connected to deleted elements.
+ * Only removes explicitly selected items — does not cascade to connected wires.
  * Returns a reversible EditCommand.
  */
 export function deleteSelection(
@@ -166,29 +166,9 @@ export function deleteSelection(
   elements: CircuitElement[],
   wires: Wire[],
 ): EditCommand {
-  // Find wires connected to deleted elements (by checking pin positions)
-  const deletedElementSet = new Set(elements);
-  const connectedWires = circuit.wires.filter((wire) => {
-    for (const el of deletedElementSet) {
-      const pins = el.getPins();
-      for (const pin of pins) {
-        const wp = pinWorldPosition(el, pin);
-        const pinWorldX = wp.x;
-        const pinWorldY = wp.y;
-        if (
-          (wire.start.x === pinWorldX && wire.start.y === pinWorldY) ||
-          (wire.end.x === pinWorldX && wire.end.y === pinWorldY)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  });
-
-  // Combine explicitly selected wires with connected wires (deduplicated)
-  const wireSet = new Set<Wire>([...wires, ...connectedWires]);
-  const allWiresToDelete = Array.from(wireSet);
+  // Only delete explicitly selected wires — do NOT cascade to wires
+  // connected to deleted elements. The user's selection is authoritative.
+  const allWiresToDelete = [...wires];
 
   // Snapshot positions in the circuit arrays for undo
   const elementIndices = elements.map((el) => circuit.elements.indexOf(el));

@@ -20,6 +20,9 @@ import { pinWorldPosition } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
 
 export interface TestBridge {
+  /** Replace the circuit that the bridge reads from (called on subcircuit drill-down / navigate-back). */
+  setCircuit(c: Circuit): void;
+
   /** Convert a world-space grid position to screen coordinates relative to the canvas. */
   worldToScreen(worldX: number, worldY: number): { x: number; y: number };
 
@@ -88,13 +91,15 @@ export interface TestBridge {
 }
 
 export function createTestBridge(
-  circuit: Circuit,
+  initialCircuit: Circuit,
   viewport: Viewport,
   canvas: HTMLCanvasElement,
   _palette: ComponentPalette,
   registry: ComponentRegistry,
   coordinatorGetter: () => SimulationCoordinator,
 ): TestBridge {
+  let circuit = initialCircuit;
+
   function worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
     return {
       x: worldX * viewport.zoom * GRID_SPACING + viewport.pan.x,
@@ -118,6 +123,8 @@ export function createTestBridge(
   }
 
   return {
+    setCircuit(c: Circuit) { circuit = c; },
+
     worldToScreen,
     screenToWorld,
 
@@ -161,7 +168,7 @@ export function createTestBridge(
           const centerScreen = worldToScreen(bb.x + bb.width / 2, bb.y + bb.height / 2);
           return {
             label,
-            typeId: def?.name ?? el.typeId,
+            typeId: el.typeId,
             position: { x: el.position.x, y: el.position.y },
             center: { screenX: centerScreen.x, screenY: centerScreen.y },
             pins: el.getPins().map(pin => {

@@ -190,14 +190,14 @@ describe("loadAllSubcircuits", () => {
     expect(all).toEqual([]);
   });
 
-  it("returns StoredSubcircuit objects with all required fields", async () => {
+  it("returns StoredSubcircuit objects with correct values", async () => {
     await storeSubcircuit("Test", "<circuit/>");
     const all = await loadAllSubcircuits();
     const entry = all[0];
-    expect(typeof entry.name).toBe("string");
-    expect(typeof entry.xml).toBe("string");
-    expect(typeof entry.created).toBe("number");
-    expect(typeof entry.modified).toBe("number");
+    expect(entry.name).toBe("Test");
+    expect(entry.xml).toBe("<circuit/>");
+    expect(entry.created).toBeGreaterThan(0);
+    expect(entry.modified).toBeGreaterThanOrEqual(entry.created);
   });
 });
 

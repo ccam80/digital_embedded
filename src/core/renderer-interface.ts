@@ -83,6 +83,12 @@ export interface GradientStop {
 
 export interface RenderContext {
   drawLine(x1: number, y1: number, x2: number, y2: number): void;
+  /**
+   * Draw multiple line segments in a single batched stroke.
+   * `coords` is a flat array: [x1,y1,x2,y2, x1,y1,x2,y2, ...].
+   * Optional — callers should fall back to individual drawLine if absent.
+   */
+  drawLinesBatch?(coords: ArrayLike<number>): void;
   drawRect(x: number, y: number, width: number, height: number, filled: boolean): void;
   drawCircle(cx: number, cy: number, radius: number, filled: boolean): void;
   drawArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): void;

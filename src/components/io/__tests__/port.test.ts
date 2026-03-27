@@ -49,7 +49,6 @@ describe("PortDefinition", () => {
   });
 
   it("models is empty object (neutral infrastructure)", () => {
-    expect(PortDefinition.models).toBeDefined();
     expect(Object.keys(PortDefinition.models as object)).toHaveLength(0);
   });
 

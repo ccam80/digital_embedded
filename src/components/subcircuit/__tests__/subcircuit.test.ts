@@ -365,3 +365,149 @@ describe("shapeTypeEnumProperty", () => {
     expect(shapeProp.defaultValue).toBe("DEFAULT");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Port element helper
+// ---------------------------------------------------------------------------
+
+function makePortElement(label: string, bitWidth: number = 1, face: string = "left") {
+  const props = new PropertyBag([
+    ["label", label],
+    ["bitWidth", bitWidth],
+    ["face", face],
+    ["sortOrder", 0],
+  ]);
+  return {
+    typeId: "Port" as const,
+    instanceId: "inst-" + label,
+    position: { x: 0, y: 0 },
+    rotation: 0 as const,
+    mirror: false,
+    getPins: () => [],
+    getProperties: () => props,
+    draw: () => {},
+    getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
+    serialize: () => ({ typeId: "Port", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
+    getHelpText: () => "",
+    getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
+  };
+}
+
+function makePortSubcircuitDefinition(
+  portLabels: { label: string; bitWidth?: number; face?: string }[],
+  name: string = "PortChip",
+): SubcircuitDefinition {
+  const circuit = new Circuit({ name });
+  for (const p of portLabels) {
+    circuit.addElement(makePortElement(p.label, p.bitWidth ?? 1, p.face ?? "left") as any);
+  }
+  const pinLayout = deriveInterfacePins(circuit);
+  return { circuit, pinLayout, shapeMode: "DEFAULT", name };
+}
+
+// ---------------------------------------------------------------------------
+// Port-based subcircuit definitions
+// ---------------------------------------------------------------------------
+
+describe("Port-based subcircuit definitions", () => {
+  it("deriveInterfacePins produces BIDIRECTIONAL pins from Port elements", () => {
+    const circuit = new Circuit({ name: "PortGate" });
+    circuit.addElement(makePortElement("A") as any);
+    circuit.addElement(makePortElement("B") as any);
+    circuit.addElement(makePortElement("Y") as any);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins).toHaveLength(3);
+    const bidir = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
+    expect(bidir).toHaveLength(3);
+    expect(bidir[0].label).toBe("A");
+    expect(bidir[0].defaultBitWidth).toBe(1);
+    expect(bidir[1].label).toBe("B");
+    expect(bidir[2].label).toBe("Y");
+  });
+
+  it("Port face property controls pin face assignment", () => {
+    const circuit = new Circuit({ name: "FaceChip" });
+    circuit.addElement(makePortElement("L", 1, "left") as any);
+    circuit.addElement(makePortElement("R", 1, "right") as any);
+    circuit.addElement(makePortElement("T", 1, "top") as any);
+    circuit.addElement(makePortElement("B", 1, "bottom") as any);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins).toHaveLength(4);
+    expect((pins[0] as any).face).toBe("left");
+    expect((pins[1] as any).face).toBe("right");
+    expect((pins[2] as any).face).toBe("top");
+    expect((pins[3] as any).face).toBe("bottom");
+  });
+
+  it("SubcircuitDefinition from Port-only circuit has correct count and all BIDIRECTIONAL", () => {
+    const definition = makePortSubcircuitDefinition([
+      { label: "D0" },
+      { label: "D1" },
+      { label: "Q0" },
+    ]);
+
+    expect(definition.pinLayout).toHaveLength(3);
+    for (const pin of definition.pinLayout) {
+      expect(pin.direction).toBe(PinDirection.BIDIRECTIONAL);
+    }
+  });
+
+  it("registerSubcircuit with Port-based definition appears in registry with correct category and pin count", () => {
+    const registry = new ComponentRegistry();
+    const definition = makePortSubcircuitDefinition(
+      [{ label: "A" }, { label: "B" }, { label: "Y" }],
+      "PortAndChip",
+    );
+
+    registerSubcircuit(registry, "PortAndChip", definition);
+
+    const def = registry.get("PortAndChip");
+    expect(def).toBeDefined();
+    expect(def!.name).toBe("PortAndChip");
+    expect(def!.category).toBe(ComponentCategory.SUBCIRCUIT);
+  });
+
+  it("SubcircuitElement instantiation from Port-based definition has BIDIRECTIONAL getPins", () => {
+    const registry = new ComponentRegistry();
+    const definition = makePortSubcircuitDefinition(
+      [{ label: "IN" }, { label: "OUT" }],
+      "PortChip",
+    );
+
+    registerSubcircuit(registry, "PortChip", definition);
+
+    const def = registry.get("PortChip")!;
+    const element = def.factory(new PropertyBag());
+
+    expect(element).toBeInstanceOf(SubcircuitElement);
+    const pins = element.getPins();
+    expect(pins.length).toBeGreaterThanOrEqual(2);
+    const bidirPins = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
+    expect(bidirPins).toHaveLength(2);
+  });
+
+  it("mixed Port and In/Out in same subcircuit definition returns mix of BIDIRECTIONAL and INPUT/OUTPUT pins", () => {
+    const circuit = new Circuit({ name: "MixedChip" });
+    circuit.addElement(makePortElement("P") as any);
+    circuit.addElement(makeInElement("A") as any);
+    circuit.addElement(makeOutElement("Y") as any);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins).toHaveLength(3);
+    const bidirPins = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
+    const inputPins = pins.filter(p => p.direction === PinDirection.INPUT);
+    const outputPins = pins.filter(p => p.direction === PinDirection.OUTPUT);
+
+    expect(bidirPins).toHaveLength(1);
+    expect(bidirPins[0].label).toBe("P");
+    expect(inputPins).toHaveLength(1);
+    expect(inputPins[0].label).toBe("A");
+    expect(outputPins).toHaveLength(1);
+    expect(outputPins[0].label).toBe("Y");
+  });
+});

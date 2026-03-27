@@ -44,6 +44,11 @@ export class PowerOverlay {
   /** Smoothed maximum power across all elements (for heatmap normalization). */
   private _smoothedMax: number = 0;
 
+  /** Cached reverse map from CircuitElement → element index. Rebuilt only when the resolver context changes. */
+  private _elementIndexMap: Map<CircuitElement, number> | null = null;
+  /** The resolver context instance the cache was built from. */
+  private _lastCtx: object | null = null;
+
   constructor(coordinator: SimulationCoordinator) {
     this._coordinator = coordinator;
   }
@@ -87,11 +92,17 @@ export class PowerOverlay {
     const powers = new Float64Array(elements.length);
     if (ctx === null) return powers;
 
-    const elementIndexMap = new Map<CircuitElement, number>();
-    for (const [idx, el] of ctx.elementToCircuitElement) {
-      elementIndexMap.set(el, idx);
+    // Rebuild the reverse map only when the resolver context instance changes.
+    if (ctx !== this._lastCtx) {
+      const map = new Map<CircuitElement, number>();
+      for (const [idx, el] of ctx.elementToCircuitElement) {
+        map.set(el, idx);
+      }
+      this._elementIndexMap = map;
+      this._lastCtx = ctx;
     }
 
+    const elementIndexMap = this._elementIndexMap!;
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i]!;
       const eIdx = elementIndexMap.get(el);

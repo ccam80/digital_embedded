@@ -31,6 +31,9 @@ export class GridRenderer {
    * @param zoom      Current zoom level.
    * @param pan       Current pan offset (pixels).
    */
+  /** Reusable buffer for batched line coordinates. */
+  private _lineBuffer: number[] = [];
+
   render(ctx: RenderContext, viewport: Rect, zoom: number, pan: Point): void {
     const topLeft = screenToWorld({ x: viewport.x, y: viewport.y }, zoom, pan);
     const bottomRight = screenToWorld(
@@ -46,6 +49,9 @@ export class GridRenderer {
 
     const pixelWidth = viewport.width;
     const pixelHeight = viewport.height;
+    const scale = zoom * GRID_SPACING;
+    const batch = ctx.drawLinesBatch;
+    const buf = this._lineBuffer;
 
     const drawMinor = zoom >= MINOR_GRID_MIN_ZOOM;
 
@@ -53,16 +59,30 @@ export class GridRenderer {
       ctx.setColor("GRID");
       ctx.setLineWidth(MINOR_LINE_WIDTH);
 
-      for (let gx = startX; gx <= endX; gx++) {
-        if (gx % MAJOR_GRID_INTERVAL === 0) continue;
-        const sx = gx * zoom * GRID_SPACING + pan.x;
-        ctx.drawLine(sx, viewport.y, sx, viewport.y + pixelHeight);
-      }
-
-      for (let gy = startY; gy <= endY; gy++) {
-        if (gy % MAJOR_GRID_INTERVAL === 0) continue;
-        const sy = gy * zoom * GRID_SPACING + pan.y;
-        ctx.drawLine(viewport.x, sy, viewport.x + pixelWidth, sy);
+      if (batch) {
+        buf.length = 0;
+        for (let gx = startX; gx <= endX; gx++) {
+          if (gx % MAJOR_GRID_INTERVAL === 0) continue;
+          const sx = gx * scale + pan.x;
+          buf.push(sx, viewport.y, sx, viewport.y + pixelHeight);
+        }
+        for (let gy = startY; gy <= endY; gy++) {
+          if (gy % MAJOR_GRID_INTERVAL === 0) continue;
+          const sy = gy * scale + pan.y;
+          buf.push(viewport.x, sy, viewport.x + pixelWidth, sy);
+        }
+        batch.call(ctx, buf);
+      } else {
+        for (let gx = startX; gx <= endX; gx++) {
+          if (gx % MAJOR_GRID_INTERVAL === 0) continue;
+          const sx = gx * scale + pan.x;
+          ctx.drawLine(sx, viewport.y, sx, viewport.y + pixelHeight);
+        }
+        for (let gy = startY; gy <= endY; gy++) {
+          if (gy % MAJOR_GRID_INTERVAL === 0) continue;
+          const sy = gy * scale + pan.y;
+          ctx.drawLine(viewport.x, sy, viewport.x + pixelWidth, sy);
+        }
       }
     }
 
@@ -70,15 +90,28 @@ export class GridRenderer {
     ctx.setLineWidth(MAJOR_LINE_WIDTH);
 
     const majorStartX = Math.ceil(startX / MAJOR_GRID_INTERVAL) * MAJOR_GRID_INTERVAL;
-    for (let gx = majorStartX; gx <= endX; gx += MAJOR_GRID_INTERVAL) {
-      const sx = gx * zoom * GRID_SPACING + pan.x;
-      ctx.drawLine(sx, viewport.y, sx, viewport.y + pixelHeight);
-    }
-
     const majorStartY = Math.ceil(startY / MAJOR_GRID_INTERVAL) * MAJOR_GRID_INTERVAL;
-    for (let gy = majorStartY; gy <= endY; gy += MAJOR_GRID_INTERVAL) {
-      const sy = gy * zoom * GRID_SPACING + pan.y;
-      ctx.drawLine(viewport.x, sy, viewport.x + pixelWidth, sy);
+
+    if (batch) {
+      buf.length = 0;
+      for (let gx = majorStartX; gx <= endX; gx += MAJOR_GRID_INTERVAL) {
+        const sx = gx * scale + pan.x;
+        buf.push(sx, viewport.y, sx, viewport.y + pixelHeight);
+      }
+      for (let gy = majorStartY; gy <= endY; gy += MAJOR_GRID_INTERVAL) {
+        const sy = gy * scale + pan.y;
+        buf.push(viewport.x, sy, viewport.x + pixelWidth, sy);
+      }
+      batch.call(ctx, buf);
+    } else {
+      for (let gx = majorStartX; gx <= endX; gx += MAJOR_GRID_INTERVAL) {
+        const sx = gx * scale + pan.x;
+        ctx.drawLine(sx, viewport.y, sx, viewport.y + pixelHeight);
+      }
+      for (let gy = majorStartY; gy <= endY; gy += MAJOR_GRID_INTERVAL) {
+        const sy = gy * scale + pan.y;
+        ctx.drawLine(viewport.x, sy, viewport.x + pixelWidth, sy);
+      }
     }
   }
 }

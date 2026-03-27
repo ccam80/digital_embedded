@@ -1005,3 +1005,177 @@ Import `BitsException` from `../../core/errors.js`.
   - `src/io/postmessage-adapter.ts` — replaced 6 `getEngine()` call sites with `getCoordinator()`, removed unused `SimulationEngine` import
   - `src/app/app-init.ts` — replaced 17 `getEngine()` call sites with `getCoordinator()`, updated `.getState?.()` optional-chain calls to `.getState()` direct calls (coordinator has non-optional getState)
 - **Tests**: 7655/7659 passing (4 pre-existing submodule ENOENT failures, unchanged from baseline)
+
+## Task SE-1: Port component definition, element class, registration, INFRASTRUCTURE_TYPES, unit tests
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/io/port.ts, src/components/io/__tests__/port.test.ts
+- **Files modified**: src/components/register-all.ts, src/compile/extract-connectivity.ts, src/components/subcircuit/pin-derivation.ts
+- **Tests**: 13/13 passing
+
+## Task flatten-port-test: Create flatten-port.test.ts
+- **Status**: skipped — file lock conflict
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 0/0 — not run (file not created)
+- **If partial — remaining work**: Agent SE-2 holds the file lock for `src/solver/digital/__tests__/flatten-port.test.ts` (locked at 2026-03-27T13:12:54+13:00) and is also working on `src/solver/digital/flatten.ts`. SE-2's task lock was still active after multiple waits (30s+). Once SE-2 completes, if `flatten-port.test.ts` has not been created, a fresh agent should create it with these 5 tests:
+  1. `findInterfaceElement()` matches a Port element by label when direction is BIDIRECTIONAL — test via `flattenCircuit` with a subcircuit whose internal circuit has a Port element; verify the Port element appears in the flat result and a bridge wire is created.
+  2. `findInterfaceElement()` falls back to In/Out for INPUT/OUTPUT direction (legacy) — standard subcircuit with In/Out elements, verify flattening works as in existing tests.
+  3. `findInterfaceElement()` returns undefined for BIDIRECTIONAL when no Port matches — subcircuit pin with BIDIRECTIONAL direction but no matching Port in internal circuit; verify no bridge wire is created for that pin.
+  4. Flattening a subcircuit with Port interface elements produces bridge wires connecting parent nets to internal pins — create a subcircuit with a Port element (typeId="Port", label="P"), parent subcircuit pin with BIDIRECTIONAL direction and matching label; verify bridge wire is created.
+  5. Port with bitWidth: 8 flattens correctly (bus-width preserved across bridge) — same as test 4 but Port has bitWidth=8 and subcircuit pin has bitWidth=8; verify bridge wire endpoints match positions.
+  Key patterns: use `TestLeafElement` / `TestSubcircuitElement` helpers from flatten.test.ts; create Port elements as `TestLeafElement("Port", ...)` with label prop; set BIDIRECTIONAL pin direction on the subcircuit element's interface pins. Import `flattenCircuit` from `@/solver/digital/flatten`.
+
+## Task SE-4: Boundary analysis refactor
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/editor/insert-subcircuit.ts`, `src/editor/__tests__/insert-subcircuit.test.ts`
+- **Tests**: 8/8 passing (all new + updated tests pass; 4 pre-existing baseline failures unaffected)
+
+### Summary of changes
+
+**`src/editor/insert-subcircuit.ts`**:
+- Removed `BoundaryWireInfo` interface (had `direction`, `pinLabel` fields)
+- Removed `BoundaryAnalysis` type
+- Added `BoundaryPort` interface (`wire`, `label`, `bitWidth`, `position` — no direction field)
+- Refactored `analyzeBoundary()` to return `{ boundaryPorts: BoundaryPort[]; internalWires: Wire[] }` instead of `BoundaryAnalysis`
+- Added `deriveBaseLabel()` and `deduplicateLabel()` helpers for label derivation/deduplication (duplicate pin labels get `_2`, `_3` suffix)
+- Added `assignFace()` and `selectionCentroid()` helpers for face assignment from position relative to centroid
+- Refactored `extractSubcircuit()` to accept `BoundaryPort[]` and create `PortElement` instances (not metadata-encoded `PinDeclaration[]`) at boundary positions
+- Refactored `insertAsSubcircuit()` to use new return shape; removed dead `pinLayout.length > 0 ? pinLayout : boundaryPins` fallback — `pinLayout` is always derived from Port elements now
+- Added imports for `PortElement`, `PropertyBag`, `Point`
+- Removed unused imports: `PinDirection`, `PinDeclaration`
+
+**`src/editor/__tests__/insert-subcircuit.test.ts`**:
+- Updated `analyzesBoundaryWires` → `analyzesBoundaryPorts_returnsBoundaryPortArray`: uses `boundaryPorts` (not `boundaryWires`), asserts no `direction` field, checks `label`/`position`
+- Updated `classifiesInternalWires`: uses `boundaryPorts` (not `boundaryWires`)
+- Added `labelDeduplication_twoBoundaryWiresBothLabeledOut`: verifies "out" + "out_2" deduplication
+- Added `zeroBoundaryCrossings_returnsEmptyBoundaryPorts`: verifies empty `boundaryPorts` for isolated selection
+- Added `extractedSubcircuit_containsPortElements_notInOut`: verifies `Port` typeId in extracted circuit, no `In`/`Out`
+- Updated `extractsCircuitWithBoundaryPins` → removed (replaced by `extractedSubcircuit_containsPortElements_notInOut`)
+- Updated `preservesInternalWiring`: no change needed (test still valid)
+- Added `undo_restoresAllOriginalElementsAndWires`: verifies undo restores elements and boundary wires
+- Added `label` parameter to `makeTestElement()` helper
+
+## Task SE-3: Label resolution unification
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: 
+  - src/solver/digital/compiler.ts (line 685)
+  - src/solver/analog/compiler.ts (lines 621, 1744)
+  - src/headless/test-runner.ts (line 76)
+  - src/headless/default-facade.ts (line 209)
+  - src/io/postmessage-adapter.ts (lines 428-429)
+  - src/app/canvas-interaction.ts (lines 550, 571)
+  - src/testing/comparison.ts (lines 98, 106)
+  - src/testing/fixture-generator.ts (lines 36, 57)
+- **Tests**: 7658/7662 passing (4 pre-existing failures due to missing git submodule ref/Digital/)
+
+### Summary
+Added `"Port"` to 8 typeId/name sets across the codebase so that compilers, test runners, and UI interactions recognize Port-labeled signals as valid inputs/outputs:
+
+1. **Digital compiler**: Added "Port" to LABELED_TYPES set (root of digital label resolution)
+2. **Analog compiler**: Added "Port" to labelTypes set in 2 locations (root of analog label resolution)
+3. **Test runner**: Added 'Port' to inputCount inference check
+4. **Default facade**: Added 'Port' to duplicated inputCount inference check (same logic as test-runner)
+5. **PostMessage adapter**: Added 'Port' to tutorial test validation checks for both inputs and outputs
+6. **Canvas interaction**: Added 'Port' to click-to-toggle signal driving checks (2 locations)
+7. **Signal comparison**: Added 'Port' to signal inventory for exhaustive equivalence comparison
+8. **Fixture generator**: Added 'Port' to input/output name extraction (2 functions)
+
+All changes are mechanical 1-line additions to existing arrays/conditions. No new test files created (existing tests continue to pass). The 4 failing unit tests are pre-existing failures unrelated to these changes (git submodule missing ref/Digital files).
+
+## Task SE-5: Instance placement
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/editor/insert-subcircuit.ts`, `src/editor/__tests__/insert-subcircuit.test.ts`
+- **Tests**: 13/13 passing (5 new SE-5 tests added; all unit tests pass with 4 pre-existing baseline failures unchanged)
+
+### Implementation summary
+
+`insertAsSubcircuit()` now returns `{ subcircuit, command, instance }` where `instance` is the `SubcircuitElement`.
+
+The function:
+1. Calls `analyzeBoundary()` + `extractSubcircuit()` (SE-4 work, unchanged)
+2. Derives interface pins via `deriveInterfacePins()` and calls `registerSubcircuit()`
+3. Creates a `SubcircuitElement` at `snapToGrid(selectionCentroid(selectedElements))` with `typeId: "Subcircuit:{name}"`
+4. Builds reconnected wires: for each `BoundaryPort`, finds the subcircuit instance pin by label, computes its world position via `pinWorldPosition()`, and creates a new `Wire` from the external endpoint to that world position
+5. Returns an atomic `EditCommand` where `execute()` removes originals + adds instance + reconnected wires; `undo()` is the full inverse
+
+New tests verify: correct typeId format, instance added to circuit on execute, original elements/wires restored on undo, boundary wires reconnected to subcircuit pins, and instance positioned at selection centroid.
+
+## Task SE-7: Persistence (IndexedDB subcircuit store)
+- **Status**: partial
+- **Agent**: implementer
+- **Files created**: src/io/subcircuit-store.ts, src/io/__tests__/subcircuit-store.test.ts
+- **Files modified**: none
+- **Tests**: 9/9 passing (all new subcircuit-store tests pass; full suite 7677/7681 passing — 4 pre-existing baseline failures only)
+- **If partial — remaining work**: The `app-init.ts` file was locked by another agent (lock: `spec/.locks/files/src__app__app-init.ts`) for both retry attempts. The lifecycle wiring could not be added. A fresh agent must add the following to `src/app/app-init.ts`:
+
+  1. Add import at top of file (after existing imports):
+     ```typescript
+     import { loadAllSubcircuits } from '../io/subcircuit-store.js';
+     import { loadDigXml } from '../io/dig-loader.js';
+     import { registerSubcircuit, createLiveDefinition } from '../components/subcircuit/subcircuit.js';
+     ```
+
+  2. After `const registry = createDefaultRegistry();` (line 79), add an async startup hook. The existing `applyModuleAndLoad()` function at line 557 is `async` and called at line 579 — add subcircuit loading inside it, before `autoLoadFile()`:
+     ```typescript
+     // Load stored subcircuits from IndexedDB
+     try {
+       const stored = await loadAllSubcircuits();
+       for (const entry of stored) {
+         try {
+           const subcircuitCircuit = loadDigXml(entry.xml, registry);
+           const def = createLiveDefinition(entry.name, subcircuitCircuit);
+           registerSubcircuit(registry, entry.name, def);
+         } catch {
+           // Skip malformed entries silently
+         }
+       }
+       if (stored.length > 0) {
+         palette.setAllowlist(params.palette ?? null);
+         paletteUI.render();
+       }
+     } catch {
+       // IndexedDB unavailable — silently skip
+     }
+     ```
+     Place this block inside `applyModuleAndLoad()` just before `await autoLoadFile()`.
+
+  3. The on-create and on-edit lifecycle hooks (calling `storeSubcircuit()` after `insertAsSubcircuit()` and on UndoRedoStack push within subcircuit drill-down) are tracked in SE-5/SE-6 tasks as they depend on the dialog and canvas-interaction wiring. The subcircuit-store API (`storeSubcircuit`, `deleteSubcircuit`) is ready for those consumers to call.
+
+## Task SE-8: Palette integration + app-init wiring
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/editor/palette.ts` — Added `refreshCategories()` method + `_forceVisibleCategories` field; SUBCIRCUIT category now appears in `getTree()` after calling `refreshCategories()` when subcircuits are registered
+  - `src/components/subcircuit/subcircuit.ts` — Changed `shapeType` property from `PropertyType.STRING` to `PropertyType.ENUM` with all 6 ShapeMode values (`DEFAULT`, `SIMPLE`, `DIL`, `CUSTOM`, `LAYOUT`, `MINIMIZED`), label updated to `"Shape"`, defaultValue set to `"DEFAULT"`
+  - `src/app/app-init.ts` — Added imports for `loadAllSubcircuits` and `loadWithSubcircuits`; in `applyModuleAndLoad()` loads stored subcircuits from IndexedDB on init, registers each via `loadWithSubcircuits`, calls `palette.refreshCategories()` + `paletteUI.render()`
+  - `src/app/menu-toolbar.ts` — Added imports for `storeSubcircuit` and `serializeCircuitToDig`; after subcircuit dialog creates subcircuit: serializes to XML, calls `storeSubcircuit()`, calls `palette.refreshCategories()` + `paletteUI.render()`, uses `ctx.showStatus()` for the confirmation message
+  - `src/editor/__tests__/palette.test.ts` — Added 3 new tests for `refreshCategories()`
+  - `src/components/subcircuit/__tests__/subcircuit.test.ts` — Added 4 new tests for `shapeType` ENUM property
+- **Tests**: 24/24 passing (7684/7688 total; 4 pre-existing failures from missing git submodule)
+
+## Task SE-9b: E2E browser tests for subcircuit creation workflow
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: e2e/gui/subcircuit-creation.spec.ts
+- **Files modified**: none
+- **Tests**: 5/5 passing
+
+## Task SE-9a: MCP tool surface tests for Port-based subcircuits
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/__tests__/port-mcp.test.ts
+- **Files modified**: src/components/io/port.ts (no net change — intermediate edit reverted), src/solver/digital/compiler.ts (two fixes: step 7 neutral-component wiring, step 11 noop execute registration)
+- **Tests**: 6/6 passing
+- **Notes**: Needed two compiler fixes to support Port (neutral infrastructure) in digital partition:
+  1. Step 7 (wiring table): neutral components (no digital model) now get empty input/output net arrays instead of incorrectly being classified as drivers via BIDIRECTIONAL pin direction.
+  2. Step 11 (function table): neutral components now get a noop execute function registered to prevent runtime crash when engine calls executeFns[typeId].
+  Both fixes are general (not Port-specific) — any future neutral component goes through the same paths correctly.

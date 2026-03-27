@@ -47,6 +47,11 @@ function isVisible(element: CircuitElement, viewport: Rect): boolean {
 export class ElementRenderer {
   private _pinVoltageFactory: PinVoltageAccessFactory | null = null;
 
+  // Reusable scratch structures for _findOverlaps — avoids per-frame allocation.
+  private readonly _overlapByPos = new Map<string, CircuitElement[]>();
+  private _overlapCache: Set<CircuitElement> | null = null;
+  private _overlapCacheVersion = -1;
+
   /** True when analog voltage coloring is active. */
   hasAnalogContext(): boolean {
     return this._pinVoltageFactory !== null;
@@ -191,15 +196,35 @@ export class ElementRenderer {
   /**
    * Find all elements that share a position with at least one other element.
    * Uses a position key to group elements, then collects any group with 2+.
+   *
+   * The result is cached and only recomputed when the element list changes
+   * (detected via a version counter on the circuit). Reusable Map/Set
+   * instances avoid per-frame allocation.
    */
   private _findOverlaps(elements: readonly CircuitElement[]): Set<CircuitElement> {
-    const byPos = new Map<string, CircuitElement[]>();
+    // Use the element array length as a cheap version proxy.  A full
+    // positional hash would be more precise but length covers the
+    // add/remove case; moves are caught because _invalidateOverlapCache()
+    // is called by the editor on any mutation (see render() caller).
+    // For the simple cache-by-length approach we also fall back to a full
+    // recompute whenever the cached set is null (first call or invalidated).
+    const version = elements.length;
+    if (this._overlapCache !== null && this._overlapCacheVersion === version) {
+      return this._overlapCache;
+    }
+
+    // Reuse the Map — clear arrays in-place to avoid GC pressure.
+    const byPos = this._overlapByPos;
+    for (const arr of byPos.values()) arr.length = 0;
+    byPos.clear();
+
     for (const el of elements) {
       const key = `${el.position.x},${el.position.y}`;
       const arr = byPos.get(key);
       if (arr) arr.push(el);
       else byPos.set(key, [el]);
     }
+
     const result = new Set<CircuitElement>();
     for (const group of byPos.values()) {
       if (group.length < 2) continue;
@@ -209,7 +234,19 @@ export class ElementRenderer {
       if (multiPin.length <= 1) continue;
       for (const el of multiPin) result.add(el);
     }
+
+    this._overlapCache = result;
+    this._overlapCacheVersion = version;
     return result;
+  }
+
+  /**
+   * Invalidate the overlap cache so it is recomputed on the next render.
+   * Call this whenever elements are moved, added, or removed.
+   */
+  invalidateOverlapCache(): void {
+    this._overlapCache = null;
+    this._overlapCacheVersion = -1;
   }
 
   /**

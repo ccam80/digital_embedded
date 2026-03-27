@@ -193,18 +193,19 @@ export class WireCurrentResolver {
     }
 
     // ------------------------------------------------------------------
-    // Step 2b: Identify tunnel vertex positions per MNA node.
+    // Step 2b: Identify inter-tree vertex positions per MNA node.
     //
-    // Tunnel components merge physically separate wire groups into one
-    // MNA node. When the wire graph for a node is a forest (multiple
-    // connected components), the tunnel pin positions are where current
-    // crosses between trees. We scan circuit elements for Tunnels and
-    // map their pin world positions to node IDs via wireToNodeId.
+    // Tunnel and Ground components merge physically separate wire groups
+    // into one MNA node. When the wire graph for a node is a forest
+    // (multiple connected components), these pin positions are where
+    // current crosses between trees. Ground elements connect separate
+    // wire groups to MNA node 0 the same way Tunnels connect groups by
+    // label — both must be recognized for correct current distribution.
     // ------------------------------------------------------------------
     const tunnelVerticesByNode = new Map<number, Set<string>>();
 
     for (const el of ctx.circuitElements) {
-      if (el.typeId !== "Tunnel") continue;
+      if (el.typeId !== "Tunnel" && el.typeId !== "Ground") continue;
       const pins = el.getPins();
       if (pins.length === 0) continue;
       const wp = pinWorldPosition(el, pins[0]);

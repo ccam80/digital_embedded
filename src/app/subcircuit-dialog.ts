@@ -31,6 +31,9 @@ export interface SubcircuitDialogPort {
 export interface SubcircuitDialogResult {
   name: string;
   ports: SubcircuitDialogPort[];
+  shapeMode: 'DEFAULT' | 'SIMPLE' | 'DIL' | 'LAYOUT';
+  chipWidth: number;
+  chipHeight: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,15 +174,30 @@ function computeCentroid(ports: BoundaryPort[]): { x: number; y: number } {
 // ---------------------------------------------------------------------------
 
 /**
+ * Generate the next available subcircuit name like "subcircuit_1", "subcircuit_2", etc.
+ */
+function generateAutoName(registry: ComponentRegistry): string {
+  let n = 1;
+  while (registry.get(`subcircuit_${n}`) !== undefined) {
+    n++;
+  }
+  return `subcircuit_${n}`;
+}
+
+/**
  * Open the "Create Subcircuit" modal dialog.
  *
- * @param boundaryPorts   Auto-derived boundary ports from analyzeBoundary().
- * @param registry        Registry for checking name uniqueness.
- * @returns               Promise resolving to the confirmed result or null.
+ * @param boundaryPorts     Auto-derived boundary ports from analyzeBoundary().
+ * @param registry          Registry for checking name uniqueness.
+ * @param selectedElements  Selected elements — Port elements found here are added to the port table.
+ * @param existingName      If provided, pre-fills the name (for editing existing subcircuits).
+ * @returns                 Promise resolving to the confirmed result or null.
  */
 export function openSubcircuitDialog(
   boundaryPorts: BoundaryPort[],
   registry: ComponentRegistry,
+  selectedElements?: import('../core/element.js').CircuitElement[],
+  existingName?: string,
 ): Promise<SubcircuitDialogResult | null> {
   return new Promise<SubcircuitDialogResult | null>((resolve) => {
     let resolved = false;
@@ -219,11 +237,10 @@ export function openSubcircuitDialog(
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
+    nameInput.value = existingName ?? generateAutoName(registry);
     nameInput.placeholder = 'MySubcircuit';
     nameInput.style.flex = '1';
     nameInput.style.padding = '4px 6px';
-    nameInput.style.border = '1px solid #ccc';
-    nameInput.style.borderRadius = '3px';
 
     const nameError = document.createElement('span');
     nameError.style.color = '#c00';
@@ -234,6 +251,68 @@ export function openSubcircuitDialog(
     nameRow.appendChild(nameInput);
     body.appendChild(nameRow);
     body.appendChild(nameError);
+
+    // -----------------------------------------------------------------------
+    // Symbol shape and size controls
+    // -----------------------------------------------------------------------
+
+    const symbolSection = document.createElement('div');
+    symbolSection.style.display = 'flex';
+    symbolSection.style.gap = '12px';
+    symbolSection.style.alignItems = 'center';
+    symbolSection.style.flexWrap = 'wrap';
+
+    // Shape mode
+    const shapeLabel = document.createElement('label');
+    shapeLabel.textContent = 'Shape:';
+    shapeLabel.style.fontWeight = 'bold';
+    shapeLabel.style.minWidth = '60px';
+    const shapeSelect = document.createElement('select');
+    shapeSelect.style.padding = '4px 6px';
+    for (const mode of ['DEFAULT', 'SIMPLE', 'DIL', 'LAYOUT'] as const) {
+      const opt = document.createElement('option');
+      opt.value = mode;
+      opt.textContent = mode.charAt(0) + mode.slice(1).toLowerCase();
+      shapeSelect.appendChild(opt);
+    }
+    shapeSelect.value = 'DEFAULT';
+    shapeSelect.addEventListener('change', validateAndUpdate);
+    symbolSection.appendChild(shapeLabel);
+    symbolSection.appendChild(shapeSelect);
+
+    // Chip width
+    const widthLabel = document.createElement('label');
+    widthLabel.textContent = 'W:';
+    widthLabel.title = 'Chip width in grid units';
+    const chipWidthInput = document.createElement('input');
+    chipWidthInput.type = 'number';
+    chipWidthInput.min = '2';
+    chipWidthInput.max = '20';
+    chipWidthInput.value = '3';
+    chipWidthInput.style.width = '45px';
+    chipWidthInput.style.padding = '4px 6px';
+    chipWidthInput.title = 'Chip width in grid units';
+    chipWidthInput.addEventListener('input', validateAndUpdate);
+    symbolSection.appendChild(widthLabel);
+    symbolSection.appendChild(chipWidthInput);
+
+    // Chip height
+    const heightLabel = document.createElement('label');
+    heightLabel.textContent = 'H:';
+    heightLabel.title = 'Chip height in grid units';
+    const chipHeightInput = document.createElement('input');
+    chipHeightInput.type = 'number';
+    chipHeightInput.min = '1';
+    chipHeightInput.max = '40';
+    chipHeightInput.value = '3';
+    chipHeightInput.style.width = '45px';
+    chipHeightInput.style.padding = '4px 6px';
+    chipHeightInput.title = 'Chip height in grid units';
+    chipHeightInput.addEventListener('input', validateAndUpdate);
+    symbolSection.appendChild(heightLabel);
+    symbolSection.appendChild(chipHeightInput);
+
+    body.appendChild(symbolSection);
 
     // -----------------------------------------------------------------------
     // Ports table
@@ -255,7 +334,7 @@ export function openSubcircuitDialog(
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    for (const col of ['Label', 'Width', 'Face']) {
+    for (const col of ['Label', 'Bits', 'Face']) {
       const th = document.createElement('th');
       th.textContent = col;
       th.style.textAlign = 'left';
@@ -298,7 +377,7 @@ export function openSubcircuitDialog(
         nameError.style.display = '';
         nameInput.style.borderColor = '#c00';
         nameValid = false;
-      } else if (registry.get(`Subcircuit:${name}`) !== undefined) {
+      } else if (name !== existingName && registry.get(name) !== undefined) {
         nameError.textContent = `A subcircuit named "${name}" already exists.`;
         nameError.style.display = '';
         nameInput.style.borderColor = '#c00';
@@ -336,21 +415,44 @@ export function openSubcircuitDialog(
       return nameValid && portsValid;
     }
 
+    // Collect Port elements from the selection that aren't already represented
+    // in the boundary ports (boundary ports come from wires crossing the boundary;
+    // Port elements IN the selection need to be included separately).
+    type PortEntry = { label: string; bitWidth: number; face: Face };
+    const allPorts: PortEntry[] = [];
+
     const portCentroid = computeCentroid(boundaryPorts);
 
     for (const bp of boundaryPorts) {
       const initialFace = computeFaceFromPosition(bp.position, portCentroid);
+      allPorts.push({ label: bp.label, bitWidth: bp.bitWidth, face: initialFace });
+    }
+
+    // Add Port elements from the selection
+    if (selectedElements) {
+      const boundaryLabels = new Set(boundaryPorts.map(bp => bp.label));
+      for (const el of selectedElements) {
+        if (el.typeId === 'Port') {
+          const label = el.getProperties().getOrDefault<string>('label', '');
+          if (label && !boundaryLabels.has(label)) {
+            const bitWidth = el.getProperties().getOrDefault<number>('bitWidth', 1);
+            const face = el.getProperties().getOrDefault<string>('face', 'left') as Face;
+            allPorts.push({ label, bitWidth, face });
+          }
+        }
+      }
+    }
+
+    for (const portEntry of allPorts) {
       const tr = document.createElement('tr');
 
       const tdLabel = document.createElement('td');
       tdLabel.style.padding = '2px 6px';
       const labelInput = document.createElement('input');
       labelInput.type = 'text';
-      labelInput.value = bp.label;
+      labelInput.value = portEntry.label;
       labelInput.style.width = '100%';
       labelInput.style.padding = '2px 4px';
-      labelInput.style.border = '1px solid #ccc';
-      labelInput.style.borderRadius = '2px';
       labelInput.addEventListener('input', validateAndUpdate);
       tdLabel.appendChild(labelInput);
 
@@ -360,7 +462,7 @@ export function openSubcircuitDialog(
       widthInput.type = 'number';
       widthInput.min = '1';
       widthInput.max = '32';
-      widthInput.value = String(bp.bitWidth);
+      widthInput.value = String(portEntry.bitWidth);
       widthInput.style.width = '50px';
       widthInput.style.padding = '2px 4px';
       widthInput.style.border = '1px solid #ccc';
@@ -380,8 +482,7 @@ export function openSubcircuitDialog(
         opt.textContent = face;
         faceSelect.appendChild(opt);
       }
-      // Assign initial face from position relative to centroid (already computed in BoundaryPort via extractSubcircuit)
-      faceSelect.value = initialFace;
+      faceSelect.value = portEntry.face;
       faceSelect.addEventListener('change', validateAndUpdate);
       tdFace.appendChild(faceSelect);
 
@@ -445,7 +546,10 @@ export function openSubcircuitDialog(
       if (!valid) return;
       const name = nameInput.value.trim();
       const ports = getCurrentPorts();
-      finish({ name, ports });
+      const shapeMode = shapeSelect.value as 'DEFAULT' | 'SIMPLE' | 'DIL' | 'LAYOUT';
+      const chipWidth = Math.max(2, parseInt(chipWidthInput.value, 10) || 3);
+      const chipHeight = Math.max(1, parseInt(chipHeightInput.value, 10) || 3);
+      finish({ name, ports, shapeMode, chipWidth, chipHeight });
     });
 
     buttonRow.appendChild(cancelBtn);

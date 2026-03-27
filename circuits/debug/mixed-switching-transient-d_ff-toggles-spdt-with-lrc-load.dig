@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes>
+    <entry>
+      <string>romContent</string>
+      <romList>
+        <roms/>
+      </romList>
+    </entry>
+  </attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>Clock</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>CLK</string>
+        </entry>
+        <entry>
+          <string>simulationModel</string>
+          <string>digital</string>
+        </entry>
+      </elementAttributes>
+      <pos x="60" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>D_FF</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>FF</string>
+        </entry>
+        <entry>
+          <string>simulationModel</string>
+          <string>digital</string>
+        </entry>
+      </elementAttributes>
+      <pos x="160" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SwitchSPDT</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>SW1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="320" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DcVoltageSource</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Vs</string>
+        </entry>
+      </elementAttributes>
+      <pos x="60" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Inductor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>L1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="440"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+  </wires>
+  <measurementOrdering/>
+</circuit>

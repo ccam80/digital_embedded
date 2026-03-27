@@ -49,34 +49,34 @@ describe('Port MCP surface — build and netlist', () => {
 // ---------------------------------------------------------------------------
 
 describe('Port MCP surface — compile', () => {
-  it('circuit_build a subcircuit using Port interfaces and circuit_compile succeeds', () => {
+  it('Port-only interface circuit compiles without In/Out elements', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
-    // Build a NOT gate with Port elements as its interface
+    // Build a NOT gate with ONLY Port elements as interface — no In/Out
     const circuit = facade.build({
       components: [
         { id: 'pIn',  type: 'Port', props: { label: 'X', bitWidth: 1, face: 'left'  } },
         { id: 'gate', type: 'Not' },
         { id: 'pOut', type: 'Port', props: { label: 'Z', bitWidth: 1, face: 'right' } },
-        // In/Out elements needed to drive the digital engine (Port is neutral infrastructure)
-        { id: 'driveIn',  type: 'In',  props: { label: 'X_drive', bitWidth: 1 } },
-        { id: 'readOut',  type: 'Out', props: { label: 'Z_read',  bitWidth: 1 } },
       ],
       connections: [
-        ['driveIn:out', 'pIn:port'],
-        ['pIn:port',    'gate:in'],
-        ['gate:out',    'pOut:port'],
-        ['pOut:port',   'readOut:in'],
+        ['pIn:port',  'gate:in'],
+        ['gate:out',  'pOut:port'],
       ],
     });
 
-    // Compile must not throw
+    // Compile must not throw — Port-only circuits are valid subcircuit definitions
     expect(() => facade.compile(circuit)).not.toThrow();
 
     const diagnostics = facade.validate(circuit);
-    // No fatal compilation errors — only warnings are acceptable
     const errors = diagnostics.filter(d => d.severity === 'error');
     expect(errors).toHaveLength(0);
+
+    // Port labels appear in signal snapshot
+    const engine = facade.compile(circuit);
+    const signals = facade.readAllSignals(engine);
+    expect('X' in signals).toBe(true);
+    expect('Z' in signals).toBe(true);
   });
 });
 
@@ -85,31 +85,28 @@ describe('Port MCP surface — compile', () => {
 // ---------------------------------------------------------------------------
 
 describe('Port MCP surface — test vectors resolve Port labels', () => {
-  it('circuit_test against a Port-labeled circuit resolves columns correctly', () => {
+  it('circuit_test resolves Port label as output column in test vectors', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
-    // AND gate: In-labeled inputs and Port-labeled output
+    // AND gate: In-labeled inputs, Port-labeled output (no Out needed)
     const circuit = facade.build({
       components: [
         { id: 'A',    type: 'In',   props: { label: 'A', bitWidth: 1 } },
         { id: 'B',    type: 'In',   props: { label: 'B', bitWidth: 1 } },
         { id: 'gate', type: 'And' },
         { id: 'pOut', type: 'Port', props: { label: 'Y', bitWidth: 1, face: 'right' } },
-        { id: 'out',  type: 'Out',  props: { label: 'Y_out', bitWidth: 1 } },
       ],
       connections: [
         ['A:out',    'gate:In_1'],
         ['B:out',    'gate:In_2'],
         ['gate:out', 'pOut:port'],
-        ['pOut:port','out:in'],
       ],
     });
 
     const engine = facade.compile(circuit);
 
-    // Test vectors: A B | Y_out  (use Out label for output column since Port is
-    // neutral infrastructure — the labeled signal in labelSignalMap is Y)
-    const testData = 'A B | Y_out\n0 0 0\n0 1 0\n1 0 0\n1 1 1';
+    // Port label Y used directly as the output column
+    const testData = 'A B | Y\n0 0 0\n0 1 0\n1 0 0\n1 1 1';
     const results = facade.runTests(engine, circuit, testData);
 
     expect(results.total).toBe(4);
@@ -205,7 +202,6 @@ describe('Port MCP surface — setInput/readOutput via Port labels', () => {
     // The Port label must exist in the compiled labelSignalMap
     const netlist = facade.netlist(circuit);
     const portComp = netlist.components.find(c => c.typeId === 'Port');
-    expect(portComp).toBeDefined();
     expect(portComp!.label).toBe('drive_port');
 
     // readOutput via Port label works

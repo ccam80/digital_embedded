@@ -195,12 +195,13 @@ export function makeDcVoltageSource(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      // Branch current I flows into nodePos (positive terminal).
+      // MNA branch variable: +I means current leaves nodePos through the branch.
       // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
-      // Current into neg = +I (conventional current enters source at neg).
-      // Current into pos = -I (current leaves element at positive terminal).
+      // "Into element at pos" = +I (current enters element at pos terminal).
+      // "Into element at neg" = -I (current exits element at neg terminal).
+      // Since pin 0 = neg and pin 1 = pos, return [-I, I].
       const I = voltages[branchIdx];
-      return [I, -I];
+      return [-I, I];
     },
   };
 }

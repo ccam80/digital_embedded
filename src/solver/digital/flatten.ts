@@ -367,11 +367,19 @@ function inlineSubcircuit(
     // In both cases it is pins[0].
     const interfacePin = interfacePins[0]!;
 
-    // Create a bridge wire from the subcircuit's pin position in the parent
-    // to the internal element's signal pin position.
+    // Create a bridge wire from the subcircuit's pin WORLD position in the parent
+    // to the internal interface element's pin WORLD position.
+    // pinWorldPosition(el, pin) = el.position + pin.position — this matches
+    // how the connectivity extractor resolves net membership for both endpoints.
     bridgeWires.push(new Wire(
-      { x: pinPos.x, y: pinPos.y },
-      { x: interfacePin.position.x, y: interfacePin.position.y },
+      {
+        x: subcircuitEl.position.x + pinPos.x,
+        y: subcircuitEl.position.y + pinPos.y,
+      },
+      {
+        x: interfaceEl.position.x + interfacePin.position.x,
+        y: interfaceEl.position.y + interfacePin.position.y,
+      },
     ));
   }
 
@@ -407,16 +415,15 @@ function buildPinMappings(el: SubcircuitHost): BoundaryPinMapping[] {
  * Find the internal interface element whose label matches the given interface
  * pin label and whose direction corresponds to the pin direction.
  *
- * Port elements (domain-agnostic) are tried first for all directions.
- * For INPUT/OUTPUT directions, falls back to In/Out (legacy subcircuits).
- * For BIDIRECTIONAL direction, returns undefined if no Port matches.
+ * Port is the standard subcircuit interface element. In/Out matching is
+ * retained for loading pre-existing .dig files that predate Port.
  */
 function findInterfaceElement(
   flatCircuit: Circuit,
   label: string,
   direction: PinDirection,
 ): CircuitElement | undefined {
-  // First try Port (domain-agnostic, preferred for new subcircuits)
+  // Port — the standard subcircuit interface element
   for (const el of flatCircuit.elements) {
     if (el.typeId === "Port") {
       const elLabel = el.getAttribute("label");
@@ -424,10 +431,10 @@ function findInterfaceElement(
     }
   }
 
-  // BIDIRECTIONAL pins should have matched Port above; don't fall through to In/Out.
+  // BIDIRECTIONAL pins only match Port.
   if (direction === PinDirection.BIDIRECTIONAL) return undefined;
 
-  // Fall back to In/Out (legacy subcircuits)
+  // In/Out — for pre-existing .dig files that predate Port
   const targetTypeId = direction === PinDirection.INPUT ? "In" : "Out";
   for (const el of flatCircuit.elements) {
     if (el.typeId !== targetTypeId) continue;

@@ -168,6 +168,11 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         ctx.scheduleRender();
         return;
       }
+      if (e.key === 'p' || e.key === 'P') {
+        const def = ctx.registry.get('Port');
+        if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
+        return;
+      }
       if (e.key === 'R') {
         const def = ctx.registry.get('Resistor');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }

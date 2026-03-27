@@ -52,6 +52,16 @@ export class CanvasRenderer implements RenderContext {
     this._ctx.stroke();
   }
 
+  drawLinesBatch(coords: ArrayLike<number>): void {
+    const ctx = this._ctx;
+    ctx.beginPath();
+    for (let i = 0; i < coords.length; i += 4) {
+      ctx.moveTo(coords[i]!, coords[i + 1]!);
+      ctx.lineTo(coords[i + 2]!, coords[i + 3]!);
+    }
+    ctx.stroke();
+  }
+
   drawRect(x: number, y: number, width: number, height: number, filled: boolean): void {
     if (filled) {
       this._ctx.fillRect(x, y, width, height);

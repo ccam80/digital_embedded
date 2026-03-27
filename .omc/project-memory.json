@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774424541090,
+  "lastScanned": 1774514028913,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -49,10 +49,8 @@
     "scripts": {
       "dev": "vite",
       "build": "vite build",
-      "test": "vitest run",
+      "test": "node scripts/run-all-tests.mjs",
       "test:watch": "vitest",
-      "test:e2e": "playwright test",
-      "test:all": "vitest run && playwright test",
       "lint": "eslint src",
       "typecheck": "tsc --noEmit"
     }
@@ -83,7 +81,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774424541057,
+      "lastAccessed": 1774514028872,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +93,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1774424541058,
+      "lastAccessed": 1774514028872,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -108,48 +106,48 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774424541058,
+      "lastAccessed": 1774514028873,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 11,
-      "lastAccessed": 1774424541058,
+      "fileCount": 10,
+      "lastAccessed": 1774514028892,
       "keyFiles": [
+        "analog-rc-workflow.dig",
         "broken_chain.dig",
         "buckbjt.dig",
         "chained_inverters.dig",
-        "dcswitchlrc.dig",
-        "falstad-shapes.json"
+        "dcswitchlrc.dig"
       ]
     },
     "lib": {
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774424541058,
+      "lastAccessed": 1774514028892,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774424541059,
+      "lastAccessed": 1774514028892,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774424541059,
+      "lastAccessed": 1774514028892,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 11,
-      "lastAccessed": 1774424541076,
+      "fileCount": 12,
+      "lastAccessed": 1774514028893,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
@@ -161,20 +159,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 4,
-      "lastAccessed": 1774424541076,
+      "fileCount": 9,
+      "lastAccessed": 1774514028893,
       "keyFiles": [
+        "analog-snapshot-analysis.md",
         "phase-3-unified-netlist.md",
-        "progress.md",
-        "test-baseline.md",
-        "unified-component-architecture.md"
+        "phase-4-simulation-coordinator.md",
+        "phase-5-simplify-consumers.md",
+        "phase-5b-eliminate-domain-branching.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774424541076,
+      "lastAccessed": 1774514028894,
       "keyFiles": [
         "main.ts"
       ]
@@ -183,14 +182,14 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774424541076,
+      "lastAccessed": 1774514028894,
       "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774424541077,
+      "lastAccessed": 1774514028895,
       "keyFiles": [
         "index.json"
       ]
@@ -199,18 +198,18 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1774424541077,
+      "lastAccessed": 1774514028895,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
-        "simulator-DhR8r7xS.js"
+        "simulator-DO3G50Oe.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 4,
-      "lastAccessed": 1774424541077,
+      "lastAccessed": 1774514028896,
       "keyFiles": [
         "harness.html",
         "simulator-harness.ts",
@@ -221,7 +220,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 3,
-      "lastAccessed": 1774424541078,
+      "lastAccessed": 1774514028898,
       "keyFiles": [
         "app-init.ts",
         "test-bridge.ts",
@@ -232,7 +231,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 3,
-      "lastAccessed": 1774424541078,
+      "lastAccessed": 1774514028898,
       "keyFiles": [
         "generic-shape.ts",
         "library-74xx.ts",
@@ -243,310 +242,310 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774424541079,
+      "lastAccessed": 1774514028899,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 153,
-      "lastAccessed": 1774486014555,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 85,
-      "lastAccessed": 1774486008864,
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 492,
+      "lastAccessed": 1774589761892,
       "type": "directory"
     },
     {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 68,
-      "lastAccessed": 1774477597193,
+      "path": "src",
+      "accessCount": 53,
+      "lastAccessed": 1774589434365,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\digital\\flatten.ts",
+      "accessCount": 45,
+      "lastAccessed": 1774589800724,
       "type": "file"
     },
     {
-      "path": "src\\analog\\analog-engine.ts",
-      "accessCount": 40,
-      "lastAccessed": 1774441513446,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
+      "path": "",
       "accessCount": 39,
-      "lastAccessed": 1774485761942,
+      "lastAccessed": 1774588928111,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\subcircuit\\subcircuit.ts",
+      "accessCount": 35,
+      "lastAccessed": 1774589827688,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 29,
-      "lastAccessed": 1774485762759,
+      "path": "src\\editor\\insert-subcircuit.ts",
+      "accessCount": 28,
+      "lastAccessed": 1774589475433,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+      "path": "src\\solver\\analog\\compiler.ts",
+      "accessCount": 26,
+      "lastAccessed": 1774578527553,
+      "type": "directory"
+    },
+    {
+      "path": "simulator.html",
+      "accessCount": 23,
+      "lastAccessed": 1774584873154,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app",
       "accessCount": 21,
-      "lastAccessed": 1774426124507,
+      "lastAccessed": 1774585548477,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774558946158,
       "type": "file"
     },
     {
-      "path": "src\\engine\\compiler.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774435122784,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 17,
+      "lastAccessed": 1774588665716,
       "type": "file"
     },
     {
-      "path": "src\\analog\\newton-raphson.ts",
-      "accessCount": 15,
-      "lastAccessed": 1774439176257,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-gate.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774426188887,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\dc-operating-point.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774427743476,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\__tests__\\led.test.ts",
+      "path": "src\\editor\\property-panel.ts",
       "accessCount": 13,
-      "lastAccessed": 1774425718783,
+      "lastAccessed": 1774572218347,
+      "type": "file"
+    },
+    {
+      "path": "spec\\app-init-modularization.md",
+      "accessCount": 9,
+      "lastAccessed": 1774529699317,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774571569457,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\coordinator-types.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774588807606,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\edit-operations.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774520453959,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\element-renderer.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774524053466,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-current-resolver.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774555805616,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\canvas-renderer.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774571895911,
+      "type": "directory"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 6,
+      "lastAccessed": 1774589003858,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\wire-renderer.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774524269872,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 5,
+      "lastAccessed": 1774555950676,
+      "type": "directory"
+    },
+    {
+      "path": "src\\compile\\types.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774588822088,
       "type": "file"
     },
     {
       "path": "src\\components",
-      "accessCount": 12,
-      "lastAccessed": 1774478314905,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-integration.test.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774426210190,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-combinational.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774426053243,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774425587876,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774425604317,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\behavioral-remaining.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774426087453,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog",
-      "accessCount": 8,
-      "lastAccessed": 1774441778524,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\sources\\dc-voltage-source.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774476207892,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774425540291,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1774425648635,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\sources\\variable-rail.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774469448649,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\opamp.test.ts",
       "accessCount": 5,
-      "lastAccessed": 1774424812400,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\cccs.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774425526367,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\ota.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774425547660,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\dac.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774425573519,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774425591006,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\__tests__\\fet-base.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774425623974,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active",
-      "accessCount": 4,
-      "lastAccessed": 1774425478869,
+      "lastAccessed": 1774589030433,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\analog-switch.ts",
+      "path": "src\\editor\\wire-drawing.ts",
       "accessCount": 4,
-      "lastAccessed": 1774425480692,
+      "lastAccessed": 1774515426671,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\renderer-interface.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774571907787,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\dac.ts",
+      "path": "src\\core\\properties.ts",
       "accessCount": 4,
-      "lastAccessed": 1774425499520,
+      "lastAccessed": 1774588790598,
+      "type": "file"
+    },
+    {
+      "path": "src\\core",
+      "accessCount": 4,
+      "lastAccessed": 1774589504363,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\__tests__\\ccvs.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774425531473,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\vccs.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774425536724,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\vcvs.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774425541692,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774425559950,
-      "type": "file"
-    },
-    {
-      "path": "src\\analog\\test-elements.ts",
+      "path": "src/app/app-init.ts",
       "accessCount": 3,
-      "lastAccessed": 1774425458592,
-      "type": "file"
+      "lastAccessed": 1774516826789,
+      "type": "directory"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+      "path": "src\\editor\\power-overlay.ts",
       "accessCount": 3,
-      "lastAccessed": 1774425641432,
+      "lastAccessed": 1774521995599,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\opamp.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774424656681,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774424657877,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\active\\timer-555.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774424664988,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774424665427,
+      "path": "src\\editor\\analog-tooltip.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774522009968,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\real-opamp.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774424703459,
+      "path": "src\\runtime\\analog-scope-panel.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774522851361,
       "type": "directory"
     },
     {
-      "path": "src\\analog\\behavioral-remaining.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774425583053,
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774555856382,
       "type": "directory"
     },
     {
-      "path": "src\\components\\semiconductors\\scr.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774424630749,
-      "type": "directory"
-    },
-    {
-      "path": "src/analog/test-elements.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774424870187,
-      "type": "directory"
-    },
-    {
-      "path": "src\\analog\\element.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774425027336,
+      "path": "src\\io\\folder-store.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774571855298,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\ota.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774425480083,
+      "path": "src\\components\\subcircuit",
+      "accessCount": 3,
+      "lastAccessed": 1774584342469,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\optocoupler.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774425493633,
+      "path": "src\\editor\\grid.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774524265028,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774556090300,
       "type": "directory"
     },
     {
-      "path": "src\\analog\\__tests__",
-      "accessCount": 1,
-      "lastAccessed": 1774425617496,
+      "path": "src\\solver\\analog\\test-elements.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774556952610,
       "type": "directory"
+    },
+    {
+      "path": "src\\io\\dig-loader.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774588221724,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\hit-test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774514260382,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-merge.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774514292227,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-drag.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774515413629,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\wire-split.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774515418889,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\property-inputs.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774515419050,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\slider-engine-bridge.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774516802778,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\slider-panel.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774516802811,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\analog-engine.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774519608004,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\null-coordinator.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774521521755,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\viewport.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774524633510,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\settings.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774525452010,
+      "type": "file"
     }
   ],
   "userDirectives": []

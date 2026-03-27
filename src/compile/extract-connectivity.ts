@@ -228,44 +228,52 @@ export function extractConnectivityGroups(
   }
 
   // -------------------------------------------------------------------------
-  // Step 3: Tunnel-merge — union pin slots for same-label Tunnel components
+  // Step 3: Label-merge — union pin slots for same-label Tunnel/Port components.
+  // Tunnel and Port both have one pin and a label. Same label = same net.
   // -------------------------------------------------------------------------
 
-  const tunnelsByLabel = new Map<string, number[]>();
+  const labelMergeSlots = new Map<string, number[]>();
 
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    if (el.typeId !== 'Tunnel') continue;
+    if (el.typeId !== 'Tunnel' && el.typeId !== 'Port') continue;
 
-    // Prefer NetName (analog convention), fall back to label (digital convention)
-    const netName = el.getAttribute('NetName');
-    const label = el.getAttribute('label');
-    const tunnelLabel =
-      (typeof netName === 'string' && netName.length > 0)
-        ? netName
-        : (typeof label === 'string' && label.length > 0)
-          ? label
-          : null;
+    // Tunnel: prefer NetName (analog convention), fall back to label (digital)
+    // Port: uses label only
+    let mergeLabel: string | null = null;
+    if (el.typeId === 'Tunnel') {
+      const netName = el.getAttribute('NetName');
+      const label = el.getAttribute('label');
+      mergeLabel =
+        (typeof netName === 'string' && netName.length > 0)
+          ? netName
+          : (typeof label === 'string' && label.length > 0)
+            ? label
+            : null;
+    } else {
+      const label = el.getAttribute('label');
+      mergeLabel = (typeof label === 'string' && label.length > 0) ? label : null;
+    }
 
-    if (tunnelLabel === null) continue;
+    if (mergeLabel === null) continue;
 
     const pins = allPins[i]!;
     if (pins.length === 0) continue;
 
-    // Tunnel has exactly one pin (index 0)
+    // Both Tunnel and Port have exactly one pin (index 0)
     const pinSlot = slotBase[i]! + 0;
 
-    let slots = tunnelsByLabel.get(tunnelLabel);
+    let slots = labelMergeSlots.get(mergeLabel);
     if (slots === undefined) {
       slots = [];
-      tunnelsByLabel.set(tunnelLabel, slots);
+      labelMergeSlots.set(mergeLabel, slots);
     }
     slots.push(pinSlot);
   }
 
-  for (const tunnelSlots of tunnelsByLabel.values()) {
-    for (let m = 1; m < tunnelSlots.length; m++) {
-      uf.union(tunnelSlots[0]!, tunnelSlots[m]!);
+  for (const slots of labelMergeSlots.values()) {
+    for (let m = 1; m < slots.length; m++) {
+      uf.union(slots[0]!, slots[m]!);
     }
   }
 

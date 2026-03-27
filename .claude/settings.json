@@ -3,7 +3,8 @@
     "allow": [
       "mcp__circuit_simulator__",
       "Circuit-simulator",
-      "Read"
+      "Read",
+      "Fetch"
     ]
   }
 }

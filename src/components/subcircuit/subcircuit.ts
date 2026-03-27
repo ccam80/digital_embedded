@@ -128,12 +128,29 @@ export class SubcircuitElement extends AbstractCircuitElement {
       w = Math.max(faceCounts.top + 1, faceCounts.bottom + 1, chipWidth);
       h = Math.max(faceCounts.left + 1, faceCounts.right + 1, chipHeight);
     } else {
-      const inputCount = pinLayout.filter(p => p.direction === PinDirection.INPUT).length;
-      const outputCount = pinLayout.filter(p => p.direction === PinDirection.OUTPUT).length;
-      const symmetric = outputCount === 1;
-      const evenGap = symmetric && inputCount % 2 === 0 ? 1 : 0;
+      // Count pins per side. BIDIRECTIONAL pins (Port elements) use their
+      // face attribute: left-face → counted as inputs, right-face → outputs.
+      let leftCount = 0;
+      let rightCount = 0;
+      for (const p of pinLayout) {
+        if (p.direction === PinDirection.INPUT) {
+          leftCount++;
+        } else if (p.direction === PinDirection.OUTPUT) {
+          rightCount++;
+        } else {
+          // BIDIRECTIONAL — use face attribute
+          const face = (p as PinDeclaration & { face?: string }).face;
+          if (face === 'right') {
+            rightCount++;
+          } else {
+            leftCount++;
+          }
+        }
+      }
+      const symmetric = rightCount === 1;
+      const evenGap = symmetric && leftCount % 2 === 0 ? 1 : 0;
       w = chipWidth;
-      h = Math.max(inputCount + evenGap, outputCount, 1);
+      h = Math.max(leftCount + evenGap, rightCount, 1);
     }
 
     const customShape = this._definition.circuit.metadata.customShape;
@@ -228,6 +245,18 @@ export class SubcircuitElement extends AbstractCircuitElement {
   get definition(): SubcircuitDefinition {
     return this._definition;
   }
+
+  // --- SubcircuitHost interface (required by flatten.ts isSubcircuitHost) ---
+
+  /** The internal Circuit definition for this subcircuit (used by flattening). */
+  get internalCircuit(): Circuit {
+    return this._definition.circuit;
+  }
+
+  /** The name used to scope internal component names during flattening. */
+  get subcircuitName(): string {
+    return this._definition.name;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -274,8 +303,16 @@ function buildDefaultPositions(
   for (const pin of pins) {
     if (pin.direction === PinDirection.INPUT) {
       inputs.push(pin);
-    } else {
+    } else if (pin.direction === PinDirection.OUTPUT) {
       outputs.push(pin);
+    } else {
+      // BIDIRECTIONAL (Port elements) — use face attribute to decide side
+      const face = (pin as PinDeclaration & { face?: string }).face;
+      if (face === 'right') {
+        outputs.push(pin);
+      } else {
+        inputs.push(pin);
+      }
     }
   }
 
@@ -537,4 +574,14 @@ export function registerSubcircuit(
   };
 
   registry.registerOrUpdate(componentDef);
+
+  // Register the "Subcircuit:<name>" alias so that SubcircuitElement instances
+  // created by insertAsSubcircuit() (which use typeId = "Subcircuit:<name>")
+  // can be found via registry.get(element.typeId) in the compiler.
+  // The bare name remains the canonical key (used by the .dig loader path).
+  // _aliases.set is idempotent so re-registration on subcircuit reload is safe.
+  const prefixedName = `Subcircuit:${name}`;
+  if (!registry.get(prefixedName)) {
+    registry.registerAlias(prefixedName, name);
+  }
 }

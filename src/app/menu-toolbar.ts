@@ -22,13 +22,14 @@ import { analyzeBoundary, insertAsSubcircuit, type PortOverride } from '../edito
 import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
-import type { Wire } from '../core/circuit.js';
+import { Circuit, type Wire } from '../core/circuit.js';
 import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
 import { PropertyBag } from '../core/properties.js';
+import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -228,14 +229,14 @@ export function initMenuAndToolbar(
               const selectedElements = [...selection.getSelectedElements()];
               const selectedWires = [...selection.getSelectedWires()];
               const { boundaryPorts } = analyzeBoundary(ctx.circuit, selectedElements, selectedWires);
-              void openSubcircuitDialog(boundaryPorts, registry).then((result) => {
+              void openSubcircuitDialog(boundaryPorts, registry, selectedElements).then((result) => {
                 if (!result) return;
                 const userPorts: PortOverride[] = result.ports.map(p => ({
                   label: p.label,
                   bitWidth: p.bitWidth,
                   face: p.face,
                 }));
-                const { subcircuit, command } = insertAsSubcircuit(
+                const { subcircuit, command, instance } = insertAsSubcircuit(
                   ctx.circuit,
                   selectedElements,
                   selectedWires,
@@ -243,6 +244,14 @@ export function initMenuAndToolbar(
                   result.name,
                   userPorts,
                 );
+
+                // Apply shape mode and chip dimensions from the dialog
+                subcircuit.metadata.shapeType = result.shapeMode;
+                subcircuit.metadata.chipWidth = result.chipWidth;
+                subcircuit.metadata.chipHeight = result.chipHeight;
+                (instance.definition as any).shapeMode = result.shapeMode;
+                instance.getProperties().set('shapeType', result.shapeMode);
+
                 undoStack.push(command);
                 selection.clear();
                 ctx.invalidateCompiled();
@@ -264,6 +273,54 @@ export function initMenuAndToolbar(
             },
           },
         );
+
+        // "Edit Symbol..." and "Open Subcircuit" — for SubcircuitElement instances
+        if ('definition' in elementHit && (elementHit as any).definition?.circuit) {
+          const subDef = (elementHit as any).definition as { name: string; circuit: Circuit; pinLayout: any[] };
+          items.push(separator());
+          items.push({
+            label: 'Open Subcircuit',
+            action: () => {
+              canvasInteraction.openSubcircuit(subDef.name, subDef.circuit);
+            },
+            enabled: true,
+          });
+          items.push({
+            label: 'Edit Symbol\u2026',
+            action: () => {
+              // Collect existing Port elements from the subcircuit definition
+              const portElements = [];
+              for (const el of subDef.circuit.elements) {
+                if (el.typeId === 'Port') portElements.push(el);
+              }
+              void openSubcircuitDialog([], registry, portElements, subDef.name).then((result) => {
+                if (!result) return;
+                // Update Port elements in the subcircuit definition to match dialog edits
+                const existingPorts = subDef.circuit.elements.filter(el => el.typeId === 'Port');
+                for (let i = 0; i < result.ports.length; i++) {
+                  const rp = result.ports[i];
+                  if (i < existingPorts.length) {
+                    const el = existingPorts[i];
+                    el.getProperties().set('label', rp.label);
+                    el.getProperties().set('bitWidth', rp.bitWidth);
+                    el.getProperties().set('face', rp.face);
+                  }
+                }
+                // Re-derive pin layout and update the definition
+                (subDef as any).pinLayout = deriveInterfacePins(subDef.circuit);
+
+                // Re-persist
+                const xml = serializeCircuitToDig(subDef.circuit, registry);
+                void storeSubcircuit(subDef.name, xml).catch(() => {});
+
+                ctx.invalidateCompiled();
+                ctx.scheduleRender();
+                ctx.showStatus(`Updated symbol for "${subDef.name}"`);
+              });
+            },
+            enabled: !ctx.isSimActive(),
+          });
+        }
 
         // "Add Slider" — for components with FLOAT properties during analog sim
         if (simController.activeSliderPanel && simController.isSimActive()) {

@@ -379,6 +379,168 @@ function buildOuterAnalogCircuit(innerCircuit: Circuit): TestOuterCircuit {
 }
 
 // ---------------------------------------------------------------------------
+// Port element helpers
+// ---------------------------------------------------------------------------
+
+function makePortElement(
+  instanceId: string,
+  label: string,
+  position: { x: number; y: number } = { x: 0, y: 0 },
+  bitWidth: number = 1,
+): MinimalLeafElement {
+  const props = new PropertyBag([
+    ["label", label],
+    ["bitWidth", bitWidth],
+    ["face", "left"],
+    ["sortOrder", 0],
+  ] as [string, PropertyValue][]);
+  const pins: Pin[] = [
+    {
+      direction: PinDirection.BIDIRECTIONAL,
+      position: { x: position.x, y: position.y + 1 },
+      label: "port",
+      bitWidth,
+      isNegated: false,
+      isClock: false,
+    },
+  ];
+  return new MinimalLeafElement("Port", instanceId, position, pins, props);
+}
+
+function makeDigitalPortDef(): ComponentDefinition {
+  return {
+    name: "Port",
+    typeId: -1,
+    factory: (_props) => new MinimalLeafElement("Port", "auto", { x: 0, y: 0 }, []),
+    pinLayout: [{ label: "port", direction: PinDirection.BIDIRECTIONAL }] as ComponentDefinition["pinLayout"],
+    propertyDefs: [],
+    attributeMap: [],
+    category: ComponentCategory.IO,
+    helpText: "Port",
+    models: {}, // Port is neutral infrastructure — no simulation models
+  };
+}
+
+/**
+ * Build a registry for Port-based subcircuit tests.
+ * Outer analog circuit: Ground + Resistor.
+ * Inner digital circuit: Port, And.
+ */
+function makePortRegistry(): ComponentRegistry {
+  const reg = new ComponentRegistry();
+  reg.register(makeGroundDef());
+  reg.register(makeAnalogStubDef("Resistor", 2));
+  reg.register(makeDigitalPortDef());
+  reg.register(makeAndDef());
+  return reg;
+}
+
+/**
+ * Build a minimal inner digital circuit using Port interface elements:
+ *   Port "A" → AND gate In_1
+ *   Port "B" → AND gate In_2
+ *   AND gate out → Port "Y"
+ *
+ * Port pin positions (pin is at position.y + 1):
+ *   portA at (0,0) → pin at (0,1) → wire to And In_1 at (5,2)
+ *   portB at (0,5) → pin at (0,6) → wire to And In_2 at (5,4)
+ *   portY at (10,2) → pin at (10,3) → wire from And out at (8,3)
+ */
+function buildPortDigitalCircuit(): {
+  circuit: Circuit;
+  aPinPos: { x: number; y: number };
+  bPinPos: { x: number; y: number };
+  yPinPos: { x: number; y: number };
+} {
+  const inner = new Circuit({ name: "AndPortSubcircuit" });
+
+  const portA = makePortElement("portA", "A", { x: 0, y: 0 });
+  const portB = makePortElement("portB", "B", { x: 0, y: 5 });
+  const andGate = makeAndElement("and1");
+  const portY = makePortElement("portY", "Y", { x: 10, y: 2 });
+
+  inner.addElement(portA);
+  inner.addElement(portB);
+  inner.addElement(andGate);
+  inner.addElement(portY);
+
+  // portA pin at (0,1) → And In_1 at (5,2)
+  inner.addWire(new Wire({ x: 0, y: 1 }, { x: 5, y: 2 }));
+  // portB pin at (0,6) → And In_2 at (5,4)
+  inner.addWire(new Wire({ x: 0, y: 6 }, { x: 5, y: 4 }));
+  // And out at (8,3) → portY pin at (10,3)
+  inner.addWire(new Wire({ x: 8, y: 3 }, { x: 10, y: 3 }));
+
+  return {
+    circuit: inner,
+    aPinPos: { x: 0, y: 1 },
+    bPinPos: { x: 0, y: 6 },
+    yPinPos: { x: 10, y: 3 },
+  };
+}
+
+/**
+ * Build the outer analog circuit wrapping a Port-based inner digital circuit.
+ *
+ * The subcircuit host's external pins are BIDIRECTIONAL (Port convention).
+ * Pin layout on subcircuit element (el.position = {x:15, y:0}):
+ *   Pin "A" at local (5,1) → world (20,1)
+ *   Pin "B" at local (5,6) → world (20,6)
+ *   Pin "Y" at local (5,3) → world (20,3)
+ */
+function buildOuterAnalogCircuitPort(innerCircuit: Circuit): TestOuterCircuit {
+  const outer = new Circuit({ name: "OuterAnalogPort" });
+
+  // Ground element
+  const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+  ]);
+  outer.addElement(groundEl);
+
+  // Resistors from each node to ground (makes MNA system solvable)
+  const res1El = new MinimalLeafElement("Resistor", "res1", { x: 1, y: 1 }, [
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+  ]);
+  outer.addElement(res1El);
+
+  const res2El = new MinimalLeafElement("Resistor", "res2", { x: 2, y: 6 }, [
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+  ]);
+  outer.addElement(res2El);
+
+  const res3El = new MinimalLeafElement("Resistor", "res3", { x: 3, y: 3 }, [
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -3, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 27, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+  ]);
+  outer.addElement(res3El);
+
+  // Subcircuit element — all pins BIDIRECTIONAL (Port convention)
+  const subcircuitPins: Pin[] = [
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+  ];
+  const subcircuitEl = new TestSubcircuitHost(
+    "AndPortGate",
+    "andPortSubcircuit_0",
+    { x: 15, y: 0 },
+    innerCircuit,
+    subcircuitPins,
+  );
+  outer.addElement(subcircuitEl);
+
+  // Wires connecting subcircuit world-pins to resistor nodes
+  outer.addWire(new Wire({ x: 20, y: 1 }, { x: 30, y: 1 }));
+  outer.addWire(new Wire({ x: 20, y: 6 }, { x: 30, y: 6 }));
+  outer.addWire(new Wire({ x: 20, y: 3 }, { x: 30, y: 3 }));
+  outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
+
+  return { circuit: outer, subcircuitEl, node1: 1, node2: 2, node3: 3 };
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -512,5 +674,132 @@ describe("BridgeCompilation", () => {
     // and was created (exact internal validation is in bridge-adapter.test.ts).
     // The adapter's label includes the instance name and pin label.
     expect(bridge.outputAdapters[0]!.label).toContain("Y");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Port-based bridge compilation tests
+// ---------------------------------------------------------------------------
+
+describe("bridge compilation — Port-based subcircuits", () => {
+  it("Port-based inner digital circuit compiles with bridge adapters", () => {
+    // Analog parent, digital subcircuit using Port interface elements.
+    // All subcircuit host pins are BIDIRECTIONAL (Port convention).
+    // buildPinMappings maps BIDIRECTIONAL → "out", so all 3 ports become
+    // outputAdapters.
+    const { circuit: innerCircuit } = buildPortDigitalCircuit();
+    const { circuit: outerCircuit } = buildOuterAnalogCircuitPort(innerCircuit);
+    const registry = makePortRegistry();
+
+    const compiled = compileUnified(outerCircuit, registry).analog!;
+
+    expect(compiled.bridges).toHaveLength(1);
+    const bridge = compiled.bridges[0]!;
+    expect(bridge.compiledInner).toBeDefined();
+    expect(bridge.compiledInner.netCount).toBeGreaterThan(0);
+    expect(bridge.instanceName).toMatch(/^AndPortGate_\d+$/);
+  });
+
+  it("bridge adapter pin mappings from Port interfaces — BIDIRECTIONAL maps to outputAdapters", () => {
+    // Port elements on the subcircuit host are BIDIRECTIONAL.
+    // buildPinMappings treats non-INPUT pins as "out" direction.
+    // All 3 Port pins (A, B, Y) become outputAdapters; inputAdapters is empty.
+    const { circuit: innerCircuit } = buildPortDigitalCircuit();
+    const { circuit: outerCircuit } = buildOuterAnalogCircuitPort(innerCircuit);
+    const registry = makePortRegistry();
+
+    const compiled = compileUnified(outerCircuit, registry).analog!;
+
+    const bridge = compiled.bridges[0]!;
+
+    // All BIDIRECTIONAL pins → "out" mapping → BridgeOutputAdapter for each
+    expect(bridge.outputAdapters).toHaveLength(3);
+    for (const adapter of bridge.outputAdapters) {
+      expect(adapter).toBeInstanceOf(BridgeOutputAdapter);
+      expect(adapter.outputNodeId).toBeGreaterThan(0);
+    }
+
+    // No INPUT-direction pins → no input adapters
+    expect(bridge.inputAdapters).toHaveLength(0);
+  });
+
+  it("Port subcircuit with multiple ports — correct adapter count", () => {
+    // Inner digital circuit with 2 Port interface elements and an And gate
+    // (the gate is needed so the inner circuit has a digital domain component,
+    // which triggers the cross-engine boundary detection in compileUnified).
+    const inner = new Circuit({ name: "TwoPortSub" });
+
+    const portX = makePortElement("portX", "X", { x: 0, y: 0 });
+    const portZ = makePortElement("portZ", "Z", { x: 0, y: 5 });
+    const andGate = makeAndElement("and1");
+    inner.addElement(portX);
+    inner.addElement(portZ);
+    inner.addElement(andGate);
+    // portX pin at (0,1) → And In_1 at (5,2)
+    inner.addWire(new Wire({ x: 0, y: 1 }, { x: 5, y: 2 }));
+    // portZ pin at (0,6) → And In_2 at (5,4)
+    inner.addWire(new Wire({ x: 0, y: 6 }, { x: 5, y: 4 }));
+
+    // Outer analog circuit with 2 BIDIRECTIONAL subcircuit pins
+    const outer = new Circuit({ name: "OuterTwoPort" });
+
+    const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+    ]);
+    outer.addElement(groundEl);
+
+    // Resistor from nodeX (30,1) to ground (0,0)
+    const resXEl = new MinimalLeafElement("Resistor", "resX", { x: 1, y: 1 }, [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    ]);
+    outer.addElement(resXEl);
+
+    // Resistor from nodeZ (30,6) to ground (0,0)
+    const resZEl = new MinimalLeafElement("Resistor", "resZ", { x: 2, y: 6 }, [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    ]);
+    outer.addElement(resZEl);
+
+    const subcircuitPins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subcircuitEl = new TestSubcircuitHost(
+      "TwoPort",
+      "twoPort_0",
+      { x: 15, y: 0 },
+      inner,
+      subcircuitPins,
+    );
+    outer.addElement(subcircuitEl);
+
+    // Wire X pin at world (20,1) to resX node at (30,1)
+    outer.addWire(new Wire({ x: 20, y: 1 }, { x: 30, y: 1 }));
+    // Wire Z pin at world (20,6) to resZ node at (30,6)
+    outer.addWire(new Wire({ x: 20, y: 6 }, { x: 30, y: 6 }));
+    outer.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
+
+    const registry = makePortRegistry();
+    const compiled = compileUnified(outer, registry).analog!;
+
+    expect(compiled.bridges).toHaveLength(1);
+    const bridge = compiled.bridges[0]!;
+
+    // 2 Port pins, both BIDIRECTIONAL → 2 outputAdapters
+    expect(bridge.outputAdapters).toHaveLength(2);
+    expect(bridge.inputAdapters).toHaveLength(0);
+
+    // Each adapter should have a valid outer MNA node
+    for (const adapter of bridge.outputAdapters) {
+      expect(adapter).toBeInstanceOf(BridgeOutputAdapter);
+      expect(adapter.outputNodeId).toBeGreaterThan(0);
+    }
+
+    // The two adapters should be at different outer nodes (X and Z on different nets)
+    expect(bridge.outputAdapters[0]!.outputNodeId).not.toBe(
+      bridge.outputAdapters[1]!.outputNodeId,
+    );
   });
 });

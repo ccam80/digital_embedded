@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && node -e \\\"\\nconst fs = require('fs');\\nconst data = JSON.parse(fs.readFileSync('fixtures/falstad-shapes.json','utf8'));\\nconst sw = d...",
-  "error": "Exit code 1\n[eval]:4\r\nconst sw = data.find(s => s.name === 'AnalogSwitch2');\r\n                ^\r\n\r\nTypeError: data.find is not a function\r\n    at [eval]:4:17\r\n    at runScriptInThisContext (node:internal/vm:219:10)\r\n    at node:internal/process/execution:451:12\r\n    at [eval]-wrapper:6:24\r\n    at runScriptInContext (node:internal/process/execution:449:60)\r\n    at evalFunction (node:internal/process/execution:283:30)\r\n    at evalTypeScript (node:internal/process/execution:295:3)\r\n    at node:inte...",
-  "timestamp": "2026-03-23T05:30:48.273Z",
-  "retry_count": 2
-}

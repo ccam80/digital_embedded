@@ -17,7 +17,7 @@ import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { deserializeCircuit } from '../io/load.js';
 import { parseCtzCircuitFromText } from '../io/ctz-parser.js';
 import { deserializeDts } from '../io/dts-deserializer.js';
-import { serializeCircuit } from '../io/save.js';
+import { serializeCircuit as serializeDts } from '../io/dts-serializer.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
 import { exportSvg } from '../export/svg.js';
@@ -36,7 +36,7 @@ export interface FileIOController {
   updateCircuitName(): void;
   updateGifMenuState(): void;
   readonly httpResolver: HttpResolver;
-  readonly saveFormat: 'dig' | 'digj';
+  readonly saveFormat: 'dts' | 'dig';
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   // Save format
   // -------------------------------------------------------------------------
 
-  let saveFormat: 'dig' | 'digj' = 'dig';
+  let saveFormat: 'dts' | 'dig' = 'dts';
 
   // -------------------------------------------------------------------------
   // applyLoadedCircuit
@@ -199,9 +199,9 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         mimeType = 'application/xml';
         ext = '.dig';
       } else {
-        content = serializeCircuit(circuit);
+        content = serializeDts(circuit);
         mimeType = 'application/json';
-        ext = '.digj';
+        ext = '.dts';
       }
       const blob = new Blob([content], { type: mimeType });
       downloadBlob(blob, (circuit.metadata.name || 'circuit') + ext);
@@ -243,23 +243,23 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   // Save format toggle
   // -------------------------------------------------------------------------
 
+  const formatDtsBtn = document.getElementById('btn-format-dts');
   const formatDigBtn = document.getElementById('btn-format-dig');
-  const formatDigjBtn = document.getElementById('btn-format-digj');
 
   function updateFormatChecks(): void {
+    const dtsCheck = formatDtsBtn?.querySelector('.format-check');
     const digCheck = formatDigBtn?.querySelector('.format-check');
-    const digjCheck = formatDigjBtn?.querySelector('.format-check');
+    if (dtsCheck) dtsCheck.textContent = saveFormat === 'dts' ? '\u2713' : '';
     if (digCheck) digCheck.textContent = saveFormat === 'dig' ? '\u2713' : '';
-    if (digjCheck) digjCheck.textContent = saveFormat === 'digj' ? '\u2713' : '';
   }
 
-  formatDigBtn?.addEventListener('click', () => {
-    saveFormat = 'dig';
+  formatDtsBtn?.addEventListener('click', () => {
+    saveFormat = 'dts';
     updateFormatChecks();
   });
 
-  formatDigjBtn?.addEventListener('click', () => {
-    saveFormat = 'digj';
+  formatDigBtn?.addEventListener('click', () => {
+    saveFormat = 'dig';
     updateFormatChecks();
   });
 

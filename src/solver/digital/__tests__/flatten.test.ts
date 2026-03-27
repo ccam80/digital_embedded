@@ -114,6 +114,30 @@ function makeOutElement(
   return new TestLeafElement("Out", instanceId, position, props, pins);
 }
 
+function makePortElement(
+  instanceId: string,
+  label: string,
+  position: { x: number; y: number } = { x: 5, y: 0 },
+  bitWidth: number = 1,
+): TestLeafElement {
+  const props = new PropertyBag();
+  props.set("label", label);
+  props.set("bitWidth", bitWidth);
+  props.set("face", "left");
+  props.set("sortOrder", 0);
+  const pins: Pin[] = [
+    {
+      direction: PinDirection.BIDIRECTIONAL,
+      position: { x: position.x, y: position.y + 1 },
+      label: "port",
+      bitWidth,
+      isNegated: false,
+      isClock: false,
+    },
+  ];
+  return new TestLeafElement("Port", instanceId, position, props, pins);
+}
+
 // ---------------------------------------------------------------------------
 // TestSubcircuitElement — implements SubcircuitHost for test use
 // ---------------------------------------------------------------------------
@@ -466,5 +490,286 @@ describe("flattenCircuit", () => {
     // Parent and internal circuit must be unchanged
     expect(parent.elements.length).toBe(originalElementCount);
     expect(internal.elements.length).toBe(originalInternalCount);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Port-based subcircuit flattening tests
+// ---------------------------------------------------------------------------
+
+describe("flattenCircuit — Port-based subcircuits", () => {
+  it("singleLevelFlattenWithPortInterfaces — internal circuit with Port elements is inlined correctly", () => {
+    // Internal circuit: Port("A") → And gate → Port("Y")
+    const internal = new Circuit({ name: "PortWrapper" });
+    const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
+    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const portY = makePortElement("port-Y", "Y", { x: 10, y: 0 });
+    internal.addElement(portA);
+    internal.addElement(andEl);
+    internal.addElement(portY);
+    internal.addWire(new Wire(
+      { x: portA.getPins()[0]!.position.x, y: portA.getPins()[0]!.position.y },
+      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+    ));
+    internal.addWire(new Wire(
+      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+      { x: portY.getPins()[0]!.position.x, y: portY.getPins()[0]!.position.y },
+    ));
+
+    // Parent circuit: subcircuit instance with BIDIRECTIONAL pins
+    const parent = new Circuit({ name: "Top" });
+    const subcircuitPins: Pin[] = [
+      {
+        direction: PinDirection.BIDIRECTIONAL,
+        position: { x: 20, y: 1 },
+        label: "A",
+        bitWidth: 1,
+        isNegated: false,
+        isClock: false,
+      },
+      {
+        direction: PinDirection.BIDIRECTIONAL,
+        position: { x: 26, y: 1 },
+        label: "Y",
+        bitWidth: 1,
+        isNegated: false,
+        isClock: false,
+      },
+    ];
+    const subEl = makeSubcircuitElement("PortWrapper", "sub-1", { x: 20, y: 0 }, internal, subcircuitPins);
+    parent.addElement(subEl);
+
+    const registry = makeRegistry("And");
+    const { circuit: flat } = flattenCircuit(parent, registry);
+
+    // No subcircuit elements remain
+    const subcircuitEls = flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:"));
+    expect(subcircuitEls.length).toBe(0);
+
+    // Gate is present in flattened circuit
+    const gateEls = flat.elements.filter((e) => e.typeId === "And");
+    expect(gateEls.length).toBe(1);
+
+    // Port elements are retained (they are leaf elements)
+    const portEls = flat.elements.filter((e) => e.typeId === "Port");
+    expect(portEls.length).toBe(2);
+
+    // Bridge wires are created: 2 internal wires + 2 bridge wires (one per subcircuit pin) = 4
+    expect(flat.wires.length).toBe(4);
+  });
+
+  it("nestedPortSubcircuits — recursive flattening works with Port at every level", () => {
+    // Inner circuit: Port("X") → And gate → Port("Z")
+    const inner = new Circuit({ name: "Inner" });
+    const innerPortX = makePortElement("port-X", "X", { x: 0, y: 0 });
+    const innerAnd = makeLeaf("And", "and-i", { x: 5, y: 0 });
+    const innerPortZ = makePortElement("port-Z", "Z", { x: 10, y: 0 });
+    inner.addElement(innerPortX);
+    inner.addElement(innerAnd);
+    inner.addElement(innerPortZ);
+
+    // Middle circuit: Port("A") + inner subcircuit + Port("Y")
+    const middle = new Circuit({ name: "Middle" });
+    const middlePortA = makePortElement("port-A", "A", { x: 0, y: 0 });
+    const middlePortY = makePortElement("port-Y", "Y", { x: 20, y: 0 });
+    const innerPins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 11, y: 1 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const innerSub = makeSubcircuitElement("Inner", "inner-sub", { x: 5, y: 0 }, inner, innerPins);
+    middle.addElement(middlePortA);
+    middle.addElement(innerSub);
+    middle.addElement(middlePortY);
+
+    // Top: contains middle as a subcircuit with BIDIRECTIONAL pins
+    const top = new Circuit({ name: "Top" });
+    const middlePins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const middleSub = makeSubcircuitElement("Middle", "mid-sub", { x: 0, y: 0 }, middle, middlePins);
+    top.addElement(middleSub);
+
+    const registry = makeRegistry("And");
+    const { circuit: flat } = flattenCircuit(top, registry);
+
+    // No subcircuit elements in result
+    const subcircuitEls = flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:"));
+    expect(subcircuitEls.length).toBe(0);
+
+    // The And gate from inner is present
+    const gateEls = flat.elements.filter((e) => e.typeId === "And");
+    expect(gateEls.length).toBe(1);
+
+    // All Port elements are present: middle has 2 (A, Y) + inner has 2 (X, Z) = 4
+    const portEls = flat.elements.filter((e) => e.typeId === "Port");
+    expect(portEls.length).toBe(4);
+  });
+
+  it("multiInstancePortSubcircuit — two instances of the same Port-based subcircuit have distinct scoped names", () => {
+    const internal = new Circuit({ name: "PortGate" });
+    const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
+    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const portY = makePortElement("port-Y", "Y", { x: 10, y: 0 });
+    internal.addElement(portA);
+    internal.addElement(andEl);
+    internal.addElement(portY);
+
+    const parent = new Circuit({ name: "Top" });
+
+    const pinsA: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const pinsB: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+
+    const sub0 = makeSubcircuitElement("PortGate", "sub-0", { x: 0, y: 0 }, internal, pinsA);
+    const sub1 = makeSubcircuitElement("PortGate", "sub-1", { x: 20, y: 0 }, internal, pinsB);
+    parent.addElement(sub0);
+    parent.addElement(sub1);
+
+    const registry = makeRegistry("And");
+    const { circuit: flat } = flattenCircuit(parent, registry);
+
+    // Each instance contributes 3 elements (Port A, And, Port Y) → 6 total
+    expect(flat.elements.length).toBe(6);
+
+    // All instanceIds must be distinct
+    const instanceIds = flat.elements.map((e) => e.instanceId);
+    const uniqueIds = new Set(instanceIds);
+    expect(uniqueIds.size).toBe(6);
+
+    // Scoped names contain the instance index to distinguish the two instances
+    const instance0Names = instanceIds.filter((id) => id.includes("PortGate_0"));
+    const instance1Names = instanceIds.filter((id) => id.includes("PortGate_1"));
+    expect(instance0Names.length).toBe(3);
+    expect(instance1Names.length).toBe(3);
+  });
+
+  it("portWithMultiBitWidth — Port('BUS', bitWidth=8) preserves bus width through the bridge", () => {
+    // Internal circuit: Port("BUS") with bitWidth 8 → And gate
+    const internal = new Circuit({ name: "BusSub" });
+    const portBus = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
+    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    internal.addElement(portBus);
+    internal.addElement(andEl);
+    internal.addWire(new Wire(
+      { x: portBus.getPins()[0]!.position.x, y: portBus.getPins()[0]!.position.y },
+      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+    ));
+
+    // Parent with an 8-bit BIDIRECTIONAL pin
+    const parent = new Circuit({ name: "Top" });
+    const subcircuitPins: Pin[] = [
+      {
+        direction: PinDirection.BIDIRECTIONAL,
+        position: { x: 10, y: 1 },
+        label: "BUS",
+        bitWidth: 8,
+        isNegated: false,
+        isClock: false,
+      },
+    ];
+    const subEl = makeSubcircuitElement("BusSub", "sub-1", { x: 10, y: 0 }, internal, subcircuitPins);
+    parent.addElement(subEl);
+
+    const registry = makeRegistry("And");
+    const { circuit: flat } = flattenCircuit(parent, registry);
+
+    // Gate and Port are both present
+    expect(flat.elements.filter((e) => e.typeId === "And").length).toBe(1);
+    const portEls = flat.elements.filter((e) => e.typeId === "Port");
+    expect(portEls.length).toBe(1);
+
+    // Port pin bitWidth is preserved
+    expect(portEls[0]!.getPins()[0]!.bitWidth).toBe(8);
+
+    // 1 internal wire + 1 bridge wire = 2
+    expect(flat.wires.length).toBe(2);
+  });
+
+  it("mixedPortAndLeafElements — multiple internal gates wired together are all preserved with correct bridge wires", () => {
+    // Internal circuit: Port("IN") → And → Or → Port("OUT")
+    const internal = new Circuit({ name: "TwoGates" });
+    const portIn = makePortElement("port-IN", "IN", { x: 0, y: 0 });
+    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const orEl = makeLeaf("Or", "or-1", { x: 10, y: 0 });
+    const portOut = makePortElement("port-OUT", "OUT", { x: 15, y: 0 });
+    internal.addElement(portIn);
+    internal.addElement(andEl);
+    internal.addElement(orEl);
+    internal.addElement(portOut);
+    // Wire the internal chain
+    internal.addWire(new Wire(
+      { x: portIn.getPins()[0]!.position.x, y: portIn.getPins()[0]!.position.y },
+      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+    ));
+    internal.addWire(new Wire(
+      { x: andEl.getPins()[0]!.position.x, y: andEl.getPins()[0]!.position.y },
+      { x: orEl.getPins()[0]!.position.x, y: orEl.getPins()[0]!.position.y },
+    ));
+    internal.addWire(new Wire(
+      { x: orEl.getPins()[0]!.position.x, y: orEl.getPins()[0]!.position.y },
+      { x: portOut.getPins()[0]!.position.x, y: portOut.getPins()[0]!.position.y },
+    ));
+
+    // Parent circuit with BIDIRECTIONAL pins for IN and OUT
+    const parent = new Circuit({ name: "Top" });
+    const subcircuitPins: Pin[] = [
+      {
+        direction: PinDirection.BIDIRECTIONAL,
+        position: { x: 30, y: 1 },
+        label: "IN",
+        bitWidth: 1,
+        isNegated: false,
+        isClock: false,
+      },
+      {
+        direction: PinDirection.BIDIRECTIONAL,
+        position: { x: 36, y: 1 },
+        label: "OUT",
+        bitWidth: 1,
+        isNegated: false,
+        isClock: false,
+      },
+    ];
+    const subEl = makeSubcircuitElement("TwoGates", "sub-1", { x: 30, y: 0 }, internal, subcircuitPins);
+    parent.addElement(subEl);
+
+    const registry = makeRegistry("And", "Or");
+    const { circuit: flat } = flattenCircuit(parent, registry);
+
+    // No subcircuit elements remain
+    expect(flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:")).length).toBe(0);
+
+    // All internal elements present: 2 Port + And + Or = 4
+    expect(flat.elements.length).toBe(4);
+    expect(flat.elements.filter((e) => e.typeId === "And").length).toBe(1);
+    expect(flat.elements.filter((e) => e.typeId === "Or").length).toBe(1);
+    expect(flat.elements.filter((e) => e.typeId === "Port").length).toBe(2);
+
+    // 3 internal wires + 2 bridge wires (one per subcircuit pin) = 5
+    expect(flat.wires.length).toBe(5);
+
+    // Bridge wire for "IN" pin: connects subcircuit pin at (30, 1) to Port("IN") pin
+    const portInPinPos = portIn.getPins()[0]!.position;
+    const bridgeWireIN = flat.wires.find(
+      (w) =>
+        (w.start.x === 30 && w.start.y === 1 && w.end.x === portInPinPos.x && w.end.y === portInPinPos.y) ||
+        (w.end.x === 30 && w.end.y === 1 && w.start.x === portInPinPos.x && w.start.y === portInPinPos.y),
+    );
+    expect(bridgeWireIN).toBeDefined();
+
+    // Bridge wire for "OUT" pin: connects subcircuit pin at (36, 1) to Port("OUT") pin
+    const portOutPinPos = portOut.getPins()[0]!.position;
+    const bridgeWireOUT = flat.wires.find(
+      (w) =>
+        (w.start.x === 36 && w.start.y === 1 && w.end.x === portOutPinPos.x && w.end.y === portOutPinPos.y) ||
+        (w.end.x === 36 && w.end.y === 1 && w.start.x === portOutPinPos.x && w.start.y === portOutPinPos.y),
+    );
+    expect(bridgeWireOUT).toBeDefined();
   });
 });

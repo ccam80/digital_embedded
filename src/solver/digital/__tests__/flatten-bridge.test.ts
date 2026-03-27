@@ -90,6 +90,30 @@ function makeInElement(
   return new TestLeafElement("In", instanceId, position, props, pins);
 }
 
+function makePortElement(
+  instanceId: string,
+  label: string,
+  position: { x: number; y: number } = { x: 5, y: 0 },
+  bitWidth: number = 1,
+): TestLeafElement {
+  const props = new PropertyBag();
+  props.set("label", label);
+  props.set("bitWidth", String(bitWidth));
+  props.set("face", "left");
+  props.set("sortOrder", "0");
+  const pins: Pin[] = [
+    {
+      direction: PinDirection.BIDIRECTIONAL,
+      position: { x: position.x, y: position.y + 1 },
+      label: "port",
+      bitWidth,
+      isNegated: false,
+      isClock: false,
+    },
+  ];
+  return new TestLeafElement("Port", instanceId, position, props, pins);
+}
+
 function makeOutElement(
   instanceId: string,
   label: string,
@@ -455,5 +479,181 @@ describe("CrossEngine", () => {
     expect(flat2.elements.length).toBe(6);
     const instanceIds = flat2.elements.map((e) => e.instanceId);
     expect(new Set(instanceIds).size).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Port-based cross-engine boundary tests
+// ---------------------------------------------------------------------------
+
+describe("cross-engine boundary — Port-based subcircuits", () => {
+  it("same_engine_port_subcircuit_inlines — digital subcircuit with Port interfaces in digital outer circuit flattens normally", () => {
+    // Internal circuit is digital with Port interface elements
+    const internal = new Circuit({ name: "PortWrapper" });
+    const portIn = makePortElement("port-in", "A", { x: 0, y: 0 });
+    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const portOut = makePortElement("port-out", "Y", { x: 10, y: 0 });
+    internal.addElement(portIn);
+    internal.addElement(andEl);
+    internal.addElement(portOut);
+
+    const outer = new Circuit({ name: "Top" });
+    const pins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subEl = makeSubcircuitElement("PortWrapper", "sub-1", { x: 20, y: 0 }, internal, pins);
+    outer.addElement(subEl);
+
+    // All types are digital — Port is registered as digital-only here
+    const registry = makeRegistry("And", "Port");
+    const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
+
+    // No boundaries — same engine
+    expect(crossEngineBoundaries.length).toBe(0);
+
+    // Internal elements must be inlined
+    expect(flat.elements.filter((e) => e.typeId === "And").length).toBe(1);
+    expect(flat.elements.filter((e) => e.typeId === "Port").length).toBe(2);
+    // No subcircuit placeholder remains
+    expect(flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:")).length).toBe(0);
+  });
+
+  it("cross_engine_port_subcircuit_preserved — analog subcircuit with Port interfaces in digital outer circuit produces boundary", () => {
+    // Internal circuit is analog — contains Resistor (analog-only) and Port interfaces
+    const internal = new Circuit({ name: "AnalogPortFilter" });
+    const portIn = makePortElement("port-in", "A", { x: 0, y: 0 });
+    const resistor = makeLeaf("Resistor", "r-1", { x: 5, y: 0 });
+    const portOut = makePortElement("port-out", "Y", { x: 10, y: 0 });
+    internal.addElement(portIn);
+    internal.addElement(resistor);
+    internal.addElement(portOut);
+
+    // Outer circuit is digital — contains And (digital-only)
+    const outer = new Circuit({ name: "Top" });
+    const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
+    outer.addElement(andEl);
+    const pins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subEl = makeSubcircuitElement("AnalogPortFilter", "sub-1", { x: 20, y: 0 }, internal, pins);
+    outer.addElement(subEl);
+
+    // Port and Resistor are analog-only; And is digital-only
+    const registry = makeRegistryWithAnalog(["And"], ["Port", "Resistor"]);
+    const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
+
+    // Boundary must be recorded
+    expect(crossEngineBoundaries.length).toBe(1);
+    expect(crossEngineBoundaries[0]!.internalEngineType).toBe("analog");
+    expect(crossEngineBoundaries[0]!.outerEngineType).toBe("digital");
+    expect(crossEngineBoundaries[0]!.subcircuitElement).toBe(subEl);
+
+    // Analog subcircuit elements must NOT appear in the flat circuit
+    expect(flat.elements.filter((e) => e.typeId === "Resistor").length).toBe(0);
+    expect(flat.elements.filter((e) => e.typeId === "Port").length).toBe(0);
+  });
+
+  it("port_pin_mappings_in_boundary — Port pins produce correct BoundaryPinMapping entries", () => {
+    // Internal circuit is analog with two Port interfaces
+    const internal = new Circuit({ name: "AnalogBlock" });
+    const portA = makePortElement("port-a", "A", { x: 0, y: 0 });
+    const portB = makePortElement("port-b", "B", { x: 0, y: 5 });
+    const resistor = makeLeaf("Resistor", "r-1", { x: 5, y: 0 });
+    internal.addElement(portA);
+    internal.addElement(portB);
+    internal.addElement(resistor);
+
+    // Outer circuit is digital — contains And (digital-only)
+    const outer = new Circuit({ name: "Top" });
+    const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
+    outer.addElement(andEl);
+    const pins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subEl = makeSubcircuitElement("AnalogBlock", "sub-1", { x: 20, y: 0 }, internal, pins);
+    outer.addElement(subEl);
+
+    const registry = makeRegistryWithAnalog(["And"], ["Port", "Resistor"]);
+    const { crossEngineBoundaries } = flattenCircuit(outer, registry);
+
+    expect(crossEngineBoundaries.length).toBe(1);
+    const mappings = crossEngineBoundaries[0]!.pinMappings;
+    expect(mappings.length).toBe(2);
+
+    const mapA = mappings.find((m) => m.pinLabel === "A");
+    const mapB = mappings.find((m) => m.pinLabel === "B");
+
+    // BIDIRECTIONAL pins map to "out" per buildPinMappings (not INPUT → not "in")
+    expect(mapA).toBeDefined();
+    expect(mapA!.direction).toBe("out");
+    expect(mapA!.innerLabel).toBe("A");
+    expect(mapA!.bitWidth).toBe(1);
+
+    expect(mapB).toBeDefined();
+    expect(mapB!.direction).toBe("out");
+    expect(mapB!.innerLabel).toBe("B");
+    expect(mapB!.bitWidth).toBe(1);
+  });
+
+  it("mixed_port_and_inout_subcircuits — Port subcircuit and In/Out subcircuit both cross-engine are both recorded as boundaries", () => {
+    // First internal circuit: analog with Port interfaces
+    const internalPort = new Circuit({ name: "PortFilter" });
+    const portEl = makePortElement("port-in", "SIG", { x: 0, y: 0 });
+    const resistor = makeLeaf("Resistor", "r-1", { x: 5, y: 0 });
+    internalPort.addElement(portEl);
+    internalPort.addElement(resistor);
+
+    // Second internal circuit: analog with In/Out interfaces
+    const internalIO = new Circuit({ name: "IOFilter" });
+    const inEl = makeInElement("in-1", "CLK", { x: 0, y: 0 });
+    const resistor2 = makeLeaf("Resistor", "r-2", { x: 5, y: 0 });
+    const outEl = makeOutElement("out-1", "Q", { x: 10, y: 0 });
+    internalIO.addElement(inEl);
+    internalIO.addElement(resistor2);
+    internalIO.addElement(outEl);
+
+    // Outer circuit is digital — contains And (digital-only)
+    const outer = new Circuit({ name: "Top" });
+    const andEl = makeLeaf("And", "and-outer", { x: 0, y: 20 });
+    outer.addElement(andEl);
+
+    // Port-based subcircuit instance
+    const portPins: Pin[] = [
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "SIG", bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subPort = makeSubcircuitElement("PortFilter", "sub-port", { x: 20, y: 0 }, internalPort, portPins);
+    outer.addElement(subPort);
+
+    // In/Out-based subcircuit instance
+    const ioPins: Pin[] = [
+      { direction: PinDirection.INPUT,  position: { x: 40, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.OUTPUT, position: { x: 46, y: 1 }, label: "Q",   bitWidth: 1, isNegated: false, isClock: false },
+    ];
+    const subIO = makeSubcircuitElement("IOFilter", "sub-io", { x: 40, y: 0 }, internalIO, ioPins);
+    outer.addElement(subIO);
+
+    // Port, In, Out, Resistor are analog-only; And is digital-only
+    const registry = makeRegistryWithAnalog(["And"], ["Port", "In", "Out", "Resistor"]);
+    const { crossEngineBoundaries } = flattenCircuit(outer, registry);
+
+    // Both subcircuits are cross-engine — two boundaries
+    expect(crossEngineBoundaries.length).toBe(2);
+
+    const portBoundary = crossEngineBoundaries.find((b) => b.subcircuitElement === subPort);
+    const ioBoundary = crossEngineBoundaries.find((b) => b.subcircuitElement === subIO);
+
+    expect(portBoundary).toBeDefined();
+    expect(portBoundary!.internalEngineType).toBe("analog");
+    expect(portBoundary!.outerEngineType).toBe("digital");
+    expect(portBoundary!.pinMappings.length).toBe(1);
+    expect(portBoundary!.pinMappings[0]!.pinLabel).toBe("SIG");
+
+    expect(ioBoundary).toBeDefined();
+    expect(ioBoundary!.internalEngineType).toBe("analog");
+    expect(ioBoundary!.outerEngineType).toBe("digital");
+    expect(ioBoundary!.pinMappings.length).toBe(2);
   });
 });

@@ -100,6 +100,10 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _voltageMax: number = -Infinity;
   private readonly _registry: ComponentRegistry | null;
   private _cachedDcOpResult: DcOpResult | null = null;
+  /** Lazily-built inverted index: CircuitElement → element index. */
+  private _elementIndexCache: Map<CircuitElement, number> | null = null;
+  /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
+  private readonly _pinVoltageResult = new Map<string, number>();
 
   constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
     this._registry = registry ?? null;
@@ -624,20 +628,28 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._clockManager.advanceClocks((this._digital as DigitalEngine).getSignalArray());
   }
 
-  getPinVoltages(element: CircuitElement): Map<string, number> | null {
-    if (this._analog === null) return null;
-    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
-    let elementIndex = -1;
-    for (const [idx, el] of compiledAnalog.elementToCircuitElement) {
-      if (el === element) {
-        elementIndex = idx;
-        break;
+  /** Resolve CircuitElement → compiled element index via cached inverted map. */
+  private _resolveElementIndex(element: CircuitElement): number {
+    if (this._elementIndexCache === null) {
+      this._elementIndexCache = new Map();
+      const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+      for (const [idx, el] of compiledAnalog.elementToCircuitElement) {
+        this._elementIndexCache.set(el, idx);
       }
     }
+    return this._elementIndexCache.get(element) ?? -1;
+  }
+
+  getPinVoltages(element: CircuitElement): Map<string, number> | null {
+    if (this._analog === null) return null;
+    const elementIndex = this._resolveElementIndex(element);
     if (elementIndex === -1) return null;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
     const resolvedPins = compiledAnalog.elementResolvedPins.get(elementIndex);
     if (resolvedPins === undefined || resolvedPins.length === 0) return null;
-    const result = new Map<string, number>();
+    // Reuse a single Map to avoid per-call allocation in the hot render path.
+    const result = this._pinVoltageResult;
+    result.clear();
     for (const pin of resolvedPins) {
       result.set(pin.label, this._analog.getNodeVoltage(pin.nodeId));
     }
@@ -685,11 +697,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   getSliderProperties(element: CircuitElement): SliderPropertyDescriptor[] {
     if (this._analog === null || this._registry === null) return [];
-    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
-    let elementIndex = -1;
-    for (const [idx, ce] of compiledAnalog.elementToCircuitElement) {
-      if (ce === element) { elementIndex = idx; break; }
-    }
+    const elementIndex = this._resolveElementIndex(element);
     if (elementIndex === -1) return [];
     const def = this._registry.get(element.typeId);
     if (!def?.propertyDefs) return [];
@@ -714,12 +722,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   setComponentProperty(element: CircuitElement, key: string, value: number): void {
     if (this._analog === null) return;
-    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
-    let elementIndex = -1;
-    for (const [idx, ce] of compiledAnalog.elementToCircuitElement) {
-      if (ce === element) { elementIndex = idx; break; }
-    }
+    const elementIndex = this._resolveElementIndex(element);
     if (elementIndex === -1) return;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
     const el = compiledAnalog.elements[elementIndex];
     if (el === undefined) return;
     if (isParameterMutable(el)) {
