@@ -168,27 +168,41 @@ export function registerCircuitTools(
     {
       title: "Describe Component Type",
       description:
-        "Query the registry for a component type's definition: pin layout, property definitions, and category. " +
-        "Use this to understand what pins and properties a component has before adding or patching.",
+        "Query the registry for one or more component type definitions: pin layout, property definitions, and category. " +
+        "Use this to understand what pins and properties a component has before adding or patching. " +
+        "Accepts a single type name or an array of type names for batch discovery.",
       inputSchema: {
         typeName: z
-          .string()
+          .union([z.string(), z.array(z.string())])
           .describe(
-            'Component type name, e.g. "And", "Or", "FlipflopD", "In", "Out", "Add", "Mux"',
+            'Component type name(s). Single string or array of strings, e.g. "And" or ["And", "Or", "XOr"]',
           ),
       },
     },
     ({ typeName }) => {
       try {
-        const def = facade.describeComponent(typeName);
-        if (!def) {
+        const typeNames = Array.isArray(typeName) ? typeName : [typeName];
+
+        const found: string[] = [];
+        const notFound: string[] = [];
+
+        for (const name of typeNames) {
+          const def = facade.describeComponent(name);
+          if (!def) {
+            notFound.push(name);
+          } else {
+            found.push(formatComponentDefinition(def));
+          }
+        }
+
+        if (found.length === 0 && notFound.length > 0) {
           const allNames = registry.getAll().map((d: ComponentDefinition) => d.name);
           return {
             content: [
               {
                 type: "text" as const,
                 text: [
-                  `Component type "${typeName}" not found in registry.`,
+                  `Component type(s) not found in registry: ${notFound.map((n) => `"${n}"`).join(", ")}`,
                   ``,
                   `Available component types (${allNames.length}):`,
                   allNames.join(", "),
@@ -198,8 +212,17 @@ export function registerCircuitTools(
             isError: true as const,
           };
         }
+
+        const sections: string[] = [...found];
+
+        if (notFound.length > 0) {
+          sections.push(
+            `\nNot found: ${notFound.map((n) => `"${n}"`).join(", ")}`,
+          );
+        }
+
         return {
-          content: [{ type: "text" as const, text: formatComponentDefinition(def) }],
+          content: [{ type: "text" as const, text: sections.join("\n---\n") }],
         };
       } catch (err) {
         return {
@@ -290,7 +313,8 @@ export function registerCircuitTools(
       description:
         "List all registered component types grouped by category. " +
         "Use this to discover available components before building circuits. " +
-        "Optionally filter by category name.",
+        "Optionally filter by category name. " +
+        "Set include_pins to true to see pin labels inline, collapsing the list+describe workflow into one call.",
       inputSchema: {
         category: z
           .string()
@@ -298,16 +322,23 @@ export function registerCircuitTools(
           .describe(
             'Optional category filter, e.g. "LOGIC", "IO", "MEMORY", "WIRING". Omit to list all.',
           ),
+        include_pins: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, include pin labels and directions for each component type inline. " +
+            "Collapses the list+describe workflow into one call.",
+          ),
       },
     },
-    ({ category }) => {
+    ({ category, include_pins }) => {
       const allDefs = registry.getAll();
-      const byCategory = new Map<string, string[]>();
+      const byCategory = new Map<string, ComponentDefinition[]>();
       for (const def of allDefs) {
         const cat = def.category ?? "UNCATEGORIZED";
         if (category && cat.toUpperCase() !== category.toUpperCase()) continue;
         if (!byCategory.has(cat)) byCategory.set(cat, []);
-        byCategory.get(cat)!.push(def.name);
+        byCategory.get(cat)!.push(def);
       }
 
       if (byCategory.size === 0) {
@@ -322,8 +353,22 @@ export function registerCircuitTools(
       }
 
       const lines: string[] = [];
-      for (const [cat, names] of [...byCategory.entries()].sort()) {
-        lines.push(`${cat}: ${names.sort().join(", ")}`);
+      for (const [cat, defs] of [...byCategory.entries()].sort()) {
+        if (include_pins) {
+          const parts = defs.sort((a, b) => a.name.localeCompare(b.name)).map((def) => {
+            if (!def.pinLayout || def.pinLayout.length === 0) return def.name;
+            const pinStr = def.pinLayout
+              .map((p) => {
+                const arrow = p.direction === "INPUT" ? "↓" : p.direction === "OUTPUT" ? "↑" : "↕";
+                return `${p.label}${arrow}`;
+              })
+              .join(" ");
+            return `${def.name} (${pinStr})`;
+          });
+          lines.push(`${cat}: ${parts.join(", ")}`);
+        } else {
+          lines.push(`${cat}: ${defs.sort((a, b) => a.name.localeCompare(b.name)).map((d) => d.name).join(", ")}`);
+        }
       }
       lines.push(
         `\nTotal: ${[...byCategory.values()].reduce((s, v) => s + v.length, 0)} component types`,
@@ -445,8 +490,8 @@ export function registerCircuitTools(
     {
       title: "Build Circuit from Spec",
       description:
-        "Create a new circuit from a declarative specification. No coordinates required — " +
-        "the builder auto-positions components and auto-routes wires. " +
+        "Create a new circuit from a declarative specification. Works with digital, analog, and mixed-signal circuits. " +
+        "No coordinates required — the builder auto-positions components and auto-routes wires. " +
         "Components are addressed by their spec id, pins by 'id:pinLabel'. " +
         "Returns a handle and post-build diagnostics.",
       inputSchema: {
@@ -538,7 +583,7 @@ export function registerCircuitTools(
       title: "Compile Circuit",
       description:
         "Compile a circuit into an executable simulation engine. " +
-        "Performs topological sort, net ID assignment, and function table construction. " +
+        "Works with digital, analog, and mixed-signal circuits. " +
         "Fails if the circuit has combinational loops, unconnected required pins, or other structural errors. " +
         "You must fix all diagnostics from circuit_validate before compiling.",
       inputSchema: {
@@ -548,27 +593,26 @@ export function registerCircuitTools(
     ({ handle }) => {
       try {
         const circuit = session.getCircuit(handle);
-        const engine = facade.compile(circuit);
+        const coordinator = facade.compile(circuit);
+        session.storeEngine(handle, coordinator);
 
-        const signals = facade.readAllSignals(engine);
+        const signals = facade.readAllSignals(coordinator);
         const signalCount = Object.keys(signals).length;
 
         const netlist = facade.netlist(circuit);
+        const lines = [
+          `Circuit compiled successfully.`,
+          `Components: ${netlist.components.length}`,
+          `Nets: ${netlist.nets.length}`,
+          `Labeled signals: ${signalCount}`,
+          `Timing model: ${coordinator.timingModel}`,
+          `DC op available: ${coordinator.supportsDcOp()}`,
+          `AC sweep available: ${coordinator.supportsAcSweep()}`,
+          ``,
+          `Engine stored. Use circuit_step, circuit_set_input, circuit_read_output for interactive simulation.`,
+        ];
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: [
-                `Circuit compiled successfully.`,
-                `Components: ${netlist.components.length}`,
-                `Nets: ${netlist.nets.length}`,
-                `Labeled signals: ${signalCount}`,
-                ``,
-                `Note: The compiled engine is not stored between tool calls.`,
-                `Use circuit_test to run test vectors, which compiles internally.`,
-              ].join("\n"),
-            },
-          ],
+          content: [{ type: "text" as const, text: lines.join("\n") }],
         };
       } catch (err) {
         return {
