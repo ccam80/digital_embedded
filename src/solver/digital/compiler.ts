@@ -298,7 +298,11 @@ export function compileDigitalPartition(
       );
     }
 
-    if (def.models?.digital?.inputSchema) {
+    if (!def.models?.digital) {
+      // Neutral infrastructure (Port, etc.) — no inputs, no outputs; pure wire identity.
+      componentInputNets.push([]);
+      componentOutputNets.push([]);
+    } else if (def.models.digital.inputSchema) {
       const inputs: number[] = [];
       for (const label of def.models.digital.inputSchema) {
         const refIdx = refs.findIndex(r => r.pinLabel === label);
@@ -307,6 +311,26 @@ export function compileDigitalPartition(
         }
       }
       componentInputNets.push(inputs);
+
+      if (def.models.digital.outputSchema) {
+        const outputs: number[] = [];
+        for (const label of def.models.digital.outputSchema) {
+          const refIdx = refs.findIndex(r => r.pinLabel === label);
+          if (refIdx >= 0) {
+            outputs.push(slotToNetId(i, refIdx));
+          }
+        }
+        componentOutputNets.push(outputs);
+      } else {
+        const outputs: number[] = [];
+        for (let j = 0; j < refs.length; j++) {
+          const ref = refs[j]!;
+          if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
+            outputs.push(slotToNetId(i, j));
+          }
+        }
+        componentOutputNets.push(outputs);
+      }
     } else {
       const inputs: number[] = [];
       for (let j = 0; j < refs.length; j++) {
@@ -316,26 +340,26 @@ export function compileDigitalPartition(
         }
       }
       componentInputNets.push(inputs);
-    }
 
-    if (def.models?.digital?.outputSchema) {
-      const outputs: number[] = [];
-      for (const label of def.models.digital.outputSchema) {
-        const refIdx = refs.findIndex(r => r.pinLabel === label);
-        if (refIdx >= 0) {
-          outputs.push(slotToNetId(i, refIdx));
+      if (def.models.digital.outputSchema) {
+        const outputs: number[] = [];
+        for (const label of def.models.digital.outputSchema) {
+          const refIdx = refs.findIndex(r => r.pinLabel === label);
+          if (refIdx >= 0) {
+            outputs.push(slotToNetId(i, refIdx));
+          }
         }
-      }
-      componentOutputNets.push(outputs);
-    } else {
-      const outputs: number[] = [];
-      for (let j = 0; j < refs.length; j++) {
-        const ref = refs[j]!;
-        if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
-          outputs.push(slotToNetId(i, j));
+        componentOutputNets.push(outputs);
+      } else {
+        const outputs: number[] = [];
+        for (let j = 0; j < refs.length; j++) {
+          const ref = refs[j]!;
+          if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
+            outputs.push(slotToNetId(i, j));
+          }
         }
+        componentOutputNets.push(outputs);
       }
-      componentOutputNets.push(outputs);
     }
   }
 
@@ -614,15 +638,24 @@ export function compileDigitalPartition(
   const typeNameMap = new Map<number, string>();
   const typeIds = new Uint16Array(componentCount);
 
+  const noopExecute: ExecuteFunction = () => {};
+
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
     typeIds[i] = def.typeId;
+    if (!def.models?.digital) {
+      if (!executeFnsMap.has(def.typeId)) {
+        executeFnsMap.set(def.typeId, noopExecute);
+        typeNameMap.set(def.typeId, def.name);
+      }
+      continue;
+    }
     if (!executeFnsMap.has(def.typeId)) {
-      executeFnsMap.set(def.typeId, def.models!.digital!.executeFn);
+      executeFnsMap.set(def.typeId, def.models.digital.executeFn);
       typeNameMap.set(def.typeId, def.name);
-      if (def.models!.digital!.sampleFn !== undefined) {
-        sampleFnsMap.set(def.typeId, def.models!.digital!.sampleFn);
+      if (def.models.digital.sampleFn !== undefined) {
+        sampleFnsMap.set(def.typeId, def.models.digital.sampleFn);
       }
     }
   }
