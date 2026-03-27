@@ -15,7 +15,7 @@ import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
-import type { SubcircuitHost, FlattenResult } from "@/solver/digital/flatten";
+import type { SubcircuitHost } from "@/solver/digital/flatten";
 
 // ---------------------------------------------------------------------------
 // Test helpers (same pattern as flatten.test.ts)
@@ -234,8 +234,8 @@ describe("flattenCircuit — Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // A bridge wire should exist connecting the subcircuit pin position to the Port's pin position
-    expect(flat.circuit.wires.length).toBeGreaterThanOrEqual(1);
+    // 1 internal wire (Port pin → And pin) + 1 bridge wire (subcircuit pin → Port pin) = 2
+    expect(flat.circuit.wires.length).toBe(2);
   });
 
   it("falls back to In/Out for INPUT/OUTPUT direction (legacy subcircuits)", () => {
@@ -282,8 +282,8 @@ describe("flattenCircuit — Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // Bridge wires created for both In and Out interface elements
-    expect(flat.circuit.wires.length).toBeGreaterThanOrEqual(1);
+    // 1 internal wire (In pin → And pin) + 2 bridge wires (one per subcircuit pin: X and Y) = 3
+    expect(flat.circuit.wires.length).toBe(3);
   });
 
   it("returns undefined for BIDIRECTIONAL when no Port matches — does not fall through to Out", () => {
@@ -359,15 +359,14 @@ describe("flattenCircuit — Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // Bridge wire should exist (Port matched by label with bitWidth 8)
-    expect(flat.circuit.wires.length).toBeGreaterThanOrEqual(1);
+    // 1 internal wire (Port pin → And pin) + 1 bridge wire (subcircuit pin → Port pin) = 2
+    expect(flat.circuit.wires.length).toBe(2);
 
-    // The Port element in the flattened circuit should preserve its 8-bit width
+    // Port IS retained in the flattened circuit — assert count unconditionally
     const flatPorts = flat.circuit.elements.filter((e) => e.typeId === "Port");
-    if (flatPorts.length > 0) {
-      const portPins = flatPorts[0].getPins();
-      expect(portPins[0].bitWidth).toBe(8);
-    }
+    expect(flatPorts.length).toBe(1);
+    const portPins = flatPorts[0].getPins();
+    expect(portPins[0].bitWidth).toBe(8);
   });
 
   it("bridge wire connects subcircuit pin position to internal Port pin position", () => {

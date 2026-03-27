@@ -55,11 +55,12 @@ export interface CompilationWarning {
  * @throws          Error if an element's typeId is not registered.
  * @throws          BitsException if connected pins have mismatched bit widths.
  */
-// Infrastructure types that are engine-neutral and never registered in the
-// component registry — they must not trigger "unknown component" errors.
+// Engine-neutral infrastructure types — Port is registered in the component
+// registry but has no simulation model; the rest are never registered at all.
+// None of these must trigger "unknown component" errors during compilation.
 const COMPILE_INFRASTRUCTURE_TYPES = new Set([
   'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe',
-  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
+  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
 ]);
 
 function compileCircuit(

@@ -586,9 +586,13 @@ export function initApp(search?: string): void {
         palette.refreshCategories();
         paletteUI.render();
       }
-    } catch {
-      // IndexedDB may be unavailable (e.g. private browsing). Non-fatal.
+    } catch (err) {
+      console.warn('Failed to load stored subcircuits:', err);
     }
+
+    // TODO(SE-deferred): Wire on-edit persistence — re-serialize subcircuit
+    // to IndexedDB on each UndoRedoStack push within subcircuit drill-down.
+    // Currently subcircuits are only persisted at creation time.
 
     await autoLoadFile();
   }

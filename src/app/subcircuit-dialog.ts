@@ -381,8 +381,7 @@ export function openSubcircuitDialog(
         faceSelect.appendChild(opt);
       }
       // Assign initial face from position relative to centroid (already computed in BoundaryPort via extractSubcircuit)
-      // We use 'left' as default — the caller sets the face via the BoundaryPort's original position
-      faceSelect.value = 'left';
+      faceSelect.value = initialFace;
       faceSelect.addEventListener('change', validateAndUpdate);
       tdFace.appendChild(faceSelect);
 

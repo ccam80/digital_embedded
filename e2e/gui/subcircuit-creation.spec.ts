@@ -266,7 +266,35 @@ test.describe('GUI: subcircuit creation', () => {
   // -------------------------------------------------------------------------
 
   test('changing a port face in the dialog updates the chip preview', async () => {
-    await setupContextMenu(harness);
+    // Select only the And gate (not the whole circuit) so that boundary wires
+    // exist and the dialog's port table is populated with face dropdowns.
+    // The And gate has 2 input boundary wires (from In A and In B) and 1
+    // output boundary wire (to Out Y) — producing 3 face dropdowns.
+    await harness.loadDigXml(AND_GATE_XML);
+    await waitForCircuitElements(harness, 4);
+
+    // Click the And gate element to select only it (deselects everything else)
+    const andIdx = await findElementIndex(harness, 'And');
+    if (andIdx === -1) throw new Error('And gate not found in circuit after load');
+    const andPos = await getElementCenterScreen(harness, andIdx);
+
+    const canvasBox = await harness.iframe.locator('#sim-canvas').boundingBox();
+    if (!canvasBox) throw new Error('Canvas bounding box not found');
+
+    // Single left-click to select only the And gate
+    await harness.page.mouse.click(
+      canvasBox.x + andPos.x,
+      canvasBox.y + andPos.y,
+    );
+    await harness.page.waitForTimeout(150);
+
+    // Right-click on the And gate to open the context menu
+    await harness.page.mouse.click(
+      canvasBox.x + andPos.x,
+      canvasBox.y + andPos.y,
+      { button: 'right' },
+    );
+    await harness.page.waitForTimeout(200);
 
     const menuItem = harness.iframe.locator('.ctx-menu-item').filter({
       hasText: 'Make Subcircuit\u2026',
@@ -277,6 +305,11 @@ test.describe('GUI: subcircuit creation', () => {
 
     const dialog = harness.iframe.locator('.subcircuit-dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });
+
+    // Expect boundary ports — selecting only the And gate yields wires that
+    // cross the selection boundary, so face dropdowns must be present.
+    const faceSelects = harness.iframe.locator('.subcircuit-dialog select');
+    await expect(faceSelects.first()).toBeVisible({ timeout: 2000 });
 
     // Capture preview canvas pixel checksum before any face change
     const pixelsBefore = await harness.page.evaluate(() => {
@@ -292,39 +325,30 @@ test.describe('GUI: subcircuit creation', () => {
       return sum;
     });
 
-    const faceSelects = harness.iframe.locator('.subcircuit-dialog select');
-    const faceCount = await faceSelects.count();
+    // Change the first face select to a different face value
+    const firstSelect = faceSelects.first();
+    const currentValue = await firstSelect.inputValue();
+    const newValue = currentValue === 'left' ? 'right' : 'left';
+    await firstSelect.selectOption(newValue);
+    await harness.page.waitForTimeout(200);
 
-    if (faceCount > 0) {
-      // Change the first face select to a different face value
-      const firstSelect = faceSelects.first();
-      const currentValue = await firstSelect.inputValue();
-      const newValue = currentValue === 'left' ? 'right' : 'left';
-      await firstSelect.selectOption(newValue);
-      await harness.page.waitForTimeout(200);
+    const pixelsAfter = await harness.page.evaluate(() => {
+      const iframe = document.getElementById('sim') as HTMLIFrameElement;
+      const doc = iframe.contentWindow!.document;
+      const canvas = doc.querySelector('.subcircuit-dialog canvas') as HTMLCanvasElement | null;
+      if (!canvas) return null;
+      const ctx2d = canvas.getContext('2d');
+      if (!ctx2d) return null;
+      const data = ctx2d.getImageData(0, 0, canvas.width, canvas.height).data;
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      return sum;
+    });
 
-      const pixelsAfter = await harness.page.evaluate(() => {
-        const iframe = document.getElementById('sim') as HTMLIFrameElement;
-        const doc = iframe.contentWindow!.document;
-        const canvas = doc.querySelector('.subcircuit-dialog canvas') as HTMLCanvasElement | null;
-        if (!canvas) return null;
-        const ctx2d = canvas.getContext('2d');
-        if (!ctx2d) return null;
-        const data = ctx2d.getImageData(0, 0, canvas.width, canvas.height).data;
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        return sum;
-      });
-
-      // Preview canvas must have been redrawn after the face change
-      if (pixelsBefore !== null && pixelsAfter !== null) {
-        expect(pixelsAfter).not.toBe(pixelsBefore);
-      }
-    } else {
-      // No boundary ports (full selection with no external wires) — no face
-      // dropdowns. The preview canvas is still rendered (empty chip outline).
-      await expect(harness.iframe.locator('.subcircuit-dialog canvas')).toBeVisible();
-    }
+    // Preview canvas must have been redrawn after the face change
+    expect(pixelsBefore).not.toBeNull();
+    expect(pixelsAfter).not.toBeNull();
+    expect(pixelsAfter).not.toBe(pixelsBefore);
 
     // Dismiss
     await harness.iframe

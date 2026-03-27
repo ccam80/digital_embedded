@@ -62,6 +62,7 @@ function makeTestElement(
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },
+    setAttribute(_name: string, _value: unknown): void {},
   };
 }
 

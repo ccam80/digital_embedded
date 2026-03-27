@@ -18,7 +18,7 @@ import { createModal } from './dialog-manager.js';
 import { separator } from '../editor/context-menu.js';
 import type { MenuItem } from '../editor/context-menu.js';
 import { deleteSelection, rotateSelection, mirrorSelection, copyToClipboard } from '../editor/edit-operations.js';
-import { analyzeBoundary, insertAsSubcircuit } from '../editor/insert-subcircuit.js';
+import { analyzeBoundary, insertAsSubcircuit, type PortOverride } from '../editor/insert-subcircuit.js';
 import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
@@ -230,12 +230,18 @@ export function initMenuAndToolbar(
               const { boundaryPorts } = analyzeBoundary(ctx.circuit, selectedElements, selectedWires);
               void openSubcircuitDialog(boundaryPorts, registry).then((result) => {
                 if (!result) return;
+                const userPorts: PortOverride[] = result.ports.map(p => ({
+                  label: p.label,
+                  bitWidth: p.bitWidth,
+                  face: p.face,
+                }));
                 const { subcircuit, command } = insertAsSubcircuit(
                   ctx.circuit,
                   selectedElements,
                   selectedWires,
                   registry,
                   result.name,
+                  userPorts,
                 );
                 undoStack.push(command);
                 selection.clear();
@@ -243,7 +249,10 @@ export function initMenuAndToolbar(
 
                 // Persist the extracted subcircuit to IndexedDB.
                 const xml = serializeCircuitToDig(subcircuit, registry);
-                void storeSubcircuit(result.name, xml).catch(() => { /* non-fatal */ });
+                void storeSubcircuit(result.name, xml).catch((err: unknown) => {
+                  console.error('Failed to persist subcircuit:', err);
+                  ctx.showStatus(`ERROR: Failed to save subcircuit "${result.name}" — it will be lost on reload`);
+                });
 
                 // Update the palette so the new subcircuit appears immediately.
                 palette.refreshCategories();

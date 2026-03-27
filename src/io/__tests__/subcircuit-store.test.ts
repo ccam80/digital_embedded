@@ -167,7 +167,7 @@ describe("storeSubcircuit", () => {
     expect(allAfterSecond).toHaveLength(1);
     expect(allAfterSecond[0].xml).toBe("<circuit><v2/></circuit>");
     expect(allAfterSecond[0].created).toBe(createdFirst);
-    expect(allAfterSecond[0].modified).toBeGreaterThanOrEqual(modifiedFirst);
+    expect(allAfterSecond[0].modified).toBeGreaterThan(modifiedFirst);
   });
 
   it("stores multiple distinct entries", async () => {
@@ -226,5 +226,109 @@ describe("deleteSubcircuit", () => {
     await deleteSubcircuit("Only");
     const all = await loadAllSubcircuits();
     expect(all).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onupgradeneeded path — fresh database (objectStore does not exist yet)
+// ---------------------------------------------------------------------------
+
+describe("openDB onupgradeneeded", () => {
+  it("calls createObjectStore when the store does not exist yet", async () => {
+    // Build a mock where contains() returns false so the upgrade branch runs.
+    const backing = new Map<string, StoredSubcircuit>();
+
+    const createObjectStoreSpy = vi.fn();
+
+    function makeTransaction(_mode: string) {
+      let oncompleteCb: (() => void) | null = null;
+      const scheduleComplete = () => {
+        Promise.resolve()
+          .then(() => Promise.resolve())
+          .then(() => Promise.resolve())
+          .then(() => Promise.resolve())
+          .then(() => oncompleteCb?.());
+      };
+
+      const objectStore = {
+        get(key: IDBValidKey) {
+          const value = backing.get(key as string);
+          const req = {
+            result: value as unknown,
+            onsuccess: null as null | (() => void),
+            onerror: null as null | (() => void),
+          };
+          Promise.resolve().then(() => req.onsuccess?.());
+          return req;
+        },
+        put(record: StoredSubcircuit) {
+          backing.set(record.name, { ...record });
+          return { result: record.name as IDBValidKey };
+        },
+        delete(key: IDBValidKey) {
+          backing.delete(key as string);
+          return { result: undefined };
+        },
+        getAll() {
+          const result = Array.from(backing.values());
+          const req = {
+            result: result as unknown,
+            onsuccess: null as null | (() => void),
+            onerror: null as null | (() => void),
+          };
+          Promise.resolve().then(() => req.onsuccess?.());
+          return req;
+        },
+      };
+
+      const tx = {
+        get oncomplete() { return oncompleteCb; },
+        set oncomplete(fn: (() => void) | null) {
+          oncompleteCb = fn;
+          scheduleComplete();
+        },
+        get onerror() { return null; },
+        set onerror(_fn: (() => void) | null) {},
+        objectStore(_name: string) { return objectStore; },
+      };
+      return tx;
+    }
+
+    const freshDB = {
+      // contains returns false → triggers createObjectStore in onupgradeneeded
+      objectStoreNames: { contains: (_n: string) => false },
+      transaction(_storeName: string, mode: string) {
+        return makeTransaction(mode);
+      },
+      close() {},
+      createObjectStore: createObjectStoreSpy,
+    };
+
+    vi.stubGlobal("indexedDB", {
+      open(_name: string, _version?: number) {
+        const req = {
+          result: freshDB as unknown as IDBDatabase,
+          error: null as DOMException | null,
+          onupgradeneeded: null as null | ((e: IDBVersionChangeEvent) => void),
+          onsuccess: null as null | ((e: Event) => void),
+          onerror: null as null | ((e: Event) => void),
+        };
+        // Fire onupgradeneeded first, then onsuccess (mirrors real IDB behaviour)
+        Promise.resolve().then(() => {
+          req.onupgradeneeded?.({} as IDBVersionChangeEvent);
+          req.onsuccess?.({} as Event);
+        });
+        return req as unknown as IDBOpenDBRequest;
+      },
+      deleteDatabase(_name: string) { return {} as IDBOpenDBRequest; },
+      cmp(_a: unknown, _b: unknown) { return 0; },
+      databases() { return Promise.resolve([]); },
+    } satisfies typeof globalThis.indexedDB);
+
+    // Any store operation triggers openDB; storeSubcircuit is the simplest.
+    await storeSubcircuit("FreshDB", "<circuit/>");
+
+    // createObjectStore must have been called during onupgradeneeded
+    expect(createObjectStoreSpy).toHaveBeenCalledWith("subcircuits", { keyPath: "name" });
   });
 });

@@ -202,12 +202,22 @@ export function analyzeBoundary(
 // ---------------------------------------------------------------------------
 
 /**
+ * User-supplied overrides for a single boundary port.
+ * When provided, these values replace the auto-derived label, bitWidth, and face.
+ */
+export interface PortOverride {
+  label: string;
+  bitWidth: number;
+  face: "left" | "right" | "top" | "bottom";
+}
+
+/**
  * Create a new Circuit from the selected elements, internal wires, and Port
  * elements at each boundary crossing position.
  *
  * Each boundary port becomes a Port element positioned at the selected-element-
  * side endpoint of the boundary wire. Face is assigned based on the port's
- * position relative to the selection centroid.
+ * position relative to the selection centroid, unless overridden by userPorts.
  *
  * The new circuit contains:
  *   - All selected elements (by reference — callers clone if needed).
@@ -218,6 +228,7 @@ export function extractSubcircuit(
   selectedElements: CircuitElement[],
   internalWires: Wire[],
   boundaryPorts: BoundaryPort[],
+  userPorts?: PortOverride[],
 ): Circuit {
   const subcircuit = new Circuit({ name: "Subcircuit" });
 
@@ -231,11 +242,16 @@ export function extractSubcircuit(
 
   const centroid = selectionCentroid(selectedElements);
 
-  for (const bp of boundaryPorts) {
-    const face = assignFace(bp.position, centroid);
+  for (let i = 0; i < boundaryPorts.length; i++) {
+    const bp = boundaryPorts[i];
+    const override = userPorts?.[i];
+    const label = override?.label ?? bp.label;
+    const bitWidth = override?.bitWidth ?? bp.bitWidth;
+    const face = override?.face ?? assignFace(bp.position, centroid);
+
     const props = new PropertyBag();
-    props.set("label", bp.label);
-    props.set("bitWidth", bp.bitWidth);
+    props.set("label", label);
+    props.set("bitWidth", bitWidth);
     props.set("face", face);
     props.set("sortOrder", 0);
 
@@ -288,10 +304,11 @@ export function insertAsSubcircuit(
   selectedWires: Wire[],
   registry?: ComponentRegistry,
   name?: string,
+  userPorts?: PortOverride[],
 ): { subcircuit: Circuit; command: EditCommand; instance: SubcircuitElement } {
   const { boundaryPorts, internalWires } = analyzeBoundary(circuit, selectedElements, selectedWires);
 
-  const subcircuit = extractSubcircuit(selectedElements, internalWires, boundaryPorts);
+  const subcircuit = extractSubcircuit(selectedElements, internalWires, boundaryPorts, userPorts);
   const subcircuitName = name ?? `Subcircuit_${Date.now()}`;
 
   const pinLayout = deriveInterfacePins(subcircuit);

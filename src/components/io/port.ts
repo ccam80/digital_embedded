@@ -96,9 +96,6 @@ export class PortElement extends AbstractCircuitElement {
       { x: DIAMOND_HALF,  y: DIAMOND_HALF },
     ], false);
 
-    // Stub wire from pin (x=0) to diamond left vertex
-    ctx.drawLine(0, 0, 0, 0);
-
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     drawUprightText(ctx, label, DIAMOND_HALF * 2 + 0.35, 0, {
