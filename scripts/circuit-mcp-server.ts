@@ -17,6 +17,7 @@ import { scan74xxPinMap } from "../src/io/dig-pin-scanner.js";
 import { SessionState } from "./mcp/tool-helpers.js";
 import { registerCircuitTools } from "./mcp/circuit-tools.js";
 import { registerTutorialTools } from "./mcp/tutorial-tools.js";
+import { registerSimulationTools } from "./mcp/simulation-tools.js";
 
 // ---------------------------------------------------------------------------
 // Registry + facade (initialized once)
@@ -37,7 +38,7 @@ const server = new McpServer(
   {
     capabilities: { tools: {} },
     instructions:
-      "Use this server to load, inspect, build, patch, compile, and test digital logic circuits. " +
+      "Use this server to load, inspect, build, patch, compile, and test digital, analog, and mixed-signal circuits. " +
       "Always start with circuit_load or circuit_build to get a handle, then use circuit_netlist to inspect topology. " +
       "Addresses use the format 'componentLabel:pinLabel'. Read netlist output to get exact addresses for patches.",
   },
@@ -45,6 +46,7 @@ const server = new McpServer(
 
 registerCircuitTools(server, facade, registry, session);
 registerTutorialTools(server, facade, registry, session);
+registerSimulationTools(server, facade, registry, session);
 
 // ---------------------------------------------------------------------------
 // Start server

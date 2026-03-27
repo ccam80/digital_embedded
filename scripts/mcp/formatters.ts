@@ -4,6 +4,7 @@
 
 import type { Diagnostic, Netlist, PinDescriptor, NetDescriptor } from "../../src/headless/netlist-types.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
+import { availableModels } from "../../src/core/registry.js";
 import { PropertyBag } from "../../src/core/properties.js";
 
 export function formatDiagnostics(diagnostics: Diagnostic[]): string {
@@ -46,7 +47,11 @@ export function formatNetlist(netlist: Netlist): string {
         ? ` {${propEntries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")}}`
         : "";
 
-    lines.push(`  [${comp.index}] ${comp.typeId}${label}${propSuffix} — pins: ${pinSummary}`);
+    const modelTag =
+      comp.availableModels.length === 0 ? "" :
+      comp.availableModels.includes("digital") && comp.availableModels.includes("analog") ? " [mixed]" :
+      comp.availableModels.includes("analog") ? " [analog]" : " [digital]";
+    lines.push(`  [${comp.index}] ${comp.typeId}${modelTag}${label}${propSuffix} — pins: ${pinSummary}`);
   }
 
   lines.push("");
@@ -74,6 +79,10 @@ export function formatComponentDefinition(def: ComponentDefinition): string {
   const lines: string[] = [];
   lines.push(`Component: ${def.name}`);
   lines.push(`Category: ${def.category}`);
+  const models = availableModels(def);
+  if (models.length > 0) {
+    lines.push(`Models: ${models.join(", ")}`);
+  }
 
   if (def.helpText) {
     lines.push(`Help: ${def.helpText}`);
@@ -90,6 +99,13 @@ export function formatComponentDefinition(def: ComponentDefinition): string {
       if (prop.description) {
         lines.push(`    ${prop.description}`);
       }
+    }
+  }
+
+  if (def.attributeMap && def.attributeMap.length > 0) {
+    lines.push(`\nAttribute map (XML → internal):`);
+    for (const entry of def.attributeMap) {
+      lines.push(`  ${entry.xmlName} → ${entry.propertyKey}`);
     }
   }
 

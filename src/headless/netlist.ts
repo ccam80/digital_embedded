@@ -389,14 +389,32 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
       };
     });
 
-    components.push({
-      index: i,
-      typeId: el.typeId,
-      label,
-      instanceId: el.instanceId,
-      pins: pinDescriptors,
-      properties,
-    });
+    const models = def.models ? Object.keys(def.models) : [];
+    const activeModelAttr = el.getAttribute('defaultModel');
+    const activeModel = typeof activeModelAttr === 'string' ? activeModelAttr : undefined;
+
+    if (activeModel !== undefined) {
+      components.push({
+        index: i,
+        typeId: el.typeId,
+        label,
+        instanceId: el.instanceId,
+        pins: pinDescriptors,
+        properties,
+        availableModels: models,
+        activeModel,
+      });
+    } else {
+      components.push({
+        index: i,
+        typeId: el.typeId,
+        label,
+        instanceId: el.instanceId,
+        pins: pinDescriptors,
+        properties,
+        availableModels: models,
+      });
+    }
   }
 
   return { components, nets, diagnostics };

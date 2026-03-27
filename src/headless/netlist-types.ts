@@ -81,6 +81,10 @@ export interface ComponentDescriptor {
   readonly pins: PinDescriptor[];
   /** Component properties (Bits, label, Inputs, etc.). */
   readonly properties: Record<string, PropertyValue>;
+  /** Simulation model keys available for this component type (e.g. ["digital"], ["analog"], ["digital", "analog"]). */
+  readonly availableModels: string[];
+  /** Active model key for this instance, if explicitly set. */
+  readonly activeModel?: string;
 }
 
 /**
