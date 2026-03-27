@@ -1741,7 +1741,7 @@ function buildAnalogNodeMapFromPartition(
 
   // Build labelToNodeId from In/Out/Probe components in the partition
   const labelToNodeId = new Map<string, number>();
-  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe"]);
+  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe", "Port"]);
   for (const pc of partition.components) {
     if (!labelTypes.has(pc.element.typeId)) continue;
     const props = pc.element.getProperties();

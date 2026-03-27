@@ -211,12 +211,11 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
 
     const signals = facade.readAllSignals(engine);
 
-    // Port is in labelTypes of compileAnalogCircuit but NOT in
-    // compileAnalogPartition. Document which path is currently taken:
-    // if this assertion fails, the partition compiler does not resolve Port
-    // labels and the label map must be fixed (add "Port" to labelTypes at
-    // line 1744 of compiler.ts).
+    // Port must appear in labelToNodeId via the partition compiler path
+    // (compileAnalogPartition) with "Port" in its labelTypes set.
     expect('P_probe' in signals).toBe(true);
+    // The voltage at the Port node should be ~5V (DcVoltageSource sets it directly).
+    expect(signals['P_probe']).toBeGreaterThan(4.9);
   });
 
   it('readOutput() via Port label works in a pure analog circuit', () => {
@@ -248,5 +247,69 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
     // With 5V source and 1kΩ load, the voltage at the Port node is ~5V
     // (DcVoltageSource sets the node to exactly 5V).
     expect(voltage).toBeGreaterThan(4.9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 4: Port in pure-digital circuit — no regression
+// ---------------------------------------------------------------------------
+
+describe('Port in pure-digital circuit — no regression', () => {
+  it('Port works as expected in a digital-only circuit', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    const circuit = facade.build({
+      components: [
+        { id: 'inA', type: 'In',  props: { label: 'A', bitWidth: 1 } },
+        { id: 'port', type: 'Port', props: { label: 'P_dig', bitWidth: 1 } },
+        { id: 'out', type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+      ],
+      connections: [
+        ['inA:out', 'port:port'],
+        ['port:port', 'out:in'],
+      ],
+    });
+
+    const engine = facade.compile(circuit);
+    facade.setInput(engine, 'A', 1);
+    facade.step(engine);
+
+    const y = facade.readOutput(engine, 'Y');
+    expect(y).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 5: Port at cross-domain boundary — connected to both digital and analog
+// ---------------------------------------------------------------------------
+
+describe('Port at cross-domain boundary', () => {
+  it('readOutput() returns a value for Port at digital-analog boundary', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    const circuit = facade.build({
+      components: [
+        { id: 'inA',  type: 'In',       props: { label: 'A', bitWidth: 1 } },
+        { id: 'inB',  type: 'In',       props: { label: 'B', bitWidth: 1 } },
+        { id: 'gate', type: 'And' },
+        { id: 'port', type: 'Port',     props: { label: 'P_bnd', bitWidth: 1 } },
+        { id: 'r1',   type: 'Resistor', props: { resistance: 1000 } },
+        { id: 'gnd',  type: 'Ground' },
+      ],
+      connections: [
+        ['inA:out',   'gate:In_1'],
+        ['inB:out',   'gate:In_2'],
+        ['gate:out',  'port:port'],
+        ['port:port', 'r1:A'],
+        ['r1:B',      'gnd:out'],
+      ],
+    });
+
+    // Compile should succeed — Port spans both domains via the bridge mechanism
+    const engine = facade.compile(circuit);
+    facade.step(engine);
+
+    // The Port label should be readable without throwing
+    expect(() => facade.readOutput(engine, 'P_bnd')).not.toThrow();
   });
 });

@@ -334,10 +334,12 @@ export function compileUnified(
 
   if (compiledAnalog !== null) {
     for (const [label, nodeId] of compiledAnalog.labelToNodeId) {
-      // Only add if not already set by digital (digital takes precedence for boundary labels)
-      if (!labelSignalMap.has(label)) {
-        labelSignalMap.set(label, { domain: "analog", nodeId });
-      }
+      // Analog takes precedence when a label exists in both maps. This
+      // happens for neutral components like Port that are routed to both
+      // partitions: the digital compiler creates a spurious net-based
+      // mapping (value 0), while the analog compiler maps to the correct
+      // MNA node with the solved voltage.
+      labelSignalMap.set(label, { domain: "analog", nodeId });
     }
   }
 

@@ -176,6 +176,29 @@ export function partitionByDomain(
         if (hasDigitalModel(def)) {
           digitalComponents.push(partComp);
         }
+      } else if (!hasDigitalModel(def)) {
+        // Truly empty models (e.g. Port with models:{}) — route by the
+        // connectivity group's domain. If any of this component's pins
+        // belong to an analog-domain group, include in the analog partition.
+        // Always include in digital for wiring.
+        const touchesAnalog = resolvedPins.some((rp) => {
+          for (const g of groups) {
+            if (
+              g.domains.has("analog") &&
+              g.pins.some(
+                (p) =>
+                  p.elementIndex === i && p.pinIndex === rp.pinIndex,
+              )
+            ) {
+              return true;
+            }
+          }
+          return false;
+        });
+        if (touchesAnalog) {
+          analogComponents.push(partComp);
+        }
+        digitalComponents.push(partComp);
       } else {
         digitalComponents.push(partComp);
       }
