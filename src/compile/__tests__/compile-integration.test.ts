@@ -975,7 +975,7 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
     const result = compileUnified(circuit, r);
 
     expect(result.analog).not.toBeNull();
-    expect(result.analog!.elements.length).toBeGreaterThan(0);
+    expect(result.analog!.elements.length).toBe(1);
   });
 
   it('neutral Ground component touching analog net produces non-null analog domain', () => {
@@ -1013,6 +1013,6 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
     const result = compileUnified(circuit, r);
 
     expect(result.analog).not.toBeNull();
-    expect(result.analog!.nodeCount).toBeGreaterThan(0);
+    expect(result.analog!.nodeCount).toBe(1);
   });
 });

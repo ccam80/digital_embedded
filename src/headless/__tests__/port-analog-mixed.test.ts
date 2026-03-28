@@ -88,9 +88,12 @@ describe('Port + Resistor — pure analog compile', () => {
       ],
     });
 
-    let engine: ReturnType<typeof facade.compile> | undefined;
-    expect(() => { engine = facade.compile(circuit); }).not.toThrow();
-    expect(engine).toBeDefined();
+    const engine = facade.compile(circuit);
+    facade.step(engine);
+    // Port is neutral infrastructure — verify the circuit compiles and steps
+    // without error, and the analog domain has elements (vsrc + r1, not Port).
+    const signals = facade.readAllSignals(engine);
+    expect(Object.keys(signals).length).toBeGreaterThan(0);
   });
 });
 
@@ -136,9 +139,9 @@ describe('Port in mixed-mode circuit — And gate + Resistor', () => {
       ],
     });
 
-    // compile() must not throw — structural integrity of the partition/bridge
-    // mechanism is what matters here, not whether signals stabilise.
-    expect(() => facade.compile(circuit)).not.toThrow();
+    const engine = facade.compile(circuit);
+    expect(engine).toBeDefined();
+    expect(facade.readAllSignals(engine)).toBeDefined();
   });
 
   it('netlist lists the Port component in a mixed-mode circuit', () => {
@@ -298,7 +301,7 @@ describe('Port at cross-domain boundary', () => {
     const engine = facade.compile(circuit);
     facade.step(engine);
 
-    // The Port label should be readable without throwing
-    expect(() => facade.readOutput(engine, 'P_bnd')).not.toThrow();
+    const value = facade.readOutput(engine, 'P_bnd');
+    expect(value).toBeDefined();
   });
 });

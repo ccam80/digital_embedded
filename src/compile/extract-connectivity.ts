@@ -73,11 +73,9 @@ export function resolveModelAssignments(
     }
 
     // Resolve model key: simulationModel prop > defaultModel > first key.
-    // The simulationModel property may hold sub-mode values (e.g. "analog-pins",
-    // "logical", "analog-internals") that are NOT model registry keys — they are
-    // read by the analog compiler internally. When a sub-mode value is set and
-    // the component has mnaModels, route to the first mna model key so the
-    // component is placed in the analog partition.
+    // Resolve model key: check simulationModel prop against known model keys,
+    // then fall back to defaultModel, then first available key.
+    // Unknown prop values with mnaModels present route to the first mna key.
     const simulationModelProp = el.getAttribute('simulationModel');
     let modelKey: string;
 
@@ -95,7 +93,7 @@ export function resolveModelAssignments(
       simulationModelProp.length > 0 &&
       firstMnaKey !== undefined
     ) {
-      // Sub-mode value (e.g. "analog-pins", "analog-internals", "logical") — route to first mna model
+      // Unrecognized prop value but component has mna models — route to first mna key
       modelKey = firstMnaKey;
     } else if (def.defaultModel !== undefined) {
       modelKey = def.defaultModel;

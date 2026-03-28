@@ -175,6 +175,7 @@ describe("FlattenPipelineReorder", () => {
     expect(crossEngineBoundaries).toHaveLength(1);
     expect(crossEngineBoundaries[0]!.subcircuitElement).toBe(subEl);
     expect(crossEngineBoundaries[0]!.outerEngineType).toBe("analog");
+    expect(crossEngineBoundaries[0]!.internalEngineType).toBeDefined();
   });
 
   it("same_domain_inline: analog subcircuit in analog outer circuit is inlined", () => {

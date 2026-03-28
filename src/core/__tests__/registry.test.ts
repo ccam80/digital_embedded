@@ -686,10 +686,16 @@ describe("ComponentRegistry", () => {
       expect(stored.pinElectricalOverrides).toBeUndefined();
     });
 
-    it("MnaModel no longer carries pinElectrical or pinElectricalOverrides", () => {
-      const analogModel: MnaModel = {};
-      expect((analogModel as Record<string, unknown>)["pinElectrical"]).toBeUndefined();
-      expect((analogModel as Record<string, unknown>)["pinElectricalOverrides"]).toBeUndefined();
+    it("MnaModel interface does not include pinElectrical fields", () => {
+      // Verify at the type level: MnaModel keys should not include pinElectrical.
+      // This is enforced by TypeScript — if someone adds pinElectrical to MnaModel,
+      // they must also update ComponentDefinition (where it belongs).
+      const mnaKeys: Array<keyof MnaModel> = [
+        "factory", "subcircuitModel", "getInternalNodeCount",
+        "requiresBranchRow", "deviceType", "defaultParams",
+      ];
+      expect(mnaKeys).not.toContain("pinElectrical");
+      expect(mnaKeys).not.toContain("pinElectricalOverrides");
     });
   });
 

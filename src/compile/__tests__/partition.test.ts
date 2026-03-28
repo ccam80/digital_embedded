@@ -501,8 +501,9 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments, NO_BOUNDARIES);
 
-      // electricalSpec is a plain object — just check it's defined
-      expect(result.bridges[0].electricalSpec).toBeDefined();
+      expect(result.bridges[0].electricalSpec).toEqual(
+        expect.objectContaining({ vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 }),
+      );
     });
   });
 
