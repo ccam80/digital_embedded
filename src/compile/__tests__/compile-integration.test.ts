@@ -883,3 +883,129 @@ describe('compileUnified — labelSignalMap', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 6: Model resolution via getActiveModelKey — H2-H8 / H12-H15 coverage
+// ---------------------------------------------------------------------------
+
+describe('compileUnified — model resolution via getActiveModelKey', () => {
+  function buildDualModelRegistry(): ComponentRegistry {
+    const r = new ComponentRegistry();
+
+    r.register({
+      name: 'Ground',
+      typeId: -1,
+      factory: () => { throw new Error('not used'); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: '',
+      models: { analog: {} } as ComponentModels,
+    } as ComponentDefinition);
+
+    r.register({
+      ...makeAnalogDef('AnalogR', false, (pinNodes) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      }),
+    } as ComponentDefinition);
+
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    r.register({
+      name: 'DualAnd',
+      typeId: -1,
+      factory: (props: PropertyBagType) => new TestElement('DualAnd', crypto.randomUUID(), { x: 0, y: 0 }, twoIn, props),
+      pinLayout: twoIn,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: '',
+      models: {
+        digital: { executeFn: noopExec },
+        analog: {
+          factory: (pinNodes: ReadonlyMap<string, number>) => {
+            const [n0, n1] = [...pinNodes.values()];
+            return makeResistorElement(n0 ?? 0, n1 ?? 0);
+          },
+        },
+      } as ComponentModels,
+      defaultModel: 'digital',
+    } as ComponentDefinition);
+
+    return r;
+  }
+
+  it('dual-model component with defaultModel="digital" and no simulationModel compiles as digital (no analog domain)', () => {
+    const r = buildDualModelRegistry();
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 0, y: 1 }));
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 2, y: 0 }));
+
+    const result = compileUnified(circuit, r);
+
+    expect(result.digital).not.toBeNull();
+    expect(result.analog).toBeNull();
+  });
+
+  it('dual-model component with simulationModel="analog" produces analog domain with elements', () => {
+    const r = buildDualModelRegistry();
+    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+
+    const propsMap = new Map<string, PropertyValue>([['simulationModel', 'analog']]);
+    const props = new PropertyBag(propsMap);
+    const circuit = new Circuit();
+    circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn, props));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 0, y: 1 }));
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 2, y: 0 }));
+
+    const result = compileUnified(circuit, r);
+
+    expect(result.analog).not.toBeNull();
+    expect(result.analog!.elements.length).toBeGreaterThan(0);
+  });
+
+  it('neutral Ground component touching analog net produces non-null analog domain', () => {
+    const r = new ComponentRegistry();
+
+    r.register({
+      name: 'Ground',
+      typeId: -1,
+      factory: () => { throw new Error('not used'); },
+      pinLayout: [{ label: 'gnd', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: '',
+      models: { analog: {} } as ComponentModels,
+    } as ComponentDefinition);
+
+    r.register({
+      ...makeAnalogDef('AnalogR', false, (pinNodes) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      }),
+      pinLayout: [
+        { label: 'a', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+        { label: 'b', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      ],
+    } as ComponentDefinition);
+
+    const circuit = new Circuit();
+    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 0, y: 0 }, { x: 2, y: 0 }]));
+    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 2, y: 0 }]));
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 1 }));
+    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 2, y: 1 }));
+
+    const result = compileUnified(circuit, r);
+
+    expect(result.analog).not.toBeNull();
+    expect(result.analog!.nodeCount).toBeGreaterThan(0);
+  });
+});

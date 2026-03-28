@@ -9,7 +9,7 @@ import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import type { CanvasInteractionDeps } from './canvas-interaction.js';
 import { PropertyPanel } from '../editor/property-panel.js';
-import { availableModels, hasDigitalModel } from '../core/registry.js';
+import { availableModels, getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
 
 // ---------------------------------------------------------------------------
@@ -81,17 +81,21 @@ export function createPopupController(
     if (availableModels(def).length > 1) {
       propertyPopup.showSimulationModeDropdown(elementHit, def);
     }
-    const simModel = elementHit.getProperties().has("simulationModel")
-      ? elementHit.getProperties().get("simulationModel") as string
-      : (def.defaultModel ?? availableModels(def)[0] ?? "logical");
+    try {
+      const activeKey = getActiveModelKey(elementHit, def);
+      const domain = modelKeyToDomain(activeKey, def);
 
-    if (simModel === "logical" || simModel === "analog-pins") {
-      if (hasDigitalModel(def)) {
+      if (domain === 'digital') {
         const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
         propertyPopup.showPinElectricalOverrides(elementHit, def, family);
+      } else {
+        const mnaModel = def.models.mnaModels?.[activeKey];
+        if (mnaModel?.deviceType) {
+          propertyPopup.showSpiceModelParameters(elementHit, def);
+        }
       }
-    } else if (def.models?.analog?.deviceType !== undefined) {
-      propertyPopup.showSpiceModelParameters(elementHit, def);
+    } catch {
+      // Component has no models — skip panel display.
     }
     activePopupPanel = propertyPopup;
 

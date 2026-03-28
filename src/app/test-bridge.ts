@@ -14,7 +14,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { Viewport } from '../editor/viewport.js';
 import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
-import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
+import { getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { ScopePanel } from '../runtime/analog-scope-panel.js';
 import { pinWorldPosition } from '../core/pin.js';
@@ -229,7 +229,11 @@ export function createTestBridge(
       const hasAnalogOnly = circuit.elements.some(el => {
         const def = registry.get(el.typeId);
         if (def === undefined) return false;
-        return hasAnalogModel(def) && !hasDigitalModel(def);
+        try {
+          return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+        } catch {
+          return false;
+        }
       });
       return hasAnalogOnly ? 'analog' : 'digital';
     },

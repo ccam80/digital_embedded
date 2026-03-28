@@ -7,7 +7,7 @@
 
 import type { CircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import { hasDigitalModel, hasAnalogModel } from "../core/registry.js";
+import { modelKeyToDomain } from "../core/registry.js";
 import { PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
@@ -160,64 +160,34 @@ export function partitionByDomain(
       analogComponents.push(partComp);
     } else if (ma.modelKey === "neutral") {
       // Infrastructure components (In, Out, Ground, Tunnel, etc.) carry no
-      // simulation model. Route them to whichever partition is appropriate:
-      // - If the component has an analog model (e.g. Ground in analog circuits),
-      //   route to analog so it can be processed by the analog backend.
-      // - Otherwise route to digital so the digital backend can handle wiring.
-      if (hasAnalogModel(def)) {
-        // Neutral components with an analog model (Ground, Probe, VDD,
-        // Driver, Splitter, etc.) should only go to the analog partition
-        // when they actually touch an analog-domain connectivity group.
-        // Without this check, their mere presence creates a spurious
-        // analog partition in purely digital circuits.
-        const touchesAnalog = resolvedPins.some((rp) => {
-          for (const g of groups) {
-            if (
-              g.domains.has("analog") &&
-              g.pins.some(
-                (p) =>
-                  p.elementIndex === i && p.pinIndex === rp.pinIndex,
-              )
-            ) {
-              return true;
-            }
+      // simulation model. Route by which connectivity groups they touch:
+      // - If any pin connects to an analog-domain net, include in the analog
+      //   partition so the analog backend can process wiring.
+      // - Always include in digital for wiring connections.
+      const touchesAnalog = resolvedPins.some((rp) => {
+        for (const g of groups) {
+          if (
+            g.domains.has("analog") &&
+            g.pins.some(
+              (p) =>
+                p.elementIndex === i && p.pinIndex === rp.pinIndex,
+            )
+          ) {
+            return true;
           }
-          return false;
-        });
-        if (touchesAnalog) {
-          analogComponents.push(partComp);
         }
-        // Always include in digital for wiring connections.
-        digitalComponents.push(partComp);
-      } else if (!hasDigitalModel(def)) {
-        // Truly empty models (e.g. Port with models:{}) — route by the
-        // connectivity group's domain. If any of this component's pins
-        // belong to an analog-domain group, include in the analog partition.
-        // Always include in digital for wiring.
-        const touchesAnalog = resolvedPins.some((rp) => {
-          for (const g of groups) {
-            if (
-              g.domains.has("analog") &&
-              g.pins.some(
-                (p) =>
-                  p.elementIndex === i && p.pinIndex === rp.pinIndex,
-              )
-            ) {
-              return true;
-            }
-          }
-          return false;
-        });
-        if (touchesAnalog) {
-          analogComponents.push(partComp);
-        }
-        digitalComponents.push(partComp);
-      } else {
-        digitalComponents.push(partComp);
+        return false;
+      });
+      if (touchesAnalog) {
+        analogComponents.push(partComp);
       }
+      digitalComponents.push(partComp);
     } else {
-      // Unknown model key: route based on which models are present.
-      if (hasDigitalModel(def) && !hasAnalogModel(def)) {
+      // Named model key: use modelKeyToDomain to determine the partition.
+      // An unrecognised key is a programming error — throw rather than silently
+      // routing to the wrong domain.
+      const domain = modelKeyToDomain(ma.modelKey, def);
+      if (domain === "digital") {
         digitalComponents.push(partComp);
       } else {
         analogComponents.push(partComp);

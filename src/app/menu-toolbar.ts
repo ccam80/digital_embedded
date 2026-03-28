@@ -23,7 +23,7 @@ import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { Circuit, Wire } from '../core/circuit.js';
-import { hasDigitalModel, hasAnalogModel } from '../core/registry.js';
+import { getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';
@@ -158,7 +158,12 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
 
     const hasAnalogOnlyComponents = ctx.circuit.elements.some(el => {
       const def = registry.get(el.typeId);
-      return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
+      if (def === undefined) return false;
+      try {
+        return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+      } catch {
+        return false;
+      }
     });
     if (hasAnalogOnlyComponents) {
       QUICK_INSERT.length = 0;
@@ -363,7 +368,12 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       // "Add to Traces"
       if (facade.getCoordinator()?.supportsAcSweep() ?? ctx.circuit.elements.some(el => {
         const def = registry.get(el.typeId);
-        return def !== undefined && hasAnalogModel(def) && !hasDigitalModel(def);
+        if (def === undefined) return false;
+        try {
+          return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+        } catch {
+          return false;
+        }
       })) {
         const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
         viewerController.appendComponentTraceItems(items, elementHit, resolverCtx);

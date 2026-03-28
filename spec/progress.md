@@ -256,3 +256,40 @@
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 1
+
+## Task W4.1: Rewrite H1-H8 (compile pipeline heuristics)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/compile/compile.ts` — H1 already deleted in Wave 2; verified absent
+  - `src/app/menu-toolbar.ts` — H2, H3: replaced `hasAnalogModel(def) && !hasDigitalModel(def)` with `modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna'`; updated import
+  - `src/app/test-bridge.ts` — H4: replaced `getCircuitDomain()` body with `modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna'`; updated import
+  - `src/app/canvas-popup.ts` — H5: replaced `simModel === "logical" || simModel === "analog-pins"` + `hasDigitalModel(def)` guard with `getActiveModelKey()` + `modelKeyToDomain()` panel routing; updated import
+  - `src/compile/partition.ts` — H6, H7: unified neutral routing to single `touchesAnalog` check (removed `hasAnalogModel`/`hasDigitalModel` branching); H8: unknown model keys now route via `modelKeyToDomain()` instead of heuristic; updated import to remove `hasDigitalModel`, `hasAnalogModel`
+  - `src/compile/__tests__/partition.test.ts` — updated "unknown model key fallback" tests to assert new `modelKeyToDomain()` routing behavior (unknown key → mna domain → analog partition)
+- **Tests**: 9745/9758 passing (13 pre-existing failures, 0 new regressions)
+
+## Task W4.2: Rewrite H9-H15 (analog/digital compiler heuristics)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/digital/flatten.ts` — H9 already deleted in Wave 2; verified absent
+  - `src/solver/analog/compiler.ts` — H10, H11 deleted in Wave 3; verified absent. H12/H13 in `runPassA_partition`: replaced `hasAnalog = def.models?.analog !== undefined` / `hasBoth = def.models?.digital !== undefined && hasAnalog` guards with `pc.model === null` (null-model skip) + `'executeFn' in pc.model` (digital-model check). H14/H15 in main Pass B loop: replaced `hasAnalogModel`/`hasBothModels` local variables with `meta.pc.model === null || 'executeFn' in meta.pc.model` skip. The `def.models?.digital !== undefined` check retained for dual-model `simulationModel` routing logic (H13/H15 sub-mode routing). Replaced `hasBothModels && def.models?.analog?.factory` with `def.models?.digital !== undefined && def.models?.analog?.factory` for bridge adapter path.
+- **Tests**: 9745/9758 passing (13 pre-existing failures, 0 new regressions)
+
+## Task W4.3: Tests: mixed-circuit compile, partition tests with new resolution
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/compile/__tests__/partition.test.ts` — added "neutral component routing by connected net domain (H6/H7)" describe block with 4 new tests: neutral-touching-analog-only, neutral-touching-digital-only, neutral-touching-both, neutral-not-connected
+  - `src/compile/__tests__/compile-integration.test.ts` — added "compileUnified — model resolution via getActiveModelKey" describe block with 3 new tests: dual-model defaultModel=digital routes to digital, dual-model simulationModel=analog routes to analog, neutral Ground touching analog produces non-null analog domain
+- **Tests**: 9754/9767 passing (13 pre-existing failures, 0 new regressions; 7 new tests added)
+
+---
+## Wave 4 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 1

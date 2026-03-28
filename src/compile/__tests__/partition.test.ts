@@ -390,7 +390,7 @@ describe("partitionByDomain", () => {
   });
 
   describe("unknown model key fallback", () => {
-    it("routes unknown-key component with only digital model to digital partition", () => {
+    it("routes unknown-key component to analog partition via modelKeyToDomain", () => {
       const el0 = makeElement("And", 0);
       const registry = makeRegistry([makeDigitalDef("And")]);
       const group = makeGroup(0, [makePin(0, 0, "digital")]);
@@ -400,11 +400,11 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
 
-      expect(result.digital.components).toHaveLength(1);
-      expect(result.analog.components).toHaveLength(0);
+      expect(result.analog.components).toHaveLength(1);
+      expect(result.digital.components).toHaveLength(0);
     });
 
-    it("routes unknown-key component with only analog model to analog partition", () => {
+    it("routes unknown-key component with analog model to analog partition", () => {
       const el0 = makeElement("Resistor", 0);
       const registry = makeRegistry([makeAnalogDef("Resistor")]);
       const group = makeGroup(0, [makePin(0, 0, "analog")]);
@@ -527,6 +527,109 @@ describe("partitionByDomain", () => {
       const labels = comp.resolvedPins.map((p) => p.pinLabel);
       expect(labels).toContain("p0");
       expect(labels).toContain("p1");
+    });
+  });
+
+  describe("neutral component routing by connected net domain (H6/H7)", () => {
+    function makeNeutralDef(name: string): ComponentDefinition {
+      return {
+        name,
+        typeId: 0,
+        factory: () => { throw new Error("not used"); },
+        pinLayout: [],
+        propertyDefs: [],
+        attributeMap: [],
+        category: "IO" as never,
+        helpText: "",
+        models: {},
+      };
+    }
+
+    it("neutral component touching only analog groups goes to analog and digital partitions", () => {
+      const elNeutral = makeElement("Ground", 0);
+      const elAnalog = makeElement("Resistor", 1);
+      const registry = makeRegistry([makeNeutralDef("Ground"), makeAnalogDef("Resistor")]);
+
+      const gAnalog = makeGroup(0, [
+        makePin(0, 0, "analog", PinDirection.BIDIRECTIONAL),
+        makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
+      ]);
+
+      const assignments: ModelAssignment[] = [
+        { elementIndex: 0, modelKey: "neutral", model: null as never },
+        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+      ];
+
+      const result = partitionByDomain([gAnalog], [elNeutral, elAnalog], registry, assignments, NO_BOUNDARIES);
+
+      expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+      expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+    });
+
+    it("neutral component touching only digital groups goes only to digital partition", () => {
+      const elNeutral = makeElement("Ground", 0);
+      const elDigital = makeElement("And", 1);
+      const registry = makeRegistry([makeNeutralDef("Ground"), makeDigitalDef("And")]);
+
+      const gDigital = makeGroup(0, [
+        makePin(0, 0, "digital", PinDirection.BIDIRECTIONAL),
+        makePin(1, 0, "digital", PinDirection.OUTPUT),
+      ]);
+
+      const assignments: ModelAssignment[] = [
+        { elementIndex: 0, modelKey: "neutral", model: null as never },
+        { elementIndex: 1, modelKey: "digital", model: DIGITAL_MODEL },
+      ];
+
+      const result = partitionByDomain([gDigital], [elNeutral, elDigital], registry, assignments, NO_BOUNDARIES);
+
+      expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+      expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(false);
+    });
+
+    it("neutral component touching both analog and digital groups goes to both partitions", () => {
+      const elNeutral = makeElement("Ground", 0);
+      const elAnalog = makeElement("Resistor", 1);
+      const elDigital = makeElement("And", 2);
+      const registry = makeRegistry([
+        makeNeutralDef("Ground"),
+        makeAnalogDef("Resistor"),
+        makeDigitalDef("And"),
+      ]);
+
+      const gAnalog = makeGroup(0, [
+        makePin(0, 0, "analog", PinDirection.BIDIRECTIONAL),
+        makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
+      ]);
+      const gDigital = makeGroup(1, [
+        makePin(0, 1, "digital", PinDirection.BIDIRECTIONAL),
+        makePin(2, 0, "digital", PinDirection.OUTPUT),
+      ]);
+
+      const assignments: ModelAssignment[] = [
+        { elementIndex: 0, modelKey: "neutral", model: null as never },
+        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 2, modelKey: "digital", model: DIGITAL_MODEL },
+      ];
+
+      const result = partitionByDomain([gAnalog, gDigital], [elNeutral, elAnalog, elDigital], registry, assignments, NO_BOUNDARIES);
+
+      expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+      expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+    });
+
+    it("neutral component not connected to any group goes only to digital partition", () => {
+      const elNeutral = makeElement("Ground", 0);
+      const registry = makeRegistry([makeNeutralDef("Ground")]);
+
+      const assignments: ModelAssignment[] = [
+        { elementIndex: 0, modelKey: "neutral", model: null as never },
+      ];
+
+      const result = partitionByDomain([], [elNeutral], registry, assignments, NO_BOUNDARIES);
+
+      expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
+      expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(false);
     });
   });
 });

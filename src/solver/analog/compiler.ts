@@ -567,10 +567,13 @@ function runPassA_partition(
     }
 
     const def = pc.definition;
-    const hasAnalog = def.models?.analog !== undefined;
-    const hasBoth = def.models?.digital !== undefined && hasAnalog;
+    if (pc.model === null) {
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      continue;
+    }
+    const isDigitalModel = 'executeFn' in pc.model;
 
-    if (!hasAnalog) {
+    if (isDigitalModel) {
       diagnostics.push(
         makeDiagnostic(
           "unsupported-component-in-analog",
@@ -593,7 +596,7 @@ function runPassA_partition(
       continue;
     }
 
-    if (hasBoth) {
+    if (def.models?.digital !== undefined) {
       const passAProps = el.getProperties();
       const passAMode = passAProps.has("simulationModel")
         ? (passAProps.get("simulationModel") as string)
@@ -956,13 +959,11 @@ export function compileAnalogPartition(
     const def = pc.definition;
     const props = el.getProperties();
 
-    const hasAnalogModel = def.models?.analog !== undefined;
-    const hasBothModels = def.models?.digital !== undefined && hasAnalogModel;
-    if (!hasAnalogModel) {
+    if (meta.pc.model === null || 'executeFn' in meta.pc.model) {
       continue;
     }
 
-    if (hasBothModels) {
+    if (def.models?.digital !== undefined) {
       const simulationModel = props.has("simulationModel")
         ? (props.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
@@ -1221,7 +1222,7 @@ export function compileAnalogPartition(
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
-    if (hasBothModels && def.models?.analog?.factory !== undefined) {
+    if (def.models?.digital !== undefined && def.models?.analog?.factory !== undefined) {
       let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       if (props.has("_pinElectricalOverrides")) {
         try {
