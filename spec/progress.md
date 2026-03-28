@@ -89,3 +89,17 @@
 - **Files modified**: e2e/gui/analog-circuit-assembly.spec.ts
 - **Tests**: 0/0 passing (E2E tests require browser; changes are structural injections — no unit tests for this task)
 - **Changes**: Added 5 SPICE model override constants (BJT_NPN_OVERRIDES, BJT_PNP_OVERRIDES, MOSFET_NMOS_OVERRIDES, MOSFET_PMOS_OVERRIDES, JFET_NJFET_OVERRIDES) near top of file. Injected setComponentProperty('_spiceModelOverrides', ...) calls into all 13 specified tests: a8_bjt_ce (Q1 NPN), a9_bjt_diffpair (Q1+Q2 NPN), a10_bjt_darlington (Q1+Q2 NPN), a11_bjt_pushpull (Q1 NPN + Q2 PNP), a12_mosfet_cs (M1 NMOS), a15_jfet_amp (J1 NJFET), a16_cascode (Q1+Q2 NPN), a17_wilson_mirror (Q1+Q2+Q3 NPN), a18_widlar (Q1+Q2 NPN), a19_hbridge_fwd (Mp1+Mp2 PMOS + Mn1+Mn2 NMOS), a20_bjt_mosfet_driver (Q1 NPN + M1 NMOS), a21_multistage (Q1+Q2+Q3 NPN), test28 MOSFET PWM (M1 NMOS). All use _spiceModelOverrides exclusively — no direct _modelParams writes.
+
+## Task P3.1: Headless tests (spice-model-overrides.test.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none (file pre-existed with tests 1-4)
+- **Files modified**: src/solver/analog/__tests__/spice-model-overrides.test.ts (added TUNNEL_DIODE_DEFAULTS import + test 5 for tunnel diode migration)
+- **Tests**: 7/7 passing
+
+## Task P3.2: MCP tool tests (spice-model-overrides-mcp.test.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/headless/__tests__/spice-model-overrides-mcp.test.ts
+- **Files modified**: none
+- **Tests**: 4/4 passing
