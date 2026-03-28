@@ -6,30 +6,30 @@
 | Task ID | Title | Status |
 |---------|-------|--------|
 | P0.1 | Add TUNNEL_DIODE_DEFAULTS to model-defaults.ts | done |
-| P0.2 | Add TUNNEL to DeviceType union | pending |
-| P0.3 | Register TUNNEL in model library | pending |
-| P0.4 | Update tunnel-diode.ts to read _modelParams | pending |
+| P0.2 | Add TUNNEL to DeviceType union | done |
+| P0.3 | Register TUNNEL in model library | done |
+| P0.4 | Update tunnel-diode.ts to read _modelParams | done |
 
 ### Wave 2: Part 1 — SPICE Panel + Compiler Merge
 | Task ID | Title | Status |
 |---------|-------|--------|
-| P1.1 | Create model-param-meta.ts metadata registry | pending |
-| P1.2 | Add showSpiceModelParameters() to property-panel.ts | pending |
-| P1.3 | Add visibility guard to canvas-popup.ts | pending |
-| P1.4 | Compiler merge with _spiceModelOverrides at both sites | pending |
+| P1.1 | Create model-param-meta.ts metadata registry | done |
+| P1.2 | Add showSpiceModelParameters() to property-panel.ts | done |
+| P1.3 | Add visibility guard to canvas-popup.ts | done |
+| P1.4 | Compiler merge with _spiceModelOverrides at both sites | done |
 | P1.5 | Add _spiceModelOverrides PropertyDef to semiconductor components | done |
 
 ### Wave 3: Part 2 — Test Parameter Alignment
 | Task ID | Title | Status |
 |---------|-------|--------|
-| P2.1 | Inject _spiceModelOverrides in analog-circuit-assembly E2E tests | pending |
+| P2.1 | Inject _spiceModelOverrides in analog-circuit-assembly E2E tests | done |
 
 ### Wave 4: Part 3 — Three-Surface Tests
 | Task ID | Title | Status |
 |---------|-------|--------|
-| P3.1 | Headless tests (spice-model-overrides.test.ts) | pending |
-| P3.2 | MCP tool tests (spice-model-overrides-mcp.test.ts) | pending |
-| P3.3 | E2E tests (spice-model-panel.spec.ts) | pending |
+| P3.1 | Headless tests (spice-model-overrides.test.ts) | done |
+| P3.2 | MCP tool tests (spice-model-overrides-mcp.test.ts) | done |
+| P3.3 | E2E tests (spice-model-panel.spec.ts) | done |
 
 ## Task P0.1: Add TUNNEL_DIODE_DEFAULTS to model-defaults.ts
 - **Status**: complete

@@ -152,13 +152,9 @@ test.describe('SPICE Model Parameters panel', () => {
     const isInputAfter = await getSpiceParamInput(page, 'IS');
     await expect(isInputAfter).toBeVisible({ timeout: 2000 });
     const displayedValue = await isInputAfter.inputValue();
-    // The value is formatted with formatSI — 1e-14 formats as "10f" or "10.0f"
-    // Accept any non-empty value that encodes 1e-14 (the field shows formatSI output)
-    expect(displayedValue).not.toBe('');
-    // Verify it round-trips: the raw numeric parse of the displayed value equals 1e-14
-    // formatSI(1e-14, "", 3) → "10.0f" → parseSI("10.0f") → 1e-14
-    // We just verify the field is non-empty (content was stored)
-    expect(displayedValue.length).toBeGreaterThan(0);
+    // formatSI(1e-14, "", 3) → "10.0 f" — verify the displayed value encodes 1e-14
+    expect(displayedValue).toContain('10');
+    expect(displayedValue.toLowerCase()).toContain('f');
 
     await page.keyboard.press('Escape');
   });

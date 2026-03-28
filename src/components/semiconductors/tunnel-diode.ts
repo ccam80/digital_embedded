@@ -74,6 +74,8 @@ export function tunnelDiodeIV(
   vp: number,
   iv: number,
   vv: number,
+  iS: number = IS_THERMAL,
+  nCoeff: number = 1,
 ): { i: number; dIdV: number } {
   // --- Tunnel current component ---
   // I_t(V) = I_p * (V/V_p) * exp(1 - V/V_p)
@@ -93,11 +95,12 @@ export function tunnelDiodeIV(
   const dIExcess = (iv / VX) * expX;
 
   // --- Thermal (Shockley) component ---
-  const thermalArg = Math.min(v / VT, 700);
+  const nVt = nCoeff * VT;
+  const thermalArg = Math.min(v / nVt, 700);
   const expTh = Math.exp(thermalArg);
-  const iThermal = IS_THERMAL * (expTh - 1);
-  // dI_thermal/dV = IS / VT * exp(V/VT)
-  const dIThermal = (IS_THERMAL * expTh) / VT;
+  const iThermal = iS * (expTh - 1);
+  // dI_thermal/dV = IS / (N*VT) * exp(V/(N*VT))
+  const dIThermal = (iS * expTh) / nVt;
 
   const i = iTunnel + iExcess + iThermal;
   const dIdV = dITunnel + dIExcess + dIThermal + GMIN;
@@ -123,6 +126,8 @@ export function createTunnelDiodeElement(
   const vp = modelParams?.VP ?? 0.08;
   const iv = modelParams?.IV ?? 0.5e-3;
   const vv = modelParams?.VV ?? 0.5;
+  const iS = modelParams?.IS ?? 1e-14;
+  const nCoeff = modelParams?.N ?? 1;
 
   // NR linearization state
   let _vd = 0;
@@ -131,7 +136,7 @@ export function createTunnelDiodeElement(
   let _id = 0; // cached junction current for getPinCurrents
 
   function recompute(v: number): void {
-    const { i, dIdV } = tunnelDiodeIV(v, ip, vp, iv, vv);
+    const { i, dIdV } = tunnelDiodeIV(v, ip, vp, iv, vv, iS, nCoeff);
     _id = i;
     _geq = dIdV; // dI/dV is the conductance (can be negative in NDR)
     _ieq = i - _geq * v;

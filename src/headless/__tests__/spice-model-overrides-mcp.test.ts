@@ -114,35 +114,44 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 // ---------------------------------------------------------------------------
 
 describe('spice-model-overrides MCP surface — override via patch', () => {
-  it('patch with _spiceModelOverrides changes IS used by compiler vs default', () => {
+  it('patch with _spiceModelOverrides changes DC operating point vs default', () => {
     const { circuit, facade } = buildBjtCircuit();
 
-    // Compile with default parameters (no _spiceModelOverrides set)
+    // Compile with default parameters and capture DC operating point
     facade.compile(circuit);
     const compiledDefault = facade.getCompiledUnified();
     expect(compiledDefault).not.toBeNull();
     expect(compiledDefault!.analog).not.toBeNull();
 
+    const dcDefault = facade.getDcOpResult();
+    expect(dcDefault).not.toBeNull();
+    expect(dcDefault!.converged).toBe(true);
+    const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
+
     // No INVALID_SPICE_OVERRIDES diagnostic in baseline
     const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
     expect(baselineCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
+    // Build a fresh circuit for the override case (avoids stale coordinator)
+    const { circuit: circuit2, facade: facade2 } = buildBjtCircuit();
+
     // Apply _spiceModelOverrides via circuit_patch (the MCP 'set' operation).
-    // Q1's label is 'Q1' — patch targets the component by its label.
-    const patchResult = facade.patch(circuit, [
+    // Override BF (forward current gain): default is 200, override to 10.
+    // This dramatically changes collector current and thus DC operating point.
+    const patchResult = facade2.patch(circuit2, [
       {
         op: 'set',
         target: 'Q1',
-        props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-14 }) },
+        props: { _spiceModelOverrides: JSON.stringify({ BF: 5 }) },
       },
     ]);
 
     // Patch must succeed without errors
     expect(patchResult.diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
 
-    // Recompile after patch — override must now be applied
-    facade.compile(circuit);
-    const compiledOverridden = facade.getCompiledUnified();
+    // Compile after patch — override must now be applied
+    facade2.compile(circuit2);
+    const compiledOverridden = facade2.getCompiledUnified();
     expect(compiledOverridden).not.toBeNull();
     expect(compiledOverridden!.analog).not.toBeNull();
 
@@ -150,9 +159,14 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
     expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
-    // Confirm the override IS differs from the NPN default
-    expect(1e-14).not.toBe(BJT_NPN_DEFAULTS['IS']);
-    expect(BJT_NPN_DEFAULTS['IS']).toBe(1e-16);
+    // Verify the override was applied: _modelParams on Q1 must have BF=5
+    const q1 = circuit2.elements.find(
+      el => el.getProperties().getOrDefault('label', '') === 'Q1',
+    )!;
+    expect(q1.getProperties().has('_modelParams')).toBe(true);
+    const mp = q1.getProperties().get('_modelParams') as unknown as Record<string, number>;
+    expect(mp).toBeDefined();
+    expect(mp['BF']).toBe(5);
   });
 
   it('patch with _spiceModelOverrides records the override in _spiceModelOverrides property', () => {
@@ -207,8 +221,6 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
       },
     ]);
 
-    // Serialize BEFORE compiling — compile injects _modelParams (an object)
-    // into PropertyBag which the serializer cannot handle (expects scalar values).
     const json = facade.serialize(circuit);
     expect(typeof json).toBe('string');
     expect(json.length).toBeGreaterThan(0);
@@ -243,8 +255,6 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
       },
     ]);
 
-    // Serialize BEFORE compiling — compile injects _modelParams (an object) into
-    // PropertyBag which the serializer cannot handle (it expects scalar PropertyValues).
     const json = facade.serialize(circuit);
 
     // Compile original and capture DC operating point
