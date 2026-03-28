@@ -36,6 +36,36 @@ export interface ParseError {
   message: string;
 }
 
+/** A single element line parsed from inside a .SUBCKT block. */
+export interface ParsedElement {
+  /** Instance name (e.g. R1, M1, Q1, X1). */
+  name: string;
+  /** Element type derived from the first character of the name. */
+  type: "R" | "C" | "L" | "D" | "Q" | "M" | "J" | "X" | "V" | "I";
+  /** Node names (positional, excluding the instance name). */
+  nodes: string[];
+  /** Numeric value for passive elements (R/C/L) and sources (V/I). */
+  value?: number;
+  /** Model reference name for active devices (D/Q/M/J) and subcircuits (X). */
+  modelName?: string;
+  /** Keyword parameters (W=10u L=1u etc.) for elements that carry them. */
+  params?: Record<string, number>;
+}
+
+/** The result of parsing a complete .SUBCKT…ENDS block. */
+export interface ParsedSubcircuit {
+  /** Subcircuit name from the .SUBCKT header. */
+  name: string;
+  /** External port names in order (as declared on the .SUBCKT line). */
+  ports: string[];
+  /** All element lines inside the block. */
+  elements: ParsedElement[];
+  /** Inline .MODEL statements found inside the block. */
+  models: ParsedModel[];
+  /** .PARAM default values found inside the block. */
+  params: Record<string, number>;
+}
+
 // ---------------------------------------------------------------------------
 // SPICE suffix table
 // ---------------------------------------------------------------------------
@@ -186,8 +216,13 @@ export function parseModelCard(
   }
 
   const name = modelMatch[1];
-  const typeStr = modelMatch[2].toUpperCase();
-  const rest = modelMatch[3] ?? "";
+  // Handle TYPE(params) where type and opening paren are not space-separated
+  const typeToken = modelMatch[2];
+  const parenIdx = typeToken.indexOf("(");
+  const typeStr = (parenIdx !== -1 ? typeToken.slice(0, parenIdx) : typeToken).toUpperCase();
+  const rest = parenIdx !== -1
+    ? typeToken.slice(parenIdx) + " " + (modelMatch[3] ?? "")
+    : (modelMatch[3] ?? "");
 
   if (!VALID_DEVICE_TYPES.has(typeStr)) {
     return {
@@ -307,4 +342,316 @@ export function parseModelFile(
   }
 
   return { models, errors };
+}
+
+// ---------------------------------------------------------------------------
+// Element type constants
+// ---------------------------------------------------------------------------
+
+const VALID_ELEMENT_PREFIXES = new Set<string>([
+  "R", "C", "L", "D", "Q", "M", "J", "X", "V", "I",
+]);
+
+// ---------------------------------------------------------------------------
+// Internal: parse a single element line
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a single SPICE element line (non-directive, non-comment) into a
+ * `ParsedElement`.  Returns null if the line cannot be recognised.
+ *
+ * Node-count rules by type:
+ *   R, C, L  → 2 nodes  + numeric value (3rd token)
+ *   D        → 2 nodes  + model name
+ *   Q        → 3 nodes  + model name  (c b e [substrate])
+ *   M        → 4 nodes  + model name  + optional KEY=VALUE params
+ *   J        → 3 nodes  + model name  (d g s)
+ *   V, I     → 2 nodes  + optional value token ("DC 5" or plain "5")
+ *   X        → variable nodes + model name (last non-KEY=VALUE token)
+ */
+function parseElementLine(line: string): ParsedElement | null {
+  const tokens = line.trim().split(/\s+/);
+  if (tokens.length < 2) return null;
+
+  const name = tokens[0].toUpperCase();
+  const prefix = name[0];
+
+  if (!VALID_ELEMENT_PREFIXES.has(prefix)) return null;
+
+  const type = prefix as ParsedElement["type"];
+
+  // Separate key=value parameter tokens from positional tokens
+  const positional: string[] = [];
+  const params: Record<string, number> = {};
+
+  for (let i = 1; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) {
+      const eqIdx = tok.indexOf("=");
+      const key = tok.slice(0, eqIdx).toUpperCase();
+      const val = parseSpiceValue(tok.slice(eqIdx + 1));
+      if (!isNaN(val)) params[key] = val;
+    } else {
+      positional.push(tok);
+    }
+  }
+
+  const hasParams = Object.keys(params).length > 0;
+
+  switch (type) {
+    case "R":
+    case "C":
+    case "L": {
+      if (positional.length < 3) return null;
+      const value = parseSpiceValue(positional[2]);
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes: [positional[0], positional[1]],
+        value: isNaN(value) ? undefined : value,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "D": {
+      if (positional.length < 3) return null;
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes: [positional[0], positional[1]],
+        modelName: positional[2].toUpperCase(),
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "Q": {
+      // Q: collector base emitter [substrate] modelName
+      if (positional.length < 4) return null;
+      const modelName = positional[positional.length - 1].toUpperCase();
+      const nodes = positional.slice(0, positional.length - 1);
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes,
+        modelName,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "M": {
+      // M: drain gate source bulk modelName [params]
+      if (positional.length < 5) return null;
+      const modelName = positional[4].toUpperCase();
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes: [positional[0], positional[1], positional[2], positional[3]],
+        modelName,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "J": {
+      // J: drain gate source modelName
+      if (positional.length < 4) return null;
+      const modelName = positional[3].toUpperCase();
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes: [positional[0], positional[1], positional[2]],
+        modelName,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "V":
+    case "I": {
+      if (positional.length < 2) return null;
+      // Accept "V1 p n DC 5", "V1 p n 5", "V1 p n"
+      let value: number | undefined;
+      // Skip a leading "DC" or "AC" keyword token
+      const valueTokenIdx = positional.length > 2
+        ? (/^(DC|AC)$/i.test(positional[2]) ? 3 : 2)
+        : -1;
+      if (valueTokenIdx >= 0 && valueTokenIdx < positional.length) {
+        const parsed = parseSpiceValue(positional[valueTokenIdx]);
+        if (!isNaN(parsed)) value = parsed;
+      }
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes: [positional[0], positional[1]],
+        value,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    case "X": {
+      // X: node1 [node2...] subcktName [params]
+      // The last positional token is the subcircuit model name
+      if (positional.length < 2) return null;
+      const modelName = positional[positional.length - 1].toUpperCase();
+      const nodes = positional.slice(0, positional.length - 1);
+      const element: ParsedElement = {
+        name,
+        type,
+        nodes,
+        modelName,
+      };
+      if (hasParams) element.params = params;
+      return element;
+    }
+
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// parseSubcircuit — parse a .SUBCKT…ENDS block
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a SPICE `.SUBCKT`…`.ENDS` block into a `ParsedSubcircuit`.
+ *
+ * Throws a `ParseError`-shaped object (with `line` and `message`) when the
+ * block is structurally invalid (missing `.ENDS`, no ports declared, or
+ * unknown element prefix on a non-directive line).  Individual element lines
+ * that cannot be parsed are skipped rather than thrown.
+ */
+export function parseSubcircuit(text: string): ParsedSubcircuit {
+  const rawLines = text.split("\n");
+
+  let subcktHeaderLine = -1;
+  let endsLine = -1;
+  let subcktName = "";
+  const ports: string[] = [];
+  const elements: ParsedElement[] = [];
+  const models: ParsedModel[] = [];
+  const params: Record<string, number> = {};
+
+  // Collect .MODEL blocks inside the subcircuit for multi-line continuation
+  // support (identical logic to parseModelFile but scoped to this block).
+  type ModelBlock = { startLine: number; lines: string[] };
+  let currentModelBlock: ModelBlock | null = null;
+  const modelBlocks: ModelBlock[] = [];
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i];
+    const trimmed = raw.trim();
+    const lineNo = i + 1; // 1-based
+
+    // Skip full-line comments and blank lines
+    if (trimmed === "" || trimmed.startsWith("*") || trimmed.startsWith(";")) {
+      if (currentModelBlock) currentModelBlock.lines.push(raw);
+      continue;
+    }
+
+    // Continuation lines inside a .MODEL block
+    if (trimmed.startsWith("+")) {
+      if (currentModelBlock) currentModelBlock.lines.push(raw);
+      continue;
+    }
+
+    const upper = trimmed.toUpperCase();
+
+    // .SUBCKT header
+    if (upper.startsWith(".SUBCKT")) {
+      if (subcktHeaderLine !== -1) {
+        throw { line: lineNo, message: "Nested .SUBCKT is not supported." };
+      }
+      subcktHeaderLine = lineNo;
+      currentModelBlock = null;
+      const headerTokens = trimmed.split(/\s+/);
+      if (headerTokens.length < 3) {
+        throw {
+          line: lineNo,
+          message: ".SUBCKT line must have a name and at least one port.",
+        };
+      }
+      subcktName = headerTokens[1];
+      for (let t = 2; t < headerTokens.length; t++) {
+        ports.push(headerTokens[t]);
+      }
+      continue;
+    }
+
+    // .ENDS — end of subcircuit
+    if (upper.startsWith(".ENDS")) {
+      endsLine = lineNo;
+      currentModelBlock = null;
+      break;
+    }
+
+    // Only process body lines after the .SUBCKT header
+    if (subcktHeaderLine === -1) continue;
+
+    // .MODEL inside the body
+    if (upper.startsWith(".MODEL")) {
+      currentModelBlock = { startLine: lineNo, lines: [raw] };
+      modelBlocks.push(currentModelBlock);
+      continue;
+    }
+
+    // Close any open .MODEL block when we hit a non-continuation, non-comment
+    // non-blank line that is not itself a directive continuation
+    currentModelBlock = null;
+
+    // .PARAM line: .PARAM key=value [key=value ...]
+    if (upper.startsWith(".PARAM")) {
+      const rest = trimmed.slice(".PARAM".length);
+      const paramPattern = /([A-Za-z_][A-Za-z0-9_]*)=([^\s=]+)/g;
+      let m: RegExpExecArray | null;
+      while ((m = paramPattern.exec(rest)) !== null) {
+        const val = parseSpiceValue(m[2]);
+        if (!isNaN(val)) params[m[1].toUpperCase()] = val;
+      }
+      continue;
+    }
+
+    // Skip other directives (lines starting with .)
+    if (trimmed.startsWith(".")) continue;
+
+    // Element line
+    const prefix = trimmed[0].toUpperCase();
+    if (!VALID_ELEMENT_PREFIXES.has(prefix)) {
+      throw {
+        line: lineNo,
+        message: `Unknown element prefix "${prefix}" on line: ${trimmed}`,
+      };
+    }
+
+    const parsed = parseElementLine(trimmed);
+    if (parsed !== null) {
+      elements.push(parsed);
+    }
+  }
+
+  // Validate structural requirements
+  if (subcktHeaderLine === -1) {
+    throw { line: 1, message: "No .SUBCKT statement found." };
+  }
+  if (ports.length === 0) {
+    throw { line: subcktHeaderLine, message: ".SUBCKT declares no ports." };
+  }
+  if (endsLine === -1) {
+    throw { line: rawLines.length, message: "Missing .ENDS statement." };
+  }
+
+  // Parse collected .MODEL blocks
+  for (const block of modelBlocks) {
+    const blockText = block.lines.join("\n");
+    const result = parseModelCard(blockText, block.startLine);
+    if (!("message" in result)) {
+      models.push(result);
+    }
+  }
+
+  return { name: subcktName, ports, elements, models, params };
 }

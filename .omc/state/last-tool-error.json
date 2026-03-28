@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"/c/local_working_projects/digital_in_browser\\\" && python3 << 'EOF'\\nimport re, os\\n\\nfiles = [\\n    'src/components/active/__tests__/adc.test.ts',\\n    'src/components/active/__tests_...",
-  "error": "Exit code 1\nFixed 1 in src/components/active/__tests__/adc.test.ts\r\nFixed 2 in src/components/active/__tests__/analog-switch.test.ts\r\nFixed 1 in src/components/active/__tests__/cccs.test.ts\r\nFixed 1 in src/components/active/__tests__/ccvs.test.ts\r\nFixed 1 in src/components/active/__tests__/comparator.test.ts\r\nFixed 1 in src/components/active/__tests__/dac.test.ts\r\nFixed 4 in src/components/active/__tests__/opamp.test.ts\r\nFixed 1 in src/components/active/__tests__/optocoupler.test.ts\r\nFixed 1 in ...",
-  "timestamp": "2026-03-28T21:34:12.542Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/headless/__tests__/digital-pin-loading-mcp.test.ts\\\" 2>&1\",\"timeout\":30000,\"description\":\"Run MCP test file and ...",
+  "error": "Exit code 1\nFFF.....\n\n============================================================\n  5 passed  3 failed  0 skipped  (2.0s)\n  1 test files\n============================================================\n\nFailures grouped by error:\n\n  [1] expected [ { severity: 'error', …(2) } ] to have a length of +0 but got 1  (x1)\n      src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts:119:20  \"circuit_compile with digitalPinLoading=\"all\" compiles without errors\"\n\nStructured report: .vitest-failures.json",
+  "timestamp": "2026-03-28T22:26:36.685Z",
   "retry_count": 1
 }

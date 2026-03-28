@@ -21,7 +21,7 @@
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { TransistorModelRegistry } from "../solver/analog/transistor-model-registry.js";
-import { resolveModelAssignments, extractConnectivityGroups, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
+import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
 import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";
 import type { FlattenResult } from "../solver/digital/flatten.js";
@@ -125,6 +125,12 @@ export function compileUnified(
   );
   diagnostics.push(...connectivityDiagnostics);
 
+  // Resolve per-net loading overrides (maps stable net IDs to loading modes)
+  const overrides = circuit.metadata.digitalPinLoadingOverrides ?? [];
+  const { diagnostics: overrideDiags } =
+    resolveLoadingOverrides(overrides, groups, circuit.elements);
+  diagnostics.push(...overrideDiags);
+
   // -------------------------------------------------------------------------
   // Step 4: Partition by domain
   // -------------------------------------------------------------------------
@@ -136,6 +142,7 @@ export function compileUnified(
       registry,
       flatModelAssignments,
       crossEngineBoundaries,
+      circuit.metadata.digitalPinLoading ?? "cross-domain",
     );
 
   // -------------------------------------------------------------------------
@@ -176,6 +183,7 @@ export function compileUnified(
         circuit.metadata.logicFamily ?? undefined,
         circuit,
         innerDigitalCompiler,
+        circuit.metadata.digitalPinLoading ?? "cross-domain",
       )
     : null;
 

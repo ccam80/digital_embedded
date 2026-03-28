@@ -32,7 +32,8 @@ export type DiagnosticCode =
   | 'combinational-loop'
   | 'missing-property'
   | 'unknown-component'
-  | 'unsupported-ctz-component';
+  | 'unsupported-ctz-component'
+  | 'orphaned-pin-loading-override';
 
 /**
  * A single diagnostic: an error, warning, or informational note about

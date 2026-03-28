@@ -1,1293 +1,33 @@
 {
   "summary": {
     "vitest": {
-      "passed": 9399,
-      "failed": 368,
+      "passed": 9987,
+      "failed": 10,
       "skipped": 0,
-      "totalFiles": 330,
-      "durationSeconds": 15.4
+      "totalFiles": 336,
+      "durationSeconds": 14.9
     },
     "playwright": {
-      "passed": 459,
-      "failed": 68,
+      "passed": 467,
+      "failed": 60,
       "skipped": 0,
       "totalFiles": 19,
-      "durationSeconds": 258.14745
+      "durationSeconds": 219.262401
     },
-    "totalFailed": 436,
-    "totalPassed": 9858
+    "totalFailed": 70,
+    "totalPassed": 10454
   },
   "failures": {
     "vitest": [
       {
-        "message": "expected null not to be null",
-        "count": 11,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "node count matches reference compileUnified for resistor divider",
-            "line": 458,
-            "column": 32
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "branch count matches reference for RC circuit",
-            "line": 534,
-            "column": 32
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "both digital and analog domains populated for mixed circuit",
-            "line": 580,
-            "column": 32
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "dual-model component with simulationModel=\"analog\" produces analog domain with elements",
-            "line": 970,
-            "column": 31
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "neutral Ground component touching analog net produces non-null analog domain",
-            "line": 1008,
-            "column": 31
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile.test.ts",
-            "test": "compiles pure analog circuit correctly",
-            "line": 444,
-            "column": 31
-          },
-          {
-            "file": "src\\compile\\__tests__\\coordinator.test.ts",
-            "test": "has non-null digital engine and non-null analog engine",
-            "line": 450,
-            "column": 32
-          },
-          {
-            "file": "src\\compile\\__tests__\\coordinator.test.ts",
-            "test": "step does not throw for analog-only circuit",
-            "line": 462,
-            "column": 32
-          },
-          {
-            "file": "src\\compile\\__tests__\\coordinator.test.ts",
-            "test": "readSignal with digital address does not throw when digital engine exists",
-            "line": 471,
-            "column": 32
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-            "test": "dcOperatingPoint returns a DcOpResult",
-            "line": 506,
-            "column": 24
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-            "test": "simTime is a number (not null) for analog-only",
-            "line": 517,
-            "column": 31
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'elements')",
+        "message": "expected false to be true // Object.is equality",
         "count": 1,
         "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "element count matches reference for resistor divider",
-            "line": 482,
-            "column": 28
-          }
-        ]
-      },
-      {
-        "message": "expected false to be true // Object.is equality",
-        "count": 7,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "wireSignalMap has analog addresses for all wires",
-            "line": 504,
-            "column": 47
-          },
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "wireSignalMap contains entries for both domain wires in mixed circuit",
-            "line": 605,
-            "column": 52
-          },
-          {
-            "file": "src\\compile\\__tests__\\extract-connectivity.test.ts",
-            "test": "all groups have domains containing only \"analog\"",
-            "line": 489,
-            "column": 43
-          },
           {
             "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
             "test": "patch with _spiceModelOverrides changes DC operating point vs default",
             "line": 165,
             "column": 24
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-            "test": "supportsAcSweep returns true",
-            "line": 389,
-            "column": 37
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-            "test": "supportsDcOp returns true",
-            "line": 398,
-            "column": 34
-          },
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "appears_in_both_palettes",
-            "line": 414,
-            "column": 29
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'matrixSize')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "matrix size matches reference for RC circuit",
-            "line": 553,
-            "column": 28
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "bridges array is non-empty when circuit has cross-domain boundary",
-            "line": 630,
-            "column": 36
-          }
-        ]
-      },
-      {
-        "message": "expected 'neutral' to be 'analog' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\extract-connectivity.test.ts",
-            "test": "assigns analog modelKey for analog-only components",
-            "line": 165,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "expected 'digital' to be 'analog' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\extract-connectivity.test.ts",
-            "test": "uses simulationModel property when present",
-            "line": 184,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than or equal to 1",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\extract-connectivity.test.ts",
-            "test": "boundary groups have domains.size > 1",
-            "line": 534,
-            "column": 35
-          }
-        ]
-      },
-      {
-        "message": "expected [] to include 'SharedComponent'",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\core\\__tests__\\registry.test.ts",
-            "test": "component_with_both_models_appears_in_digital_and_analog",
-            "line": 314,
-            "column": 41
-          }
-        ]
-      },
-      {
-        "message": "expected [] to include 'PureAnalog'",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\core\\__tests__\\registry.test.ts",
-            "test": "pure_analog_excluded_from_digital",
-            "line": 329,
-            "column": 41
-          }
-        ]
-      },
-      {
-        "message": "hasMnaModel is not a function",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\core\\__tests__\\registry.test.ts",
-            "test": "hasAnalogModel returns true when mna model is present",
-            "line": 361,
-            "column": 14
-          },
-          {
-            "file": "src\\core\\__tests__\\registry.test.ts",
-            "test": "hasMnaModel returns false for digital-only component",
-            "line": 368,
-            "column": 14
-          }
-        ]
-      },
-      {
-        "message": "expected [] to include 'AnalogPassive'",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\core\\__tests__\\registry.test.ts",
-            "test": "getWithModel analog returns components with analog model",
-            "line": 494,
-            "column": 41
-          }
-        ]
-      },
-      {
-        "message": "expected 'discrete' to be 'mixed' // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-            "test": "timingModel is mixed (both engines present via neutral components)",
-            "line": 408,
-            "column": 31
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "analog-only circuit has timingModel mixed (both engines via neutral components)",
-            "line": 171,
-            "column": 31
-          }
-        ]
-      },
-      {
-        "message": "expected 16 to be +0 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "returns steps=0 for continuous",
-            "line": 224,
-            "column": 50
-          }
-        ]
-      },
-      {
-        "message": "expected null to be close to 0.000016, received difference is 0.000016, but expected 5e-16",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "simTimeGoal equals simTime plus speed times wallDt",
-            "line": 230,
-            "column": 32
-          }
-        ]
-      },
-      {
-        "message": "expected Infinity to be 12 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "budgetMs is 12 for continuous",
-            "line": 233,
-            "column": 53
-          }
-        ]
-      },
-      {
-        "message": "expected null to be close to 0.0001, received difference is 0.0001, but expected 5e-16",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "clamps wallDt to 0.1s for continuous",
-            "line": 241,
-            "column": 55
-          }
-        ]
-      },
-      {
-        "message": "expected 1000 to be 0.001 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "default analog speed is 1e-3",
-            "line": 284,
-            "column": 66
-          }
-        ]
-      },
-      {
-        "message": "expected 1 to be 0.000001 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "speed setter updates analog speed",
-            "line": 285,
-            "column": 91
-          }
-        ]
-      },
-      {
-        "message": "expected 1 to be 1e-9 // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "speed setter clamps negative to 1e-9 floor",
-            "line": 286,
-            "column": 98
-          },
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "adjustSpeed clamps analog speed at 1e-9 floor for negative result",
-            "line": 291,
-            "column": 68
-          }
-        ]
-      },
-      {
-        "message": "expected 10 to be close to 0.01, received difference is 9.99, but expected 5e-16",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "adjustSpeed multiplies analog speed by factor",
-            "line": 288,
-            "column": 68
-          }
-        ]
-      },
-      {
-        "message": "expected 1 to be close to 0.005, received difference is 0.995, but expected 5e-11",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "parseSpeed parses float for analog",
-            "line": 293,
-            "column": 99
-          }
-        ]
-      },
-      {
-        "message": "expected 1 to be close to 0.000001, received difference is 0.999999, but expected 5e-21",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "parseSpeed parses scientific notation for analog",
-            "line": 294,
-            "column": 112
-          }
-        ]
-      },
-      {
-        "message": "expected 'Hz' to be 's/s' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "formatSpeed returns s/s for rate at or above 1",
-            "line": 296,
-            "column": 114
-          }
-        ]
-      },
-      {
-        "message": "expected 'Hz' to be 'ms/s' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "formatSpeed returns ms/s for rate in 1e-3 to 1 range",
-            "line": 299,
-            "column": 22
-          }
-        ]
-      },
-      {
-        "message": "expected 'Hz' to be 'µs/s' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range",
-            "line": 303,
-            "column": 22
-          }
-        ]
-      },
-      {
-        "message": "expected 'Hz' to be 'ns/s' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-            "test": "formatSpeed returns ns/s for rate below 1e-6",
-            "line": 306,
-            "column": 60
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'factory')",
-        "count": 136,
-        "locations": [
-          {
-            "file": "src\\components\\active\\__tests__\\adc.test.ts",
-            "test": "midscale_input",
-            "line": 101,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\adc.test.ts",
-            "test": "full_scale",
-            "line": 101,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\adc.test.ts",
-            "test": "zero_input",
-            "line": 101,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\adc.test.ts",
-            "test": "ramp_test",
-            "line": 101,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\adc.test.ts",
-            "test": "eoc_pulses_after_conversion",
-            "line": 101,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "on_resistance",
-            "line": 61,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "off_resistance",
-            "line": 61,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "smooth_transition",
-            "line": 61,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "signal_passes_when_on",
-            "line": 61,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "nr_converges_during_transition",
-            "line": 61,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "no_and_nc_complementary",
-            "line": 80,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
-            "test": "break_before_make",
-            "line": 80,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\cccs.test.ts",
-            "test": "current_mirror_gain_1",
-            "line": 50,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\cccs.test.ts",
-            "test": "current_gain_10",
-            "line": 50,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\cccs.test.ts",
-            "test": "nonlinear_expression",
-            "line": 50,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ccvs.test.ts",
-            "test": "transresistance_1k",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ccvs.test.ts",
-            "test": "zero_current_zero_output",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ccvs.test.ts",
-            "test": "sense_port_zero_voltage_drop",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\comparator.test.ts",
-            "test": "output_high_when_vp_greater",
-            "line": 55,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\comparator.test.ts",
-            "test": "output_low_when_vm_greater",
-            "line": 55,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\comparator.test.ts",
-            "test": "hysteresis_prevents_chatter",
-            "line": 55,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\comparator.test.ts",
-            "test": "zero_crossing_detector",
-            "line": 55,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\comparator.test.ts",
-            "test": "response_time",
-            "line": 55,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\dac.test.ts",
-            "test": "full_scale",
-            "line": 95,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\dac.test.ts",
-            "test": "zero_code",
-            "line": 95,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\dac.test.ts",
-            "test": "midscale",
-            "line": 95,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\dac.test.ts",
-            "test": "monotonic_ramp",
-            "line": 95,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\dac.test.ts",
-            "test": "lsb_step_size",
-            "line": 95,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "linear_region",
-            "line": 65,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "positive_saturation",
-            "line": 65,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "negative_saturation",
-            "line": 65,
-            "column": 42
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "output_impedance",
-            "line": 205,
-            "column": 65
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "inverting_amplifier",
-            "line": 281,
-            "column": 65
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
-            "test": "voltage_follower",
-            "line": 321,
-            "column": 65
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-            "test": "current_transfer",
-            "line": 48,
-            "column": 43
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-            "test": "galvanic_isolation",
-            "line": 48,
-            "column": 43
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-            "test": "led_forward_voltage",
-            "line": 48,
-            "column": 43
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-            "test": "zero_input_zero_output",
-            "line": 48,
-            "column": 43
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
-            "test": "ctr_scaling",
-            "line": 48,
-            "column": 43
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ota.test.ts",
-            "test": "linear_region",
-            "line": 48,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ota.test.ts",
-            "test": "tanh_limiting",
-            "line": 48,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ota.test.ts",
-            "test": "gm_proportional_to_ibias",
-            "line": 48,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\ota.test.ts",
-            "test": "vca_circuit",
-            "line": 48,
-            "column": 35
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "switches_low_on_rising_threshold",
-            "line": 60,
-            "column": 53
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "switches_high_on_falling_threshold",
-            "line": 60,
-            "column": 53
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "hysteresis_prevents_oscillation",
-            "line": 60,
-            "column": 53
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "output_follows_input_sense",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "noisy_sine_clean_square",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-            "test": "plot_matches_hysteresis_loop",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "internal_divider_voltages",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "forces_output_low",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "external_voltage_changes_thresholds",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "saturates_when_output_low",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "oscillates_at_correct_frequency",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "duty_cycle",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "pulse_width",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-            "test": "retrigger_ignored_during_pulse",
-            "line": 80,
-            "column": 40
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vccs.test.ts",
-            "test": "linear_transconductance",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vccs.test.ts",
-            "test": "zero_control_zero_output",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vccs.test.ts",
-            "test": "nonlinear_square_law",
-            "line": 41,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vcvs.test.ts",
-            "test": "unity_gain_buffer",
-            "line": 40,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vcvs.test.ts",
-            "test": "gain_of_10",
-            "line": 40,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vcvs.test.ts",
-            "test": "nonlinear_expression",
-            "line": 40,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\active\\__tests__\\vcvs.test.ts",
-            "test": "output_drives_load",
-            "line": 40,
-            "column": 36
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-            "test": "computes correct geq and ieq for trapezoidal method",
-            "line": 60,
-            "column": 50
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-            "test": "computes correct geq for BDF-1 method",
-            "line": 60,
-            "column": 50
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-            "test": "computes correct geq for BDF-2 method and uses vPrevPrev",
-            "line": 60,
-            "column": 50
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-            "test": "declares isReactive === true",
-            "line": 60,
-            "column": 50
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
-            "test": "CrystalDefinition isReactive",
-            "line": 364,
-            "column": 52
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
-            "test": "CrystalDefinition isNonlinear is false",
-            "line": 374,
-            "column": 52
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
-            "test": "stamps branch incidence and conductance entries",
-            "line": 61,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
-            "test": "computes correct geq for trapezoidal method",
-            "line": 61,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
-            "test": "computes correct geq for BDF-1 method",
-            "line": 61,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
-            "test": "declares isReactive === true",
-            "line": 61,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
-            "test": "PolarizedCapDefinition isReactive",
-            "line": 311,
-            "column": 57
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
-            "test": "PolarizedCapDefinition isNonlinear",
-            "line": 317,
-            "column": 57
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\potentiometer.test.ts",
-            "test": "stamps 8 conductance entries for position 0.5",
-            "line": 60,
-            "column": 69
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\potentiometer.test.ts",
-            "test": "position=0 clamps R_top to minimum and R_bottom to full",
-            "line": 89,
-            "column": 69
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\potentiometer.test.ts",
-            "test": "position=1 clamps R_bottom to minimum and R_top to full",
-            "line": 116,
-            "column": 69
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-            "test": "stamp_places_four_conductance_entries",
-            "line": 34,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-            "test": "resistance_from_props",
-            "line": 52,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-            "test": "minimum_resistance_clamped",
-            "line": 67,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-            "test": "is_not_nonlinear_and_not_reactive",
-            "line": 82,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-            "test": "branch_index_is_minus_one",
-            "line": 90,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
-            "test": "analogFactory creates element with correct branch indices",
-            "line": 388,
-            "column": 60
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-            "test": "analogFactory creates element with correct branch indices",
-            "line": 602,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "lossless line: R_seg and G_seg stamps are zero when loss=0",
-            "line": 123,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "derives correct L_seg and C_seg from Z0 and delay",
-            "line": 186,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "step input arrives at port 2 approximately at delay τ",
-            "line": 278,
-            "column": 66
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "matched load produces no reflection — output voltage ≈ input/2",
-            "line": 380,
-            "column": 66
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "lossy line output is less than lossless for same parameters",
-            "line": 458,
-            "column": 68
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "N=50 delay more accurate than N=5",
-            "line": 519,
-            "column": 68
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "unterminated line: voltage at port2 rises above source step voltage",
-            "line": 586,
-            "column": 66
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "isReactive is true",
-            "line": 704,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "isNonlinear is false",
-            "line": 712,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "stamp produces entries into solver",
-            "line": 725,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-            "test": "stampCompanion is defined",
-            "line": 739,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "stamp_is_noop calls no solver methods",
-            "line": 366,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "reads_node_voltage returns voltage at node index",
-            "line": 382,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "analogFactory returns AnalogElement with correct properties",
-            "line": 419,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-            "test": "npn_analogFactory_creates_element",
-            "line": 440,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-            "test": "pnp_analogFactory_creates_element",
-            "line": 448,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "sine_at_t_zero",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "sine_at_quarter_period",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "square_at_half_period",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "triangle_linearity",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "dc_offset_applied",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "square_wave_breakpoints",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "set_scale_applied",
-            "line": 74,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "rc_lowpass",
-            "line": 238,
-            "column": 61
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "custom_sine",
-            "line": 307,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "ramp",
-            "line": 307,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "invalid_expression_emits_diagnostic",
-            "line": 307,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-            "test": "expression_parsed_once",
-            "line": 307,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
-            "test": "default_current_from_analog_factory",
-            "line": 102,
-            "column": 56
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
-            "test": "default_voltage_from_analog_factory",
-            "line": 111,
-            "column": 58
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ground.test.ts",
-            "test": "stamp_is_noop",
-            "line": 29,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ground.test.ts",
-            "test": "element_is_not_nonlinear_and_not_reactive",
-            "line": 62,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ground.test.ts",
-            "test": "element_branch_index_is_minus_one",
-            "line": 76,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\ground.test.ts",
-            "test": "element_node_indices_matches_input",
-            "line": 89,
-            "column": 54
-          },
-          {
-            "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
-            "test": "analogFactory_creates_element",
-            "line": 140,
-            "column": 55
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "closed_stamps_ron",
-            "line": 779,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "open_stamps_roff",
-            "line": 798,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "toggle_changes_conductance",
-            "line": 816,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "normallyClosed_inverts_analog_conductance",
-            "line": 846,
-            "column": 49
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "common_to_c_when_open",
-            "line": 871,
-            "column": 51
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "common_to_b_when_closed",
-            "line": 897,
-            "column": 51
-          },
-          {
-            "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-            "test": "switched_resistor_divider",
-            "line": 928,
-            "column": 51
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\behavioral-flipflop.test.ts",
-            "test": "analog_factory_returns_analog_element",
-            "line": 332,
-            "column": 49
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\behavioral-remaining.test.ts",
-            "test": "forward_current_lights",
-            "line": 188,
-            "column": 47
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\behavioral-sequential.test.ts",
-            "test": "counter_analog_factory_returns_analog_element",
-            "line": 406,
-            "column": 55
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\behavioral-sequential.test.ts",
-            "test": "register_analog_factory_returns_analog_element",
-            "line": 426,
-            "column": 56
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\darlington.test.ts",
-            "test": "subcircuit expands to 3 analog elements (Q1, Q2, R_BE)",
-            "line": 39,
-            "column": 40
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\darlington.test.ts",
-            "test": "expansion produces internal node connecting Q1E to Q2B",
-            "line": 39,
-            "column": 40
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\darlington.test.ts",
-            "test": "PNP expansion produces correct element types",
-            "line": 39,
-            "column": 40
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\darlington.test.ts",
-            "test": "PNP Darlington current flows in opposite direction vs NPN",
-            "line": 39,
-            "column": 40
-          }
-        ]
-      },
-      {
-        "message": "expected [] to include 'And'",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\components\\gates\\__tests__\\analog-gates.test.ts",
-            "test": "analog_palette_includes_gates",
-            "line": 89,
-            "column": 25
           }
         ]
       },
@@ -1332,210 +72,6 @@
             "column": 26
           }
         ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'bridges')",
-        "count": 8,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "compiles_digital_subcircuit_separately",
-            "line": 553,
-            "column": 21
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "creates_output_adapters",
-            "line": 567,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "creates_input_adapters",
-            "line": 585,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "inner_net_ids_mapped",
-            "line": 605,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "pin_electrical_resolved_for_ttl",
-            "line": 666,
-            "column": 21
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "Port-based inner digital circuit compiles with bridge adapters",
-            "line": 694,
-            "column": 21
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "bridge adapter pin mappings from Port interfaces — BIDIRECTIONAL maps to outputAdapters",
-            "line": 711,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-compiler.test.ts",
-            "test": "Port subcircuit with multiple ports — correct adapter count",
-            "line": 785,
-            "column": 21
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'diagnostics')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\bridge-diagnostics.test.ts",
-            "test": "emits_bridge_impedance_mismatch_when_source_resistance_too_high",
-            "line": 449,
-            "column": 36
-          }
-        ]
-      },
-      {
-        "message": "Cannot use 'in' operator to search for 'executeFn' in undefined",
-        "count": 9,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "produces_compiled_circuit_for_simple_analog_partition",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "node_count_matches_expected_for_and_gate_partition",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "factory_called_once_for_and_gate",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "wireToNodeId_populated_for_all_wires",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "ground_group_assigned_node_zero",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "non_ground_groups_assigned_sequential_node_ids",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "no_ground_emits_warning_diagnostic",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "matrixSize_equals_nodeCount_plus_branchCount",
-            "line": 574,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\compiler.ts",
-            "test": "pin_node_ids_passed_to_factory_match_group_node_ids",
-            "line": 574,
-            "column": 28
-          }
-        ]
-      },
-      {
-        "message": "expected \"spy\" to be called once, but got 0 times",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "calls_analog_factory_with_correct_args",
-            "line": 461,
-            "column": 24
-          }
-        ]
-      },
-      {
-        "message": "expected undefined to be defined",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\darlington.test.ts",
-            "test": "DarlingtonNPN has analog model only",
-            "line": 268,
-            "column": 69
-          }
-        ]
-      },
-      {
-        "message": "expected \"makeStubAnalogElement\" to be called once, but got 0 times",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-            "test": "behavioral_mode_still_calls_analog_factory",
-            "line": 321,
-            "column": 27
-          }
-        ]
-      },
-      {
-        "message": "expected [] to have a length of 1 but got +0",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "per_instance_override: simulationModel=digital on dual-model subcircuit in analog outer circuit produces cross-engine boundary",
-            "line": 174,
-            "column": 35
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "cross_domain_opaque: digital subcircuit in analog outer circuit is NOT inlined and boundary is recorded",
-            "line": 244,
-            "column": 35
-          }
-        ]
-      },
-      {
-        "message": "expected 'behavioral' to be 'analog' // Object.is equality",
-        "count": 3,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "analog_wins_for_submode: resolveModelAssignments assigns modelKey=analog when simulationModel is a sub-mode value on a dual-model component",
-            "line": 274,
-            "column": 38
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "analog_wins_for_logical_submode: simulationModel=logical routes dual-model component to analog",
-            "line": 290,
-            "column": 38
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "explicit_analog_key_respected: simulationModel=analog on dual-model component routes to analog",
-            "line": 322,
-            "column": 38
-          }
-        ]
       }
     ],
     "playwright": [
@@ -1576,37 +112,13 @@
         ]
       },
       {
-        "message": "Error: Vcc: expected 5 ±0.1%, got 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "voltage divider: Vout equals Vin × R2/(R1+R2)",
-            "line": 190,
-            "column": 5
-          }
-        ]
-      },
-      {
         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 19,
+        "count": 11,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "RL circuit: current rise with time constant L/R",
             "line": 224,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "CMOS inverter: Vin=0 gives Vout=Vdd",
-            "line": 707,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "CMOS NAND: truth table at analog voltages",
-            "line": 747,
             "column": 5
           },
           {
@@ -1629,20 +141,8 @@
           },
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "switched capacitor filter: clock-driven analog switches",
-            "line": 1367,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "SPDT source selector: toggles between two voltage sources",
             "line": 1415,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "BJT switch with flyback diode: clamps inductive kick",
-            "line": 1463,
             "column": 5
           },
           {
@@ -1653,26 +153,8 @@
           },
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "op-amp inverting: gain equals -Rf/Rin",
-            "line": 1604,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "555 astable: oscillation at expected frequency",
             "line": 1689,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "SCR latch: trigger on and stays latched",
-            "line": 1741,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "LDR voltage divider: output varies with light level",
-            "line": 1843,
             "column": 5
           },
           {
@@ -1694,12 +176,6 @@
             "column": 5
           },
           {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "IS override affects BJT collector current",
-            "line": 165,
-            "column": 3
-          },
-          {
             "file": "gui/workflow-tests.spec.ts",
             "test": "speed control affects analog simulation rate",
             "line": 635,
@@ -1708,19 +184,7 @@
         ]
       },
       {
-        "message": "Error: Vpeak_rectified: expected 4.307074 ±0.1%, got 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "diode rectifier: output near Vpeak minus Vf with ripple",
-            "line": 351,
-            "column": 5
-          }
-        ]
-      },
-      {
-        "message": "Error: Vsource: expected 10 ±0.1%, got 0",
+        "message": "Error: Vregulated: expected 5.140892 ±0.1%, got 0",
         "count": 1,
         "locations": [
           {
@@ -1834,13 +298,97 @@
         ]
       },
       {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 1,
+        "message": "Error: Status bar shows an error",
+        "count": 12,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "op-amp integrator: ramp output for DC input",
-            "line": 1644,
+            "test": "switched capacitor filter: clock-driven analog switches",
+            "line": 1367,
+            "column": 5
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "DAC + RC filter: digital input produces filtered analog voltage",
+            "line": 153,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital gate driving analog load: And output drives resistor",
+            "line": 218,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "comparator to logic: analog threshold drives digital gate",
+            "line": 318,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "ADC readout: analog waveform sampled to digital outputs",
+            "line": 377,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "Schmitt trigger to counter: analog sine drives digital count",
+            "line": 437,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "555 timer driving digital counter: analog oscillator to digital count",
+            "line": 495,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
+            "line": 563,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed transistor + gate: BJT level-shifts into digital And",
+            "line": 657,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "relay from digital logic: And gate drives relay coil",
+            "line": 768,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SCR latch: trigger on and stays latched",
+            "line": 1741,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LDR voltage divider: output varies with light level",
+            "line": 1843,
             "column": 5
           }
         ]
@@ -1938,78 +486,6 @@
             "test": "node voltages change during transient simulation",
             "line": 144,
             "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: Status bar shows an error",
-        "count": 11,
-        "locations": [
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DAC at bits=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DAC at bits=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "DAC + RC filter: digital input produces filtered analog voltage",
-            "line": 153,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "digital gate driving analog load: And output drives resistor",
-            "line": 218,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "comparator to logic: analog threshold drives digital gate",
-            "line": 318,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "ADC readout: analog waveform sampled to digital outputs",
-            "line": 377,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "Schmitt trigger to counter: analog sine drives digital count",
-            "line": 437,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "555 timer driving digital counter: analog oscillator to digital count",
-            "line": 495,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
-            "line": 563,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "mixed transistor + gate: BJT level-shifts into digital And",
-            "line": 657,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "relay from digital logic: And gate drives relay coil",
-            "line": 768,
-            "column": 5
           }
         ]
       },

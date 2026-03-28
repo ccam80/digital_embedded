@@ -175,6 +175,11 @@ export class BridgeOutputAdapter implements AnalogElement {
   get outputNodeId(): number {
     return this._pinModel.nodeId;
   }
+
+  /** Output impedance (Ω) used by this adapter's Norton equivalent. */
+  get rOut(): number {
+    return this._pinModel.rOut;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +292,11 @@ export class BridgeInputAdapter implements AnalogElement {
   /** MNA node ID for this input pin. The coordinator reads voltage here. */
   get inputNodeId(): number {
     return this._pinModel.nodeId;
+  }
+
+  /** Input impedance (Ω) used by this adapter's loading conductance stamp. */
+  get rIn(): number {
+    return this._pinModel.rIn;
   }
 }
 

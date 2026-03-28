@@ -100,6 +100,7 @@ export function partitionByDomain(
   registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
   crossEngineBoundaries: CrossEngineBoundary[],
+  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
 ): PartitionResult {
   // -------------------------------------------------------------------------
   // Step 1: Build lookup from elementIndex → ModelAssignment
@@ -155,7 +156,15 @@ export function partitionByDomain(
     };
 
     if (ma.modelKey === "digital") {
-      digitalComponents.push(partComp);
+      // When digitalPinLoading is "all", every dual-model component (digital +
+      // at least one mnaModel) is treated as if at a partition boundary and
+      // routed to the analog partition for bridge synthesis.
+      const isDualModel = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
+      if (digitalPinLoading === "all" && isDualModel) {
+        analogComponents.push(partComp);
+      } else {
+        digitalComponents.push(partComp);
+      }
     } else if (ma.modelKey === "analog") {
       analogComponents.push(partComp);
     } else if (ma.modelKey === "neutral") {
@@ -223,6 +232,13 @@ export function partitionByDomain(
       const analogElementIndices = new Set(analogComponents.map(c => elements.indexOf(c.element)));
       const touchesAnalogElement = g.pins.some(p => analogElementIndices.has(p.elementIndex));
       if (touchesAnalogElement) analogGroups.push(g);
+    } else if (hasDigital && digitalPinLoading === "all") {
+      // When digitalPinLoading is "all", dual-model components rerouted to the
+      // analog partition bring their digital groups into the analog partition so
+      // the analog compiler can resolve pin node IDs for bridge synthesis.
+      const analogElementIndices = new Set(analogComponents.map(c => elements.indexOf(c.element)));
+      const touchesReroutedAnalog = g.pins.some(p => analogElementIndices.has(p.elementIndex));
+      if (touchesReroutedAnalog) analogGroups.push(g);
     }
 
     if (isBoundary) {

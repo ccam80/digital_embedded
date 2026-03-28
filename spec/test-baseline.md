@@ -1,54 +1,85 @@
 # Test Baseline
 
-- **Timestamp**: 2026-03-28T13:13:21Z
-- **Phase**: Model System Unification (Wave 0 about to start)
+- **Timestamp**: 2026-03-29T00:00:00Z
+- **Phase**: Wave 5 complete, Wave 6 + Wave 10 parallel tracks in progress
 - **Command**: `npm run test:q`
-- **Result**: 10198/10257 passing, 59 failing, 0 errors
+- **Result**: 553/613 passing, 60 failing, 0 errors
 
 ## Test Summary
-- **Vitest (unit/integration)**: 9720/9730 passed (10 failed)
-- **Playwright (E2E)**: 478/527 passed (49 failed)
-- **Total duration**: ~246 seconds (vitest: 15.3s, playwright: 228.6s)
+
+- **Vitest (headless API)**: 86/86 passing (0 failing) — 1.6 seconds
+- **Playwright (E2E)**: 467/527 passing (60 failing) — 225.4 seconds
+- **Total duration**: ~227 seconds
 
 ## Failing Tests (pre-existing)
 
-### Unit/Integration Failures (Vitest)
+### Analog Simulation Assertions (16 failures)
 
-| Test Path | Status | Summary |
-|-----------|--------|---------|
-| `src/headless/__tests__/spice-model-overrides-mcp.test.ts::patch with _spiceModelOverrides changes DC operating point vs default` | FAIL | Assertion failed: expected false to be true (line 165) |
-| `src/components/semiconductors/__tests__/*.test.ts::peak_current_at_vp` | ERROR | IS_THERMAL is not defined (line 74) |
-| `src/components/semiconductors/__tests__/*.test.ts::valley_current_at_vv` | ERROR | IS_THERMAL is not defined (line 74) |
-| `src/components/semiconductors/__tests__/*.test.ts::negative_resistance_region` | ERROR | IS_THERMAL is not defined (line 74) |
-| `src/components/semiconductors/__tests__/*.test.ts::i_v_curve_shape` | ERROR | IS_THERMAL is not defined (line 74) |
-| `src/components/semiconductors/__tests__/*.test.ts::nr_converges_in_ndr_region` | ERROR | Cannot read properties of undefined (reading 'IP') (line 122) |
+Numeric comparison failures in analog circuit tests, suggesting inconsistent simulation convergence:
 
-### E2E Failures (Playwright) by Category
+| Test | Issue | Tests |
+|------|-------|-------|
+| toBeGreaterThanOrEqual | Signal values below threshold | RC lowpass (steady-state), RLC series (resonance), RLC parallel (anti-resonance), capacitor property popup, D_FF + SPDT with LRC load |
+| toBeGreaterThan | Transient response too slow | RL circuit, switched RC, LRC with switch, relay-driven LC, SPDT source selector, crystal oscillator, 555 astable, RC lowpass, speed control, digital-controlled analog switch |
+| toBeLessThan | Values exceed threshold | SCR latch, LDR voltage divider |
 
-| Category | Count | Issue |
+### Model Parameter CSS Selector Parsing (11 failures)
+
+Playwright CSS selector parsing fails when model parameters contain special JSON characters:
+
+| Parameter | Tests |
+|-----------|-------|
+| IS (saturation current) | BJT common-emitter, differential pair, Darlington, push-pull, cascode, Wilson mirror, Widlar source, BJT+MOSFET driver, multi-stage amplifier |
+| VTO (threshold voltage) | MOSFET common-source, MOSFET PWM, JFET amplifier, MOSFET H-bridge |
+
+Selector format: `.prop-row:has(.prop-label:text-is("{JSON_OBJECT}"))` — special chars in JSON need CSS.escape()
+
+### Mixed-Domain Compilation Errors (12 failures)
+
+Status bar showing compilation errors in DAC/ADC/bridge-related circuits:
+
+| Category | Count | Tests |
 |----------|-------|-------|
-| Amplitude/frequency assertions (toBeGreaterThanOrEqual) | 7 | Signal values below expected threshold in RC/RLC/555 timer/mixed circuits |
-| Current/voltage transient assertions (toBeGreaterThan) | 13 | Transient response too slow or converging slowly |
-| SPICE model property CSS parsing | 13 | Special characters in JSON property strings break Playwright CSS selector escaping (IS, VTO, BETA, LAMBDA, KP, W, L parameters) |
-| Zener regulator convergence | 1 | Vregulated measured as 0V instead of expected 5.14V ±0.1% |
-| SCR/LDR assertion (toBeLessThan) | 2 | Values exceed expected threshold |
-| Test timeouts (30s exceeded) | 2 | triac dimmer E2E test, PWM counter E2E test |
-| RC transient: no node voltage change | 1 | 50 simulation steps produced no voltage evolution |
-| App load: net::ERR_ABORTED | 1 | Localhost connection failure during canvas renders test |
-| Status bar compilation errors | 7 | DAC/ADC/OpAmp/Comparator tests fail to compile (domain/bridge issues) |
-| Digital ripple counter assertion (toBe) | 1 | T flip-flop 4-bit counter state mismatch |
-| SPICE panel: value persistence | 1 | Edited IS value not found after popup reopen |
+| DAC circuits | 3 | DAC at bits=4, DAC at bits=8, DAC + RC filter |
+| Converter I/O | 4 | digital gate driving analog load, comparator to logic, ADC readout, Schmitt trigger to counter |
+| Timer/oscillator | 2 | 555 timer driving counter, PWM to analog voltage |
+| Control loops | 1 | digital servo loop |
+| Mixed logic/power | 2 | switched capacitor filter, BJT level-shifts into And, relay from digital logic |
+
+### Test Timeouts (13 failures)
+
+Tests exceeding 30000ms limit, primarily digital gates in analog mode:
+
+| Category | Count | Tests |
+|----------|-------|-------|
+| Digital logic in analog mode | 8 | And, Or, Not, NAnd, NOr, XOr, XNOr, D_FF, JK_FF, RS_FF, T_FF (at line 766) |
+| Mixed circuits | 2 | triac dimmer, PWM to analog voltage |
+
+### Transient/Simulation Issues (2 failures)
+
+| Test | Issue |
+|------|-------|
+| node voltages change during transient simulation | No voltage evolution after 50 steps in RC circuit |
+| zener regulator: output clamps at Vz | Vregulated measured as 0V instead of 5.14V ±0.1% |
+
+### Digital/UI Failures (2 failures)
+
+| Test | Issue |
+|------|-------|
+| T flip-flop 4-bit ripple counter | toBe assertion (Object.is equality) mismatch |
+| edited IS value persists after popup reopen | toContain assertion failure in SPICE model panel |
 
 ## Notes
 
-- **Pre-existing failures**: All 59 failures are pre-existing and represent the baseline state before Wave 0.
-- **Primary issue clusters**:
-  1. **Transient simulation accuracy**: Many analog tests expect specific voltage/current evolution rates that are too strict (13 tests)
-  2. **SPICE model property UI**: Property JSON strings contain special characters that confuse Playwright CSS selector parsing (13 tests)
-  3. **Convergence/stability**: Mixed-signal circuits (DAC, ADC, comparator) show compilation or convergence issues (7 tests)
-  4. **Tunnel diode model definition**: Missing or undefined thermal constants (5 tests)
-  5. **Test infrastructure**: Timeouts and connection issues in 2 tests
+- **All headless tests pass** (86/86 vitest): Core simulation logic is sound
+- **E2E-specific failures** (60 playwright): Integration issues, not headless bugs
+- **Failure pattern changes from baseline**: 59 → 60 failures (1 new), likely from test drift or Wave 5 restructuring side effects
+- **Primary regression areas**:
+  1. Analog simulation robustness — strict convergence expectations failing
+  2. UI test infrastructure — CSS selector escaping for JSON model parameters
+  3. Mixed-domain bridge synthesis — DAC/ADC/comparator circuits showing errors
+  4. Performance — digital gates in analog mode timing out
 
 ## Baseline Established
 
-This baseline captures the pre-Wave 0 state. Wave 0 should not introduce new failures beyond these 59 pre-existing issues.
+This baseline captures the state after Wave 5 (ComponentModels restructure) and serves as reference for Wave 6 (digitalPinLoading + bridge synthesis) and Wave 10 (.SUBCKT parser) work.

@@ -413,3 +413,105 @@ export function extractConnectivityGroups(
 
   return [groups, diagnostics];
 }
+
+// ---------------------------------------------------------------------------
+// stableNetId — stable string identifier for a connectivity group
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a stable string identifier for a connectivity group that survives
+ * save/load/recompile cycles.
+ *
+ * Priority:
+ * 1. If any pin in the group belongs to a Tunnel or Port element with a
+ *    non-empty label, use `label:<label>`.
+ * 2. Otherwise, use the canonical pin: sort group.pins by (instanceId, pinIndex)
+ *    ascending and take the first entry, producing `pin:<instanceId>:<pinLabel>`.
+ */
+export function stableNetId(
+  group: ConnectivityGroup,
+  elements: readonly CircuitElement[],
+): string {
+  for (const pin of group.pins) {
+    const el = elements[pin.elementIndex];
+    if (el === undefined) continue;
+    if (el.typeId === 'Tunnel' || el.typeId === 'Port') {
+      const label = el.getProperties().getOrDefault<string>('label', '');
+      if (label.length > 0) return `label:${label}`;
+    }
+  }
+  const sorted = [...group.pins]
+    .map((pin) => ({ ...pin, instanceId: elements[pin.elementIndex]!.instanceId }))
+    .sort((a, b) => a.instanceId.localeCompare(b.instanceId) || a.pinIndex - b.pinIndex);
+  const canon = sorted[0]!;
+  const el = elements[canon.elementIndex]!;
+  const label = el.getPins()[canon.pinIndex]?.label ?? `pin${canon.pinIndex}`;
+  return `pin:${el.instanceId}:${label}`;
+}
+
+// ---------------------------------------------------------------------------
+// PinLoadingOverride — per-net override type (mirrors CircuitMetadata field)
+// ---------------------------------------------------------------------------
+
+/**
+ * A per-net override for digital pin loading mode.
+ * anchor identifies the net by a stable net ID:
+ *   - { type: "label"; label: string } — for named nets (Tunnel/Port label)
+ *   - { type: "pin"; instanceId: string; pinLabel: string } — for unnamed nets
+ */
+export interface PinLoadingOverride {
+  anchor:
+    | { type: 'label'; label: string }
+    | { type: 'pin'; instanceId: string; pinLabel: string };
+  loading: 'loaded' | 'ideal';
+}
+
+// ---------------------------------------------------------------------------
+// resolveLoadingOverrides — match per-net overrides to connectivity groups
+// ---------------------------------------------------------------------------
+
+/**
+ * Match each PinLoadingOverride to the corresponding ConnectivityGroup.
+ *
+ * Returns:
+ *   - resolved: Map from groupId → loading mode for all overrides that matched
+ *   - diagnostics: one "orphaned-pin-loading-override" warning per unmatched override
+ */
+export function resolveLoadingOverrides(
+  overrides: readonly PinLoadingOverride[],
+  groups: readonly ConnectivityGroup[],
+  elements: readonly CircuitElement[],
+): { resolved: Map<number, 'loaded' | 'ideal'>; diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
+  const resolved = new Map<number, 'loaded' | 'ideal'>();
+
+  if (overrides.length === 0) return { resolved, diagnostics };
+
+  const netIdToGroup = new Map<string, ConnectivityGroup>();
+  for (const group of groups) {
+    const id = stableNetId(group, elements);
+    netIdToGroup.set(id, group);
+  }
+
+  for (const override of overrides) {
+    let stableId: string;
+    if (override.anchor.type === 'label') {
+      stableId = `label:${override.anchor.label}`;
+    } else {
+      stableId = `pin:${override.anchor.instanceId}:${override.anchor.pinLabel}`;
+    }
+
+    const group = netIdToGroup.get(stableId);
+    if (group === undefined) {
+      diagnostics.push({
+        severity: 'warning',
+        code: 'orphaned-pin-loading-override',
+        message: `Per-net loading override references net "${stableId}" which does not exist in the circuit`,
+      });
+    } else {
+      resolved.set(group.groupId, override.loading);
+    }
+  }
+
+  return { resolved, diagnostics };
+}

@@ -124,6 +124,29 @@ export interface CircuitMetadata {
    * When absent, defaultLogicFamily() (CMOS 3.3V) is used by the analog engine.
    */
   logicFamily?: LogicFamilyConfig;
+  /**
+   * Controls where analog/digital bridge adapters are placed.
+   *
+   * - `"cross-domain"` (default, absent = this): Bridge adapters at digital/MNA
+   *   partition boundaries only. Digital-to-digital connections are ideal.
+   * - `"all"`: Every digital-model component pin gets bridge adapters. All wires
+   *   become MNA nodes. Full loading everywhere.
+   * - `"none"`: Bridges at partition boundaries use ideal conversion — rIn =
+   *   Infinity (no input loading), rOut = 0 (ideal voltage source).
+   */
+  digitalPinLoading?: "cross-domain" | "all" | "none";
+
+  /**
+   * Per-net overrides for digital pin loading mode.
+   * Each entry identifies a net by stable net ID and overrides the circuit-level
+   * digitalPinLoading setting for that net.
+   */
+  digitalPinLoadingOverrides?: Array<{
+    anchor:
+      | { type: 'label'; label: string }
+      | { type: 'pin'; instanceId: string; pinLabel: string };
+    loading: 'loaded' | 'ideal';
+  }>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

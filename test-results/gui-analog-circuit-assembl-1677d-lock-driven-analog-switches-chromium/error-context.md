@@ -278,7 +278,9 @@
     - generic "Drag to resize palette" [ref=e369]
     - generic "Circuit editor canvas" [ref=e371]
   - generic [ref=e372]:
-    - generic [ref=e373]: Ready
-    - button "100%" [ref=e375] [cursor=pointer]
-    - generic [ref=e376]: 6, 16
+    - generic [ref=e373]: ⚠️
+    - generic [ref=e374]: "Simulation error: Bus conflict on net 0: conflicting drivers"
+    - button "×" [ref=e375] [cursor=pointer]
+    - button "100%" [ref=e377] [cursor=pointer]
+    - generic [ref=e378]: 6, 16
 ```

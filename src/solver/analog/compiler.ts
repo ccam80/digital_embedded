@@ -549,6 +549,7 @@ function runPassA_partition(
   crossEnginePlaceholderIds: Set<string>,
   externalNodeCount: number,
   diagnostics: SolverDiagnostic[],
+  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
 ): PassAPartitionResult {
   let nextInternalNode = externalNodeCount + 1;
   let branchCount = 0;
@@ -574,6 +575,13 @@ function runPassA_partition(
     const isDigitalModel = 'executeFn' in pc.model;
 
     if (isDigitalModel) {
+      const hasMnaModels = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
+      if (digitalPinLoading === "all" && hasMnaModels) {
+        // Dual-model component rerouted to analog partition for bridge synthesis —
+        // treat the same as simulationModel="logical" in Pass A.
+        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        continue;
+      }
       diagnostics.push(
         makeDiagnostic(
           "unsupported-component-in-analog",
@@ -601,7 +609,7 @@ function runPassA_partition(
       const passAMode = passAProps.has("simulationModel")
         ? (passAProps.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-      if ((passAMode === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) || passAMode === "logical") {
+      if ((passAMode === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) || passAMode === "logical" || digitalPinLoading === "all") {
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       }
@@ -887,6 +895,7 @@ export function compileAnalogPartition(
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
+  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
@@ -914,7 +923,7 @@ export function compileAnalogPartition(
   );
 
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
-  const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics);
+  const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);
 
   const elementMeta = passA.elementMeta;
   let branchCount = passA.branchCount;
@@ -960,8 +969,14 @@ export function compileAnalogPartition(
     const def = pc.definition;
     const props = el.getProperties();
 
-    if (meta.pc.model === null || 'executeFn' in meta.pc.model) {
-      continue;
+    const isDigitalOnlyModel = meta.pc.model === null || 'executeFn' in meta.pc.model;
+    if (isDigitalOnlyModel) {
+      // When digitalPinLoading is "all", dual-model components rerouted to the
+      // analog partition must proceed to bridge synthesis below, not be skipped.
+      const hasMnaModels = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
+      if (digitalPinLoading !== "all" || !hasMnaModels) {
+        continue;
+      }
     }
 
     if (def.models?.digital !== undefined) {
@@ -1053,7 +1068,7 @@ export function compileAnalogPartition(
           }
           continue;
         }
-      } else if (simulationModel === "logical") {
+      } else if (simulationModel === "logical" || digitalPinLoading === "all") {
         const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
 
         let hasUnconnectedPin = false;
@@ -1132,7 +1147,9 @@ export function compileAnalogPartition(
           const mergedPinOverride = userPinOverride
             ? { ...defPinOverride, ...userPinOverride }
             : defPinOverride;
-          const spec = resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
+          const spec = digitalPinLoading === "none"
+            ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0, ...mergedPinOverride }, componentOverride)
+            : resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
 
           if (pinDecl.direction === PinDirection.OUTPUT) {
             const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
@@ -1379,6 +1396,7 @@ export function compileAnalogPartition(
         registry,
         diagnostics,
         digitalCompiler!,
+        digitalPinLoading,
       );
       if (bridgeInstance !== null) {
         for (const adapter of bridgeInstance.outputAdapters) {
@@ -1598,6 +1616,7 @@ function compileBridgeInstance(
   registry: ComponentRegistry,
   diagnostics: SolverDiagnostic[],
   digitalCompiler: DigitalCompilerFn,
+  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
 ): BridgeInstance | null {
   // Step 1: Compile the inner digital circuit.
   let compiledInner: CompiledCircuitImpl;
@@ -1660,7 +1679,9 @@ function compileBridgeInstance(
     }
 
     // Resolve the pin electrical spec from the circuit logic family.
-    const spec = resolvePinElectrical(circuitFamily);
+    const spec = digitalPinLoading === "none"
+      ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0 })
+      : resolvePinElectrical(circuitFamily);
 
     if (mapping.direction === "out") {
       // Digital subcircuit output → drives analog net.

@@ -277,7 +277,7 @@
     - generic "Circuit editor canvas" [ref=e368]
   - generic [ref=e369]:
     - generic [ref=e370]: ⚠️
-    - generic [ref=e371]: "Circuit problem: Component \"Out\" (06c236b7-7c17-454c-b3e8-86d43047a19d) is digital-only and cannot be simulated in an analog circuit"
+    - generic [ref=e371]: "Circuit problem: Component \"Out\" (34211538-2714-497a-89ac-0486bf9eee94) is digital-only and cannot be simulated in an analog circuit | Voltage source loop detected — two or more voltage sources form a loop with no resistance"
     - button "×" [ref=e372] [cursor=pointer]
     - button "100%" [ref=e374] [cursor=pointer]
     - generic [ref=e375]: 30, 8
