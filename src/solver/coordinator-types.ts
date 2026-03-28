@@ -125,6 +125,14 @@ export interface SimulationCoordinator {
   acAnalysis(params: AcParams): AcResult | null;
 
   /**
+   * Step until simTime >= targetSimTime, with optional wall-clock budget.
+   * Returns the number of steps taken. No-op (returns 0) for discrete-only circuits.
+   * @param targetSimTime - Target simulation time in seconds
+   * @param budgetMs - Wall-clock budget in milliseconds (default 5000)
+   */
+  stepToTime(targetSimTime: number, budgetMs?: number): Promise<number>;
+
+  /**
    * Current simulation time in seconds, or null if timing is purely discrete.
    * For mixed circuits, returns the analog engine's simTime.
    */

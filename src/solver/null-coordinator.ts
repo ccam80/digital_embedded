@@ -100,6 +100,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   runToBreak(): void { /* no-op */ }
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
+  async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
 
   // -------------------------------------------------------------------------
   // Timing

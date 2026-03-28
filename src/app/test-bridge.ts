@@ -16,6 +16,7 @@ import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { hasAnalogModel, hasDigitalModel } from '../core/registry.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
+import type { ScopePanel } from '../runtime/analog-scope-panel.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
 
@@ -88,6 +89,27 @@ export interface TestBridge {
     wires: Array<{ x1: number; y1: number; x2: number; y2: number }>;
     pins: Array<{ x: number; y: number }>;
   };
+
+  /** Returns true when a placement (palette item click) is active. */
+  isPlacementActive(): boolean;
+
+  /**
+   * Get trace statistics (min/max/mean) for all scope panel channels.
+   * Returns null if no scope panel is active or no data has been collected.
+   */
+  getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> | null;
+
+  /** Resolve a component name or alias to its canonical registry name. Returns null if not found. */
+  resolveComponentName(nameOrAlias: string): string | null;
+
+  /**
+   * Describe a component type from the registry: pin layout and property defs.
+   * Returns null if the type is not found.
+   */
+  describeComponent(typeName: string): {
+    pinLayout: Array<{ label: string; direction: 'INPUT' | 'OUTPUT' | 'BIDIRECTIONAL'; defaultBitWidth: number }>;
+    propertyDefs: Array<{ key: string; label: string; type: string; defaultValue: string | number | boolean; min?: number; max?: number }>;
+  } | null;
 }
 
 export function createTestBridge(
@@ -97,6 +119,8 @@ export function createTestBridge(
   _palette: ComponentPalette,
   registry: ComponentRegistry,
   coordinatorGetter: () => SimulationCoordinator,
+  placementGetter: () => { isActive(): boolean } = () => ({ isActive: () => false }),
+  scopeGetter: () => ScopePanel[] = () => [],
 ): TestBridge {
   let circuit = initialCircuit;
 
@@ -163,7 +187,6 @@ export function createTestBridge(
         wireCount: circuit.wires.length,
         elements: circuit.elements.map(el => {
           const label = el.getProperties().getOrDefault('label', '') as string;
-          const def = registry.get(el.typeId);
           const bb = el.getBoundingBox();
           const centerScreen = worldToScreen(bb.x + bb.width / 2, bb.y + bb.height / 2);
           return {
@@ -188,6 +211,13 @@ export function createTestBridge(
 
     getViewport() {
       return { zoom: viewport.zoom, panX: viewport.pan.x, panY: viewport.pan.y };
+    },
+
+    getTraceStats() {
+      const panels = scopeGetter();
+      if (panels.length === 0) return null;
+      const allStats = panels.flatMap(p => p.getTraceStats());
+      return allStats.length === 0 ? null : allStats;
     },
 
     resolveComponentName(nameOrAlias: string): string | null {
@@ -261,6 +291,34 @@ export function createTestBridge(
         }
       }
       return { wires, pins };
+    },
+
+    isPlacementActive() {
+      return placementGetter().isActive();
+    },
+
+    describeComponent(typeName: string) {
+      const def = registry.get(typeName);
+      if (!def) return null;
+      return {
+        pinLayout: def.pinLayout.map(p => ({
+          label: p.label,
+          direction: p.direction as 'INPUT' | 'OUTPUT' | 'BIDIRECTIONAL',
+          defaultBitWidth: p.defaultBitWidth,
+        })),
+        propertyDefs: def.propertyDefs.map(pd => ({
+          key: pd.key,
+          label: pd.label,
+          type: pd.type as string,
+          defaultValue: (typeof pd.defaultValue === 'bigint'
+            ? Number(pd.defaultValue)
+            : Array.isArray(pd.defaultValue)
+              ? JSON.stringify(pd.defaultValue)
+              : pd.defaultValue) as string | number | boolean,
+          ...(pd.min !== undefined ? { min: pd.min } : {}),
+          ...(pd.max !== undefined ? { max: pd.max } : {}),
+        })),
+      };
     },
   };
 }

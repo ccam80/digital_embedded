@@ -64,6 +64,31 @@ export interface SimControllerCallbacks {
 }
 
 // ---------------------------------------------------------------------------
+// parseTimeValue — parse SI time strings like "5m", "100u", "1n" → seconds
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a human-readable time string with SI suffixes into seconds.
+ * Examples: "5m" → 0.005, "100u" → 0.0001, "1n" → 1e-9, "0.01" → 0.01.
+ * Returns NaN for invalid input.
+ */
+export function parseTimeValue(s: string): number {
+  const t = s.trim();
+  const suffixes: Record<string, number> = {
+    s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9, ps: 1e-12,
+    m: 1e-3, u: 1e-6, n: 1e-9, p: 1e-12,
+  };
+  // Try two-char suffix first, then one-char
+  for (const suffix of ['ms', 'us', 'ns', 'ps', 's', 'm', 'u', 'n', 'p']) {
+    if (t.toLowerCase().endsWith(suffix)) {
+      const num = parseFloat(t.slice(0, -suffix.length));
+      return isNaN(num) ? NaN : num * suffixes[suffix];
+    }
+  }
+  return parseFloat(t);
+}
+
+// ---------------------------------------------------------------------------
 // initSimulationController
 // ---------------------------------------------------------------------------
 
@@ -472,6 +497,32 @@ export function initSimulationController(
         const msg = err instanceof Error ? err.message : String(err);
         ctx.showStatus(`Simulation error: ${msg}`, true);
       }
+    }
+    renderPipeline.scheduleRender();
+  });
+
+  document.getElementById('btn-step-to-time')?.addEventListener('click', async () => {
+    if (!ctx.ensureCompiled()) return;
+    const coordinator = facade.getCoordinator();
+    if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
+    const input = document.getElementById('step-to-time-input') as HTMLInputElement | null;
+    const btn = document.getElementById('btn-step-to-time') as HTMLButtonElement | null;
+    const raw = input?.value ?? '1m';
+    const delta = parseTimeValue(raw);
+    if (delta <= 0 || !isFinite(delta)) {
+      ctx.showStatus(`Invalid time value: "${raw}". Use SI suffixes: 1m, 100u, 1n.`, true);
+      return;
+    }
+    const currentTime = coordinator.simTime ?? 0;
+    if (btn) btn.disabled = true;
+    try {
+      await coordinator.stepToTime(currentTime + delta);
+      ctx.clearStatus();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.showStatus(`Simulation error: ${msg}`, true);
+    } finally {
+      if (btn) btn.disabled = false;
     }
     renderPipeline.scheduleRender();
   });

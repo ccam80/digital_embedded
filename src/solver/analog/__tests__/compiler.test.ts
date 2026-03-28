@@ -73,7 +73,6 @@ function makeElement(
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
-    getHelpText() { return ""; },
     getAttribute(k: string) { return propsMap.get(k); },
   };
 }
@@ -393,8 +392,12 @@ describe("AnalogCompiler", () => {
 
     // Digital-only components emit an error diagnostic instead of throwing
     expect(() => compileUnified(circuit, registry)).not.toThrow();
-    const compiled = compileUnified(circuit, registry).analog!;
-    expect(compiled.diagnostics.some((d) => d.code === "unsupported-component-in-analog")).toBe(true);
+    const compiled = compileUnified(circuit, registry);
+    const errorDiags = compiled.diagnostics.filter(
+      (d) => d.code === "unsupported-component-in-analog",
+    );
+    expect(errorDiags).toHaveLength(1);
+    expect(errorDiags[0]!.severity).toBe("error");
   });
 
   it("calls_analog_factory_with_correct_args", () => {

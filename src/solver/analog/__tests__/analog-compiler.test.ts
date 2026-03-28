@@ -69,7 +69,6 @@ function makeElement(
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
-    getHelpText() { return ""; },
     getAttribute(k: string) { return propsMap.get(k); },
   };
 }
@@ -291,7 +290,7 @@ describe("BehavioralCompilation", () => {
 
     // Compiler should not throw — emits diagnostic instead
     expect(() => compileUnified(circuit, registry)).not.toThrow();
-    const compiled = compileUnified(circuit, registry).analog!;
+    const compiled = compileUnified(circuit, registry);
     const errorDiags = compiled.diagnostics.filter(
       (d) => d.code === "unsupported-component-in-analog",
     );
@@ -409,7 +408,6 @@ describe("SimulationMode", () => {
         draw() {},
         getBoundingBox() { return { x: 0, y: 0, width: 4, height: 4 }; },
         serialize() { return { typeId, instanceId: this.instanceId, position: this.position, rotation: 0, mirror: false, properties: {} }; },
-        getHelpText() { return ""; },
       } as unknown as CircuitElement);
     }
 

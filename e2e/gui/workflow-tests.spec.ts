@@ -69,6 +69,34 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
 // Test helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Load a circuit via postMessage and wait for the sim-loaded acknowledgement.
+ * Replaces the raw postMessage + waitForTimeout(500) pattern.
+ */
+async function loadCircuitData(page: Page, b64: string): Promise<void> {
+  const loaded = page.waitForEvent('console', {
+    predicate: () => true,
+    timeout: 5000,
+  }).catch(() => undefined);
+  // Listen for sim-loaded message from the simulator
+  const simLoaded = page.evaluate(() => {
+    return new Promise<void>((resolve) => {
+      const handler = (e: MessageEvent) => {
+        if (e.data?.type === 'sim-loaded') {
+          window.removeEventListener('message', handler);
+          resolve();
+        }
+      };
+      window.addEventListener('message', handler);
+    });
+  });
+  await page.evaluate((data) => {
+    window.postMessage({ type: 'sim-load-data', data }, '*');
+  }, b64);
+  await Promise.race([simLoaded, page.waitForTimeout(500)]);
+  void loaded;
+}
+
 /** Evaluate a bridge expression inside the simulator page. */
 async function bridge<T>(page: Page, expr: string): Promise<T> {
   return page.evaluate((code) => {
@@ -428,10 +456,7 @@ test.describe('Workflow: speed control', () => {
     await page.waitForTimeout(500);
     // Load and compile a minimal circuit so a real coordinator is active.
     const b64 = Buffer.from(MINIMAL_DIGITAL_XML).toString('base64');
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(300);
+    await loadCircuitData(page, b64);
     await menuAction(page, 'btn-step');
     await page.waitForTimeout(200);
   });
@@ -546,10 +571,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
   test('build RC, run simulation, select capacitor, see slider', async ({ page }) => {
     // Load analog RC circuit via postMessage
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(500);
+    await loadCircuitData(page, b64);
 
     const built = await bridge<{ elementCount: number; wireCount: number }>(
       page, 'bridge.getCircuitInfo()',
@@ -579,10 +601,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
 
   test('slider panel lifecycle: created on run, disposed on stop', async ({ page }) => {
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(500);
+    await loadCircuitData(page, b64);
     await menuAction(page, 'btn-step');
 
     // Before run: slider panel hidden
@@ -616,10 +635,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
 
     // Slow run
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(500);
+    await loadCircuitData(page, b64);
     await menuAction(page, 'btn-step');
     await page.locator('#speed-input').fill('1');
     await page.locator('#speed-input').press('Tab');
@@ -632,10 +648,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
     await page.waitForTimeout(200);
 
     // Fast run
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(500);
+    await loadCircuitData(page, b64);
     await menuAction(page, 'btn-step');
     await page.locator('#speed-input').fill('10000000');
     await page.locator('#speed-input').press('Tab');

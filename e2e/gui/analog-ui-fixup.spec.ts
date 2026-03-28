@@ -4,7 +4,7 @@
  *  2. Slider panel appears during analog simulation
  *  3. FLOAT property popup works for capacitor/inductor
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { SimulatorHarness } from '../fixtures/simulator-harness';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +87,28 @@ async function buildAndCompileRc(harness: SimulatorHarness): Promise<void> {
   // Trigger compilation by stepping once
   await clickIframeButton(harness, 'btn-step');
   await harness.page.waitForTimeout(300);
+}
+
+/**
+ * Load circuit data into a page that runs simulator.html directly (not via iframe harness).
+ * Waits for the sim-loaded response instead of a fixed sleep.
+ */
+async function loadCircuitDataDirect(page: Page, b64: string): Promise<void> {
+  const simLoaded = page.evaluate(() => {
+    return new Promise<void>((resolve) => {
+      const handler = (e: MessageEvent) => {
+        if (e.data?.type === 'sim-loaded') {
+          window.removeEventListener('message', handler);
+          resolve();
+        }
+      };
+      window.addEventListener('message', handler);
+    });
+  });
+  await page.evaluate((data) => {
+    window.postMessage({ type: 'sim-load-data', data }, '*');
+  }, b64);
+  await Promise.race([simLoaded, page.waitForTimeout(500)]);
 }
 
 /** Set the speed input value in the iframe using proper Playwright interaction. */
@@ -240,12 +262,9 @@ test.describe('Analog UI fixes', () => {
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
 
-    // Load the RC circuit via postMessage
+    // Load the RC circuit via postMessage, waiting for sim-loaded
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
-    await page.evaluate((data) => {
-      window.postMessage({ type: 'sim-load-data', data }, '*');
-    }, b64);
-    await page.waitForTimeout(500);
+    await loadCircuitDataDirect(page, b64);
 
     // Get C1 body center and canvas rect, then click on it with Playwright mouse
     // The capacitor body is 2 grid units wide, so center is at origin + 1 grid unit
@@ -271,7 +290,7 @@ test.describe('Analog UI fixes', () => {
     await page.waitForTimeout(300);
 
     // Property panel should show capacitance as a number input with step="any"
-    const propInputs = page.locator('#property-content input[type="number"]');
+    const propInputs = page.locator('.prop-popup input[type="number"]');
     const inputCount = await propInputs.count();
     expect(inputCount).toBeGreaterThanOrEqual(1);
 

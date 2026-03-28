@@ -325,13 +325,6 @@ export class ScrElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "SCR — Silicon Controlled Rectifier.\n" +
-      "Pins: A (anode), K (cathode), G (gate).\n" +
-      "Triggers when gate current raises α₁+α₂ above 0.95. Latches until I_AK < I_hold."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +342,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
-      direction: PinDirection.OUTPUT,
+      direction: PinDirection.INPUT,
       label: "K",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },

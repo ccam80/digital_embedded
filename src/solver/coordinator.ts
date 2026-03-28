@@ -514,6 +514,30 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return this._analog.acAnalysis(params);
   }
 
+  async stepToTime(targetSimTime: number, budgetMs = 5000): Promise<number> {
+    if (this._analog === null) return 0;
+    const wallStart = performance.now();
+    let count = 0;
+    const FRAME_BUDGET_MS = 12;
+
+    while ((this._analog.simTime ?? 0) < targetSimTime) {
+      if (performance.now() - wallStart > budgetMs) break;
+
+      const chunkStart = performance.now();
+      while ((this._analog.simTime ?? 0) < targetSimTime) {
+        if (performance.now() - chunkStart > FRAME_BUDGET_MS) break;
+        if (performance.now() - wallStart > budgetMs) break;
+        this.step();
+        count++;
+      }
+
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+      if (this.getState() === EngineState.ERROR) break;
+    }
+    return count;
+  }
+
   get simTime(): number | null {
     return this._analog !== null ? this._analog.simTime : null;
   }

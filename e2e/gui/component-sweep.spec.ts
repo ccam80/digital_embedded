@@ -117,68 +117,186 @@ const ALL_SWEEP_TYPES: Array<{ type: string; category: string }> = [
 // ===========================================================================
 // 5B — Bit-width variation matrix
 //
-// Each entry defines: component type, UI property label for width,
-// widths to test, and the pin pair to wire for verification.
-// Pin names are from circuit_describe output.
+// Each entry defines: component type, internal property key for width,
+// widths to test. Pin names are derived from the registry via resolveTestPins().
+// inputPinWidth overrides the width set on the SRC In component (for components
+// whose control pin, e.g. clock, is always 1-bit regardless of data width).
 // ===========================================================================
 
 interface WidthTestEntry {
   type: string;
-  propLabel: string;
+  /** Internal property key, e.g. 'bitWidth', 'selectorBits'. */
+  propKey: string;
   widths: number[];
-  inputPin: string;
-  outputPin: string;
+  /** Override for the SRC In component width (e.g. clock pin is always 1-bit). */
   inputPinWidth?: number;
 }
 
 const WIDTH_MATRIX: WidthTestEntry[] = [
-  // Gates — "Bits" controls all I/O pin widths
-  { type: 'And', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'Or', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'XOr', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'NAnd', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'NOr', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'XNOr', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'In_1', outputPin: 'out' },
-  { type: 'Not', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'in', outputPin: 'out' },
+  // Gates — bitWidth controls all I/O pin widths
+  { type: 'And',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'Or',   propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'XOr',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'NAnd', propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'NOr',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'XNOr', propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'Not',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
 
   // I/O
-  { type: 'In', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: '', outputPin: 'out' },
-  { type: 'Out', propLabel: 'Bits', widths: [1, 2, 4, 8, 16, 32], inputPin: 'in', outputPin: '' },
+  { type: 'In',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
+  { type: 'Out', propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
 
-  // Arithmetic — "Bits" controls operand + result widths
-  { type: 'Add', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 's' },
-  { type: 'Sub', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 's' },
-  { type: 'Mul', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 'out' },
-  { type: 'Div', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'a', outputPin: 'q' },
-  { type: 'MagnitudeComparator', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'a', outputPin: '>' },
+  // Arithmetic — bitWidth controls operand + result widths
+  { type: 'Add',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
+  { type: 'Sub',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
+  { type: 'Mul',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
+  { type: 'Div',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
+  { type: 'MagnitudeComparator', propKey: 'bitWidth', widths: [1, 4, 8, 16] },
 
-  // Counters — "Bits" controls output width
-  { type: 'Counter',       propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out', inputPinWidth: 1 },
-  { type: 'CounterPreset', propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'C', outputPin: 'out', inputPinWidth: 1 },
+  // Counters — bitWidth controls output width, clock input is always 1-bit
+  { type: 'Counter',       propKey: 'bitWidth', widths: [2, 4, 8, 16], inputPinWidth: 1 },
+  { type: 'CounterPreset', propKey: 'bitWidth', widths: [2, 4, 8, 16], inputPinWidth: 1 },
 
   // Registers
-  { type: 'Register', propLabel: 'Bits', widths: [1, 4, 8, 16, 32], inputPin: 'D', outputPin: 'Q' },
+  { type: 'Register', propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
 
   // Flip-flops
-  { type: 'D_FF', propLabel: 'Bits', widths: [1, 4, 8], inputPin: 'D', outputPin: 'Q' },
-  { type: 'D_FF_AS', propLabel: 'Bits', widths: [1, 4, 8], inputPin: 'D', outputPin: 'Q' },
-  { type: 'JK_FF', propLabel: 'Bits', widths: [1, 4, 8], inputPin: 'J', outputPin: 'Q' },
-  { type: 'JK_FF_AS', propLabel: 'Bits', widths: [1, 4, 8], inputPin: 'J', outputPin: 'Q' },
+  { type: 'D_FF',     propKey: 'bitWidth', widths: [1, 4, 8] },
+  { type: 'D_FF_AS',  propKey: 'bitWidth', widths: [1, 4, 8] },
+  { type: 'JK_FF',    propKey: 'bitWidth', widths: [1, 4, 8] },
+  { type: 'JK_FF_AS', propKey: 'bitWidth', widths: [1, 4, 8] },
 
-  // Wiring components — "Selector Bits" or "Bits"
-  { type: 'Decoder', propLabel: 'Selector Bits', widths: [1, 2, 3, 4], inputPin: 'sel', outputPin: 'out_0' },
-  { type: 'BitSelector', propLabel: 'Selector Bits', widths: [2, 3, 4, 5], inputPin: 'in', outputPin: 'out' },
-  { type: 'PriorityEncoder', propLabel: 'Bits', widths: [2, 4, 8], inputPin: 'in', outputPin: 'out' },
-  { type: 'BarrelShifter', propLabel: 'Bits', widths: [4, 8, 16, 32], inputPin: 'in', outputPin: 'out' },
-  { type: 'Driver', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'in', outputPin: 'out' },
-  { type: 'DriverInvSel', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'in', outputPin: 'out' },
-  { type: 'Delay', propLabel: 'Bits', widths: [1, 4, 8, 16], inputPin: 'in', outputPin: 'out' },
-  { type: 'BusSplitter', propLabel: 'Bits', widths: [2, 4, 8, 16], inputPin: 'D', outputPin: 'D' },
+  // Wiring components
+  { type: 'Decoder',         propKey: 'selectorBits', widths: [1, 2, 3, 4] },
+  { type: 'BitSelector',     propKey: 'selectorBits', widths: [2, 3, 4, 5] },
+  { type: 'PriorityEncoder', propKey: 'selectorBits',  widths: [2, 4] },
+  { type: 'BarrelShifter',   propKey: 'bitWidth',     widths: [4, 8, 16, 32] },
+  { type: 'Driver',          propKey: 'bitWidth',     widths: [1, 4, 8, 16] },
+  { type: 'DriverInvSel',    propKey: 'bitWidth',     widths: [1, 4, 8, 16] },
+  { type: 'Delay',           propKey: 'bitWidth',     widths: [1, 4, 8, 16] },
+  { type: 'BusSplitter',     propKey: 'bitWidth',     widths: [2, 4, 8, 16] },
 
-  // DAC/ADC — "Resolution (bits)"
-  { type: 'DAC', propLabel: 'Resolution (bits)', widths: [4, 8], inputPin: 'D0', outputPin: 'OUT' },
-  { type: 'ADC', propLabel: 'Resolution (bits)', widths: [4, 8], inputPin: 'VIN', outputPin: 'D0' },
+  // DAC/ADC — bits property (internal key: 'bits', label: 'Resolution (bits)')
+  { type: 'DAC', propKey: 'bits', widths: [4, 8] },
+  { type: 'ADC', propKey: 'bits', widths: [4, 8] },
 ];
+
+// ---------------------------------------------------------------------------
+// resolveTestPins — derives input/output pin labels from the registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Describes the wiring topology needed for a given WIDTH_MATRIX entry.
+ * inputPin / outputPin are the pin labels on the DUT to wire.
+ * srcWidth is the width to set on the SRC In component.
+ * dstWidth is the width to set on the DST Out component.
+ */
+interface ResolvedPins {
+  inputPin: string;
+  outputPin: string;
+  srcWidth: number;
+  dstWidth: number;
+}
+
+/**
+ * Derives which input and output pin to use for wiring a SRC→DUT→DST circuit.
+ * Uses the registry to find the first INPUT and first OUTPUT pin, then applies
+ * per-component overrides for components with non-obvious topologies.
+ */
+async function resolveTestPins(
+  builder: UICircuitBuilder,
+  entry: WidthTestEntry,
+  width: number,
+): Promise<ResolvedPins> {
+  const desc = await builder.describeComponent(entry.type);
+
+  // Per-component overrides for non-obvious pin layouts
+
+  // BusSplitter: D pin is the wide aggregate bus. No output pin wired in this test.
+  if (entry.type === 'BusSplitter') {
+    return { inputPin: 'OE', outputPin: '', srcWidth: 1, dstWidth: width };
+  }
+
+  // MagnitudeComparator: output pins (>, =, <) are always 1-bit regardless of width.
+  if (entry.type === 'MagnitudeComparator') {
+    return { inputPin: 'a', outputPin: '>', srcWidth: width, dstWidth: 1 };
+  }
+
+  // Decoder: output pins out_0…out_N are always 1-bit; sel is selectorBits wide.
+  if (entry.type === 'Decoder') {
+    return { inputPin: 'sel', outputPin: 'out_0', srcWidth: width, dstWidth: 1 };
+  }
+
+  // BitSelector: input bus is 2^selectorBits wide; output is always 1-bit.
+  if (entry.type === 'BitSelector') {
+    const inputWidth = Math.pow(2, width);
+    return { inputPin: 'in', outputPin: 'out', srcWidth: inputWidth, dstWidth: 1 };
+  }
+
+  // PriorityEncoder: selectorBits=N gives 2^N 1-bit inputs (in0..in(2^N-1));
+  // output 'num' is N bits wide (same as selectorBits = width).
+  if (entry.type === 'PriorityEncoder') {
+    return { inputPin: 'in0', outputPin: 'num', srcWidth: 1, dstWidth: width };
+  }
+
+  // Mul: output is 2*bitWidth (capped at 32).
+  if (entry.type === 'Mul') {
+    const outWidth = Math.min(width * 2, 32);
+    return { inputPin: 'a', outputPin: 'mul', srcWidth: width, dstWidth: outWidth };
+  }
+
+  // In: output-only component — no input pin to wire.
+  if (entry.type === 'In') {
+    return { inputPin: '', outputPin: 'out', srcWidth: width, dstWidth: width };
+  }
+
+  // Out: input-only component — no output pin to wire.
+  if (entry.type === 'Out') {
+    return { inputPin: 'in', outputPin: '', srcWidth: width, dstWidth: width };
+  }
+
+  // Counter/CounterPreset: clock pin is always 1-bit.
+  if (entry.type === 'Counter' || entry.type === 'CounterPreset') {
+    return { inputPin: 'C', outputPin: 'out', srcWidth: 1, dstWidth: width };
+  }
+
+  // D_FF_AS: first INPUT pin is 'Set' (1-bit), but data pin is 'D' (bitWidth wide).
+  // Wire D→Q to exercise the data path at the configured width.
+  if (entry.type === 'D_FF_AS') {
+    return { inputPin: 'D', outputPin: 'Q', srcWidth: width, dstWidth: width };
+  }
+
+  // JK_FF_AS: first INPUT pin is 'Set' (1-bit), but data pin is 'J' (bitWidth wide).
+  // Wire J→Q to exercise the data path at the configured width.
+  if (entry.type === 'JK_FF_AS') {
+    return { inputPin: 'J', outputPin: 'Q', srcWidth: width, dstWidth: width };
+  }
+
+  // DAC: digital input D0, analog output OUT (no Out component needed).
+  if (entry.type === 'DAC') {
+    return { inputPin: 'D0', outputPin: '', srcWidth: 1, dstWidth: width };
+  }
+
+  // ADC: analog input VIN (no In component), digital output D0.
+  if (entry.type === 'ADC') {
+    return { inputPin: '', outputPin: 'D0', srcWidth: width, dstWidth: 1 };
+  }
+
+  // Generic: first INPUT pin → inputPin, first OUTPUT pin → outputPin.
+  if (!desc) {
+    return { inputPin: '', outputPin: '', srcWidth: width, dstWidth: width };
+  }
+
+  const firstInput  = desc.pinLayout.find(p => p.direction === 'INPUT');
+  const firstOutput = desc.pinLayout.find(p => p.direction === 'OUTPUT');
+
+  return {
+    inputPin:  firstInput?.label  ?? '',
+    outputPin: firstOutput?.label ?? '',
+    srcWidth:  entry.inputPinWidth ?? width,
+    dstWidth:  width,
+  };
+}
 
 // Selector-bits × data-bits matrix for Mux/Demux
 interface MuxWidthEntry {
@@ -306,9 +424,9 @@ function expectedOutput(type: string, inputVal: number, width: number): number |
     case 'Or':    return inputVal & mask;          // OR(x, 0) = x
     case 'XOr':   return inputVal & mask;          // XOR(x, 0) = x
     case 'NAnd':  return mask;                     // NAND(x, 0) = all-ones
-    case 'NOr':   return (~inputVal) & mask;       // NOR(x, 0) = NOT(x)
-    case 'XNOr':  return (~inputVal) & mask;       // XNOR(x, 0) = NOT(x)
-    case 'Not':   return (~inputVal) & mask;       // NOT(x)
+    case 'NOr':   return ((~inputVal) & mask) >>> 0; // NOR(x, 0) = NOT(x)
+    case 'XNOr':  return ((~inputVal) & mask) >>> 0; // XNOR(x, 0) = NOT(x)
+    case 'Not':   return ((~inputVal) & mask) >>> 0; // NOT(x)
 
     // --- Arithmetic (a wired, b = 0) ---
     case 'Add':   return inputVal & mask;          // x + 0 = x
@@ -411,23 +529,52 @@ test.describe('Component sweep tests', () => {
 
     for (const entry of WIDTH_MATRIX) {
       for (const width of entry.widths) {
-        test(`${entry.type} at ${entry.propLabel}=${width}: set property and compile`, async () => {
+        test(`${entry.type} at ${entry.propKey}=${width}: set property and compile`, async () => {
           // Place the component under test with a label
           await builder.placeLabeled(entry.type, 10, 8, 'DUT');
 
+          // Resolve display label for this property key from the registry
+          const propLabel = await builder.resolvePropertyLabel(entry.type, entry.propKey);
+
           // Set width property via popup
-          await builder.setComponentProperty('DUT', entry.propLabel, width);
+          await builder.setComponentProperty('DUT', propLabel, width);
+
+          // Resolve which pins to wire from the registry
+          const pins = await resolveTestPins(builder, entry, width);
+
+          // Resolve display label for the bitWidth property on In/Out
+          const bitsLabel = await builder.resolvePropertyLabel('In', 'bitWidth');
 
           // Place matching-width In and Out (if pins exist for wiring)
-          if (entry.inputPin) {
+          if (pins.inputPin) {
             await builder.placeLabeled('In', 3, 8, 'SRC');
-            await builder.setComponentProperty('SRC', 'Bits', entry.inputPinWidth ?? width);
-            await builder.drawWire('SRC', 'out', 'DUT', entry.inputPin);
+            await builder.setComponentProperty('SRC', bitsLabel, pins.srcWidth);
+            await builder.drawWire('SRC', 'out', 'DUT', pins.inputPin);
           }
-          if (entry.outputPin) {
+          if (pins.outputPin) {
             await builder.placeLabeled('Out', 18, 8, 'DST');
-            await builder.setComponentProperty('DST', 'Bits', width);
-            await builder.drawWire('DUT', entry.outputPin, 'DST', 'in');
+            await builder.setComponentProperty('DST', bitsLabel, pins.dstWidth);
+            await builder.drawWire('DUT', pins.outputPin, 'DST', 'in');
+          }
+
+          // Extra pins required by specific component types to avoid unconnected-input errors
+          if (entry.type === 'D_FF_AS' || entry.type === 'JK_FF_AS') {
+            // Clock pin must be driven — tie it low via a Const
+            await builder.placeLabeled('Const', 3, 14, 'CLK_TIE');
+            await builder.drawWire('CLK_TIE', 'out', 'DUT', 'C');
+          }
+          if (entry.type === 'Driver' || entry.type === 'DriverInvSel') {
+            // sel pin must be driven — tie it high so signal passes through
+            await builder.placeLabeled('Const', 3, 14, 'SEL_TIE');
+            await builder.setComponentProperty('SEL_TIE', 'Value', 1);
+            await builder.drawWire('SEL_TIE', 'out', 'DUT', 'sel');
+          }
+          if (entry.type === 'DAC') {
+            // VREF and GND must be driven for the DAC analog model to compile
+            await builder.placeLabeled('DcVoltageSource', 3, 14, 'VREF_SRC');
+            await builder.drawWire('VREF_SRC', 'pos', 'DUT', 'VREF');
+            await builder.placeLabeled('Ground', 3, 18, 'GND_TIE');
+            await builder.drawWire('GND_TIE', 'out', 'DUT', 'GND');
           }
 
           // Compile and verify
@@ -437,8 +584,8 @@ test.describe('Component sweep tests', () => {
           // Signal propagation check: drive SRC and read DST
           // Use per-component expected output (gates, arithmetic, etc. behave
           // differently when only one input is wired and others default to 0).
-          if (entry.inputPin && entry.outputPin) {
-            const testVal = Math.min(3, (1 << width) - 1);
+          if (pins.inputPin && pins.outputPin) {
+            const testVal = Math.min(3, (1 << Math.min(width, 30)) - 1);
             const expected = expectedOutput(entry.type, testVal, width);
             if (expected !== null) {
               const result = await builder.runTestVectors(`SRC DST\n${testVal} ${expected}`);
@@ -456,28 +603,33 @@ test.describe('Component sweep tests', () => {
     for (const entry of MUX_MATRIX) {
       test(`${entry.type} sel=${entry.selectorBits} data=${entry.dataBits}: set properties and compile`, async () => {
         await builder.placeLabeled(entry.type, 10, 8, 'DUT');
-        await builder.setComponentProperty('DUT', 'Selector Bits', entry.selectorBits);
-        await builder.setComponentProperty('DUT', 'Bits', entry.dataBits);
+        const selLabel  = await builder.resolvePropertyLabel(entry.type, 'selectorBits');
+        const dataLabel = await builder.resolvePropertyLabel(entry.type, 'bitWidth');
+        await builder.setComponentProperty('DUT', selLabel, entry.selectorBits);
+        await builder.setComponentProperty('DUT', dataLabel, entry.dataBits);
+
+        // Resolve display label for the bitWidth property on In/Out
+        const bitsLabel = await builder.resolvePropertyLabel('In', 'bitWidth');
 
         // Wire selector input
         await builder.placeLabeled('In', 3, 4, 'SEL');
-        await builder.setComponentProperty('SEL', 'Bits', entry.selectorBits);
+        await builder.setComponentProperty('SEL', bitsLabel, entry.selectorBits);
         await builder.drawWire('SEL', 'out', 'DUT', 'sel');
 
         // Wire first data input/output
         if (entry.type === 'Multiplexer') {
           await builder.placeLabeled('In', 3, 10, 'D0');
-          await builder.setComponentProperty('D0', 'Bits', entry.dataBits);
-          await builder.drawWire('D0', 'out', 'DUT', '0');
+          await builder.setComponentProperty('D0', bitsLabel, entry.dataBits);
+          await builder.drawWire('D0', 'out', 'DUT', 'in_0');
           await builder.placeLabeled('Out', 18, 8, 'Y');
-          await builder.setComponentProperty('Y', 'Bits', entry.dataBits);
+          await builder.setComponentProperty('Y', bitsLabel, entry.dataBits);
           await builder.drawWire('DUT', 'out', 'Y', 'in');
         } else {
           await builder.placeLabeled('In', 3, 10, 'DIN');
-          await builder.setComponentProperty('DIN', 'Bits', entry.dataBits);
+          await builder.setComponentProperty('DIN', bitsLabel, entry.dataBits);
           await builder.drawWire('DIN', 'out', 'DUT', 'in');
           await builder.placeLabeled('Out', 18, 8, 'Y0');
-          await builder.setComponentProperty('Y0', 'Bits', entry.dataBits);
+          await builder.setComponentProperty('Y0', bitsLabel, entry.dataBits);
           await builder.drawWire('DUT', 'out_0', 'Y0', 'in');
         }
 
@@ -493,18 +645,27 @@ test.describe('Component sweep tests', () => {
     for (const entry of MEM_MATRIX) {
       test(`${entry.type} addr=${entry.addrBits} data=${entry.dataBits}: set properties and compile`, async () => {
         await builder.placeLabeled(entry.type, 10, 8, 'DUT');
-        await builder.setComponentProperty('DUT', 'Address bits', entry.addrBits);
-        await builder.setComponentProperty('DUT', 'Data bits', entry.dataBits);
+        const addrLabel = await builder.resolvePropertyLabel(entry.type, 'addrBits');
+        const dataLabel = await builder.resolvePropertyLabel(entry.type, 'dataBits');
+        await builder.setComponentProperty('DUT', addrLabel, entry.addrBits);
+        await builder.setComponentProperty('DUT', dataLabel, entry.dataBits);
+
+        // ROMDualPort has ports A1/D1 instead of A/D
+        const addrPin = entry.type === 'ROMDualPort' ? 'A1' : 'A';
+        const dataPin = entry.type === 'ROMDualPort' ? 'D1' : 'D';
+
+        // Resolve display label for the bitWidth property on In/Out
+        const bitsLabel = await builder.resolvePropertyLabel('In', 'bitWidth');
 
         // Wire address input
         await builder.placeLabeled('In', 3, 6, 'ADDR');
-        await builder.setComponentProperty('ADDR', 'Bits', entry.addrBits);
-        await builder.drawWire('ADDR', 'out', 'DUT', 'A');
+        await builder.setComponentProperty('ADDR', bitsLabel, entry.addrBits);
+        await builder.drawWire('ADDR', 'out', 'DUT', addrPin);
 
         // Wire data output
         await builder.placeLabeled('Out', 18, 8, 'DOUT');
-        await builder.setComponentProperty('DOUT', 'Bits', entry.dataBits);
-        await builder.drawWire('DUT', 'D', 'DOUT', 'in');
+        await builder.setComponentProperty('DOUT', bitsLabel, entry.dataBits);
+        await builder.drawWire('DUT', dataPin, 'DOUT', 'in');
 
         await builder.stepViaUI();
         await builder.verifyNoErrors();
@@ -518,15 +679,19 @@ test.describe('Component sweep tests', () => {
     for (const entry of EXTENDER_MATRIX) {
       test(`BitExtender ${entry.inputBits}→${entry.outputBits}: set properties and compile`, async () => {
         await builder.placeLabeled('BitExtender', 10, 8, 'DUT');
-        await builder.setComponentProperty('DUT', 'Input Bits', entry.inputBits);
-        await builder.setComponentProperty('DUT', 'Output Bits', entry.outputBits);
+        const inBitsLabel  = await builder.resolvePropertyLabel('BitExtender', 'inputBits');
+        const outBitsLabel = await builder.resolvePropertyLabel('BitExtender', 'outputBits');
+        await builder.setComponentProperty('DUT', inBitsLabel, entry.inputBits);
+        await builder.setComponentProperty('DUT', outBitsLabel, entry.outputBits);
+
+        const bitsLabel = await builder.resolvePropertyLabel('In', 'bitWidth');
 
         await builder.placeLabeled('In', 3, 8, 'SRC');
-        await builder.setComponentProperty('SRC', 'Bits', entry.inputBits);
+        await builder.setComponentProperty('SRC', bitsLabel, entry.inputBits);
         await builder.drawWire('SRC', 'out', 'DUT', 'in');
 
         await builder.placeLabeled('Out', 18, 8, 'DST');
-        await builder.setComponentProperty('DST', 'Bits', entry.outputBits);
+        await builder.setComponentProperty('DST', bitsLabel, entry.outputBits);
         await builder.drawWire('DUT', 'out', 'DST', 'in');
 
         await builder.stepViaUI();
@@ -541,8 +706,10 @@ test.describe('Component sweep tests', () => {
     for (const entry of SPLITTER_MATRIX) {
       test(`Splitter ${entry.inputSplitting}→${entry.outputSplitting}: set properties and compile`, async () => {
         await builder.placeLabeled('Splitter', 10, 8, 'DUT');
-        await builder.setComponentProperty('DUT', 'Input Splitting', entry.inputSplitting);
-        await builder.setComponentProperty('DUT', 'Output Splitting', entry.outputSplitting);
+        const inSplitLabel  = await builder.resolvePropertyLabel('Splitter', 'input splitting');
+        const outSplitLabel = await builder.resolvePropertyLabel('Splitter', 'output splitting');
+        await builder.setComponentProperty('DUT', inSplitLabel, entry.inputSplitting);
+        await builder.setComponentProperty('DUT', outSplitLabel, entry.outputSplitting);
 
         await builder.stepViaUI();
         await builder.verifyNoErrors();
@@ -554,24 +721,29 @@ test.describe('Component sweep tests', () => {
     // -----------------------------------------------------------------------
 
     for (const width of TUNNEL_WIDTHS) {
-      test(`Tunnel at Bits=${width}: set property and compile`, async () => {
-        // Place two tunnels with same label for invisible wire
+      test(`Tunnel at bitWidth=${width}: set property and compile`, async () => {
+        // Resolve property labels from registry once (shared by T1 and T2)
+        const bitsLabel = await builder.resolvePropertyLabel('Tunnel', 'bitWidth');
+        const netLabel  = await builder.resolvePropertyLabel('Tunnel', 'NetName');
+
+        // Place two tunnels with same net name for invisible wire
         await builder.placeLabeled('Tunnel', 5, 8, 'T1');
-        await builder.setComponentProperty('T1', 'Bits', width);
-        await builder.setComponentProperty('T1', 'Net Name', 'net_a');
+        await builder.setComponentProperty('T1', bitsLabel, width);
+        await builder.setComponentProperty('T1', netLabel, 'net_a');
 
         await builder.placeLabeled('Tunnel', 15, 8, 'T2');
-        await builder.setComponentProperty('T2', 'Bits', width);
-        await builder.setComponentProperty('T2', 'Net Name', 'net_a');
+        await builder.setComponentProperty('T2', bitsLabel, width);
+        await builder.setComponentProperty('T2', netLabel, 'net_a');
 
         // Wire In → T1, T2 → Out
+        const inOutBitsLabel = await builder.resolvePropertyLabel('In', 'bitWidth');
         await builder.placeLabeled('In', 1, 8, 'SRC');
-        await builder.setComponentProperty('SRC', 'Bits', width);
+        await builder.setComponentProperty('SRC', inOutBitsLabel, width);
         await builder.drawWire('SRC', 'out', 'T1', 'in');
 
         await builder.placeLabeled('Out', 20, 8, 'DST');
-        await builder.setComponentProperty('DST', 'Bits', width);
-        await builder.drawWire('T2', 'out', 'DST', 'in');
+        await builder.setComponentProperty('DST', inOutBitsLabel, width);
+        await builder.drawWire('T2', 'in', 'DST', 'in');
 
         await builder.stepViaUI();
         await builder.verifyNoErrors();
@@ -595,14 +767,13 @@ test.describe('Component sweep tests', () => {
           // Place the component
           await builder.placeLabeled(entry.type, 10, 8, 'DUT');
 
-          // For gates in analog mode, set simulation mode property
-          if (mode === 'analog' && ['And', 'Or', 'Not', 'NAnd', 'NOr', 'XOr', 'XNOr'].includes(entry.type)) {
-            await builder.setComponentProperty('DUT', 'Simulation Mode', 'analog-pins');
-          }
-
-          // For flip-flops in analog mode, set simulation mode
-          if (mode === 'analog' && ['D_FF', 'JK_FF', 'RS_FF', 'T_FF'].includes(entry.type)) {
-            await builder.setComponentProperty('DUT', 'Simulation Mode', 'analog-pins');
+          // For gates/flip-flops in analog mode, set simulation model via the
+          // property panel row labelled "Mode" (added dynamically by
+          // showSimulationModeDropdown; internal key is 'simulationModel').
+          const analogModeTypes = ['And', 'Or', 'Not', 'NAnd', 'NOr', 'XOr', 'XNOr',
+                                   'D_FF', 'JK_FF', 'RS_FF', 'T_FF'];
+          if (mode === 'analog' && analogModeTypes.includes(entry.type)) {
+            await builder.setComponentProperty('DUT', 'Mode', 'analog');
           }
 
           // Verify placement succeeded

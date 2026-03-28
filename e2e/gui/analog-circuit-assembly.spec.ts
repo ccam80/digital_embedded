@@ -42,6 +42,22 @@ async function stepAndRead(
 }
 
 /**
+ * Step to a sim-time target via the step-to-time toolbar input and return
+ * final analog state. Uses the fast bulk-stepping path instead of N clicks.
+ */
+async function stepToTimeAndRead(
+  builder: UICircuitBuilder,
+  targetTime: string,
+): Promise<{
+  simTime: number;
+  nodeVoltages: Record<string, number>;
+  nodeCount: number;
+} | null> {
+  await builder.stepToTimeViaUI(targetTime);
+  return builder.getAnalogState();
+}
+
+/**
  * Step N times via toolbar clicks, sampling every step to find peak/trough
  * voltage per node. Each step clicks the real Step button.
  */
@@ -136,11 +152,11 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      // Step past transient (5τ = 5ms)
-      await stepAndRead(builder, 2000);
+      // Step past transient (5τ = 5ms) then measure one full period (10ms at 100Hz)
+      await stepToTimeAndRead(builder, '10m');
 
-      // Sample one full period (10ms at 100Hz) for peak/trough
-      const result = await measurePeaks(builder, 3000);
+      // Sample peak/trough via scope trace stats (fast path)
+      const result = await builder.measureAnalogPeaks('10m');
       expect(result).not.toBeNull();
       expect(result!.nodeCount).toBeGreaterThanOrEqual(2);
 
@@ -165,12 +181,14 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 16);
       await builder.placeComponent('Ground', 14, 16);
       await builder.placeLabeled('Probe', 18, 9, 'P1');
+      await builder.placeLabeled('Probe', 18, 5, 'P2');
 
       await builder.drawWire('Vs', 'pos', 'R1', 'A');
       await builder.drawWire('R1', 'B', 'R2', 'A');
       await builder.drawWireFromPin('R2', 'B', 14, 16);
       await builder.drawWireFromPin('Vs', 'neg', 6, 16);
       await builder.drawWire('R1', 'B', 'P1', 'in');
+      await builder.drawWire('Vs', 'pos', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -180,10 +198,10 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: v_mid = 2.5V exactly (resistive divider)
-      const volts = sortedVoltages(state!);
+      // P1 = midpoint (Vmid), P2 = supply (Vcc)
       const ref = SPICE_REF.a2_voltage_divider;
-      expectVoltage(volts[0], ref.v_vcc, 'Vcc');
-      expectVoltage(volts[1], ref.v_mid, 'Vmid');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_vcc, 'Vcc');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_mid, 'Vmid');
     });
 
     // -----------------------------------------------------------------------
@@ -215,8 +233,8 @@ test.describe('Analog circuit assembly via UI', () => {
       // During early transient, inductor opposes current change → voltage appears across it
       // DC steady state: v=0 (inductor shorts). Test captures transient behavior.
       expect(state!.simTime).toBeGreaterThan(0);
-      const volts = sortedVoltages(state!);
-      expect(volts[0]).toBeGreaterThan(0);  // At least some voltage during transient
+      // P1 is at R1:B (between R1 and L1)
+      expect(state!.nodeVoltages['P1']).toBeGreaterThan(0);  // At least some voltage during transient
     });
 
     // -----------------------------------------------------------------------
@@ -247,11 +265,11 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      // Step past transient
-      await stepAndRead(builder, 2000);
+      // Step past transient (fast path via step-to-time)
+      await stepToTimeAndRead(builder, '5m');
 
       // Measure oscillation — at resonance, voltages should oscillate
-      const result = await measurePeaks(builder, 2000);
+      const result = await builder.measureAnalogPeaks('5m');
       expect(result).not.toBeNull();
       expect(result!.nodeCount).toBeGreaterThanOrEqual(2);
       // At resonance f0≈5033Hz, impedance is minimum → maximum current → maximum voltage across L or C
@@ -292,8 +310,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      await stepAndRead(builder, 2000);
-      const result = await measurePeaks(builder, 2000);
+      await stepToTimeAndRead(builder, '5m');
+      const result = await builder.measureAnalogPeaks('5m');
       expect(result).not.toBeNull();
       expect(result!.nodeCount).toBeGreaterThanOrEqual(2);
       expect(Math.max(...result!.amplitudes)).toBeGreaterThan(0.5);
@@ -335,8 +353,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      await stepAndRead(builder, 3000);
-      const result = await measurePeaks(builder, 3000);
+      // Step past transient (several 60Hz cycles = ~50ms) then measure peaks
+      await stepToTimeAndRead(builder, '50m');
+      const result = await builder.measureAnalogPeaks('50m');
       expect(result).not.toBeNull();
 
       // ngspice: peak rectified ≈ 4.307V (5V - 0.7V diode drop)
@@ -357,6 +376,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 14);
       await builder.placeComponent('Ground', 19, 14);
       await builder.placeLabeled('Probe', 22, 8, 'P1');
+      await builder.placeLabeled('Probe', 22, 5, 'P2');
 
       await builder.setComponentProperty('Vs', 'voltage', 10);
 
@@ -367,6 +387,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Z1', 'A', 19, 14);
       await builder.drawWireFromPin('Vs', 'neg', 6, 14);
       await builder.drawWire('R1', 'B', 'P1', 'in');
+      await builder.drawWire('Vs', 'pos', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -376,10 +397,10 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: regulated ≈ 5.141V (zener breakdown), source = 10V
+      // P1 = regulated node (R1:B / Z1:K), P2 = supply (Vs:pos)
       const ref = SPICE_REF.a7_zener_regulator;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_source, 'Vsource');
-      expectVoltage(volts[1], ref.v_regulated, 'Vregulated');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_source, 'Vsource');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_regulated, 'Vregulated');
     });
 
     // -----------------------------------------------------------------------
@@ -433,11 +454,11 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: Vc≈11.05V, Vb≈0.816V, Ve≈0.205V
+      // P1 = collector (Rc:B), P2 = base (Rb:B), P3 = emitter (Re:A)
       const ref = SPICE_REF.a8_bjt_ce;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_collector, 'Vcollector');
-      expectVoltage(volts[1], ref.v_base, 'Vbase');
-      expectVoltage(volts[2], ref.v_emitter, 'Vemitter');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_collector, 'Vcollector');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_base, 'Vbase');
+      expectVoltage(state!.nodeVoltages['P3'], ref.v_emitter, 'Vemitter');
     });
 
     // -----------------------------------------------------------------------
@@ -490,14 +511,14 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       // ngspice: v_col1 = v_col2 ≈ 11.896V (balanced)
+      // P1 = Rc1:B (collector Q1), P2 = Rc2:B (collector Q2)
       const ref = SPICE_REF.a9_bjt_diffpair;
       expect(state!.simTime).toBeGreaterThan(0);
       expect(state!.nodeCount).toBeGreaterThanOrEqual(2);
-      const volts = sortedVoltages(state!);
       // Both collectors should be at similar voltage (balanced pair)
-      expectVoltage(volts[0], SPICE_REF.a9_bjt_diffpair.v_col1, 'Vcol1');
+      expectVoltage(state!.nodeVoltages['P1'], SPICE_REF.a9_bjt_diffpair.v_col1, 'Vcol1');
       // Balance check: collectors within 0.1% of each other
-      expect(Math.abs(volts[0] - volts[1])).toBeLessThan(volts[0] * 0.001);
+      expect(Math.abs(state!.nodeVoltages['P1'] - state!.nodeVoltages['P2'])).toBeLessThan(state!.nodeVoltages['P1'] * 0.001);
     });
 
     // -----------------------------------------------------------------------
@@ -544,11 +565,11 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       // ngspice: Vc≈11.97V (very little current due to high Rb)
+      // P1 = Rc:B (collector), P2 = Q1:E (mid node between Q1 and Q2)
       const ref = SPICE_REF.a10_bjt_darlington;
       expect(state!.simTime).toBeGreaterThan(0);
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], SPICE_REF.a10_bjt_darlington.v_collector, 'Vcollector');
-      expectVoltage(volts[1], ref.v_mid, 'Vmid');
+      expectVoltage(state!.nodeVoltages['P1'], SPICE_REF.a10_bjt_darlington.v_collector, 'Vcollector');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_mid, 'Vmid');
     });
 
     // -----------------------------------------------------------------------
@@ -594,11 +615,11 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       // ngspice: Vout≈2.325V (Vin=3V minus Vbe≈0.67V)
+      // P1 = Rload:A (output node)
       const ref = SPICE_REF.a11_bjt_pushpull;
       expect(state!.simTime).toBeGreaterThan(0);
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_output, 'Vout');
-      expect(volts[0]).toBeLessThan(ref.v_input);
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_output, 'Vout');
+      expect(state!.nodeVoltages['P1']).toBeLessThan(ref.v_input);
     });
 
     // -----------------------------------------------------------------------
@@ -616,6 +637,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 18, 20);
       await builder.placeComponent('Ground', 6, 18);
       await builder.placeLabeled('Probe', 22, 8, 'P1');
+      await builder.placeLabeled('Probe', 22, 14, 'P2');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('Vg', 'voltage', 3);
@@ -632,6 +654,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vdd', 'neg', 6, 20);
       await builder.drawWireFromPin('Vg', 'neg', 6, 18);
       await builder.drawWire('Rd', 'B', 'P1', 'in');
+      await builder.drawWire('M1', 'S', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -641,10 +664,10 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: Vd≈4.46V, Vs≈1.60V
+      // P1 = drain (Rd:B), P2 = source (M1:S / Rs:A)
       const ref = SPICE_REF.a12_mosfet_cs;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_drain, 'Vdrain');
-      expectVoltage(volts[1], ref.v_source, 'Vsource');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_drain, 'Vdrain');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_source, 'Vsource');
     });
 
     // -----------------------------------------------------------------------
@@ -683,8 +706,8 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: Vout≈5V when Vin=0 (PMOS on, NMOS off)
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], SPICE_REF.a13_cmos_inverter_low.v_output, 'Vout(Vin=0)');
+      // P1 = output node (Mp:D = Mn:D)
+      expectVoltage(state!.nodeVoltages['P1'], SPICE_REF.a13_cmos_inverter_low.v_output, 'Vout(Vin=0)');
     });
 
     // -----------------------------------------------------------------------
@@ -738,8 +761,8 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: Vout≈5V when both inputs LOW (both PMOS on)
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], SPICE_REF.a14_cmos_nand_00.v_output, 'Vout(A=0,B=0)');
+      // P1 = output node (Mn1:D = Mp1:D = Mp2:D)
+      expectVoltage(state!.nodeVoltages['P1'], SPICE_REF.a14_cmos_nand_00.v_output, 'Vout(A=0,B=0)');
     });
 
     // -----------------------------------------------------------------------
@@ -757,6 +780,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 18, 20);
       await builder.placeComponent('Ground', 6, 18);
       await builder.placeLabeled('Probe', 22, 8, 'P1');
+      await builder.placeLabeled('Probe', 22, 14, 'P2');
 
       await builder.setComponentProperty('Vdd', 'voltage', 15);
       await builder.setComponentProperty('Vg', 'voltage', 0);
@@ -773,6 +797,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vdd', 'neg', 6, 20);
       await builder.drawWireFromPin('Vg', 'neg', 6, 18);
       await builder.drawWire('Rd', 'B', 'P1', 'in');
+      await builder.drawWire('J1', 'S', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -780,11 +805,11 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       // ngspice: Vd≈11.79V, Vs≈0.99V
+      // P1 = drain (Rd:B), P2 = source (J1:S / Rs:A)
       const ref = SPICE_REF.a15_jfet_amp;
       expect(state!.simTime).toBeGreaterThan(0);
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_drain, 'Vdrain');
-      expectVoltage(volts[1], ref.v_source, 'Vsource');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_drain, 'Vdrain');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_source, 'Vsource');
     });
   });
 
@@ -812,6 +837,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 16);
       await builder.placeComponent('Ground', 6, 23);
       await builder.placeLabeled('Probe', 20, 5, 'P1');
+      await builder.placeLabeled('Probe', 20, 10, 'P2');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -835,6 +861,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vin', 'neg', 6, 16);
       await builder.drawWireFromPin('Vbias', 'neg', 6, 23);
       await builder.drawWire('Rc', 'B', 'P1', 'in');
+      await builder.drawWire('Q2', 'E', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -842,10 +869,10 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = output (Rc:B = Q2:C), P2 = mid node (Q2:E = Q1:C)
       const ref = SPICE_REF.a16_cascode;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_output, 'Voutput');
-      expectVoltage(volts[1], ref.v_mid, 'Vmid');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_output, 'Voutput');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_mid, 'Vmid');
     });
 
     // -----------------------------------------------------------------------
@@ -862,6 +889,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 22);
       await builder.placeComponent('Ground', 17, 22);
       await builder.placeLabeled('Probe', 24, 8, 'P1');
+      await builder.placeLabeled('Probe', 14, 8, 'P2');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Rref', 'resistance', 10000);
@@ -883,6 +911,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Q2', 'E', 17, 22);
       await builder.drawWireFromPin('Vcc', 'neg', 6, 22);
       await builder.drawWire('Rload', 'B', 'P1', 'in');
+      await builder.drawWire('Rref', 'B', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -890,10 +919,10 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = output (Rload:B = Q2:C), P2 = ref leg (Rref:B = Q1:C)
       const ref = SPICE_REF.a17_wilson_mirror;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_ref_leg, 'Vref_leg');
-      expectVoltage(volts[1], ref.v_output, 'Voutput');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_ref_leg, 'Vref_leg');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_output, 'Voutput');
     });
 
     // -----------------------------------------------------------------------
@@ -939,9 +968,9 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = output (Rload:B = Q2:C)
       const ref = SPICE_REF.a18_widlar;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_output, 'Voutput');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_output, 'Voutput');
     });
 
     // -----------------------------------------------------------------------
@@ -963,6 +992,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 20);
       await builder.placeComponent('Ground', 6, 26);
       await builder.placeLabeled('Probe', 26, 11, 'P1');
+      await builder.placeLabeled('Probe', 26, 15, 'P2');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('Vfwd', 'voltage', 0);
@@ -990,6 +1020,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vfwd', 'neg', 6, 20);
       await builder.drawWireFromPin('Vrev', 'neg', 6, 26);
       await builder.drawWire('Rload', 'A', 'P1', 'in');
+      await builder.drawWire('Rload', 'B', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -997,10 +1028,10 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = high side (Rload:A = Mp1:D), P2 = low side (Rload:B = Mp2:D)
       const ref = SPICE_REF.a19_hbridge_fwd;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_high_side, 'Vhigh');
-      expectVoltage(volts[1], ref.v_low_side, 'Vlow');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_high_side, 'Vhigh');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_low_side, 'Vlow');
     });
 
     // -----------------------------------------------------------------------
@@ -1020,6 +1051,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 22, 16);
       await builder.placeComponent('Ground', 6, 18);
       await builder.placeLabeled('Probe', 26, 8, 'P1');
+      await builder.placeLabeled('Probe', 18, 8, 'P2');
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -1042,6 +1074,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vdd', 'neg', 6, 20);
       await builder.drawWireFromPin('Vin', 'neg', 6, 18);
       await builder.drawWire('Rd', 'B', 'P1', 'in');
+      await builder.drawWire('Rc', 'B', 'P2', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
@@ -1049,10 +1082,10 @@ test.describe('Analog circuit assembly via UI', () => {
       const state = await stepAndRead(builder, 300);
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = MOSFET drain (Rd:B), P2 = BJT collector / MOSFET gate (Rc:B = Q1:C)
       const ref = SPICE_REF.a20_bjt_mosfet_driver;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_q1c, 'Vq1c');
-      expectVoltage(volts[1], ref.v_drain, 'Vdrain');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_q1c, 'Vq1c');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_drain, 'Vdrain');
     });
 
     // -----------------------------------------------------------------------
@@ -1086,6 +1119,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 30, 17);
       await builder.placeComponent('Ground', 6, 24);
       await builder.placeLabeled('Probe', 32, 5, 'P1');
+      await builder.placeLabeled('Probe', 14, 5, 'P2');
+      await builder.placeLabeled('Probe', 22, 5, 'P3');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -1127,18 +1162,20 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.drawWireFromPin('Vcc', 'neg', 6, 18);
       await builder.drawWireFromPin('Vin', 'neg', 6, 24);
       await builder.drawWire('Rc3', 'B', 'P1', 'in');
+      await builder.drawWire('Rc1', 'B', 'P2', 'in');
+      await builder.drawWire('Rc2', 'B', 'P3', 'in');
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      const state = await stepAndRead(builder, 300);
+      const state = await stepToTimeAndRead(builder, '5m');
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
+      // P1 = stage 3 collector (Rc3:B), P2 = stage 1 collector (Rc1:B), P3 = stage 2 collector (Rc2:B)
       const ref = SPICE_REF.a21_multistage;
-      const volts = sortedVoltages(state!);
-      expectVoltage(volts[0], ref.v_c1, 'Vc1');
-      expectVoltage(volts[1], ref.v_c3, 'Vc3');
-      expectVoltage(volts[2], ref.v_c2, 'Vc2');
+      expectVoltage(state!.nodeVoltages['P2'], ref.v_c1, 'Vc1');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_c3, 'Vc3');
+      expectVoltage(state!.nodeVoltages['P3'], ref.v_c2, 'Vc2');
     });
   });
 
@@ -1218,7 +1255,7 @@ test.describe('Analog circuit assembly via UI', () => {
       // Close switch and observe oscillation
       await clickElementCenter(builder, 'SW');
 
-      const result = await measurePeaks(builder, 2000);
+      const result = await builder.measureAnalogPeaks('5m');
       expect(result).not.toBeNull();
       // Should see oscillation (amplitude > 2.0 on some node)
       expect(Math.max(...result!.amplitudes)).toBeGreaterThan(2.0);
@@ -1278,8 +1315,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vdd');
       await builder.placeLabeled('DcVoltageSource', 3, 12, 'Vin');
       await builder.placeLabeled('Clock', 3, 18, 'CLK');
-      await builder.placeLabeled('AnalogSwitchSPST', 12, 8, 'S1');
-      await builder.placeLabeled('AnalogSwitchSPST', 20, 8, 'S2');
+      await builder.placeLabeled('SwitchSPST', 12, 8, 'S1');
+      await builder.placeLabeled('SwitchSPST', 20, 8, 'S2');
       await builder.placeLabeled('Capacitor', 16, 12, 'C1');
       await builder.placeLabeled('Capacitor', 24, 12, 'C2');
       await builder.placeLabeled('Resistor', 28, 8, 'R1');
@@ -1443,7 +1480,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      const state = await stepAndRead(builder, 1000);
+      const state = await stepToTimeAndRead(builder, '10m');
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
       expect(Math.max(...sortedVoltages(state!))).toBeGreaterThan(0.1);
@@ -1490,7 +1527,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      const state = await stepAndRead(builder, 1000);
+      const state = await stepToTimeAndRead(builder, '1m');
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
 
@@ -1541,10 +1578,9 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // ngspice: Vout≈-10V (gain=-Rf/Rin=-10k/1k=-10, Vin=1V)
+      // P1 = op-amp output (OA:out)
       const ref = SPICE_REF.opamp_inverting;
-      const volts = sortedVoltages(state!);
-      const sortedAsc = [...volts].sort((a, b) => a - b);
-      expectVoltage(sortedAsc[0], ref.v_output, 'Vout');
+      expectVoltage(state!.nodeVoltages['P1'], ref.v_output, 'Vout');
     });
 
     // -----------------------------------------------------------------------
@@ -1577,19 +1613,18 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.verifyNoErrors();
 
       // Step and check output is ramping (becoming more negative over time)
+      // P1 = op-amp output (OA:out)
       const state1 = await stepAndRead(builder, 100);
       expect(state1).not.toBeNull();
-      const v1 = sortedVoltages(state1!);
+      const v1 = state1!.nodeVoltages['P1'];
 
       const state2 = await stepAndRead(builder, 200);
       expect(state2).not.toBeNull();
-      const v2 = sortedVoltages(state2!);
+      const v2 = state2!.nodeVoltages['P1'];
 
       // Output should be getting more negative (integrating positive input)
-      expect(v2[v2.length - 1]).toBeLessThan(v1[v1.length - 1] + 0.01);
-
-      const volts = sortedVoltages(state2!);
-      expect(volts[volts.length - 1]).toBeLessThan(0);
+      expect(v2).toBeLessThan(v1 + 0.01);
+      expect(v2).toBeLessThan(0);
     });
 
     // -----------------------------------------------------------------------
@@ -1633,9 +1668,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      // Step and verify oscillation on output
-      await stepAndRead(builder, 1000);
-      const result = await measurePeaks(builder, 3000);
+      // Step past startup transient then measure oscillation (fast path)
+      await stepToTimeAndRead(builder, '100m');
+      const result = await builder.measureAnalogPeaks('100m');
       expect(result).not.toBeNull();
       // Output should oscillate between ~0V and ~Vcc-1.5V
       const outAmps = [...result!.amplitudes].sort((a, b) => b - a);
@@ -1771,12 +1806,12 @@ test.describe('Analog circuit assembly via UI', () => {
       expect(state!.simTime).toBeGreaterThan(0);
 
       // Verify voltage divider produces output between 0 and Vs
-      const volts = sortedVoltages(state!);
-      expect(volts[0]).toBeGreaterThan(0);
-      expect(volts[0]).toBeLessThan(6);
+      // P1 = midpoint (R1:B = LDR1:pos)
+      const vOut = state!.nodeVoltages['P1'];
+      expect(vOut).toBeGreaterThan(0);
+      expect(vOut).toBeLessThan(6);
 
       const ref = SPICE_REF.ldr_divider;
-      const vOut = volts.find((v: number) => v > 0.3 && v < 4.0) ?? volts[volts.length - 1];
       expect(vOut).toBeGreaterThan(ref.v_out_500lux * 0.60);
       expect(vOut).toBeLessThan(ref.v_out_500lux * 1.40);
     });

@@ -195,27 +195,6 @@ export function compileUnified(
     : null;
 
   // -------------------------------------------------------------------------
-  // Step 6b: For analog circuits, inject unsupported-component-in-analog
-  // diagnostics for any digital-only components that were routed to the
-  // digital partition (they have no analog model).
-  // -------------------------------------------------------------------------
-
-  if (hasAnalogOnlyComponent && compiledAnalog !== null) {
-    for (const el of circuit.elements) {
-      if (INFRASTRUCTURE.has(el.typeId)) continue;
-      const def = registry.get(el.typeId);
-      if (!def) continue;
-      if (def.models?.analog === undefined && def.models?.digital !== undefined) {
-        compiledAnalog.diagnostics.push({
-          code: "unsupported-component-in-analog",
-          severity: "error",
-          message: `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-        });
-      }
-    }
-  }
-
-  // -------------------------------------------------------------------------
   // Step 7: Build groupId → netId/nodeId lookup maps for bridge cross-reference
   // -------------------------------------------------------------------------
 
@@ -366,6 +345,39 @@ export function compileUnified(
       bitWidth: bd.bitWidth,
       electricalSpec: bd.electricalSpec,
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 10b: Emit diagnostics for digital-only components in mixed-signal
+  // circuits that are NOT bridge-connected.
+  //
+  // A bridge-connected component participates in a boundary group (its element
+  // index appears in a boundary group's pin list). Such components are handled
+  // by bridge adapters and do not need an analog model. Components that are
+  // digital-only and have no bridge connection cannot be simulated in an
+  // analog circuit.
+  // -------------------------------------------------------------------------
+
+  if (analogPartition.components.length > 0) {
+    // Build a set of element indices that participate in any boundary group.
+    const bridgeElementIndices = new Set<number>();
+    for (const bd of bridgeDescriptors) {
+      for (const pin of bd.boundaryGroup.pins) {
+        bridgeElementIndices.add(pin.elementIndex);
+      }
+    }
+
+    for (const pc of digitalPartition.components) {
+      const def = registry.get(pc.element.typeId);
+      if (!def || def.models?.analog) continue; // has analog model — fine
+      const elementIndex = circuit.elements.indexOf(pc.element);
+      if (bridgeElementIndices.has(elementIndex)) continue; // bridge-connected — fine
+      diagnostics.push({
+        severity: "error",
+        code: "unsupported-component-in-analog",
+        message: `Component "${pc.element.typeId}" (${pc.element.instanceId}) is digital-only and cannot be simulated in an analog circuit`,
+      });
+    }
   }
 
   // Collect analog diagnostics

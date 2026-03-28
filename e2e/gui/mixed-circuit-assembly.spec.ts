@@ -63,6 +63,22 @@ async function stepAndRead(
 }
 
 /**
+ * Step to a sim-time target via the step-to-time toolbar input and return
+ * final analog state. Uses the fast bulk-stepping path instead of N clicks.
+ */
+async function stepToTimeAndRead(
+  builder: UICircuitBuilder,
+  targetTime: string,
+): Promise<{
+  simTime: number;
+  nodeVoltages: Record<string, number>;
+  nodeCount: number;
+} | null> {
+  await builder.stepToTimeViaUI(targetTime);
+  return builder.getAnalogState();
+}
+
+/**
  * Step N times via toolbar clicks, sampling every step to find peak/trough
  * voltage per node. Each step clicks the real Step button.
  */
@@ -143,7 +159,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // DAC (4-bit) — center
       await builder.placeLabeled('DAC', 12, 8, 'DAC1');
-      await builder.setComponentProperty('DAC1', 'bits', 4);
+      await builder.setComponentProperty('DAC1', 'Resolution (bits)', 4);
 
       // VREF source and DAC ground
       await builder.placeLabeled('DcVoltageSource', 8, 3, 'Vref');
@@ -243,11 +259,11 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('Clock', 3, 6, 'CLK');
       await builder.placeLabeled('Counter', 8, 6, 'CNT');
       await builder.placeLabeled('Const', 3, 12, 'THR');
-      await builder.setComponentProperty('THR', 'bitWidth', 4);
+      await builder.setComponentProperty('THR', 'Bits', 4);
       await builder.setComponentProperty('THR', 'value', 8); // 50% duty cycle
 
       await builder.placeLabeled('Comparator', 14, 8, 'CMP');
-      await builder.setComponentProperty('CMP', 'bitWidth', 4);
+      await builder.setComponentProperty('CMP', 'Bits', 4);
 
       // Const for counter enable
       await builder.placeLabeled('Const', 3, 3, 'EN');
@@ -302,7 +318,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     test('comparator to logic: analog threshold drives digital gate', async () => {
       // Analog input stage: voltage divider via potentiometer
       await builder.placeLabeled('DcVoltageSource', 3, 6, 'Vs');
-      await builder.placeLabeled('AnalogPotentiometer', 10, 6, 'POT');
+      await builder.placeLabeled('Potentiometer', 10, 6, 'POT');
       await builder.setComponentProperty('POT', 'position', '0.7');
       await builder.placeComponent('Ground', 6, 14);
       await builder.placeComponent('Ground', 14, 14);
@@ -312,7 +328,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Analog comparator
       await builder.placeLabeled('VoltageComparator', 18, 8, 'CMP');
-      await builder.setComponentProperty('CMP', 'outputType', 'push-pull');
+      await builder.setComponentProperty('CMP', 'Output type', 'push-pull');
 
       // Digital logic: And gate and output
       await builder.placeLabeled('And', 24, 8, 'GA');
@@ -366,7 +382,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // ADC (4-bit)
       await builder.placeLabeled('ADC', 18, 8, 'ADC1');
-      await builder.setComponentProperty('ADC1', 'bits', 4);
+      await builder.setComponentProperty('ADC1', 'Resolution (bits)', 4);
 
       // Clock for ADC sampling
       await builder.placeLabeled('Clock', 14, 3, 'CLK');
@@ -526,8 +542,8 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      // Step through several 555 oscillation cycles
-      const state = await stepAndRead(builder, 5000);
+      // Step through several 555 oscillation cycles (fast path via step-to-time)
+      const state = await stepToTimeAndRead(builder, '100m');
       expect(state).not.toBeNull();
       expect(state!.simTime).toBeGreaterThan(0);
       // Should have analog nodes for the 555 circuit
@@ -562,7 +578,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // DAC (4-bit)
       await builder.placeLabeled('DAC', 10, 8, 'DAC1');
-      await builder.setComponentProperty('DAC1', 'bits', 4);
+      await builder.setComponentProperty('DAC1', 'Resolution (bits)', 4);
 
       // OpAmp voltage follower (buffer)
       await builder.placeLabeled('OpAmp', 18, 10, 'AMP');
@@ -571,7 +587,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // ADC (4-bit)
       await builder.placeLabeled('ADC', 26, 8, 'ADC1');
-      await builder.setComponentProperty('ADC1', 'bits', 4);
+      await builder.setComponentProperty('ADC1', 'Resolution (bits)', 4);
       await builder.placeLabeled('Clock', 22, 3, 'CLK');
       await builder.placeLabeled('DcVoltageSource', 22, 14, 'Vref2');
       await builder.placeComponent('Ground', 22, 20);
@@ -712,7 +728,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeComponent('Ground', 6, 20);
 
       // Analog switch
-      await builder.placeLabeled('AnalogSwitchSPST', 12, 10, 'SW1');
+      await builder.placeLabeled('SwitchSPST', 12, 10, 'SW1');
 
       // Load and probe
       await builder.placeLabeled('Resistor', 20, 10, 'R1');
@@ -847,8 +863,8 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
-      // Step through several toggle cycles
-      const result = await measurePeaks(builder, 3000);
+      // Step through several toggle cycles (fast path via step-to-time)
+      const result = await builder.measureAnalogPeaks('10m');
       expect(result).not.toBeNull();
       expect(result!.nodeCount).toBeGreaterThanOrEqual(3);
 

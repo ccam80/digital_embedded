@@ -337,13 +337,6 @@ export class TriacElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Triac — bidirectional thyristor.\n" +
-      "Pins: MT1 (main terminal 1), MT2 (main terminal 2), G (gate).\n" +
-      "Conducts in both directions when triggered. Turns off at current zero-crossing."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +354,7 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
       isClockCapable: false,
     },
     {
-      direction: PinDirection.OUTPUT,
+      direction: PinDirection.INPUT,
       label: "MT1",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },

@@ -20,33 +20,19 @@ import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
 // ---------------------------------------------------------------------------
 
 /**
- * Step N times via toolbar clicks and return the final analog engine state.
+ * Step to a sim-time target via the step-to-time toolbar input and return
+ * final analog state. Uses the fast bulk-stepping path instead of N clicks.
  */
-async function stepAndRead(
+async function stepToTimeAndRead(
   builder: UICircuitBuilder,
-  steps: number,
+  targetTime: string,
 ): Promise<{
   simTime: number;
   nodeVoltages: Record<string, number>;
   nodeCount: number;
 } | null> {
-  return builder.stepAndReadAnalog(steps);
-}
-
-/**
- * Step N times via toolbar clicks, sampling every step to find peak/trough
- * voltage per node. Used for AC steady-state amplitude verification.
- */
-async function measurePeaks(
-  builder: UICircuitBuilder,
-  steps: number,
-): Promise<{
-  amplitudes: number[];
-  peaks: number[];
-  troughs: number[];
-  nodeCount: number;
-} | null> {
-  return builder.measureAnalogPeaks(steps);
+  await builder.stepToTimeViaUI(targetTime);
+  return builder.getAnalogState();
 }
 
 /**
@@ -95,9 +81,9 @@ test.describe('GUI: analog RC circuit', () => {
   test('analog palette contains analog component types', async () => {
     // All palette items are available without any mode switch. Verify that
     // the palette exposes the analog component types we will use.
-    const hasResistor = await builder['page'].locator('[data-type="Resistor"]').count();
-    const hasCapacitor = await builder['page'].locator('[data-type="Capacitor"]').count();
-    const hasAcSource = await builder['page'].locator('[data-type="AcVoltageSource"]').count();
+    const hasResistor = await builder['page'].locator('[data-component="Resistor"]').count();
+    const hasCapacitor = await builder['page'].locator('[data-component="Capacitor"]').count();
+    const hasAcSource = await builder['page'].locator('[data-component="AcVoltageSource"]').count();
 
     const totalAnalog = hasResistor + hasCapacitor + hasAcSource;
     expect(totalAnalog).toBeGreaterThan(0);
@@ -186,11 +172,11 @@ test.describe('GUI: analog RC circuit', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // Step past transient (5τ = 5ms at τ = RC = 1kΩ × 1µF = 1ms)
-    await stepAndRead(builder, 2000);
+    // Step past transient (5τ = 5ms) then sample one full period (10ms at 100Hz)
+    await stepToTimeAndRead(builder, '10m');
 
-    // Sample one full period (10ms at 100Hz) for peak/trough measurement
-    const result = await measurePeaks(builder, 3000);
+    // Sample peak/trough via scope trace stats (fast path)
+    const result = await builder.measureAnalogPeaks('10m');
     expect(result).not.toBeNull();
     expect(result!.nodeCount).toBeGreaterThanOrEqual(2);
 

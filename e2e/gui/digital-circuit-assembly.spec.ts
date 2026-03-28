@@ -674,25 +674,26 @@ test.describe('Digital circuit assembly via UI', () => {
 
   test('ROM lookup: read preloaded data by address', async () => {
     await builder.placeLabeled('In', 3, 7, 'A');
-    // VDD has no Label property — use placeComponent + coordinate wiring
-    await builder.placeComponent('VDD', 3, 10);
+    // Use a labeled Const(1) so sel can be wired by label (VDD has no Label property)
+    await builder.placeLabeled('Const', 3, 10, 'SEL');
     await builder.placeLabeled('ROM', 10, 7, 'ROM');
     await builder.placeLabeled('Out', 18, 7, 'D');
 
     // Configure ROM: 2-bit address, 8-bit data, preload data
     await builder.setComponentProperty('ROM', 'Address bits', 2);
     await builder.setComponentProperty('ROM', 'Data bits', 8);
-    await builder.setComponentProperty('ROM', 'Data', '1,2,3,4');
+    // HexDataEditor parses space-separated hex tokens; commas are not a delimiter
+    await builder.setComponentProperty('ROM', 'Data', '01 02 03 04');
+
+    // Drive sel high via Const value=1
+    await builder.setComponentProperty('SEL', 'Value', 1);
 
     // Set input/output widths
     await builder.setComponentProperty('A', 'Bits', 2);
     await builder.setComponentProperty('D', 'Bits', 8);
 
     await builder.drawWire('A', 'out', 'ROM', 'A');
-    // Wire VDD → ROM:sel via coordinates
-    const vddOut = await builder.getPinPagePositionByTypeIndex('VDD', 0, 'out');
-    const romSel = await builder.getPinPagePosition('ROM', 'sel');
-    await builder.drawWireBetweenPoints(vddOut, romSel);
+    await builder.drawWire('SEL', 'out', 'ROM', 'sel');
     await builder.drawWire('ROM', 'D', 'D', 'in');
 
     await builder.stepViaUI();
@@ -718,7 +719,7 @@ test.describe('Digital circuit assembly via UI', () => {
     await builder.placeLabeled('In', 3, 3, 'A');
     await builder.placeLabeled('In', 3, 6, 'Din');
     await builder.placeLabeled('In', 3, 9, 'WE');
-    await builder.placeLabeled('Clock', 3, 12, 'C');
+    await builder.placeLabeled('In', 3, 12, 'C');
     await builder.placeLabeled('In', 3, 15, 'LD');
     await builder.placeLabeled('RAMDualPort', 10, 8, 'RAM');
     await builder.placeLabeled('Out', 18, 8, 'D');
@@ -760,7 +761,7 @@ test.describe('Digital circuit assembly via UI', () => {
     await builder.placeLabeled('In', 3, 3, 'Din');
     await builder.placeLabeled('In', 3, 6, 'WE');
     await builder.placeLabeled('In', 3, 9, 'Rw');
-    await builder.placeLabeled('Clock', 3, 12, 'C');
+    await builder.placeLabeled('In', 3, 12, 'C');
     await builder.placeLabeled('In', 3, 15, 'Ra');
     await builder.placeLabeled('In', 3, 18, 'Rb');
     await builder.placeLabeled('RegisterFile', 10, 10, 'RF');

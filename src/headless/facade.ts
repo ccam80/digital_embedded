@@ -119,6 +119,16 @@ export interface SimulatorFacade {
   runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
 
   /**
+   * Step until coordinator.simTime >= targetSimTime, with optional wall-clock budget.
+   * Returns the number of steps taken. Returns 0 immediately for discrete-only circuits.
+   *
+   * @param coordinator - The compiled coordinator
+   * @param targetSimTime - Target simulation time in seconds
+   * @param budgetMs - Wall-clock budget in milliseconds (default 5000)
+   */
+  stepToTime(coordinator: SimulationCoordinator, targetSimTime: number, budgetMs?: number): Promise<number>;
+
+  /**
    * Drive an input pin to a specific value
    * Typically called before step() to set switch/input pin states.
    *

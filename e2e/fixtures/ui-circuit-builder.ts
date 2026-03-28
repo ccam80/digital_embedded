@@ -117,6 +117,29 @@ export class UICircuitBuilder {
     return this.bridge('bridge.getCircuitDomain()');
   }
 
+  /**
+   * Describe a component type from the registry.
+   * Returns null if the type is not registered.
+   */
+  async describeComponent(typeName: string): Promise<{
+    pinLayout: Array<{ label: string; direction: 'INPUT' | 'OUTPUT' | 'BIDIRECTIONAL'; defaultBitWidth: number }>;
+    propertyDefs: Array<{ key: string; label: string; type: string; defaultValue: string | number | boolean; min?: number; max?: number }>;
+  } | null> {
+    return this.bridge(`bridge.describeComponent("${typeName}")`);
+  }
+
+  /**
+   * Resolve an internal property key (e.g. 'bitWidth') to its display label
+   * (e.g. 'Bits') as shown in the property popup. Returns the key itself if
+   * no matching definition is found.
+   */
+  async resolvePropertyLabel(typeName: string, propKey: string): Promise<string> {
+    const desc = await this.describeComponent(typeName);
+    if (!desc) return propKey;
+    const def = desc.propertyDefs.find(pd => pd.key === propKey);
+    return def ? def.label : propKey;
+  }
+
   /** Get analog engine state (null if no analog engine active). */
   async getAnalogState(): Promise<{
     simTime: number;
@@ -162,6 +185,10 @@ export class UICircuitBuilder {
    */
   async placeComponent(typeName: string, gridX: number, gridY: number): Promise<void> {
     await this._clickPaletteItem(typeName);
+    await this.page.waitForFunction(
+      () => !!(window as any).__test?.isPlacementActive?.(),
+      { timeout: 5000 },
+    );
     const coords = await this.getGridPagePosition(gridX, gridY);
     await this.page.mouse.click(coords.x, coords.y);
     await this.page.keyboard.press('Escape');
@@ -418,40 +445,71 @@ export class UICircuitBuilder {
   }
 
   /**
-   * Step N times via toolbar clicks, sampling analog state at every step to
-   * find peak/trough voltage per node. Used for AC steady-state verification.
-   * Each step clicks the real Step button.
+   * Step to a sim-time offset and read peak/trough statistics from the scope
+   * panel trace buffers. Uses stepToTimeViaUI for efficient bulk stepping and
+   * getTraceStats to read pre-computed min/max/mean from scope channels.
+   *
+   * @param stepsOrTime - SI time string (e.g. "5m", "100u") or legacy step count (ignored)
+   * @param targetTime - SI time string when stepsOrTime is a number (legacy call form)
    */
-  async measureAnalogPeaks(steps: number): Promise<{
+  async measureAnalogPeaks(stepsOrTime: number | string, targetTime?: string): Promise<{
     amplitudes: number[];
     peaks: number[];
     troughs: number[];
     nodeCount: number;
   } | null> {
+    const resolvedTime = typeof stepsOrTime === 'string' ? stepsOrTime : targetTime;
+
     const s0 = await this.getAnalogState();
     if (!s0) return null;
-    const nc = s0.nodeCount;
-    const peaks = new Array(nc).fill(-Infinity);
-    const troughs = new Array(nc).fill(Infinity);
 
-    for (let i = 0; i < steps; i++) {
-      await this.stepViaUI(1);
-      const s = await this.getAnalogState();
-      if (!s) break;
-      for (let j = 0; j < nc; j++) {
-        const v = s.nodeVoltages[`node_${j}`];
-        if (v !== undefined) {
-          if (v > peaks[j]) peaks[j] = v;
-          if (v < troughs[j]) troughs[j] = v;
-        }
+    if (resolvedTime) {
+      await this.stepToTimeViaUI(resolvedTime);
+      const stats = await this.getTraceStats();
+      if (stats && stats.length > 0) {
+        const peaks = stats.map(s => s.max);
+        const troughs = stats.map(s => s.min);
+        return {
+          amplitudes: peaks.map((p, i) => (p - troughs[i]) / 2),
+          peaks,
+          troughs,
+          nodeCount: stats.length,
+        };
       }
+      // No trace stats — return analog state snapshot after stepping
+      const s1 = await this.getAnalogState();
+      if (!s1) return null;
+      const voltages = Object.values(s1.nodeVoltages);
+      return {
+        amplitudes: voltages,
+        peaks: voltages,
+        troughs: voltages,
+        nodeCount: s1.nodeCount,
+      };
     }
-    return {
-      amplitudes: peaks.map((p: number, i: number) => (p - troughs[i]) / 2),
-      peaks,
-      troughs,
-      nodeCount: nc,
-    };
+
+    return null;
+  }
+
+  /**
+   * Set the step-to-time input and click the step-to-time button.
+   * Waits briefly for stepping to complete.
+   * @param targetTime - Time offset string with SI suffix (e.g. "5m", "100u", "1n")
+   */
+  async stepToTimeViaUI(targetTime: string): Promise<void> {
+    const input = this.page.locator('#step-to-time-input');
+    const btn = this.page.locator('#btn-step-to-time');
+    await input.fill(targetTime);
+    await btn.click();
+    await expect(btn).toBeEnabled({ timeout: 30000 });
+  }
+
+  /**
+   * Read trace statistics (min/max/mean) from the scope panel via the test bridge.
+   * Returns null if no scope panel is active or no data has been collected.
+   */
+  async getTraceStats(): Promise<Array<{ label: string; min: number; max: number; mean: number }> | null> {
+    return this.bridge('bridge.getTraceStats()');
   }
 
   /** Click the Run button on the toolbar. */
@@ -1065,8 +1123,25 @@ export class UICircuitBuilder {
     const popup = this.page.locator('.prop-popup');
     await expect(popup).toBeVisible({ timeout: 3000 });
 
-    const row = popup.locator(`.prop-row:has(.prop-label:text-is("${propLabel}"))`);
-    const input = row.locator('input, select').first();
+    // Try exact text-is match first, then fall back to case-insensitive prefix match
+    let row = popup.locator(`.prop-row:has(.prop-label:text-is("${propLabel}"))`);
+    const exactCount = await row.count();
+    if (exactCount === 0) {
+      // Case-insensitive prefix fallback: find the row whose label starts with the given text
+      const lowerLabel = propLabel.toLowerCase();
+      const allRows = popup.locator('.prop-row');
+      const count = await allRows.count();
+      for (let i = 0; i < count; i++) {
+        const rowEl = allRows.nth(i);
+        const labelText = await rowEl.locator('.prop-label').textContent();
+        if (labelText && labelText.toLowerCase().startsWith(lowerLabel)) {
+          row = rowEl;
+          break;
+        }
+      }
+    }
+
+    const input = row.locator('input, select, textarea').first();
     await expect(input).toBeVisible({ timeout: 2000 });
 
     const tagName = await input.evaluate(el => el.tagName.toLowerCase());

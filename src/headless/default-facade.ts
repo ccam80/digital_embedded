@@ -136,6 +136,10 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
   }
 
+  stepToTime(coordinator: SimulationCoordinator, targetSimTime: number, budgetMs = 5000): Promise<number> {
+    return coordinator.stepToTime(targetSimTime, budgetMs);
+  }
+
   runToStable(coordinator: SimulationCoordinator, maxIterations = 1000, opts?: StepOptions): void {
     const settleOpts = opts ?? { clockAdvance: false };
 
