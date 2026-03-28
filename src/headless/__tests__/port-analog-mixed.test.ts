@@ -172,19 +172,8 @@ describe('Port in mixed-mode circuit — And gate + Resistor', () => {
 // ---------------------------------------------------------------------------
 // Test 3: Port label resolution in analog domain
 //
-// The top-level compileAnalogCircuit() (line 621 of compiler.ts) includes
-// "Port" in its labelTypes set so Port labels are resolved into labelToNodeId.
-// The partition compile path (compileAnalogPartition, line 1744) does NOT
-// include "Port" in its labelTypes.
-//
-// Since DefaultSimulatorFacade.compile() uses the unified pipeline (which
-// calls compileAnalogPartition, not compileAnalogCircuit), a Port label in a
-// pure-analog circuit will NOT appear in readAllSignals() via the current
-// partition path.
-//
-// These tests document the current behaviour precisely so that any fix to
-// compileAnalogPartition (adding "Port" to its labelTypes) causes the
-// currently-failing assertion to start passing, making the regression visible.
+// Port labels must appear in labelToNodeId via the partition compiler path
+// (compileAnalogPartition) with "Port" in its labelTypes set.
 // ---------------------------------------------------------------------------
 
 describe('Port label resolution in analog domain via readAllSignals()', () => {

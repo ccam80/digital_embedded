@@ -19,12 +19,6 @@ import { PinDirection } from "@/core/pin";
 import { getParamMeta } from "../solver/analog/model-param-meta.js";
 import { getDeviceDefaults } from "../solver/analog/model-defaults.js";
 
-/** Human-friendly labels for simulation mode dropdown. */
-const SIMULATION_MODE_LABELS: Record<string, string> = {
-  "logical": "Digital",
-  "analog-pins": "Analog (at pins)",
-  "analog-internals": "Analog (full)",
-};
 
 // ---------------------------------------------------------------------------
 // Change callback type
@@ -275,7 +269,7 @@ export class PropertyPanel {
     for (const mode of modes) {
       const option = document.createElement("option");
       option.value = mode;
-      option.textContent = SIMULATION_MODE_LABELS[mode] ?? mode;
+      option.textContent = mode;
       if (mode === current) {
         (option as unknown as { selected: boolean }).selected = true;
       }

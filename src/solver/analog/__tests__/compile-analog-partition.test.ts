@@ -1,9 +1,8 @@
 /**
  * Tests for compileAnalogPartition (P3-7).
  *
- * Verifies that the partition-based entry point produces identical compiled
- * output to compileAnalogCircuit for the same circuit, and that the function
- * handles Ground group identification, node assignment, and bridge stubs.
+ * Verifies that the partition-based entry point handles Ground group
+ * identification, node assignment, and bridge stubs correctly.
  */
 
 import { describe, it, expect, vi } from "vitest";

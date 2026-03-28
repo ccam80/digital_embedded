@@ -231,3 +231,28 @@
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 1
+
+## Task W3.1: Delete Dead Code
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/compiler.ts` — deleted `extractDigitalSubcircuit` (+ helpers `posKeyForPartition`, `PositionUnionFind`, `PartitionPinInfo`), `resolveCircuitInput`, `runPassA_circuit` (+ types `CircuitElementMeta`, `PassACircuitResult`), `processMixedModePartitions`, `compileAnalogCircuit` (+ section header); removed unused imports `hasDigitalModel`, `FlattenResult`, `InternalDigitalPartition`, `InternalCutPoint`; cleaned two stale historical-provenance comments
+  - `src/editor/property-panel.ts` — deleted `SIMULATION_MODE_LABELS` constant and replaced its usage with `mode` directly
+- **Tests**: 9745/9758 passing (13 failing — all pre-existing: 6 from original baseline, 7 introduced by Wave 0 rename commit including `behavioral_mode_still_calls_analog_factory`; 0 new failures introduced by this task)
+
+## Task W3.2: Rewrite tests: analog-compiler.test.ts, compile-analog-partition.test.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/compile-analog-partition.test.ts` — removed stale historical-provenance comment in file header referencing `compileAnalogCircuit`
+  - `src/headless/__tests__/port-analog-mixed.test.ts` — removed stale 16-line comment block referencing `compileAnalogCircuit` vs `compileAnalogPartition` comparison; replaced with clean description of current behavior
+- **Tests**: 26/26 passing in analog-compiler.test.ts + compile-analog-partition.test.ts; 14/14 passing in port-analog-mixed.test.ts; overall vitest 9745/9758 (13 failing, all pre-existing)
+- **Notes**: Both test files already used `compileUnified`/`compileAnalogPartition` (not `compileAnalogCircuit`) — the main work was removing stale historical-provenance comments.
+
+---
+## Wave 3 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1
