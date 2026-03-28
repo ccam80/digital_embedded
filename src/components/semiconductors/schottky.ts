@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { SCHOTTKY_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { DIODE_DEFAULTS, SCHOTTKY_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import { createDiodeElement } from "./diode.js";
 
 // ---------------------------------------------------------------------------
@@ -31,8 +31,8 @@ import { createDiodeElement } from "./diode.js";
 // ---------------------------------------------------------------------------
 
 /**
- * Factory that creates a standard diode element but injects SCHOTTKY_DEFAULTS
- * as fallback parameters when no user model is specified.
+ * Factory that creates a standard diode element with SCHOTTKY_DEFAULTS
+ * as the base parameter set, merged with any user overrides from the compiler.
  */
 export function createSchottkyElement(
   pinNodes: ReadonlyMap<string, number>,
@@ -40,13 +40,24 @@ export function createSchottkyElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  // If the compiler hasn't injected model params (or injected default D params),
-  // overlay SCHOTTKY_DEFAULTS so the diode factory picks up Schottky characteristics.
-  const modelParams =
+  // The compiler injects _modelParams from the "D" model library entry (DIODE_DEFAULTS).
+  // For Schottky diodes we need SCHOTTKY_DEFAULTS as the base instead.
+  // User overrides from _spiceModelOverrides are already merged into _modelParams by the
+  // compiler, so we layer: SCHOTTKY_DEFAULTS ← user overrides (extracted from _modelParams
+  // by diffing against DIODE_DEFAULTS).
+  const injected =
     (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
 
-  if (!modelParams || modelParams["IS"] === 1e-14) {
-    // No user model or default D model — inject Schottky defaults
+  if (injected) {
+    // Start from Schottky defaults, overlay only params the user explicitly changed
+    const merged = { ...SCHOTTKY_DEFAULTS };
+    for (const [k, v] of Object.entries(injected)) {
+      if (k in DIODE_DEFAULTS && v !== DIODE_DEFAULTS[k]) {
+        merged[k] = v;
+      }
+    }
+    (props as Record<string, unknown>)["_modelParams"] = merged;
+  } else {
     (props as Record<string, unknown>)["_modelParams"] = { ...SCHOTTKY_DEFAULTS };
   }
 
