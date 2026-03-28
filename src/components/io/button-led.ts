@@ -237,7 +237,9 @@ export const ButtonLEDDefinition: ComponentDefinition = {
     "Interactive: the engine sets the output value on mouse-down/up events.",
   models: {
     digital: { executeFn: executeButtonLED, inputSchema: ["in"], outputSchema: ["out"] },
-    analog: { factory: createButtonLEDAnalogElement },
+    mnaModels: {
+      behavioral: { factory: createButtonLEDAnalogElement },
+    },
   },
   defaultModel: "digital",
 };

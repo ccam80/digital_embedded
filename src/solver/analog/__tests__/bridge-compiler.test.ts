@@ -96,16 +96,19 @@ function makeAnalogStubDef(typeId: string, _pinCount: number): ComponentDefiniti
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: typeId,
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        factory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
-          pinNodeIds: [...pinNodes.values()],
-          allNodeIds: [...pinNodes.values()],
-          branchIndex: -1,
-          isNonlinear: false,
-          isReactive: false,
-          stamp(_s: SparseSolver) {},
-        }),
+      mnaModels: {
+        behavioral: {
+          factory: (pinNodes, _internalNodeIds, _branchIdx, _props, _getTime): AnalogElement => ({
+            pinNodeIds: [...pinNodes.values()],
+            allNodeIds: [...pinNodes.values()],
+            branchIndex: -1,
+            isNonlinear: false,
+            isReactive: false,
+            stamp(_s: SparseSolver) {},
+          }),
+        },
       },
     },
   };
@@ -167,7 +170,7 @@ function makeGroundDef(): ComponentDefinition {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "Ground",
-    models: { analog: {} },
+    models: { mnaModels: { behavioral: {} } },
   };
 }
 

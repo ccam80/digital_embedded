@@ -221,9 +221,9 @@ describe("Diode", () => {
 
   it("definition_has_correct_fields", () => {
     expect(DiodeDefinition.name).toBe("Diode");
-    expect(DiodeDefinition.models?.analog).toBeDefined();
-    expect(DiodeDefinition.models?.analog?.deviceType).toBe("D");
-    expect(DiodeDefinition.models?.analog?.factory).toBeDefined();
+    expect(DiodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(DiodeDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("D");
+    expect(DiodeDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 });
 

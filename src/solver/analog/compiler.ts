@@ -601,19 +601,20 @@ function runPassA_partition(
       const passAMode = passAProps.has("simulationModel")
         ? (passAProps.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-      if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
+      if ((passAMode === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) || passAMode === "logical") {
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       }
     }
 
     let branchIdx = -1;
-    if (def.models?.analog?.requiresBranchRow) {
+    const activeMnaModel = def.models?.mnaModels?.behavioral;
+    if (activeMnaModel?.requiresBranchRow) {
       branchIdx = branchCount++;
     }
 
     const props = el.getProperties();
-    const internalCount = def.models?.analog?.getInternalNodeCount?.(props) ?? 0;
+    const internalCount = activeMnaModel?.getInternalNodeCount?.(props) ?? 0;
     const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
     nextInternalNode += internalCount;
 
@@ -968,7 +969,7 @@ export function compileAnalogPartition(
         ? (props.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
 
-      if (simulationModel === "analog-internals" && def.models?.analog?.transistorModel) {
+      if (simulationModel === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) {
         if (!transistorModels) {
           diagnostics.push(
             makeDiagnostic(
@@ -985,7 +986,7 @@ export function compileAnalogPartition(
           continue;
         }
 
-        if (def.models?.analog?.factory !== undefined) {
+        if (def.models?.mnaModels?.behavioral?.factory !== undefined) {
           const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
             def.pinLayout.length,
           ).fill(null);
@@ -1222,7 +1223,7 @@ export function compileAnalogPartition(
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
-    if (def.models?.digital !== undefined && def.models?.analog?.factory !== undefined) {
+    if (def.models?.digital !== undefined && def.models?.mnaModels?.behavioral?.factory !== undefined) {
       let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       if (props.has("_pinElectricalOverrides")) {
         try {
@@ -1248,11 +1249,11 @@ export function compileAnalogPartition(
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    if (def.models?.analog?.deviceType !== undefined) {
+    if (def.models?.mnaModels?.behavioral?.deviceType !== undefined) {
       const modelName = props.has("model") ? props.get<string>("model") : "";
       const resolvedModel =
         (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
-        modelLibrary.getDefault(def.models!.analog!.deviceType);
+        modelLibrary.getDefault(def.models!.mnaModels!.behavioral!.deviceType!);
 
       const modelDiags = validateModel(resolvedModel);
       diagnostics.push(...modelDiags);
@@ -1275,7 +1276,7 @@ export function compileAnalogPartition(
       props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    const analogFactory = def.models!.analog!.factory;
+    const analogFactory = def.models!.mnaModels!.behavioral!.factory;
     if (!analogFactory) continue;
     const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
     const element: import("./element.js").AnalogElement = Object.assign(core, {
@@ -1440,8 +1441,8 @@ function detectHighSourceImpedance(
     const def = registry.get(el.typeId);
     if (!def) continue;
 
-    // Only inspect analog or both elements
-    if (def.models?.analog === undefined) continue;
+    // Only inspect elements with MNA models
+    if (!def.models?.mnaModels || Object.keys(def.models.mnaModels).length === 0) continue;
 
     // Check if any pin of this element is connected to targetNodeId
     const nodeIds = resolveElementNodes(el, wireToNodeId, outerCircuit);

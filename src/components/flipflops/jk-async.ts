@@ -313,8 +313,10 @@ export const JKAsyncDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeJKAsyncFlipflopAnalogFactory(),
+    },
     },
   },
   defaultModel: "digital",

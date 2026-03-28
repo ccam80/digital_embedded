@@ -57,7 +57,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
-  const el = CapacitorDefinition.models!.analog!.factory(pinNodes, [], -1, props, () => 0);
+  const el = CapacitorDefinition.models!.mnaModels!.behavioral!.factory(pinNodes, [], -1, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -143,11 +143,11 @@ describe("Capacitor", () => {
     });
 
     it("CapacitorDefinition has analog model", () => {
-      expect(CapacitorDefinition.models?.analog).toBeDefined();
+      expect(CapacitorDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("CapacitorDefinition has analogFactory", () => {
-      expect(CapacitorDefinition.models?.analog?.factory).toBeDefined();
+      expect(CapacitorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     });
 
     it("CapacitorDefinition category is PASSIVES", () => {

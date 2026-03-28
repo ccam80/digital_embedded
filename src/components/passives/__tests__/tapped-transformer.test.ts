@@ -352,15 +352,15 @@ describe("TappedTransformerDefinition", () => {
   });
 
   it("TappedTransformerDefinition has analog model", () => {
-    expect(TappedTransformerDefinition.models?.analog).toBeDefined();
+    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("has analogFactory", () => {
-    expect(TappedTransformerDefinition.models?.analog?.factory).toBeDefined();
+    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 
   it("requiresBranchRow is true", () => {
-    expect(TappedTransformerDefinition.models?.analog?.requiresBranchRow).toBe(true);
+    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
   });
 
   it("category is PASSIVES", () => {
@@ -385,7 +385,7 @@ describe("TappedTransformerDefinition", () => {
     props.set("primaryResistance", 0);
     props.set("secondaryResistance", 0);
 
-    const el = TappedTransformerDefinition.models!.analog!.factory(
+    const el = TappedTransformerDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["P1", 1], ["P2", 0], ["S1", 2], ["CT", 3], ["S2", 4]]),
       [],
       10,

@@ -364,9 +364,12 @@ export const VaractorDefinition: ComponentDefinition = {
     "C_j(V_R) = CJO / (1 + V_R/VJ)^M\n" +
     "Used for voltage-controlled oscillators and tuned circuits.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createVaractorElement,
       deviceType: "D",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

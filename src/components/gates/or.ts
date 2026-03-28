@@ -160,9 +160,13 @@ export const OrDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeOrAnalogFactory(0),
-      transistorModel: "CmosOr2",
+    },
+      cmos: {
+        subcircuitModel: "CmosOr2",
+      },
     },
   },
   defaultModel: "digital",

@@ -224,9 +224,12 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "Same Shockley equation as standard diode but with Schottky defaults:\n" +
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createSchottkyElement,
       deviceType: "D",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

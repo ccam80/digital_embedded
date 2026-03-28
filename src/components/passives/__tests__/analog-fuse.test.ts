@@ -341,12 +341,12 @@ describe("AnalogFuseElement", () => {
 
   describe("unified FuseDefinition", () => {
     it("FuseDefinition has both digital and analog models", () => {
-      expect(FuseDefinition.models?.analog).toBeDefined();
+      expect(FuseDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("FuseDefinition has analogFactory", () => {
-      expect(FuseDefinition.models?.analog?.factory).toBeDefined();
-      expect(typeof FuseDefinition.models?.analog?.factory).toBe("function");
+      expect(FuseDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(typeof FuseDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
     });
 
     it("FuseDefinition has switchPins for bus resolver", () => {

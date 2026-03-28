@@ -440,23 +440,23 @@ describe("T", () => {
 describe("Registration", () => {
   it("all_flipflops_have_analog_factory", () => {
     // JK, RS, T and all async variants must have analog factory defined
-    expect(JKDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof JKDefinition.models?.analog?.factory).toBe("function");
+    expect(JKDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof JKDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
 
-    expect(RSDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof RSDefinition.models?.analog?.factory).toBe("function");
+    expect(RSDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof RSDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
 
-    expect(TDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof TDefinition.models?.analog?.factory).toBe("function");
+    expect(TDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof TDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
 
-    expect(JKAsyncDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof JKAsyncDefinition.models?.analog?.factory).toBe("function");
+    expect(JKAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof JKAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
 
-    expect(RSAsyncDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof RSAsyncDefinition.models?.analog?.factory).toBe("function");
+    expect(RSAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof RSAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
 
-    expect(DAsyncDefinition.models?.analog?.factory).toBeDefined();
-    expect(typeof DAsyncDefinition.models?.analog?.factory).toBe("function");
+    expect(DAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(typeof DAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 });
 

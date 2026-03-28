@@ -16,10 +16,10 @@
       - button "↷" [disabled] [ref=e14]
       - button "⧉" [ref=e15] [cursor=pointer]
       - button "▶" [ref=e17] [cursor=pointer]
-      - button "⏵" [ref=e18] [cursor=pointer]
+      - button "⏵" [active] [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
-        - text: 100m
+        - text: 1m
       - button "▶▶" [ref=e20] [cursor=pointer]
       - button "■" [ref=e21] [cursor=pointer]
       - button "−" [ref=e22] [cursor=pointer]
@@ -278,7 +278,9 @@
     - generic "Drag to resize palette" [ref=e369]
     - generic "Circuit editor canvas" [ref=e371]
   - generic [ref=e372]:
-    - generic [ref=e373]: Ready
-    - button "100%" [ref=e375] [cursor=pointer]
-    - generic [ref=e376]: 32, 8
+    - generic [ref=e373]: ⚠️
+    - generic [ref=e374]: "Circuit problem: Component \"Out\" (bfc2886c-908a-4b96-b3b0-550f09d3c436) is digital-only and cannot be simulated in an analog circuit"
+    - button "×" [ref=e375] [cursor=pointer]
+    - button "100%" [ref=e377] [cursor=pointer]
+    - generic [ref=e378]: 32, 8
 ```

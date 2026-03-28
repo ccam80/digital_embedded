@@ -283,8 +283,10 @@ export const JKDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeJKFlipflopAnalogFactory(),
+    },
     },
   },
   defaultModel: "digital",

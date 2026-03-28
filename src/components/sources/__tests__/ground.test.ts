@@ -26,7 +26,7 @@ function makeMockSolver() {
 describe("Ground", () => {
   it("stamp_is_noop", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.models!.analog!.factory(
+    const element = GroundDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["out", 3]]),
       [],
       -1,
@@ -50,16 +50,16 @@ describe("Ground", () => {
   });
 
   it("definition_has_engine_type_both", () => {
-    expect(GroundDefinition.models?.analog).toBeDefined();
+    expect(GroundDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("definition_has_analog_factory", () => {
-    expect(GroundDefinition.models?.analog?.factory).toBeDefined();
+    expect(GroundDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 
   it("element_is_not_nonlinear_and_not_reactive", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.models!.analog!.factory(
+    const element = GroundDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["out", 0]]),
       [],
       -1,
@@ -73,7 +73,7 @@ describe("Ground", () => {
 
   it("element_branch_index_is_minus_one", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.models!.analog!.factory(
+    const element = GroundDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["out", 2]]),
       [],
       -1,
@@ -86,7 +86,7 @@ describe("Ground", () => {
 
   it("element_node_indices_matches_input", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.models!.analog!.factory(
+    const element = GroundDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["out", 5]]),
       [],
       -1,

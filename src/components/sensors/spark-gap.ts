@@ -381,5 +381,6 @@ export const SparkGapDefinition: ComponentDefinition = {
   helpText:
     "Spark Gap — voltage-triggered switch with hysteresis. " +
     "Fires at breakdown voltage; stays on until current drops below holding threshold.",
-  models: { analog: { factory: createSparkGapElement } },
+  models: { mnaModels: { behavioral: { factory: createSparkGapElement } } },
+  defaultModel: "behavioral",
 };

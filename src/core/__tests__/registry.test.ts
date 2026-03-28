@@ -3,7 +3,7 @@ import {
   ComponentRegistry,
   ComponentCategory,
   hasDigitalModel,
-  hasAnalogModel,
+  hasMnaModel,
   availableModels,
   getActiveModelKey,
   modelKeyToDomain,
@@ -14,7 +14,7 @@ import type {
   ComponentLayout,
   ExecuteFunction,
   DigitalModel,
-  AnalogModel,
+  MnaModel,
   ComponentModels,
   MnaModel,
 } from "../registry.js";
@@ -303,7 +303,7 @@ describe("ComponentRegistry", () => {
       const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
       const def: ComponentDefinition = {
         ...makeDefinition("SharedComponent"),
-        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
+        models: { digital: { executeFn: noopExecuteFn }, mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
 
@@ -318,7 +318,7 @@ describe("ComponentRegistry", () => {
       const stubAnalogFactory = () => ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
       const def: ComponentDefinition = {
         ...makeDefinition("PureAnalog"),
-        models: { analog: { factory: stubAnalogFactory } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
 
@@ -344,28 +344,28 @@ describe("ComponentRegistry", () => {
     it("hasDigitalModel returns false for pure-analog component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("PureA"),
-        models: { analog: { factory: stubAnalogFactory } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const stored = registry.get("PureA")!;
       expect(hasDigitalModel(stored)).toBe(false);
     });
 
-    it("hasAnalogModel returns true when analog model is present", () => {
+    it("hasAnalogModel returns true when mna model is present", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("WithAnalog"),
-        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
+        models: { digital: { executeFn: noopExecuteFn }, mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const stored = registry.get("WithAnalog")!;
-      expect(hasAnalogModel(stored)).toBe(true);
+      expect(hasMnaModel(stored)).toBe(true);
     });
 
-    it("hasAnalogModel returns false for digital-only component", () => {
+    it("hasMnaModel returns false for digital-only component", () => {
       const def = makeDefinition("DigOnly2");
       registry.register(def);
       const stored = registry.get("DigOnly2")!;
-      expect(hasAnalogModel(stored)).toBe(false);
+      expect(hasMnaModel(stored)).toBe(false);
     });
 
     it("availableModels returns ['digital'] for digital-only component", () => {
@@ -375,26 +375,26 @@ describe("ComponentRegistry", () => {
       expect(availableModels(stored)).toEqual(["digital"]);
     });
 
-    it("availableModels returns ['analog'] for pure-analog component", () => {
+    it("availableModels returns ['behavioral'] for pure-mna component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("JustAnalog"),
-        models: { analog: { factory: stubAnalogFactory } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const stored = registry.get("JustAnalog")!;
-      expect(availableModels(stored)).toEqual(["analog"]);
+      expect(availableModels(stored)).toEqual(["behavioral"]);
     });
 
     it("availableModels returns both keys for dual-model component", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("DualModel"),
-        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
+        models: { digital: { executeFn: noopExecuteFn }, mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const stored = registry.get("DualModel")!;
       const models = availableModels(stored);
       expect(models).toContain("digital");
-      expect(models).toContain("analog");
+      expect(models).toContain("behavioral");
       expect(models).toHaveLength(2);
     });
 
@@ -438,14 +438,14 @@ describe("ComponentRegistry", () => {
       expect(stored.models.digital!.switchPins).toEqual([0, 1]);
     });
 
-    it("models.analog.requiresBranchRow is preserved through register()", () => {
+    it("models.mnaModels.behavioral.requiresBranchRow is preserved through register()", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("VSource"),
-        models: { analog: { factory: stubAnalogFactory, requiresBranchRow: true } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory, requiresBranchRow: true } } },
       };
       registry.register(def);
       const stored = registry.get("VSource")!;
-      expect(stored.models.analog!.requiresBranchRow).toBe(true);
+      expect(stored.models.mnaModels.behavioral!.requiresBranchRow).toBe(true);
     });
 
     it("register() preserves explicitly supplied models", () => {
@@ -461,7 +461,7 @@ describe("ComponentRegistry", () => {
     it("defaultModel is preserved through register()", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("WithDefault"),
-        models: { digital: { executeFn: noopExecuteFn }, analog: { factory: stubAnalogFactory } },
+        models: { digital: { executeFn: noopExecuteFn }, mnaModels: { behavioral: { factory: stubAnalogFactory } } },
         defaultModel: "digital",
       };
       registry.register(def);
@@ -474,7 +474,7 @@ describe("ComponentRegistry", () => {
       registry.register(makeDefinition("Gate2"));
       const def: ComponentDefinition = {
         ...makeDefinition("PureAnalogOnly"),
-        models: { analog: { factory: stubAnalogFactory } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const digital = registry.getWithModel("digital");
@@ -487,7 +487,7 @@ describe("ComponentRegistry", () => {
       registry.register(makeDefinition("DigOnlyGate"));
       const def: ComponentDefinition = {
         ...makeDefinition("AnalogPassive"),
-        models: { analog: { factory: stubAnalogFactory } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
       };
       registry.register(def);
       const analog = registry.getWithModel("analog");
@@ -665,17 +665,17 @@ describe("ComponentRegistry", () => {
       expect(stored.pinElectricalOverrides).toEqual(overrides);
     });
 
-    it("pinElectrical and pinElectricalOverrides are independent of models.analog", () => {
+    it("pinElectrical and pinElectricalOverrides are independent of models.mnaModels.behavioral", () => {
       const spec: PinElectricalSpec = { vOH: 3.3, vOL: 0 };
       const def: ComponentDefinition = {
         ...makeDefinition("MixedGate"),
         pinElectrical: spec,
-        models: { digital: { executeFn: noopExecuteFn }, analog: {} },
+        models: { digital: { executeFn: noopExecuteFn }, mnaModels: { behavioral: {} } },
       };
       registry.register(def);
       const stored = registry.get("MixedGate")!;
       expect(stored.pinElectrical).toEqual(spec);
-      expect(stored.models.analog).toBeDefined();
+      expect(stored.models.mnaModels?.behavioral).toBeDefined();
     });
 
     it("ComponentDefinition without pinElectrical has undefined pinElectrical", () => {
@@ -686,8 +686,8 @@ describe("ComponentRegistry", () => {
       expect(stored.pinElectricalOverrides).toBeUndefined();
     });
 
-    it("AnalogModel no longer carries pinElectrical or pinElectricalOverrides", () => {
-      const analogModel: AnalogModel = {};
+    it("MnaModel no longer carries pinElectrical or pinElectricalOverrides", () => {
+      const analogModel: MnaModel = {};
       expect((analogModel as Record<string, unknown>)["pinElectrical"]).toBeUndefined();
       expect((analogModel as Record<string, unknown>)["pinElectricalOverrides"]).toBeUndefined();
     });

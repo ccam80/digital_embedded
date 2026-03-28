@@ -479,8 +479,11 @@ export const ScrDefinition: ComponentDefinition = {
     "Pins: A (anode), K (cathode), G (gate).\n" +
     "Triggers when gate current raises α₁+α₂ above 0.95. Latches until I_AK < I_hold.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createScrElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

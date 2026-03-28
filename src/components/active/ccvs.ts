@@ -358,7 +358,8 @@ export const CCVSDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -379,5 +380,7 @@ export const CCVSDefinition: ComponentDefinition = {
         );
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

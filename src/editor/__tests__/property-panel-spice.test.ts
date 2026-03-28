@@ -118,11 +118,13 @@ function makeNpnDef(): ComponentDefinition {
     category: "semiconductors" as never,
     propertyDefs: [],
     pinLayout: [],
-    defaultModel: "analog",
+    defaultModel: "behavioral",
     models: {
-      analog: {
-        deviceType: "NPN",
-      } as never,
+      mnaModels: {
+        behavioral: {
+          deviceType: "NPN",
+        },
+      },
     },
   } as unknown as ComponentDefinition;
 }
@@ -200,7 +202,7 @@ describe("showSpiceModelParameters", () => {
     expect(doc.findInputs().length).toBe(0);
   });
 
-  it("does not render when def has no models.analog (logical gate)", () => {
+  it("does not render when def has no mnaModels (logical gate)", () => {
     const element = makeElement();
     const def = makeLogicalGateDef();
     panel.showSpiceModelParameters(element, def);

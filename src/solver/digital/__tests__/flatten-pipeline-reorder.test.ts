@@ -112,7 +112,8 @@ function makeAnalogDef(typeId: string): ComponentDefinition {
     factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),
     pinLayout: [], propertyDefs: [], attributeMap: [],
     category: ComponentCategory.MISC, helpText: typeId,
-    models: { analog: { factory: noopAnalogFactory } },
+    defaultModel: "behavioral",
+    models: { mnaModels: { behavioral: { factory: noopAnalogFactory } } },
   };
 }
 
@@ -124,7 +125,7 @@ function makeDualDef(typeId: string): ComponentDefinition {
     category: ComponentCategory.MISC, helpText: typeId,
     models: {
       digital: { executeFn: noopExecute() },
-      analog: { factory: noopAnalogFactory },
+      mnaModels: { behavioral: { factory: noopAnalogFactory } },
     },
   };
 }
@@ -255,7 +256,7 @@ describe("FlattenPipelineReorder", () => {
     expect(subEls).toHaveLength(1);
   });
 
-  it("analog_wins_for_submode: resolveModelAssignments assigns modelKey=analog when simulationModel is a sub-mode value on a dual-model component", () => {
+  it("analog_wins_for_submode: resolveModelAssignments assigns first mna model key when simulationModel is a sub-mode value on a dual-model component", () => {
     const props = new PropertyBag();
     props.set("simulationModel", "analog-pins");
     const el = new TestLeafElement(
@@ -268,13 +269,13 @@ describe("FlattenPipelineReorder", () => {
 
     const assignments = resolveModelAssignments([el], registry);
 
-    // "analog-pins" is not a model key but the component has an analog model —
-    // resolveModelAssignments must route it to "analog"
+    // "analog-pins" is not a model key but the component has mnaModels —
+    // resolveModelAssignments must route it to the first mna model key ("behavioral")
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]!.modelKey).toBe("analog");
+    expect(assignments[0]!.modelKey).toBe("behavioral");
   });
 
-  it("analog_wins_for_logical_submode: simulationModel=logical routes dual-model component to analog", () => {
+  it("analog_wins_for_logical_submode: simulationModel=logical routes dual-model component to first mna model key", () => {
     const props = new PropertyBag();
     props.set("simulationModel", "logical");
     const el = new TestLeafElement(
@@ -287,7 +288,7 @@ describe("FlattenPipelineReorder", () => {
 
     const assignments = resolveModelAssignments([el], registry);
 
-    expect(assignments[0]!.modelKey).toBe("analog");
+    expect(assignments[0]!.modelKey).toBe("behavioral");
   });
 
   it("explicit_digital_key_respected: simulationModel=digital on dual-model component routes to digital", () => {
@@ -306,9 +307,9 @@ describe("FlattenPipelineReorder", () => {
     expect(assignments[0]!.modelKey).toBe("digital");
   });
 
-  it("explicit_analog_key_respected: simulationModel=analog on dual-model component routes to analog", () => {
+  it("explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model", () => {
     const props = new PropertyBag();
-    props.set("simulationModel", "analog");
+    props.set("simulationModel", "behavioral");
     const el = new TestLeafElement(
       "DualGate", "gate-4", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],
@@ -319,6 +320,6 @@ describe("FlattenPipelineReorder", () => {
 
     const assignments = resolveModelAssignments([el], registry);
 
-    expect(assignments[0]!.modelKey).toBe("analog");
+    expect(assignments[0]!.modelKey).toBe("behavioral");
   });
 });

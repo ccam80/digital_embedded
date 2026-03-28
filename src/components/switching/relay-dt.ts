@@ -287,8 +287,10 @@ export const RelayDTDefinition: ComponentDefinition = {
       switchPins: [2, 3],
       defaultDelay: 0,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createRelayDTAnalogElement,
+    },
     },
   },
   defaultModel: "digital",

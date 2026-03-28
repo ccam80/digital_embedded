@@ -255,9 +255,13 @@ export const DDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeDFlipflopAnalogFactory(),
-      transistorModel: 'CmosDFlipflop',
+    },
+      cmos: {
+        subcircuitModel: "CmosDFlipflop",
+      },
     },
   },
   defaultModel: "digital",

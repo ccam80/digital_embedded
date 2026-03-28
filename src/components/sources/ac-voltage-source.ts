@@ -541,7 +541,8 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -553,5 +554,7 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
         return createAcVoltageSourceElement(pinNodes, internalNodeIds, branchIdx, props, getTime);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

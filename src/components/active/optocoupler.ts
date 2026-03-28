@@ -436,7 +436,8 @@ export const OptocouplerDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -457,5 +458,7 @@ export const OptocouplerDefinition: ComponentDefinition = {
         );
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

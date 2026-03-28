@@ -370,8 +370,11 @@ export const PotentiometerDefinition: ComponentDefinition = {
     "Potentiometer — voltage divider with 3 terminals (A, wiper, B).\n" +
     "Position determines the voltage division between top and bottom resistances.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createPotentiometerElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

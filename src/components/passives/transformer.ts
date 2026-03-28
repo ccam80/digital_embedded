@@ -482,9 +482,12 @@ export const TransformerDefinition: ComponentDefinition = {
     "Two-winding transformer using coupled inductor companion model.\n" +
     "Specify turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createTransformerElement,
       requiresBranchRow: true,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

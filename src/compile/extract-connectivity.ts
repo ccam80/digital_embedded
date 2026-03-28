@@ -31,13 +31,13 @@ export interface ModelAssignment {
   /** Index into the elements array. */
   elementIndex: number;
   /**
-   * Active model key: "digital" | "analog" | "neutral".
+   * Active model key: "digital" | a named mna model key | "neutral".
    * "neutral" for infrastructure components (Wire, Tunnel, Ground, etc.)
    * that carry no simulation model but are still part of connectivity.
    */
   modelKey: string;
   /** The resolved model object, or null for neutral/infrastructure elements. */
-  model: import('../core/registry.js').DigitalModel | import('../core/registry.js').AnalogModel | null;
+  model: import('../core/registry.js').DigitalModel | import('../core/registry.js').MnaModel | null;
 }
 
 /**
@@ -76,26 +76,27 @@ export function resolveModelAssignments(
     // The simulationModel property may hold sub-mode values (e.g. "analog-pins",
     // "logical", "analog-internals") that are NOT model registry keys — they are
     // read by the analog compiler internally. When a sub-mode value is set and
-    // the component has an analog model, assign "analog" so the component is
-    // routed to the analog partition. Only treat the property value as a model
-    // key when it actually exists in def.models.
+    // the component has mnaModels, route to the first mna model key so the
+    // component is placed in the analog partition.
     const simulationModelProp = el.getAttribute('simulationModel');
-    const models = def.models as Record<string, import('../core/registry.js').DigitalModel | import('../core/registry.js').AnalogModel | undefined>;
     let modelKey: string;
+
+    const mnaModelKeys = def.models.mnaModels ? Object.keys(def.models.mnaModels) : [];
+    const firstMnaKey = mnaModelKeys[0];
+
     if (
       typeof simulationModelProp === 'string' &&
       simulationModelProp.length > 0 &&
-      models[simulationModelProp] !== undefined
+      (simulationModelProp === 'digital' ? def.models.digital !== undefined : def.models.mnaModels?.[simulationModelProp] !== undefined)
     ) {
       modelKey = simulationModelProp;
     } else if (
       typeof simulationModelProp === 'string' &&
       simulationModelProp.length > 0 &&
-      models[simulationModelProp] === undefined &&
-      models['analog'] !== undefined
+      firstMnaKey !== undefined
     ) {
-      // Sub-mode value (e.g. "analog-pins", "analog-internals", "logical") — route to analog
-      modelKey = 'analog';
+      // Sub-mode value (e.g. "analog-pins", "analog-internals", "logical") — route to first mna model
+      modelKey = firstMnaKey;
     } else if (def.defaultModel !== undefined) {
       modelKey = def.defaultModel;
     } else {
@@ -104,7 +105,12 @@ export function resolveModelAssignments(
     }
 
     // Resolve the actual model object
-    const model = models[modelKey] ?? null;
+    let model: import('../core/registry.js').DigitalModel | import('../core/registry.js').MnaModel | null;
+    if (modelKey === 'digital') {
+      model = def.models.digital ?? null;
+    } else {
+      model = def.models.mnaModels?.[modelKey] ?? null;
+    }
 
     // If the resolved key doesn't correspond to a real model, fall back to neutral
     if (model === null) {
@@ -124,12 +130,12 @@ export function resolveModelAssignments(
 
 /**
  * Map a model key to a domain string.
- * "digital" → "digital", "analog" → "analog", anything else → "neutral".
+ * "digital" → "digital", any mna model key → "analog", "neutral" → "neutral".
  */
 function modelKeyToDomain(modelKey: string): string {
   if (modelKey === 'digital') return 'digital';
-  if (modelKey === 'analog') return 'analog';
-  return 'neutral';
+  if (modelKey === 'neutral') return 'neutral';
+  return 'analog';
 }
 
 // ---------------------------------------------------------------------------

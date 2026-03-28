@@ -469,10 +469,13 @@ export const NJfetDefinition: ComponentDefinition = {
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createNJfetElement(pinNodes, branchIdx, props),
       deviceType: "NJFET",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

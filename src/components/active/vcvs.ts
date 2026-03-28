@@ -327,7 +327,8 @@ export const VCVSDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -348,5 +349,7 @@ export const VCVSDefinition: ComponentDefinition = {
         );
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

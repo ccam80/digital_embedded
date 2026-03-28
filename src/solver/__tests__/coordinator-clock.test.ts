@@ -73,13 +73,15 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     helpText: '',
     pinElectrical: {},
     models: {
-      analog: {
-        analogFactory: (_el: unknown, _pins: number[]) => ({
-          pinNodeIds: _pins, allNodeIds: _pins, branchIndex: -1,
-          isNonlinear: false, isReactive: false,
-          stamp(_s: SparseSolver) {},
-          getPinCurrents(_v: Float64Array) { return [0]; },
-        }),
+      mnaModels: {
+        behavioral: {
+          analogFactory: (_el: unknown, _pins: number[]) => ({
+            pinNodeIds: _pins, allNodeIds: _pins, branchIndex: -1,
+            isNonlinear: false, isReactive: false,
+            stamp(_s: SparseSolver) {},
+            getPinCurrents(_v: Float64Array) { return [0]; },
+          }),
+        },
       },
     },
   } as unknown as ComponentDefinition;

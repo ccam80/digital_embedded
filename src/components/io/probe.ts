@@ -266,7 +266,9 @@ export const ProbeDefinition: ComponentDefinition = {
     "Display format is configurable: binary, decimal, hexadecimal, or octal.",
   models: {
     digital: { executeFn: executeProbe, inputSchema: ["in"], outputSchema: [] },
-    analog: { factory: probeAnalogFactory },
+    mnaModels: {
+      behavioral: { factory: probeAnalogFactory },
+    },
   },
   defaultModel: "digital",
 };

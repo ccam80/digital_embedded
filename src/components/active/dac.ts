@@ -423,7 +423,8 @@ export const DACDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         internalNodeIds: readonly number[],
@@ -433,5 +434,7 @@ export const DACDefinition: ComponentDefinition = {
         return createDACElement(pinNodes, internalNodeIds, branchIdx, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

@@ -358,5 +358,6 @@ export const LDRDefinition: ComponentDefinition = {
   helpText:
     "LDR (Light Dependent Resistor) — resistance varies with illumination. " +
     "Power-law model: R = R_dark × (lux / lux_ref)^(-γ).",
-  models: { analog: { factory: createLDRElement } },
+  models: { mnaModels: { behavioral: { factory: createLDRElement } } },
+  defaultModel: "behavioral",
 };

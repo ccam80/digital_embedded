@@ -116,7 +116,7 @@ function buildAndCompile(spiceModelOverrides?: string): {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "Ground",
-    models: { analog: {} },
+    models: { mnaModels: { behavioral: {} } },
   } as unknown as ComponentDefinition);
 
   registry.register({
@@ -133,9 +133,11 @@ function buildAndCompile(spiceModelOverrides?: string): {
     category: ComponentCategory.MISC,
     helpText: "NPN Stub",
     models: {
-      analog: {
-        deviceType: "NPN" as import("../../analog/model-parser.js").DeviceType,
-        factory: npnFactory,
+      mnaModels: {
+        behavioral: {
+          deviceType: "NPN" as import("../../analog/model-parser.js").DeviceType,
+          factory: npnFactory,
+        },
       },
     },
   } as unknown as ComponentDefinition);
@@ -258,7 +260,7 @@ describe("spice-model-overrides compiler merge", () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "Ground",
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     } as unknown as ComponentDefinition);
 
     registry.register({
@@ -274,9 +276,11 @@ describe("spice-model-overrides compiler merge", () => {
       category: ComponentCategory.MISC,
       helpText: "Tunnel Diode Stub",
       models: {
-        analog: {
-          deviceType: "TUNNEL" as import("../../analog/model-parser.js").DeviceType,
-          factory: tunnelFactory,
+        mnaModels: {
+          behavioral: {
+            deviceType: "TUNNEL" as import("../../analog/model-parser.js").DeviceType,
+            factory: tunnelFactory,
+          },
         },
       },
     } as unknown as ComponentDefinition);

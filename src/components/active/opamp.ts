@@ -325,7 +325,8 @@ export const OpAmpDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         internalNodeIds: readonly number[],
@@ -335,5 +336,7 @@ export const OpAmpDefinition: ComponentDefinition = {
         return createOpAmpElement(pinNodes, internalNodeIds, branchIdx, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

@@ -295,8 +295,10 @@ export const MuxDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeBehavioralMuxAnalogFactory(1),
+    },
     },
   },
   defaultModel: "digital",

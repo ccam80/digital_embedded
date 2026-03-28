@@ -45,7 +45,7 @@ function makeOptocouplerElement(
     ["label",    ""],
   ]).entries());
   return withNodeIds(
-    OptocouplerDefinition.models!.analog!.factory(
+    OptocouplerDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
       [],
       -1,

@@ -234,8 +234,10 @@ export const DecoderDefinition: ComponentDefinition = {
         return Array.from({ length: outCount }, (_, i) => `out_${i}`);
       },
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeBehavioralDecoderAnalogFactory(1),
+    },
     },
   },
   defaultModel: "digital",

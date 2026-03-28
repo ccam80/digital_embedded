@@ -134,7 +134,7 @@ describe("AnalogClock", () => {
 
   it("has both digital and analog models — clock appears in both palettes", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
-    expect(ClockDefinition.models.analog).toBeDefined();
+    expect(ClockDefinition.models.mnaModels.behavioral).toBeDefined();
   });
 
   it("has digital model — logical clock behavior preserved", () => {
@@ -145,7 +145,7 @@ describe("AnalogClock", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
-    const el = ClockDefinition.models.analog!.factory!(new Map([["out", 1]]), [], 1, props, () => 0);
+    const el = ClockDefinition.models.mnaModels!.behavioral!.factory!(new Map([["out", 1]]), [], 1, props, () => 0);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(false);
     expect(el.isReactive).toBe(false);

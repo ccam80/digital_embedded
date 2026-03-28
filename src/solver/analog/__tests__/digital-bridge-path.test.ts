@@ -89,7 +89,8 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: "",
-    models: { analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }) } },
+    defaultModel: 'behavioral',
+    models: { mnaModels: { behavioral: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }) } } },
   });
 
   // In: one OUTPUT pin at (0,0), label and bitWidth from props
@@ -167,7 +168,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
     helpText: "",
     models: {
       digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction },
-      analog: { factory: (analogFactory ?? makeStubAnalogElement) as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+      mnaModels: { behavioral: { factory: (analogFactory ?? makeStubAnalogElement) as unknown as import("../../core/registry.js").MnaModel["factory"] } },
     },
   });
 
@@ -313,8 +314,8 @@ describe("DigitalBridgePath", () => {
   it("behavioral_mode_still_calls_analog_factory", () => {
     const analogFactory = vi.fn(makeStubAnalogElement);
     const registry = buildRegistry(analogFactory);
-    // No simulationModel → defaults to "analog-pins"
-    const circuit = buildCircuit();
+    // simulationModel="behavioral" routes dual-model component to the behavioral mna model
+    const circuit = buildCircuit(new Map([["simulationModel", "behavioral"]]));
 
     compileUnified(circuit, registry);
 

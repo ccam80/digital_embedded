@@ -149,22 +149,22 @@ export function expandTransistorModel(
 ): TransistorExpansionResult {
   const diagnostics: SolverDiagnostic[] = [];
 
-  // Validate: must have transistorModel set
-  const transistorModelName = componentDef.models?.analog?.transistorModel;
+  // Validate: must have subcircuitModel set on cmos model
+  const transistorModelName = componentDef.models?.mnaModels?.cmos?.subcircuitModel;
   if (!transistorModelName) {
     diagnostics.push(
       makeDiagnostic(
         "missing-transistor-model",
         "error",
-        `Component "${componentDef.name}" has simulationModel 'transistor' but no transistorModel defined`,
+        `Component "${componentDef.name}" has simulationModel 'transistor' but no subcircuitModel defined`,
         {
           explanation:
             `The component "${componentDef.name}" is configured for transistor-level simulation ` +
-            `but its ComponentDefinition has no models.analog.transistorModel field. ` +
-            `Set models.analog.transistorModel to the name of a registered transistor model subcircuit.`,
+            `but its ComponentDefinition has no models.mnaModels.cmos.subcircuitModel field. ` +
+            `Set models.mnaModels.cmos.subcircuitModel to the name of a registered transistor model subcircuit.`,
           suggestions: [
             {
-              text: `Add models: { analog: { transistorModel: 'CmosXxx' } } to the ComponentDefinition for "${componentDef.name}".`,
+              text: `Add mnaModels: { cmos: { subcircuitModel: 'CmosXxx' } } to the ComponentDefinition for "${componentDef.name}".`,
               automatable: false,
             },
           ],

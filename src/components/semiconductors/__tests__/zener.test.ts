@@ -146,9 +146,9 @@ describe("Zener", () => {
 
   it("definition_has_correct_fields", () => {
     expect(ZenerDiodeDefinition.name).toBe("ZenerDiode");
-    expect(ZenerDiodeDefinition.models?.analog).toBeDefined();
-    expect(ZenerDiodeDefinition.models?.analog?.deviceType).toBe("D");
-    expect(ZenerDiodeDefinition.models?.analog?.factory).toBeDefined();
+    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("D");
+    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 });
 

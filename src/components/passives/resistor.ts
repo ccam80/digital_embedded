@@ -229,8 +229,11 @@ export const ResistorDefinition: ComponentDefinition = {
     "Resistor — stamps conductance G=1/R into the MNA matrix.\n" +
     "Minimum resistance is clamped to 1e-9 Ω.",
   models: {
-    analog: {
-      factory: createResistorElement,
+    mnaModels: {
+      behavioral: {
+        factory: createResistorElement,
+      },
     },
   },
+  defaultModel: "behavioral",
 };

@@ -293,3 +293,22 @@
 - **Status**: complete
 - **Tasks completed**: 3/3
 - **Rounds**: 1
+
+---
+## Task W5.1: ComponentModels Restructure — models.analog → models.mnaModels
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/registry.ts` — removed `AnalogModel` interface; added `MnaModel` interface; updated `ComponentModels` to use `mnaModels?: Record<string, MnaModel>`; updated `hasAnalogModel()` to check `mnaModels`; added `hasMnaModel` export alias; updated `getWithModel("analog")` to check `mnaModels`; updated `availableModels()` and `getActiveModelKey()`
+  - `src/compile/extract-connectivity.ts` — updated `resolveModelAssignments()` to use `mnaModels` keys; updated `modelKeyToDomain()` 
+  - `src/compile/compile.ts` — updated analog check to use `mnaModels`
+  - `src/compile/types.ts` — changed `AnalogModel` → `MnaModel`
+  - `src/compile/index.ts` — changed `AnalogModel` → `MnaModel` export
+  - `src/solver/analog/compiler.ts` — all `def.models?.analog` → `def.models?.mnaModels?.behavioral`; `transistorModel` → `mnaModels.cmos.subcircuitModel`
+  - `src/solver/analog/transistor-expansion.ts` — `transistorModel` → `subcircuitModel`
+  - `src/editor/property-panel.ts` — `analog?.deviceType` → `mnaModels?.behavioral?.deviceType`
+  - 80+ component files in `src/components/` — all `analog: { factory }` → `mnaModels: { behavioral: { factory } }`, Pattern E `transistorModel` → `mnaModels.cmos.subcircuitModel`
+  - Test files updated: `registry.test.ts`, `partition.test.ts`, `analog-compiler.test.ts`, `compiler.test.ts`, `compile-analog-partition.test.ts`, `extract-connectivity.test.ts`, `flatten-pipeline-reorder.test.ts`, `flatten-bridge.test.ts`, `digital-bridge-path.test.ts`, `darlington.test.ts`, `spice-model-overrides.test.ts`, `model-binding.test.ts`, `bridge-compiler.test.ts`, `bridge-diagnostics.test.ts`, `behavioral-*.test.ts`, all `src/components/**/__tests__/*.test.ts`
+  - `src/compile/__tests__/coordinator.test.ts`, `src/solver/__tests__/coordinator-capability.test.ts`, `src/solver/__tests__/coordinator-speed-control.test.ts` — updated factory signatures and model structures
+- **Tests**: 9757/9767 passing (10 pre-existing failures, 0 new regressions; baseline was 9720/9730)

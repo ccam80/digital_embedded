@@ -391,8 +391,11 @@ export const MemristorDefinition: ComponentDefinition = {
     "Memristor — Joglekar window function model.\n" +
     "Resistance depends on charge history (state variable w, 0–1).",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createMemristorElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

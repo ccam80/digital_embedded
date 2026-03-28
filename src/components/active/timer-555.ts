@@ -489,7 +489,8 @@ export const Timer555Definition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -499,5 +500,7 @@ export const Timer555Definition: ComponentDefinition = {
         return createTimer555Element(pinNodes, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

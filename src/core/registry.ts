@@ -175,24 +175,6 @@ export interface DigitalModel {
 }
 
 /**
- * MNA analog simulation model.
- * Stamps conductance/current into sparse matrix via factory.
- */
-export interface AnalogModel {
-  factory?: (
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-    getTime: () => number,
-  ) => AnalogElementCore;
-  requiresBranchRow?: boolean;
-  getInternalNodeCount?: (props: PropertyBag) => number;
-  deviceType?: DeviceType;
-  transistorModel?: string;
-}
-
-/**
  * Named MNA simulation model entry in the mnaModels map.
  * Each key is a user-selectable model name (e.g. "behavioral", "ideal", "real").
  */
@@ -224,13 +206,11 @@ export interface MnaModel {
 
 /**
  * Container for all simulation models a component type supports.
- * A component may have a digital model, an analog model, or both.
+ * A component may have a digital model, MNA models, or both.
  */
 export interface ComponentModels {
   /** Event-driven digital: reads/writes bit vectors on discrete nets. */
   digital?: DigitalModel;
-  /** MNA analog: stamps conductance/current into sparse matrix. */
-  analog?: AnalogModel;
   /** Named MNA models keyed by model name (e.g. "behavioral", "ideal", "real"). */
   mnaModels?: Record<string, MnaModel>;
 }
@@ -289,14 +269,20 @@ export function hasDigitalModel(def: ComponentDefinition): boolean {
   return def.models?.digital !== undefined;
 }
 
-/** Returns true if the component definition has an analog simulation model. */
+/** Returns true if the component definition has an MNA simulation model. */
 export function hasAnalogModel(def: ComponentDefinition): boolean {
-  return def.models?.analog !== undefined;
+  return def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
 }
+
+/** Alias for hasAnalogModel — returns true when the component has any named MNA model. */
+export const hasMnaModel = hasAnalogModel;
 
 /** Returns the list of model keys available on this component definition. */
 export function availableModels(def: ComponentDefinition): string[] {
-  return def.models ? Object.keys(def.models) : [];
+  const keys: string[] = [];
+  if (def.models?.digital) keys.push('digital');
+  if (def.models?.mnaModels) keys.push(...Object.keys(def.models.mnaModels));
+  return keys;
 }
 
 /**
@@ -488,11 +474,18 @@ export class ComponentRegistry {
     return this._byCategory.get(category) ?? [];
   }
 
-  /** Return all definitions that have a simulation model for the given model key. */
+  /** Return all definitions that have a simulation model for the given model key.
+   * Passing "analog" returns all components with any named MNA model. */
   getWithModel(modelKey: string): ComponentDefinition[] {
-    return Array.from(this._byName.values()).filter((d) =>
-      d.models[modelKey as keyof ComponentModels] !== undefined
-    );
+    return Array.from(this._byName.values()).filter((d) => {
+      if (modelKey === 'analog') {
+        return d.models.mnaModels !== undefined && Object.keys(d.models.mnaModels).length > 0;
+      }
+      if (modelKey === 'digital') {
+        return d.models.digital !== undefined;
+      }
+      return d.models.mnaModels?.[modelKey] !== undefined;
+    });
   }
 
   /** Total number of registered component types. */

@@ -273,8 +273,10 @@ export const DriverDefinition: ComponentDefinition = {
       inputSchema: ["in", "sel"],
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createDriverAnalogElement,
+    },
     },
   },
   defaultModel: "digital",

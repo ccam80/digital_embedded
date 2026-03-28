@@ -58,7 +58,7 @@ function makeSPST(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPSTDefinition.models!.analog!.factory(
+    SwitchSPSTDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
       [],
       -1,
@@ -77,7 +77,7 @@ function makeSPDT(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPDTDefinition.models!.analog!.factory(
+    SwitchSPDTDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
       [],
       -1,

@@ -456,7 +456,7 @@ export class PropertyPanel {
     element: CircuitElement,
     def: ComponentDefinition,
   ): void {
-    const deviceType = def.models?.analog?.deviceType;
+    const deviceType = def.models?.mnaModels?.behavioral?.deviceType;
     if (!deviceType) return;
 
     const paramMeta = getParamMeta(deviceType);

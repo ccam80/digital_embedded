@@ -14,7 +14,7 @@ import { FacadeError } from '../../headless/types.js';
 import type { Pin, Rotation } from '../../core/pin.js';
 import type { PinDeclaration } from '../../core/pin.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentDefinition, ComponentLayout, AnalogFactory } from '../../core/registry.js';
+import type { ComponentDefinition, ComponentLayout } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
@@ -160,7 +160,7 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
 function makeAnalogDef(
   name: string,
   pinPairs: Array<{ x: number; y: number; label?: string }>,
-  analogFactory: AnalogFactory,
+  mnaFactory: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
 ): ComponentDefinition {
   return {
     name,
@@ -179,7 +179,8 @@ function makeAnalogDef(
     category: ComponentCategory.ANALOG,
     helpText: '',
     pinElectrical: {},
-    models: { analog: { analogFactory } },
+    defaultModel: 'behavioral',
+    models: { mnaModels: { behavioral: { factory: (pinNodes) => mnaFactory(pinNodes) } } },
   } as unknown as ComponentDefinition;
 }
 
@@ -197,14 +198,17 @@ function makeGroundDef(): ComponentDefinition {
     category: ComponentCategory.ANALOG,
     helpText: '',
     pinElectrical: {},
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        analogFactory: (_el: unknown, _pins: number[]) => ({
-          pinNodeIds: _pins, allNodeIds: _pins, branchIndex: -1,
-          isNonlinear: false, isReactive: false,
-          stamp(_s: SparseSolver) {},
-          getPinCurrents(_v: Float64Array) { return [0]; },
-        }),
+      mnaModels: {
+        behavioral: {
+          factory: (_pinNodes) => ({
+            pinNodeIds: [], allNodeIds: [], branchIndex: -1,
+            isNonlinear: false, isReactive: false,
+            stamp(_s: SparseSolver) {},
+            getPinCurrents(_v: Float64Array) { return [0]; },
+          }),
+        },
       },
     },
   } as unknown as ComponentDefinition;
@@ -212,13 +216,10 @@ function makeGroundDef(): ComponentDefinition {
 
 function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
   const groundDef = makeGroundDef();
-  const resistorFactory: AnalogFactory = (
-    _el: unknown, pinNodes: number[], _props: unknown,
-  ) => makeResistorAnalogEl(pinNodes[0] ?? 0, pinNodes[1] ?? 0, 1000);
   const resistorDef = makeAnalogDef(
     'Resistor',
     [{ x: 0, y: 0, label: 'p1' }, { x: 0, y: 4, label: 'p2' }],
-    resistorFactory as AnalogFactory,
+    (pinNodes) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000),
   );
   const registry = new ComponentRegistry();
   registry.register(groundDef);

@@ -243,8 +243,11 @@ export const CapacitorDefinition: ComponentDefinition = {
     "Capacitor — reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createCapacitorElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

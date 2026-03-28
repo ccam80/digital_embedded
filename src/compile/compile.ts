@@ -354,7 +354,7 @@ export function compileUnified(
 
     for (const pc of digitalPartition.components) {
       const def = registry.get(pc.element.typeId);
-      if (!def || def.models?.analog) continue; // has analog model — fine
+      if (!def || (def.models?.mnaModels && Object.keys(def.models.mnaModels).length > 0)) continue; // has mna model — fine
       if (INFRASTRUCTURE_TYPES.has(pc.element.typeId)) continue; // infrastructure — no-op wiring element
       const elementIndex = circuit.elements.indexOf(pc.element);
       if (bridgeElementIndices.has(elementIndex)) continue; // bridge-connected — fine

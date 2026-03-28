@@ -511,7 +511,8 @@ export const ADCDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         internalNodeIds: readonly number[],
@@ -521,5 +522,7 @@ export const ADCDefinition: ComponentDefinition = {
         return createADCElement(pinNodes, internalNodeIds, branchIdx, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

@@ -365,7 +365,8 @@ export const OTADefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -385,5 +386,7 @@ export const OTADefinition: ComponentDefinition = {
         );
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

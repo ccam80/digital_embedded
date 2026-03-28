@@ -406,17 +406,17 @@ describe("PNP", () => {
 describe("Definitions", () => {
   it("npn_definition_fields", () => {
     expect(NpnBjtDefinition.name).toBe("NpnBJT");
-    expect(NpnBjtDefinition.models?.analog).toBeDefined();
-    expect(NpnBjtDefinition.models?.analog?.deviceType).toBe("NPN");
-    expect(NpnBjtDefinition.models?.analog?.factory).toBeDefined();
+    expect(NpnBjtDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(NpnBjtDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("NPN");
+    expect(NpnBjtDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(NpnBjtDefinition.pinLayout).toHaveLength(3);
   });
 
   it("pnp_definition_fields", () => {
     expect(PnpBjtDefinition.name).toBe("PnpBJT");
-    expect(PnpBjtDefinition.models?.analog).toBeDefined();
-    expect(PnpBjtDefinition.models?.analog?.deviceType).toBe("PNP");
-    expect(PnpBjtDefinition.models?.analog?.factory).toBeDefined();
+    expect(PnpBjtDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(PnpBjtDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("PNP");
+    expect(PnpBjtDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(PnpBjtDefinition.pinLayout).toHaveLength(3);
   });
 
@@ -437,7 +437,7 @@ describe("Definitions", () => {
   it("npn_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = withNodeIds(NpnBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(NpnBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -445,7 +445,7 @@ describe("Definitions", () => {
   it("pnp_analogFactory_creates_element", () => {
     const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = withNodeIds(PnpBjtDefinition.models!.analog!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(PnpBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });

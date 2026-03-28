@@ -219,7 +219,8 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -231,5 +232,7 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
         return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

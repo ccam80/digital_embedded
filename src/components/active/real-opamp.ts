@@ -785,7 +785,8 @@ export const RealOpAmpDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -795,5 +796,7 @@ export const RealOpAmpDefinition: ComponentDefinition = {
         return createRealOpAmpElement(pinNodes, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

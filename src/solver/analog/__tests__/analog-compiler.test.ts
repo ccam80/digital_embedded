@@ -134,7 +134,7 @@ function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): Compone
 
   registry.register({
     ...makeBaseDef("Ground"),
-    models: { analog: {} },
+    models: { mnaModels: { behavioral: {} } },
   });
 
   const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
@@ -144,7 +144,7 @@ function buildBehavioralRegistry(factorySpy?: ReturnType<typeof vi.fn>): Compone
     pinLayout: makeGatePinLayout(2),
     models: {
       digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
-      analog: { factory: andFactory as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+      mnaModels: { behavioral: { factory: andFactory as unknown as import("../../core/registry.js").MnaModel["factory"] } },
     },
     defaultModel: "digital",
   });
@@ -271,15 +271,17 @@ describe("BehavioralCompilation", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     });
 
     // Analog resistor so the analog partition is non-empty
     registry.register({
       ...makeBaseDef("AnalogR"),
       models: {
-        analog: {
-          factory: vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()])),
+        mnaModels: {
+          behavioral: {
+            factory: vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()])),
+          },
         },
       },
     });
@@ -319,7 +321,7 @@ describe("BehavioralCompilation", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     });
 
     // Register a gate with per-pin rOut override on "out" pin
@@ -331,8 +333,10 @@ describe("BehavioralCompilation", () => {
       },
       models: {
         digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
-        analog: {
-          factory: factorySpy as unknown as import("../../core/registry.js").AnalogModel["factory"],
+        mnaModels: {
+          behavioral: {
+            factory: factorySpy as unknown as import("../../core/registry.js").MnaModel["factory"],
+          },
         },
       },
     });
@@ -426,7 +430,7 @@ describe("SimulationMode", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     });
 
     registry.register({
@@ -469,7 +473,7 @@ describe("SimulationMode", () => {
       ]),
       models: {
         digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
-        analog: { factory: factorySpy as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+        mnaModels: { behavioral: { factory: factorySpy as unknown as import("../../core/registry.js").MnaModel["factory"] } },
       },
     });
 
@@ -519,7 +523,10 @@ describe("SimulationMode", () => {
       ...def,
       models: {
         ...def.models,
-        analog: { ...def.models.analog, transistorModel: "CmosAnd2" },
+        mnaModels: {
+          behavioral: { ...def.models.mnaModels?.behavioral },
+          cmos: { subcircuitModel: "CmosAnd2" },
+        },
       },
     });
 

@@ -90,16 +90,16 @@ describe("CurrentSource", () => {
   });
 
   it("definition_engine_type_analog", () => {
-    expect(CurrentSourceDefinition.models?.analog).toBeDefined();
+    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("definition_does_not_require_branch_row", () => {
-    expect(CurrentSourceDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
+    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
   });
 
   it("default_current_from_analog_factory", () => {
     const props = new PropertyBag();
-    const el = CurrentSourceDefinition.models!.analog!.factory(
+    const el = CurrentSourceDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["pos", 1], ["neg", 2]]),
       [],
       -1,

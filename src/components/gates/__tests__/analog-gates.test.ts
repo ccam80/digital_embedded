@@ -44,14 +44,14 @@ const GATE_NAMES = ["And", "NAnd", "Or", "NOr", "XOr", "XNOr", "Not"];
 describe("Registration", () => {
   it("and_has_analog_factory", () => {
     const registry = makeGateRegistry();
-    expect(registry.get("And")!.models?.analog?.factory).toBeDefined();
+    expect(registry.get("And")!.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 
   it("and_has_both_digital_and_analog_models", () => {
     const registry = makeGateRegistry();
     const def = registry.get("And")!;
     expect(def.models?.digital).toBeDefined();
-    expect(def.models?.analog).toBeDefined();
+    expect(def.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("all_gates_have_analog_factory", () => {
@@ -60,7 +60,7 @@ describe("Registration", () => {
       const def = registry.get(name);
       expect(def, `Expected ${name} to be registered`).toBeDefined();
       expect(
-        def!.models?.analog?.factory,
+        def!.models?.mnaModels?.behavioral?.factory,
         `Expected ${name} to have analog factory`,
       ).toBeDefined();
     }
@@ -71,7 +71,7 @@ describe("Registration", () => {
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
       expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
-      expect(def.models?.analog, `${name} should have analog model`).toBeDefined();
+      expect(def.models?.mnaModels?.behavioral, `${name} should have analog model`).toBeDefined();
     }
   });
 });
@@ -119,7 +119,7 @@ describe("SimulationModes", () => {
     const registry = makeGateRegistry();
     const def = registry.get("And")!;
     expect(def.models?.digital).toBeDefined();
-    expect(def.models?.analog).toBeDefined();
+    expect(def.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("all_gates_support_digital_and_simplified", () => {
@@ -127,7 +127,7 @@ describe("SimulationModes", () => {
     for (const name of GATE_NAMES) {
       const def = registry.get(name)!;
       expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
-      expect(def.models?.analog, `${name} should have analog model`).toBeDefined();
+      expect(def.models?.mnaModels?.behavioral, `${name} should have analog model`).toBeDefined();
     }
   });
 });

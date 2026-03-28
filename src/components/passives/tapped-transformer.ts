@@ -562,9 +562,12 @@ export const TappedTransformerDefinition: ComponentDefinition = {
     "Center-tapped three-winding transformer using 3×3 coupled inductor companion model.\n" +
     "Specify total turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createTappedTransformerElement,
       requiresBranchRow: true,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

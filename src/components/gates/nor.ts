@@ -166,9 +166,13 @@ export const NOrDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeNorAnalogFactory(0),
-      transistorModel: "CmosNor2",
+    },
+      cmos: {
+        subcircuitModel: "CmosNor2",
+      },
     },
   },
   defaultModel: "digital",

@@ -38,7 +38,7 @@ function makeVCCSElement(
     ["label", ""],
   ]).entries());
   return withNodeIds(
-    VCCSDefinition.models!.analog!.factory(
+    VCCSDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       -1,

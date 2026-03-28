@@ -198,10 +198,13 @@ function makeAnalogDef(
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        requiresBranchRow,
-        factory: factoryFn,
+      mnaModels: {
+        behavioral: {
+          requiresBranchRow,
+          factory: factoryFn,
+        },
       },
     } as ComponentModels,
   };
@@ -253,7 +256,7 @@ function buildAnalogRegistry(): ComponentRegistry {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models: { analog: {} } as ComponentModels,
+    models: { mnaModels: { behavioral: {} } } as ComponentModels,
   } as ComponentDefinition);
 
   return r;
@@ -285,7 +288,7 @@ function buildMixedRegistry(): ComponentRegistry {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models: { analog: {} } as ComponentModels,
+    models: { mnaModels: { behavioral: {} } } as ComponentModels,
   } as ComponentDefinition);
 
   // Bridge component with both models (has digital output, analog input)
@@ -300,11 +303,13 @@ function buildMixedRegistry(): ComponentRegistry {
     helpText: '',
     models: {
       digital: { executeFn: noopExec },
-      analog: {
-        requiresBranchRow: false,
-        factory: (pinNodes) => {
-          const [n0, n1] = [...pinNodes.values()];
-          return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      mnaModels: {
+        behavioral: {
+          requiresBranchRow: false,
+          factory: (pinNodes) => {
+            const [n0, n1] = [...pinNodes.values()];
+            return makeResistorElement(n0 ?? 0, n1 ?? 0);
+          },
         },
       },
     } as ComponentModels,
@@ -901,7 +906,7 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: '',
-      models: { analog: {} } as ComponentModels,
+      models: { mnaModels: { behavioral: {} } } as ComponentModels,
     } as ComponentDefinition);
 
     r.register({
@@ -923,10 +928,12 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
       helpText: '',
       models: {
         digital: { executeFn: noopExec },
-        analog: {
-          factory: (pinNodes: ReadonlyMap<string, number>) => {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeResistorElement(n0 ?? 0, n1 ?? 0);
+        mnaModels: {
+          behavioral: {
+            factory: (pinNodes: ReadonlyMap<string, number>) => {
+              const [n0, n1] = [...pinNodes.values()];
+              return makeResistorElement(n0 ?? 0, n1 ?? 0);
+            },
           },
         },
       } as ComponentModels,
@@ -983,7 +990,7 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: '',
-      models: { analog: {} } as ComponentModels,
+      models: { mnaModels: { behavioral: {} } } as ComponentModels,
     } as ComponentDefinition);
 
     r.register({

@@ -304,7 +304,9 @@ export const LedDefinition: ComponentDefinition = {
     "Color is configurable. Label is shown above the component.",
   models: {
     digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
-    analog: { factory: createLedAnalogElement },
+    mnaModels: {
+      behavioral: { factory: createLedAnalogElement },
+    },
   },
   defaultModel: "digital",
 };

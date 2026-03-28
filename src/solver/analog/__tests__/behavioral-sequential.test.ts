@@ -363,47 +363,47 @@ describe("Register", () => {
 
 describe("Registration", () => {
   it("counter_has_analog_factory", () => {
-    expect(CounterDefinition.models?.analog).toBeDefined();
-    expect(typeof CounterDefinition.models?.analog?.factory).toBe("function");
+    expect(CounterDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof CounterDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("counter_engine_type_is_both", () => {
     expect(CounterDefinition.models?.digital).toBeDefined();
-    expect(CounterDefinition.models?.analog).toBeDefined();
+    expect(CounterDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("counter_simulation_modes_include_digital_and_simplified", () => {
     expect(CounterDefinition.models?.digital).toBeDefined();
-    expect(CounterDefinition.models?.analog).toBeDefined();
+    expect(CounterDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("counter_preset_has_analog_factory", () => {
-    expect(CounterPresetDefinition.models?.analog).toBeDefined();
-    expect(typeof CounterPresetDefinition.models?.analog?.factory).toBe("function");
+    expect(CounterPresetDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof CounterPresetDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("counter_preset_engine_type_is_both", () => {
     expect(CounterPresetDefinition.models?.digital).toBeDefined();
-    expect(CounterPresetDefinition.models?.analog).toBeDefined();
+    expect(CounterPresetDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("register_has_analog_factory", () => {
-    expect(RegisterDefinition.models?.analog).toBeDefined();
-    expect(typeof RegisterDefinition.models?.analog?.factory).toBe("function");
+    expect(RegisterDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof RegisterDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("register_engine_type_is_both", () => {
     expect(RegisterDefinition.models?.digital).toBeDefined();
-    expect(RegisterDefinition.models?.analog).toBeDefined();
+    expect(RegisterDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("register_simulation_modes_include_digital_and_simplified", () => {
     expect(RegisterDefinition.models?.digital).toBeDefined();
-    expect(RegisterDefinition.models?.analog).toBeDefined();
+    expect(RegisterDefinition.models?.mnaModels?.behavioral).toBeDefined();
   });
 
   it("counter_analog_factory_returns_analog_element", () => {
-    const factory = CounterDefinition.models!.analog!.factory;
+    const factory = CounterDefinition.models!.mnaModels!.behavioral!.factory;
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 4 : undefined,
@@ -423,7 +423,7 @@ describe("Registration", () => {
   });
 
   it("register_analog_factory_returns_analog_element", () => {
-    const factory = RegisterDefinition.models!.analog!.factory;
+    const factory = RegisterDefinition.models!.mnaModels!.behavioral!.factory;
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 8 : undefined,

@@ -8,7 +8,7 @@ import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
-import type { ComponentDefinition, DigitalModel, AnalogModel } from "../core/registry.js";
+import type { ComponentDefinition, DigitalModel, MnaModel } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
@@ -66,7 +66,7 @@ export interface Diagnostic {
 // Re-export imported types for downstream consumers of this module
 // ---------------------------------------------------------------------------
 
-export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, AnalogModel };
+export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, MnaModel };
 export type { PinElectricalSpec, CrossEngineBoundary };
 export type { CompiledDigitalDomain, CompiledAnalogDomain };
 
@@ -130,7 +130,7 @@ export interface ConnectivityGroup {
 export interface PartitionedComponent {
   element: CircuitElement;
   definition: ComponentDefinition;
-  model: DigitalModel | AnalogModel;
+  model: DigitalModel | MnaModel;
   resolvedPins: ResolvedGroupPin[];
 }
 

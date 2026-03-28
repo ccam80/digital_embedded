@@ -174,7 +174,9 @@ export const GroundDefinition: ComponentDefinition = {
     "Ground — outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
   models: {
     digital: { executeFn: executeGround, inputSchema: [], outputSchema: ["out"] },
-    analog: { factory: createGroundAnalogElement },
+    mnaModels: {
+      behavioral: { factory: createGroundAnalogElement },
+    },
   },
   defaultModel: "digital",
 };

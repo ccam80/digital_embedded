@@ -380,9 +380,12 @@ export const DiodeDefinition: ComponentDefinition = {
     "Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createDiodeElement,
       deviceType: "D",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

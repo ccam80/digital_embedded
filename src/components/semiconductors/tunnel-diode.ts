@@ -349,9 +349,12 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
     "Peak current I_p at V_p, valley current I_v at V_v.\n" +
     "NDR region: V_p < V < V_v.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createTunnelDiodeElement,
       deviceType: "TUNNEL",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

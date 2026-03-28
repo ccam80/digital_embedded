@@ -272,7 +272,9 @@
     - generic "Drag to resize palette" [ref=e360]
     - generic "Circuit editor canvas" [ref=e362]
   - generic [ref=e363]:
-    - generic [ref=e364]: Ready
-    - button "100%" [ref=e366] [cursor=pointer]
-    - generic [ref=e367]: 24, 8
+    - generic [ref=e364]: ⚠️
+    - generic [ref=e365]: "Circuit problem: Component \"In\" (8dd1057e-9d4b-4175-8898-ff458850a6e6) is digital-only and cannot be simulated in an analog circuit | Component \"In\" (998e5bda-ad6c-4deb-9820-5f120305cfd9) is digital-only and cannot be simulated in an analog circuit"
+    - button "×" [ref=e366] [cursor=pointer]
+    - button "100%" [ref=e368] [cursor=pointer]
+    - generic [ref=e369]: 24, 8
 ```

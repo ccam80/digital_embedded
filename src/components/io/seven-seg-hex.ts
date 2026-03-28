@@ -202,7 +202,9 @@ export const SevenSegHexDefinition: ComponentDefinition = {
     "commonCathode=true: common cathode configuration (active high).",
   models: {
     digital: { executeFn: executeSevenSegHex, inputSchema: ["d", "dp"], outputSchema: [] },
-    analog: { factory: createSevenSegAnalogElement },
+    mnaModels: {
+      behavioral: { factory: createSevenSegAnalogElement },
+    },
   },
   defaultModel: "digital",
 };

@@ -92,7 +92,7 @@ function solveDac(
   dacPinNodeIds.push(nOutNode);   // OUT
   dacPinNodeIds.push(0);          // GND
   const dacEl = withNodeIds(
-    DACDefinition.models!.analog!.factory(dacPinNodes, [], -1, props, () => 0),
+    DACDefinition.models!.mnaModels!.behavioral!.factory(dacPinNodes, [], -1, props, () => 0),
     dacPinNodeIds,
   );
 

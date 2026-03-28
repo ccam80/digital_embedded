@@ -166,9 +166,13 @@ export const XNOrDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeXnorAnalogFactory(0),
-      transistorModel: "CmosXnor2",
+    },
+      cmos: {
+        subcircuitModel: "CmosXnor2",
+      },
     },
   },
   defaultModel: "digital",

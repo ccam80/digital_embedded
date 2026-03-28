@@ -443,7 +443,8 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -452,6 +453,7 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
       ): AnalogElementCore {
         return createSchmittTriggerElement(pinNodes, props, true);
       },
+    },
     },
   },
 };
@@ -474,7 +476,8 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -483,6 +486,7 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
       ): AnalogElementCore {
         return createSchmittTriggerElement(pinNodes, props, false);
       },
+    },
     },
   },
 };

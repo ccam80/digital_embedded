@@ -466,9 +466,12 @@ export const PolarizedCapDefinition: ComponentDefinition = {
     "Polarized electrolytic capacitor — extends the standard capacitor with ESR,\n" +
     "leakage current, and reverse-bias polarity enforcement.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createPolarizedCapElement,
       getInternalNodeCount: () => 1,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

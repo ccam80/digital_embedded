@@ -582,10 +582,12 @@ export const NpnBjtDefinition: ComponentDefinition = {
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(1, pinNodes, branchIdx, props),
       deviceType: "NPN",
+    },
     },
   },
 };
@@ -603,10 +605,13 @@ export const PnpBjtDefinition: ComponentDefinition = {
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(-1, pinNodes, branchIdx, props),
       deviceType: "PNP",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

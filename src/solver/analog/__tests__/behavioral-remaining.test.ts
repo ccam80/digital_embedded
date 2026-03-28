@@ -185,7 +185,7 @@ describe("LED", () => {
     const props = new PropertyBag();
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const led = LedDefinition.models!.analog!.factory(new Map([["in", 2]]), [], -1, props, () => 0);
+    const led = LedDefinition.models!.mnaModels!.behavioral!.factory(new Map([["in", 2]]), [], -1, props, () => 0);
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);
@@ -414,7 +414,7 @@ describe("Registration", () => {
         `${def.name} should have a digital model`,
       ).toBeDefined();
       expect(
-        def.models?.analog,
+        def.models?.mnaModels?.behavioral,
         `${def.name} should have an analog model`,
       ).toBeDefined();
     }

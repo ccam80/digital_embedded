@@ -301,7 +301,11 @@ export const DarlingtonNpnDefinition: ComponentDefinition = {
     "Two NPN BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
   models: {
-    analog: { transistorModel: "DarlingtonNPN" },
+    mnaModels: {
+      cmos: {
+        subcircuitModel: "DarlingtonNPN",
+      },
+    },
   },
 };
 
@@ -320,6 +324,10 @@ export const DarlingtonPnpDefinition: ComponentDefinition = {
     "Two PNP BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
   models: {
-    analog: { transistorModel: "DarlingtonPNP" },
+    mnaModels: {
+      cmos: {
+        subcircuitModel: "DarlingtonPNP",
+      },
+    },
   },
 };

@@ -219,7 +219,7 @@ describe("NTC", () => {
 
   describe("definition", () => {
     it("NTCThermistorDefinition has correct engine type", () => {
-      expect(NTCThermistorDefinition.models?.analog).toBeDefined();
+      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("NTCThermistorDefinition has correct category", () => {
@@ -240,7 +240,7 @@ describe("NTC", () => {
     });
 
     it("requiresBranchRow is false", () => {
-      expect(NTCThermistorDefinition.models?.analog?.requiresBranchRow).toBeFalsy();
+      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
     });
   });
 });

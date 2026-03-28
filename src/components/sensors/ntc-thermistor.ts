@@ -469,5 +469,6 @@ export const NTCThermistorDefinition: ComponentDefinition = {
   helpText:
     "NTC Thermistor — negative temperature coefficient resistor. " +
     "Resistance decreases exponentially with temperature (B-parameter model).",
-  models: { analog: { factory: createNTCThermistorElement } },
+  models: { mnaModels: { behavioral: { factory: createNTCThermistorElement } } },
+  defaultModel: "behavioral",
 };

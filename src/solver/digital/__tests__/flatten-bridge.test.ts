@@ -225,7 +225,7 @@ function makeRegistryWithAnalog(digitalIds: string[], analogIds: string[]): Comp
       category: ComponentCategory.MISC,
       helpText: typeId,
       models: {
-        analog: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) },
+        mnaModels: { behavioral: { factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] }) } },
       },
     };
     reg.register(def);

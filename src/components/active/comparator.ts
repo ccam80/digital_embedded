@@ -392,7 +392,8 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -402,5 +403,7 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
         return createComparatorElement(pinNodes, props);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

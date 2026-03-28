@@ -58,7 +58,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const el = InductorDefinition.models!.analog!.factory(pinNodes, [], branchIdx, props, () => 0);
+  const el = InductorDefinition.models!.mnaModels!.behavioral!.factory(pinNodes, [], branchIdx, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -155,15 +155,15 @@ describe("Inductor", () => {
     });
 
     it("InductorDefinition has analog model", () => {
-      expect(InductorDefinition.models?.analog).toBeDefined();
+      expect(InductorDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("InductorDefinition has analogFactory", () => {
-      expect(InductorDefinition.models?.analog?.factory).toBeDefined();
+      expect(InductorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     });
 
     it("InductorDefinition requiresBranchRow is true", () => {
-      expect(InductorDefinition.models?.analog?.requiresBranchRow).toBe(true);
+      expect(InductorDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
     });
 
     it("InductorDefinition category is PASSIVES", () => {

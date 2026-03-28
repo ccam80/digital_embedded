@@ -270,8 +270,10 @@ export const CounterDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeBehavioralCounterAnalogFactory(),
+    },
     },
   },
   defaultModel: "digital",

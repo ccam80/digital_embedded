@@ -36,7 +36,7 @@ beforeAll(() => {
     createBjtElement(-1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
   // Adapter: AnalogFactory (old nodeIds[]) → createResistorElement (new Map signature)
   registerAnalogFactory("Resistor", (nodeIds, _branchIdx, props, _getTime) =>
-    ResistorDefinition.models!.analog!.factory(
+    ResistorDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["A", nodeIds[0] ?? 0], ["B", nodeIds[1] ?? 0]]),
       [],
       _branchIdx,
@@ -257,7 +257,7 @@ describe("PNP", () => {
 describe("Registration", () => {
   describe("npn_darlington_registered", () => {
     it("DarlingtonNPN has transistorModel set", () => {
-      expect(DarlingtonNpnDefinition.models?.analog?.transistorModel).toBe("DarlingtonNPN");
+      expect(DarlingtonNpnDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonNPN");
     });
 
     it("DarlingtonNPN is in SEMICONDUCTORS category", () => {
@@ -265,12 +265,12 @@ describe("Registration", () => {
     });
 
     it("DarlingtonNPN has analog model only", () => {
-      expect(DarlingtonNpnDefinition.models?.analog).toBeDefined();
+      expect(DarlingtonNpnDefinition.models?.mnaModels?.cmos).toBeDefined();
       expect(DarlingtonNpnDefinition.models?.digital).toBeUndefined();
     });
 
     it("DarlingtonPNP has transistorModel set", () => {
-      expect(DarlingtonPnpDefinition.models?.analog?.transistorModel).toBe("DarlingtonPNP");
+      expect(DarlingtonPnpDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonPNP");
     });
 
     it("registerDarlingtonModels registers both models in registry", () => {

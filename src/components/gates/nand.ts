@@ -150,9 +150,13 @@ export const NAndDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeNandAnalogFactory(0),
-      transistorModel: "CmosNand2",
+    },
+      cmos: {
+        subcircuitModel: "CmosNand2",
+      },
     },
   },
   defaultModel: "digital",

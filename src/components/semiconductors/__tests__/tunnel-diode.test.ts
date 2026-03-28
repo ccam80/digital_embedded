@@ -290,9 +290,9 @@ describe("TunnelDiode", () => {
 
   it("definition_has_correct_fields", () => {
     expect(TunnelDiodeDefinition.name).toBe("TunnelDiode");
-    expect(TunnelDiodeDefinition.models?.analog).toBeDefined();
-    expect(TunnelDiodeDefinition.models?.analog?.deviceType).toBe("TUNNEL");
-    expect(TunnelDiodeDefinition.models?.analog?.factory).toBeDefined();
+    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("TUNNEL");
+    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(TunnelDiodeDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

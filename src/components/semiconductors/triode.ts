@@ -471,9 +471,12 @@ export const TriodeDefinition: ComponentDefinition = {
     "Pins: P (plate), G (grid), K (cathode).\n" +
     "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, internalNodeIds, branchIdx, props) =>
         createTriodeElement(pinNodes, internalNodeIds, branchIdx, props),
     },
+    },
   },
+  defaultModel: "behavioral",
 };

@@ -38,7 +38,7 @@ function makeCCVSElement(
     ["label", ""],
   ]).entries());
   return withNodeIds(
-    CCVSDefinition.models!.analog!.factory(
+    CCVSDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       senseBranchIdx,

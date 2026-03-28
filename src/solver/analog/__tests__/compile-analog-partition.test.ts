@@ -129,7 +129,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
 
   registry.register({
     ...makeBaseDef("Ground"),
-    models: { analog: {} },
+    models: { mnaModels: { behavioral: {} } },
   });
 
   const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
@@ -139,7 +139,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     pinLayout: makeGatePinLayout(2),
     models: {
       digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
-      analog: { factory: andFactory as unknown as import("../../core/registry.js").AnalogModel["factory"] },
+      mnaModels: { behavioral: { factory: andFactory as unknown as import("../../core/registry.js").MnaModel["factory"] } },
     },
     defaultModel: "digital",
   });
@@ -300,14 +300,14 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
   const andComponent: PartitionedComponent = {
     element: andGate,
     definition: andDef,
-    model: andDef.models!.analog!,
+    model: andDef.models!.mnaModels!.behavioral!,
     resolvedPins: andResolvedPins,
   };
 
   const gndComponent: PartitionedComponent = {
     element: gnd,
     definition: gndDef,
-    model: gndDef.models!.analog!,
+    model: gndDef.models!.mnaModels!.behavioral!,
     resolvedPins: gndResolvedPins,
   };
 
@@ -440,7 +440,7 @@ describe("compileAnalogPartition", () => {
       components: [{
         element: andGate,
         definition: andDef,
-        model: andDef.models!.analog!,
+        model: andDef.models!.mnaModels!.behavioral!,
         resolvedPins: andResolvedPins,
       }],
       groups: [
@@ -478,7 +478,7 @@ describe("compileAnalogPartition", () => {
 
     registry.register({
       ...makeBaseDef("Ground"),
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     });
 
     registry.register({

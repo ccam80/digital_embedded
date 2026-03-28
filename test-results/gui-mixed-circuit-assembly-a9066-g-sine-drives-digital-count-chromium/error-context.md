@@ -277,7 +277,7 @@
     - generic "Circuit editor canvas" [ref=e368]
   - generic [ref=e369]:
     - generic [ref=e370]: ⚠️
-    - generic [ref=e371]: "Simulation error: Cannot read properties of undefined (reading '2')"
+    - generic [ref=e371]: "Circuit problem: Component \"Out\" (f27f36c1-abac-46b4-a6fd-95cbbd7032df) is digital-only and cannot be simulated in an analog circuit"
     - button "×" [ref=e372] [cursor=pointer]
     - button "100%" [ref=e374] [cursor=pointer]
     - generic [ref=e375]: 30, 8

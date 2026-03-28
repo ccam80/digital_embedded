@@ -501,8 +501,10 @@ export const SplitterDefinition: ComponentDefinition = {
         return parsePorts(outputSplitting).map((p) => p.name);
       },
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createSplitterAnalogElement,
+    },
     },
   },
   defaultModel: "digital",

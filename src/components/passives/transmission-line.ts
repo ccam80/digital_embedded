@@ -718,7 +718,8 @@ export const TransmissionLineDefinition: ComponentDefinition = {
     "N cascaded segments with series RL and shunt GC. " +
     "Parameterised by Z\u2080, propagation delay, loss, and segment count.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createTransmissionLineElement,
       requiresBranchRow: true,
       getInternalNodeCount: (props: PropertyBag): number => {
@@ -726,5 +727,7 @@ export const TransmissionLineDefinition: ComponentDefinition = {
         return (N - 1) * 2;
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

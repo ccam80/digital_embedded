@@ -177,9 +177,9 @@ describe("Varactor", () => {
 
   it("definition_has_correct_fields", () => {
     expect(VaractorDefinition.name).toBe("VaractorDiode");
-    expect(VaractorDefinition.models?.analog).toBeDefined();
-    expect(VaractorDefinition.models?.analog?.deviceType).toBe("D");
-    expect(VaractorDefinition.models?.analog?.factory).toBeDefined();
+    expect(VaractorDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(VaractorDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("D");
+    expect(VaractorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(VaractorDefinition.category).toBe("SEMICONDUCTORS");
   });
 

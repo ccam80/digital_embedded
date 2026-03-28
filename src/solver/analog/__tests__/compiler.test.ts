@@ -142,11 +142,13 @@ function buildTestRegistry(): ComponentRegistry {
   registry.register({
     ...makeBaseDef("AnalogVs"),
     models: {
-      analog: {
-        requiresBranchRow: true,
-        factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-          const [n0, n1] = [...pinNodes.values()];
-          return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      mnaModels: {
+        behavioral: {
+          requiresBranchRow: true,
+          factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+            const [n0, n1] = [...pinNodes.values()];
+            return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+          },
         },
       },
     },
@@ -155,11 +157,13 @@ function buildTestRegistry(): ComponentRegistry {
   registry.register({
     ...makeBaseDef("AnalogR"),
     models: {
-      analog: {
-        requiresBranchRow: false,
-        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-          const [n0, n1] = [...pinNodes.values()];
-          return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+      mnaModels: {
+        behavioral: {
+          requiresBranchRow: false,
+          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+            const [n0, n1] = [...pinNodes.values()];
+            return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+          },
         },
       },
     },
@@ -167,12 +171,15 @@ function buildTestRegistry(): ComponentRegistry {
 
   registry.register({
     ...makeBaseDef("AnalogL"),
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        requiresBranchRow: true,
-        factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-          const [n0, n1] = [...pinNodes.values()];
-          return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      mnaModels: {
+        behavioral: {
+          requiresBranchRow: true,
+          factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+            const [n0, n1] = [...pinNodes.values()];
+            return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+          },
         },
       },
     },
@@ -180,16 +187,20 @@ function buildTestRegistry(): ComponentRegistry {
 
   registry.register({
     ...makeBaseDef("Ground"),
-    models: { analog: {} },
+    defaultModel: 'behavioral',
+    models: { mnaModels: { behavioral: {} } },
   });
 
   registry.register({
     ...makeBaseDef("In"),
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-          const [n0] = [...pinNodes.values()];
-          return makeTestResistorElement(n0 ?? 0, 0);
+      mnaModels: {
+        behavioral: {
+          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+            const [n0] = [...pinNodes.values()];
+            return makeTestResistorElement(n0 ?? 0, 0);
+          },
         },
       },
     },
@@ -197,11 +208,14 @@ function buildTestRegistry(): ComponentRegistry {
 
   registry.register({
     ...makeBaseDef("Out"),
+    defaultModel: 'behavioral',
     models: {
-      analog: {
-        factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-          const [n0] = [...pinNodes.values()];
-          return makeTestResistorElement(n0 ?? 0, 0);
+      mnaModels: {
+        behavioral: {
+          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+            const [n0] = [...pinNodes.values()];
+            return makeTestResistorElement(n0 ?? 0, 0);
+          },
         },
       },
     },
@@ -429,17 +443,21 @@ describe("AnalogCompiler", () => {
         { label: "pos", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
         { label: "neg", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
       ],
+      defaultModel: 'behavioral',
       models: {
-        analog: {
-          requiresBranchRow: true,
-          factory: factorySpy,
+        mnaModels: {
+          behavioral: {
+            requiresBranchRow: true,
+            factory: factorySpy,
+          },
         },
       },
     });
 
     registry.register({
       ...makeBaseDef("Ground"),
-      models: { analog: {} },
+      defaultModel: 'behavioral',
+      models: { mnaModels: { behavioral: {} } },
     });
 
     // Vs: pos at (10,0), neg at (0,0) = ground

@@ -150,9 +150,13 @@ export const AndDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeAndAnalogFactory(0),
-      transistorModel: "CmosAnd2",
+    },
+      cmos: {
+        subcircuitModel: "CmosAnd2",
+      },
     },
   },
   defaultModel: "digital",

@@ -385,8 +385,10 @@ export const SwitchDefinition: ComponentDefinition = {
       switchPins: [0, 1],
       defaultDelay: 0,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createSwitchAnalogElement,
+    },
     },
   },
   defaultModel: "digital",

@@ -456,10 +456,13 @@ export const CrystalDefinition: ComponentDefinition = {
     "Quartz crystal — Butterworth-Van Dyke equivalent circuit model.\n" +
     "Series RLC motional arm in parallel with shunt electrode capacitance.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createCrystalElement,
       requiresBranchRow: true,
       getInternalNodeCount: () => 2,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

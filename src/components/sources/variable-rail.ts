@@ -241,7 +241,8 @@ export const VariableRailDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -257,5 +258,7 @@ export const VariableRailDefinition: ComponentDefinition = {
         return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

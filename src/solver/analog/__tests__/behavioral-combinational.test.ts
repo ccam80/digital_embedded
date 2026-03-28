@@ -345,20 +345,20 @@ describe("Decoder", () => {
 describe("Registration", () => {
   it("mux_has_analog_factory", () => {
     expect(MuxDefinition.models?.digital).toBeDefined();
-    expect(MuxDefinition.models?.analog).toBeDefined();
-    expect(typeof MuxDefinition.models?.analog?.factory).toBe("function");
+    expect(MuxDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof MuxDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("demux_has_analog_factory", () => {
     expect(DemuxDefinition.models?.digital).toBeDefined();
-    expect(DemuxDefinition.models?.analog).toBeDefined();
-    expect(typeof DemuxDefinition.models?.analog?.factory).toBe("function");
+    expect(DemuxDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof DemuxDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("decoder_has_analog_factory", () => {
     expect(DecoderDefinition.models?.digital).toBeDefined();
-    expect(DecoderDefinition.models?.analog).toBeDefined();
-    expect(typeof DecoderDefinition.models?.analog?.factory).toBe("function");
+    expect(DecoderDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(typeof DecoderDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("factory_produces_nonlinear_element", () => {

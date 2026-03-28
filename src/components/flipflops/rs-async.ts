@@ -207,8 +207,10 @@ export const RSAsyncDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeRSAsyncLatchAnalogFactory(),
+    },
     },
   },
   defaultModel: "digital",

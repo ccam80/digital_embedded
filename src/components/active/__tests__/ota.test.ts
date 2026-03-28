@@ -45,7 +45,7 @@ function makeOTAElement(
     ["label", ""],
   ]).entries());
   return withNodeIds(
-    OTADefinition.models!.analog!.factory(
+    OTADefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
       [],
       -1,

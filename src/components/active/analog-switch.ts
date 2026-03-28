@@ -437,7 +437,8 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -446,6 +447,7 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
       ): AnalogElementCore {
         return createSwitchSPSTElement(pinNodes, props);
       },
+    },
     },
   },
 };
@@ -468,7 +470,8 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -477,6 +480,7 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
       ): AnalogElementCore {
         return createSwitchSPDTElement(pinNodes, props);
       },
+    },
     },
   },
 };

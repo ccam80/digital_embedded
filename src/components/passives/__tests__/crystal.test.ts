@@ -339,20 +339,20 @@ describe("Crystal", () => {
     });
 
     it("CrystalDefinition has analog model", () => {
-      expect(CrystalDefinition.models?.analog).toBeDefined();
+      expect(CrystalDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("CrystalDefinition has analogFactory", () => {
-      expect(CrystalDefinition.models?.analog?.factory).toBeDefined();
+      expect(CrystalDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     });
 
     it("CrystalDefinition requiresBranchRow is true", () => {
-      expect(CrystalDefinition.models?.analog?.requiresBranchRow).toBe(true);
+      expect(CrystalDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
     });
 
     it("CrystalDefinition getInternalNodeCount returns 2", () => {
       const props = new PropertyBag();
-      expect(CrystalDefinition.models?.analog?.getInternalNodeCount!(props)).toBe(2);
+      expect(CrystalDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(2);
     });
 
     it("CrystalDefinition isReactive", () => {
@@ -361,7 +361,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.models!.analog!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.models!.mnaModels!.behavioral!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -371,7 +371,7 @@ describe("Crystal", () => {
       props.set("qualityFactor", 1000);
       props.set("motionalCapacitance", 20e-15);
       props.set("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.models!.analog!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = CrystalDefinition.models!.mnaModels!.behavioral!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 

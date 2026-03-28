@@ -130,7 +130,9 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
     helpText: "",
     models: {
       digital: { executeFn: () => {} },
-      analog: { transistorModel },
+      mnaModels: {
+        cmos: { subcircuitModel: transistorModel },
+      },
     },
     defaultModel: "digital",
     transistorModel,

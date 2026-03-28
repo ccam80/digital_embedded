@@ -370,7 +370,8 @@ export const CCCSDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -391,5 +392,7 @@ export const CCCSDefinition: ComponentDefinition = {
         );
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

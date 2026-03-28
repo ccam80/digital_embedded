@@ -37,7 +37,7 @@ function makeVCVSElement(
     ["label", ""],
   ]).entries());
   return withNodeIds(
-    VCVSDefinition.models!.analog!.factory(
+    VCVSDefinition.models!.mnaModels!.behavioral!.factory(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       branchIdx,

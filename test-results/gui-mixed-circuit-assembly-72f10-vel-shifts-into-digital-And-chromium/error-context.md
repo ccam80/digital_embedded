@@ -276,7 +276,9 @@
     - generic "Drag to resize palette" [ref=e366]
     - generic "Circuit editor canvas" [ref=e368]
   - generic [ref=e369]:
-    - generic [ref=e370]: Ready
-    - button "100%" [ref=e372] [cursor=pointer]
-    - generic [ref=e373]: 26, 8
+    - generic [ref=e370]: ⚠️
+    - generic [ref=e371]: "Circuit problem: Component \"Out\" (d2c2bdf4-494e-45e1-b97f-14d1776b4d81) is digital-only and cannot be simulated in an analog circuit"
+    - button "×" [ref=e372] [cursor=pointer]
+    - button "100%" [ref=e374] [cursor=pointer]
+    - generic [ref=e375]: 26, 8
 ```

@@ -364,10 +364,13 @@ export const PJfetDefinition: ComponentDefinition = {
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createPJfetElement(pinNodes, branchIdx, props),
       deviceType: "PJFET",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

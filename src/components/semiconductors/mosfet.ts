@@ -865,10 +865,12 @@ export const NmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
       deviceType: "NMOS",
+    },
     },
   },
 };
@@ -886,10 +888,13 @@ export const PmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
       deviceType: "PMOS",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

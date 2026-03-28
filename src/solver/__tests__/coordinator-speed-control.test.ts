@@ -14,7 +14,7 @@ import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { Pin, Rotation } from '../../core/pin.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentDefinition, ComponentLayout, AnalogFactory } from '../../core/registry.js';
+import type { ComponentDefinition, ComponentLayout } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { AnalogElement } from '../analog/element.js';
 import type { SparseSolver } from '../analog/sparse-solver.js';
@@ -115,20 +115,19 @@ function makeGroundDef(): ComponentDefinition {
     pinLayout: [{ direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
     pinElectrical: {},
-    models: { analog: {
-      analogFactory: (_el: unknown, _pins: number[]) => ({
-        pinNodeIds: _pins, allNodeIds: _pins, branchIndex: -1,
+    defaultModel: 'behavioral',
+    models: { mnaModels: { behavioral: {
+      factory: (_pinNodes) => ({
+        pinNodeIds: [], allNodeIds: [], branchIndex: -1,
         isNonlinear: false, isReactive: false,
         stamp(_s: SparseSolver) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
       }),
-    } },
+    } } },
   } as unknown as ComponentDefinition;
 }
 
 function makeResistorDef(): ComponentDefinition {
-  const analogFactory: AnalogFactory = (_el: unknown, pinNodes: number[], _props: unknown) =>
-    makeResistorAnalogEl(pinNodes[0] ?? 0, pinNodes[1] ?? 0, 1000);
   return {
     name: 'Resistor', typeId: -1 as unknown as number,
     factory: () => makeAnalogElementObj('Resistor', crypto.randomUUID(), [{ x: 0, y: 0, label: 'p1' }, { x: 0, y: 4, label: 'p2' }]),
@@ -138,7 +137,10 @@ function makeResistorDef(): ComponentDefinition {
     ],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
     pinElectrical: {},
-    models: { analog: { analogFactory } },
+    defaultModel: 'behavioral',
+    models: { mnaModels: { behavioral: {
+      factory: (pinNodes) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000),
+    } } },
   } as unknown as ComponentDefinition;
 }
 

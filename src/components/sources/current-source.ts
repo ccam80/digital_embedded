@@ -214,7 +214,8 @@ export const CurrentSourceDefinition: ComponentDefinition = {
   },
 
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
@@ -225,5 +226,7 @@ export const CurrentSourceDefinition: ComponentDefinition = {
         return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
       },
     },
+    },
   },
+  defaultModel: "behavioral",
 };

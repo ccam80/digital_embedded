@@ -276,5 +276,5 @@
   - generic [ref=e366]:
     - generic [ref=e367]: Ready
     - button "100%" [ref=e369] [cursor=pointer]
-    - generic [ref=e370]: 8, 14.38
+    - generic [ref=e370]: 22, 8
 ```

@@ -24,7 +24,7 @@ export type {
   CircuitElement,
   ComponentDefinition,
   DigitalModel,
-  AnalogModel,
+  MnaModel,
   PinElectricalSpec,
   CrossEngineBoundary,
 } from "./types.js";

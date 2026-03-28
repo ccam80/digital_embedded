@@ -158,9 +158,13 @@ export const XOrDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeXorAnalogFactory(0),
-      transistorModel: "CmosXor2",
+    },
+      cmos: {
+        subcircuitModel: "CmosXor2",
+      },
     },
   },
   defaultModel: "digital",

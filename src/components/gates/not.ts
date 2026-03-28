@@ -228,9 +228,13 @@ export const NotDefinition: ComponentDefinition = {
       inputSchema: ["in"],
       outputSchema: ["out"],
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeNotAnalogFactory(),
-      transistorModel: "CmosInverter",
+    },
+      cmos: {
+        subcircuitModel: "CmosInverter",
+      },
     },
   },
   defaultModel: "digital",

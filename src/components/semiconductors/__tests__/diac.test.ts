@@ -190,9 +190,9 @@ describe("Diac", () => {
 
   it("definition_has_correct_fields", () => {
     expect(DiacDefinition.name).toBe("Diac");
-    expect(DiacDefinition.models?.analog).toBeDefined();
-    expect(DiacDefinition.models?.analog?.deviceType).toBeUndefined();
-    expect(DiacDefinition.models?.analog?.factory).toBeDefined();
+    expect(DiacDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(DiacDefinition.models?.mnaModels?.behavioral?.deviceType).toBeUndefined();
+    expect(DiacDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(DiacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

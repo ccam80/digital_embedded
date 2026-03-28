@@ -448,8 +448,11 @@ export const TriacDefinition: ComponentDefinition = {
     "Pins: MT1 (main terminal 1), MT2 (main terminal 2), G (gate).\n" +
     "Conducts in both directions when triggered. Turns off at current zero-crossing.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createTriacElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

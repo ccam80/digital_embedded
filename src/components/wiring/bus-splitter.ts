@@ -290,8 +290,10 @@ export const BusSplitterDefinition: ComponentDefinition = {
         return labels;
       },
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createSplitterAnalogElement,
+    },
     },
   },
   defaultModel: "digital",

@@ -343,7 +343,8 @@ export const ClockDefinition: ComponentDefinition = {
     "The signal value is managed by ClockManager and set externally.",
   models: {
     digital: { executeFn: executeClock, inputSchema: [], outputSchema: ["out"] },
-    analog: {
+    mnaModels: {
+      behavioral: {
       requiresBranchRow: true,
       factory(
         pinNodes: ReadonlyMap<string, number>,
@@ -358,6 +359,7 @@ export const ClockDefinition: ComponentDefinition = {
         const nodeNeg = 0;
         return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
       },
+    },
     },
   },
   defaultModel: "digital",

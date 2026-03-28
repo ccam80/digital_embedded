@@ -327,9 +327,12 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createZenerElement,
       deviceType: "D",
     },
+    },
   },
+  defaultModel: "behavioral",
 };

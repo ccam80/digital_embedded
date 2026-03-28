@@ -724,7 +724,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
 describe("AnalogLED", () => {
   it("definition_has_engine_type_both", () => {
     expect(LedDefinition.models.digital).toBeDefined();
-    expect(LedDefinition.models.analog).toBeDefined();
+    expect(LedDefinition.models.mnaModels.behavioral).toBeDefined();
   });
 
   it("digital_behavior_unchanged", () => {
@@ -742,13 +742,13 @@ describe("AnalogLED", () => {
   });
 
   it("analog_factory_defined", () => {
-    expect(LedDefinition.models.analog!.factory).toBeDefined();
+    expect(LedDefinition.models.mnaModels!.behavioral!.factory).toBeDefined();
   });
 
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    const element = LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
+    const element = LedDefinition.models.mnaModels!.behavioral!.factory!(new Map([["in", 1]]), [], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(false);
   });
@@ -770,7 +770,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    const led = withNodeIds(LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
+    const led = withNodeIds(LedDefinition.models.mnaModels!.behavioral!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -803,7 +803,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    const led = withNodeIds(LedDefinition.models.analog!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
+    const led = withNodeIds(LedDefinition.models.mnaModels!.behavioral!.factory!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

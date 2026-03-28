@@ -335,9 +335,9 @@ describe("SCR", () => {
 
   it("definition_has_correct_fields", () => {
     expect(ScrDefinition.name).toBe("SCR");
-    expect(ScrDefinition.models?.analog).toBeDefined();
-    expect(ScrDefinition.models?.analog?.deviceType).toBeUndefined();
-    expect(ScrDefinition.models?.analog?.factory).toBeDefined();
+    expect(ScrDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(ScrDefinition.models?.mnaModels?.behavioral?.deviceType).toBeUndefined();
+    expect(ScrDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     expect(ScrDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

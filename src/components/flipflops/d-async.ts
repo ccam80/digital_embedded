@@ -285,8 +285,10 @@ export const DAsyncDefinition: ComponentDefinition = {
       stateSlotCount: 2,
       defaultDelay: 10,
     },
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: makeDAsyncFlipflopAnalogFactory(),
+    },
     },
   },
   defaultModel: "digital",

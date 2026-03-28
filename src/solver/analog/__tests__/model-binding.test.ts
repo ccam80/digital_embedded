@@ -236,7 +236,7 @@ describe("ModelBinding", () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "Ground",
-      models: { analog: {} },
+      models: { mnaModels: { behavioral: {} } },
     } as unknown as ComponentDefinition);
 
     // DiodeStub — analog component with analogDeviceType = "D"
@@ -253,9 +253,11 @@ describe("ModelBinding", () => {
       category: ComponentCategory.MISC,
       helpText: "DiodeStub",
       models: {
-        analog: {
-          deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
-          factory: diodeFactory,
+        mnaModels: {
+          behavioral: {
+            deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+            factory: diodeFactory,
+          },
         },
       },
     } as unknown as ComponentDefinition);

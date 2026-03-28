@@ -4,7 +4,7 @@ import type { ModelAssignment } from "../partition.js";
 import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
-import type { ComponentDefinition, ComponentRegistry, DigitalModel, AnalogModel } from "@/core/registry.js";
+import type { ComponentDefinition, ComponentRegistry, DigitalModel, MnaModel } from "@/core/registry.js";
 import type { CrossEngineBoundary } from "@/solver/digital/cross-engine-boundary.js";
 
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ const DIGITAL_MODEL: DigitalModel = {
   executeFn: () => {},
 };
 
-const ANALOG_MODEL: AnalogModel = {};
+const ANALOG_MODEL: MnaModel = {};
 
 function makeDigitalDef(name: string): ComponentDefinition {
   return {
@@ -57,7 +57,7 @@ function makeAnalogDef(name: string): ComponentDefinition {
     category: "PASSIVES" as never,
     helpText: "",
     pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-    models: { analog: ANALOG_MODEL },
+    models: { mnaModels: { behavioral: ANALOG_MODEL } },
   };
 }
 
@@ -72,7 +72,7 @@ function makeBothDef(name: string): ComponentDefinition {
     category: "SEMICONDUCTORS" as never,
     helpText: "",
     pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-    models: { digital: DIGITAL_MODEL, analog: ANALOG_MODEL },
+    models: { digital: DIGITAL_MODEL, mnaModels: { behavioral: ANALOG_MODEL } },
   };
 }
 
@@ -454,7 +454,7 @@ describe("partitionByDomain", () => {
 
   describe("electrical spec on bridge", () => {
     it("picks electricalSpec from component definition pinElectrical", () => {
-      const analogModel: AnalogModel = {};
+      const analogModel: MnaModel = {};
       const analogDef: ComponentDefinition = {
         name: "SpecResistor",
         typeId: 0,
@@ -465,7 +465,7 @@ describe("partitionByDomain", () => {
         category: "PASSIVES" as never,
         helpText: "",
         pinElectrical: { vOH: 5.0, vOL: 0.1, rOut: 100 },
-        models: { analog: analogModel },
+        models: { mnaModels: { behavioral: analogModel } },
       };
       const el0 = makeElement("And", 0);
       const el1 = makeElement("SpecResistor", 1);

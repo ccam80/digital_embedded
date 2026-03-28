@@ -364,8 +364,11 @@ export const DiacDefinition: ComponentDefinition = {
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > V_breakover, then snaps to V_hold.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createDiacElement,
     },
+    },
   },
+  defaultModel: "behavioral",
 };

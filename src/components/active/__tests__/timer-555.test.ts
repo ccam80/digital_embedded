@@ -77,7 +77,7 @@ function make555(
 ): AnalogElement {
   // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
   return withNodeIds(
-    Timer555Definition.models!.analog!.factory(
+    Timer555Definition.models!.mnaModels!.behavioral!.factory(
       new Map([
         ["DIS",  nodes.dis],
         ["TRIG", nodes.trig],

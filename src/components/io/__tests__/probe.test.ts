@@ -363,7 +363,7 @@ describe("Probe", () => {
         solve: () => new Float64Array([]),
       };
 
-      const analogElement = ProbeDefinition.models!.analog!.factory(
+      const analogElement = ProbeDefinition.models!.mnaModels!.behavioral!.factory(
         new Map([["in", 3]]),
         [],
         -1,
@@ -379,7 +379,7 @@ describe("Probe", () => {
 
     it("reads_node_voltage returns voltage at node index", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.models!.analog!.factory(
+      const analogElement = ProbeDefinition.models!.mnaModels!.behavioral!.factory(
         new Map([["in", 3]]),
         [],
         -1,
@@ -397,7 +397,7 @@ describe("Probe", () => {
 
     it("definition_has_engine_type_both", () => {
       expect(ProbeDefinition.models?.digital).toBeDefined();
-      expect(ProbeDefinition.models?.analog).toBeDefined();
+      expect(ProbeDefinition.models?.mnaModels?.behavioral).toBeDefined();
     });
 
     it("appears_in_both_palettes", () => {
@@ -416,7 +416,7 @@ describe("Probe", () => {
 
     it("analogFactory returns AnalogElement with correct properties", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.models!.analog!.factory(
+      const analogElement = ProbeDefinition.models!.mnaModels!.behavioral!.factory(
         new Map([["in", 5]]),
         [],
         -1,

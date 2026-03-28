@@ -261,9 +261,12 @@ export const InductorDefinition: ComponentDefinition = {
     "Inductor — reactive element with companion model and branch current.\n" +
     "Stamps equivalent conductance, history current, and branch incidence entries.",
   models: {
-    analog: {
+    mnaModels: {
+      behavioral: {
       factory: createInductorElement,
       requiresBranchRow: true,
     },
+    },
   },
+  defaultModel: "behavioral",
 };
