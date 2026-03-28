@@ -101,6 +101,7 @@ export function partitionByDomain(
   modelAssignments: ModelAssignment[],
   crossEngineBoundaries: CrossEngineBoundary[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
+  _perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): PartitionResult {
   // -------------------------------------------------------------------------
   // Step 1: Build lookup from elementIndex → ModelAssignment

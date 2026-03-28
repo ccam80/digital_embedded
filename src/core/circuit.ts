@@ -147,6 +147,28 @@ export interface CircuitMetadata {
       | { type: 'pin'; instanceId: string; pinLabel: string };
     loading: 'loaded' | 'ideal';
   }>;
+
+  /**
+   * Named SPICE .MODEL parameter sets imported by the user.
+   * Keys are model names (e.g. "2N2222", "1N4148").
+   * Values are serialized as { deviceType, params } for persistence.
+   */
+  namedParameterSets?: Record<string, {
+    deviceType: string;
+    params: Record<string, number>;
+  }>;
+
+  /**
+   * Subcircuit model definitions imported from .SUBCKT blocks.
+   * Keys are subcircuit names (e.g. "OPAMP", "MYBJT").
+   * Values are serialized Circuit JSON for persistence.
+   */
+  modelDefinitions?: Record<string, {
+    /** Port names in order (from the .SUBCKT header). */
+    ports: string[];
+    /** Serialized element count — informational only; the full Circuit is in TransistorModelRegistry. */
+    elementCount: number;
+  }>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

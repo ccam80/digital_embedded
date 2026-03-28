@@ -79,7 +79,7 @@ export function createPopupController(
     const propertyPopup = new PropertyPanel(propsContainer);
     propertyPopup.showProperties(elementHit, def.propertyDefs);
     if (availableModels(def).length > 1) {
-      propertyPopup.showSimulationModeDropdown(elementHit, def);
+      propertyPopup.showModelSelector(elementHit, def);
     }
     try {
       const activeKey = getActiveModelKey(elementHit, def);

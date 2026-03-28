@@ -125,9 +125,9 @@ export function compileUnified(
   );
   diagnostics.push(...connectivityDiagnostics);
 
-  // Resolve per-net loading overrides (maps stable net IDs to loading modes)
+  // Resolve per-net loading overrides (maps groupId → 'loaded'|'ideal')
   const overrides = circuit.metadata.digitalPinLoadingOverrides ?? [];
-  const { diagnostics: overrideDiags } =
+  const { resolved: perNetLoadingOverrides, diagnostics: overrideDiags } =
     resolveLoadingOverrides(overrides, groups, circuit.elements);
   diagnostics.push(...overrideDiags);
 
@@ -143,6 +143,7 @@ export function compileUnified(
       flatModelAssignments,
       crossEngineBoundaries,
       circuit.metadata.digitalPinLoading ?? "cross-domain",
+      perNetLoadingOverrides,
     );
 
   // -------------------------------------------------------------------------
@@ -184,6 +185,7 @@ export function compileUnified(
         circuit,
         innerDigitalCompiler,
         circuit.metadata.digitalPinLoading ?? "cross-domain",
+        perNetLoadingOverrides,
       )
     : null;
 

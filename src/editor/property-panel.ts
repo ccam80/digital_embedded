@@ -19,6 +19,16 @@ import { PinDirection } from "@/core/pin";
 import { getParamMeta } from "../solver/analog/model-param-meta.js";
 import { getDeviceDefaults } from "../solver/analog/model-defaults.js";
 
+const MODEL_LABELS: Record<string, string> = {
+  digital: "Digital",
+  behavioral: "Behavioral (MNA)",
+  cmos: "CMOS (Subcircuit)",
+};
+
+function getModelLabel(key: string): string {
+  return MODEL_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
 
 // ---------------------------------------------------------------------------
 // Change callback type
@@ -252,7 +262,7 @@ export class PropertyPanel {
    * @param element   The selected circuit element.
    * @param def       The component definition declaring simulationModels.
    */
-  showSimulationModeDropdown(
+  showModelSelector(
     element: CircuitElement,
     def: ComponentDefinition,
   ): void {
@@ -269,7 +279,7 @@ export class PropertyPanel {
     for (const mode of modes) {
       const option = document.createElement("option");
       option.value = mode;
-      option.textContent = mode;
+      option.textContent = getModelLabel(mode);
       if (mode === current) {
         (option as unknown as { selected: boolean }).selected = true;
       }
@@ -288,7 +298,7 @@ export class PropertyPanel {
       }
     });
 
-    const row = this._buildRow("Mode", select as unknown as HTMLElement);
+    const row = this._buildRow("Model", select as unknown as HTMLElement);
     this._container.appendChild(row);
     this._inputs.set("simulationModel", {
       element: select as unknown as HTMLElement,

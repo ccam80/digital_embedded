@@ -896,6 +896,7 @@ export function compileAnalogPartition(
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
+  _perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
