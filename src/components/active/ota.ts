@@ -301,15 +301,6 @@ export class OTAElement extends AbstractCircuitElement {
     ctx.restore();
     void vVp; void vVm; void vIabc; void vOutP; void vOut;
   }
-
-  getHelpText(): string {
-    return (
-      "Operational Transconductance Amplifier — voltage-in, current-out amplifier. " +
-      "I_out = I_bias * tanh(V_diff / (2*V_T)). " +
-      "Transconductance gm = I_bias / (2*V_T), up to gmMax. " +
-      "Pins: V+, V- (differential input), Iabc (bias current), OUT+, OUT (output)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

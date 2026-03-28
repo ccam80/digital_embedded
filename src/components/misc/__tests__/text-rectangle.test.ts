@@ -321,10 +321,6 @@ describe("Text", () => {
       expect(typeof TextDefinition.helpText).toBe("string"); expect(TextDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("TextElement.getHelpText() returns relevant text", () => {
-      const el = makeText();
-      expect(el.getHelpText()).toContain("Text");
-    });
 
     it("TextDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();
@@ -598,10 +594,6 @@ describe("Rectangle", () => {
       expect(typeof RectangleDefinition.helpText).toBe("string"); expect(RectangleDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("RectangleElement.getHelpText() returns relevant text", () => {
-      const el = makeRectangle();
-      expect(el.getHelpText()).toContain("Rectangle");
-    });
 
     it("RectangleDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

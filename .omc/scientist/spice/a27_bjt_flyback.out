@@ -1,0 +1,40 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: bjt switch flyback diode
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+1                                           12
+4                                            3
+3                                           12
+5                                     0.816269
+l1#branch                             0.242843
+vin#branch                         -0.00218373
+vcc#branch                           -0.242843
+
+
+No. of Data Rows : 1008
+
+  Measurements for Transient Analysis
+
+v_probe_on          =  1.200000e+01
+il_on               =  2.428431e-01
+
+
+Total analysis time (seconds) = 0.006
+
+Total elapsed time (seconds) = 0.047 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12913.324 MB.
+Maximum ngspice program size =   16.051 MB.
+Current ngspice program size =   16.051 MB.
+

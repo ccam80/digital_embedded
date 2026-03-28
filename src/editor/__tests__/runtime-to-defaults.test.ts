@@ -48,9 +48,6 @@ function makeElement(
         properties: {},
       };
     },
-    getHelpText(): string {
-      return "";
-    },
     getAttribute(name: string): PropertyValue | undefined {
       return bag.has(name) ? bag.get(name) : undefined;
     },

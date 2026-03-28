@@ -114,15 +114,6 @@ export class DivElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "Div — N-bit divider with quotient and remainder.\n" +
-      "Inputs: a, b (bitWidth bits each).\n" +
-      "Outputs: q (quotient), r (remainder).\n" +
-      "Division by zero is treated as division by 1.\n" +
-      "Supports signed mode with optional positive-remainder adjustment."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

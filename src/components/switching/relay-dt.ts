@@ -193,15 +193,6 @@ export class RelayDTElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "RelayDT (SPDT) — coil-controlled double-throw contact switch.\n" +
-      "Coil terminals in1 and in2: when current flows (in1 XOR in2 nonzero), C connects to T.\n" +
-      "When de-energised, C connects to R (rest/normally-closed position).\n" +
-      "Contact routing is managed by the bus resolution subsystem."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

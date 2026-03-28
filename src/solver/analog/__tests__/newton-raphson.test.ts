@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
-import { makeResistor, makeVoltageSource, makeDiode } from "../test-elements.js";
+import { makeResistor, makeVoltageSource, makeDiode } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build a simple diode+resistor circuit

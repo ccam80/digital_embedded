@@ -135,14 +135,6 @@ export class OutElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Out — output display component.\n" +
-      "Shows the current value of the connected signal.\n" +
-      "Configurable display radix: binary, decimal, hexadecimal, octal."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

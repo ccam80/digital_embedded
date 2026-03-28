@@ -13,7 +13,6 @@ import { FacadeError } from './types.js';
 import type { CircuitBuildOptions, TestResults } from './types.js';
 import { loadDig as loadDigFromXml } from '../io/dig-loader.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
-import { SimulationRunner } from './runner.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
@@ -322,8 +321,44 @@ export class CircuitBuilder {
     }
 
     const parsed = parseTestData(resolvedData);
-    const runner = new SimulationRunner(this.registry);
-    return executeTests(runner, coordinator, circuit, parsed);
+    // Provide a minimal RunnerFacade inline — reads/writes via the coordinator directly.
+    const runnerFacade = {
+      setInput(coord: SimulationCoordinator, label: string, value: number): void {
+        const addr = coord.compiled.labelSignalMap.get(label);
+        if (addr === undefined) {
+          const available = [...coord.compiled.labelSignalMap.keys()].join(', ');
+          throw new FacadeError(
+            `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
+          );
+        }
+        coord.writeSignal(addr, { type: 'digital', value });
+      },
+      readOutput(coord: SimulationCoordinator, label: string): number {
+        const addr = coord.compiled.labelSignalMap.get(label);
+        if (addr === undefined) {
+          const available = [...coord.compiled.labelSignalMap.keys()].join(', ');
+          throw new FacadeError(
+            `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
+          );
+        }
+        const sv = coord.readSignal(addr);
+        return sv.type === 'digital' ? sv.value : sv.voltage;
+      },
+      runToStable(coord: SimulationCoordinator, maxIterations = 1000): void {
+        for (let iter = 0; iter < maxIterations; iter++) {
+          const before = coord.snapshotSignals();
+          coord.step();
+          const after = coord.snapshotSignals();
+          let stable = true;
+          for (let n = 0; n < before.length; n++) {
+            if (before[n] !== after[n]) { stable = false; break; }
+          }
+          if (stable) return;
+        }
+        throw new FacadeError(`Circuit did not stabilize within ${maxIterations} iterations.`);
+      },
+    };
+    return executeTests(runnerFacade, coordinator, circuit, parsed);
   }
 
   // ---------------------------------------------------------------------------

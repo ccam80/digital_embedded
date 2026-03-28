@@ -32,6 +32,7 @@ export interface RunnerFacade {
   setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
   readOutput(coordinator: SimulationCoordinator, label: string): number;
   runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
+  step(coordinator: SimulationCoordinator, opts?: { clockAdvance?: boolean }): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,18 +149,20 @@ function executeVector(
   // components' sampleFns would see stale enable/data signals.
   facade.runToStable(coordinator);
 
-  // Handle clock inputs: toggle high → stable → low → stable
+  // Handle clock inputs: toggle high → step → low → step
+  // Use single step() rather than runToStable() so ripple counters propagate
+  // one stage per clock edge instead of settling all the way through.
   if (clockInputs.length > 0) {
     for (const name of clockInputs) {
       facade.setInput(coordinator, name, 1);
       inputRecord[name] = 1;
     }
-    facade.runToStable(coordinator);
+    facade.step(coordinator, { clockAdvance: false });
 
     for (const name of clockInputs) {
       facade.setInput(coordinator, name, 0);
     }
-    facade.runToStable(coordinator);
+    facade.step(coordinator, { clockAdvance: false });
   }
 
   // Read all outputs and compare

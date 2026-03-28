@@ -30,7 +30,6 @@ function makeElement(): CircuitElement {
     draw: (_ctx: RenderContext) => {},
     getBoundingBox: (): Rect => ({ x: 0, y: 0, width: 4, height: 4 }),
     serialize: () => ({} as SerializedElement),
-    getHelpText: () => "",
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
   };
 }

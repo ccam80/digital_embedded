@@ -43,7 +43,6 @@ function makeElement(typeId: 'In' | 'Out', label: string): CircuitElement {
       mirror: false,
       properties: { label },
     }),
-    getHelpText: () => typeId,
   };
 }
 

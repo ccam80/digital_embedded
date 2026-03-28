@@ -132,14 +132,6 @@ export class DelayElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    const delayTime = this._properties.getOrDefault<number>("delayTime", 1);
-    return (
-      `Delay — passes input to output with a delay of ${delayTime} gate-delay units.\n` +
-      "In level-by-level mode: pass-through (no delay applied).\n" +
-      "In timed mode: output is scheduled at currentTime + delayTime."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

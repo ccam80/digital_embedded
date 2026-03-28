@@ -183,16 +183,6 @@ export class DemuxElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    const outputCount = 1 << selectorBits;
-    return (
-      `Demultiplexer — routes input to one of ${outputCount} outputs based on selector.\n` +
-      `Selected output = input, all others = 0.\n` +
-      `Selector bits: ${selectorBits}, data bit width: ${bitWidth}.`
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -37,7 +37,6 @@ class TestElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
   }
-  getHelpText(): string { return "test"; }
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +218,6 @@ describe("DigLoader", () => {
       getPins(): readonly Pin[] { return [this._testPin]; }
       draw(_ctx: RenderContext): void { /* no-op */ }
       getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; }
-      getHelpText(): string { return ""; }
     }
 
     const element = new PinnedElement(new PropertyBag());

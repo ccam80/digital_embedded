@@ -279,15 +279,6 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
     return this._outputCount;
   }
 
-  getHelpText(): string {
-    return (
-      "Boolean Function — a user-defined combinational function expressed as a truth table.\n" +
-      "inputCount sets the number of input variables (1–8).\n" +
-      "outputCount sets the number of output bits (1–32).\n" +
-      "The truth table maps each input combination to an output value.\n" +
-      "Don't-care entries (-1) output 0 at simulation time."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

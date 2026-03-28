@@ -1,0 +1,39 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t5 adc input
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vs_pos                                       0
+adc_in                                       0
+vref                                         5
+vref#branch                                  0
+vs#branch                                    0
+
+
+No. of Data Rows : 408
+
+  Measurements for Transient Analysis
+
+v_vref              =  5.000000e+00
+v_adc_pk            =  4.999807e+00 at=  2.502800e-02
+v_adc_in_pk         =  4.999807e+00 at=  2.502800e-02
+
+
+Total analysis time (seconds) = 0.005
+
+Total elapsed time (seconds) = 0.042 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12878.801 MB.
+Maximum ngspice program size =   15.969 MB.
+Current ngspice program size =   15.969 MB.
+

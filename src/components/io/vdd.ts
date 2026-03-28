@@ -88,14 +88,6 @@ export class VddElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "VDD — always outputs logic 1 (all bits set).\n" +
-      "Connects the net to the supply voltage in the simulation.\n" +
-      "Configurable bit width."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

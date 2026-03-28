@@ -37,7 +37,6 @@ function makeInElement(label: string, bitWidth: number = 1) {
     draw: () => {},
     getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
     serialize: () => ({ typeId: "In", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getHelpText: () => "",
     getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
   };
 }
@@ -58,7 +57,6 @@ function makeOutElement(label: string, bitWidth: number = 1) {
     draw: () => {},
     getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
     serialize: () => ({ typeId: "Out", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getHelpText: () => "",
     getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
   };
 }
@@ -388,7 +386,6 @@ function makePortElement(label: string, bitWidth: number = 1, face: string = "le
     draw: () => {},
     getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
     serialize: () => ({ typeId: "Port", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getHelpText: () => "",
     getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
   };
 }

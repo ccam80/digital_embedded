@@ -138,14 +138,6 @@ export class PolarityLedElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "PolarityAwareLED — LED that considers anode/cathode orientation.\n" +
-      "Lights up when anode is high AND cathode is low (current flows anode→cathode).\n" +
-      "Color is configurable."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

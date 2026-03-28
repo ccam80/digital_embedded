@@ -169,15 +169,6 @@ export class ProgramCounterElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("isProgramCounter", true);
   }
 
-  getHelpText(): string {
-    return (
-      "ProgramCounter — edge-triggered counter with jump support.\n" +
-      "On rising clock edge: if ld=1, jumps to address D; else if en=1, PC increments.\n" +
-      "Output Q holds the current program counter value.\n" +
-      "Output ovf goes high when the counter wraps from maxValue to 0.\n" +
-      "Set isProgramCounter=true to identify this as the CPU program counter."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -169,12 +169,6 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Quartz crystal — Butterworth-Van Dyke equivalent circuit model.\n" +
-      "Series RLC motional arm in parallel with shunt electrode capacitance."
-    );
-  }
 }
 
 

@@ -1,0 +1,38 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: buck debug toggle
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+1                                           12
+g                                            0
+2                                  0.000119999
+vgate#branch                                 0
+vdd#branch                        -1.19999e-07
+
+
+No. of Data Rows : 278
+
+  Measurements for Transient Analysis
+
+v2_25u              =  1.199999e+01
+v2_75u              =  1.199988e-04
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.040 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13394.145 MB.
+Maximum ngspice program size =   15.984 MB.
+Current ngspice program size =   15.984 MB.
+

@@ -206,14 +206,6 @@ export class SevenSegElement extends AbstractCircuitElement {
     drawSevenSegShape(ctx);
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "SevenSeg — direct-drive 7-segment display.\n" +
-      "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
-      "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -316,12 +316,6 @@ describe("ProgramMemory", () => {
     expect(ProgramMemoryDefinition.factory(props)).toBeInstanceOf(ProgramMemoryElement);
   });
 
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
-
   it("boundingBox — returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 1, y: 2 }, 0, false, props);

@@ -1,0 +1,17 @@
+Buck PWM CLK=5V gate drive
+* CLK drives gate to 5V (digital clock), Vdd=12V
+Vdd 1 0 DC 12
+Vgate g 0 PULSE(0 5 0 10n 10n 50u 100u)
+SW1 1 2 g 0 MYSW
+D1 0 2 DFAST
+L1 2 3 1m
+R1 3 4 100
+C1 4 0 1u IC=0
+.model MYSW SW(Ron=0.001 Roff=100Meg Vt=2.5)
+.model DFAST D(IS=1e-9 N=1 RS=0.01)
+.tran 2u 50m UIC
+.meas tran vc_avg  AVG V(4) FROM=30m TO=50m
+.meas tran vc_pp   PP  V(4) FROM=30m TO=50m
+.meas tran vc_at_t1 FIND V(4) AT=25u
+.meas tran vc_at_t2 FIND V(4) AT=75u
+.end

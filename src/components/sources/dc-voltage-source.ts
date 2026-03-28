@@ -89,10 +89,6 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "Ideal DC voltage source. Introduces a branch current row in the MNA matrix.";
-  }
 }
 
 // ---------------------------------------------------------------------------

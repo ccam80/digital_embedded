@@ -108,7 +108,6 @@ function makeElement(
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
-    getHelpText() { return ""; },
     getAttribute(k: string) { return propsMap.get(k); },
   };
 }
@@ -153,7 +152,6 @@ function buildDigitalRegistry(): ComponentRegistry {
     draw() {},
     getBoundingBox() { return { x: 0, y: 0, width: 2, height: 2 }; },
     serialize() { return { typeId: "In", instanceId: this.instanceId, position: { x: 0, y: 0 }, rotation: 0, mirror: false, properties: {} }; },
-    getHelpText() { return ""; },
   } as unknown as CircuitElement);
 
   // Minimal Out stub — one INPUT pin labelled "in"
@@ -178,7 +176,6 @@ function buildDigitalRegistry(): ComponentRegistry {
     draw() {},
     getBoundingBox() { return { x: 0, y: 0, width: 2, height: 2 }; },
     serialize() { return { typeId: "Out", instanceId: this.instanceId, position: { x: 0, y: 0 }, rotation: 0, mirror: false, properties: {} }; },
-    getHelpText() { return ""; },
   } as unknown as CircuitElement);
 
   registry.register({
@@ -726,7 +723,6 @@ function buildFixtureRegistry(): ComponentRegistry {
     draw() {},
     getBoundingBox() { return { x: 0, y: 0, width: 2, height: 2 }; },
     serialize() { return { typeId: "In", instanceId: this.instanceId, position: { x: 0, y: 0 }, rotation: 0, mirror: false, properties: {} }; },
-    getHelpText() { return ""; },
   } as unknown as CircuitElement);
 
   const outStubFactory = (props: PropertyBag): CircuitElement => ({
@@ -750,7 +746,6 @@ function buildFixtureRegistry(): ComponentRegistry {
     draw() {},
     getBoundingBox() { return { x: 0, y: 0, width: 2, height: 2 }; },
     serialize() { return { typeId: "Out", instanceId: this.instanceId, position: { x: 0, y: 0 }, rotation: 0, mirror: false, properties: {} }; },
-    getHelpText() { return ""; },
   } as unknown as CircuitElement);
 
   registry.register({

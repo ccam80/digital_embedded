@@ -123,18 +123,6 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    const runAtRealTime = this._properties.getOrDefault<boolean>("runAtRealTime", false);
-    const frequency = this._properties.getOrDefault<number>("frequency", 1);
-    return (
-      "AsyncSeq — marks circuit as asynchronous sequential.\n" +
-      "Propagation is triggered by input changes only (no explicit clock).\n" +
-      (runAtRealTime
-        ? `Runs at real-time frequency: ${frequency} Hz.`
-        : "Level-by-level (event-driven) propagation mode.")
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

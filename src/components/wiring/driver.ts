@@ -165,14 +165,6 @@ export class DriverElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Driver — tri-state buffer.\n" +
-      "When sel=1: output = input.\n" +
-      "When sel=0: output is high-impedance (disconnected)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

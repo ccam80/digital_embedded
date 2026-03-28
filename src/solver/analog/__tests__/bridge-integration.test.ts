@@ -28,7 +28,7 @@ import {
 } from "../bridge-adapter.js";
 import type { BridgeInstance } from "../bridge-instance.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
-import { makeResistor, makeVoltageSource, makeCapacitor } from "../test-elements.js";
+import { makeResistor, makeVoltageSource, makeCapacitor } from "./test-helpers.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { BitVector } from "../../../core/signal.js";
 import { DigitalEngine } from "../../digital/digital-engine.js";

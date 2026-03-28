@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { CircuitBuilder } from "../../../headless/builder.js";
-import { SimulationRunner } from "../../../headless/runner.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { createDefaultRegistry } from "@/components/register-all";
 
 describe("CMOS inverter", () => {
@@ -33,18 +33,18 @@ describe("CMOS inverter", () => {
       ],
     });
 
-    const runner = new SimulationRunner(registry);
-    const engine = runner.compile(circuit);
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(circuit);
 
     // A=0: PFET conducts (G=0), NFET open → Y should be 1 (VDD)
-    runner.setInput(engine, "A", 0);
-    runner.runToStable(engine);
+    facade.setInput(coordinator, "A", 0);
+    facade.runToStable(coordinator);
     // VDD outputs all-ones (0xFFFFFFFF); mask to 1-bit
-    expect(runner.readOutput(engine, "Y") & 1).toBe(1);
+    expect(facade.readOutput(coordinator, "Y") & 1).toBe(1);
 
     // A=1: NFET conducts (G=1), PFET open → Y should be 0 (GND)
-    runner.setInput(engine, "A", 1);
-    runner.runToStable(engine);
-    expect(runner.readOutput(engine, "Y") & 1).toBe(0);
+    facade.setInput(coordinator, "A", 1);
+    facade.runToStable(coordinator);
+    expect(facade.readOutput(coordinator, "Y") & 1).toBe(0);
   });
 });

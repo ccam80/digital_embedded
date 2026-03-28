@@ -139,15 +139,6 @@ export class ClockElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Clock — periodic signal source.\n" +
-      "Generates a square wave at the configured frequency.\n" +
-      "In real-time mode the frequency corresponds to actual Hz. " +
-      "The signal value is managed by ClockManager and set externally."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

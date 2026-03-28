@@ -25,7 +25,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor, withNodeIds } from "../test-elements.js";
+import { makeVoltageSource, makeResistor, withNodeIds } from "./test-helpers.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,

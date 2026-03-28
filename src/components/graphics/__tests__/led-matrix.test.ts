@@ -439,10 +439,6 @@ describe("LedMatrix", () => {
       expect(typeof LedMatrixDefinition.helpText).toBe("string"); expect(LedMatrixDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("LedMatrixElement.getHelpText() returns relevant text", () => {
-      const el = makeLedMatrix();
-      expect(el.getHelpText()).toContain("LedMatrix");
-    });
 
     it("LedMatrixDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

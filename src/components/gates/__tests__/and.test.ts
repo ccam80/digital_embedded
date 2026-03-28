@@ -514,10 +514,6 @@ describe("AndGate", () => {
       expect(typeof AndDefinition.helpText).toBe("string"); expect(AndDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("AndElement.getHelpText() returns the expected text", () => {
-      const el = makeAnd();
-      expect(el.getHelpText()).toContain("And gate");
-    });
 
     it("AndDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

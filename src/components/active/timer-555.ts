@@ -186,14 +186,6 @@ export class Timer555Element extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "555 Timer IC — behavioral model with two comparators, SR flip-flop, " +
-      "discharge transistor, and output stage. Supports astable and monostable modes. " +
-      "Pins: VCC, GND, TRIG, THR, CTRL, RST, DIS, OUT."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

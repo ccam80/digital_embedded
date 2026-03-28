@@ -26,7 +26,7 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";

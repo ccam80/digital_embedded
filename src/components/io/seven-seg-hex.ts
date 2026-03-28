@@ -125,14 +125,6 @@ export class SevenSegHexElement extends AbstractCircuitElement {
     drawSevenSegShape(ctx);
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "SevenSegHex — 7-segment display with internal hex decoder.\n" +
-      "4-bit input selects which hex digit (0–F) to display.\n" +
-      "commonCathode=true: common cathode configuration (active high)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

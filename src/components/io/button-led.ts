@@ -143,15 +143,6 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "ButtonLED — push button with integrated LED indicator.\n" +
-      "The 'in' pin drives the LED; the 'out' pin is the button output.\n" +
-      "Button behavior: output high while held, low when released (inverted if activeLow).\n" +
-      "Interactive: the engine sets the output value on mouse-down/up events."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -302,13 +302,6 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Spark Gap — voltage-triggered switch with hysteresis.\n" +
-      "Fires when voltage exceeds breakdown; stays conducting until current drops below holding threshold."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

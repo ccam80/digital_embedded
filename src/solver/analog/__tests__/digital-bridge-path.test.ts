@@ -50,7 +50,6 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
     serialize() {
       return { typeId, instanceId: this.instanceId, position: this.position, rotation: 0, mirror: false, properties: {} };
     },
-    getHelpText() { return ""; },
   } as unknown as CircuitElement);
 }
 

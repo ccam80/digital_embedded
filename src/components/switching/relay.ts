@@ -197,15 +197,6 @@ export class RelayElement extends AbstractCircuitElement {
   get normallyClosed(): boolean {
     return this._properties.getOrDefault<boolean>("normallyClosed", false);
   }
-
-  getHelpText(): string {
-    return (
-      "Relay (SPST) — coil-controlled contact switch.\n" +
-      "Coil terminals in1 and in2: when current flows (in1 XOR in2 is nonzero), contact closes.\n" +
-      "normallyClosed=true inverts behavior: coil energised → contact opens.\n" +
-      "Contact state is managed by the bus resolution subsystem."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

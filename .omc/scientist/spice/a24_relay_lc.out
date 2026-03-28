@@ -1,0 +1,29 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: relay-driven lc
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+
+No. of Data Rows : 1030
+
+  Measurements for Transient Analysis
+
+v3_max              =  5.015190e+00 at=  1.542717e-04
+v3_at5u             =  4.001205e-05
+v3_at100u           =  4.999821e+00
+v3_at500u           =  5.001071e+00
+
+
+Total analysis time (seconds) = 0.006
+
+Total elapsed time (seconds) = 0.044 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13260.293 MB.
+Maximum ngspice program size =   16.016 MB.
+Current ngspice program size =   16.016 MB.
+

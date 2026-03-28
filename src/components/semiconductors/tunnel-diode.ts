@@ -274,13 +274,6 @@ export class TunnelDiodeElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Tunnel Diode — N-shaped I-V curve with negative differential resistance.\n" +
-      "Peak current I_p at V_p, valley current I_v at V_v.\n" +
-      "NDR region: V_p < V < V_v."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

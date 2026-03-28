@@ -161,15 +161,6 @@ export class SwitchDTElement extends AbstractCircuitElement {
   isClosed(): boolean {
     return this._properties.getOrDefault<boolean>("closed", false);
   }
-
-  getHelpText(): string {
-    return (
-      "Switch DT (SPDT) — a manually controlled single-pole double-throw switch.\n" +
-      "Common terminal A connects to B when closed, to C when open.\n" +
-      "Net merging/splitting handled by bus resolution subsystem.\n" +
-      "Click to toggle during simulation."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

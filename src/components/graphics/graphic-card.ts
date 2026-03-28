@@ -320,19 +320,6 @@ export class GraphicCardElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "GraphicCard — memory-mapped graphics framebuffer with double buffering.\n" +
-      "Inputs: A (address), str (store strobe), C (clock), ld (load/read), B (bank select), D (data in).\n" +
-      "Output: D (data out, high-Z when ld=0).\n" +
-      "On rising clock edge with str=1: data is written to memory[A].\n" +
-      "When ld=1: memory[A] is output on D.\n" +
-      "B selects which memory bank is shown in the display panel.\n" +
-      "dataBits: bit width of data bus (default 8).\n" +
-      "graphicWidth/graphicHeight: display resolution (default 160x100)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -143,14 +143,6 @@ export class DecoderElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
-    const outputCount = 1 << selectorBits;
-    return (
-      `Decoder — ${selectorBits}-bit input produces ${outputCount} one-hot outputs.\n` +
-      "Only output[input_value] is 1; all others are 0."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

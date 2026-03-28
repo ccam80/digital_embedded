@@ -292,11 +292,6 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "Schmitt Trigger (Inverting) — output goes LOW when input rises above V_TH, " +
-      "HIGH when input falls below V_TL. Hysteresis band prevents oscillation on noisy inputs.";
-  }
 }
 
 export class SchmittNonInvertingElement extends AbstractCircuitElement {
@@ -360,11 +355,6 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     ctx.drawLine(hx4,  hy, hx4, -hy);  // left vertical
 
     ctx.restore();
-  }
-
-  getHelpText(): string {
-    return "Schmitt Trigger (Non-Inverting) — output goes HIGH when input rises above V_TH, " +
-      "LOW when input falls below V_TL. Hysteresis band prevents oscillation on noisy inputs.";
   }
 }
 

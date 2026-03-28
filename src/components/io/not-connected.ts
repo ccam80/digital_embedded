@@ -88,14 +88,6 @@ export class NotConnectedElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "NotConnected — marks an intentionally unconnected pin.\n" +
-      "Attach this to a pin to suppress the unconnected-pin warning.\n" +
-      "Has no simulation behavior."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

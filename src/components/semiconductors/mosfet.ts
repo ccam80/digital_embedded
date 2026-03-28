@@ -635,13 +635,6 @@ export class NmosfetElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "N-channel MOSFET — Level 2 model with body effect and channel-length modulation.\n" +
-      "Pins: D (drain), G (gate), S (source).\n" +
-      "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L."
-    );
-  }
 }
 
 export class PmosfetElement extends AbstractCircuitElement {
@@ -719,13 +712,6 @@ export class PmosfetElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "P-channel MOSFET — Level 2 model with body effect and channel-length modulation.\n" +
-      "Pins: D (drain), G (gate), S (source).\n" +
-      "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

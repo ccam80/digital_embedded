@@ -1,0 +1,47 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t12 lrc switching transient
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vcc                                          5
+sw_com                                       5
+no_node                                  5e-06
+ctrl                                         0
+nc_node                                      5
+ctrl2                                        1
+cap_nc                                       5
+l1#branch                          5.00002e-09
+vctrl2#branch                                0
+vctrl#branch                                 0
+vs#branch                         -5.00002e-09
+
+
+No. of Data Rows : 4096
+
+  Measurements for Transient Analysis
+
+v_no_pk             =  4.999950e+00 at=  4.008138e-03
+v_no_ss             =  4.999950e+00
+v_nc_pk             =  5.005644e+00 at=  6.006390e-03
+v_nc_ss             =  5.002090e+00
+i_inductor_ss       =  4.999950e-03
+
+
+Total analysis time (seconds) = 0.017
+
+Total elapsed time (seconds) = 0.059 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12659.988 MB.
+Maximum ngspice program size =   16.109 MB.
+Current ngspice program size =   16.109 MB.
+

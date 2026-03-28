@@ -74,12 +74,6 @@ export interface HelpContent {
   readonly pinTable: PinInfo[];
   /** One row per property definition registered for the component type. */
   readonly propertyTable: PropInfo[];
-  /**
-   * Full help text from the element instance (element.getHelpText()).
-   * May include behavior notes, truth tables, or usage examples specific to
-   * the component type.
-   */
-  readonly helpText: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,8 +119,7 @@ function propDefToPropInfo(def: PropertyDefinition): PropInfo {
  * Build structured help content for a placed component instance.
  *
  * @param element     The placed CircuitElement instance. Provides resolved
- *                    pins (world-space positions already applied) and the
- *                    instance-level help text.
+ *                    pins (world-space positions already applied).
  * @param definition  The ComponentDefinition from the registry. Provides the
  *                    property definitions and definition-level help text.
  * @returns           A HelpContent record ready for display.
@@ -144,6 +137,5 @@ export function buildHelpContent(
     description: definition.helpText,
     pinTable,
     propertyTable,
-    helpText: element.getHelpText(),
   };
 }

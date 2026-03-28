@@ -169,7 +169,7 @@ export function wiresInRect(rect: Rect, wires: readonly Wire[]): Wire[] {
  * When the perpendicular foot lies outside the segment, the distance is to
  * the nearest endpoint.
  */
-export function distancePointToSegment(p: Point, a: Point, b: Point): number {
+function distancePointToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const lenSq = dx * dx + dy * dy;

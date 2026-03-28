@@ -40,9 +40,6 @@ class StubElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: 4, height: 2 };
   }
-  getHelpText(): string {
-    return "stub";
-  }
 }
 
 function makeDefinition(name: string): ComponentDefinition {

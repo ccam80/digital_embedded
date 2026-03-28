@@ -13,10 +13,7 @@ import { describe, it, expect } from "vitest";
 import {
   SimulationError,
   BurnException,
-  BacktrackException,
   BitsException,
-  NodeException,
-  PinException,
 } from "../errors.js";
 
 // ---------------------------------------------------------------------------
@@ -126,53 +123,6 @@ describe("BurnException", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BacktrackException
-// ---------------------------------------------------------------------------
-
-describe("BacktrackException", () => {
-  it("is an instance of SimulationError", () => {
-    const err = new BacktrackException("backtrack exhausted");
-    expect(err).toBeInstanceOf(SimulationError);
-  });
-
-  it("is an instance of BacktrackException", () => {
-    const err = new BacktrackException("backtrack exhausted");
-    expect(err).toBeInstanceOf(BacktrackException);
-  });
-
-  it("is an instance of Error", () => {
-    const err = new BacktrackException("backtrack exhausted");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("has name BacktrackException", () => {
-    const err = new BacktrackException("backtrack exhausted");
-    expect(err.name).toBe("BacktrackException");
-  });
-
-  it("carries the message", () => {
-    const err = new BacktrackException("switching network unstable");
-    expect(err.message).toBe("switching network unstable");
-  });
-
-  it("attempts defaults to 0 when not provided", () => {
-    const err = new BacktrackException("failed");
-    expect(err.attempts).toBe(0);
-  });
-
-  it("carries attempts when provided", () => {
-    const err = new BacktrackException("failed", { attempts: 10 });
-    expect(err.attempts).toBe(10);
-  });
-
-  it("carries componentId and netId from base", () => {
-    const err = new BacktrackException("failed", { componentId: "switch-3", netId: 9 });
-    expect(err.componentId).toBe("switch-3");
-    expect(err.netId).toBe(9);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // BitsException
 // ---------------------------------------------------------------------------
 
@@ -226,136 +176,30 @@ describe("BitsException", () => {
 });
 
 // ---------------------------------------------------------------------------
-// NodeException
-// ---------------------------------------------------------------------------
-
-describe("NodeException", () => {
-  it("is an instance of SimulationError", () => {
-    const err = new NodeException("node eval failed");
-    expect(err).toBeInstanceOf(SimulationError);
-  });
-
-  it("is an instance of NodeException", () => {
-    const err = new NodeException("node eval failed");
-    expect(err).toBeInstanceOf(NodeException);
-  });
-
-  it("is an instance of Error", () => {
-    const err = new NodeException("node eval failed");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("has name NodeException", () => {
-    const err = new NodeException("node eval failed");
-    expect(err.name).toBe("NodeException");
-  });
-
-  it("carries the message", () => {
-    const err = new NodeException("decoder overflow");
-    expect(err.message).toBe("decoder overflow");
-  });
-
-  it("carries componentId and netId from base", () => {
-    const err = new NodeException("failed", { componentId: "dec-7", netId: 11 });
-    expect(err.componentId).toBe("dec-7");
-    expect(err.netId).toBe(11);
-  });
-
-  it("componentId is undefined when not provided", () => {
-    const err = new NodeException("failed");
-    expect(err.componentId).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PinException
-// ---------------------------------------------------------------------------
-
-describe("PinException", () => {
-  it("is an instance of SimulationError", () => {
-    const err = new PinException("pin unconnected");
-    expect(err).toBeInstanceOf(SimulationError);
-  });
-
-  it("is an instance of PinException", () => {
-    const err = new PinException("pin unconnected");
-    expect(err).toBeInstanceOf(PinException);
-  });
-
-  it("is an instance of Error", () => {
-    const err = new PinException("pin unconnected");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("has name PinException", () => {
-    const err = new PinException("pin unconnected");
-    expect(err.name).toBe("PinException");
-  });
-
-  it("carries the message", () => {
-    const err = new PinException("input A is unconnected");
-    expect(err.message).toBe("input A is unconnected");
-  });
-
-  it("pinLabel is undefined when not provided", () => {
-    const err = new PinException("unconnected");
-    expect(err.pinLabel).toBeUndefined();
-  });
-
-  it("carries pinLabel when provided", () => {
-    const err = new PinException("unconnected", { pinLabel: "A" });
-    expect(err.pinLabel).toBe("A");
-  });
-
-  it("carries componentId and netId from base", () => {
-    const err = new PinException("unconnected", { componentId: "and-2", netId: 5, pinLabel: "B" });
-    expect(err.componentId).toBe("and-2");
-    expect(err.netId).toBe(5);
-    expect(err.pinLabel).toBe("B");
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Cross-type: instanceof checks confirm no cross-contamination
 // ---------------------------------------------------------------------------
 
 describe("Error type isolation", () => {
-  it("BurnException is not an instance of BacktrackException", () => {
+  it("BurnException is not an instance of BitsException", () => {
     const err = new BurnException("burn");
-    expect(err).not.toBeInstanceOf(BacktrackException);
-  });
-
-  it("BitsException is not an instance of PinException", () => {
-    const err = new BitsException("bits");
-    expect(err).not.toBeInstanceOf(PinException);
-  });
-
-  it("NodeException is not an instance of BurnException", () => {
-    const err = new NodeException("node");
-    expect(err).not.toBeInstanceOf(BurnException);
-  });
-
-  it("PinException is not an instance of BitsException", () => {
-    const err = new PinException("pin");
     expect(err).not.toBeInstanceOf(BitsException);
+  });
+
+  it("BitsException is not an instance of BurnException", () => {
+    const err = new BitsException("bits");
+    expect(err).not.toBeInstanceOf(BurnException);
   });
 
   it("SimulationError is not an instance of any subtype", () => {
     const err = new SimulationError("base");
     expect(err).not.toBeInstanceOf(BurnException);
-    expect(err).not.toBeInstanceOf(BacktrackException);
     expect(err).not.toBeInstanceOf(BitsException);
-    expect(err).not.toBeInstanceOf(NodeException);
-    expect(err).not.toBeInstanceOf(PinException);
   });
 
   it("all error subtypes are instances of SimulationError", () => {
     const errors: SimulationError[] = [
       new BurnException("burn"),
-      new BacktrackException("backtrack"),
       new BitsException("bits"),
-      new NodeException("node"),
-      new PinException("pin"),
     ];
     for (const err of errors) {
       expect(err).toBeInstanceOf(SimulationError);
@@ -365,10 +209,7 @@ describe("Error type isolation", () => {
   it("all error subtypes are instances of Error", () => {
     const errors: Error[] = [
       new BurnException("burn"),
-      new BacktrackException("backtrack"),
       new BitsException("bits"),
-      new NodeException("node"),
-      new PinException("pin"),
     ];
     for (const err of errors) {
       expect(err).toBeInstanceOf(Error);

@@ -249,20 +249,86 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 236,
-      "lastAccessed": 1774652747334,
+      "accessCount": 313,
+      "lastAccessed": 1774668080908,
       "type": "directory"
     },
     {
+      "path": "e2e\\gui\\component-sweep.spec.ts",
+      "accessCount": 156,
+      "lastAccessed": 1774667113746,
+      "type": "file"
+    },
+    {
       "path": "src\\app\\app-init.ts",
-      "accessCount": 35,
-      "lastAccessed": 1774651808796,
+      "accessCount": 55,
+      "lastAccessed": 1774668029791,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 47,
+      "lastAccessed": 1774668450914,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\workflow-tests.spec.ts",
+      "accessCount": 46,
+      "lastAccessed": 1774667187928,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\simulation-controller.ts",
+      "accessCount": 46,
+      "lastAccessed": 1774668052696,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\test-bridge.ts",
+      "accessCount": 45,
+      "lastAccessed": 1774667206717,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
+      "accessCount": 42,
+      "lastAccessed": 1774668104789,
       "type": "file"
     },
     {
       "path": "src\\app\\menu-toolbar.ts",
-      "accessCount": 34,
-      "lastAccessed": 1774651423587,
+      "accessCount": 41,
+      "lastAccessed": 1774662703651,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 39,
+      "lastAccessed": 1774671011560,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 38,
+      "lastAccessed": 1774671026835,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app",
+      "accessCount": 33,
+      "lastAccessed": 1774666102981,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\property-panel.ts",
+      "accessCount": 33,
+      "lastAccessed": 1774668020440,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 33,
+      "lastAccessed": 1774671084090,
       "type": "file"
     },
     {
@@ -272,100 +338,88 @@
       "type": "file"
     },
     {
-      "path": "src\\components",
-      "accessCount": 30,
-      "lastAccessed": 1774649822951,
-      "type": "directory"
-    },
-    {
-      "path": "e2e\\gui\\component-sweep.spec.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774611441615,
-      "type": "file"
-    },
-    {
-      "path": "src\\app\\simulation-controller.ts",
-      "accessCount": 22,
-      "lastAccessed": 1774647241317,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 21,
-      "lastAccessed": 1774651119336,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 20,
-      "lastAccessed": 1774647220812,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 20,
-      "lastAccessed": 1774648016630,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\ground.ts",
-      "accessCount": 18,
-      "lastAccessed": 1774650236387,
-      "type": "file"
-    },
-    {
-      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774647906208,
-      "type": "file"
-    },
-    {
-      "path": "src\\app",
-      "accessCount": 14,
-      "lastAccessed": 1774649380580,
-      "type": "directory"
-    },
-    {
-      "path": "src\\app\\test-bridge.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774610921277,
-      "type": "directory"
-    },
-    {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774649829260,
-      "type": "file"
-    },
-    {
-      "path": "e2e\\gui\\workflow-tests.spec.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774651893371,
+      "accessCount": 30,
+      "lastAccessed": 1774671025151,
       "type": "file"
     },
     {
       "path": "e2e",
-      "accessCount": 13,
-      "lastAccessed": 1774651934230,
+      "accessCount": 29,
+      "lastAccessed": 1774668082680,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 27,
+      "lastAccessed": 1774668438352,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver",
+      "accessCount": 24,
+      "lastAccessed": 1774666195005,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\subcircuit-creation.spec.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774663502318,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\ground.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774664209465,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\analog-rc-circuit.spec.ts",
+      "accessCount": 21,
+      "lastAccessed": 1774666066034,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 19,
+      "lastAccessed": 1774671075570,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\subcircuit-dialog.ts",
+      "accessCount": 16,
+      "lastAccessed": 1774663482587,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 16,
+      "lastAccessed": 1774666157051,
+      "type": "file"
     },
     {
       "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774650013462,
+      "accessCount": 14,
+      "lastAccessed": 1774671049910,
       "type": "file"
     },
     {
-      "path": "src\\editor\\property-panel.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774612833717,
+      "path": "src\\components\\subcircuit\\subcircuit.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774666188086,
       "type": "file"
     },
     {
-      "path": "src\\solver\\coordinator.ts",
+      "path": "src\\components\\library-74xx.ts",
+      "accessCount": 12,
+      "lastAccessed": 1774661056087,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette-ui.ts",
       "accessCount": 9,
-      "lastAccessed": 1774613847888,
-      "type": "directory"
+      "lastAccessed": 1774661263810,
+      "type": "file"
     },
     {
       "path": "src\\components\\sources\\dc-voltage-source.ts",
@@ -374,21 +428,21 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
+      "path": "src\\components\\io\\in.ts",
       "accessCount": 8,
-      "lastAccessed": 1774652654920,
+      "lastAccessed": 1774666165405,
       "type": "file"
     },
     {
-      "path": "e2e\\gui\\subcircuit-creation.spec.ts",
+      "path": "src\\editor\\placement.ts",
       "accessCount": 7,
-      "lastAccessed": 1774608398230,
+      "lastAccessed": 1774666114215,
       "type": "file"
     },
     {
-      "path": "src\\components\\library-74xx.ts",
+      "path": "src\\components\\io\\vdd.ts",
       "accessCount": 7,
-      "lastAccessed": 1774611073325,
+      "lastAccessed": 1774668047203,
       "type": "file"
     },
     {
@@ -398,39 +452,27 @@
       "type": "file"
     },
     {
-      "path": "e2e\\gui\\analog-rc-circuit.spec.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774610921705,
+      "path": "playwright.config.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774663164115,
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\vdd.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774613197790,
+      "path": "src\\editor\\insert-subcircuit.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774666183158,
       "type": "file"
     },
     {
-      "path": "src\\compile\\partition.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774613237445,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver",
-      "accessCount": 5,
-      "lastAccessed": 1774642539229,
-      "type": "directory"
-    },
-    {
-      "path": "src\\app\\subcircuit-dialog.ts",
-      "accessCount": 5,
-      "lastAccessed": 1774650689337,
+      "path": "src\\solver\\null-coordinator.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774668037162,
       "type": "file"
     },
     {
       "path": "src\\components\\io\\clock.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774611432084,
+      "accessCount": 5,
+      "lastAccessed": 1774662837668,
       "type": "file"
     },
     {
@@ -440,39 +482,15 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\insert-subcircuit.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774608629346,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\placement.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774608629409,
-      "type": "file"
-    },
-    {
       "path": "test-results\\.last-run.json",
       "accessCount": 3,
       "lastAccessed": 1774609085719,
       "type": "file"
     },
     {
-      "path": "src\\components\\subcircuit\\subcircuit.ts",
+      "path": "src\\integration\\speed-control.ts",
       "accessCount": 3,
-      "lastAccessed": 1774611034429,
-      "type": "file"
-    },
-    {
-      "path": "src\\editor\\palette-ui.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774611097725,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\in.ts",
-      "accessCount": 3,
-      "lastAccessed": 1774613141109,
+      "lastAccessed": 1774656134293,
       "type": "file"
     },
     {
@@ -500,15 +518,9 @@
       "type": "file"
     },
     {
-      "path": "src\\integration\\speed-control.ts",
+      "path": "src\\components\\io\\out.ts",
       "accessCount": 2,
-      "lastAccessed": 1774647208266,
-      "type": "file"
-    },
-    {
-      "path": "playwright.config.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774605955015,
+      "lastAccessed": 1774666165600,
       "type": "file"
     },
     {
@@ -527,18 +539,6 @@
       "path": "src\\editor\\context-menu.ts",
       "accessCount": 1,
       "lastAccessed": 1774607652857,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\null-coordinator.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774607691514,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\out.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774607934334,
       "type": "file"
     },
     {

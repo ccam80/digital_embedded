@@ -138,16 +138,6 @@ export class SwitchElement extends AbstractCircuitElement {
   switchActsAsInput(): boolean {
     return this._properties.getOrDefault<boolean>("switchActsAsInput", false);
   }
-
-  getHelpText(): string {
-    return (
-      "Switch (SPST) — a manually controlled single-pole single-throw switch.\n" +
-      "When closed, terminals A and B are connected (bus nets merged).\n" +
-      "When open, terminals are disconnected.\n" +
-      "Click to toggle during simulation.\n" +
-      "If 'switchActsAsInput' is set with a label, the switch can be driven by an external signal."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

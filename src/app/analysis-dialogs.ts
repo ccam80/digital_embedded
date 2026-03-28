@@ -9,7 +9,6 @@
 
 import type { AppContext } from './app-context.js';
 import { createModal } from './dialog-manager.js';
-import { autoConnectPower } from '../editor/auto-power.js';
 import { analyseCircuit } from '../analysis/model-analyser.js';
 import { TruthTableTab } from '../analysis/truth-table-ui.js';
 import { TruthTable } from '../analysis/truth-table.js';
@@ -408,19 +407,6 @@ function openAnalysisDialog(ctx: AppContext): void {
 
 export function initAnalysisDialogs(ctx: AppContext): void {
   const { circuit, registry, facade } = ctx;
-
-  // -------------------------------------------------------------------------
-  // Edit menu: Auto-Connect Power Supplies
-  // -------------------------------------------------------------------------
-  document.getElementById('btn-auto-power')?.addEventListener('click', () => {
-    if (ctx.params.locked) return;
-    const cmd = autoConnectPower(ctx.circuit);
-    cmd.execute();
-    ctx.undoStack.push(cmd);
-    ctx.invalidateCompiled();
-    ctx.scheduleRender();
-    ctx.showStatus(`Auto-power: added supplies`);
-  });
 
   // -------------------------------------------------------------------------
   // Analysis menu: Analyse Circuit / Synthesise Circuit

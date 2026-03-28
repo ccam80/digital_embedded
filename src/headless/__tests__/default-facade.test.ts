@@ -12,6 +12,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
+import { FacadeError } from '../types.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag } from '../../core/properties.js';
@@ -245,6 +246,194 @@ describe('DefaultSimulatorFacade', () => {
     const engine2 = facade.compile(circuit);
     expect(facade.getCoordinator()).toBe(engine2);
     expect(engine2).not.toBe(engine1);
+  });
+
+  // -------------------------------------------------------------------------
+  // R1: runToStable — combinational stabilization
+  // -------------------------------------------------------------------------
+
+  it('runToStable stabilizes a combinational AND gate and reads correct output', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = buildAndGate(facade);
+    const engine = facade.compile(circuit);
+
+    facade.setInput(engine, 'A', 1);
+    facade.setInput(engine, 'B', 1);
+    // runToStable should return without throwing for a stable combinational circuit
+    expect(() => facade.runToStable(engine)).not.toThrow();
+    expect(facade.readOutput(engine, 'Y')).toBe(1);
+
+    facade.setInput(engine, 'A', 0);
+    facade.runToStable(engine);
+    expect(facade.readOutput(engine, 'Y')).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // R2: runToStable throws FacadeError for oscillating circuit (ring oscillator)
+  // -------------------------------------------------------------------------
+
+  it('runToStable throws FacadeError when circuit does not stabilize', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    // Single NOT gate with output wired back to its own input.
+    // This is a 1-NOT ring oscillator that can never stabilize.
+    const circuit = facade.createCircuit();
+    const notGate = facade.addComponent(circuit, 'Not', {});
+    const notPins = notGate.getPins();
+    const outPin = notPins.find(p => p.label === 'out')!;
+    const inPin  = notPins.find(p => p.label === 'in')!;
+    const outPos = pinWorldPosition(notGate, outPin);
+    const inPos  = pinWorldPosition(notGate, inPin);
+    // Wire from output back to input — creates a combinational feedback loop
+    circuit.addWire(new Wire(outPos, inPos));
+
+    const engine = facade.compile(circuit);
+    // The NOT-self-loop will never stabilize within a small iteration cap
+    expect(() => facade.runToStable(engine, 5)).toThrow(FacadeError);
+  });
+
+  // -------------------------------------------------------------------------
+  // R3: Unknown label throws FacadeError
+  // -------------------------------------------------------------------------
+
+  it('setInput with unknown label throws FacadeError', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = buildAndGate(facade);
+    const engine = facade.compile(circuit);
+
+    expect(() => facade.setInput(engine, 'nonexistent', 1)).toThrow(FacadeError);
+  });
+
+  // -------------------------------------------------------------------------
+  // R4: getDcOpResult returns null for digital-only circuit (no throw)
+  // -------------------------------------------------------------------------
+
+  it('getDcOpResult returns null for a digital-only circuit without throwing', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = buildAndGate(facade);
+    facade.compile(circuit);
+
+    // Digital-only: DC operating point is not available, should return null not throw
+    expect(() => facade.getDcOpResult()).not.toThrow();
+    expect(facade.getDcOpResult()).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // R5: SR latch feedback convergence via runToStable
+  // -------------------------------------------------------------------------
+
+  it('SR latch: S=1 R=0 converges to Q=1, then S=0 R=1 gives Q=0', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    // SR latch from two cross-coupled NOR gates
+    // Q  = NOR(R, QB)
+    // QB = NOR(S, Q)
+    // Use Tunnels to express cross-coupling in CircuitSpec
+    const circuit = facade.build({
+      components: [
+        { id: 'S',   type: 'In',  props: { label: 'S',  bitWidth: 1 } },
+        { id: 'R',   type: 'In',  props: { label: 'R',  bitWidth: 1 } },
+        { id: 'norQ',  type: 'NOr', props: { inputCount: 2 } },
+        { id: 'norQB', type: 'NOr', props: { inputCount: 2 } },
+        { id: 'Q',   type: 'Out', props: { label: 'Q',  bitWidth: 1 } },
+        { id: 'QB',  type: 'Out', props: { label: 'QB', bitWidth: 1 } },
+      ],
+      connections: [
+        ['R:out',     'norQ:In_1'],
+        ['norQB:out', 'norQ:In_2'],
+        ['S:out',     'norQB:In_1'],
+        ['norQ:out',  'norQB:In_2'],
+        ['norQ:out',  'Q:in'],
+        ['norQB:out', 'QB:in'],
+      ],
+    });
+
+    const engine = facade.compile(circuit);
+
+    // S=1, R=0 → Q should become 1
+    facade.setInput(engine, 'S', 1);
+    facade.setInput(engine, 'R', 0);
+    facade.runToStable(engine);
+    expect(facade.readOutput(engine, 'Q')).toBe(1);
+    expect(facade.readOutput(engine, 'QB')).toBe(0);
+
+    // S=0, R=1 → Q should become 0
+    facade.setInput(engine, 'S', 0);
+    facade.setInput(engine, 'R', 1);
+    facade.runToStable(engine);
+    expect(facade.readOutput(engine, 'Q')).toBe(0);
+    expect(facade.readOutput(engine, 'QB')).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // R6: Exhaustive half-adder test (all 4 input combinations)
+  // -------------------------------------------------------------------------
+
+  it('half adder produces correct S and C for all 4 input combinations', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: 'A',   type: 'In',  props: { label: 'A', bitWidth: 1 } },
+        { id: 'B',   type: 'In',  props: { label: 'B', bitWidth: 1 } },
+        { id: 'xor', type: 'XOr' },
+        { id: 'and', type: 'And' },
+        { id: 'S',   type: 'Out', props: { label: 'S', bitWidth: 1 } },
+        { id: 'C',   type: 'Out', props: { label: 'C', bitWidth: 1 } },
+      ],
+      connections: [
+        ['A:out',   'xor:In_1'],
+        ['B:out',   'xor:In_2'],
+        ['A:out',   'and:In_1'],
+        ['B:out',   'and:In_2'],
+        ['xor:out', 'S:in'],
+        ['and:out', 'C:in'],
+      ],
+    });
+
+    const cases: [number, number, number, number][] = [
+      [0, 0, 0, 0],
+      [0, 1, 1, 0],
+      [1, 0, 1, 0],
+      [1, 1, 0, 1],
+    ];
+
+    for (const [a, b, expectedS, expectedC] of cases) {
+      const engine = facade.compile(circuit);
+      facade.setInput(engine, 'A', a);
+      facade.setInput(engine, 'B', b);
+      facade.step(engine);
+      expect(facade.readOutput(engine, 'S')).toBe(expectedS);
+      expect(facade.readOutput(engine, 'C')).toBe(expectedC);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // R7: Chain of 3 inverters: NOT(NOT(NOT(x))) = NOT(x)
+  // -------------------------------------------------------------------------
+
+  it('chain of 3 NOT gates: output is inverted input', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: 'X',  type: 'In',  props: { label: 'X', bitWidth: 1 } },
+        { id: 'n1', type: 'Not' },
+        { id: 'n2', type: 'Not' },
+        { id: 'n3', type: 'Not' },
+        { id: 'Y',  type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+      ],
+      connections: [
+        ['X:out',  'n1:in'],
+        ['n1:out', 'n2:in'],
+        ['n2:out', 'n3:in'],
+        ['n3:out', 'Y:in'],
+      ],
+    });
+
+    for (const input of [0, 1] as const) {
+      const engine = facade.compile(circuit);
+      facade.setInput(engine, 'X', input);
+      facade.step(engine);
+      // NOT(NOT(NOT(x))) = NOT(x)
+      expect(facade.readOutput(engine, 'Y')).toBe(input === 0 ? 1 : 0);
+    }
   });
 
 });

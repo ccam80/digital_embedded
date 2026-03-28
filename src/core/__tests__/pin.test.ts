@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   PinDirection,
   createInverterConfig,
-  isPinInverted,
   createClockConfig,
   makePin,
   rotatePoint,
@@ -36,14 +35,14 @@ describe("PinDirection", () => {
 describe("InverterConfig", () => {
   it("createInverterConfig creates a config with the given labels inverted", () => {
     const config = createInverterConfig(["A", "B"]);
-    expect(isPinInverted(config, "A")).toBe(true);
-    expect(isPinInverted(config, "B")).toBe(true);
-    expect(isPinInverted(config, "C")).toBe(false);
+    expect(config.invertedPins.has("A")).toBe(true);
+    expect(config.invertedPins.has("B")).toBe(true);
+    expect(config.invertedPins.has("C")).toBe(false);
   });
 
   it("empty inverter config inverts nothing", () => {
     const config = createInverterConfig([]);
-    expect(isPinInverted(config, "A")).toBe(false);
+    expect(config.invertedPins.has("A")).toBe(false);
   });
 
   it("invertedPins is a ReadonlySet", () => {

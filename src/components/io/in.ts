@@ -113,14 +113,6 @@ export class InElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "In — interactive input component.\n" +
-      "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +
-      "The executeFn is a pass-through; the signal value is set externally by user interaction."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

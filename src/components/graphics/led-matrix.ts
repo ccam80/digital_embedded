@@ -165,16 +165,6 @@ export class LedMatrixElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "LedMatrix — NxN LED grid display.\n" +
-      "r-data input selects which rows are lit in the addressed column.\n" +
-      "c-addr input selects the column to update.\n" +
-      "Matrix has (2^colAddrBits) columns and rowDataBits rows.\n" +
-      "Display shown in a floating panel."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

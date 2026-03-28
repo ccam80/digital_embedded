@@ -131,13 +131,6 @@ export class SubElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "Sub — N-bit subtractor with borrow in/out.\n" +
-      "Inputs: a, b (bitWidth bits each), c_i (1-bit borrow in).\n" +
-      "Outputs: s (bitWidth-bit difference), c_o (1-bit borrow out)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { MOSFET_NMOS_DEFAULTS } from "../../../solver/analog/model-defaults.js";

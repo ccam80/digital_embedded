@@ -284,9 +284,5 @@ describe("ButtonLED", () => {
       expect(() => registry.register(ButtonLEDDefinition)).not.toThrow();
     });
 
-    it("ButtonLEDElement.getHelpText() contains 'ButtonLED'", () => {
-      const el = makeButtonLED();
-      expect(el.getHelpText()).toContain("ButtonLED");
-    });
   });
 });

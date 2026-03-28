@@ -20,7 +20,7 @@ import {
   makeVoltageSource,
   makeCapacitor,
   makeDiode,
-} from "../test-elements.js";
+} from "./test-helpers.js";
 import { AnalogFuseElement } from "../../../components/passives/analog-fuse.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry } from "../../../core/registry.js";
@@ -515,7 +515,6 @@ function makeAnalogElement(
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
-    getHelpText() { return ""; },
     getAttribute(k: string) { return propsMap.get(k); },
   };
 }

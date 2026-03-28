@@ -37,17 +37,6 @@ export function grayCodeSequence(n: number): number[] {
   return seq;
 }
 
-/**
- * Return the position (0-based index) of a Gray code value in a sequence of
- * length n.  E.g. for n=4, value 3 (binary 11) is at index 2.
- */
-export function grayCodeIndex(value: number, n: number): number {
-  const seq = grayCodeSequence(n);
-  const idx = seq.indexOf(value);
-  if (idx === -1) throw new Error(`grayCodeIndex: value ${value} not found in sequence of ${n}`);
-  return idx;
-}
-
 // ---------------------------------------------------------------------------
 // Grid layout constants
 // ---------------------------------------------------------------------------

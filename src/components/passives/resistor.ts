@@ -129,12 +129,6 @@ export class ResistorElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Resistor — stamps conductance G=1/R into the MNA matrix.\n" +
-      "Minimum resistance is clamped to 1e-9 Ω."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

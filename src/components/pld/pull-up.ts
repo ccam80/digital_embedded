@@ -117,15 +117,6 @@ export class PullUpElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "PullUp — pulls a floating net to logic 1.\n" +
-      "Connects a resistor from VDD to the output net.\n" +
-      "When no active-low driver overrides, the net reads as logic 1.\n" +
-      "Used in open-drain / wired-AND configurations."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

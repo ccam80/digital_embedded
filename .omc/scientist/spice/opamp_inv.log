@@ -1,0 +1,102 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * op-amp inverting amplifier  vin=1v rin=1k rf=10k
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 8:
+       .measure oppoint v_output find v(out) at=0
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 9:
+       .measure oppoint v_inv find v(inv) at=0
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 10:
+       .measure oppoint v_in find v(in) at=0
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 8:
+       .measure oppoint v_output find v(out) at=0
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 9:
+       .measure oppoint v_inv find v(inv) at=0
+Error: unrecognized analysis type 'oppoint' for the following .meas statement on line 10:
+       .measure oppoint v_in find v(in) at=0
+
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	out                              -9.99989e+00
+	inv                              9.999890e-06
+	in                               1.000000e+00
+
+	Source	Current
+	------	-------
+
+	vin#branch                       -9.99990e-04
+	eoa#branch                       9.999900e-04
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ Resistor: Simple linear resistor
+     device                    rf                   rin
+      model                     R                     R
+ resistance                 10000                  1000
+         ac                 10000                  1000
+      dtemp                     0                     0
+     bv_max                 1e+99                 1e+99
+      noisy                     1                     1
+          i            0.00099999            0.00099999
+          p             0.0099998            0.00099998
+
+ VCVS: Voltage controlled voltage source
+     device                   eoa
+          i            0.00099999
+          v              -9.99989
+          p           -0.00999979
+
+ Vsource: Independent voltage source
+     device                   vin
+         dc                     1
+      acmag                     0
+      pulse         -
+        sin         -
+        exp         -
+        pwl         -
+       sffm         -
+         am         -
+    trnoise         -
+   trrandom         -
+    portnum                     0
+         z0                     0
+        pwr                     0
+       freq                     0
+      phase                     0
+          i           -0.00099999
+          p           -0.00099999
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.055 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13020.906 MB.
+Maximum ngspice program size =   14.160 MB.
+Current ngspice program size =   14.160 MB.
+

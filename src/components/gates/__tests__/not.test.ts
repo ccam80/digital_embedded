@@ -377,10 +377,6 @@ describe("NotGate", () => {
       expect(typeof NotDefinition.helpText).toBe("string"); expect(NotDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("NotElement.getHelpText() returns the expected text", () => {
-      const el = makeNot();
-      expect(el.getHelpText()).toContain("Not gate");
-    });
 
     it("NotDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

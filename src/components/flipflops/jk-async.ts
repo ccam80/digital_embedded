@@ -19,7 +19,7 @@ import {
   PinDirection,
 } from "../../core/pin.js";
 import { drawGenericShape } from "../generic-shape.js";
-import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -120,7 +120,66 @@ export class JKAsyncElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    return this.derivePins(JK_FF_AS_PIN_DECLARATIONS, ["C"]);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const decls: PinDeclaration[] = [
+      {
+        direction: PinDirection.INPUT,
+        label: "Set",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 0 },
+        isNegatable: true,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "J",
+        defaultBitWidth: bitWidth,
+        position: { x: 0, y: 1 },
+        isNegatable: true,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "C",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 2 },
+        isNegatable: true,
+        isClockCapable: true,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "K",
+        defaultBitWidth: bitWidth,
+        position: { x: 0, y: 3 },
+        isNegatable: true,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.INPUT,
+        label: "Clr",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 4 },
+        isNegatable: true,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.OUTPUT,
+        label: "Q",
+        defaultBitWidth: bitWidth,
+        position: { x: COMP_WIDTH, y: 0 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+      {
+        direction: PinDirection.OUTPUT,
+        label: "~Q",
+        defaultBitWidth: bitWidth,
+        position: { x: COMP_WIDTH, y: 1 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+    ];
+    return this.derivePins(decls, ["C"]);
   }
 
   getBoundingBox(): Rect {
@@ -146,14 +205,6 @@ export class JKAsyncElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "JK Flip-Flop with async Set/Clear.\n" +
-      "Set (active-high) forces Q=1 asynchronously.\n" +
-      "Clr (active-high) forces Q=0 asynchronously.\n" +
-      "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -177,15 +228,18 @@ export function executeJKAsync(index: number, state: Uint32Array, _highZs: Uint3
   const clr = state[wt[inBase + 4]];
   const prevClock = state[stBase + 1];
 
+  const bw = layout.getProperty(index, "bitWidth");
+  const bitWidth = typeof bw === "number" && bw > 0 ? bw : 1;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
+
   if (clock !== 0 && prevClock === 0) {
     const jBit = j !== 0;
     const kBit = k !== 0;
-    const qBit = state[stBase] !== 0;
 
     if (jBit && kBit) {
-      state[stBase] = qBit ? 0 : 1;
+      state[stBase] = (~state[stBase] & mask) >>> 0;
     } else if (jBit) {
-      state[stBase] = 1;
+      state[stBase] = mask;
     } else if (kBit) {
       state[stBase] = 0;
     }
@@ -193,14 +247,14 @@ export function executeJKAsync(index: number, state: Uint32Array, _highZs: Uint3
   state[stBase + 1] = clock;
 
   if (setIn !== 0) {
-    state[stBase] = 1;
+    state[stBase] = mask;
   } else if (clr !== 0) {
     state[stBase] = 0;
   }
 
   const q = state[stBase];
   state[wt[outBase]] = q;
-  state[wt[outBase + 1]] = q !== 0 ? 0 : 1;
+  state[wt[outBase + 1]] = (~q & mask) >>> 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +262,7 @@ export function executeJKAsync(index: number, state: Uint32Array, _highZs: Uint3
 // ---------------------------------------------------------------------------
 
 export const JK_FF_AS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
   { xmlName: "inverterConfig", propertyKey: "_inverterLabels", convert: (v) => v },
 ];
@@ -217,6 +272,15 @@ export const JK_FF_AS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 const JK_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "bitWidth",
+    type: PropertyType.BIT_WIDTH,
+    label: "Bits",
+    defaultValue: 1,
+    min: 1,
+    max: 32,
+    description: "Bit width of J, K, and Q signals",
+  },
   LABEL_PROPERTY_DEF,
 ];
 

@@ -46,9 +46,6 @@ class TestLeafElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
   }
 
-  getHelpText(): string {
-    return "test leaf";
-  }
 }
 
 function makeLeaf(
@@ -170,9 +167,6 @@ class TestSubcircuitElement extends AbstractCircuitElement implements Subcircuit
     return { x: this.position.x, y: this.position.y, width: 6, height: 4 };
   }
 
-  getHelpText(): string {
-    return "subcircuit";
-  }
 }
 
 function makeSubcircuitElement(

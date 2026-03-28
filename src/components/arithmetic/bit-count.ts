@@ -80,10 +80,6 @@ export class BitCountElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "BitCount — counts the number of set (1) bits in the input (population count / popcount).";
-  }
 }
 
 export function executebitCount(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {

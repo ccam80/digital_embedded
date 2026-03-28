@@ -104,14 +104,6 @@ export class BreakElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Break — halts simulation when input goes high.\n" +
-      "Used for run-to-breakpoint debugging.\n" +
-      "The engine checks this component's output after each step."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

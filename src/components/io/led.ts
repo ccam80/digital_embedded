@@ -107,14 +107,6 @@ export class LedElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "LED — single-color light-emitting diode indicator.\n" +
-      "Lights up (filled circle) when the input is non-zero.\n" +
-      "Color is configurable. Label is shown above the component."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

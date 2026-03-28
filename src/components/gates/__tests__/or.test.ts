@@ -415,10 +415,6 @@ describe("OrGate", () => {
       expect(typeof OrDefinition.helpText).toBe("string"); expect(OrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("OrElement.getHelpText() returns the expected text", () => {
-      const el = makeOr();
-      expect(el.getHelpText()).toContain("Or gate");
-    });
 
     it("OrDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

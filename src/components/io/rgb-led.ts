@@ -123,14 +123,6 @@ export class RgbLedElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "RGBLED — three-color LED with independent R, G, B channel inputs.\n" +
-      "Each channel is 1-bit: channel lights when input is non-zero.\n" +
-      "All three channels active produces white light."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

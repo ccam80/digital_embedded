@@ -532,10 +532,6 @@ describe("VGA", () => {
       expect(typeof VGADefinition.helpText).toBe("string"); expect(VGADefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("VGAElement.getHelpText() returns relevant text", () => {
-      const el = makeVga();
-      expect(el.getHelpText()).toContain("VGA");
-    });
 
     it("VGADefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

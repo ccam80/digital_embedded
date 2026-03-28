@@ -511,10 +511,6 @@ class ScopedElement extends AbstractCircuitElement {
     return this._wrapped.getBoundingBox();
   }
 
-  getHelpText(): string {
-    return this._wrapped.getHelpText();
-  }
-
   serialize(): SerializedElement {
     const base = this._wrapped.serialize();
     return { ...base, instanceId: this.instanceId };

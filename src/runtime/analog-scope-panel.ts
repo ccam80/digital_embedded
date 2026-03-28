@@ -149,6 +149,25 @@ export class ScopePanel implements MeasurementObserver {
   // Channel management
   // -------------------------------------------------------------------------
 
+  /**
+   * Compute min/max/mean statistics for all channels from their recorded buffers.
+   * Returns one entry per channel. Returns an empty array if no data has been collected.
+   */
+  getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> {
+    return this._channels.map(ch => {
+      const { value } = ch.buffer.getSamplesInRange(ch.buffer.timeStart, ch.buffer.timeEnd);
+      if (value.length === 0) return { label: ch.label, min: 0, max: 0, mean: 0 };
+      let mn = value[0], mx = value[0], sum = 0;
+      for (let i = 0; i < value.length; i++) {
+        const v = value[i];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+        sum += v;
+      }
+      return { label: ch.label, min: mn, max: mx, mean: sum / value.length };
+    });
+  }
+
   /** Read-only channel info for UI (e.g. context menus). */
   getChannelDescriptors(): Array<{ label: string; kind: ChannelKind; autoRange: boolean; yMin: number; yMax: number; overlays: ReadonlySet<OverlayKind> }> {
     return this._channels.map(c => ({

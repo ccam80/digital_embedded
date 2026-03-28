@@ -217,14 +217,6 @@ export class SixteenSegElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "SixteenSeg — direct-drive 16-segment alphanumeric display.\n" +
-      "16 independent segment inputs for full alphanumeric character display.\n" +
-      "commonCathode=true: segments light when input=1."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

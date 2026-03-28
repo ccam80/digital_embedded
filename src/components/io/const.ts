@@ -94,14 +94,6 @@ export class ConstElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Const — constant value source.\n" +
-      "Outputs a fixed value on every simulation step.\n" +
-      "Configurable bit width and constant value."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

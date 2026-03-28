@@ -135,13 +135,6 @@ export class NotElement extends AbstractCircuitElement {
     drawUprightText(ctx, label, w / 2, -0.5, { horizontal: "center", vertical: "bottom" }, this.rotation);
   }
 
-  getHelpText(): string {
-    return (
-      "Not gate — performs bitwise NOT (inversion) of the input.\n" +
-      "Single input, configurable bit width (1–32).\n" +
-      "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

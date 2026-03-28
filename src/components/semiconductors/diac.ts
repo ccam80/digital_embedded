@@ -253,13 +253,6 @@ export class DiacElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Diac — bidirectional trigger diode.\n" +
-      "Pins: A (terminal 1), B (terminal 2).\n" +
-      "Blocks until |V| > V_breakover, then snaps to V_hold."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

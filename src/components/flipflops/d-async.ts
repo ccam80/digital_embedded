@@ -187,14 +187,6 @@ export class DAsyncElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "D Flip-Flop with async Set/Clear — edge-triggered with async preset/clear.\n" +
-      "Set (active-high) forces Q=1 asynchronously.\n" +
-      "Clr (active-high) forces Q=0 asynchronously.\n" +
-      "When Set and Clr are both inactive, stores D on rising clock edge."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

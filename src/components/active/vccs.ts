@@ -271,14 +271,6 @@ export class VCCSElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Voltage-Controlled Current Source — 4-terminal element. " +
-      "Output current = expression(V_ctrl). " +
-      "Pins: ctrl+, ctrl- (control sense), out+, out- (output)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

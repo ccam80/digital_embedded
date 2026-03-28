@@ -28,7 +28,7 @@ import { checkWireConsistency } from "@/editor/wire-consistency";
  * We check collinearity on the shared axis and that P is strictly between
  * the two endpoints.
  */
-export function isPointOnSegmentInterior(p: Point, a: Point, b: Point): boolean {
+function isPointOnSegmentInterior(p: Point, a: Point, b: Point): boolean {
   if (a.x === b.x) {
     // Vertical segment
     if (p.x !== a.x) return false;

@@ -54,65 +54,6 @@ export interface WaveformRenderContext {
 }
 
 // ---------------------------------------------------------------------------
-// RecordingContext — test double that records DrawCommands
-// ---------------------------------------------------------------------------
-
-/**
- * Test implementation of WaveformRenderContext.
- * Records every draw call as a DrawCommand for assertion.
- */
-export class RecordingContext implements WaveformRenderContext {
-  readonly commands: DrawCommand[] = [];
-  readonly width: number;
-  readonly height: number;
-
-  constructor(width = 800, height = 400) {
-    this.width = width;
-    this.height = height;
-  }
-
-  beginPath(): void {
-    this.commands.push({ kind: "beginPath" });
-  }
-
-  moveTo(x: number, y: number): void {
-    this.commands.push({ kind: "moveTo", x, y });
-  }
-
-  lineTo(x: number, y: number): void {
-    this.commands.push({ kind: "lineTo", x, y });
-  }
-
-  stroke(): void {
-    this.commands.push({ kind: "stroke" });
-  }
-
-  fillRect(x: number, y: number, w: number, h: number): void {
-    this.commands.push({ kind: "fillRect", x, y, w, h });
-  }
-
-  fillText(text: string, x: number, y: number): void {
-    this.commands.push({ kind: "text", value: text, x, y });
-  }
-
-  fill(): void {
-    this.commands.push({ kind: "fill" });
-  }
-
-  setStrokeStyle(style: string): void {
-    this.commands.push({ kind: "setStrokeStyle", style });
-  }
-
-  setFillStyle(style: string): void {
-    this.commands.push({ kind: "setFillStyle", style });
-  }
-
-  clearRect(_x: number, _y: number, _w: number, _h: number): void {
-    // no-op in recording context — clears are not tracked as draw commands
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Viewport — describes which time range is visible
 // ---------------------------------------------------------------------------
 

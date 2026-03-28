@@ -1,0 +1,4 @@
+* probe
+.model SCRMOD SCR(IH=5m IGT=200u VTM=1.7)
+.op
+.end

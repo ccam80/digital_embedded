@@ -55,9 +55,6 @@ function makeMockElement(typeId: string, instanceId: string): CircuitElement {
         properties: {},
       };
     },
-    getHelpText(): string {
-      return `Help for ${typeId}`;
-    },
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },

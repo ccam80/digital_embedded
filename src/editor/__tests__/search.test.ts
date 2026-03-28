@@ -35,7 +35,6 @@ function makeElement(typeId: string, label?: string) {
       mirror: false,
       properties: {},
     }),
-    getHelpText: () => "",
     getAttribute: (name: string) => (bag.has(name) ? bag.get(name) : undefined),
   };
 }

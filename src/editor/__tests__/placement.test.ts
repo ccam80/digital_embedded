@@ -32,7 +32,6 @@ function makeStubElement(position: Point = { x: 0, y: 0 }): CircuitElement {
     draw: (_ctx: RenderContext): void => {},
     getBoundingBox: (): Rect => ({ x: position.x, y: position.y, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
-    getHelpText: (): string => "Mock component",
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
   };
 }

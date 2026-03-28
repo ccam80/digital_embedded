@@ -265,10 +265,4 @@ describe("ProgramCounter", () => {
     const props = new PropertyBag();
     expect(ProgramCounterDefinition.factory(props)).toBeInstanceOf(ProgramCounterElement);
   });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
 });

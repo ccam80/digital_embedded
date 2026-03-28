@@ -104,32 +104,51 @@ export class DataField {
 }
 
 // ---------------------------------------------------------------------------
-// Module-level backing store registry
-// Phase 3 engine populates this before calling executeFn for memory components.
+// Backing store registry — scoped per engine via setActiveBackingStores()
+//
+// Each engine owns its own Map<number, DataField>. Before compilation or
+// stepping, the engine calls setActiveBackingStores() to make its map
+// the active target for registerBackingStore / getBackingStore.
 // ---------------------------------------------------------------------------
 
-const _backingStores: Map<number, DataField> = new Map();
+let _activeStores: Map<number, DataField> = new Map();
+
+/**
+ * Create a new backing store map. Each engine should own one.
+ */
+export function createBackingStoreMap(): Map<number, DataField> {
+  return new Map();
+}
+
+/**
+ * Set the active backing store map. Called by the engine before
+ * compilation and before each step to ensure the correct per-engine
+ * stores are targeted.
+ */
+export function setActiveBackingStores(stores: Map<number, DataField>): void {
+  _activeStores = stores;
+}
 
 /**
  * Register a DataField for a component instance.
  * Called by the Phase 3 engine during circuit compilation.
  */
 export function registerBackingStore(componentIndex: number, field: DataField): void {
-  _backingStores.set(componentIndex, field);
+  _activeStores.set(componentIndex, field);
 }
 
 /**
  * Retrieve the DataField for a component instance.
  */
 export function getBackingStore(componentIndex: number): DataField | undefined {
-  return _backingStores.get(componentIndex);
+  return _activeStores.get(componentIndex);
 }
 
 /**
  * Remove all registered backing stores. Used for testing and engine reset.
  */
 export function clearBackingStores(): void {
-  _backingStores.clear();
+  _activeStores.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -260,13 +279,6 @@ export class RAMSinglePortElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "RAMSinglePort — synchronous RAM with a single read/write port.\n" +
-      "On rising clock edge: if str=1, writes data to memory[A].\n" +
-      "If ld=1, outputs memory[A] on D; otherwise D is 0."
-    );
-  }
 }
 
 export function sampleRAMSinglePort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -281,7 +293,7 @@ export function sampleRAMSinglePort(index: number, state: Uint32Array, _highZs: 
 
   if (!lastClk && clk) {
     if (str) {
-      const mem = _backingStores.get(index);
+      const mem = getBackingStore(index);
       if (mem !== undefined) {
         mem.write(A, state[wt[inBase + 1 + 3]]);
       }
@@ -300,7 +312,7 @@ export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs:
   const ld = state[wt[inBase + 3]] & 1;
 
   if (ld) {
-    const mem = _backingStores.get(index);
+    const mem = getBackingStore(index);
     state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
     state[wt[outBase]] = 0;
@@ -394,13 +406,6 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "RAMSinglePortSel — combinational RAM with chip select.\n" +
-      "CS=1 selects chip. WE=1 writes data to memory[A].\n" +
-      "OE=1 and CS=1 and WE=0 outputs memory[A] on D."
-    );
-  }
 }
 
 export function executeRAMSinglePortSel(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -415,13 +420,13 @@ export function executeRAMSinglePortSel(index: number, state: Uint32Array, _high
 
   if (cs) {
     if (we) {
-      const mem = _backingStores.get(index);
+      const mem = getBackingStore(index);
       if (mem !== undefined) {
         mem.write(A, state[wt[outBase]]);
       }
     }
     if (oe && !we) {
-      const mem = _backingStores.get(index);
+      const mem = getBackingStore(index);
       state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
     } else {
       state[wt[outBase]] = 0;
@@ -518,13 +523,6 @@ export class RAMDualPortElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "RAMDualPort — synchronous RAM with separate read/write ports.\n" +
-      "On rising clock edge: if str=1, writes Din to memory[A].\n" +
-      "If ld=1, outputs memory[A] on D; otherwise D is 0."
-    );
-  }
 }
 
 export function sampleRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -540,7 +538,7 @@ export function sampleRAMDualPort(index: number, state: Uint32Array, _highZs: Ui
 
   if (!lastClk && clk) {
     if (str) {
-      const mem = _backingStores.get(index);
+      const mem = getBackingStore(index);
       if (mem !== undefined) {
         mem.write(A, din);
       }
@@ -559,7 +557,7 @@ export function executeRAMDualPort(index: number, state: Uint32Array, _highZs: U
   const ld = state[wt[inBase + 4]] & 1;
 
   if (ld) {
-    const mem = _backingStores.get(index);
+    const mem = getBackingStore(index);
     state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
   } else {
     state[wt[outBase]] = 0;
@@ -657,13 +655,6 @@ export class RAMDualAccessElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "RAMDualAccess — RAM with two independent access ports.\n" +
-      "Port 1 (synchronous): write 1Din to mem[1A] on clock edge if str=1; read with ld=1.\n" +
-      "Port 2 (async read): 2D = mem[2A] combinationally."
-    );
-  }
 }
 
 export function sampleRAMDualAccess(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -679,7 +670,7 @@ export function sampleRAMDualAccess(index: number, state: Uint32Array, _highZs: 
 
   if (!lastClk && clk) {
     if (str) {
-      const mem = _backingStores.get(index);
+      const mem = getBackingStore(index);
       if (mem !== undefined) {
         mem.write(addr1, din1);
       }
@@ -698,7 +689,7 @@ export function executeRAMDualAccess(index: number, state: Uint32Array, _highZs:
   const addr1 = state[wt[inBase + 3]] >>> 0;
   const addr2 = state[wt[inBase + 5]] >>> 0;
 
-  const mem = _backingStores.get(index);
+  const mem = getBackingStore(index);
   state[wt[outBase]] = ld ? (mem !== undefined ? mem.read(addr1) : 0) : 0;
   state[wt[outBase + 1]] = mem !== undefined ? mem.read(addr2) : 0;
 }
@@ -787,13 +778,6 @@ export class RAMAsyncElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "RAMAsync — asynchronous (combinational) RAM.\n" +
-      "If we=1, writes D to memory[A] immediately.\n" +
-      "Output Q always reflects memory[A]."
-    );
-  }
 }
 
 export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -805,7 +789,7 @@ export function executeRAMAsync(index: number, state: Uint32Array, _highZs: Uint
   const D = state[wt[inBase + 1]] >>> 0;
   const we = state[wt[inBase + 2]] & 1;
 
-  const mem = _backingStores.get(index);
+  const mem = getBackingStore(index);
   if (we && mem !== undefined) {
     mem.write(A, D);
   }
@@ -900,13 +884,6 @@ export class BlockRAMDualPortElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "BlockRAMDualPort — block RAM with synchronous read (read-before-write).\n" +
-      "On rising clock edge: captures memory[A] into output register, then writes Din if str=1.\n" +
-      "Output D reflects the value registered on the previous clock edge."
-    );
-  }
 }
 
 export function sampleBlockRAMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -921,7 +898,7 @@ export function sampleBlockRAMDualPort(index: number, state: Uint32Array, _highZ
   const lastClk = state[stBase] & 1;
 
   if (!lastClk && clk) {
-    const mem = _backingStores.get(index);
+    const mem = getBackingStore(index);
     const readVal = mem !== undefined ? mem.read(A) : 0;
     state[stBase + 1] = readVal;
     if (str && mem !== undefined) {

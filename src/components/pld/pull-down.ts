@@ -115,15 +115,6 @@ export class PullDownElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "PullDown — pulls a floating net to logic 0.\n" +
-      "Connects a resistor from GND to the output net.\n" +
-      "When no active-high driver overrides, the net reads as logic 0.\n" +
-      "Used in open-collector / wired-OR configurations."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

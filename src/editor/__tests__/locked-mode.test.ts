@@ -38,9 +38,6 @@ function makeElement(typeId: string): CircuitElement {
         properties: {},
       };
     },
-    getHelpText(): string {
-      return "";
-    },
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },

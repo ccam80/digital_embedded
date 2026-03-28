@@ -340,12 +340,6 @@ describe("EEPROM", () => {
     expect(typeof EEPROMDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
-
   it("factoryCreatesInstance — EEPROMDefinition.factory returns EEPROMElement", () => {
     const props = new PropertyBag();
     expect(EEPROMDefinition.factory(props)).toBeInstanceOf(EEPROMElement);
@@ -577,12 +571,6 @@ describe("EEPROMDualPort", () => {
   it("factoryCreatesInstance — factory returns EEPROMDualPortElement", () => {
     const props = new PropertyBag();
     expect(EEPROMDualPortDefinition.factory(props)).toBeInstanceOf(EEPROMDualPortElement);
-  });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
   });
 
   it("noBackingStore — read returns 0 gracefully", () => {

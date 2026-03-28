@@ -242,13 +242,6 @@ export class RealOpAmpElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Real Op-Amp — finite gain, GBW, slew rate, input offset, bias currents, " +
-      "output resistance, current limiting, and rail saturation."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

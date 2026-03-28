@@ -284,13 +284,6 @@ export class PJfetElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "P-channel JFET — Shichman-Hodges model (polarity inverted).\n" +
-      "Pins: G (gate), D (drain), S (source).\n" +
-      "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

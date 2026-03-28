@@ -30,9 +30,9 @@ import type { Circuit } from "@/core/circuit";
  */
 function makeMockFacade(outputValues: Record<string, number> = {}): {
   facade: SimulatorFacade;
-  calls: { setInput: Array<[string, number]>; runToStable: number };
+  calls: { setInput: Array<[string, number]>; runToStable: number; step: number };
 } {
-  const calls = { setInput: [] as Array<[string, number]>, runToStable: 0 };
+  const calls = { setInput: [] as Array<[string, number]>, runToStable: 0, step: 0 };
 
   const facade = {
     setInput: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
@@ -44,12 +44,14 @@ function makeMockFacade(outputValues: Record<string, number> = {}): {
     runToStable: vi.fn((_coordinator: SimulationCoordinator) => {
       calls.runToStable++;
     }),
+    step: vi.fn((_coordinator: SimulationCoordinator) => {
+      calls.step++;
+    }),
     // Unused facade methods — present to satisfy the interface
     createCircuit: vi.fn(),
     addComponent: vi.fn(),
     connect: vi.fn(),
     compile: vi.fn(),
-    step: vi.fn(),
     run: vi.fn(),
     readAllSignals: vi.fn(),
     runTests: vi.fn(),
@@ -230,9 +232,10 @@ describe("executeTests", () => {
     expect(clockCalls[0]).toEqual(["CLK", 1]);
     expect(clockCalls[1]).toEqual(["CLK", 0]);
 
-    // runToStable called three times: once to propagate regular inputs before
-    // clock toggle, once after rising edge, once after falling edge
-    expect(calls.runToStable).toBe(3);
+    // runToStable called once: to propagate regular inputs before the clock edge
+    // step called twice: once after rising edge, once after falling edge
+    expect(calls.runToStable).toBe(1);
+    expect(calls.step).toBe(2);
   });
 
   // -------------------------------------------------------------------------

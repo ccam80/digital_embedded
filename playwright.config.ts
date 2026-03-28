@@ -6,7 +6,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: process.env.CI
+    ? 'github'
+    : process.env.VITEST_QUIET
+      ? [['json', { outputFile: 'test-results/playwright-failures.json' }]]
+      : process.env.VITEST_VERBOSE
+        ? 'list'
+        : [['list'], ['json', { outputFile: 'test-results/playwright-failures.json' }]],
   timeout: 30_000,
   expect: { timeout: 10_000 },
 

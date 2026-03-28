@@ -345,14 +345,6 @@ export class OptocouplerElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Optocoupler (opto-isolator) — 4-terminal compound component. " +
-      "LED input (anode, cathode) drives phototransistor output (collector, emitter). " +
-      "I_collector = CTR * I_LED. Galvanic isolation between input and output."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

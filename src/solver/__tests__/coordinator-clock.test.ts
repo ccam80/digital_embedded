@@ -37,7 +37,6 @@ class MockElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-  getHelpText(): string { return ''; }
 }
 
 function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {

@@ -59,9 +59,6 @@ class TestElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
   }
 
-  getHelpText(): string {
-    return "";
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +102,6 @@ function makeAnalogElement(
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
-    getHelpText() { return ""; },
     getAttribute(k: string) { return propsMap.get(k); },
   };
 }

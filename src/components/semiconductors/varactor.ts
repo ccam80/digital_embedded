@@ -269,13 +269,6 @@ export class VaractorElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Varactor Diode — voltage-controlled junction capacitance.\n" +
-      "C_j(V_R) = CJO / (1 + V_R/VJ)^M\n" +
-      "Used for voltage-controlled oscillators and tuned circuits."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

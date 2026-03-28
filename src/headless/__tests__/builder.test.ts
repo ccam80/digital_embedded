@@ -50,9 +50,6 @@ class MockCircuitElement implements CircuitElement {
       properties: {},
     };
   }
-  getHelpText() {
-    return '';
-  }
   getAttribute(_name: string): PropertyValue | undefined {
     return this.getProperties().has(_name) ? this.getProperties().get(_name) : undefined;
   }

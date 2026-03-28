@@ -23,7 +23,6 @@ function makeElement(typeId: string, index: number): CircuitElement {
     draw: () => {},
     getBoundingBox: () => ({ x: 0, y: 0, width: 0, height: 0 }),
     serialize: () => ({ typeId, instanceId: `inst-${index}`, position: { x: 0, y: 0 }, rotation: 0 as never, mirror: false, properties: {} }),
-    getHelpText: () => "",
   } as unknown as CircuitElement;
 }
 

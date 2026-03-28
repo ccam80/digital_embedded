@@ -1,0 +1,28 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: crystal oscillator with kick
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+
+No. of Data Rows : 50011
+
+  Measurements for Transient Analysis
+
+vc_pp               =  3.210606e-03 from=  5.000000e-04 to=  1.000000e-03
+vc_max              =  5.000016e+00 at=  5.000192e-04
+vb_pp               =  2.315277e-01 from=  5.000000e-04 to=  1.000000e-03
+
+
+Total analysis time (seconds) = 0.207
+
+Total elapsed time (seconds) = 0.244 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13360.957 MB.
+Maximum ngspice program size =   17.180 MB.
+Current ngspice program size =   17.180 MB.
+

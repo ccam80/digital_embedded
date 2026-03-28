@@ -150,14 +150,6 @@ export class TransformerElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Two-winding transformer — uses coupled inductor companion model.\n" +
-      "Properties: turnsRatio (N), primaryInductance (H), couplingCoefficient (k),\n" +
-      "primaryResistance (Ω), secondaryResistance (Ω)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

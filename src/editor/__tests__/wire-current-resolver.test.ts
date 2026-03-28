@@ -20,7 +20,7 @@ import {
   makeAcVoltageSource,
   makeCapacitor,
   makeInductor,
-} from "@/solver/analog/test-elements";
+} from "@/solver/analog/__tests__/test-helpers";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -86,9 +86,6 @@ function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
     draw(_ctx: RenderContext) {},
     serialize() {
       return serialized;
-    },
-    getHelpText() {
-      return "";
     },
     getAttribute() {
       return undefined;

@@ -88,15 +88,6 @@ export class AndElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "And gate — performs bitwise AND of all inputs.\n" +
-      "Configurable input count (2–5) and bit width (1–32).\n" +
-      "Both IEEE/US (curved) and IEC/DIN (rectangular with &) shapes are supported.\n" +
-      "Individual inputs can be inverted via the inverterConfig property."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

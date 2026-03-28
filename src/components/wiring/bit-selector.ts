@@ -126,15 +126,6 @@ export class BitSelectorElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 3);
-    const dataBits = 1 << selectorBits;
-    return (
-      `BitSelector — selects a single bit from a ${dataBits}-bit input.\n` +
-      `Output = (input >> selector) & 1.\n` +
-      `Selector bits: ${selectorBits}.`
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

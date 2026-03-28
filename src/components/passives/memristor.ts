@@ -264,13 +264,6 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Memristor — Joglekar window function model.\n" +
-      "Resistance depends on charge history (state variable w, 0–1).\n" +
-      "dw/dt = µ_v · R_on / D² · i · f_p(w), f_p(w) = 1 − (2w−1)^(2p)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

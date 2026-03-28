@@ -1,0 +1,15 @@
+MOSFET PWM ideal switch
+* Use voltage-controlled switch to model MOSFET PWM correctly
+* 50% duty, 10kHz clock
+Vdd 1 0 DC 12
+Vgate g 0 PULSE(0 1 0 10n 10n 50u 100u)
+SW1 1 2 g 0 MYSW
+L1 2 3 1m
+R1 3 4 100
+C1 4 0 1u IC=0
+.model MYSW SW(Ron=0.001 Roff=1Meg Vt=0.5)
+.tran 5u 30m UIC
+.meas tran vout_avg  AVG V(4) FROM=20m TO=30m
+.meas tran vout_pp   PP  V(4) FROM=20m TO=30m
+.meas tran vsw_avg   AVG V(2) FROM=20m TO=30m
+.end

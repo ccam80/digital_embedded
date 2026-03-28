@@ -12,7 +12,6 @@ import {
   hitTestAll,
   elementsInRect,
   wiresInRect,
-  distancePointToSegment,
 } from "@/editor/hit-test";
 import type { CircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
@@ -40,7 +39,6 @@ function makeElement(bb: Rect, pins: Pin[] = []): CircuitElement {
     draw: (_ctx: RenderContext) => {},
     getBoundingBox: () => bb,
     serialize: () => ({} as SerializedElement),
-    getHelpText: () => "",
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
   };
 }
@@ -192,27 +190,4 @@ describe("HitTest", () => {
     expect(result).not.toContain(w2);
   });
 
-  // ---------------------------------------------------------------------------
-  // distancePointToSegment
-  // ---------------------------------------------------------------------------
-
-  it("distancePointToSegmentMidpoint", () => {
-    // Horizontal segment from (0,0) to (10,0), point at (5, 3)
-    // Perpendicular to midpoint → distance is 3
-    const d = distancePointToSegment({ x: 5, y: 3 }, { x: 0, y: 0 }, { x: 10, y: 0 });
-    expect(d).toBeCloseTo(3, 5);
-  });
-
-  it("distancePointToSegmentEndpoint", () => {
-    // Segment from (0,0) to (10,0), point at (15, 0)
-    // Beyond end — nearest point is (10,0), distance = 5
-    const d = distancePointToSegment({ x: 15, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 });
-    expect(d).toBeCloseTo(5, 5);
-  });
-
-  it("distancePointToSegmentDegenerateSegment", () => {
-    // Degenerate segment (zero length) — distance to the point
-    const d = distancePointToSegment({ x: 3, y: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 });
-    expect(d).toBeCloseTo(5, 5);
-  });
 });

@@ -148,15 +148,6 @@ export class DipSwitchElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "DipSwitch — multi-bit toggle switch array.\n" +
-      "Each bit is independently toggled by clicking the corresponding switch position.\n" +
-      "The bitCount property controls how many individual switches are shown.\n" +
-      "Interactive: the engine sets each bit's value when the user clicks."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -367,10 +367,6 @@ describe("Testcase", () => {
       expect(() => registry.register(TestcaseDefinition)).not.toThrow();
     });
 
-    it("TestcaseElement.getHelpText() contains 'Testcase'", () => {
-      const el = makeTestcase();
-      expect(el.getHelpText()).toContain("Testcase");
-    });
 
     it("TestcaseDefinition pinLayout has no pins", () => {
       expect(TestcaseDefinition.pinLayout).toHaveLength(0);

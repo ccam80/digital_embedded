@@ -198,13 +198,6 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Potentiometer — voltage divider with 3 terminals (A, wiper, B).\n" +
-      "Position determines the voltage division between top and bottom resistances."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

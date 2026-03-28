@@ -95,8 +95,5 @@ export {
 export {
   SimulationError,
   BurnException,
-  BacktrackException,
   BitsException,
-  NodeException,
-  PinException,
 } from '../core/errors.js';

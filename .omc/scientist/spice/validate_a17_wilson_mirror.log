@@ -1,0 +1,229 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * a17: wilson current mirror (vcc=12v)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	vbase                            6.569302e-01
+	vq2c                             1.022575e+00
+	vq1c                             1.212468e+00
+	vcc                              1.200000e+01
+
+	Source	Current
+	------	-------
+
+	vcc#branch                       -2.17650e-03
+
+ BJT models (Bipolar Junction Transistor)
+      model                  qnpn
+
+       type                   npn
+       tnom                    27
+         is                 1e-14
+        ibe                     0
+        ibc                     0
+         bf                   100
+         nf                     1
+        vaf                   100
+        ikf                     0
+        ise                     0
+         ne                   1.5
+         br                     1
+         nr                     1
+        var                     0
+        ikr                     0
+        isc                     0
+         nc                     2
+         rb                     0
+        irb                     0
+        rbm                     0
+         re                     0
+         rc                     0
+        cje                     0
+        vje                  0.75
+        mje                  0.33
+         tf                     0
+        xtf                     0
+        vtf                     0
+        itf                     0
+        ptf                     0
+        cjc                     0
+        vjc                  0.75
+        mjc                  0.33
+       xcjc                     1
+         tr                     0
+        cjs                     0
+        vjs                  0.75
+        mjs                     0
+        xtb                     0
+         eg                  1.11
+        xti                     3
+         fc                   0.5
+         kf                     0
+         af                     0
+        iss                     0
+         ns                     1
+        rco                  0.01
+         vo                    10
+      gamma                 1e-11
+        qco                     0
+       tlev                     0
+      tlevc                     0
+       tbf1                     0
+       tbf2                     0
+       tbr1                     0
+       tbr2                     0
+      tikf1                     0
+      tikf2                     0
+      tikr1                     0
+      tikr2                     0
+      tirb1                     0
+      tirb2                     0
+       tnc1                     0
+       tnc2                     0
+       tne1                     0
+       tne2                     0
+       tnf1                     0
+       tnf2                     0
+       tnr1                     0
+       tnr2                     0
+       trb1                     0
+       trb2                     0
+       trc1                     0
+       trc2                     0
+       tre1                     0
+       tre2                     0
+       trm1                     0
+       trm2                     0
+      tvaf1                     0
+      tvaf2                     0
+      tvar1                     0
+      tvar2                     0
+        ctc                     0
+        cte                     0
+        cts                     0
+       tvjc                     0
+       tvje                     0
+       tvjs                     0
+      titf1                     0
+      titf2                     0
+       ttf1                     0
+       ttf2                     0
+       ttr1                     0
+       ttr2                     0
+      tmje1                     0
+      tmje2                     0
+      tmjc1                     0
+      tmjc2                     0
+      tmjs1                     0
+      tmjs2                     0
+       tns1                     0
+       tns2                     0
+        nkf                   0.5
+       tis1                     0
+       tis2                     0
+      tise1                     0
+      tise2                     0
+      tisc1                     0
+      tisc2                     0
+      tiss1                     0
+      tiss2                     0
+   quasimod                     0
+         vg                 1.206
+         cn                  2.42
+          d                  0.87
+    vbe_max                 1e+99
+    vbc_max                 1e+99
+    vce_max                 1e+99
+     pd_max                 1e+99
+     ic_max                 1e+99
+     ib_max                 1e+99
+     te_max                 1e+99
+       rth0                     0
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ BJT: Bipolar Junction Transistor
+     device                    q2                    q1                    q3
+      model                  qnpn                  qnpn                  qnpn
+         ic             0.0010765            0.00107854           2.12389e-05
+         ib           1.07258e-05           1.07258e-05           2.12809e-07
+         ie           -0.00108723           -0.00108927          -2.14517e-05
+        vbe               0.65693               0.65693              0.555537
+        vbc             -0.365645             -0.555537              0.189893
+         gm             0.0416095             0.0416882           0.000820934
+        gpi           0.000414686           0.000414686           8.22709e-06
+        gmu           1.00004e-12           1.00001e-12           5.97694e-10
+         gx                     0                     0                     0
+         go           1.07258e-05           1.07258e-05           2.13388e-07
+        cpi                     0                     0                     0
+        cmu                     0                     0                     0
+        cbx                     0                     0                     0
+       csub                     0                     0                     0
+
+ Resistor: Simple linear resistor
+     device                 rload                  rref
+      model                     R                     R
+ resistance                 10000                 10000
+         ac                 10000                 10000
+      dtemp                     0                     0
+     bv_max                 1e+99                 1e+99
+      noisy                     1                     1
+          i            0.00109774            0.00107875
+          p             0.0120504             0.0116371
+
+ Vsource: Independent voltage source
+     device                   vcc
+         dc                    12
+      acmag                     0
+      pulse         -
+        sin         -
+        exp         -
+        pwl         -
+       sffm         -
+         am         -
+    trnoise         -
+   trrandom         -
+    portnum                     0
+         z0                     0
+        pwr                     0
+       freq                     0
+      phase                     0
+          i            -0.0021765
+          p            -0.0261179
+
+Error: .print: no dc analysis found.
+
+Total analysis time (seconds) = 0.001
+
+Total elapsed time (seconds) = 0.043 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 14749.051 MB.
+Maximum ngspice program size =   15.945 MB.
+Current ngspice program size =   15.945 MB.
+

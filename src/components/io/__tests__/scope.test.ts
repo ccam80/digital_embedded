@@ -300,10 +300,6 @@ describe("Scope", () => {
       expect(() => registry.register(ScopeDefinition)).not.toThrow();
     });
 
-    it("ScopeElement.getHelpText() contains 'Scope'", () => {
-      const el = makeScope();
-      expect(el.getHelpText()).toContain("Scope");
-    });
   });
 });
 
@@ -414,9 +410,5 @@ describe("ScopeTrigger", () => {
       expect(() => registry.register(ScopeTriggerDefinition)).not.toThrow();
     });
 
-    it("ScopeTriggerElement.getHelpText() contains 'ScopeTrigger'", () => {
-      const el = makeScopeTrigger();
-      expect(el.getHelpText()).toContain("ScopeTrigger");
-    });
   });
 });

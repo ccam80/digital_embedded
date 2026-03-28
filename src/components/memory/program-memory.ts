@@ -160,15 +160,6 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("isProgramMemory", true);
   }
 
-  getHelpText(): string {
-    return (
-      "ProgramMemory — ROM with built-in address auto-increment.\n" +
-      "On rising clock edge: if ld=1, jumps to address A; else address increments by 1.\n" +
-      "Output D always reflects memory[current_address].\n" +
-      "Designed for instruction fetch in CPU circuits.\n" +
-      "Set isProgramMemory=true to allow Phase 6 to preload a program binary."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

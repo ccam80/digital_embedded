@@ -279,13 +279,6 @@ export class LDRCircuitElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "LDR (Light Dependent Resistor) — resistance varies with illumination.\n" +
-      "Uses a power-law model: R = R_dark × (lux / lux_ref)^(-γ)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

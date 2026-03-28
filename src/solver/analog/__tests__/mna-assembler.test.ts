@@ -14,7 +14,7 @@ import {
   makeResistor,
   makeVoltageSource,
   makeCurrentSource,
-} from "../test-elements.js";
+} from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 
 // ---------------------------------------------------------------------------

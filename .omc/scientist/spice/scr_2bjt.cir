@@ -1,0 +1,19 @@
+* SCR 2-BJT model  Vcc=12V R1=1k Rg=1k Vtrig=3V
+* SCR = Q1(PNP) + Q2(NPN) cross-coupled
+* Anode=a, Cathode=k(GND), Gate=g
+Vcc    vcc   0    DC 12
+R1     vcc   a    1k
+Rg     gsrc  g    1k
+* Gate trigger: open until t=1ms, then Vtrig=3V for 0.5ms
+Vtrig  gsrc  0    PULSE(0 3 1ms 0.01ms 0.01ms 0.5ms 100ms)
+* PNP Q1: emitter=a, base=nd1, collector=k(0)
+Q1     0     nd1   a    PMOD
+.model PMOD PNP(BF=50 IS=1e-12 VAF=100)
+* NPN Q2: collector=nd1, base=g, emitter=k(0)
+Q2     nd1   g     0    NMOD
+.model NMOD NPN(BF=50 IS=1e-12 VAF=100)
+* snubber to help convergence
+Rsnub  a   0   1Meg
+.tran 0.05ms 4ms
+.print tran V(a) V(g) V(nd1)
+.end

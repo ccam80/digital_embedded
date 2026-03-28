@@ -234,12 +234,6 @@ describe("Relay", () => {
     expect(RelayDefinition.factory(props)).toBeInstanceOf(RelayElement);
   });
 
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
-
   it("boundingBox — returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new RelayElement(crypto.randomUUID(), { x: 1, y: 2 }, 0, false, props);
@@ -379,11 +373,5 @@ describe("RelayDT", () => {
   it("factoryCreatesInstance — factory returns RelayDTElement", () => {
     const props = new PropertyBag();
     expect(RelayDTDefinition.factory(props)).toBeInstanceOf(RelayDTElement);
-  });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
   });
 });

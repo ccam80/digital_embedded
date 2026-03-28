@@ -33,7 +33,7 @@ import type { Wire } from "@/core/circuit";
 import type { EvaluationMode } from "./evaluation-mode.js";
 import { initializeCircuit } from "./init-sequence.js";
 import type { InitializableEngine } from "./init-sequence.js";
-import { DataField, registerBackingStore, clearBackingStores } from "@/components/memory/ram.js";
+import { DataField, registerBackingStore, clearBackingStores, createBackingStoreMap, setActiveBackingStores } from "@/components/memory/ram.js";
 import type { BusResolver } from "./bus-resolution.js";
 import { OscillationError } from "@/core/errors.js";
 import { OscillationDetector, COLLECTION_STEPS } from "./oscillation.js";
@@ -228,6 +228,9 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _snapshotBudget = DEFAULT_SNAPSHOT_BUDGET;
   private _snapshotBytesUsed = 0;
 
+  // Per-engine backing store map for RAM/ROM components (F11 scoping)
+  private readonly _backingStores = createBackingStoreMap();
+
   constructor(mode: EvaluationMode = "level") {
     this._mode = mode;
   }
@@ -313,6 +316,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._pendingTimedEvents = [];
     this._initSnapshotBuffer = new Uint32Array(arraySize);
     this._switchPrevStates = new Uint32Array(circuit.switchComponentIndices?.length ?? 0);
+    setActiveBackingStores(this._backingStores);
     initializeBackingStores(circuit);
     initializeCircuit(this);
     this._initBusResolver(circuit);
@@ -327,7 +331,8 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._currentTime = 0n;
     this._pendingTimedEvents = [];
     this._setState(EngineState.STOPPED);
-    clearBackingStores();
+    this._backingStores.clear();
+    setActiveBackingStores(this._backingStores);
     if (this._compiled !== null) {
       initializeBackingStores(this._compiled);
     }
@@ -341,7 +346,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     this._changeListeners.clear();
     this._measurementObservers.clear();
     this._setState(EngineState.STOPPED);
-    clearBackingStores();
+    this._backingStores.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -350,6 +355,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
 
   step(): void {
     if (this._compiled === null) return;
+    setActiveBackingStores(this._backingStores);
 
     switch (this._mode) {
       case "level":

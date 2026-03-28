@@ -94,10 +94,6 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "Ideal DC current source. Stamps only into the RHS vector — no matrix entries.";
-  }
 }
 
 // ---------------------------------------------------------------------------

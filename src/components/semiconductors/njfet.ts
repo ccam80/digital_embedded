@@ -381,13 +381,6 @@ export class NJfetElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "N-channel JFET — Shichman-Hodges model with gate junction.\n" +
-      "Pins: G (gate), D (drain), S (source).\n" +
-      "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -83,9 +83,6 @@ class StubElement extends AbstractCircuitElement {
     this._drawFn(ctx);
   }
 
-  getHelpText(): string {
-    return "stub";
-  }
 }
 
 // ---------------------------------------------------------------------------

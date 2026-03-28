@@ -237,13 +237,6 @@ export class ZenerElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Zener Diode — Shockley diode with reverse breakdown at BV.\n" +
-      "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
-      "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))"
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

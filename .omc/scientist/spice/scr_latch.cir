@@ -1,0 +1,17 @@
+* SCR with state cap for proper latching
+Vcc    vcc   0    DC 12
+R1     vcc   a    1k
+Rg     gsrc  g    1k
+Vtrig  gsrc  0    PULSE(0 3 0.5ms 0.01ms 0.01ms 0.3ms 100ms)
+* State storage capacitor - holds latch state
+* Clatch charges when gate fires, stays charged
+Clatch st  0  100n  IC=0
+Rself  a   st  100k
+* Gate coupling to state cap
+Rgate_st  g  st  10k
+* SCR switch driven by state
+Sscr  a  0  st  0  SWSCR
+.model SWSCR SW(VT=0.5 VH=0.1 RON=10 ROFF=100Meg)
+.tran 0.02ms 5ms uic
+.print tran V(a) V(g) V(st)
+.end

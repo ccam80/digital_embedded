@@ -103,15 +103,6 @@ export class XOrElement extends AbstractCircuitElement {
     ctx.drawLine(0, 2, 0.7, 2);
     if (center) ctx.drawLine(0, 1, 0.85, 1);
   }
-
-  getHelpText(): string {
-    return (
-      "XOr gate — performs bitwise XOR of all inputs.\n" +
-      "Configurable input count (2–5) and bit width (1–32).\n" +
-      "Both IEEE/US (curved with extra line) and IEC/DIN (rectangular with =1) shapes are supported.\n" +
-      "Individual inputs can be inverted via the inverterConfig property."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

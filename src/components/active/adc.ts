@@ -199,13 +199,6 @@ export class ADCElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      `${this._bits}-bit ADC — converts analog input voltage to a ${this._bits}-bit digital code ` +
-      "on each rising clock edge. Output code = floor(V_in / V_ref × 2^N)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

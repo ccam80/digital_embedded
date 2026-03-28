@@ -114,14 +114,6 @@ export class MulElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "Mul — N-bit multiplier producing a 2N-bit product.\n" +
-      "Inputs: a, b (bitWidth bits each).\n" +
-      "Output: mul (2*bitWidth-bit product).\n" +
-      "Supports signed and unsigned modes."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

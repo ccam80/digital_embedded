@@ -308,14 +308,6 @@ export class CCCSElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Current-Controlled Current Source — 4-terminal element. " +
-      "Output current = expression(I_sense). " +
-      "Pins: sense+, sense- (current sense port), out+, out- (output)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

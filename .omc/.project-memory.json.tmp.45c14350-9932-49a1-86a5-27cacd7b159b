@@ -1,0 +1,552 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774605927687,
+  "projectRoot": "C:\\local_working_projects\\digital_in_browser",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.58.2",
+        "category": "testing"
+      },
+      {
+        "name": "vite",
+        "version": "5.4.0",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "2.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "test": "node scripts/run-all-tests.mjs",
+      "test:watch": "vitest",
+      "lint": "eslint src",
+      "typecheck": "tsc --noEmit"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "lib",
+      "scripts",
+      "spec",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "circuits": {
+      "path": "circuits",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1774605927652,
+      "keyFiles": [
+        "and-gate.dig",
+        "half-adder.dig",
+        "shift-add-multiplier.dig",
+        "sr-latch.dig"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 5,
+      "lastAccessed": 1774605927652,
+      "keyFiles": [
+        "simulator.html",
+        "tutorial-editor.html",
+        "tutorial-viewer.html",
+        "tutorial.html",
+        "tutorials.html"
+      ]
+    },
+    "e2e": {
+      "path": "e2e",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774605927652,
+      "keyFiles": []
+    },
+    "fixtures": {
+      "path": "fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 10,
+      "lastAccessed": 1774605927653,
+      "keyFiles": [
+        "analog-rc-workflow.dig",
+        "broken_chain.dig",
+        "buckbjt.dig",
+        "chained_inverters.dig",
+        "dcswitchlrc.dig"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1774605927653,
+      "keyFiles": []
+    },
+    "modules": {
+      "path": "modules",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774605927671,
+      "keyFiles": []
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774605927671,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 12,
+      "lastAccessed": 1774605927671,
+      "keyFiles": [
+        "circuit-cli.ts",
+        "circuit-mcp-server.ts",
+        "generate-all-components-fixture.ts",
+        "generate-spice-references.sh",
+        "measure-engine-references.ts"
+      ]
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 12,
+      "lastAccessed": 1774605927672,
+      "keyFiles": [
+        "analog-snapshot-analysis.md",
+        "app-init-modularization.md",
+        "app-modules-test-plan.md",
+        "phase-3-unified-netlist.md",
+        "phase-4-simulation-coordinator.md"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1774605927672,
+      "keyFiles": [
+        "main.ts"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774605927672,
+      "keyFiles": []
+    },
+    "tutorials": {
+      "path": "tutorials",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774605927673,
+      "keyFiles": [
+        "index.json"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 5,
+      "lastAccessed": 1774605927673,
+      "keyFiles": [
+        "memory-editor-DEA45Iu0.js",
+        "search-B4BtHZDg.js",
+        "simulator-DPIijWtq.js"
+      ]
+    },
+    "e2e\\fixtures": {
+      "path": "e2e\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 4,
+      "lastAccessed": 1774605927674,
+      "keyFiles": [
+        "harness.html",
+        "simulator-harness.ts",
+        "spice-reference-values.json"
+      ]
+    },
+    "src\\app": {
+      "path": "src\\app",
+      "purpose": "Application code",
+      "fileCount": 14,
+      "lastAccessed": 1774605927675,
+      "keyFiles": [
+        "analysis-dialogs.ts",
+        "app-context.ts",
+        "app-init.ts"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 3,
+      "lastAccessed": 1774605927675,
+      "keyFiles": [
+        "generic-shape.ts",
+        "library-74xx.ts",
+        "register-all.ts"
+      ]
+    },
+    "src\\fixtures": {
+      "path": "src\\fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1774605927675,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src",
+      "accessCount": 212,
+      "lastAccessed": 1774650118971,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 30,
+      "lastAccessed": 1774649822951,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\gui\\component-sweep.spec.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774611441615,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\menu-toolbar.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774650114124,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\simulation-controller.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774647241317,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774647220812,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774648016630,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 19,
+      "lastAccessed": 1774649646004,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app\\app-init.ts",
+      "accessCount": 17,
+      "lastAccessed": 1774649662279,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\ground.ts",
+      "accessCount": 16,
+      "lastAccessed": 1774650004136,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\digital-circuit-assembly.spec.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774647906208,
+      "type": "file"
+    },
+    {
+      "path": "src\\app",
+      "accessCount": 14,
+      "lastAccessed": 1774649380580,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app\\test-bridge.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774610921277,
+      "type": "directory"
+    },
+    {
+      "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774649829260,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774650013462,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\workflow-tests.spec.ts",
+      "accessCount": 10,
+      "lastAccessed": 1774608650433,
+      "type": "file"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 10,
+      "lastAccessed": 1774642516094,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\property-panel.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774612833717,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774613847888,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app\\canvas-interaction.ts",
+      "accessCount": 9,
+      "lastAccessed": 1774648503199,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\subcircuit-creation.spec.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774608398230,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\library-74xx.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774611073325,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774649772577,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\flatten.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774613212401,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774649998610,
+      "type": "file"
+    },
+    {
+      "path": "e2e\\gui\\analog-rc-circuit.spec.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774610921705,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\vdd.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774613197790,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774613237445,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver",
+      "accessCount": 5,
+      "lastAccessed": 1774642539229,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\io\\clock.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774611432084,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\bus-resolution.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774647236507,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\insert-subcircuit.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774608629346,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\placement.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774608629409,
+      "type": "file"
+    },
+    {
+      "path": "test-results\\.last-run.json",
+      "accessCount": 3,
+      "lastAccessed": 1774609085719,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\subcircuit\\subcircuit.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774611034429,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette-ui.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774611097725,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\in.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774613141109,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-pin-scanner.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774608661174,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\dialog-manager.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774608913207,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\__tests__\\flatten-port.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774611048851,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\memory\\counter.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774611059320,
+      "type": "file"
+    },
+    {
+      "path": "src\\integration\\speed-control.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774647208266,
+      "type": "file"
+    },
+    {
+      "path": "playwright.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774605955015,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\palette.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607617122,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\__tests__\\flatten.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607637590,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\subcircuit-dialog.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607638808,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\context-menu.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607652857,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\null-coordinator.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607691514,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\out.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774607934334,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\__tests__\\library-74xx.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774608363011,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

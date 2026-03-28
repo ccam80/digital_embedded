@@ -288,11 +288,17 @@ test.describe('GUI: subcircuit creation', () => {
     );
     await harness.page.waitForTimeout(150);
 
-    // Select all via the toolbar button (required: "Make Subcircuit…" needs >= 2 selected)
-    await harness.page.evaluate(() => {
-      const iframe = document.getElementById('sim') as HTMLIFrameElement;
-      iframe.contentWindow!.document.getElementById('btn-select-all')?.click();
-    });
+    // Shift+click the first In component to add it to the selection (And + In_A
+    // selected). Wires from In_B and Out_Y cross the boundary → 2 face dropdowns.
+    const inIdx = await findElementIndex(harness, 'In');
+    if (inIdx === -1) throw new Error('In component not found in circuit after load');
+    const inPos = await getElementCenterScreen(harness, inIdx);
+    await harness.page.keyboard.down('Shift');
+    await harness.page.mouse.click(
+      canvasBox.x + inPos.x,
+      canvasBox.y + inPos.y,
+    );
+    await harness.page.keyboard.up('Shift');
     await harness.page.waitForTimeout(150);
 
     // Right-click on the And gate to open the context menu
@@ -315,7 +321,8 @@ test.describe('GUI: subcircuit creation', () => {
 
     // Expect boundary ports — selecting only the And gate yields wires that
     // cross the selection boundary, so face dropdowns must be present.
-    const faceSelects = harness.iframe.locator('.subcircuit-dialog select');
+    // Scope to the table to skip the shape select (LAYOUT/DIL) above the table.
+    const faceSelects = harness.iframe.locator('.subcircuit-dialog table select');
     await expect(faceSelects.first()).toBeVisible({ timeout: 2000 });
 
     // Capture preview canvas pixel checksum before any face change

@@ -1,0 +1,6 @@
+* LDR divider: Vs=5V, R1=10k, R_ldr=3241
+Vs    in  0  DC 5
+R1    in  mid  10k
+Rldr  mid  0   3241
+.op
+.end

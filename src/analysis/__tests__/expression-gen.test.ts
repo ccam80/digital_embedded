@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { exprToLatex, exprToString, type BoolExpr } from '../expression.js';
+import { exprToString, type BoolExpr } from '../expression.js';
 import { generatePOS, generateSOP } from '../expression-gen.js';
 import { TruthTable } from '../truth-table.js';
 
@@ -210,52 +210,3 @@ describe('toStringFormat', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// LaTeX format
-// ---------------------------------------------------------------------------
-
-describe('toLatexFormat', () => {
-  it('formats variable as plain name', () => {
-    const table = makeTable(['A', 'B'], 'Y', [0n, 0n, 0n, 1n]);
-    const sop = generateSOP(table, 0);
-    const latex = exprToLatex(sop);
-    expect(latex).toContain('A');
-    expect(latex).toContain('B');
-  });
-
-  it('uses \\cdot for AND in LaTeX', () => {
-    const table = makeTable(['A', 'B'], 'Y', [0n, 0n, 0n, 1n]);
-    const sop = generateSOP(table, 0);
-    const latex = exprToLatex(sop);
-    expect(latex).toContain('\\cdot');
-  });
-
-  it('uses + for OR in LaTeX', () => {
-    // XOR-like function to get multi-minterm SOP
-    const table = makeTable(['A', 'B'], 'Y', [0n, 1n, 1n, 0n]);
-    const sop = generateSOP(table, 0);
-    const latex = exprToLatex(sop);
-    expect(latex).toContain('+');
-  });
-
-  it('uses \\overline for negated variable in LaTeX', () => {
-    // Row 0 only (A=0, B=0 → Y=1): minterm !A & !B
-    const table = makeTable(['A', 'B'], 'Y', [1n, 0n, 0n, 0n]);
-    const sop = generateSOP(table, 0);
-    const latex = exprToLatex(sop);
-    expect(latex).toContain('\\overline{A}');
-    expect(latex).toContain('\\overline{B}');
-  });
-
-  it('constant false formats as "0" in LaTeX', () => {
-    const table = makeTable(['A'], 'Y', [0n, 0n]);
-    const sop = generateSOP(table, 0);
-    expect(exprToLatex(sop)).toBe('0');
-  });
-
-  it('constant true formats as "1" in LaTeX', () => {
-    const table = makeTable(['A'], 'Y', [1n, 1n]);
-    const pos = generatePOS(table, 0);
-    expect(exprToLatex(pos)).toBe('1');
-  });
-});

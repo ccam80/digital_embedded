@@ -87,12 +87,6 @@ export class GroundElement extends AbstractCircuitElement {
     ctx.drawLine(-0.2, 1.0, 0.2, 1.0);
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Ground — outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

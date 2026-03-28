@@ -1,0 +1,293 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * a20: bjt+mosfet mixed driver (vdd=12v)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	vd                               6.431999e-01
+	vc                               1.009354e+01
+	vb                               6.294408e-01
+	vin                              1.000000e+00
+	vdd                              1.200000e+01
+
+	Source	Current
+	------	-------
+
+	vdd#branch                       -1.17624e-02
+	vin#branch                       -3.70559e-06
+
+ BJT models (Bipolar Junction Transistor)
+      model                  qnpn
+
+       type                   npn
+       tnom                    27
+         is                 1e-14
+        ibe                     0
+        ibc                     0
+         bf                   100
+         nf                     1
+        vaf                   100
+        ikf                     0
+        ise                     0
+         ne                   1.5
+         br                     1
+         nr                     1
+        var                     0
+        ikr                     0
+        isc                     0
+         nc                     2
+         rb                     0
+        irb                     0
+        rbm                     0
+         re                     0
+         rc                     0
+        cje                     0
+        vje                  0.75
+        mje                  0.33
+         tf                     0
+        xtf                     0
+        vtf                     0
+        itf                     0
+        ptf                     0
+        cjc                     0
+        vjc                  0.75
+        mjc                  0.33
+       xcjc                     1
+         tr                     0
+        cjs                     0
+        vjs                  0.75
+        mjs                     0
+        xtb                     0
+         eg                  1.11
+        xti                     3
+         fc                   0.5
+         kf                     0
+         af                     0
+        iss                     0
+         ns                     1
+        rco                  0.01
+         vo                    10
+      gamma                 1e-11
+        qco                     0
+       tlev                     0
+      tlevc                     0
+       tbf1                     0
+       tbf2                     0
+       tbr1                     0
+       tbr2                     0
+      tikf1                     0
+      tikf2                     0
+      tikr1                     0
+      tikr2                     0
+      tirb1                     0
+      tirb2                     0
+       tnc1                     0
+       tnc2                     0
+       tne1                     0
+       tne2                     0
+       tnf1                     0
+       tnf2                     0
+       tnr1                     0
+       tnr2                     0
+       trb1                     0
+       trb2                     0
+       trc1                     0
+       trc2                     0
+       tre1                     0
+       tre2                     0
+       trm1                     0
+       trm2                     0
+      tvaf1                     0
+      tvaf2                     0
+      tvar1                     0
+      tvar2                     0
+        ctc                     0
+        cte                     0
+        cts                     0
+       tvjc                     0
+       tvje                     0
+       tvjs                     0
+      titf1                     0
+      titf2                     0
+       ttf1                     0
+       ttf2                     0
+       ttr1                     0
+       ttr2                     0
+      tmje1                     0
+      tmje2                     0
+      tmjc1                     0
+      tmjc2                     0
+      tmjs1                     0
+      tmjs2                     0
+       tns1                     0
+       tns2                     0
+        nkf                   0.5
+       tis1                     0
+       tis2                     0
+      tise1                     0
+      tise2                     0
+      tisc1                     0
+      tisc2                     0
+      tiss1                     0
+      tiss2                     0
+   quasimod                     0
+         vg                 1.206
+         cn                  2.42
+          d                  0.87
+    vbe_max                 1e+99
+    vbc_max                 1e+99
+    vce_max                 1e+99
+     pd_max                 1e+99
+     ic_max                 1e+99
+     ib_max                 1e+99
+     te_max                 1e+99
+       rth0                     0
+
+ Mos1 models (Level 1 MOSfet model with Meyer capacitance model)
+      model                 mnmos
+
+       type                  nmos
+        vto                     1
+         kp                 0.002
+      gamma                     0
+        phi                   0.6
+     lambda                  0.01
+         rd                     0
+         rs                     0
+        cbd                     0
+        cbs                     0
+         is                 1e-14
+         pb                   0.8
+       cgso                     0
+       cgdo                     0
+       cgbo                     0
+        rsh                     0
+         cj                     0
+         mj                   0.5
+       cjsw                     0
+       mjsw                   0.5
+         js                     0
+        tox                     0
+         ld                     0
+         u0                     0
+         fc                   0.5
+       nsub                     0
+        tpg                     0
+        nss                     0
+       tnom                    27
+         kf <<NAN, error = 7>>
+         af <<NAN, error = 7>>
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ BJT: Bipolar Junction Transistor
+     device                    q1
+      model                  qnpn
+         ic           0.000405631
+         ib            3.7056e-06
+         ie          -0.000409337
+        vbe              0.629441
+        vbc               -9.4641
+         gm              0.015679
+        gpi           0.000143268
+        gmu                 1e-12
+         gx                     0
+         go           3.70561e-06
+        cpi                     0
+        cmu                     0
+        cbx                     0
+       csub                     0
+
+ Mos1: Level 1 MOSfet model with Meyer capacitance model
+     device                    m1
+      model                 mnmos
+         id             0.0113568
+         is            -0.0113568
+         ig                     0
+         ib            -6.532e-13
+        vgs               10.0935
+        vds                0.6432
+        vbs                     0
+        von                     1
+      vdsat               9.09354
+         rs                     0
+         rd                     0
+         gm            0.00129467
+        gds             0.0171222
+        gmb                     0
+        cbd                     0
+        cbs                     0
+        cgs                     0
+        cgd                     0
+        cgb                     0
+       cbd0                     0
+     cbdsw0                     0
+       cbs0                     0
+     cbssw0                     0
+
+ Resistor: Simple linear resistor
+     device                    rd                    rc                    rb
+      model                     R                     R                     R
+ resistance                  1000                  4700                100000
+         ac                  1000                  4700                100000
+      dtemp                     0                     0                     0
+     bv_max                 1e+99                 1e+99                 1e+99
+      noisy                     1                     1                     1
+          i             0.0113568            0.00040563           3.70559e-06
+          p              0.128977           0.000773319           1.37314e-06
+
+ Vsource: Independent voltage source
+     device                   vin                   vdd
+         dc                     1                    12
+      acmag                     0                     0
+      pulse         -         -
+        sin         -         -
+        exp         -         -
+        pwl         -         -
+       sffm         -         -
+         am         -         -
+    trnoise         -         -
+   trrandom         -         -
+    portnum                     0                     0
+         z0                     0                     0
+        pwr                     0                     0
+       freq                     0                     0
+      phase                     0                     0
+          i          -3.70559e-06            -0.0117624
+          p          -3.70559e-06             -0.141149
+
+Error: .print: no dc analysis found.
+
+Total analysis time (seconds) = 0.002
+
+Total elapsed time (seconds) = 0.051 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 14742.918 MB.
+Maximum ngspice program size =   16.027 MB.
+Current ngspice program size =   16.027 MB.
+

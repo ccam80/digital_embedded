@@ -105,14 +105,6 @@ export class PortElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Port — domain-agnostic subcircuit interface element.\n" +
-      "Bidirectional pin that connects internal circuit nodes to external parent circuit nets.\n" +
-      "Neutral infrastructure: no simulation model. Domain is inferred from connected components."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

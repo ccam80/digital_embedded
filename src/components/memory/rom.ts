@@ -194,15 +194,6 @@ export class ROMElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("autoReload", false);
   }
 
-  getHelpText(): string {
-    return (
-      "ROM — read-only memory with chip select.\n" +
-      "If sel=1, output D = memory[A]; otherwise D is 0.\n" +
-      "Contents are set at design time via the DATA attribute.\n" +
-      "Set isProgramMemory=true for CPU instruction fetch integration.\n" +
-      "Set autoReload=true to reload contents from hex file on reset."
-    );
-  }
 }
 
 export function executeROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -334,14 +325,6 @@ export class ROMDualPortElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("autoReload", false);
   }
 
-  getHelpText(): string {
-    return (
-      "ROMDualPort — dual-port read-only memory.\n" +
-      "Port 1: D1 = s1 ? memory[A1] : 0.\n" +
-      "Port 2: D2 = s2 ? memory[A2] : 0.\n" +
-      "Both ports share the same backing store and are fully combinational."
-    );
-  }
 }
 
 export function executeROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {

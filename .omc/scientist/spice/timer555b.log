@@ -1,0 +1,61 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * 555 astable - proper behavioral with sr latch
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+Warning: singular matrix:  check nodes q and bq#branch
+
+Warning: singular matrix:  check nodes q and bq#branch
+
+Warning: singular matrix:  check nodes q and bq#branch
+
+Warning: singular matrix:  check nodes q and bq#branch
+
+Warning: singular matrix:  check nodes q and bq#branch
+
+Warning: singular matrix:  check nodes q and bq#branch
+
+doAnalyses: TRAN:  Timestep too small; time = 0.000498, timestep = 6.25e-17: cause unrecorded.
+
+
+run simulation(s) aborted
+                * 555 astable - proper behavioral with sr latch
+                Transient Analysis  Fri Mar 27 20:38:35  2026
+--------------------------------------------------------------------------------
+Index   time            v(out)          v(nc)           
+--------------------------------------------------------------------------------
+0	5.000000e-07	5.000000e+00	1.500159e+00	
+1	1.000000e-06	5.000000e+00	1.500318e+00	
+2	2.000000e-06	5.000000e+00	1.500636e+00	
+3	4.000000e-06	5.000000e+00	1.501272e+00	
+4	8.000000e-06	5.000000e+00	1.502544e+00	
+5	1.600000e-05	5.000000e+00	1.505087e+00	
+6	3.200000e-05	5.000000e+00	1.510167e+00	
+7	5.000000e-05	5.000000e+00	1.515873e+00	
+8	5.320000e-05	5.000000e+00	1.516886e+00	
+9	5.960000e-05	5.000000e+00	1.518912e+00	
+10	7.240000e-05	5.000000e+00	1.522960e+00	
+11	9.800000e-05	5.000000e+00	1.531043e+00	
+12	1.480000e-04	5.000000e+00	1.546775e+00	
+13	1.980000e-04	5.000000e+00	1.562435e+00	
+14	2.480000e-04	5.000000e+00	1.578025e+00	
+15	2.980000e-04	5.000000e+00	1.593544e+00	
+16	3.480000e-04	5.000000e+00	1.608993e+00	
+17	3.980000e-04	5.000000e+00	1.624371e+00	
+18	4.480000e-04	5.000000e+00	1.639680e+00	
+19	4.980000e-04	5.000000e+00	1.654919e+00	
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.043 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12893.141 MB.
+Maximum ngspice program size =   16.055 MB.
+Current ngspice program size =   16.055 MB.
+

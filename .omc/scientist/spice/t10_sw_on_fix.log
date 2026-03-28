@@ -1,0 +1,36 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t10 analog switch on corrected
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vs_pos                                       5
+probe                                  4.99995
+vs#branch                          -0.00499995
+
+
+No. of Data Rows : 59
+
+  Measurements for Transient Analysis
+
+v_vs                =  5.000000e+00
+v_probe             =  4.999950e+00
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.046 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12931.379 MB.
+Maximum ngspice program size =   15.902 MB.
+Current ngspice program size =   15.902 MB.
+

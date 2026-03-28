@@ -126,7 +126,7 @@ export interface CircuitMetadata {
   logicFamily?: LogicFamilyConfig;
 }
 
-export function defaultCircuitMetadata(): CircuitMetadata {
+function defaultCircuitMetadata(): CircuitMetadata {
   return {
     name: "Untitled",
     description: "",
@@ -136,7 +136,7 @@ export function defaultCircuitMetadata(): CircuitMetadata {
     isLocked: false,
     chipWidth: 3,
     chipHeight: 3,
-    shapeType: "LAYOUT",
+    shapeType: "",
   };
 }
 

@@ -48,7 +48,6 @@ function makeStubElement(
     draw: (_ctx: RenderContext): void => {},
     getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
-    getHelpText: (): string => "stub",
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
   };
 }
@@ -70,7 +69,6 @@ function makeDefinition(typeId: string = "StubComp"): ComponentDefinition {
         draw: (_ctx: RenderContext): void => {},
         getBoundingBox: (): Rect => ({ x: 0, y: 0, width: 4, height: 4 }),
         serialize: (): SerializedElement => ({} as SerializedElement),
-        getHelpText: (): string => "stub",
         getAttribute: (_name: string): PropertyValue | undefined => undefined,
       };
     },

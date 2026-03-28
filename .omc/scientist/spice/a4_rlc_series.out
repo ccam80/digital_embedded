@@ -1,0 +1,39 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: rlc series resonance at f0
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+1                                            0
+2                                            0
+3                                            0
+l1#branch                                    0
+vs#branch                                    0
+
+
+No. of Data Rows : 5015
+
+  Measurements for Transient Analysis
+
+v_c_peak            =  4.372375e-01 at=  9.521721e-05
+v_c_min             =  -3.161174e-01 at=  4.967217e-03
+v_lc_amp            =  7.533548e-01 from=  0.000000e+00 to=  0.000000e+00
+
+
+Total analysis time (seconds) = 0.016
+
+Total elapsed time (seconds) = 0.052 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13017.496 MB.
+Maximum ngspice program size =   16.082 MB.
+Current ngspice program size =   16.082 MB.
+

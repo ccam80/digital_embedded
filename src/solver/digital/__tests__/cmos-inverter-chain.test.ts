@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createDefaultRegistry } from "../../../components/register-all.js";
-import { SimulationRunner } from "../../../headless/runner.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { CircuitBuilder } from "../../../headless/builder.js";
 
 /** Mask raw signal to 1-bit: 0 stays 0, any non-zero becomes 1. */
@@ -25,7 +25,7 @@ function bit(raw: number): number {
 describe("Chained CMOS inverters", () => {
   const registry = createDefaultRegistry();
   const builder = new CircuitBuilder(registry);
-  const runner = new SimulationRunner(registry);
+  const facade = new DefaultSimulatorFacade(registry);
 
   function buildChainedInverters() {
     return builder.build({
@@ -59,39 +59,39 @@ describe("Chained CMOS inverters", () => {
 
   it("compiles without bus conflict", () => {
     const circuit = buildChainedInverters();
-    expect(() => runner.compile(circuit)).not.toThrow();
+    expect(() => facade.compile(circuit)).not.toThrow();
   });
 
   it("A=0 → Y=0 (double inversion)", () => {
     const circuit = buildChainedInverters();
-    const engine = runner.compile(circuit);
-    runner.setInput(engine, "A", 0);
-    runner.runToStable(engine);
-    expect(bit(runner.readOutput(engine, "Y"))).toBe(0);
+    const coordinator = facade.compile(circuit);
+    facade.setInput(coordinator, "A", 0);
+    facade.runToStable(coordinator);
+    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
   });
 
   it("A=1 → Y=1 (double inversion)", () => {
     const circuit = buildChainedInverters();
-    const engine = runner.compile(circuit);
-    runner.setInput(engine, "A", 1);
-    runner.runToStable(engine);
-    expect(bit(runner.readOutput(engine, "Y"))).toBe(1);
+    const coordinator = facade.compile(circuit);
+    facade.setInput(coordinator, "A", 1);
+    facade.runToStable(coordinator);
+    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(1);
   });
 
   it("toggles correctly", () => {
     const circuit = buildChainedInverters();
-    const engine = runner.compile(circuit);
+    const coordinator = facade.compile(circuit);
 
-    runner.setInput(engine, "A", 0);
-    runner.runToStable(engine);
-    expect(bit(runner.readOutput(engine, "Y"))).toBe(0);
+    facade.setInput(coordinator, "A", 0);
+    facade.runToStable(coordinator);
+    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
 
-    runner.setInput(engine, "A", 1);
-    runner.runToStable(engine);
-    expect(bit(runner.readOutput(engine, "Y"))).toBe(1);
+    facade.setInput(coordinator, "A", 1);
+    facade.runToStable(coordinator);
+    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(1);
 
-    runner.setInput(engine, "A", 0);
-    runner.runToStable(engine);
-    expect(bit(runner.readOutput(engine, "Y"))).toBe(0);
+    facade.setInput(coordinator, "A", 0);
+    facade.runToStable(coordinator);
+    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
   });
 });

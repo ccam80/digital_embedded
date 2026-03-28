@@ -23,7 +23,7 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { makeVoltageSource, makeResistor } from "../../../solver/analog/test-elements.js";
+import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 

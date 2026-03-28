@@ -1,0 +1,15 @@
+Buck PWM check V(sw_node)
+Vdd 1 0 DC 12
+Vgate g 0 PULSE(0 1 0 10n 10n 50u 100u)
+SW1 1 2 g 0 MYSW
+D1 0 2 DFAST
+L1 2 3 1m
+R1 3 0 100
+.model MYSW SW(Ron=0.001 Roff=100Meg Vt=0.5)
+.model DFAST D(IS=1e-9 N=1 RS=0.01)
+.tran 2u 50m UIC
+.meas tran v2_at_25u  FIND V(2) AT=25u
+.meas tran v2_at_75u  FIND V(2) AT=75u
+.meas tran v3_avg     AVG V(3) FROM=30m TO=50m
+.meas tran v3_pp      PP  V(3) FROM=30m TO=50m
+.end

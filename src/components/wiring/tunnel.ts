@@ -128,14 +128,6 @@ export class TunnelElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Tunnel — named wire connection.\n" +
-      "All Tunnels with the same label in a circuit are electrically connected.\n" +
-      "The net resolver merges same-label nets during compilation."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

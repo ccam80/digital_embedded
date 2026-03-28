@@ -1,0 +1,12 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: crystal oscillator colpitts
+
+Error on line:
+  .connect 1 a
+ unimplemented control card - error 
+    Simulation interrupted due to error!
+
+Note: No ".plot", ".print", or ".fourier" lines; no simulations run

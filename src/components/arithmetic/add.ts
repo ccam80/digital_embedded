@@ -127,13 +127,6 @@ export class AddElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "Add — N-bit adder with carry in/out.\n" +
-      "Inputs: a, b (bitWidth bits each), c_i (1-bit carry in).\n" +
-      "Outputs: s (bitWidth-bit sum), c_o (1-bit carry out)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

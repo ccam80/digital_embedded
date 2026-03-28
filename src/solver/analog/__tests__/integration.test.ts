@@ -18,7 +18,7 @@ import {
 } from "../integration.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
-import { makeResistor, makeVoltageSource, makeCapacitor, makeInductor } from "../test-elements.js";
+import { makeResistor, makeVoltageSource, makeCapacitor, makeInductor } from "./test-helpers.js";
 import { newtonRaphson } from "../newton-raphson.js";
 
 // ---------------------------------------------------------------------------

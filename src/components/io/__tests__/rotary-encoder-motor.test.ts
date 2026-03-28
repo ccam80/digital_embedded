@@ -510,9 +510,5 @@ describe("StepperMotorUnipolar", () => {
       expect(() => registry.register(StepperMotorUnipolarDefinition)).not.toThrow();
     });
 
-    it("StepperMotorUnipolarElement.getHelpText() contains 'StepperMotorUnipolar'", () => {
-      const el = makeUnipolarMotor();
-      expect(el.getHelpText()).toContain("StepperMotorUnipolar");
-    });
   });
 });

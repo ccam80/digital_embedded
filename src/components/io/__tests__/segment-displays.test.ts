@@ -626,9 +626,5 @@ describe("SixteenSeg", () => {
       expect(() => registry.register(SixteenSegDefinition)).not.toThrow();
     });
 
-    it("SixteenSegElement.getHelpText() contains 'SixteenSeg'", () => {
-      const el = makeSixteenSeg();
-      expect(el.getHelpText()).toContain("SixteenSeg");
-    });
   });
 });

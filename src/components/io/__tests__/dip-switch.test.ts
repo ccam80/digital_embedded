@@ -281,9 +281,5 @@ describe("DipSwitch", () => {
       expect(() => registry.register(DipSwitchDefinition)).not.toThrow();
     });
 
-    it("DipSwitchElement.getHelpText() contains 'DipSwitch'", () => {
-      const el = makeDipSwitch();
-      expect(el.getHelpText()).toContain("DipSwitch");
-    });
   });
 });

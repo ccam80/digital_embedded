@@ -46,7 +46,7 @@ import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -275,10 +275,6 @@ describe("LED", () => {
       expect(() => registry.register(LedDefinition)).not.toThrow();
     });
 
-    it("LedElement.getHelpText() contains 'LED'", () => {
-      const el = makeLed();
-      expect(el.getHelpText()).toContain("LED");
-    });
   });
 });
 
@@ -535,10 +531,6 @@ describe("LightBulb", () => {
       expect(() => registry.register(LightBulbDefinition)).not.toThrow();
     });
 
-    it("LightBulbElement.getHelpText() contains 'LightBulb'", () => {
-      const el = makeLightBulb();
-      expect(el.getHelpText()).toContain("LightBulb");
-    });
   });
 });
 
@@ -703,10 +695,6 @@ describe("RGBLED", () => {
       expect(() => registry.register(RgbLedDefinition)).not.toThrow();
     });
 
-    it("RgbLedElement.getHelpText() contains 'RGBLED'", () => {
-      const el = makeRgbLed();
-      expect(el.getHelpText()).toContain("RGBLED");
-    });
   });
 });
 

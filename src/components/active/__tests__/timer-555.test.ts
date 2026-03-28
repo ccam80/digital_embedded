@@ -187,7 +187,7 @@ import {
   makeCapacitor,
   makeVoltageSource,
   withNodeIds,
-} from "../../../solver/analog/test-elements.js";
+} from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Timer555 unit tests — operating-point level

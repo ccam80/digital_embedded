@@ -1,0 +1,28 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: switched capacitor filter simplified
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+
+No. of Data Rows : 25559
+
+  Measurements for Transient Analysis
+
+v4_avg              =  1.021345e+00 from=  1.000000e-02 to=  2.000000e-02
+v4_pp               =  2.007455e+00 from=  1.000000e-02 to=  2.000000e-02
+vout_avg            =  -1.011222e+03 from=  1.000000e-02 to=  2.000000e-02
+
+
+Total analysis time (seconds) = 0.07
+
+Total elapsed time (seconds) = 0.110 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13191.547 MB.
+Maximum ngspice program size =   16.836 MB.
+Current ngspice program size =   16.836 MB.
+

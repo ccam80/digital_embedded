@@ -27,7 +27,7 @@ import {
   type SweepCircuitFactory,
 } from "../parameter-sweep.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
-import { makeResistor, makeVoltageSource, makeCapacitor } from "../test-elements.js";
+import { makeResistor, makeVoltageSource, makeCapacitor } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Circuit factory helpers

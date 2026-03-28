@@ -153,15 +153,6 @@ export class BusSplitterElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    const bits = this._properties.getOrDefault<number>("bitWidth", 1);
-    const spreading = this._properties.getOrDefault<number>("spreading", 1);
-    return (
-      `BusSplitter — bidirectional bus splitter with OE control.\n` +
-      `${bits} bits, spreading ${spreading}.`
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

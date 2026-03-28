@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "../diagnostics.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
-import { makeResistor, makeVoltageSource, makeCurrentSource, makeDiode } from "../test-elements.js";
+import { makeResistor, makeVoltageSource, makeCurrentSource, makeDiode } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";

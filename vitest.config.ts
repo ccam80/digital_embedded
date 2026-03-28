@@ -6,6 +6,9 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     exclude: ["node_modules", "dist"],
+    reporters: process.env.VITEST_VERBOSE
+      ? ["default"]
+      : ["./scripts/vitest-compact-reporter.ts"],
   },
   resolve: {
     alias: {

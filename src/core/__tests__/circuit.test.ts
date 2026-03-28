@@ -3,7 +3,6 @@ import {
   Circuit,
   Wire,
   Net,
-  defaultCircuitMetadata,
 } from "../circuit.js";
 import type { CircuitElement, SerializedElement } from "../element.js";
 import type { Point, Rect } from "../renderer-interface.js";
@@ -48,9 +47,6 @@ function makeMockElement(
         mirror: false,
         properties: {},
       };
-    },
-    getHelpText(): string {
-      return "A mock component";
     },
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
@@ -148,28 +144,6 @@ describe("Net", () => {
   it("has no signal value property", () => {
     const net = new Net();
     expect("signalValue" in net).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// defaultCircuitMetadata tests
-// ---------------------------------------------------------------------------
-
-describe("defaultCircuitMetadata", () => {
-  it("returns a metadata object with expected defaults", () => {
-    const meta = defaultCircuitMetadata();
-    expect(meta.name).toBe("Untitled");
-    expect(meta.description).toBe("");
-    expect(meta.testDataRefs).toEqual([]);
-    expect(meta.measurementOrdering).toEqual([]);
-    expect(meta.isGeneric).toBe(false);
-  });
-
-  it("returns independent objects on each call", () => {
-    const a = defaultCircuitMetadata();
-    const b = defaultCircuitMetadata();
-    a.testDataRefs.push("ref1");
-    expect(b.testDataRefs).toEqual([]);
   });
 });
 

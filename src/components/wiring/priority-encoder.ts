@@ -142,15 +142,6 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
-    const inputCount = 1 << selectorBits;
-    return (
-      `PriorityEncoder — ${inputCount} inputs, outputs index of highest-priority active input.\n` +
-      "num: index of highest active input (last active wins).\n" +
-      "any: 1 if any input is active."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

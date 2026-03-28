@@ -65,10 +65,6 @@ export class NegElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "Neg — two's complement negation. Output = -input, masked to bitWidth bits.";
-  }
 }
 
 export function executeNeg(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {

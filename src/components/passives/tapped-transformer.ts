@@ -154,14 +154,6 @@ export class TappedTransformerElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Center-tapped transformer — three-winding coupled inductor model.\n" +
-      "Properties: turnsRatio (N total), primaryInductance (H), couplingCoefficient (k),\n" +
-      "primaryResistance (Ω), secondaryResistance (Ω per half)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -113,14 +113,6 @@ export class LightBulbElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "LightBulb — incandescent bulb indicator.\n" +
-      "Rendered as a circle with filament cross. On when input is non-zero.\n" +
-      "Label is shown above the component."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

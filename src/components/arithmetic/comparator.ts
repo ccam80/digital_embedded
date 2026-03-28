@@ -77,10 +77,6 @@ export class ComparatorElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less). Supports signed and unsigned modes.";
-  }
 }
 
 export function makeExecuteComparator(

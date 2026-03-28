@@ -135,10 +135,6 @@ export class PRNGElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "PRNG — pseudo-random number generator (LFSR-based). On rising clock edge: se=1 seeds with S input; ne=1 advances to next value. Output R is current random value.";
-  }
 }
 
 // ---------------------------------------------------------------------------

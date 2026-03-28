@@ -150,14 +150,6 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "ScopeTrigger — trigger source for the Scope waveform display.\n" +
-      "Detects edges on its input and signals the Scope to start recording.\n" +
-      "triggerMode: 'rising', 'falling', or 'both'."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

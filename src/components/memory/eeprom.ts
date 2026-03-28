@@ -191,15 +191,6 @@ export class EEPROMElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
-  getHelpText(): string {
-    return (
-      "EEPROM — electrically-erasable programmable read-only memory.\n" +
-      "Write: CS=1, WE=1 captures the write address on WE rising edge;\n" +
-      "on WE falling edge, Din is written to memory[capturedAddr].\n" +
-      "Read: CS=1 and OE=1 and WE=0 outputs memory[A] on D.\n" +
-      "Written data persists across simulation resets (saved to .dig file)."
-    );
-  }
 }
 
 export function sampleEEPROM(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -354,14 +345,6 @@ export class EEPROMDualPortElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("isProgramMemory", false);
   }
 
-  getHelpText(): string {
-    return (
-      "EEPROMDualPort — EEPROM with separate read/write port (like RAMDualPort).\n" +
-      "On rising clock edge: if str=1, writes Din to memory[A].\n" +
-      "If ld=1, output D = memory[A]; otherwise D is 0.\n" +
-      "Written data persists across simulation resets (saved to .dig file)."
-    );
-  }
 }
 
 export function sampleEEPROMDualPort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {

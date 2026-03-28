@@ -24,7 +24,7 @@ import type { ComponentLayout, ExecuteFunction } from "../../core/registry.js";
  * @param start  Index of the first element in the subrange
  * @param length Number of elements to shuffle
  */
-export function shuffleArray(arr: Uint32Array, start: number, length: number): void {
+function shuffleArray(arr: Uint32Array, start: number, length: number): void {
   if (length <= 1) return;
   for (let i = length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

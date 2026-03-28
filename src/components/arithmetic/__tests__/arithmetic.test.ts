@@ -399,10 +399,6 @@ describe("Add", () => {
       expect(keys).toContain("label");
     });
 
-    it("AddElement.getHelpText() mentions Add", () => {
-      const el = makeAddElement();
-      expect(el.getHelpText()).toContain("Add");
-    });
 
     it("getBoundingBox returns correct dimensions", () => {
       const el = makeAddElement();
@@ -594,10 +590,6 @@ describe("Sub", () => {
       expect(keys).toContain("label");
     });
 
-    it("SubElement.getHelpText() mentions Sub", () => {
-      const el = makeSubElement();
-      expect(el.getHelpText()).toContain("Sub");
-    });
   });
 });
 
@@ -827,10 +819,6 @@ describe("Mul", () => {
       expect(keys).toContain("label");
     });
 
-    it("MulElement.getHelpText() mentions Mul", () => {
-      const el = makeMulElement();
-      expect(el.getHelpText()).toContain("Mul");
-    });
   });
 });
 
@@ -1111,10 +1099,6 @@ describe("Div", () => {
       expect(typeof DivDefinition.helpText).toBe("string"); expect(DivDefinition.helpText.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("DivElement.getHelpText() mentions Div", () => {
-      const el = makeDivElement();
-      expect(el.getHelpText()).toContain("Div");
-    });
 
     it("DivDefinition factory produces a DivElement", () => {
       const props = new PropertyBag();

@@ -199,7 +199,6 @@ describe("ModelBinding", () => {
         getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
         draw(_ctx: RenderContext) { /* no-op */ },
         serialize() { return serialized; },
-        getHelpText() { return ""; },
         getAttribute(k: string) { return propsMap.get(k); },
       };
     }

@@ -173,12 +173,6 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Lossy Transmission Line — lumped RLCG model.\n" +
-      "N cascaded segments with series RL and shunt GC."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,28 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: mosfet pwm ideal switch
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+
+No. of Data Rows : 12687
+
+  Measurements for Transient Analysis
+
+vout_avg            =  1.200000e+01 from=  2.000000e-02 to=  3.000000e-02
+vout_pp             =  2.842171e-14 from=  2.000000e-02 to=  3.000000e-02
+vsw_avg             =  1.200000e+01 from=  2.000000e-02 to=  3.000000e-02
+
+
+Total analysis time (seconds) = 0.052
+
+Total elapsed time (seconds) = 0.099 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12795.824 MB.
+Maximum ngspice program size =   16.457 MB.
+Current ngspice program size =   16.457 MB.
+

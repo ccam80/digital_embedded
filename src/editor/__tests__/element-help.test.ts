@@ -40,9 +40,6 @@ function makeElementWithPins(
     getBoundingBox(): Rect {
       return { x: 0, y: 0, width: 2, height: 2 };
     }
-    getHelpText(): string {
-      return capturedHelp;
-    }
     serialize(): SerializedElement {
       return {} as SerializedElement;
     }
@@ -276,15 +273,6 @@ describe("ElementHelp", () => {
   });
 
   describe("includesHelpText", () => {
-    it("helpText comes from element.getHelpText()", () => {
-      const expectedText = "AND gate: output is 1 only when all inputs are 1.";
-      const element = makeElementWithPins(expectedText, []);
-      const definition = makeDefinition("And", "description from definition");
-
-      const content = buildHelpContent(element, definition);
-
-      expect(content.helpText).toBe(expectedText);
-    });
 
     it("description comes from definition helpText, not element", () => {
       const element = makeElementWithPins("element help text", []);
@@ -304,18 +292,9 @@ describe("ElementHelp", () => {
       expect(content.title).toBe("FlipflopD");
     });
 
-    it("helpText is empty string when element returns empty help", () => {
-      const element = makeElementWithPins("", []);
-      const definition = makeDefinition("Comp", "desc");
-
-      const content = buildHelpContent(element, definition);
-
-      expect(content.helpText).toBe("");
-    });
-
     it("returns all fields as a complete HelpContent record", () => {
       const pins = [makePin("IN", PinDirection.INPUT), makePin("OUT", PinDirection.OUTPUT)];
-      const element = makeElementWithPins("Full help text here.", pins);
+      const element = makeElementWithPins("ignored", pins);
       const propDefs = [makePropDef("bits", "Bits", PropertyType.BIT_WIDTH, 1)];
       const definition = makeDefinition("SomeGate", "Gate description", propDefs);
 
@@ -325,7 +304,6 @@ describe("ElementHelp", () => {
       expect(content.description).toBe("Gate description");
       expect(content.pinTable).toHaveLength(2);
       expect(content.propertyTable).toHaveLength(1);
-      expect(content.helpText).toBe("Full help text here.");
     });
   });
 });

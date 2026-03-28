@@ -180,12 +180,6 @@ describe("NFET", () => {
     expect(NFETDefinition.factory(props)).toBeInstanceOf(NFETElement);
   });
 
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
-
   it("boundingBox — non-zero dimensions at correct position", () => {
     const props = new PropertyBag();
     const el = new NFETElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
@@ -285,12 +279,6 @@ describe("PFET", () => {
   it("factoryCreatesInstance — factory returns PFETElement", () => {
     const props = new PropertyBag();
     expect(PFETDefinition.factory(props)).toBeInstanceOf(PFETElement);
-  });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
   });
 });
 
@@ -455,12 +443,6 @@ describe("FGNFET", () => {
     const props = new PropertyBag();
     expect(FGNFETDefinition.factory(props)).toBeInstanceOf(FGNFETElement);
   });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -579,12 +561,6 @@ describe("FGPFET", () => {
   it("factoryCreatesInstance — factory returns FGPFETElement", () => {
     const props = new PropertyBag();
     expect(FGPFETDefinition.factory(props)).toBeInstanceOf(FGPFETElement);
-  });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new FGPFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
   });
 });
 
@@ -763,12 +739,6 @@ describe("TransGate", () => {
   it("factoryCreatesInstance — factory returns TransGateElement", () => {
     const props = new PropertyBag();
     expect(TransGateDefinition.factory(props)).toBeInstanceOf(TransGateElement);
-  });
-
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
   });
 
   it("boundingBox — non-zero dimensions at correct position", () => {

@@ -288,17 +288,6 @@ export class VGAElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "VGA — VGA-resolution pixel display.\n" +
-      "Inputs: R, G, B (color channels), H (HSync), V (VSync), C (pixel clock).\n" +
-      "Rising clock edge samples a pixel. HSync resets X, VSync resets Y.\n" +
-      "Framebuffer contents displayed in a floating panel.\n" +
-      "colorBits: bit width of each color channel (default 4).\n" +
-      "frameWidth/frameHeight: framebuffer resolution (default 640x480)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -145,15 +145,6 @@ export class TransGateElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "TransGate — CMOS transmission gate.\n" +
-      "S=1, ~S=0: A and B are connected (conducting).\n" +
-      "S=0, ~S=1: A and B are disconnected.\n" +
-      "S == ~S: invalid state, treated as open."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

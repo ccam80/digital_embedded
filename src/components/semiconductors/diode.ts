@@ -292,13 +292,6 @@ export class DiodeElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Diode — Shockley equation with NR linearization.\n" +
-      "Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
-      "Model parameters: IS, N, CJO, VJ, M, TT, FC."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

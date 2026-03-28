@@ -178,9 +178,6 @@ export class CtzPlaceholderElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return `Placeholder for unsupported CTZ type '${this.ctzType}'.`;
-  }
 }
 
 // ---------------------------------------------------------------------------

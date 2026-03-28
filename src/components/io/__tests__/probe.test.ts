@@ -344,10 +344,6 @@ describe("Probe", () => {
       expect(() => registry.register(ProbeDefinition)).not.toThrow();
     });
 
-    it("ProbeElement.getHelpText() contains 'Probe'", () => {
-      const el = makeProbe();
-      expect(el.getHelpText()).toContain("Probe");
-    });
   });
 
   // ---------------------------------------------------------------------------

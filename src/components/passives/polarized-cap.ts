@@ -179,12 +179,6 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Polarized electrolytic capacitor — extends the standard capacitor with ESR,\n" +
-      "leakage current, and reverse-bias polarity enforcement."
-    );
-  }
 }
 
 

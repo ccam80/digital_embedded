@@ -1,0 +1,38 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: rlc parallel anti-resonance
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+1                                            0
+2                                            0
+3                                            0
+l1#branch                                    0
+vs#branch                                    0
+
+
+No. of Data Rows : 5008
+
+  Measurements for Transient Analysis
+
+v_out_peak          =  1.000000e+00 at=  2.036560e-03
+v_out_pp            =  2.000000e+00 from=  0.000000e+00 to=  0.000000e+00
+
+
+Total analysis time (seconds) = 0.016
+
+Total elapsed time (seconds) = 0.050 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13004.703 MB.
+Maximum ngspice program size =   16.020 MB.
+Current ngspice program size =   16.020 MB.
+

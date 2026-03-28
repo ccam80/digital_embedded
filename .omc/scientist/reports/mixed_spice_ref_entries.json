@@ -1,0 +1,101 @@
+{
+  "mixed_1_dac_rc_filter": {
+    "vdac_v": 3.125,
+    "v_cap_at_5tau": 3.103945,
+    "v_cap_final": 3.124858,
+    "vref_v": 5.0,
+    "dac_code": 10,
+    "dac_bits": 4,
+    "tau_ms": 1.0,
+    "R_ohm": 1000,
+    "C_F": 1e-06
+  },
+  "mixed_2_gate_analog_load_high": {
+    "v_probe": 5.0,
+    "comment": "AND gate HIGH drives 1k resistor: V=Vdd=5V"
+  },
+  "mixed_2_gate_analog_load_low": {
+    "v_probe": 0.0,
+    "comment": "AND gate LOW: V=0V"
+  },
+  "mixed_3_pwm_rc_filter": {
+    "v_cap_mean_50pct": 2.5,
+    "v_cap_mean_tol": 0.3,
+    "comment": "50% duty PWM, 5V swing: steady-state average = 2.5V. Ripple depends on freq vs tau."
+  },
+  "mixed_4_comparator_to_logic": {
+    "v_wiper": 3.5,
+    "v_vref": 5.0,
+    "v_vcc": 5.0,
+    "pot_position": 0.7,
+    "cmp_in_plus": 3.5,
+    "cmp_in_minus": 5.0,
+    "cmp_output_digital": 0,
+    "comment": "in+ (3.5V) < in- (5V) \u2192 comparator output LOW"
+  },
+  "mixed_5_adc_readout": {
+    "v_vref": 5.0,
+    "v_adc_in_peak": 4.9998,
+    "adc_code_at_peak": 15,
+    "adc_bits": 4,
+    "comment": "AcVoltageSource 5V amplitude \u2192 ADC input peak \u2248 5V \u2192 code 15 at peak"
+  },
+  "mixed_6_schmitt_to_counter": {
+    "v_schmitt_in_peak": 4.9998,
+    "v_schmitt_in_min": -4.9998,
+    "schmitt_vhi_threshold": 3.3,
+    "schmitt_vlo_threshold": 1.7,
+    "ac_freq_hz": 50,
+    "transitions_per_sec": 100
+  },
+  "mixed_7_555_timer": {
+    "f_hz": 288.6,
+    "period_ms": 3.465,
+    "t_high_ms": 2.079,
+    "t_low_ms": 1.386,
+    "duty_pct": 60.0,
+    "v_cap_lo": 1.6667,
+    "v_cap_hi": 3.3333,
+    "v_vcc": 5.0,
+    "Ra_ohm": 1000,
+    "Rb_ohm": 2000,
+    "C_F": 1e-06
+  },
+  "mixed_8_servo_dac_opamp_adc": {
+    "dac_code": 5,
+    "dac_bits": 4,
+    "v_dac": 1.5625,
+    "opamp_gain": 2.0,
+    "v_amp_out": 3.124994,
+    "v_vref2": 5.0,
+    "adc_code_out": 10,
+    "comment": "DAC code 5 \u2192 1.5625V \u2192 gain-2 opamp \u2192 3.125V \u2192 ADC code 10 (3.125/5*16=10)"
+  },
+  "mixed_9_bjt_ce_to_gate": {
+    "v_vcc": 5.0,
+    "v_base": 0.722,
+    "v_collector": 0.03,
+    "bjt_state": "saturated",
+    "collector_logic_level": "LOW",
+    "comment": "BJT driven from Vcc via Rb=1k: fully saturated, Vce_sat\u22480.03V \u2192 collector is digital LOW"
+  },
+  "mixed_10_digital_switch": {
+    "v_source": 5.0,
+    "v_probe_ctrl0": 0.0,
+    "v_probe_ctrl1": 4.9999,
+    "comment": "CTRL=0: switch open \u2192 V_probe=0V. CTRL=1: switch closed \u2192 V_probe\u22485V"
+  },
+  "mixed_11_relay_from_logic": {
+    "v_vs": 5.0,
+    "v_probe_deenergized": 0.0,
+    "v_probe_energized": 4.9995,
+    "comment": "A=B=0 \u2192 relay OFF \u2192 contact open \u2192 V_probe=0V. A=B=1 \u2192 V_probe\u22485V"
+  },
+  "mixed_12_spdt_lrc_transient": {
+    "v_no_steady": 4.9999,
+    "v_nc_steady": 5.0,
+    "i_inductor_ss_mA": 5.0,
+    "min_switching_amplitude_V": 0.1,
+    "comment": "FF toggles SPDT: NO path V=5V (5mA through 1k), NC path charges to 5V"
+  }
+}

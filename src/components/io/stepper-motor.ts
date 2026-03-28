@@ -148,14 +148,6 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
     drawMotorBody(ctx);
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "StepperMotorBipolar — bipolar stepper motor simulation.\n" +
-      "4 coil inputs (A+, A-, B+, B-). Step position output tracks current step.\n" +
-      "Full-step sequence advances one position per valid coil pattern change."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -186,14 +178,6 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
     ctx.save();
     drawMotorBody(ctx);
     ctx.restore();
-  }
-
-  getHelpText(): string {
-    return (
-      "StepperMotorUnipolar — unipolar stepper motor simulation.\n" +
-      "4 coil inputs (A, B, C, D). Step position output tracks current step.\n" +
-      "Full-step sequence advances one position per valid coil pattern change."
-    );
   }
 }
 

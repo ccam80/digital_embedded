@@ -157,13 +157,6 @@ export class DElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "D Flip-Flop — stores the D input on the rising clock edge.\n" +
-      "Q is the stored value, ~Q is its complement.\n" +
-      "Edge-triggered: only samples D when clock transitions from 0 to 1."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

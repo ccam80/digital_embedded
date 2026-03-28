@@ -41,7 +41,6 @@ class StubElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
   }
-  getHelpText(): string { return ''; }
 }
 
 function makePin(label: string, direction: PinDirection, x: number, y: number): Pin {

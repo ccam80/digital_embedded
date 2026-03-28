@@ -233,14 +233,6 @@ export class SubcircuitElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      `Subcircuit: ${this._definition.name}\n` +
-      `Pins: ${this._definition.pinLayout.length} interface pins derived from In/Out components.\n` +
-      "This component is flattened into its constituent gates before simulation."
-    );
-  }
-
   /** The loaded subcircuit definition (used by flattening and rendering). */
   get definition(): SubcircuitDefinition {
     return this._definition;

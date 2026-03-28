@@ -1,0 +1,147 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * a12: mosfet cs with w=10u l=1u (as in generate-spice-references.sh)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	vsrc                             1.604971e+00
+	vdrain                           4.456636e+00
+	vgate                            3.000000e+00
+	vdd                              1.200000e+01
+
+	Source	Current
+	------	-------
+
+	vdd#branch                       -1.60497e-03
+	vg#branch                        0.000000e+00
+
+ Mos1 models (Level 1 MOSfet model with Meyer capacitance model)
+      model                 mnmos
+
+       type                  nmos
+        vto                     1
+         kp                 0.002
+      gamma                     0
+        phi                   0.6
+     lambda                  0.01
+         rd                     0
+         rs                     0
+        cbd                     0
+        cbs                     0
+         is                 1e-14
+         pb                   0.8
+       cgso                     0
+       cgdo                     0
+       cgbo                     0
+        rsh                     0
+         cj                     0
+         mj                   0.5
+       cjsw                     0
+       mjsw                   0.5
+         js                     0
+        tox                     0
+         ld                     0
+         u0                     0
+         fc                   0.5
+       nsub                     0
+        tpg                     0
+        nss                     0
+       tnom                    27
+         kf <<NAN, error = 7>>
+         af <<NAN, error = 7>>
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ Mos1: Level 1 MOSfet model with Meyer capacitance model
+     device                    m1
+      model                 mnmos
+         id            0.00160498
+         is           -0.00160498
+         ig                     0
+         ib          -6.08161e-12
+        vgs               1.39503
+        vds               2.85167
+        vbs              -1.60497
+        von                     1
+      vdsat              0.395029
+         rs                     0
+         rd                     0
+         gm            0.00812588
+        gds           1.56048e-05
+        gmb                     0
+        cbd                     0
+        cbs                     0
+        cgs                     0
+        cgd                     0
+        cgb                     0
+       cbd0                     0
+     cbdsw0                     0
+       cbs0                     0
+     cbssw0                     0
+
+ Resistor: Simple linear resistor
+     device                    rs                    rd
+      model                     R                     R
+ resistance                  1000                  4700
+         ac                  1000                  4700
+      dtemp                     0                     0
+     bv_max                 1e+99                 1e+99
+      noisy                     1                     1
+          i            0.00160497            0.00160497
+          p            0.00257593             0.0121069
+
+ Vsource: Independent voltage source
+     device                    vg                   vdd
+         dc                     3                    12
+      acmag                     0                     0
+      pulse         -         -
+        sin         -         -
+        exp         -         -
+        pwl         -         -
+       sffm         -         -
+         am         -         -
+    trnoise         -         -
+   trrandom         -         -
+    portnum                     0                     0
+         z0                     0                     0
+        pwr                     0                     0
+       freq                     0                     0
+      phase                     0                     0
+          i                     0           -0.00160497
+          p                     0            -0.0192597
+
+Error: .print: no dc analysis found.
+
+Total analysis time (seconds) = 0.002
+
+Total elapsed time (seconds) = 0.056 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 14802.977 MB.
+Maximum ngspice program size =   15.938 MB.
+Current ngspice program size =   15.938 MB.
+

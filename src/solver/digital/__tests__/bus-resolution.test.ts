@@ -433,9 +433,6 @@ class TestElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
   }
 
-  getHelpText(): string {
-    return "";
-  }
 }
 
 function outputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {

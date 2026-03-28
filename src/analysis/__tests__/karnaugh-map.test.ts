@@ -15,7 +15,6 @@ import {
   KarnaughMap,
   KarnaughMapTab,
   grayCodeSequence,
-  grayCodeIndex,
   cycleValue,
   type KMapRenderContext,
 } from '../karnaugh-map.js';
@@ -80,15 +79,6 @@ describe('grayCodeSequence', () => {
       expect(diff & (diff - 1)).toBe(0);
       expect(diff).toBeGreaterThan(0);
     }
-  });
-});
-
-describe('grayCodeIndex', () => {
-  it('returns correct index for n=4', () => {
-    // seq = [0,1,3,2]: value 3 is at index 2
-    expect(grayCodeIndex(3, 4)).toBe(2);
-    // value 2 is at index 3
-    expect(grayCodeIndex(2, 4)).toBe(3);
   });
 });
 

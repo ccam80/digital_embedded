@@ -34,7 +34,7 @@ import {
   makeVoltageSource,
   makeResistor,
   withNodeIds,
-} from "../test-elements.js";
+} from "./test-helpers.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,

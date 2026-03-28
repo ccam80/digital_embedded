@@ -17,7 +17,7 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------

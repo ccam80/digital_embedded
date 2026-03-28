@@ -364,13 +364,6 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "NTC Thermistor — negative temperature coefficient resistor.\n" +
-      "Resistance decreases exponentially with temperature using the B-parameter model."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

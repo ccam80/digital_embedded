@@ -1,0 +1,176 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * a19: mosfet h-bridge forward (vdd=12v)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	vb                               2.265046e+00
+	va                               6.836352e+00
+	vrev                             1.200000e+01
+	vfwd                             0.000000e+00
+	vdd                              1.200000e+01
+
+	Source	Current
+	------	-------
+
+	vdd#branch                       -4.57131e-02
+	vfwd#branch                      0.000000e+00
+	vrev#branch                      0.000000e+00
+
+ Mos1 models (Level 1 MOSfet model with Meyer capacitance model)
+      model                 mnmos                 mpmos
+
+       type                  nmos                  pmos
+        vto                     1                    -1
+         kp                 0.002                 0.001
+      gamma                     0                     0
+        phi                   0.6                   0.6
+     lambda                  0.01                  0.01
+         rd                     0                     0
+         rs                     0                     0
+        cbd                     0                     0
+        cbs                     0                     0
+         is                 1e-14                 1e-14
+         pb                   0.8                   0.8
+       cgso                     0                     0
+       cgdo                     0                     0
+       cgbo                     0                     0
+        rsh                     0                     0
+         cj                     0                     0
+         mj                   0.5                   0.5
+       cjsw                     0                     0
+       mjsw                   0.5                   0.5
+         js                     0                     0
+        tox                     0                     0
+         ld                     0                     0
+         u0                     0                     0
+         fc                   0.5                   0.5
+       nsub                     0                     0
+        tpg                     0                     0
+        nss                     0                     0
+       tnom                    27                    27
+         kf <<NAN, error = 7>> <<NAN, error = 7>>
+         af <<NAN, error = 7>> <<NAN, error = 7>>
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ Mos1: Level 1 MOSfet model with Meyer capacitance model
+     device                   mn2                   mn1                   mp2
+      model                 mnmos                 mnmos                 mpmos
+         id             0.0457131           6.84635e-12           9.74495e-12
+         is            -0.0457131                     0                     0
+         ig                     0                     0                     0
+         ib          -2.27505e-12          -6.84635e-12          -9.74495e-12
+        vgs                    12                     0                    -0
+        vds               2.26505               6.83635               9.73495
+        vbs                     0                     0                    -0
+        von                     1                     1                    -1
+      vdsat                    11                     0                    -0
+         rs                     0                     0                     0
+         rd                     0                     0                     0
+         gm             0.0046327                     0                     0
+        gds             0.0183126                     0                     0
+        gmb                     0                     0                     0
+        cbd                     0                     0                     0
+        cbs                     0                     0                     0
+        cgs                     0                     0                     0
+        cgd                     0                     0                     0
+        cgb                     0                     0                     0
+       cbd0                     0                     0                     0
+     cbdsw0                     0                     0                     0
+       cbs0                     0                     0                     0
+     cbssw0                     0                     0                     0
+
+ Mos1: Level 1 MOSfet model with Meyer capacitance model
+     device                   mp1
+      model                 mpmos
+         id             0.0457131
+         is            -0.0457131
+         ig                     0
+         ib          -5.17365e-12
+        vgs                    12
+        vds               5.16365
+        vbs                    -0
+        von                    -1
+      vdsat                   -11
+         rs                     0
+         rd                     0
+         gm            0.00543028
+        gds            0.00657241
+        gmb                     0
+        cbd                     0
+        cbs                     0
+        cgs                     0
+        cgd                     0
+        cgb                     0
+       cbd0                     0
+     cbdsw0                     0
+       cbs0                     0
+     cbssw0                     0
+
+ Resistor: Simple linear resistor
+     device                 rload
+      model                     R
+ resistance                   100
+         ac                   100
+      dtemp                     0
+     bv_max                 1e+99
+      noisy                     1
+          i             0.0457131
+          p              0.208968
+
+ Vsource: Independent voltage source
+     device                  vrev                  vfwd                   vdd
+         dc                    12                     0                    12
+      acmag                     0                     0                     0
+      pulse         -         -         -
+        sin         -         -         -
+        exp         -         -         -
+        pwl         -         -         -
+       sffm         -         -         -
+         am         -         -         -
+    trnoise         -         -         -
+   trrandom         -         -         -
+    portnum                     0                     0                     0
+         z0                     0                     0                     0
+        pwr                     0                     0                     0
+       freq                     0                     0                     0
+      phase                     0                     0                     0
+          i                     0                     0            -0.0457131
+          p                     0                     0             -0.548557
+
+Error: .print: no dc analysis found.
+
+Total analysis time (seconds) = 0.001
+
+Total elapsed time (seconds) = 0.059 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 14743.355 MB.
+Maximum ngspice program size =   15.965 MB.
+Current ngspice program size =   15.965 MB.
+

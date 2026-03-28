@@ -249,12 +249,6 @@ describe("Fuse — ComponentDefinition", () => {
     expect(FuseDefinition.factory(props)).toBeInstanceOf(FuseElement);
   });
 
-  it("helpText — returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.getHelpText().length).toBeGreaterThan(0);
-  });
-
   it("boundingBox — non-zero dimensions at correct position", () => {
     const props = new PropertyBag();
     const el = new FuseElement(crypto.randomUUID(), { x: 4, y: 6 }, 0, false, props);

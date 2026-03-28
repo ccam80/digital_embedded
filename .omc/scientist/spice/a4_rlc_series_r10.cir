@@ -1,0 +1,9 @@
+RLC Series R=10 (Q=3.162)
+Vs 1 0 SIN(0 1 5033)
+R1 1 2 10
+L1 2 3 1m
+C1 3 0 1u
+.tran 1u 20m
+.meas tran v_c_ss_peak MAX V(3) FROM=18m TO=20m
+.meas tran v_lc_ss_pp  PP  V(3) FROM=18m TO=20m
+.end

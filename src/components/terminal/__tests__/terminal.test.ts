@@ -339,10 +339,6 @@ describe("Terminal", () => {
       expect(() => registry.register(TerminalDefinition)).not.toThrow();
     });
 
-    it("TerminalElement.getHelpText() contains 'Terminal'", () => {
-      const el = makeTerminal();
-      expect(el.getHelpText()).toContain("Terminal");
-    });
 
     it("TerminalDefinition has pinLayout with 3 inputs and 0 outputs", () => {
       const inputs = TerminalDefinition.pinLayout.filter(
@@ -601,10 +597,6 @@ describe("Keyboard", () => {
       expect(() => registry.register(KeyboardDefinition)).not.toThrow();
     });
 
-    it("KeyboardElement.getHelpText() contains 'Keyboard'", () => {
-      const el = makeKeyboard();
-      expect(el.getHelpText()).toContain("Keyboard");
-    });
 
     it("KeyboardDefinition has pinLayout with 2 inputs and 2 outputs", () => {
       const inputs = KeyboardDefinition.pinLayout.filter(

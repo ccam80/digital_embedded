@@ -172,14 +172,6 @@ export class TElement extends AbstractCircuitElement {
     }
   }
 
-  getHelpText(): string {
-    return (
-      "T Flip-Flop — toggles Q on rising clock edge.\n" +
-      "With T input: toggles only when T=1.\n" +
-      "Without T input: toggles on every rising clock edge.\n" +
-      "Q and ~Q are always complementary."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

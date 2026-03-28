@@ -128,15 +128,6 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "PowerSupply — VCC/GND source enforcer for CMOS circuits.\n" +
-      "VDD input must be connected to logic 1 (VCC).\n" +
-      "GND input must be connected to logic 0 (ground).\n" +
-      "The engine raises a simulation error if either connection is incorrect."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -71,15 +71,6 @@ export class TextElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Text — visual annotation label on the canvas.\n" +
-      "No simulation behavior. Used for documentation and labelling.\n" +
-      "text: the content to display.\n" +
-      "fontSize: font size in grid units (default 1.0)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

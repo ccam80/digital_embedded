@@ -1,0 +1,7 @@
+* 555 Discharge Phase: cap discharges from 2*Vcc/3 to 0 via Rb
+* (DIS pin shunts Ra side, so only Rb discharges cap)
+Rb    0   nc  10k
+C1    nc  0   1u  IC=3.3333
+.tran 0.01ms 15ms uic
+.print tran V(nc)
+.end

@@ -126,13 +126,6 @@ export class InductorElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Inductor — reactive element with companion model and branch current.\n" +
-      "Stamps equivalent conductance, history current, and branch incidence entries."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

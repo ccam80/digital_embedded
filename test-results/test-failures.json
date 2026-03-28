@@ -1,0 +1,566 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 9595,
+      "failed": 3,
+      "skipped": 0,
+      "totalFiles": 324,
+      "durationSeconds": 12.2
+    },
+    "playwright": {
+      "passed": 459,
+      "failed": 63,
+      "skipped": 0,
+      "totalFiles": 18,
+      "durationSeconds": 219.97463499999998
+    },
+    "totalFailed": 66,
+    "totalPassed": 10054
+  },
+  "failures": {
+    "vitest": [
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "rejects_digital_only_component",
+            "line": 396,
+            "column": 92
+          }
+        ]
+      }
+    ],
+    "playwright": [
+      {
+        "message": "Error: Status bar shows error: \"Circuit problem: Component \"Tunnel\" (95650d06-f49d-4700-94ff-30c85cd18275) is digital-only and cannot be simulated in an analog circuit | Component \"Tunnel\" (d88385a0-6...",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "load buckbjt.dig and step — no convergence error, voltages sane",
+            "line": 111,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Status bar shows error: \"Circuit problem: Component \"Tunnel\" (ffe9a056-3d54-4994-ac6e-15563ea82310) is digital-only and cannot be simulated in an analog circuit | Component \"Tunnel\" (c7facbf6-c...",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "load buckbjt.dig and run briefly — voltages remain bounded",
+            "line": 150,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Analog engine should be active after first step",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "load buckbjt.dig and step 20 times — all voltages finite and evolving",
+            "line": 191,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 7,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RC lowpass: steady-state amplitude matches analytical",
+            "line": 136,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC series: resonance frequency f0 = 1/(2pi*sqrt(LC))",
+            "line": 245,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC parallel: anti-resonance behavior",
+            "line": 286,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "compile and step analog RC circuit — simTime advances",
+            "line": 123,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "RC lowpass steady-state amplitude matches analytical",
+            "line": 168,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "capacitor shows property popup with float input",
+            "line": 259,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed switching transient: D_FF toggles SPDT with LRC load",
+            "line": 818,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 14,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RL circuit: current rise with time constant L/R",
+            "line": 211,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched RC: charge on close, discharge on open",
+            "line": 1192,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LRC with switch: damped oscillation after closing",
+            "line": 1232,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SPDT source selector: toggles between two voltage sources",
+            "line": 1362,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET PWM into RLC: filtered DC output",
+            "line": 1454,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "crystal oscillator: oscillation builds at crystal frequency",
+            "line": 1493,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "555 astable: oscillation at expected frequency",
+            "line": 1635,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 139,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital gate driving analog load: And output drives resistor",
+            "line": 218,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital-controlled analog switch: In toggles analog path",
+            "line": 722,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "relay from digital logic: And gate drives relay coil",
+            "line": 768,
+            "column": 5
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "build RC, run simulation, select capacitor, see slider",
+            "line": 571,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "slider panel lifecycle: created on run, disposed on stop",
+            "line": 602,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 634,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Vpeak_rectified: expected 4.307074 ±0.1%, got 0.00011501045039776852",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "diode rectifier: output near Vpeak minus Vf with ripple",
+            "line": 332,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vregulated: expected 5.140892 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "zener regulator: output clamps at Vz",
+            "line": 372,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcollector: expected 11.04672 ±0.1%, got 11.36427604669815",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT common-emitter: DC bias point Vce > 0, Ic > 0",
+            "line": 411,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcol1: expected 11.89609 ±0.1%, got 11.917061667418198",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT differential pair: balanced outputs when inputs equal",
+            "line": 470,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcollector: expected 11.97211 ±0.1%, got 11.76603430698557",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT Darlington pair: high current gain",
+            "line": 528,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vout: expected 2.32547 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT push-pull: complementary output follows input",
+            "line": 579,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vdrain: expected 4.456636 ±0.1%, got 10.622903595586548",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET common-source: DC bias Vds > Vgs-Vth",
+            "line": 629,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vdrain: expected 11.78713 ±0.1%, got 14.608061420350076",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "JFET amplifier: pinch-off region operation",
+            "line": 772,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Voutput: expected 11.10296 ±0.1%, got 11.34996309817316",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "cascode amplifier: two-stage BJT with higher output impedance",
+            "line": 826,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vref_leg: expected 1.212704 ±0.1%, got 0.7766197171865578",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "Wilson current mirror: output current tracks reference",
+            "line": 882,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Voutput: expected 11.12009 ±0.1%, got 11.070283813365483",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "Widlar current source: low current output",
+            "line": 932,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vhigh: expected 6.836352 ±0.1%, got 6.000416203162121",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET H-bridge: forward and reverse drive states",
+            "line": 980,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vq1c: expected 10.25837 ±0.1%, got 10.768500038996589",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT+MOSFET mixed driver: NPN drives NMOS gate",
+            "line": 1041,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vc1: expected 10.72269 ±0.1%, got 12",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "multi-stage amplifier: three CE stages with overall gain",
+            "line": 1094,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 17,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "relay-driven LC: relay switches between load paths",
+            "line": 1268,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SCR latch: trigger on and stays latched",
+            "line": 1684,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "triac dimmer: phase-angle AC control",
+            "line": 1738,
+            "column": 5
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 4,4,4,4→16: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Register file: write and read registers",
+            "line": 760,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "DAC + RC filter: digital input produces filtered analog voltage",
+            "line": 153,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "comparator to logic: analog threshold drives digital gate",
+            "line": 318,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "ADC readout: analog waveform sampled to digital outputs",
+            "line": 377,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "Schmitt trigger to counter: analog sine drives digital count",
+            "line": 437,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "555 timer driving digital counter: analog oscillator to digital count",
+            "line": 495,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
+            "line": 563,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed transistor + gate: BJT level-shifts into digital And",
+            "line": 657,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LDR voltage divider: output varies with light level",
+            "line": 1783,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: No node voltages changed after 50 steps",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "node voltages change during transient simulation",
+            "line": 144,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Bus splitter: 8-bit to 4+4 nibbles",
+            "line": 880,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.evaluate: TypeError: registerAllComponents is not a function",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/diag-analog.spec.ts",
+            "test": "diagnostic: use import to create headless facade",
+            "line": 6,
+            "column": 1
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "T flip-flop 4-bit ripple counter",
+            "line": 381,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "RAM write/read: store and retrieve values",
+            "line": 718,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

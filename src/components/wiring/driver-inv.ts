@@ -133,14 +133,6 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "DriverInvSel — tri-state buffer with active-low enable.\n" +
-      "When sel=0 (active-low): output = input.\n" +
-      "When sel=1: output is high-impedance (disconnected)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

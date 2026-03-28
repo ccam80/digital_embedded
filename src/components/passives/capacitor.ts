@@ -110,12 +110,6 @@ export class CapacitorElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "Capacitor — reactive element with companion model.\n" +
-      "Stamps equivalent conductance and history current source at each timestep."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

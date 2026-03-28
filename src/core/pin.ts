@@ -70,7 +70,7 @@ export function createInverterConfig(invertedPinLabels: readonly string[]): Inve
   return { invertedPins: new Set(invertedPinLabels) };
 }
 
-export function isPinInverted(config: InverterConfig, label: string): boolean {
+function isPinInverted(config: InverterConfig, label: string): boolean {
   return config.invertedPins.has(label);
 }
 

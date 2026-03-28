@@ -109,15 +109,6 @@ export class NOrElement extends AbstractCircuitElement {
     ctx.drawLine(0, 2, 0.2, 2);
     if (center) ctx.drawLine(0, 1, 0.35, 1);
   }
-
-  getHelpText(): string {
-    return (
-      "NOr gate — performs bitwise NOT(OR) of all inputs.\n" +
-      "Configurable input count (2–5) and bit width (1–32).\n" +
-      "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with ≥1 and bubble) shapes are supported.\n" +
-      "Individual inputs can be inverted via the inverterConfig property."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -175,16 +175,6 @@ export class MuxElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    const inputCount = 1 << selectorBits;
-    return (
-      `Multiplexer — selects one of ${inputCount} inputs based on the selector.\n` +
-      `Output = input[selector].\n` +
-      `Selector bits: ${selectorBits}, data bit width: ${bitWidth}.`
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

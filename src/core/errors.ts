@@ -68,35 +68,6 @@ export class BurnException extends SimulationError {
 }
 
 // ---------------------------------------------------------------------------
-// BacktrackException — switching network initialization failure
-// ---------------------------------------------------------------------------
-
-/**
- * Thrown when the switching network (bidirectional switches, transmission
- * gates) cannot reach a stable initial state during circuit initialization.
- * The resolver backtracks but exhausts its attempts.
- *
- */
-export class BacktrackException extends SimulationError {
-  /** Number of backtrack attempts made before giving up. */
-  readonly attempts: number;
-
-  constructor(
-    message: string,
-    options?: {
-      componentId?: string;
-      netId?: number;
-      attempts?: number;
-      cause?: unknown;
-    },
-  ) {
-    super(message, options);
-    this.name = "BacktrackException";
-    this.attempts = options?.attempts ?? 0;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // BitsException — bit-width mismatch between connected pins
 // ---------------------------------------------------------------------------
 
@@ -126,30 +97,6 @@ export class BitsException extends SimulationError {
     this.name = "BitsException";
     this.expectedBits = options?.expectedBits ?? 0;
     this.actualBits = options?.actualBits ?? 0;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// NodeException — component evaluation error
-// ---------------------------------------------------------------------------
-
-/**
- * Thrown when a component's evaluation (flat execute function) encounters an
- * internal error — for example, an invalid configuration that was not caught
- * at compile time.
- *
- */
-export class NodeException extends SimulationError {
-  constructor(
-    message: string,
-    options?: {
-      componentId?: string;
-      netId?: number;
-      cause?: unknown;
-    },
-  ) {
-    super(message, options);
-    this.name = "NodeException";
   }
 }
 
@@ -187,31 +134,3 @@ export class OscillationError extends SimulationError {
   }
 }
 
-// ---------------------------------------------------------------------------
-// PinException — unconnected or misconfigured pin
-// ---------------------------------------------------------------------------
-
-/**
- * Thrown when a pin is in an invalid state: unconnected when it must be
- * connected, multiply-driven when it may only have one driver, or configured
- * with an invalid bit width.
- *
- */
-export class PinException extends SimulationError {
-  /** Label of the pin that caused the error. */
-  readonly pinLabel: string | undefined;
-
-  constructor(
-    message: string,
-    options?: {
-      componentId?: string;
-      netId?: number;
-      pinLabel?: string;
-      cause?: unknown;
-    },
-  ) {
-    super(message, options);
-    this.name = "PinException";
-    this.pinLabel = options?.pinLabel;
-  }
-}

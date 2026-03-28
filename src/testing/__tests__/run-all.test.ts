@@ -67,7 +67,6 @@ function makeCircuitWithInputs(inputCount: number, ...testcases: TestcaseElement
       getBoundingBox: () => ({ x: 0, y: 0, width: 1, height: 1 }),
       draw: () => {},
       serialize: () => ({ typeId: 'In', instanceId: `in-${i}`, position: { x: i, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-      getHelpText: () => 'In',
     };
     circuit.addElement(stub as import('../../core/element.js').CircuitElement);
   }

@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node scripts/run-all-tests.mjs",
+    "test:q": "node scripts/run-all-tests.mjs -q",
     "test:watch": "vitest",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"

@@ -37,7 +37,6 @@ class StubElement implements CircuitElement {
   serialize(): SerializedElement {
     return { typeId: this.typeId, instanceId: this.instanceId, position: this.position, rotation: this.rotation, mirror: this.mirror, properties: {} };
   }
-  getHelpText(): string { return ""; }
   getAttribute(_name: string): PropertyValue | undefined { return undefined; }
 }
 

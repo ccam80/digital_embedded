@@ -1,0 +1,14 @@
+* 555 Astable Behavioral Model Ra=1k Rb=10k C=1u Vcc=5V
+* f = 1.44 / ((Ra+2Rb)*C) = 68.57 Hz
+Vcc   vcc  0   DC 5
+Ra    vcc  node1  1k
+Rb    node1  cap  10k
+C1    cap  0   1u  IC=0
+* Discharge switch: when output < 2.5V (LOW), discharge cap via Rb
+Sdis  node1  0  output  0  SWMOD
+.model SWMOD SW(VT=2.5 VH=0.1 RON=10 ROFF=1Meg)
+* Hysteretic comparator output: set low when cap>2/3*5=3.333V, high when cap<1/3*5=1.667V
+Bout  output  0  V = ( V(cap) < 1.667 ? 5 : ( V(cap) > 3.333 ? 0 : V(output) ) )
+.tran 0.1ms 60ms uic
+.print tran V(output) V(cap)
+.end

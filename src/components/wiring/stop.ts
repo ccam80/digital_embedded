@@ -95,13 +95,6 @@ export class StopElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "Stop — terminates simulation when input goes high.\n" +
-      "Unlike Break, Stop closes the model entirely rather than just pausing."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

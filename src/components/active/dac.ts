@@ -159,13 +159,6 @@ export class DACElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "N-bit DAC — converts a digital input code to an analog output voltage. " +
-      "V_out = V_ref · code / 2^N (unipolar) or V_ref · (2·code/2^N − 1) (bipolar)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

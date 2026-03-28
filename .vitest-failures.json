@@ -1,0 +1,23 @@
+{
+  "summary": {
+    "passed": 9595,
+    "failed": 3,
+    "skipped": 0,
+    "totalFiles": 324,
+    "durationSeconds": 12.2
+  },
+  "failures": [
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "rejects_digital_only_component",
+          "line": 396,
+          "column": 92
+        }
+      ]
+    }
+  ]
+}

@@ -28,7 +28,6 @@ class MockElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-  getHelpText(): string { return ''; }
 }
 
 function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
@@ -62,7 +61,6 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ 
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
-    getHelpText() { return ''; },
     getAttribute(_k: string) { return undefined; },
   };
 }

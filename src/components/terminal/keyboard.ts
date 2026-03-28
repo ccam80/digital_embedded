@@ -182,16 +182,6 @@ export class KeyboardElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "Keyboard — keyboard input source.\n" +
-      "rd (1-bit): rising edge dequeues the front key from the queue.\n" +
-      "dout (8-bit): current key code at the front of the queue.\n" +
-      "rdy (1-bit): 1 when a key is waiting, 0 when queue is empty.\n" +
-      "Key codes are enqueued via the floating keyboard panel."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

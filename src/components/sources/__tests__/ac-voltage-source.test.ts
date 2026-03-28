@@ -18,7 +18,7 @@ import {
   makeResistor,
   makeCapacitor,
   makeVoltageSource,
-} from "../../../solver/analog/test-elements.js";
+} from "../../../solver/analog/__tests__/test-helpers.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 

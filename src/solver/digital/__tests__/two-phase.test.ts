@@ -52,7 +52,6 @@ class TestElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
   }
-  getHelpText(): string { return ""; }
 }
 
 // ---------------------------------------------------------------------------

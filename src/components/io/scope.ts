@@ -209,15 +209,6 @@ export class ScopeElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Scope — multi-channel waveform recorder.\n" +
-      "Records signal values over time. Waveform displayed in a floating panel.\n" +
-      "channelCount: number of input channels (1–8).\n" +
-      "timeScale: horizontal time scale factor."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

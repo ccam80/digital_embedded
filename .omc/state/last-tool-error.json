@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\cca79\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--local-working-projects-digital-in_browser\\\\9f176253-c918-41b4-8ad5-fbabbe7c5d20\\\\tasks\\\\blrzbwf10.output\"}",
-  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
-  "timestamp": "2026-03-27T22:57:12.290Z",
-  "retry_count": 1
-}

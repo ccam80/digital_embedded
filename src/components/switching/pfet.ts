@@ -146,14 +146,6 @@ export class PFETElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "PFET — P-channel MOSFET.\n" +
-      "G=0: S and D are connected (conducting).\n" +
-      "G=1: S and D are disconnected."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

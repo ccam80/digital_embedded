@@ -3,7 +3,7 @@
  *
  * Tests verify:
  * - A concrete element can be created and satisfies the interface
- * - draw(), getPins(), serialize(), getHelpText(), getAttribute() behave correctly
+ * - draw(), getPins(), serialize(), getAttribute() behave correctly
  * - getBoundingBox() returns the correct rect
  * - Serialization produces the expected shape
  * - Mutation of position/rotation/mirror is reflected immediately
@@ -95,9 +95,6 @@ class ConcreteElement extends AbstractCircuitElement {
     return { x: this.position.x, y: this.position.y, width: 4, height: 2 };
   }
 
-  getHelpText(): string {
-    return "A test component.";
-  }
 }
 
 function makeElement(overrides?: {
@@ -229,9 +226,6 @@ describe("CircuitElement interface via AbstractCircuitElement", () => {
 
   // --- Help text ---
 
-  it("getHelpText returns the expected text", () => {
-    expect(el.getHelpText()).toBe("A test component.");
-  });
 
   // --- Serialization ---
 
@@ -346,7 +340,6 @@ describe("CircuitElement interface via AbstractCircuitElement", () => {
     expect(typeof asInterface.getProperties).toBe("function");
     expect(typeof asInterface.getBoundingBox).toBe("function");
     expect(typeof asInterface.serialize).toBe("function");
-    expect(typeof asInterface.getHelpText).toBe("function");
     expect(typeof asInterface.getAttribute).toBe("function");
   });
 });

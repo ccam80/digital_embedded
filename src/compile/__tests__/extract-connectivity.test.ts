@@ -51,7 +51,6 @@ class TestElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 2, height: 2 }; }
-  getHelpText(): string { return ''; }
 }
 
 // ---------------------------------------------------------------------------

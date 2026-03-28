@@ -1,0 +1,41 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t8 dac opamp adc servo
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+dac_out                                 1.5625
+vref2                                        5
+amp_out                                3.12499
+fb_node                                 1.5625
+eamp#branch                         -0.0015625
+vref2#branch                                 0
+vdac#branch                                  0
+
+
+No. of Data Rows : 59
+
+  Measurements for Transient Analysis
+
+v_dac               =  1.562500e+00
+v_amp               =  3.124994e+00
+v_vref2             =  5.000000e+00
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.040 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12838.715 MB.
+Maximum ngspice program size =   15.918 MB.
+Current ngspice program size =   15.918 MB.
+

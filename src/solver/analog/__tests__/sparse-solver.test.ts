@@ -333,7 +333,7 @@ import {
   makeCapacitor,
   makeDiode,
   makeInductor,
-} from "../test-elements.js";
+} from "./test-helpers.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";

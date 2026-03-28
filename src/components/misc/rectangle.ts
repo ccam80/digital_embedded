@@ -85,16 +85,6 @@ export class RectangleElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Rectangle — visual grouping box on the canvas.\n" +
-      "No simulation behavior. Used to group related circuit sections.\n" +
-      "label: optional label displayed above the rectangle.\n" +
-      "rectWidth/rectHeight: dimensions in grid units.\n" +
-      "lineWidth: border thickness."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

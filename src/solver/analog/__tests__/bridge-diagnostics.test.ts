@@ -247,7 +247,6 @@ class HighZResistorElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; }
-  getHelpText(): string { return ""; }
 }
 
 /** Ground placeholder element — gives MNA a ground reference node. */
@@ -262,7 +261,6 @@ class GroundElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: 0, y: 0, width: 2, height: 2 }; }
-  getHelpText(): string { return ""; }
 }
 
 /** SubcircuitHost placeholder for the bridge inner digital circuit. */
@@ -287,7 +285,6 @@ class BridgeSubcircuitElement extends AbstractCircuitElement implements Subcircu
   getPins(): readonly Pin[] { return this._pins; }
   draw(_ctx: RenderContext): void {}
   getBoundingBox(): Rect { return { x: 0, y: 0, width: 6, height: 6 }; }
-  getHelpText(): string { return "subcircuit"; }
 }
 
 function noopExec(): ExecuteFunction {
@@ -382,7 +379,6 @@ describe("bridge-impedance-mismatch", () => {
       getPins(): readonly Pin[] { return this._p; }
       draw(_ctx: RenderContext): void {}
       getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 2 }; }
-      getHelpText(): string { return ""; }
     }
 
     const innerIn = new InnerInElement();

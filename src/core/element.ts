@@ -131,14 +131,6 @@ export interface CircuitElement {
    */
   serialize(): SerializedElement;
 
-  // --- Help ---
-
-  /**
-   * Returns the help / documentation text for this component type.
-   * Displayed in the property panel and tooltip help popups.
-   */
-  getHelpText(): string;
-
   // --- HGS attribute access ---
 
   /**
@@ -164,7 +156,7 @@ export interface CircuitElement {
 /**
  * Base class providing default implementations for the parts of CircuitElement
  * that are uniform across component types. Component classes extend this and
- * override draw(), getPins(), getHelpText(), and any property-specific logic.
+ * override draw(), getPins(), and any property-specific logic.
  *
  * Using a class here is justified: every component is a genuine CircuitElement.
  * The alternative (separate interface + standalone helpers) would duplicate
@@ -225,7 +217,6 @@ export abstract class AbstractCircuitElement implements CircuitElement {
   abstract getPins(): readonly Pin[];
   abstract draw(ctx: RenderContext, signals?: PinVoltageAccess): void;
   abstract getBoundingBox(): Rect;
-  abstract getHelpText(): string;
 
   /**
    * Returns the label string if showLabel is true, otherwise empty string.

@@ -224,16 +224,6 @@ export class MidiElement extends AbstractCircuitElement {
     return this._properties.getOrDefault<boolean>("progChangeEnable", false);
   }
 
-  getHelpText(): string {
-    return (
-      "MIDI — sends MIDI note-on/off and program-change messages via Web MIDI API.\n" +
-      "Inputs: N (note, 7-bit), V (velocity, 7-bit), OnOff (1=on, 0=off), en (enable), C (clock).\n" +
-      "When progChangeEnable=true, an additional PC input enables program-change mode.\n" +
-      "On rising clock edge with en=1: sends note-on or note-off depending on OnOff.\n" +
-      "If Web MIDI is unavailable, the component produces no audio but signals propagate normally.\n" +
-      "midiChannel selects the MIDI channel (1–16). midiInstrument sets the GM instrument name."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

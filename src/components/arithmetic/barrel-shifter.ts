@@ -95,10 +95,6 @@ export class BarrelShifterElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "BarrelShifter — configurable shift/rotate. Modes: logical, rotate, arithmetic. Directions: left, right. Signed shift amount supported.";
-  }
 }
 
 // ---------------------------------------------------------------------------

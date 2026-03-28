@@ -298,15 +298,6 @@ export class DiodeElement extends AbstractCircuitElement {
   isBlown(): boolean {
     return this._properties.getOrDefault<boolean>("blown", false);
   }
-
-  getHelpText(): string {
-    return (
-      "Diode — unidirectional current-flow element for PLD wired-OR/AND arrays.\n" +
-      "Anode (right) to cathode (left). Active: anode high drives cathode high;\n" +
-      "cathode low drives anode low. Use in conjunction with pull-up/pull-down resistors.\n" +
-      "blown=true permanently opens the diode."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,15 +345,6 @@ export class DiodeForwardElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "DiodeForward — forward diode for wired-OR PLD arrays.\n" +
-      "Input 'in' drives output 'out': in=1 → out=1; in=0 → out=high-Z.\n" +
-      "Requires a pull-down resistor on the output net.\n" +
-      "blown=true permanently opens the diode (output always high-Z)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -409,15 +391,6 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
     }
 
     ctx.restore();
-  }
-
-  getHelpText(): string {
-    return (
-      "DiodeBackward — backward diode for wired-AND PLD arrays.\n" +
-      "Input 'in' drives output 'out': in=1 → out=1; in=0 → out=0.\n" +
-      "Requires a pull-up resistor on the output net.\n" +
-      "blown=true permanently opens the diode (output always high-Z)."
-    );
   }
 }
 

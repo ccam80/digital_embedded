@@ -1,0 +1,36 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * scr 2bjt with holding cap
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Warning: can't parse 'r1#branch': ignored
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vcc                                         12
+a                                       11.988
+g                                            0
+nd1                                    11.7659
+vgate#branch                       1.27659e-11
+vcc#branch                         -1.1993e-05
+
+
+No. of Data Rows : 654
+Warning from checkvalid: vector r1#branch is not available or has zero length.
+
+
+Total analysis time (seconds) = 0.005
+
+Total elapsed time (seconds) = 0.045 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13163.645 MB.
+Maximum ngspice program size =   15.992 MB.
+Current ngspice program size =   15.992 MB.
+

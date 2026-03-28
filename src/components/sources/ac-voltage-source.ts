@@ -244,10 +244,6 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "AC Voltage Source — time-varying voltage source (sine, square, triangle, sawtooth).";
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { WireDrawingMode, isPointOnSegmentInterior, splitWiresAtPoint } from "@/editor/wire-drawing";
+import { WireDrawingMode, splitWiresAtPoint } from "@/editor/wire-drawing";
 import { mergeCollinearSegments } from "@/core/wire-utils";
 import { checkWireConsistency } from "@/editor/wire-consistency";
 import { Wire, Circuit } from "@/core/circuit";
@@ -55,7 +55,6 @@ function makeStubElement(
     draw: (_ctx: RenderContext): void => {},
     getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
-    getHelpText: (): string => "stub",
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
   };
 }
@@ -193,28 +192,6 @@ describe("WireMerge", () => {
 // Wire-tap tests
 // ---------------------------------------------------------------------------
 
-describe("isPointOnSegmentInterior", () => {
-  it("returns true for interior point on horizontal segment", () => {
-    expect(isPointOnSegmentInterior({ x: 3, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(true);
-  });
-
-  it("returns false for endpoint of horizontal segment", () => {
-    expect(isPointOnSegmentInterior({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
-    expect(isPointOnSegmentInterior({ x: 5, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
-  });
-
-  it("returns true for interior point on vertical segment", () => {
-    expect(isPointOnSegmentInterior({ x: 0, y: 3 }, { x: 0, y: 0 }, { x: 0, y: 5 })).toBe(true);
-  });
-
-  it("returns false for point off the segment axis", () => {
-    expect(isPointOnSegmentInterior({ x: 3, y: 1 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
-  });
-
-  it("returns false for point beyond segment bounds", () => {
-    expect(isPointOnSegmentInterior({ x: 7, y: 0 }, { x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
-  });
-});
 
 describe("splitWiresAtPoint", () => {
   it("splits a horizontal wire at an interior point", () => {

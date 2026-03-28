@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 // ---------------------------------------------------------------------------
 // PropertyType
 // ---------------------------------------------------------------------------
@@ -123,42 +121,7 @@ export class PropertyBag {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Zod schemas — used only at serialization boundaries (JSON load/save).
-// Not for internal use between components and the engine.
-// ---------------------------------------------------------------------------
-
-/**
- * Schema for a single serialized property value.
- * bigint is not natively JSON-serializable, so it is transmitted as a string
- * with a leading "0n" sentinel that the parser restores to bigint.
- */
-const BigIntString = z.string().regex(/^0n\d+$/).transform((s) => BigInt(s.slice(2)));
-
-const PropertyValueSchema = z.union([
-  z.number(),
-  BigIntString,
-  z.string(),
-  z.boolean(),
-  z.array(z.number()),
-]) as z.ZodType<PropertyValue>;
-
-/**
- * Schema for a plain-object representation of a PropertyBag as it appears in
- * a saved JSON circuit file.
- */
-export const PropertyBagSchema = z.record(z.string(), PropertyValueSchema);
-
 export type SerializedPropertyBag = Record<string, number | string | boolean | number[]>;
-
-/**
- * Deserialize a raw JSON object into a PropertyBag.
- * Throws a ZodError if validation fails.
- */
-export function propertyBagFromJson(raw: unknown): PropertyBag {
-  const parsed = PropertyBagSchema.parse(raw);
-  return new PropertyBag(Object.entries(parsed));
-}
 
 /**
  * Serialize a PropertyBag to a plain object suitable for JSON.stringify.
@@ -188,18 +151,3 @@ export const LABEL_PROPERTY_DEF: PropertyDefinition = {
   description: "Optional label shown above the component",
 };
 
-/**
- * Schema for a PropertyDefinition as stored in JSON (e.g. component library
- * metadata). Only used when definitions are serialized externally.
- */
-export const PropertyDefinitionSchema = z.object({
-  key: z.string(),
-  type: z.enum(['INT', 'FLOAT', 'STRING', 'ENUM', 'BOOLEAN', 'BIT_WIDTH', 'HEX_DATA', 'COLOR', 'LONG', 'FILE', 'ROTATION', 'INTFORMAT']),
-  label: z.string(),
-  defaultValue: PropertyValueSchema,
-  description: z.string().optional(),
-  enumValues: z.array(z.string()).optional(),
-  min: z.number().optional(),
-  max: z.number().optional(),
-  unit: z.string().optional(),
-});

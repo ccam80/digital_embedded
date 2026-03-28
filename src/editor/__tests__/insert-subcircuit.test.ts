@@ -56,9 +56,6 @@ function makeTestElement(
         properties: {},
       };
     },
-    getHelpText(): string {
-      return "";
-    },
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },

@@ -1,0 +1,37 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t6 schmitt trigger input voltage
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vs_pos                                       0
+schmitt_in                                   0
+vs#branch                                    0
+
+
+No. of Data Rows : 1008
+
+  Measurements for Transient Analysis
+
+v_schmitt_pk        =  4.999807e+00 at=  2.502800e-02
+v_schmitt_min       =  -4.999807e+00 at=  3.502800e-02
+v_schmitt_at_20ms   =  2.291916e-06
+
+
+Total analysis time (seconds) = 0.005
+
+Total elapsed time (seconds) = 0.047 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12833.027 MB.
+Maximum ngspice program size =   15.945 MB.
+Current ngspice program size =   15.945 MB.
+

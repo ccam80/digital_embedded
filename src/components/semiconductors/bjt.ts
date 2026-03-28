@@ -390,13 +390,6 @@ export class NpnBjtElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "NPN BJT — Gummel-Poon Level 2 bipolar junction transistor.\n" +
-      "Pins: C (collector), B (base), E (emitter).\n" +
-      "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR."
-    );
-  }
 }
 
 export class PnpBjtElement extends AbstractCircuitElement {
@@ -460,13 +453,6 @@ export class PnpBjtElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-  getHelpText(): string {
-    return (
-      "PNP BJT — Gummel-Poon Level 2 bipolar junction transistor.\n" +
-      "Pins: C (collector), B (base), E (emitter).\n" +
-      "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

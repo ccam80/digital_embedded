@@ -156,51 +156,6 @@ function formatPlain(expr: BoolExpr, outerPrec: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// LaTeX formatting
-// ---------------------------------------------------------------------------
-
-/**
- * Format a BoolExpr as a LaTeX math-mode expression string.
- *
- * Operator symbols:
- *   AND  →  " \cdot "
- *   OR   →  " + "
- *   NOT  →  \overline{...}
- *
- * Parentheses are added where needed to preserve precedence.
- */
-export function exprToLatex(expr: BoolExpr): string {
-  return formatLatex(expr, 0);
-}
-
-function formatLatex(expr: BoolExpr, outerPrec: number): string {
-  switch (expr.kind) {
-    case 'constant':
-      return expr.value ? '1' : '0';
-
-    case 'variable':
-      return expr.negated ? `\\overline{${expr.name}}` : expr.name;
-
-    case 'not': {
-      const inner = formatLatex(expr.operand, 0);
-      return `\\overline{${inner}}`;
-    }
-
-    case 'and': {
-      const parts = expr.operands.map((op) => formatLatex(op, PREC_AND));
-      const joined = parts.join(' \\cdot ');
-      return outerPrec > PREC_AND ? `(${joined})` : joined;
-    }
-
-    case 'or': {
-      const parts = expr.operands.map((op) => formatLatex(op, PREC_OR));
-      const joined = parts.join(' + ');
-      return outerPrec > PREC_OR ? `(${joined})` : joined;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Private utilities
 // ---------------------------------------------------------------------------
 

@@ -1,0 +1,39 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: t4 comparator pot divider
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vcc                                          5
+wiper                                      3.5
+vref_node                                    5
+vref#branch                                  0
+vs#branch                              -0.0005
+
+
+No. of Data Rows : 59
+
+  Measurements for Transient Analysis
+
+v_wiper             =  3.500000e+00
+v_vref              =  5.000000e+00
+v_vcc               =  5.000000e+00
+
+
+Total analysis time (seconds) = 0.003
+
+Total elapsed time (seconds) = 0.040 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12877.191 MB.
+Maximum ngspice program size =   15.926 MB.
+Current ngspice program size =   15.926 MB.
+

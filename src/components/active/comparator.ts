@@ -141,14 +141,6 @@ export class ComparatorElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Analog Comparator — 3-terminal element (in+, in-, out). " +
-      "Output switches based on whether V+ > V- with optional hysteresis. " +
-      "Open-collector output requires external pull-up; push-pull drives directly."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

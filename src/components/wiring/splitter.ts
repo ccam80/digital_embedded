@@ -321,17 +321,6 @@ export class SplitterElement extends AbstractCircuitElement {
       ctx.drawText(text, x, y, align);
     }
   }
-
-  getHelpText(): string {
-    const inTotal = totalBitsFromPattern(this.inputPorts.map((p) => p.bits));
-    const outTotal = totalBitsFromPattern(this.outputPorts.map((p) => p.bits));
-    return (
-      "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
-      `Input: ${this.inputPorts.length} port(s), ${inTotal} bits total.\n` +
-      `Output: ${this.outputPorts.length} port(s), ${outTotal} bits total.\n` +
-      "Connect to the input ports to merge, or to the output ports to split."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

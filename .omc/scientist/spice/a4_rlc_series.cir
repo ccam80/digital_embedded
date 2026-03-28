@@ -1,0 +1,10 @@
+RLC Series Resonance at f0
+Vs 1 0 SIN(0 1 5033)
+R1 1 2 100
+L1 2 3 1m
+C1 3 0 1u
+.tran 2u 10m
+.meas tran v_c_peak  MAX V(3)
+.meas tran v_c_min   MIN V(3)
+.meas tran v_lc_amp  PP  V(3)
+.end

@@ -124,13 +124,6 @@ export class OpAmpElement extends AbstractCircuitElement {
     ctx.restore();
   }
 
-
-  getHelpText(): string {
-    return (
-      "Ideal Op-Amp — 3-terminal nonlinear element with high gain, output saturation " +
-      "at supply rails, and configurable output impedance."
-    );
-  }
 }
 
 

@@ -127,14 +127,6 @@ export class LookUpTableElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "LookUpTable — user-configurable combinational truth table.\n" +
-      "N 1-bit inputs form an address into the data table.\n" +
-      "Output = table[address]. The table is editable at design time.\n" +
-      "Input 0 is the LSB of the address, input N-1 is the MSB."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

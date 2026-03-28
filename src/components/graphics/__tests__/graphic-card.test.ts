@@ -630,10 +630,6 @@ describe("GraphicCard", () => {
       expect(typeof GraphicCardDefinition.helpText).toBe("string"); expect(GraphicCardDefinition.helpText!.length).toBeGreaterThanOrEqual(3);
     });
 
-    it("GraphicCardElement.getHelpText() returns relevant text", () => {
-      const el = makeCard();
-      expect(el.getHelpText()).toContain("GraphicCard");
-    });
 
     it("GraphicCardDefinition can be registered in ComponentRegistry without throwing", () => {
       const registry = new ComponentRegistry();

@@ -190,18 +190,6 @@ export class TerminalElement extends AbstractCircuitElement {
       ...(label.length > 0 ? { label } : {}),
     });
   }
-
-  getHelpText(): string {
-    return (
-      "Terminal — serial text terminal with keyboard input.\n" +
-      "din (8-bit): character code to display.\n" +
-      "wr (1-bit): rising edge latches din into the display buffer.\n" +
-      "rd (1-bit): rising edge dequeues one key from the keyboard queue.\n" +
-      "dout (8-bit): key code from keyboard queue.\n" +
-      "rdy (1-bit): 1 when a key is waiting, 0 when queue is empty.\n" +
-      "The display buffer and keyboard queue are shown in a floating panel."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

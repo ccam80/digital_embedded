@@ -137,14 +137,6 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "RotEncoder — rotary encoder with quadrature output.\n" +
-      "Outputs A and B follow a Gray-code quadrature sequence.\n" +
-      "Interactive: user rotates the encoder by clicking CW or CCW."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

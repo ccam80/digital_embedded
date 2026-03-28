@@ -72,10 +72,6 @@ export class BitExtenderElement extends AbstractCircuitElement {
       rotation: this.rotation,
     });
   }
-
-  getHelpText(): string {
-    return "BitExtender — sign-extends the input from inputBits to outputBits. MSB of input determines sign fill.";
-  }
 }
 
 export function makeExecuteBitExtender(

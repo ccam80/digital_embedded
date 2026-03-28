@@ -313,15 +313,6 @@ export class FuseElement extends AbstractCircuitElement {
   get blown(): boolean {
     return this._properties.getOrDefault<boolean>("blown", false);
   }
-
-  getHelpText(): string {
-    return (
-      "Fuse — one-time irreversible switch with I²t thermal model.\n" +
-      "In digital mode: blown property controls open/closed state.\n" +
-      "In analog mode: accumulates thermal energy from current flow;\n" +
-      "blows permanently when I²t exceeds the rating."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

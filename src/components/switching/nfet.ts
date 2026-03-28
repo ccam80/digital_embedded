@@ -143,14 +143,6 @@ export class NFETElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "NFET — N-channel MOSFET.\n" +
-      "G=1: D and S are connected (conducting).\n" +
-      "G=0: D and S are disconnected."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

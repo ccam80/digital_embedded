@@ -1,0 +1,7 @@
+* LDR divider sensitivity check
+Vs    in  0  DC 5
+R1    in  mid  10k
+* R_ldr at 500 lux = 3241 Ohm
+Rldr  mid  0  3241
+.op
+.end

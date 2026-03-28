@@ -1,0 +1,124 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * a15: jfet amplifier (vdd=15v)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	vgate                            1.280017e-05
+	vsrc                             9.930688e-01
+	vdrain                           1.178713e+01
+	vdd                              1.500000e+01
+
+	Source	Current
+	------	-------
+
+	vdd#branch                       -1.46040e-03
+
+ JFET models (Junction Field effect transistor)
+      model                 jfet1
+
+       type                   njf
+        vt0                    -2
+       beta                0.0013
+     lambda                  0.01
+         rd                     0
+         rs                     0
+        cgs                     0
+        cgd                     0
+         pb                     1
+         is                 1e-14
+         fc                   0.5
+          b                     1
+        tcv                     0
+      vtotc                     0
+        bex                     0
+    betatce                     0
+        xti                     3
+         eg                  1.11
+         kf                     0
+         af                     1
+       nlev                     2
+     gdsnoi                     1
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ JFET: Junction Field effect transistor
+     device                    j1
+      model                 jfet1
+        vgs             -0.993056
+        vgd              -11.7871
+         ig          -1.28002e-11
+         id             0.0014604
+         is            -0.0014604
+        igd          -1.17971e-11
+         gm            0.00290065
+        gds           1.31812e-05
+        ggs                 1e-12
+        ggd                 1e-12
+
+ Resistor: Simple linear resistor
+     device                    rg                    rs                    rd
+      model                     R                     R                     R
+ resistance                 1e+06                   680                  2200
+         ac                 1e+06                   680                  2200
+      dtemp                     0                     0                     0
+     bv_max                 1e+99                 1e+99                 1e+99
+      noisy                     1                     1                     1
+          i          -1.28002e-11             0.0014604             0.0014604
+          p           1.63844e-16            0.00145027            0.00469206
+
+ Vsource: Independent voltage source
+     device                   vdd
+         dc                    15
+      acmag                     0
+      pulse         -
+        sin         -
+        exp         -
+        pwl         -
+       sffm         -
+         am         -
+    trnoise         -
+   trrandom         -
+    portnum                     0
+         z0                     0
+        pwr                     0
+       freq                     0
+      phase                     0
+          i            -0.0014604
+          p            -0.0219059
+
+Error: .print: no dc analysis found.
+
+Total analysis time (seconds) = 0.001
+
+Total elapsed time (seconds) = 0.046 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 14744.758 MB.
+Maximum ngspice program size =   15.957 MB.
+Current ngspice program size =   15.957 MB.
+

@@ -751,7 +751,8 @@ export function initApp(search?: string): void {
 
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
     (window as unknown as Record<string, unknown>).__test = createTestBridge(
-      circuit, viewport, canvas, palette, registry, () => facade.getCoordinator(),
+      circuit, viewport, canvas, palette, registry, () => facade.getCoordinator(), () => placement,
+      () => renderPipeline.state.scopePanels.map(e => e.panel),
     );
   }
 

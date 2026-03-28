@@ -187,15 +187,6 @@ export class TestcaseElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Testcase — embedded truth table test element.\n" +
-      "Contains test data (pin names + expected input/output rows).\n" +
-      "No simulation behavior — acts as data carrier for the test executor.\n" +
-      "testData: newline-delimited string in Digital test format."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

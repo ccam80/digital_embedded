@@ -1,0 +1,42 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: crystal oscillator colpitts
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+1                                            5
+2                                            5
+3                                            5
+4                                      4.99997
+5                                            5
+6                                            5
+ls#branch                                    0
+vcc#branch                        -4.99994e-12
+
+
+No. of Data Rows : 4008
+
+  Measurements for Transient Analysis
+
+vc_pp               =  2.220446e-14 from=  1.000000e-04 to=  2.000000e-04
+vc_max              =  5.000000e+00 at=  2.000000e-04
+vc_min              =  5.000000e+00 at=  1.999140e-04
+
+
+Total analysis time (seconds) = 0.016
+
+Total elapsed time (seconds) = 0.055 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 13367.688 MB.
+Maximum ngspice program size =   16.121 MB.
+Current ngspice program size =   16.121 MB.
+

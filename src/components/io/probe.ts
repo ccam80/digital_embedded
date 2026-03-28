@@ -121,16 +121,6 @@ export class ProbeElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Probe — measurement point.\n" +
-      "Reads the connected signal and adds it to the signal/measurement list.\n" +
-      "probeMode controls what is displayed: VALUE (current value), UP (rising edge count),\n" +
-      "DOWN (falling edge count), or BOTH (total edge count).\n" +
-      "Display format is configurable: binary, decimal, hexadecimal, or octal."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

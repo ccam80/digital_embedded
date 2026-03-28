@@ -50,7 +50,6 @@ class StubElement implements CircuitElement {
   getPins(): readonly Pin[] { return []; }
   getBoundingBox(): Rect { return { x: 0, y: 0, width: 1, height: 1 }; }
   draw(_ctx: RenderContext): void {}
-  getHelpText(): string { return ""; }
 
   serialize(): SerializedElement {
     return {

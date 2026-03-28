@@ -311,11 +311,6 @@ export class SwitchSPSTElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "Analog Switch (SPST) — voltage-controlled variable resistance. " +
-      "Transitions smoothly from R_off to R_on as control voltage crosses threshold.";
-  }
 }
 
 export class SwitchSPDTElement extends AbstractCircuitElement {
@@ -360,11 +355,6 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
     drawColoredLead(ctx, signals, vNc, 3, 1, 4, 1);
 
     ctx.restore();
-  }
-
-  getHelpText(): string {
-    return "Analog Switch (SPDT) — voltage-controlled double-throw switch. " +
-      "COM-NO closes and COM-NC opens as control voltage crosses threshold.";
   }
 }
 

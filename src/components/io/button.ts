@@ -118,15 +118,6 @@ export class ButtonElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Button — momentary push button.\n" +
-      "Output is high while the button is held down, low when released.\n" +
-      "activeLow=true inverts this: output is low while held, high when released.\n" +
-      "Interactive: the engine sets the output value on mouse-down/up events."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

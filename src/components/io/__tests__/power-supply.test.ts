@@ -272,9 +272,5 @@ describe("PowerSupply", () => {
       expect(() => registry.register(PowerSupplyDefinition)).not.toThrow();
     });
 
-    it("PowerSupplyElement.getHelpText() contains 'PowerSupply'", () => {
-      const el = makePowerSupply();
-      expect(el.getHelpText()).toContain("PowerSupply");
-    });
   });
 });

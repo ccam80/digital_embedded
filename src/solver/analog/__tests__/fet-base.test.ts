@@ -17,7 +17,7 @@ import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
-import { withNodeIds } from "../test-elements.js";
+import { withNodeIds } from "./test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
 

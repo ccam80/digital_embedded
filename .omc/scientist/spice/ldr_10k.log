@@ -1,0 +1,81 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: * ldr divider: vs=5v, r1=10k, r_ldr=3241
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	mid                              1.223850e+00
+	in                               5.000000e+00
+
+	Source	Current
+	------	-------
+
+	vs#branch                        -3.77615e-04
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ Resistor: Simple linear resistor
+     device                  rldr                    r1
+      model                     R                     R
+ resistance                  3241                 10000
+         ac                  3241                 10000
+      dtemp                     0                     0
+     bv_max                 1e+99                 1e+99
+      noisy                     1                     1
+          i           0.000377615           0.000377615
+          p           0.000462144            0.00142593
+
+ Vsource: Independent voltage source
+     device                    vs
+         dc                     5
+      acmag                     0
+      pulse         -
+        sin         -
+        exp         -
+        pwl         -
+       sffm         -
+         am         -
+    trnoise         -
+   trrandom         -
+    portnum                     0
+         z0                     0
+        pwr                     0
+       freq                     0
+      phase                     0
+          i          -0.000377615
+          p           -0.00188807
+
+
+Total analysis time (seconds) = 0.001
+
+Total elapsed time (seconds) = 0.042 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 12552.773 MB.
+Maximum ngspice program size =   15.875 MB.
+Current ngspice program size =   15.875 MB.
+

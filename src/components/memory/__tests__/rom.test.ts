@@ -282,13 +282,6 @@ describe("ROM", () => {
     expect(typeof ROMDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("helpText — getHelpText returns non-empty string", () => {
-    const props = new PropertyBag();
-    const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const help = el.getHelpText();
-    expect(typeof help).toBe("string");
-    expect(help.length).toBeGreaterThan(0);
-  });
 
   it("boundingBox — returns non-zero dimensions", () => {
     const props = new PropertyBag();

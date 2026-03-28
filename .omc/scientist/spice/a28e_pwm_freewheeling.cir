@@ -1,0 +1,17 @@
+MOSFET PWM with freewheeling diode
+* Proper buck: SW closes (Vdd to L) then opens (freewheeling diode conducts)
+* SW duty 50%, 10kHz
+Vdd 1 0 DC 12
+Vgate g 0 PULSE(0 1 0 10n 10n 50u 100u)
+SW1 1 2 g 0 MYSW
+D1 0 2 DFAST
+L1 2 3 1m
+R1 3 4 100
+C1 4 0 1u IC=0
+.model MYSW SW(Ron=0.001 Roff=100Meg Vt=0.5)
+.model DFAST D(IS=1e-9 N=1 RS=0.01)
+.tran 5u 50m UIC
+.meas tran vout_avg  AVG V(4) FROM=30m TO=50m
+.meas tran vout_pp   PP  V(4) FROM=30m TO=50m
+.meas tran vsw_avg   AVG V(2) FROM=30m TO=50m
+.end

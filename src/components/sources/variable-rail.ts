@@ -81,10 +81,6 @@ export class VariableRailElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return "Variable Rail — user-adjustable DC voltage source with internal resistance.";
-  }
 }
 
 // ---------------------------------------------------------------------------

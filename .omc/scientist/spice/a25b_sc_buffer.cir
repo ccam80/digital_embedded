@@ -1,0 +1,14 @@
+Switched Capacitor unity buffer
+Vin 2 0 DC 2
+Vclk g 0 PULSE(0 1 0 10n 10n 50u 100u)
+S1 2 3 g 0 MYSW
+S2 3 4 g 0 MYSW
+C1 3 0 1n IC=0
+C2 4 0 1n IC=0
+R1 4 0 10k
+.model MYSW SW(Ron=0.001 Roff=1Meg Vt=0.5)
+.tran 1u 5m UIC
+.meas tran v4_avg  AVG V(4) FROM=3m TO=5m
+.meas tran v4_pp   PP  V(4) FROM=3m TO=5m
+.meas tran v3_avg  AVG V(3) FROM=3m TO=5m
+.end

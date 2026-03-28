@@ -262,9 +262,5 @@ describe("Button", () => {
       expect(() => registry.register(ButtonDefinition)).not.toThrow();
     });
 
-    it("ButtonElement.getHelpText() contains 'Button'", () => {
-      const el = makeButton();
-      expect(el.getHelpText()).toContain("Button");
-    });
   });
 });

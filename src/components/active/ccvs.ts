@@ -296,14 +296,6 @@ export class CCVSElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    return (
-      "Current-Controlled Voltage Source — 4-terminal element. " +
-      "Output voltage = expression(I_sense). " +
-      "Pins: sense+, sense- (current sense port), out+, out- (output)."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

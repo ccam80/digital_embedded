@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { analyseCircuit } from '../model-analyser.js';
-import { SimulationRunner } from '../../headless/runner.js';
+import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
 import { AbstractCircuitElement } from '../../core/element.js';
@@ -45,7 +45,6 @@ class StubElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
   }
-  getHelpText(): string { return ''; }
 }
 
 function makePin(
@@ -180,37 +179,11 @@ function buildRegistry(): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Facade adapter: wraps SimulationRunner as SimulatorFacade
+// Facade — uses DefaultSimulatorFacade directly
 // ---------------------------------------------------------------------------
 
 function buildFacade(registry: ComponentRegistry): SimulatorFacade {
-  const runner = new SimulationRunner(registry);
-  return {
-    createCircuit: () => { throw new Error('not implemented'); },
-    addComponent: () => { throw new Error('not implemented'); },
-    connect: () => { throw new Error('not implemented'); },
-    compile: (circuit) => runner.compile(circuit),
-    step: (engine) => runner.step(engine),
-    run: (engine, cycles) => runner.run(engine, cycles),
-    runToStable: (engine, max) => runner.runToStable(engine, max),
-    setInput: (engine, label, value) => runner.setInput(engine, label, value),
-    readOutput: (engine, label) => runner.readOutput(engine, label),
-    readAllSignals: (engine) => {
-      const map = runner.readAllSignals(engine);
-      const obj: Record<string, number> = {};
-      for (const [k, v] of map) obj[k] = v;
-      return obj;
-    },
-    runTests: () => { throw new Error('not implemented'); },
-    loadDig: () => { throw new Error('not implemented'); },
-    serialize: () => { throw new Error('not implemented'); },
-    deserialize: () => { throw new Error('not implemented'); },
-    netlist: () => { throw new Error('not implemented'); },
-    validate: () => { throw new Error('not implemented'); },
-    describeComponent: () => { throw new Error('not implemented'); },
-    build: () => { throw new Error('not implemented'); },
-    patch: () => { throw new Error('not implemented'); },
-  };
+  return new DefaultSimulatorFacade(registry);
 }
 
 // ---------------------------------------------------------------------------

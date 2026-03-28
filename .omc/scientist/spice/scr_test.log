@@ -1,0 +1,14 @@
+
+Note: No compatibility mode selected!
+
+warning, model type mismatch in line
+    qscr anode gate 0 scrmod
+
+Circuit: * scr test
+
+Error on line 4 or its substitute:
+  qscr anode gate 0 scrmod
+could not find a valid modelname
+    Simulation interrupted due to error!
+
+Note: No ".plot", ".print", or ".fourier" lines; no simulations run

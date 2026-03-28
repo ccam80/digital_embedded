@@ -1251,10 +1251,5 @@ describe("BlockRAMDualPort", () => {
       expect(el.typeId).toBe("BlockRAMDualPort");
     });
 
-    it("getHelpText mentions BlockRAM", () => {
-      const props = new PropertyBag();
-      const el = new BlockRAMDualPortElement("id", { x: 0, y: 0 }, 0, false, props);
-      expect(el.getHelpText()).toContain("BlockRAM");
-    });
   });
 });

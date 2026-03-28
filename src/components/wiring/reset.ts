@@ -119,15 +119,6 @@ export class ResetElement extends AbstractCircuitElement {
 
     ctx.restore();
   }
-
-  getHelpText(): string {
-    const invertOutput = this._properties.getOrDefault<boolean>("invertOutput", false);
-    return (
-      "Reset — output is held in reset state during initialization.\n" +
-      "After init, output transitions to its post-reset value.\n" +
-      `Output polarity: ${invertOutput ? "inverted (active-low reset)" : "normal (active-high reset)"}.`
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -125,13 +125,6 @@ export class RegisterElement extends AbstractCircuitElement {
     });
   }
 
-  getHelpText(): string {
-    return (
-      "Register — edge-triggered storage register with enable.\n" +
-      "On rising clock edge: if en=1, captures D input into stored value.\n" +
-      "Output Q always reflects the stored value."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

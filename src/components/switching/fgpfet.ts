@@ -155,15 +155,6 @@ export class FGPFETElement extends AbstractCircuitElement {
   get blown(): boolean {
     return this._properties.getOrDefault<boolean>("blown", false);
   }
-
-  getHelpText(): string {
-    return (
-      "FGPFET — P-channel floating-gate MOSFET.\n" +
-      "G=0: S and D connected (conducting), unless floating gate is programmed.\n" +
-      "When blown=true: permanently non-conducting regardless of gate input.\n" +
-      "Used in PLD arrays as a programmable switch."
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------

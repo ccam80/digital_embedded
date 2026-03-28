@@ -19,7 +19,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { withNodeIds } from "../../../solver/analog/test-elements.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
