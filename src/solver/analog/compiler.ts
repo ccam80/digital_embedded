@@ -1630,7 +1630,21 @@ function compileAnalogCircuit(
 
       // Inject resolved model params into the PropertyBag directly rather
       // than spreading (spreading PropertyBag loses _map contents).
-      props.set("_modelParams", resolvedModel.params as unknown as import("../../core/properties.js").PropertyValue);
+      let finalParams = resolvedModel.params;
+      if (props.has("_spiceModelOverrides")) {
+        try {
+          const overrides = JSON.parse(props.get("_spiceModelOverrides") as string) as Record<string, number>;
+          finalParams = { ...resolvedModel.params, ...overrides };
+        } catch {
+          const label = props.has("label") ? props.get<string>("label") : el.typeId;
+          diagnostics.push({
+            code: "INVALID_SPICE_OVERRIDES",
+            severity: "warning",
+            message: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+          });
+        }
+      }
+      props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     // Call the analog factory — returns AnalogElementCore (no pinNodeIds).
@@ -2319,7 +2333,21 @@ export function compileAnalogPartition(
 
       const modelDiags = validateModel(resolvedModel);
       diagnostics.push(...modelDiags);
-      props.set("_modelParams", resolvedModel.params as unknown as import("../../core/properties.js").PropertyValue);
+      let finalParams = resolvedModel.params;
+      if (props.has("_spiceModelOverrides")) {
+        try {
+          const overrides = JSON.parse(props.get("_spiceModelOverrides") as string) as Record<string, number>;
+          finalParams = { ...resolvedModel.params, ...overrides };
+        } catch {
+          const label = props.has("label") ? props.get<string>("label") : el.typeId;
+          diagnostics.push({
+            code: "INVALID_SPICE_OVERRIDES",
+            severity: "warning",
+            message: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+          });
+        }
+      }
+      props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     const analogFactory = def.models!.analog!.factory;

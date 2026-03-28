@@ -321,6 +321,14 @@ const DIAC_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: 1e-3,
     description: "Holding current",
   },
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -358,7 +366,6 @@ export const DiacDefinition: ComponentDefinition = {
   models: {
     analog: {
       factory: createDiacElement,
-      deviceType: "DIAC",
     },
   },
 };

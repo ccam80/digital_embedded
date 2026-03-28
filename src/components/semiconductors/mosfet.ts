@@ -803,6 +803,14 @@ const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Channel length in meters",
   },
   LABEL_PROPERTY_DEF,
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------

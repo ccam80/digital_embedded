@@ -16,6 +16,8 @@ import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
 import { PinDirection } from "@/core/pin";
+import { getParamMeta } from "../solver/analog/model-param-meta.js";
+import { getDeviceDefaults } from "../solver/analog/model-defaults.js";
 
 /** Human-friendly labels for simulation mode dropdown. */
 const SIMULATION_MODE_LABELS: Record<string, string> = {
@@ -83,6 +85,10 @@ export class PropertyPanel {
     for (const def of definitions) {
       // showLabel and showValue are rendered inline — skip standalone rows
       if (def.key === "showLabel" || def.key === "showValue") {
+        continue;
+      }
+      // Hidden properties are stored in the bag but not shown as panel rows
+      if (def.hidden) {
         continue;
       }
 
@@ -437,6 +443,125 @@ export class PropertyPanel {
       }
 
       content.appendChild(pinDiv);
+    }
+
+    this._container.appendChild(section);
+  }
+
+  // ---------------------------------------------------------------------------
+  // SPICE model parameter overrides
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Show a collapsible "SPICE Model Parameters" section for analog components.
+   * Displays per-parameter override fields with resolved defaults as placeholders.
+   * Overrides are stored in the element's PropertyBag as a JSON string under
+   * `_spiceModelOverrides`.
+   */
+  showSpiceModelParameters(
+    element: CircuitElement,
+    def: ComponentDefinition,
+  ): void {
+    const deviceType = def.models?.analog?.deviceType;
+    if (!deviceType) return;
+
+    const paramMeta = getParamMeta(deviceType);
+    if (paramMeta.length === 0) return;
+
+    const bag = element.getProperties();
+    const stored: Record<string, number> = bag.has("_spiceModelOverrides")
+      ? JSON.parse(bag.get("_spiceModelOverrides") as string)
+      : {};
+    const defaults = getDeviceDefaults(deviceType);
+
+    const section = document.createElement("div");
+    section.style.marginTop = "10px";
+
+    const toggle = document.createElement("div");
+    toggle.style.cssText = "font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;cursor:pointer;user-select:none;";
+    toggle.textContent = "▶ SPICE Model Parameters";
+    const content = document.createElement("div");
+    content.style.display = "none";
+
+    toggle.addEventListener("click", () => {
+      const open = content.style.display !== "none";
+      content.style.display = open ? "none" : "block";
+      toggle.textContent = (open ? "▶" : "▼") + " SPICE Model Parameters";
+    });
+
+    section.appendChild(toggle);
+    section.appendChild(content);
+
+    for (const meta of paramMeta) {
+      const overrideVal = stored[meta.key];
+      const defaultVal = defaults[meta.key];
+      const unit = meta.unit;
+
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:4px;margin:2px 0 2px 8px;";
+
+      const label = document.createElement("span");
+      label.style.cssText = "min-width:50px;opacity:0.7;font-size:11px;";
+      label.textContent = meta.key;
+      label.title = meta.description ? `${meta.label} — ${meta.description}` : meta.label;
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.style.cssText = "width:70px;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
+      input.title = meta.description ? `${meta.label} — ${meta.description}` : meta.label;
+
+      if (defaultVal !== undefined) {
+        input.placeholder = unit ? formatSI(defaultVal, "", 3).trim() : String(defaultVal);
+      }
+
+      if (overrideVal !== undefined) {
+        input.value = unit ? formatSI(overrideVal, "", 3).trim() : String(overrideVal);
+      } else {
+        input.value = "";
+      }
+
+      const unitSpan = document.createElement("span");
+      unitSpan.style.cssText = "opacity:0.5;font-size:11px;min-width:16px;";
+      unitSpan.textContent = unit;
+
+      input.addEventListener("focus", () => input.select());
+
+      const commitOverride = () => {
+        const current: Record<string, number> = bag.has("_spiceModelOverrides")
+          ? JSON.parse(bag.get("_spiceModelOverrides") as string)
+          : {};
+        const raw = input.value.trim();
+        if (raw === "") {
+          delete current[meta.key];
+          input.value = "";
+        } else {
+          const parsed = unit ? parseSI(raw) : parseFloat(raw);
+          if (isNaN(parsed)) {
+            input.value = overrideVal !== undefined
+              ? (unit ? formatSI(overrideVal, "", 3).trim() : String(overrideVal))
+              : "";
+            return;
+          }
+          current[meta.key] = parsed;
+          input.value = unit ? formatSI(parsed, "", 3).trim() : String(parsed);
+        }
+        const oldValue = bag.has("_spiceModelOverrides") ? bag.get("_spiceModelOverrides") : undefined;
+        const newValue = Object.keys(current).length > 0 ? JSON.stringify(current) : "{}";
+        bag.set("_spiceModelOverrides", newValue);
+        for (const cb of this._changeCallbacks) {
+          cb("_spiceModelOverrides", oldValue ?? "{}", newValue);
+        }
+      };
+
+      input.addEventListener("blur", commitOverride);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); commitOverride(); input.blur(); }
+      });
+
+      row.appendChild(label);
+      row.appendChild(input);
+      row.appendChild(unitSpan);
+      content.appendChild(row);
     }
 
     this._container.appendChild(section);

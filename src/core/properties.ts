@@ -51,6 +51,12 @@ export interface PropertyDefinition {
    * waveform-specific parameters (e.g. sweep fields only when waveform="sweep").
    */
   visibleWhen?: { key: string; values: PropertyValue[] };
+  /**
+   * When true, the property is excluded from the visible property panel rows.
+   * The value is still stored in the PropertyBag and accessible via
+   * setComponentProperty / serialization.
+   */
+  hidden?: boolean;
 }
 
 // ---------------------------------------------------------------------------

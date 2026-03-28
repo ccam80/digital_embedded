@@ -406,3 +406,26 @@ export const TUNNEL_DIODE_DEFAULTS: Record<string, number> = {
   /** N: emission coefficient */
   N: 1,
 };
+
+// ---------------------------------------------------------------------------
+// Lookup by device type string
+// ---------------------------------------------------------------------------
+
+const DEVICE_DEFAULTS_MAP: Record<string, Record<string, number>> = {
+  D:      DIODE_DEFAULTS,
+  NPN:    BJT_NPN_DEFAULTS,
+  PNP:    BJT_PNP_DEFAULTS,
+  NMOS:   MOSFET_NMOS_DEFAULTS,
+  PMOS:   MOSFET_PMOS_DEFAULTS,
+  NJFET:  JFET_N_DEFAULTS,
+  PJFET:  JFET_P_DEFAULTS,
+  TUNNEL: TUNNEL_DIODE_DEFAULTS,
+};
+
+/**
+ * Return the default SPICE parameter set for a given device type string.
+ * Returns an empty object for unrecognized device types.
+ */
+export function getDeviceDefaults(deviceType: string): Record<string, number> {
+  return DEVICE_DEFAULTS_MAP[deviceType] ?? {};
+}

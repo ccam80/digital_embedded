@@ -23,7 +23,7 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -308,6 +308,14 @@ function buildTunnelDiodePinDeclarations(): PinDeclaration[] {
 
 const TUNNEL_DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------

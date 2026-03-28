@@ -436,6 +436,14 @@ const SCR_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: 1,
     description: "Emission coefficient",
   },
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -473,7 +481,6 @@ export const ScrDefinition: ComponentDefinition = {
   models: {
     analog: {
       factory: createScrElement,
-      deviceType: "SCR",
     },
   },
 };

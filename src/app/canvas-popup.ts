@@ -81,14 +81,17 @@ export function createPopupController(
     if (availableModels(def).length > 1) {
       propertyPopup.showSimulationModeDropdown(elementHit, def);
     }
-    if (hasDigitalModel(def)) {
-      const simModel = elementHit.getProperties().has("simulationModel")
-        ? elementHit.getProperties().get("simulationModel") as string
-        : (def.defaultModel ?? "logical");
-      if (simModel === "logical" || simModel === "analog-pins") {
+    const simModel = elementHit.getProperties().has("simulationModel")
+      ? elementHit.getProperties().get("simulationModel") as string
+      : (def.defaultModel ?? "logical");
+
+    if (simModel === "logical" || simModel === "analog-pins") {
+      if (hasDigitalModel(def)) {
         const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
         propertyPopup.showPinElectricalOverrides(elementHit, def, family);
       }
+    } else if (def.models?.analog?.deviceType !== undefined) {
+      propertyPopup.showSpiceModelParameters(elementHit, def);
     }
     activePopupPanel = propertyPopup;
 

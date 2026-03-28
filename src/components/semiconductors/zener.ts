@@ -21,11 +21,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { DIODE_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { ZENER_DEFAULTS } from "../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -54,12 +54,14 @@ export function createZenerElement(
   // Resolve model parameters from _modelParams (injected by compiler) or defaults
   const modelParams =
     (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
-  const mp = modelParams ?? DIODE_DEFAULTS;
+  const mp = modelParams ?? ZENER_DEFAULTS;
 
-  const IS = mp["IS"] ?? DIODE_DEFAULTS["IS"];
-  const N = mp["N"] ?? DIODE_DEFAULTS["N"];
-  const BV = mp["BV"] ?? DIODE_DEFAULTS["BV"];
-  const IBV = mp["IBV"] ?? DIODE_DEFAULTS["IBV"];
+  const IS = mp["IS"] ?? ZENER_DEFAULTS["IS"];
+  const N = mp["N"] ?? ZENER_DEFAULTS["N"];
+  // If BV is infinite (i.e. unset by user model), use the Zener default
+  const rawBV = mp["BV"] ?? ZENER_DEFAULTS["BV"];
+  const BV = Number.isFinite(rawBV) ? rawBV : ZENER_DEFAULTS["BV"];
+  const IBV = mp["IBV"] ?? ZENER_DEFAULTS["IBV"];
 
   const nVt = N * VT;
   const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
@@ -277,6 +279,14 @@ const ZENER_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "SPICE model name (blank = use built-in defaults)",
   },
   LABEL_PROPERTY_DEF,
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------

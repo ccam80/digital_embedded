@@ -332,6 +332,14 @@ const DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "SPICE model name (blank = use built-in defaults)",
   },
   LABEL_PROPERTY_DEF,
+  {
+    key: "_spiceModelOverrides",
+    type: PropertyType.STRING,
+    label: "SPICE Model Overrides",
+    defaultValue: "",
+    description: "JSON string of user-supplied SPICE parameter overrides",
+    hidden: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
