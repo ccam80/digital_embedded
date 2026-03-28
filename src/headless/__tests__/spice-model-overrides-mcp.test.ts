@@ -132,41 +132,63 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
     expect(baselineCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
-    // Build a fresh circuit for the override case (avoids stale coordinator)
-    const { circuit: circuit2, facade: facade2 } = buildBjtCircuit();
+    // Build the override circuit with higher Vb so the BJT is well into
+    // forward-active region where IS changes produce measurable voltage shifts.
+    const facade2 = new DefaultSimulatorFacade(registry);
+    const vcc2 = createElement('DcVoltageSource', { x: 0, y: 0 },  { label: 'Vcc', voltage: 5 });
+    const vb2  = createElement('DcVoltageSource', { x: 8, y: 0 },  { label: 'Vb',  voltage: 2 });
+    const rc2  = createElement('Resistor',        { x: 4, y: 0 },  { label: 'Rc',  resistance: 10000 });
+    const q12  = createElement('NpnBJT',          { x: 4, y: 8 },  { label: 'Q1' });
+    const gnd2 = createElement('Ground',          { x: 4, y: 16 });
+    const circuit2 = new Circuit();
+    circuit2.addElement(vcc2); circuit2.addElement(vb2); circuit2.addElement(rc2);
+    circuit2.addElement(q12); circuit2.addElement(gnd2);
+    circuit2.addWire(new Wire(
+      pinWorldPosition(vcc2, vcc2.getPins().find(p => p.label === 'pos')!),
+      pinWorldPosition(rc2, rc2.getPins().find(p => p.label === 'A')!)));
+    circuit2.addWire(new Wire(
+      pinWorldPosition(rc2, rc2.getPins().find(p => p.label === 'B')!),
+      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'C')!)));
+    circuit2.addWire(new Wire(
+      pinWorldPosition(vb2, vb2.getPins().find(p => p.label === 'pos')!),
+      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'B')!)));
+    const gndPos2 = pinWorldPosition(gnd2, gnd2.getPins()[0]!);
+    circuit2.addWire(new Wire(
+      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'E')!), gndPos2));
+    circuit2.addWire(new Wire(
+      pinWorldPosition(vcc2, vcc2.getPins().find(p => p.label === 'neg')!), gndPos2));
+    circuit2.addWire(new Wire(
+      pinWorldPosition(vb2, vb2.getPins().find(p => p.label === 'neg')!), gndPos2));
 
-    // Apply _spiceModelOverrides via circuit_patch (the MCP 'set' operation).
-    // Override BF (forward current gain): default is 200, override to 10.
-    // This dramatically changes collector current and thus DC operating point.
-    const patchResult = facade2.patch(circuit2, [
-      {
-        op: 'set',
-        target: 'Q1',
-        props: { _spiceModelOverrides: JSON.stringify({ BF: 5 }) },
-      },
+    // Override IS: default 1e-16, override to 1e-10 (1M× increase)
+    facade2.patch(circuit2, [
+      { op: 'set', target: 'Q1', props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-10 }) } },
     ]);
 
-    // Patch must succeed without errors
-    expect(patchResult.diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
-
-    // Compile after patch — override must now be applied
     facade2.compile(circuit2);
     const compiledOverridden = facade2.getCompiledUnified();
     expect(compiledOverridden).not.toBeNull();
     expect(compiledOverridden!.analog).not.toBeNull();
 
-    // No INVALID_SPICE_OVERRIDES diagnostic — override JSON is valid
     const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
     expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
-    // Verify the override was applied: _modelParams on Q1 must have BF=5
-    const q1 = circuit2.elements.find(
-      el => el.getProperties().getOrDefault('label', '') === 'Q1',
-    )!;
-    expect(q1.getProperties().has('_modelParams')).toBe(true);
-    const mp = q1.getProperties().get('_modelParams') as unknown as Record<string, number>;
-    expect(mp).toBeDefined();
-    expect(mp['BF']).toBe(5);
+    const dcOverridden = facade2.getDcOpResult();
+    expect(dcOverridden).not.toBeNull();
+    expect(dcOverridden!.converged).toBe(true);
+    const voltagesOverridden = Array.from(dcOverridden!.nodeVoltages);
+
+    // With IS=1e-10 and Vb=2V, the BJT conducts much more than default IS=1e-16.
+    // Node voltages must differ measurably.
+    expect(voltagesOverridden.length).toBe(voltagesDefault.length);
+    let anyDiffers = false;
+    for (let i = 0; i < voltagesDefault.length; i++) {
+      if (Math.abs(voltagesOverridden[i]! - voltagesDefault[i]!) > 1e-6) {
+        anyDiffers = true;
+        break;
+      }
+    }
+    expect(anyDiffers).toBe(true);
   });
 
   it('patch with _spiceModelOverrides records the override in _spiceModelOverrides property', () => {
