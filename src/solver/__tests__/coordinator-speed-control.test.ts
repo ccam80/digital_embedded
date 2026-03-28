@@ -114,6 +114,7 @@ function makeGroundDef(): ComponentDefinition {
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
     pinLayout: [{ direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
+    pinElectrical: {},
     models: { analog: {
       analogFactory: (_el: unknown, _pins: number[]) => ({
         pinNodeIds: _pins, allNodeIds: _pins, branchIndex: -1,
@@ -121,7 +122,6 @@ function makeGroundDef(): ComponentDefinition {
         stamp(_s: SparseSolver) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
       }),
-      pinElectrical: {},
     } },
   } as unknown as ComponentDefinition;
 }
@@ -137,7 +137,8 @@ function makeResistorDef(): ComponentDefinition {
       { direction: PinDirection.BIDIRECTIONAL, label: 'p2', defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
     ],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
-    models: { analog: { analogFactory, pinElectrical: {} } },
+    pinElectrical: {},
+    models: { analog: { analogFactory } },
   } as unknown as ComponentDefinition;
 }
 

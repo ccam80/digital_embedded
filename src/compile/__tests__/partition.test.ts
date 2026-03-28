@@ -30,9 +30,7 @@ const DIGITAL_MODEL: DigitalModel = {
   executeFn: () => {},
 };
 
-const ANALOG_MODEL: AnalogModel = {
-  pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-};
+const ANALOG_MODEL: AnalogModel = {};
 
 function makeDigitalDef(name: string): ComponentDefinition {
   return {
@@ -58,6 +56,7 @@ function makeAnalogDef(name: string): ComponentDefinition {
     attributeMap: [],
     category: "PASSIVES" as never,
     helpText: "",
+    pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
     models: { analog: ANALOG_MODEL },
   };
 }
@@ -72,6 +71,7 @@ function makeBothDef(name: string): ComponentDefinition {
     attributeMap: [],
     category: "SEMICONDUCTORS" as never,
     helpText: "",
+    pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
     models: { digital: DIGITAL_MODEL, analog: ANALOG_MODEL },
   };
 }
@@ -453,10 +453,8 @@ describe("partitionByDomain", () => {
   });
 
   describe("electrical spec on bridge", () => {
-    it("picks electricalSpec from analog model pinElectrical", () => {
-      const analogModel: AnalogModel = {
-        pinElectrical: { vOH: 5.0, vOL: 0.1, rOut: 100 },
-      };
+    it("picks electricalSpec from component definition pinElectrical", () => {
+      const analogModel: AnalogModel = {};
       const analogDef: ComponentDefinition = {
         name: "SpecResistor",
         typeId: 0,
@@ -466,6 +464,7 @@ describe("partitionByDomain", () => {
         attributeMap: [],
         category: "PASSIVES" as never,
         helpText: "",
+        pinElectrical: { vOH: 5.0, vOL: 0.1, rOut: 100 },
         models: { analog: analogModel },
       };
       const el0 = makeElement("And", 0);
@@ -497,7 +496,7 @@ describe("partitionByDomain", () => {
       ]);
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: { pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 } } },
+        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
       const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments, NO_BOUNDARIES);

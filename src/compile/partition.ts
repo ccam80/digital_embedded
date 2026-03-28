@@ -58,7 +58,7 @@ function bridgeDirection(
 /**
  * Pick the electrical spec for a boundary group.
  *
- * Prefer the first analog-domain pin's spec (from the AnalogModel), since
+ * Prefer the first analog-domain pin's spec (from the ComponentDefinition), since
  * the analog side defines electrical characteristics. Falls back to an empty
  * spec when no override is present (circuit-level logic family fills it in).
  */
@@ -73,12 +73,9 @@ function electricalSpecForGroup(
     if (!el) continue;
     const def = registry.get(el.typeId);
     if (!def) continue;
-    const analogModel = def.models?.analog;
-    if (!analogModel) continue;
-
-    const perPin = analogModel.pinElectricalOverrides?.[pin.pinLabel];
+    const perPin = def.pinElectricalOverrides?.[pin.pinLabel];
     if (perPin) return perPin;
-    if (analogModel.pinElectrical) return analogModel.pinElectrical;
+    if (def.pinElectrical) return def.pinElectrical;
   }
   return {};
 }

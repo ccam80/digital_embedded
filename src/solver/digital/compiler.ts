@@ -27,7 +27,7 @@ import { findSCCs, hasSelfLoop } from "./tarjan.js";
 import { topologicalSort } from "./topological-sort.js";
 import { BusResolver } from "./bus-resolution.js";
 import type { PullResistor } from "./bus-resolution.js";
-import { resolveModelAssignments, extractConnectivityGroups } from "@/compile/extract-connectivity.js";
+import { resolveModelAssignments, extractConnectivityGroups, INFRASTRUCTURE_TYPES } from "@/compile/extract-connectivity.js";
 import { partitionByDomain } from "@/compile/partition.js";
 import type { SolverPartition } from "@/compile/types.js";
 
@@ -58,10 +58,6 @@ export interface CompilationWarning {
 // Engine-neutral infrastructure types — Port is registered in the component
 // registry but has no simulation model; the rest are never registered at all.
 // None of these must trigger "unknown component" errors during compilation.
-const COMPILE_INFRASTRUCTURE_TYPES = new Set([
-  'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe',
-  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
-]);
 
 function compileCircuit(
   circuit: Circuit,
@@ -69,7 +65,7 @@ function compileCircuit(
 ): CompiledCircuitImpl {
   // Validate that all non-infrastructure components are registered.
   for (const el of circuit.elements) {
-    if (COMPILE_INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
     if (registry.get(el.typeId) === undefined) {
       throw new Error(
         `Compiler: unknown component type "${el.typeId}". ` +

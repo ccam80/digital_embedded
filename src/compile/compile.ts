@@ -93,11 +93,6 @@ export function compileUnified(
   // indicator that a circuit is wired for MNA simulation.
   // -------------------------------------------------------------------------
 
-  const INFRASTRUCTURE = new Set([
-    "Wire", "Tunnel", "Ground", "VDD", "Const", "Probe",
-    "Splitter", "Driver", "NotConnected", "ScopeTrigger",
-  ]);
-
   let hasAnalogOnlyComponent = false;
   for (const el of circuit.elements) {
     const def = registry.get(el.typeId);
@@ -112,7 +107,7 @@ export function compileUnified(
 
   if (!hasAnalogOnlyComponent) {
     for (const el of circuit.elements) {
-      if (INFRASTRUCTURE.has(el.typeId)) continue;
+      if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
       if (registry.get(el.typeId) === undefined) {
         throw new Error(
           `unknown component type "${el.typeId}" — ` +

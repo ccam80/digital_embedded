@@ -41,6 +41,7 @@ import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, B
 import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn } from "../../compile/types.js";
+import { INFRASTRUCTURE_TYPES } from "../../compile/extract-connectivity.js";
 
 function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
   return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
@@ -284,11 +285,6 @@ function detectInductorLoops(
 // extractDigitalSubcircuit — split mixed-mode circuit into analog + digital parts
 // ---------------------------------------------------------------------------
 
-const NEUTRAL_TYPES_FOR_PARTITION = new Set([
-  "In", "Out", "Ground", "VDD", "Const", "Probe", "Tunnel",
-  "Splitter", "Driver", "NotConnected", "ScopeTrigger",
-]);
-
 function posKeyForPartition(p: { x: number; y: number }): string {
   return `${Math.round(p.x * 2) / 2},${Math.round(p.y * 2) / 2}`;
 }
@@ -333,7 +329,7 @@ function extractDigitalSubcircuit(
   for (const el of circuit.elements) {
     const def = registry.get(el.typeId);
     if (!def) continue;
-    if (NEUTRAL_TYPES_FOR_PARTITION.has(el.typeId)) {
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
       analogElements.add(el);
       continue;
     }
@@ -677,14 +673,10 @@ function resolveCircuitInput(
   // Detect truly mixed-mode: partition only when BOTH digital-only AND
   // analog-only components are present. If only digital-only components
   // exist (no analog), let the per-element check below emit diagnostics.
-  const neutralTypes = new Set([
-    'In', 'Out', 'Ground', 'VDD', 'Const', 'Probe', 'Tunnel',
-    'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger',
-  ]);
   let hasDigitalOnlyEl = false;
   let hasAnalogOnlyEl = false;
   for (const el of rawCircuit.elements) {
-    if (neutralTypes.has(el.typeId)) continue;
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
     const def = registry.get(el.typeId);
     if (!def) continue;
     if (hasDigitalModel(def) && def.models?.analog === undefined) hasDigitalOnlyEl = true;
@@ -1454,8 +1446,8 @@ function compileAnalogCircuit(
             continue;
           }
 
-          const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinDecl.label];
-          const componentOverride = def.models?.analog?.pinElectrical;
+          const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
+          const componentOverride = def.pinElectrical;
           // Merge user per-pin overrides (from property panel) with definition overrides
           let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
           if (props.has("_pinElectricalOverrides")) {
@@ -1600,8 +1592,8 @@ function compileAnalogCircuit(
       const pinLabels = def.pinLayout.map((pd) => pd.label);
       const pinElectricalMap: Record<string, ResolvedPinElectrical> = {};
       for (const pinLabel of pinLabels) {
-        const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
-        const componentOverride = def.models?.analog?.pinElectrical;
+        const defPinOverride = def.pinElectricalOverrides?.[pinLabel];
+        const componentOverride = def.pinElectrical;
         // Merge: user per-pin overrides take highest priority
         const userPinOverride = userOverrides[pinLabel];
         const mergedPinOverride = userPinOverride
@@ -2198,8 +2190,8 @@ export function compileAnalogPartition(
             continue;
           }
 
-          const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinDecl.label];
-          const componentOverride = def.models?.analog?.pinElectrical;
+          const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
+          const componentOverride = def.pinElectrical;
           let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
           if (props.has("_pinElectricalOverrides")) {
             try {
@@ -2312,8 +2304,8 @@ export function compileAnalogPartition(
       const pinLabelsForElec = def.pinLayout.map((pd) => pd.label);
       const pinElectricalMap: Record<string, ResolvedPinElectrical> = {};
       for (const pinLabel of pinLabelsForElec) {
-        const defPinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
-        const componentOverride = def.models?.analog?.pinElectrical;
+        const defPinOverride = def.pinElectricalOverrides?.[pinLabel];
+        const componentOverride = def.pinElectrical;
         const userPinOverride = userOverrides[pinLabel];
         const mergedPinOverride = userPinOverride
           ? { ...defPinOverride, ...userPinOverride }

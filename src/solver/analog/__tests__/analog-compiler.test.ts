@@ -326,13 +326,13 @@ describe("BehavioralCompilation", () => {
     registry.register({
       ...makeBaseDef("HighDriveAnd"),
       pinLayout: makeGatePinLayout(2),
+      pinElectricalOverrides: {
+        out: { rOut: 25 },
+      },
       models: {
         digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
         analog: {
           factory: factorySpy as unknown as import("../../core/registry.js").AnalogModel["factory"],
-          pinElectricalOverrides: {
-            out: { rOut: 25 },
-          },
         },
       },
     });

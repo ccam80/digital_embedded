@@ -278,16 +278,13 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   const xorTypeId = (outPinOverride || componentOverride) ? "XOrOverride" : "XOr";
   if (outPinOverride || componentOverride) {
     const baseXorDef = registry.get("XOr")!;
-    const analogOverrides: Record<string, unknown> = {};
-    if (componentOverride) analogOverrides.pinElectrical = componentOverride;
-    if (outPinOverride) analogOverrides.pinElectricalOverrides = { out: outPinOverride };
+    const defOverrides: Partial<ComponentDefinition> = {};
+    if (componentOverride) defOverrides.pinElectrical = componentOverride;
+    if (outPinOverride) defOverrides.pinElectricalOverrides = { out: outPinOverride };
     registry.register({
       ...baseXorDef,
       name: "XOrOverride",
-      models: {
-        ...baseXorDef.models,
-        analog: { ...baseXorDef.models.analog, ...analogOverrides },
-      },
+      ...defOverrides,
     } as ComponentDefinition);
   }
 

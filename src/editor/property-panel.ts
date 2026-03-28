@@ -360,8 +360,8 @@ export class PropertyPanel {
     for (const pin of pins) {
       const pinLabel = pin.label;
       const fields = pin.direction === PinDirection.OUTPUT ? outputFields : inputFields;
-      const pinOverride = def.models?.analog?.pinElectricalOverrides?.[pinLabel];
-      const resolved = resolvePinElectrical(family, pinOverride, def.models?.analog?.pinElectrical);
+      const pinOverride = def.pinElectricalOverrides?.[pinLabel];
+      const resolved = resolvePinElectrical(family, pinOverride, def.pinElectrical);
 
       const pinDiv = document.createElement("div");
       pinDiv.style.cssText = "margin:6px 0 0 8px;font-size:11px;";

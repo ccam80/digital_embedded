@@ -139,3 +139,62 @@
 - **Status**: complete
 - **Tasks completed**: 2/2
 - **Rounds**: 1
+
+## Task W1.1: MnaModel interface, getActiveModelKey(), modelKeyToDomain()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/core/registry.ts, src/core/__tests__/registry.test.ts
+- **Tests**: 53/53 passing (registry tests); 6 pre-existing failures in tunnel-diode tests unchanged
+
+## Task W1.2: Canonical INFRASTRUCTURE_TYPES export
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/compile/compile.ts` (replaced local INFRASTRUCTURE set with import of INFRASTRUCTURE_TYPES)
+  - `src/solver/analog/compiler.ts` (added import of INFRASTRUCTURE_TYPES; replaced NEUTRAL_TYPES_FOR_PARTITION and neutralTypes with canonical set)
+  - `src/solver/digital/compiler.ts` (added import of INFRASTRUCTURE_TYPES; replaced COMPILE_INFRASTRUCTURE_TYPES with import)
+- **Tests**: 9730/9730 passing (vitest), 478/527 passing (playwright) — no new regressions vs baseline
+- **Details**:
+  - Verified canonical set I1 at `src/compile/extract-connectivity.ts:21-24` contains: `'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe', 'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port'`
+  - I2 (compile.ts:96) replaced local set with imported INFRASTRUCTURE_TYPES
+  - I3 (analog/compiler.ts:287) removed NEUTRAL_TYPES_FOR_PARTITION and replaced usage with INFRASTRUCTURE_TYPES (note: removed In/Out which are NOT infrastructure per spec line 325)
+  - I4 (analog/compiler.ts:680) removed local neutralTypes set and replaced usage with INFRASTRUCTURE_TYPES
+  - I5 (digital/compiler.ts:61) removed COMPILE_INFRASTRUCTURE_TYPES set and replaced usage with imported INFRASTRUCTURE_TYPES
+  - All In/Out references removed from infrastructure classification (correct per spec: they have simulation models and are not infrastructure)
+  - All Port references added where missing (correct per spec: Port is infrastructure)
+
+## Task W1.3: Move pinElectrical/pinElectricalOverrides from AnalogModel to ComponentDefinition
+- **Status**: available for next implementer
+- **Agent**: (none yet)
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 0/0
+- **If partial — remaining work**: This task requires file locks on src/solver/analog/compiler.ts and src/compile/partition.ts which are now available. It requires: (1) add pinElectrical/pinElectricalOverrides to ComponentDefinition interface in registry.ts; (2) remove those fields from AnalogModel in registry.ts; (3) update partition.ts lines 79-81 to read from def instead of analogModel; (4) update compiler.ts lines 1449-1450 and 1595-1596 to read from def instead of def.models?.analog; (5) update property-panel.ts lines 363-364 to read from def instead of def.models?.analog; (6) move pinElectrical: {} from models.analog to the definition root in all test files: compile.test.ts (lines 245, 279), coordinator.test.ts (lines 181, 206), coordinator-speed-control.test.ts (lines 124, 140), coordinator-capability.test.ts (lines 91, 116), coordinator-clock.test.ts (lines 82, 122); (7) update partition.test.ts to set pinElectrical on the definition not the analog model (lines 34, 458-460, 500); (8) write new registry tests verifying pinElectrical/pinElectricalOverrides are stored on ComponentDefinition.
+
+## Task W1.3: Move pinElectrical/pinElectricalOverrides from AnalogModel to ComponentDefinition
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/registry.ts` — removed `pinElectrical` and `pinElectricalOverrides` from `AnalogModel`; added them to `ComponentDefinition`
+  - `src/compile/partition.ts` — `electricalSpecForGroup()` reads from `def` instead of `def.models?.analog`
+  - `src/solver/analog/compiler.ts` — all 4 read sites updated to read from `def` instead of `def.models?.analog`
+  - `src/editor/property-panel.ts` — reads from `def` instead of `def.models?.analog`
+  - `src/compile/__tests__/compile.test.ts` — moved `pinElectrical: {}` from `models.analog` to def root
+  - `src/compile/__tests__/coordinator.test.ts` — moved `pinElectrical: {}` from `models.analog` to def root
+  - `src/compile/__tests__/partition.test.ts` — moved `pinElectrical` from `ANALOG_MODEL`/`models.analog` to def root; updated ModelAssignment in test
+  - `src/solver/__tests__/coordinator-speed-control.test.ts` — moved `pinElectrical: {}` from `models.analog` to def root
+  - `src/solver/__tests__/coordinator-capability.test.ts` — moved `pinElectrical: {}` from `models.analog` to def root
+  - `src/solver/__tests__/coordinator-clock.test.ts` — moved `pinElectrical: {}` from `models.analog` to def root
+  - `src/solver/analog/__tests__/lrcxor-fixture.test.ts` — moved override spreading from `analog` model to def root
+  - `src/solver/analog/__tests__/analog-compiler.test.ts` — moved `pinElectricalOverrides` from `analog` model to def root
+  - `src/core/__tests__/registry.test.ts` — added 5 new tests verifying pinElectrical/pinElectricalOverrides on ComponentDefinition
+- **Tests**: 7622/7622 unit tests passing (6 pre-existing failures unchanged); 5 new registry tests all pass (58/58 in registry.test.ts)
+
+---
+## Wave 1 Summary
+- **Status**: complete
+- **Tasks completed**: 3/3
+- **Rounds**: 2 (W1.3 retried after lock conflict)

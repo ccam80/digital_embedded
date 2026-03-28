@@ -71,6 +71,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     attributeMap: [],
     category: ComponentCategory.PASSIVE,
     helpText: '',
+    pinElectrical: {},
     models: {
       analog: {
         analogFactory: (_el: unknown, _pins: number[]) => ({
@@ -79,7 +80,6 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
           stamp(_s: SparseSolver) {},
           getPinCurrents(_v: Float64Array) { return [0]; },
         }),
-        pinElectrical: {},
       },
     },
   } as unknown as ComponentDefinition;
@@ -119,7 +119,8 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     attributeMap: [],
     category: ComponentCategory.PASSIVE,
     helpText: '',
-    models: { analog: { analogFactory: resistorFactory as AnalogFactory, pinElectrical: {} } },
+    pinElectrical: {},
+    models: { analog: { analogFactory: resistorFactory as AnalogFactory } },
   } as unknown as ComponentDefinition;
 
   registry.register(groundDef);

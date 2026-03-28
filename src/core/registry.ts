@@ -190,8 +190,36 @@ export interface AnalogModel {
   getInternalNodeCount?: (props: PropertyBag) => number;
   deviceType?: DeviceType;
   transistorModel?: string;
-  pinElectrical?: PinElectricalSpec;
-  pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+}
+
+/**
+ * Named MNA simulation model entry in the mnaModels map.
+ * Each key is a user-selectable model name (e.g. "behavioral", "ideal", "real").
+ */
+export interface MnaModel {
+  /** Produces AnalogElementCore stamp objects for this component. */
+  factory?: (
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
+    branchIdx: number,
+    props: PropertyBag,
+    getTime: () => number,
+  ) => AnalogElementCore;
+
+  /** Named subcircuit in TransistorModelRegistry to expand instead of using factory. */
+  subcircuitModel?: string;
+
+  /** Number of internal MNA nodes needed. */
+  getInternalNodeCount?: (props: PropertyBag) => number;
+
+  /** Whether this model needs an MNA branch row (voltage sources, inductors). */
+  requiresBranchRow?: boolean;
+
+  /** Device type for SPICE parameter lookup (e.g., "NPN", "D", "NMOS"). */
+  deviceType?: DeviceType;
+
+  /** Default parameter values for this model. */
+  defaultParams?: Record<string, number>;
 }
 
 /**
@@ -203,6 +231,8 @@ export interface ComponentModels {
   digital?: DigitalModel;
   /** MNA analog: stamps conductance/current into sparse matrix. */
   analog?: AnalogModel;
+  /** Named MNA models keyed by model name (e.g. "behavioral", "ideal", "real"). */
+  mnaModels?: Record<string, MnaModel>;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +274,10 @@ export interface ComponentDefinition {
    * model is available.
    */
   defaultModel?: string;
+  /** Bridge adapter electrical specs for digital model pins. */
+  pinElectrical?: PinElectricalSpec;
+  /** Per-pin overrides for bridge adapter specs. */
+  pinElectricalOverrides?: Record<string, PinElectricalSpec>;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +297,54 @@ export function hasAnalogModel(def: ComponentDefinition): boolean {
 /** Returns the list of model keys available on this component definition. */
 export function availableModels(def: ComponentDefinition): string[] {
   return def.models ? Object.keys(def.models) : [];
+}
+
+/**
+ * Resolves the active model key for a component instance.
+ *
+ * Resolution order:
+ * 1. `simulationModel` property on the element (if set and valid)
+ * 2. `def.defaultModel` (if set)
+ * 3. `"digital"` if a digital model exists
+ * 4. First key in `mnaModels`
+ *
+ * Throws if the `simulationModel` property is set to an unrecognised key,
+ * or if the component has no models at all.
+ */
+export function getActiveModelKey(
+  el: CircuitElement,
+  def: ComponentDefinition,
+): string {
+  const prop = el.getAttribute('simulationModel');
+  if (typeof prop === 'string' && prop.length > 0) {
+    if (prop === 'digital' && def.models.digital) return prop;
+    if (def.models.mnaModels?.[prop]) return prop;
+    const validKeys: string[] = [];
+    if (def.models.digital) validKeys.push('digital');
+    validKeys.push(...Object.keys(def.models.mnaModels ?? {}));
+    throw new Error(
+      `Unknown simulationModel "${prop}" on ${el.instanceId}; valid keys: ${validKeys.join(', ')}`,
+    );
+  }
+  if (def.defaultModel !== undefined) return def.defaultModel;
+  if (def.models.digital) return 'digital';
+  const mnaKeys = Object.keys(def.models.mnaModels ?? {});
+  if (mnaKeys.length > 0) return mnaKeys[0]!;
+  throw new Error(`Component ${el.instanceId} (${def.name}) has no models`);
+}
+
+/**
+ * Maps a resolved model key to its simulation domain.
+ *
+ * `"digital"` → `"digital"` domain.
+ * Anything present in `mnaModels` → `"mna"` domain.
+ */
+export function modelKeyToDomain(
+  key: string,
+  def: ComponentDefinition,
+): "digital" | "mna" {
+  if (key === 'digital' && def.models.digital) return 'digital';
+  return 'mna';
 }
 
 // ---------------------------------------------------------------------------

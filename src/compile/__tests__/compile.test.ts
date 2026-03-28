@@ -239,10 +239,10 @@ function makeAnalogDef(
     attributeMap: [],
     category: ComponentCategory.ANALOG,
     helpText: "",
+    pinElectrical: {},
     models: {
       analog: {
         analogFactory,
-        pinElectrical: {},
       },
     },
   } as unknown as ComponentDefinition;
@@ -265,6 +265,7 @@ function makeGroundDef(): ComponentDefinition {
     attributeMap: [],
     category: ComponentCategory.ANALOG,
     helpText: "",
+    pinElectrical: {},
     models: {
       analog: {
         analogFactory: (_el: unknown, _pins: number[]) => ({
@@ -276,7 +277,6 @@ function makeGroundDef(): ComponentDefinition {
           stamp(_s: SparseSolver) {},
           getPinCurrents(_v: Float64Array) { return [0]; },
         }),
-        pinElectrical: {},
       },
     },
   } as unknown as ComponentDefinition;

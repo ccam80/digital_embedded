@@ -5,6 +5,8 @@ import {
   hasDigitalModel,
   hasAnalogModel,
   availableModels,
+  getActiveModelKey,
+  modelKeyToDomain,
 } from "../registry.js";
 import type {
   ComponentDefinition,
@@ -14,8 +16,10 @@ import type {
   DigitalModel,
   AnalogModel,
   ComponentModels,
+  MnaModel,
 } from "../registry.js";
 import { PropertyBag } from "../properties.js";
+import type { PinElectricalSpec } from "../pin-electrical.js";
 import type { CircuitElement, SerializedElement } from "../element.js";
 import type { PropertyValue } from "../properties.js";
 import type { Pin } from "../pin.js";
@@ -513,6 +517,215 @@ describe("ComponentRegistry", () => {
       expect(result).toBeDefined();
       expect(result!.name).toBe("Diode");
       expect(registry.get("PldDiode")!.name).toBe("PldDiode");
+    });
+  });
+
+  describe("getActiveModelKey", () => {
+    const stubMnaFactory = () =>
+      ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
+
+    function makeMockElementWithProp(
+      instanceId: string,
+      simulationModel?: string,
+    ): CircuitElement {
+      const base = makeMockElement("TestType", instanceId);
+      return {
+        ...base,
+        getAttribute(name: string): PropertyValue | undefined {
+          if (name === 'simulationModel') return simulationModel;
+          return undefined;
+        },
+      };
+    }
+
+    it("returns simulationModel prop when set to 'digital' and digital model exists", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("AndGate"),
+        models: {
+          digital: { executeFn: noopExecuteFn },
+          mnaModels: { behavioral: { factory: stubMnaFactory } },
+        },
+        defaultModel: "behavioral",
+      };
+      const el = makeMockElementWithProp("and1", "digital");
+      expect(getActiveModelKey(el, def)).toBe("digital");
+    });
+
+    it("returns simulationModel prop when set to an mnaModels key", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("OpAmp"),
+        models: {
+          mnaModels: {
+            ideal: { factory: stubMnaFactory },
+            real: { factory: stubMnaFactory, getInternalNodeCount: () => 1 },
+          },
+        },
+        defaultModel: "ideal",
+      };
+      const el = makeMockElementWithProp("op1", "real");
+      expect(getActiveModelKey(el, def)).toBe("real");
+    });
+
+    it("throws when simulationModel prop is set to an invalid key", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Resistor"),
+        models: { mnaModels: { behavioral: { factory: stubMnaFactory } } },
+        defaultModel: "behavioral",
+      };
+      const el = makeMockElementWithProp("r1", "nonexistent");
+      expect(() => getActiveModelKey(el, def)).toThrow(
+        /Unknown simulationModel "nonexistent"/,
+      );
+    });
+
+    it("throws with valid keys listed when simulationModel prop is invalid", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Bjt"),
+        models: {
+          mnaModels: {
+            behavioral: { factory: stubMnaFactory },
+            spice: { factory: stubMnaFactory },
+          },
+        },
+        defaultModel: "behavioral",
+      };
+      const el = makeMockElementWithProp("q1", "missing");
+      expect(() => getActiveModelKey(el, def)).toThrow(/behavioral.*spice|spice.*behavioral/);
+    });
+
+    it("falls through to defaultModel when simulationModel prop is absent", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Capacitor"),
+        models: {
+          mnaModels: {
+            behavioral: { factory: stubMnaFactory },
+            ideal: { factory: stubMnaFactory },
+          },
+        },
+        defaultModel: "ideal",
+      };
+      const el = makeMockElementWithProp("c1", undefined);
+      expect(getActiveModelKey(el, def)).toBe("ideal");
+    });
+
+    it("falls through to 'digital' when no prop and no defaultModel", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Buffer"),
+        models: {
+          digital: { executeFn: noopExecuteFn },
+          mnaModels: { behavioral: { factory: stubMnaFactory } },
+        },
+      };
+      const el = makeMockElementWithProp("buf1", undefined);
+      expect(getActiveModelKey(el, def)).toBe("digital");
+    });
+
+    it("falls through to first mnaModels key when no prop, no defaultModel, no digital", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Inductor"),
+        models: { mnaModels: { behavioral: { factory: stubMnaFactory } } },
+      };
+      const el = makeMockElementWithProp("l1", undefined);
+      expect(getActiveModelKey(el, def)).toBe("behavioral");
+    });
+
+    it("throws when component has no models at all", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Empty"),
+        models: {},
+      };
+      const el = makeMockElementWithProp("e1", undefined);
+      expect(() => getActiveModelKey(el, def)).toThrow(/no models/);
+    });
+  });
+
+  describe("pinElectrical on ComponentDefinition", () => {
+    it("pinElectrical stored on ComponentDefinition is preserved through register()", () => {
+      const spec: PinElectricalSpec = { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 };
+      const def: ComponentDefinition = {
+        ...makeDefinition("BridgeGate"),
+        pinElectrical: spec,
+      };
+      registry.register(def);
+      const stored = registry.get("BridgeGate")!;
+      expect(stored.pinElectrical).toEqual(spec);
+    });
+
+    it("pinElectricalOverrides stored on ComponentDefinition is preserved through register()", () => {
+      const overrides: Record<string, PinElectricalSpec> = {
+        out: { vOH: 5.0, vOL: 0.1, rOut: 25 },
+        in: { vIH: 2.5, vIL: 0.5 },
+      };
+      const def: ComponentDefinition = {
+        ...makeDefinition("HighDriveGate"),
+        pinElectricalOverrides: overrides,
+      };
+      registry.register(def);
+      const stored = registry.get("HighDriveGate")!;
+      expect(stored.pinElectricalOverrides).toEqual(overrides);
+    });
+
+    it("pinElectrical and pinElectricalOverrides are independent of models.analog", () => {
+      const spec: PinElectricalSpec = { vOH: 3.3, vOL: 0 };
+      const def: ComponentDefinition = {
+        ...makeDefinition("MixedGate"),
+        pinElectrical: spec,
+        models: { digital: { executeFn: noopExecuteFn }, analog: {} },
+      };
+      registry.register(def);
+      const stored = registry.get("MixedGate")!;
+      expect(stored.pinElectrical).toEqual(spec);
+      expect(stored.models.analog).toBeDefined();
+    });
+
+    it("ComponentDefinition without pinElectrical has undefined pinElectrical", () => {
+      const def = makeDefinition("PlainGate");
+      registry.register(def);
+      const stored = registry.get("PlainGate")!;
+      expect(stored.pinElectrical).toBeUndefined();
+      expect(stored.pinElectricalOverrides).toBeUndefined();
+    });
+
+    it("AnalogModel no longer carries pinElectrical or pinElectricalOverrides", () => {
+      const analogModel: AnalogModel = {};
+      expect((analogModel as Record<string, unknown>)["pinElectrical"]).toBeUndefined();
+      expect((analogModel as Record<string, unknown>)["pinElectricalOverrides"]).toBeUndefined();
+    });
+  });
+
+  describe("modelKeyToDomain", () => {
+    const stubMnaFactory = () =>
+      ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
+
+    it("returns 'digital' for key 'digital' when digital model exists", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("AndGate2"),
+        models: { digital: { executeFn: noopExecuteFn } },
+      };
+      expect(modelKeyToDomain("digital", def)).toBe("digital");
+    });
+
+    it("returns 'mna' for a key present in mnaModels", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("Resistor2"),
+        models: { mnaModels: { behavioral: { factory: stubMnaFactory } } },
+        defaultModel: "behavioral",
+      };
+      expect(modelKeyToDomain("behavioral", def)).toBe("mna");
+    });
+
+    it("returns 'mna' for any key that is not 'digital'", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("OpAmp2"),
+        models: {
+          mnaModels: {
+            ideal: { factory: stubMnaFactory },
+            real: { factory: stubMnaFactory },
+          },
+        },
+      };
+      expect(modelKeyToDomain("ideal", def)).toBe("mna");
+      expect(modelKeyToDomain("real", def)).toBe("mna");
     });
   });
 });
