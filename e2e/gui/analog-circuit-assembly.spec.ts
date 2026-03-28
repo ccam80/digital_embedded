@@ -23,6 +23,16 @@ const SPICE_REF = JSON.parse(
 );
 
 // ---------------------------------------------------------------------------
+// SPICE model override parameter sets — match ngspice reference models
+// ---------------------------------------------------------------------------
+
+const BJT_NPN_OVERRIDES = JSON.stringify({ IS: 1e-14, BF: 100, VAF: 100 });
+const BJT_PNP_OVERRIDES = JSON.stringify({ IS: 1e-14, BF: 100, VAF: 100 });
+const MOSFET_NMOS_OVERRIDES = JSON.stringify({ VTO: 1, KP: 2e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 });
+const MOSFET_PMOS_OVERRIDES = JSON.stringify({ VTO: -1, KP: 1e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 });
+const JFET_NJFET_OVERRIDES = JSON.stringify({ VTO: -2, BETA: 1.3e-3, LAMBDA: 0.01 });
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -152,6 +162,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Capacitor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('C1', 'pos');
+
       // Step past transient (5τ = 5ms) then measure one full period (10ms at 100Hz)
       await stepToTimeAndRead(builder, '10m');
 
@@ -265,6 +278,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Capacitor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('C1', 'pos');
+
       // Step past transient (fast path via step-to-time)
       await stepToTimeAndRead(builder, '5m');
 
@@ -310,6 +326,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Resistor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('R1', 'B');
+
       await stepToTimeAndRead(builder, '5m');
       const result = await builder.measureAnalogPeaks('5m');
       expect(result).not.toBeNull();
@@ -352,6 +371,9 @@ test.describe('Analog circuit assembly via UI', () => {
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
+
+      // Add scope trace via a real analog component (Resistor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('R1', 'A');
 
       // Step past transient (several 60Hz cycles = ~50ms) then measure peaks
       await stepToTimeAndRead(builder, '50m');
@@ -425,6 +447,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Re', 'resistance', 1000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       // Vcc:pos → Rc:A, Rc:B → Q1:C
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
@@ -489,6 +512,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc1', 'resistance', 4700);
       await builder.setComponentProperty('Rc2', 'resistance', 4700);
       await builder.setComponentProperty('Re', 'resistance', 10000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       await builder.drawWire('Vcc', 'pos', 'Rc1', 'A');
       await builder.drawWire('Vcc', 'pos', 'Rc2', 'A');
@@ -543,6 +568,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rc', 'resistance', 1000);
       await builder.setComponentProperty('Re', 'resistance', 100);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
       await builder.drawWire('Rc', 'B', 'Q1', 'C');
@@ -590,8 +617,10 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.placeLabeled('Probe', 24, 11, 'P1');
 
       await builder.setComponentProperty('Vcc', 'voltage', 12);
-      await builder.setComponentProperty('Vee', 'voltage', 12);
+      await builder.setComponentProperty('Vee', 'voltage', -12);
       await builder.setComponentProperty('Vin', 'voltage', 3);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_PNP_OVERRIDES);
 
       // NPN: Vcc → Q1:C, Q1:B ← Vin, Q1:E → output node
       await builder.drawWire('Vcc', 'pos', 'Q1', 'C');
@@ -644,6 +673,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rd', 'resistance', 4700);
       await builder.setComponentProperty('Rg', 'resistance', 100000);
       await builder.setComponentProperty('Rs', 'resistance', 1000);
+      await builder.setComponentProperty('M1', '_spiceModelOverrides', MOSFET_NMOS_OVERRIDES);
 
       await builder.drawWire('Vdd', 'pos', 'Rd', 'A');
       await builder.drawWire('Rd', 'B', 'M1', 'D');
@@ -787,6 +817,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rd', 'resistance', 2200);
       await builder.setComponentProperty('Rg', 'resistance', 1000000);
       await builder.setComponentProperty('Rs', 'resistance', 680);
+      await builder.setComponentProperty('J1', '_spiceModelOverrides', JFET_NJFET_OVERRIDES);
 
       await builder.drawWire('Vdd', 'pos', 'Rd', 'A');
       await builder.drawWire('Rd', 'B', 'J1', 'D');
@@ -845,6 +876,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Re', 'resistance', 1000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       // Vcc → Rc → Q2:C, Q2:E → Q1:C, Q1:E → Re → GND
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
@@ -894,6 +927,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Rref', 'resistance', 10000);
       await builder.setComponentProperty('Rload', 'resistance', 10000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q3', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       // Vcc → Rref → Q1:C, Vcc → Rload → Q2:C
       await builder.drawWire('Vcc', 'pos', 'Rref', 'A');
@@ -945,6 +981,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rref', 'resistance', 10000);
       await builder.setComponentProperty('Rload', 'resistance', 47000);
       await builder.setComponentProperty('Re', 'resistance', 5600);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       // Vcc → Rref → Q1:C, Q1:B shorted to Q1:C (diode-connected)
       await builder.drawWire('Vcc', 'pos', 'Rref', 'A');
@@ -997,6 +1035,10 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('Vfwd', 'voltage', 0);
       await builder.setComponentProperty('Vrev', 'voltage', 12);
+      await builder.setComponentProperty('Mp1', '_spiceModelOverrides', MOSFET_PMOS_OVERRIDES);
+      await builder.setComponentProperty('Mp2', '_spiceModelOverrides', MOSFET_PMOS_OVERRIDES);
+      await builder.setComponentProperty('Mn1', '_spiceModelOverrides', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('Mn2', '_spiceModelOverrides', MOSFET_NMOS_OVERRIDES);
 
       // Supply to PMOS sources
       await builder.drawWire('Vdd', 'pos', 'Mp1', 'S');
@@ -1058,6 +1100,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rd', 'resistance', 1000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('M1', '_spiceModelOverrides', MOSFET_NMOS_OVERRIDES);
 
       // BJT stage: Vin → Rb → Q1:B, Vdd → Rc → Q1:C
       await builder.drawWire('Vin', 'pos', 'Rb', 'A');
@@ -1133,6 +1177,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Re1', 'resistance', 1000);
       await builder.setComponentProperty('Re2', 'resistance', 1000);
       await builder.setComponentProperty('Re3', 'resistance', 1000);
+      await builder.setComponentProperty('Q1', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q3', '_spiceModelOverrides', BJT_NPN_OVERRIDES);
 
       // Stage 1
       await builder.drawWire('Vcc', 'pos', 'Rc1', 'A');
@@ -1252,6 +1299,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Capacitor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('C1', 'pos');
+
       // Close switch and observe oscillation
       await clickElementCenter(builder, 'SW');
 
@@ -1267,32 +1317,35 @@ test.describe('Analog circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('relay-driven LC: relay switches between load paths', async () => {
       await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcoil');
+      await builder.placeLabeled('Resistor', 10, 3, 'Rcoil');
       await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vsig');
-      await builder.placeLabeled('Relay', 12, 8, 'RL');
-      await builder.placeLabeled('Inductor', 20, 5, 'L1');
-      await builder.placeLabeled('Capacitor', 26, 5, 'C1');
-      await builder.placeLabeled('Resistor', 20, 14, 'R1');
+      await builder.placeLabeled('Relay', 18, 8, 'RL');
+      await builder.placeLabeled('Inductor', 24, 5, 'L1');
+      await builder.placeLabeled('Capacitor', 30, 5, 'C1');
+      await builder.placeLabeled('Resistor', 24, 14, 'R1');
       await builder.placeComponent('Ground', 6, 20);
       await builder.placeComponent('Ground', 6, 10);
-      await builder.placeComponent('Ground', 28, 10);
-      await builder.placeComponent('Ground', 22, 18);
-      await builder.placeLabeled('Probe', 30, 8, 'P1');
+      await builder.placeComponent('Ground', 32, 10);
+      await builder.placeComponent('Ground', 26, 18);
+      await builder.placeLabeled('Probe', 34, 8, 'P1');
 
       await builder.setComponentProperty('Vcoil', 'voltage', 5);
       await builder.setComponentProperty('Vsig', 'voltage', 5);
+      await builder.setComponentProperty('Rcoil', 'resistance', 1);
 
-      // Coil drive
-      await builder.drawWire('Vcoil', 'pos', 'RL', 'in1');
+      // Coil drive: Vcoil → Rcoil → RL coil (series R breaks voltage source loop)
+      await builder.drawWire('Vcoil', 'pos', 'Rcoil', 'A');
+      await builder.drawWire('Rcoil', 'B', 'RL', 'in1');
       await builder.drawWireFromPin('RL', 'in2', 6, 10);
       // Signal through relay contact
       await builder.drawWire('Vsig', 'pos', 'RL', 'A1');
       // LC path
       await builder.drawWire('RL', 'B1', 'L1', 'A');
       await builder.drawWire('L1', 'B', 'C1', 'pos');
-      await builder.drawWireFromPin('C1', 'neg', 28, 10);
+      await builder.drawWireFromPin('C1', 'neg', 32, 10);
       // R path via separate wire (relay switches between paths)
       await builder.drawWire('RL', 'B1', 'R1', 'A');
-      await builder.drawWireFromPin('R1', 'B', 22, 18);
+      await builder.drawWireFromPin('R1', 'B', 26, 18);
       // Grounds
       await builder.drawWireFromPin('Vcoil', 'neg', 6, 20);
       await builder.drawWireFromPin('Vsig', 'neg', 6, 20);
@@ -1465,6 +1518,7 @@ test.describe('Analog circuit assembly via UI', () => {
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('R1', 'resistance', 100);
+      await builder.setComponentProperty('M1', '_spiceModelOverrides', MOSFET_NMOS_OVERRIDES);
 
       // Vdd → M1:D, M1:S → L1 → R1 → C1 → GND
       await builder.drawWire('Vdd', 'pos', 'M1', 'D');
@@ -1668,6 +1722,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Resistor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('Rb', 'B');
+
       // Step past startup transient then measure oscillation (fast path)
       await stepToTimeAndRead(builder, '100m');
       const result = await builder.measureAnalogPeaks('100m');
@@ -1768,6 +1825,9 @@ test.describe('Analog circuit assembly via UI', () => {
 
       await builder.stepViaUI();
       await builder.verifyNoErrors();
+
+      // Add scope trace via a real analog component (Resistor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('Rload', 'A');
 
       await stepAndRead(builder, 1000);
       const result = await measurePeaks(builder, 2000);
