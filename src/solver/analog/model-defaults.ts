@@ -43,6 +43,48 @@ export const DIODE_DEFAULTS: Record<string, number> = {
 };
 
 // ---------------------------------------------------------------------------
+// Zener diode defaults — same as standard diode but with finite BV
+// ---------------------------------------------------------------------------
+
+/**
+ * Default parameters for a Zener diode.
+ * Inherits all SPICE D-model defaults but overrides BV to a typical 5.1 V
+ * Zener breakdown voltage so that reverse breakdown is active by default.
+ */
+export const ZENER_DEFAULTS: Record<string, number> = {
+  ...DIODE_DEFAULTS,
+  /** BV: reverse breakdown voltage (V) — typical Zener */
+  BV: 5.1,
+  /** IBV: current at reverse breakdown (A) — 1 mA reference */
+  IBV: 1e-3,
+};
+
+// ---------------------------------------------------------------------------
+// Schottky diode defaults — higher IS, lower BV than standard silicon diode
+// ---------------------------------------------------------------------------
+
+/**
+ * Default parameters for a Schottky barrier diode.
+ * Key differences from silicon: much higher saturation current (metal-
+ * semiconductor junction), lower forward voltage drop, lower breakdown.
+ */
+export const SCHOTTKY_DEFAULTS: Record<string, number> = {
+  ...DIODE_DEFAULTS,
+  /** IS: saturation current (A) — ~1000x higher than Si diode */
+  IS: 1e-8,
+  /** N: ideality factor — slightly above 1 for Schottky */
+  N: 1.05,
+  /** BV: reverse breakdown voltage (V) — lower than Si diode */
+  BV: 40,
+  /** RS: series resistance (Ω) */
+  RS: 1,
+  /** CJO: zero-bias junction capacitance (F) */
+  CJO: 1e-12,
+  /** EG: Schottky barrier height (eV) — lower than Si bandgap */
+  EG: 0.69,
+};
+
+// ---------------------------------------------------------------------------
 // BJT NPN defaults (SPICE Q model, Level 1)
 // ---------------------------------------------------------------------------
 
@@ -343,4 +385,24 @@ export const JFET_P_DEFAULTS: Record<string, number> = {
   AF: 1,
   /** FC: forward-bias depletion capacitance coefficient */
   FC: 0.5,
+};
+
+// ---------------------------------------------------------------------------
+// Tunnel diode defaults
+// ---------------------------------------------------------------------------
+
+/** Default parameters for a tunnel diode (Esaki diode) model. */
+export const TUNNEL_DIODE_DEFAULTS: Record<string, number> = {
+  /** IP: peak tunnel current (A) */
+  IP: 5e-3,
+  /** VP: peak voltage (V) */
+  VP: 0.08,
+  /** IV: valley current (A) */
+  IV: 0.5e-3,
+  /** VV: valley voltage (V) */
+  VV: 0.5,
+  /** IS: thermal saturation current (A) */
+  IS: 1e-14,
+  /** N: emission coefficient */
+  N: 1,
 };

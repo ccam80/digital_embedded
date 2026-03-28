@@ -15,6 +15,7 @@ import {
   MOSFET_PMOS_DEFAULTS,
   JFET_N_DEFAULTS,
   JFET_P_DEFAULTS,
+  TUNNEL_DIODE_DEFAULTS,
 } from "./model-defaults.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { makeDiagnostic } from "./diagnostics.js";
@@ -48,6 +49,7 @@ export const KNOWN_PARAMS: Record<DeviceType, Set<string>> = {
   PMOS: new Set(Object.keys(MOSFET_PMOS_DEFAULTS)),
   NJFET: new Set(Object.keys(JFET_N_DEFAULTS)),
   PJFET: new Set(Object.keys(JFET_P_DEFAULTS)),
+  TUNNEL: new Set(Object.keys(TUNNEL_DIODE_DEFAULTS)),
 };
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,12 @@ const BUILT_IN_DEFAULTS: Record<DeviceType, DeviceModel> = {
     type: "PJFET",
     level: 1,
     params: { ...JFET_P_DEFAULTS },
+  },
+  TUNNEL: {
+    name: "__default_TUNNEL",
+    type: "TUNNEL",
+    level: 1,
+    params: { ...TUNNEL_DIODE_DEFAULTS },
   },
 };
 

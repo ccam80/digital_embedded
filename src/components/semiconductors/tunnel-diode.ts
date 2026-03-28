@@ -23,7 +23,7 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -118,10 +118,11 @@ export function createTunnelDiodeElement(
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  const ip: number = props.getOrDefault<number>("ip", 5e-3);
-  const vp: number = props.getOrDefault<number>("vp", 0.08);
-  const iv: number = props.getOrDefault<number>("iv", 0.5e-3);
-  const vv: number = props.getOrDefault<number>("vv", 0.5);
+  const modelParams = (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const ip = modelParams?.IP ?? 5e-3;
+  const vp = modelParams?.VP ?? 0.08;
+  const iv = modelParams?.IV ?? 0.5e-3;
+  const vv = modelParams?.VV ?? 0.5;
 
   // NR linearization state
   let _vd = 0;
@@ -307,34 +308,6 @@ function buildTunnelDiodePinDeclarations(): PinDeclaration[] {
 
 const TUNNEL_DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
-  {
-    key: "ip",
-    type: PropertyType.FLOAT,
-    label: "I_p (A)",
-    defaultValue: 5e-3,
-    description: "Peak tunnel current",
-  },
-  {
-    key: "vp",
-    type: PropertyType.FLOAT,
-    label: "V_p (V)",
-    defaultValue: 0.08,
-    description: "Peak voltage",
-  },
-  {
-    key: "iv",
-    type: PropertyType.FLOAT,
-    label: "I_v (A)",
-    defaultValue: 0.5e-3,
-    description: "Valley current",
-  },
-  {
-    key: "vv",
-    type: PropertyType.FLOAT,
-    label: "V_v (V)",
-    defaultValue: 0.5,
-    description: "Valley voltage",
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -343,10 +316,6 @@ const TUNNEL_DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
 
 export const TUNNEL_DIODE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-  { xmlName: "ip",    propertyKey: "ip",    convert: (v) => parseFloat(v) },
-  { xmlName: "vp",    propertyKey: "vp",    convert: (v) => parseFloat(v) },
-  { xmlName: "iv",    propertyKey: "iv",    convert: (v) => parseFloat(v) },
-  { xmlName: "vv",    propertyKey: "vv",    convert: (v) => parseFloat(v) },
 ];
 
 // ---------------------------------------------------------------------------
