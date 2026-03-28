@@ -22,7 +22,7 @@ import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import { hasAnalogModel, hasDigitalModel } from "../core/registry.js";
 import type { TransistorModelRegistry } from "../solver/analog/transistor-model-registry.js";
-import { resolveModelAssignments, extractConnectivityGroups } from "./extract-connectivity.js";
+import { resolveModelAssignments, extractConnectivityGroups, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
 import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";
 import type { FlattenResult } from "../solver/digital/flatten.js";
@@ -370,6 +370,7 @@ export function compileUnified(
     for (const pc of digitalPartition.components) {
       const def = registry.get(pc.element.typeId);
       if (!def || def.models?.analog) continue; // has analog model — fine
+      if (INFRASTRUCTURE_TYPES.has(pc.element.typeId)) continue; // infrastructure — no-op wiring element
       const elementIndex = circuit.elements.indexOf(pc.element);
       if (bridgeElementIndices.has(elementIndex)) continue; // bridge-connected — fine
       diagnostics.push({

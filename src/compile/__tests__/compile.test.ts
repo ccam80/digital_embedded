@@ -442,7 +442,9 @@ describe("compileUnified", () => {
     const result = compileUnified(circuit, registry);
 
     expect(result.analog).not.toBeNull();
-    expect(result.digital).toBeNull();
+    // Ground (neutral with analog model) always routes to digital partition,
+    // so digital is non-null even in "pure analog" circuits.
+    expect(result.digital).not.toBeNull();
     expect(result.bridges).toHaveLength(0);
   });
 });

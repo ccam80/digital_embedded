@@ -154,6 +154,7 @@ import { NmosfetDefinition } from "./semiconductors/mosfet.js";
 import { PmosfetDefinition } from "./semiconductors/mosfet.js";
 import { NJfetDefinition } from "./semiconductors/njfet.js";
 import { PJfetDefinition } from "./semiconductors/pjfet.js";
+import { SchottkyDiodeDefinition } from "./semiconductors/schottky.js";
 import { ScrDefinition } from "./semiconductors/scr.js";
 import { TriacDefinition } from "./semiconductors/triac.js";
 import { DiacDefinition } from "./semiconductors/diac.js";
@@ -361,6 +362,7 @@ export function createDefaultRegistry(
   // Semiconductors
   registry.register(DiodeDefinition);
   registry.register(ZenerDiodeDefinition);
+  registry.register(SchottkyDiodeDefinition);
   registry.register(NpnBjtDefinition);
   registry.register(PnpBjtDefinition);
   registry.register(NmosfetDefinition);

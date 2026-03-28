@@ -83,7 +83,7 @@ export function createPopupController(
     }
     const simModel = elementHit.getProperties().has("simulationModel")
       ? elementHit.getProperties().get("simulationModel") as string
-      : (def.defaultModel ?? "logical");
+      : (def.defaultModel ?? availableModels(def)[0] ?? "logical");
 
     if (simModel === "logical" || simModel === "analog-pins") {
       if (hasDigitalModel(def)) {

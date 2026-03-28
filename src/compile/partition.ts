@@ -168,14 +168,30 @@ export function partitionByDomain(
       //   route to analog so it can be processed by the analog backend.
       // - Otherwise route to digital so the digital backend can handle wiring.
       if (hasAnalogModel(def)) {
-        // Neutral components with an analog model (Ground, Probe, VDD, etc.)
-        // must go to the analog partition so the analog compiler can use them
-        // for ground detection and label-to-node mapping. They also go to
-        // digital so the digital backend can handle wiring connections.
-        analogComponents.push(partComp);
-        if (hasDigitalModel(def)) {
-          digitalComponents.push(partComp);
+        // Neutral components with an analog model (Ground, Probe, VDD,
+        // Driver, Splitter, etc.) should only go to the analog partition
+        // when they actually touch an analog-domain connectivity group.
+        // Without this check, their mere presence creates a spurious
+        // analog partition in purely digital circuits.
+        const touchesAnalog = resolvedPins.some((rp) => {
+          for (const g of groups) {
+            if (
+              g.domains.has("analog") &&
+              g.pins.some(
+                (p) =>
+                  p.elementIndex === i && p.pinIndex === rp.pinIndex,
+              )
+            ) {
+              return true;
+            }
+          }
+          return false;
+        });
+        if (touchesAnalog) {
+          analogComponents.push(partComp);
         }
+        // Always include in digital for wiring connections.
+        digitalComponents.push(partComp);
       } else if (!hasDigitalModel(def)) {
         // Truly empty models (e.g. Port with models:{}) — route by the
         // connectivity group's domain. If any of this component's pins

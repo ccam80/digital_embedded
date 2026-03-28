@@ -1,21 +1,33 @@
 {
   "summary": {
-    "passed": 9595,
-    "failed": 3,
+    "passed": 9725,
+    "failed": 5,
     "skipped": 0,
-    "totalFiles": 324,
-    "durationSeconds": 12.2
+    "totalFiles": 329,
+    "durationSeconds": 12.9
   },
   "failures": [
     {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
+      "message": "tunnel-diode: _modelParams not injected by compiler",
+      "count": 3,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-          "test": "rejects_digital_only_component",
-          "line": 396,
-          "column": 92
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "peak_current_at_vp",
+          "line": 122,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "valley_current_at_vv",
+          "line": 122,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "nr_converges_in_ndr_region",
+          "line": 122,
+          "column": 27
         }
       ]
     }

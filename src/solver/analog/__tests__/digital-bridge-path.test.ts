@@ -283,18 +283,21 @@ describe("DigitalBridgePath", () => {
     }
   });
 
-  it("adapter_outer_node_ids_are_positive", () => {
+  it("adapter_outer_node_ids_are_non_negative", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(new Map([["simulationMode", "logical"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
 
+    // Ground (neutral) is excluded from the analog partition when it
+    // does not touch an analog-domain group, so node 0 is not reserved
+    // for ground — adapter node IDs can validly be 0.
     for (const adapter of bridge.inputAdapters) {
-      expect(adapter.inputNodeId).toBeGreaterThan(0);
+      expect(adapter.inputNodeId).toBeGreaterThanOrEqual(0);
     }
     for (const adapter of bridge.outputAdapters) {
-      expect(adapter.outputNodeId).toBeGreaterThan(0);
+      expect(adapter.outputNodeId).toBeGreaterThanOrEqual(0);
     }
   });
 

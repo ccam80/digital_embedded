@@ -337,38 +337,18 @@ describe("compileAnalogPartition", () => {
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 
-  it("node_count_matches_compileAnalogCircuit", () => {
+  it("node_count_matches_expected_for_and_gate_partition", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
 
-    // Build via old path
-    const circuit = new Circuit();
-    const factorySpy = vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
-    const registry = buildRegistry(factorySpy);
+    // Build via partition path (which explicitly includes Ground)
+    const { partition, registry } = buildAndGatePartition(propsMap);
+    const compiled = compileAnalogPartition(partition, registry);
 
-    const andGate = makeElement("BehavioralAnd", "and1", [
-      { x: 10, y: 0, label: "In_1" },
-      { x: 20, y: 0, label: "In_2" },
-      { x: 30, y: 0, label: "out" },
-    ], propsMap);
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
-
-    circuit.addElement(andGate);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
-    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
-    circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
-
-    const compiledOld = compileUnified(circuit, registry).analog!;
-
-    // Build via new path
-    const { partition, registry: registry2 } = buildAndGatePartition(propsMap);
-    const compiledNew = compileAnalogPartition(partition, registry2);
-
-    // Node counts must match
-    expect(compiledNew.nodeCount).toBe(compiledOld.nodeCount);
-    expect(compiledNew.branchCount).toBe(compiledOld.branchCount);
-    expect(compiledNew.matrixSize).toBe(compiledOld.matrixSize);
+    // 3 non-ground nodes: In_1 at (10,0), In_2 at (20,0), out at (30,0)
+    // Ground at (0,0) is node 0 (not counted in nodeCount).
+    expect(compiled.nodeCount).toBe(3);
+    expect(compiled.branchCount).toBe(0);
+    expect(compiled.matrixSize).toBe(3);
   });
 
   it("factory_called_once_for_and_gate", () => {

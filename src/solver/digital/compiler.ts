@@ -839,6 +839,9 @@ function isSequentialComponent(typeId: string): boolean {
     typeId === "RS_FF_AS" ||
     typeId === "Monoflop" ||
     typeId.startsWith("Register") ||
-    typeId.startsWith("Counter")
+    typeId.startsWith("Counter") ||
+    typeId.startsWith("RAM") ||
+    typeId.startsWith("BlockRAM") ||
+    typeId.startsWith("EEPROM")
   );
 }

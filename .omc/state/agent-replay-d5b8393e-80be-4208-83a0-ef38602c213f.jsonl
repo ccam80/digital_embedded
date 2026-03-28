@@ -1,0 +1,16 @@
+{"t":0,"agent":"a51e0a5","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a1e7668","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a8e637f","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a51e0a5","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":75830}
+{"t":0,"agent":"a1e7668","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":155781}
+{"t":0,"agent":"a8e637f","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":166040}
+{"t":0,"agent":"a3154d9","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a3154d9","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":159268}
+{"t":0,"agent":"a459c07","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a459c07","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":226907}
+{"t":0,"agent":"system","event":"keyword_detected","keyword":"autopilot"}
+{"t":0,"agent":"system","event":"mode_change","mode_from":"none","mode_to":"autopilot"}
+{"t":0,"agent":"a6a3ee5","agent_type":"explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a0d6f72","agent_type":"explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a0d6f72","agent_type":"explore","event":"agent_stop","success":true,"duration_ms":85146}
+{"t":0,"agent":"a6a3ee5","agent_type":"explore","event":"agent_stop","success":true,"duration_ms":185845}

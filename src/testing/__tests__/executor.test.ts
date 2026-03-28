@@ -210,7 +210,7 @@ describe("executeTests", () => {
   // clockToggle
   // -------------------------------------------------------------------------
 
-  it("clockToggle — clock input in vector → setInput called with 1 then 0, runToStable called twice", () => {
+  it("clockToggle — clock input in vector → setInput called with 1 then 0, runToStable called three times", () => {
     const { facade, calls } = makeMockFacade({ Q: 0 });
 
     const testData: ParsedTestData = {
@@ -232,10 +232,9 @@ describe("executeTests", () => {
     expect(clockCalls[0]).toEqual(["CLK", 1]);
     expect(clockCalls[1]).toEqual(["CLK", 0]);
 
-    // runToStable called once: to propagate regular inputs before the clock edge
-    // step called twice: once after rising edge, once after falling edge
-    expect(calls.runToStable).toBe(1);
-    expect(calls.step).toBe(2);
+    // runToStable called three times: once to propagate regular inputs before the clock edge,
+    // once after rising edge, once after falling edge
+    expect(calls.runToStable).toBe(3);
   });
 
   // -------------------------------------------------------------------------

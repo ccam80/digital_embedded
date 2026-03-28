@@ -129,7 +129,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
+    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
     const addrBits = this._properties.getOrDefault<number>("addrBits", 2);
     const scaled: PinDeclaration[] = REGISTER_FILE_PIN_DECLARATIONS.map((decl) => {
       // Data pins scale with bitWidth

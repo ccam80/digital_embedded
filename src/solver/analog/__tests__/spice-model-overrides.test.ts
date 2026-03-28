@@ -8,7 +8,7 @@
  *   1. Override merge: IS overridden to 1e-14, other params equal NPN defaults
  *   2. Empty overrides: {} leaves _modelParams equal to raw defaults
  *   3. No overrides property: _modelParams equals raw defaults
- *   4. Malformed JSON: emits INVALID_SPICE_OVERRIDES warning, falls back to defaults
+ *   4. Malformed JSON: emits invalid-spice-overrides warning, falls back to defaults
  */
 
 import { describe, it, expect } from "vitest";
@@ -216,13 +216,13 @@ describe("spice-model-overrides compiler merge", () => {
     expect(capturedModelParams!["BF"]).toBe(BJT_NPN_DEFAULTS["BF"]);
   });
 
-  it("malformed_json: emits INVALID_SPICE_OVERRIDES warning and falls back to defaults", () => {
+  it("malformed_json: emits invalid-spice-overrides warning and falls back to defaults", () => {
     const { capturedModelParams, diagnostics } = buildAndCompile("not json");
 
-    const warning = diagnostics.find((d) => d.code === "INVALID_SPICE_OVERRIDES");
+    const warning = diagnostics.find((d) => d.code === "invalid-spice-overrides");
     expect(warning).toBeDefined();
     expect(warning!.severity).toBe("warning");
-    expect(warning!.message).toContain("q1");
+    expect(warning!.summary).toContain("q1");
 
     // Falls back to unmodified defaults
     expect(capturedModelParams).toBeDefined();

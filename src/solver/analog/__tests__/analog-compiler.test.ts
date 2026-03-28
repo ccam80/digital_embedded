@@ -274,17 +274,30 @@ describe("BehavioralCompilation", () => {
       models: { analog: {} },
     });
 
+    // Analog resistor so the analog partition is non-empty
+    registry.register({
+      ...makeBaseDef("AnalogR"),
+      models: {
+        analog: {
+          factory: vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()])),
+        },
+      },
+    });
+
     // Digital-only component — only digital model, no analog
     registry.register({
       ...makeBaseDef("PureDigital"),
       models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
 
+    const analogR = makeElement("AnalogR", "r1", [{ x: 30, y: 0 }, { x: 0, y: 0 }]);
     const digitalComp = makeElement("PureDigital", "d1", [{ x: 10, y: 0 }]);
     const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
 
+    circuit.addElement(analogR);
     circuit.addElement(digitalComp);
     circuit.addElement(gnd);
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 

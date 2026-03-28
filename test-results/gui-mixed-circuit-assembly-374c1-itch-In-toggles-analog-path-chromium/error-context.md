@@ -90,189 +90,191 @@
                 - generic [ref=e108]: Diode
               - treeitem "ZenerDiode" [ref=e109] [cursor=pointer]:
                 - generic [ref=e111]: ZenerDiode
-              - treeitem "NpnBJT" [ref=e112] [cursor=pointer]:
-                - generic [ref=e114]: NpnBJT
-              - treeitem "PnpBJT" [ref=e115] [cursor=pointer]:
-                - generic [ref=e117]: PnpBJT
-              - treeitem "NMOS" [ref=e118] [cursor=pointer]:
-                - generic [ref=e120]: NMOS
-              - treeitem "PMOS" [ref=e121] [cursor=pointer]:
-                - generic [ref=e123]: PMOS
-              - treeitem "NJFET" [ref=e124] [cursor=pointer]:
-                - generic [ref=e126]: NJFET
-              - treeitem "PJFET" [ref=e127] [cursor=pointer]:
-                - generic [ref=e129]: PJFET
-              - treeitem "SCR" [ref=e130] [cursor=pointer]:
-                - generic [ref=e132]: SCR
-              - treeitem "Triac" [ref=e133] [cursor=pointer]:
-                - generic [ref=e135]: Triac
-              - treeitem "Diac" [ref=e136] [cursor=pointer]:
-                - generic [ref=e138]: Diac
-              - treeitem "TunnelDiode" [ref=e139] [cursor=pointer]:
-                - generic [ref=e141]: TunnelDiode
-              - treeitem "VaractorDiode" [ref=e142] [cursor=pointer]:
-                - generic [ref=e144]: VaractorDiode
-              - treeitem "Triode" [ref=e145] [cursor=pointer]:
-                - generic [ref=e147]: Triode
-          - generic [ref=e148]:
-            - generic [ref=e149] [cursor=pointer]:
-              - generic [ref=e150]: ▼
-              - generic [ref=e151]: Sources
-            - list [ref=e152]:
-              - treeitem "DcVoltageSource" [ref=e153] [cursor=pointer]:
-                - generic [ref=e155]: DcVoltageSource
-              - treeitem "CurrentSource" [ref=e156] [cursor=pointer]:
-                - generic [ref=e158]: CurrentSource
-              - treeitem "AcVoltageSource" [ref=e159] [cursor=pointer]:
-                - generic [ref=e161]: AcVoltageSource
-              - treeitem "VariableRail" [ref=e162] [cursor=pointer]:
-                - generic [ref=e164]: VariableRail
-          - generic [ref=e165]:
-            - generic [ref=e166] [cursor=pointer]:
-              - generic [ref=e167]: ▼
-              - generic [ref=e168]: Active
-            - list [ref=e169]:
-              - treeitem "VoltageComparator" [ref=e170] [cursor=pointer]:
-                - generic [ref=e172]: VoltageComparator
-              - treeitem "Timer555" [ref=e173] [cursor=pointer]:
-                - generic [ref=e175]: Timer555
-              - treeitem "RealOpAmp" [ref=e176] [cursor=pointer]:
-                - generic [ref=e178]: RealOpAmp
-              - treeitem "OTA" [ref=e179] [cursor=pointer]:
-                - generic [ref=e181]: OTA
-              - treeitem "Optocoupler" [ref=e182] [cursor=pointer]:
-                - generic [ref=e184]: Optocoupler
-              - treeitem "DAC" [ref=e185] [cursor=pointer]:
-                - generic [ref=e187]: DAC
-              - treeitem "ADC" [ref=e188] [cursor=pointer]:
-                - generic [ref=e190]: ADC
-              - treeitem "OpAmp" [ref=e191] [cursor=pointer]:
-                - generic [ref=e193]: OpAmp
-              - treeitem "VCVS" [ref=e194] [cursor=pointer]:
-                - generic [ref=e196]: VCVS
-              - treeitem "VCCS" [ref=e197] [cursor=pointer]:
-                - generic [ref=e199]: VCCS
-              - treeitem "CCVS" [ref=e200] [cursor=pointer]:
-                - generic [ref=e202]: CCVS
-              - treeitem "CCCS" [ref=e203] [cursor=pointer]:
-                - generic [ref=e205]: CCCS
-              - treeitem "SchmittInverting" [ref=e206] [cursor=pointer]:
-                - generic [ref=e208]: SchmittInverting
-              - treeitem "SchmittNonInverting" [ref=e209] [cursor=pointer]:
-                - generic [ref=e211]: SchmittNonInverting
-              - treeitem "SwitchSPST" [ref=e212] [cursor=pointer]:
-                - generic [ref=e214]: SwitchSPST
-              - treeitem "SwitchSPDT" [ref=e215] [cursor=pointer]:
-                - generic [ref=e217]: SwitchSPDT
-          - generic [ref=e218]:
-            - generic [ref=e219] [cursor=pointer]:
-              - generic [ref=e220]: ▼
-              - generic [ref=e221]: I/O
-            - list [ref=e222]:
-              - treeitem "In" [ref=e223] [cursor=pointer]:
-                - generic [ref=e225]: In
-              - treeitem "Out" [ref=e226] [cursor=pointer]:
-                - generic [ref=e228]: Out
-              - treeitem "Clock" [ref=e229] [cursor=pointer]:
-                - generic [ref=e231]: Clock
-              - treeitem "Const" [ref=e232] [cursor=pointer]:
-                - generic [ref=e234]: Const
-              - treeitem "Ground" [ref=e235] [cursor=pointer]:
-                - generic [ref=e237]: Ground
-              - treeitem "VDD" [ref=e238] [cursor=pointer]:
-                - generic [ref=e240]: VDD
-          - generic [ref=e241]:
-            - generic [ref=e242] [cursor=pointer]:
-              - generic [ref=e243]: ▼
-              - generic [ref=e244]: Wiring
-            - list [ref=e245]:
-              - treeitem "Tunnel" [ref=e246] [cursor=pointer]:
-                - generic [ref=e248]: Tunnel
-              - treeitem "Driver" [ref=e249] [cursor=pointer]:
-                - generic [ref=e251]: Driver
-              - treeitem "Splitter" [ref=e252] [cursor=pointer]:
-                - generic [ref=e254]: Splitter
-              - treeitem "Multiplexer" [ref=e255] [cursor=pointer]:
-                - generic [ref=e257]: Multiplexer
-              - treeitem "Demultiplexer" [ref=e258] [cursor=pointer]:
-                - generic [ref=e260]: Demultiplexer
-          - generic [ref=e261]:
-            - generic [ref=e262] [cursor=pointer]:
-              - generic [ref=e263]: ▼
-              - generic [ref=e264]: Logic
-            - list [ref=e265]:
-              - treeitem "And" [ref=e266] [cursor=pointer]:
-                - generic [ref=e268]: And
-              - treeitem "Or" [ref=e269] [cursor=pointer]:
-                - generic [ref=e271]: Or
-              - treeitem "Not" [ref=e272] [cursor=pointer]:
-                - generic [ref=e274]: Not
-              - treeitem "NAnd" [ref=e275] [cursor=pointer]:
-                - generic [ref=e277]: NAnd
-              - treeitem "NOr" [ref=e278] [cursor=pointer]:
-                - generic [ref=e280]: NOr
-              - treeitem "XOr" [ref=e281] [cursor=pointer]:
-                - generic [ref=e283]: XOr
-              - treeitem "XNOr" [ref=e284] [cursor=pointer]:
-                - generic [ref=e286]: XNOr
-          - generic [ref=e287]:
-            - generic [ref=e288] [cursor=pointer]:
-              - generic [ref=e289]: ▼
-              - generic [ref=e290]: Switching
-            - list [ref=e291]:
-              - treeitem "NFET" [ref=e292] [cursor=pointer]:
-                - generic [ref=e294]: NFET
-              - treeitem "PFET" [ref=e295] [cursor=pointer]:
-                - generic [ref=e297]: PFET
-              - treeitem "Switch" [ref=e298] [cursor=pointer]:
-                - generic [ref=e300]: Switch
-              - treeitem "SwitchDT" [ref=e301] [cursor=pointer]:
-                - generic [ref=e303]: SwitchDT
-          - generic [ref=e304]:
-            - generic [ref=e305] [cursor=pointer]:
-              - generic [ref=e306]: ▼
-              - generic [ref=e307]: Flip-Flops
-            - list [ref=e308]:
-              - treeitem "D_FF" [ref=e309] [cursor=pointer]:
-                - generic [ref=e311]: D_FF
-              - treeitem "JK_FF" [ref=e312] [cursor=pointer]:
-                - generic [ref=e314]: JK_FF
-              - treeitem "RS_FF" [ref=e315] [cursor=pointer]:
-                - generic [ref=e317]: RS_FF
-              - treeitem "T_FF" [ref=e318] [cursor=pointer]:
-                - generic [ref=e320]: T_FF
-              - treeitem "D_FF_AS" [ref=e321] [cursor=pointer]:
-                - generic [ref=e323]: D_FF_AS
-              - treeitem "JK_FF_AS" [ref=e324] [cursor=pointer]:
-                - generic [ref=e326]: JK_FF_AS
-              - treeitem "RS_FF_AS" [ref=e327] [cursor=pointer]:
-                - generic [ref=e329]: RS_FF_AS
-          - generic [ref=e330]:
-            - generic [ref=e331] [cursor=pointer]:
-              - generic [ref=e332]: ▼
-              - generic [ref=e333]: Memory
-            - list [ref=e334]:
-              - treeitem "Counter" [ref=e335] [cursor=pointer]:
-                - generic [ref=e337]: Counter
-              - treeitem "CounterPreset" [ref=e338] [cursor=pointer]:
-                - generic [ref=e340]: CounterPreset
-              - treeitem "Register" [ref=e341] [cursor=pointer]:
-                - generic [ref=e343]: Register
-              - treeitem "RegisterFile" [ref=e344] [cursor=pointer]:
-                - generic [ref=e346]: RegisterFile
-              - treeitem "ROM" [ref=e347] [cursor=pointer]:
-                - generic [ref=e349]: ROM
-              - treeitem "EEPROM" [ref=e350] [cursor=pointer]:
-                - generic [ref=e352]: EEPROM
-              - treeitem "LookUpTable" [ref=e353] [cursor=pointer]:
-                - generic [ref=e355]: LookUpTable
-              - treeitem "RAMSinglePort" [ref=e356] [cursor=pointer]:
-                - generic [ref=e358]: RAMSinglePort
-      - button "‹" [ref=e359] [cursor=pointer]
-    - generic "Drag to resize palette" [ref=e360]
-    - generic "Circuit editor canvas" [ref=e362]
-  - generic [ref=e363]:
-    - generic [ref=e364]: Ready
-    - button "100%" [ref=e366] [cursor=pointer]
-    - generic [ref=e367]: 26, 10
+              - treeitem "SchottkyDiode" [ref=e112] [cursor=pointer]:
+                - generic [ref=e114]: SchottkyDiode
+              - treeitem "NpnBJT" [ref=e115] [cursor=pointer]:
+                - generic [ref=e117]: NpnBJT
+              - treeitem "PnpBJT" [ref=e118] [cursor=pointer]:
+                - generic [ref=e120]: PnpBJT
+              - treeitem "NMOS" [ref=e121] [cursor=pointer]:
+                - generic [ref=e123]: NMOS
+              - treeitem "PMOS" [ref=e124] [cursor=pointer]:
+                - generic [ref=e126]: PMOS
+              - treeitem "NJFET" [ref=e127] [cursor=pointer]:
+                - generic [ref=e129]: NJFET
+              - treeitem "PJFET" [ref=e130] [cursor=pointer]:
+                - generic [ref=e132]: PJFET
+              - treeitem "SCR" [ref=e133] [cursor=pointer]:
+                - generic [ref=e135]: SCR
+              - treeitem "Triac" [ref=e136] [cursor=pointer]:
+                - generic [ref=e138]: Triac
+              - treeitem "Diac" [ref=e139] [cursor=pointer]:
+                - generic [ref=e141]: Diac
+              - treeitem "TunnelDiode" [ref=e142] [cursor=pointer]:
+                - generic [ref=e144]: TunnelDiode
+              - treeitem "VaractorDiode" [ref=e145] [cursor=pointer]:
+                - generic [ref=e147]: VaractorDiode
+              - treeitem "Triode" [ref=e148] [cursor=pointer]:
+                - generic [ref=e150]: Triode
+          - generic [ref=e151]:
+            - generic [ref=e152] [cursor=pointer]:
+              - generic [ref=e153]: ▼
+              - generic [ref=e154]: Sources
+            - list [ref=e155]:
+              - treeitem "DcVoltageSource" [ref=e156] [cursor=pointer]:
+                - generic [ref=e158]: DcVoltageSource
+              - treeitem "CurrentSource" [ref=e159] [cursor=pointer]:
+                - generic [ref=e161]: CurrentSource
+              - treeitem "AcVoltageSource" [ref=e162] [cursor=pointer]:
+                - generic [ref=e164]: AcVoltageSource
+              - treeitem "VariableRail" [ref=e165] [cursor=pointer]:
+                - generic [ref=e167]: VariableRail
+          - generic [ref=e168]:
+            - generic [ref=e169] [cursor=pointer]:
+              - generic [ref=e170]: ▼
+              - generic [ref=e171]: Active
+            - list [ref=e172]:
+              - treeitem "VoltageComparator" [ref=e173] [cursor=pointer]:
+                - generic [ref=e175]: VoltageComparator
+              - treeitem "Timer555" [ref=e176] [cursor=pointer]:
+                - generic [ref=e178]: Timer555
+              - treeitem "RealOpAmp" [ref=e179] [cursor=pointer]:
+                - generic [ref=e181]: RealOpAmp
+              - treeitem "OTA" [ref=e182] [cursor=pointer]:
+                - generic [ref=e184]: OTA
+              - treeitem "Optocoupler" [ref=e185] [cursor=pointer]:
+                - generic [ref=e187]: Optocoupler
+              - treeitem "DAC" [ref=e188] [cursor=pointer]:
+                - generic [ref=e190]: DAC
+              - treeitem "ADC" [ref=e191] [cursor=pointer]:
+                - generic [ref=e193]: ADC
+              - treeitem "OpAmp" [ref=e194] [cursor=pointer]:
+                - generic [ref=e196]: OpAmp
+              - treeitem "VCVS" [ref=e197] [cursor=pointer]:
+                - generic [ref=e199]: VCVS
+              - treeitem "VCCS" [ref=e200] [cursor=pointer]:
+                - generic [ref=e202]: VCCS
+              - treeitem "CCVS" [ref=e203] [cursor=pointer]:
+                - generic [ref=e205]: CCVS
+              - treeitem "CCCS" [ref=e206] [cursor=pointer]:
+                - generic [ref=e208]: CCCS
+              - treeitem "SchmittInverting" [ref=e209] [cursor=pointer]:
+                - generic [ref=e211]: SchmittInverting
+              - treeitem "SchmittNonInverting" [ref=e212] [cursor=pointer]:
+                - generic [ref=e214]: SchmittNonInverting
+              - treeitem "SwitchSPST" [ref=e215] [cursor=pointer]:
+                - generic [ref=e217]: SwitchSPST
+              - treeitem "SwitchSPDT" [ref=e218] [cursor=pointer]:
+                - generic [ref=e220]: SwitchSPDT
+          - generic [ref=e221]:
+            - generic [ref=e222] [cursor=pointer]:
+              - generic [ref=e223]: ▼
+              - generic [ref=e224]: I/O
+            - list [ref=e225]:
+              - treeitem "In" [ref=e226] [cursor=pointer]:
+                - generic [ref=e228]: In
+              - treeitem "Out" [ref=e229] [cursor=pointer]:
+                - generic [ref=e231]: Out
+              - treeitem "Clock" [ref=e232] [cursor=pointer]:
+                - generic [ref=e234]: Clock
+              - treeitem "Const" [ref=e235] [cursor=pointer]:
+                - generic [ref=e237]: Const
+              - treeitem "Ground" [ref=e238] [cursor=pointer]:
+                - generic [ref=e240]: Ground
+              - treeitem "VDD" [ref=e241] [cursor=pointer]:
+                - generic [ref=e243]: VDD
+          - generic [ref=e244]:
+            - generic [ref=e245] [cursor=pointer]:
+              - generic [ref=e246]: ▼
+              - generic [ref=e247]: Wiring
+            - list [ref=e248]:
+              - treeitem "Tunnel" [ref=e249] [cursor=pointer]:
+                - generic [ref=e251]: Tunnel
+              - treeitem "Driver" [ref=e252] [cursor=pointer]:
+                - generic [ref=e254]: Driver
+              - treeitem "Splitter" [ref=e255] [cursor=pointer]:
+                - generic [ref=e257]: Splitter
+              - treeitem "Multiplexer" [ref=e258] [cursor=pointer]:
+                - generic [ref=e260]: Multiplexer
+              - treeitem "Demultiplexer" [ref=e261] [cursor=pointer]:
+                - generic [ref=e263]: Demultiplexer
+          - generic [ref=e264]:
+            - generic [ref=e265] [cursor=pointer]:
+              - generic [ref=e266]: ▼
+              - generic [ref=e267]: Logic
+            - list [ref=e268]:
+              - treeitem "And" [ref=e269] [cursor=pointer]:
+                - generic [ref=e271]: And
+              - treeitem "Or" [ref=e272] [cursor=pointer]:
+                - generic [ref=e274]: Or
+              - treeitem "Not" [ref=e275] [cursor=pointer]:
+                - generic [ref=e277]: Not
+              - treeitem "NAnd" [ref=e278] [cursor=pointer]:
+                - generic [ref=e280]: NAnd
+              - treeitem "NOr" [ref=e281] [cursor=pointer]:
+                - generic [ref=e283]: NOr
+              - treeitem "XOr" [ref=e284] [cursor=pointer]:
+                - generic [ref=e286]: XOr
+              - treeitem "XNOr" [ref=e287] [cursor=pointer]:
+                - generic [ref=e289]: XNOr
+          - generic [ref=e290]:
+            - generic [ref=e291] [cursor=pointer]:
+              - generic [ref=e292]: ▼
+              - generic [ref=e293]: Switching
+            - list [ref=e294]:
+              - treeitem "NFET" [ref=e295] [cursor=pointer]:
+                - generic [ref=e297]: NFET
+              - treeitem "PFET" [ref=e298] [cursor=pointer]:
+                - generic [ref=e300]: PFET
+              - treeitem "Switch" [ref=e301] [cursor=pointer]:
+                - generic [ref=e303]: Switch
+              - treeitem "SwitchDT" [ref=e304] [cursor=pointer]:
+                - generic [ref=e306]: SwitchDT
+          - generic [ref=e307]:
+            - generic [ref=e308] [cursor=pointer]:
+              - generic [ref=e309]: ▼
+              - generic [ref=e310]: Flip-Flops
+            - list [ref=e311]:
+              - treeitem "D_FF" [ref=e312] [cursor=pointer]:
+                - generic [ref=e314]: D_FF
+              - treeitem "JK_FF" [ref=e315] [cursor=pointer]:
+                - generic [ref=e317]: JK_FF
+              - treeitem "RS_FF" [ref=e318] [cursor=pointer]:
+                - generic [ref=e320]: RS_FF
+              - treeitem "T_FF" [ref=e321] [cursor=pointer]:
+                - generic [ref=e323]: T_FF
+              - treeitem "D_FF_AS" [ref=e324] [cursor=pointer]:
+                - generic [ref=e326]: D_FF_AS
+              - treeitem "JK_FF_AS" [ref=e327] [cursor=pointer]:
+                - generic [ref=e329]: JK_FF_AS
+              - treeitem "RS_FF_AS" [ref=e330] [cursor=pointer]:
+                - generic [ref=e332]: RS_FF_AS
+          - generic [ref=e333]:
+            - generic [ref=e334] [cursor=pointer]:
+              - generic [ref=e335]: ▼
+              - generic [ref=e336]: Memory
+            - list [ref=e337]:
+              - treeitem "Counter" [ref=e338] [cursor=pointer]:
+                - generic [ref=e340]: Counter
+              - treeitem "CounterPreset" [ref=e341] [cursor=pointer]:
+                - generic [ref=e343]: CounterPreset
+              - treeitem "Register" [ref=e344] [cursor=pointer]:
+                - generic [ref=e346]: Register
+              - treeitem "RegisterFile" [ref=e347] [cursor=pointer]:
+                - generic [ref=e349]: RegisterFile
+              - treeitem "ROM" [ref=e350] [cursor=pointer]:
+                - generic [ref=e352]: ROM
+              - treeitem "EEPROM" [ref=e353] [cursor=pointer]:
+                - generic [ref=e355]: EEPROM
+              - treeitem "LookUpTable" [ref=e356] [cursor=pointer]:
+                - generic [ref=e358]: LookUpTable
+              - treeitem "RAMSinglePort" [ref=e359] [cursor=pointer]:
+                - generic [ref=e361]: RAMSinglePort
+      - button "‹" [ref=e362] [cursor=pointer]
+    - generic "Drag to resize palette" [ref=e363]
+    - generic "Circuit editor canvas" [ref=e365]
+  - generic [ref=e366]:
+    - generic [ref=e367]: Ready
+    - button "100%" [ref=e369] [cursor=pointer]
+    - generic [ref=e370]: 26, 10
 ```

@@ -149,20 +149,19 @@ function executeVector(
   // components' sampleFns would see stale enable/data signals.
   facade.runToStable(coordinator);
 
-  // Handle clock inputs: toggle high → step → low → step
-  // Use single step() rather than runToStable() so ripple counters propagate
-  // one stage per clock edge instead of settling all the way through.
+  // Handle clock inputs: toggle high → runToStable → low → runToStable
+  // Use runToStable() to allow ripple propagation through cascaded sequential elements.
   if (clockInputs.length > 0) {
     for (const name of clockInputs) {
       facade.setInput(coordinator, name, 1);
       inputRecord[name] = 1;
     }
-    facade.step(coordinator, { clockAdvance: false });
+    facade.runToStable(coordinator);
 
     for (const name of clockInputs) {
       facade.setInput(coordinator, name, 0);
     }
-    facade.step(coordinator, { clockAdvance: false });
+    facade.runToStable(coordinator);
   }
 
   // Read all outputs and compare

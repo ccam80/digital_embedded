@@ -4,3 +4,4 @@ dist/
 *.tsbuildinfo
 nul
 .omc/.vitest-failures.json
+test_results/

@@ -18,7 +18,7 @@ import type { PinDirection } from '../core/pin.js';
 // Infrastructure component types — engine-neutral, carry no domain signal
 // ---------------------------------------------------------------------------
 
-const INFRASTRUCTURE_TYPES = new Set([
+export const INFRASTRUCTURE_TYPES = new Set([
   'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe',
   'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
 ]);

@@ -290,10 +290,18 @@ describe("AnalogCompiler", () => {
     const labelIn:  Map<string, PropertyValue> = new Map([["label", "V_in"]]);
     const labelOut: Map<string, PropertyValue> = new Map([["label", "V_mid"]]);
 
+    // Include a true analog element (AnalogVs + AnalogR) so that Ground
+    // touches an analog-domain connectivity group and participates in the
+    // analog partition. Without them, Ground is excluded (neutral +
+    // touchesAnalog check) and node numbering has no ground reference.
+    const vs   = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
+    const r1   = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
     const inEl  = makeElement("In",     "in1",  [{ x: 10, y: 0 }], labelIn);
     const outEl = makeElement("Out",    "out1", [{ x: 20, y: 0 }], labelOut);
     const gnd   = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }]);
 
+    circuit.addElement(vs);
+    circuit.addElement(r1);
     circuit.addElement(inEl);
     circuit.addElement(outEl);
     circuit.addElement(gnd);
@@ -381,12 +389,16 @@ describe("AnalogCompiler", () => {
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
+    // Analog resistor so the analog partition is non-empty
+    const analogR = makeElement("AnalogR", "r1", [{ x: 30, y: 0 }, { x: 0, y: 0 }]);
     // AND gate has no engineType → defaults to "digital"
     const andGate = makeElement("And",    "and1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
     const gnd     = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }]);
 
+    circuit.addElement(analogR);
     circuit.addElement(andGate);
     circuit.addElement(gnd);
+    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 

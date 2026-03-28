@@ -863,6 +863,9 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.stepViaUI();
       await builder.verifyNoErrors();
 
+      // Add scope trace via a real analog component (Resistor) so measureAnalogPeaks has data
+      await builder.addTraceViaContextMenu('R1', 'A');
+
       // Step through several toggle cycles (fast path via step-to-time)
       const result = await builder.measureAnalogPeaks('10m');
       expect(result).not.toBeNull();

@@ -17,7 +17,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { PropertyBag, PropertyType } from "../../core/properties.js";
+import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -142,6 +142,7 @@ export const GROUND_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 const GROUND_PROPERTY_DEFS: PropertyDefinition[] = [
+  LABEL_PROPERTY_DEF,
   {
     key: "bitWidth",
     type: PropertyType.BIT_WIDTH,

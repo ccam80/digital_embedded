@@ -358,21 +358,23 @@ describe('capability queries — digital-only coordinator', () => {
 // ---------------------------------------------------------------------------
 
 describe('capability queries — analog-only coordinator', () => {
-  it('supportsMicroStep returns false', () => {
+  it('supportsMicroStep returns true (digital engine exists via neutral components)', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.supportsMicroStep()).toBe(false);
+    // Neutral components (Ground) always route to digital, so a digital
+    // engine exists and provides microStep capability.
+    expect(coord.supportsMicroStep()).toBe(true);
     coord.dispose();
   });
 
-  it('supportsRunToBreak returns false', () => {
+  it('supportsRunToBreak returns true (digital engine exists via neutral components)', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.supportsRunToBreak()).toBe(false);
+    expect(coord.supportsRunToBreak()).toBe(true);
     coord.dispose();
   });
 
@@ -394,12 +396,13 @@ describe('capability queries — analog-only coordinator', () => {
     coord.dispose();
   });
 
-  it('timingModel is continuous', () => {
+  it('timingModel is mixed (both engines present via neutral components)', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.timingModel).toBe('continuous');
+    // Neutral components (Ground) route to digital, creating both engines.
+    expect(coord.timingModel).toBe('mixed');
     coord.dispose();
   });
 });

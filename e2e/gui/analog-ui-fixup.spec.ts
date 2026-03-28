@@ -25,7 +25,7 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
         <entry><string>Amplitude</string><int>5</int></entry>
         <entry><string>Frequency</string><int>100</int></entry>
       </elementAttributes>
-      <pos x="140" y="200"/>
+      <pos x="140" y="260"/>
     </visualElement>
     <visualElement>
       <elementName>Resistor</elementName>
@@ -51,14 +51,15 @@ const ANALOG_RC_XML = `<?xml version="1.0" encoding="utf-8"?>
     <visualElement>
       <elementName>Ground</elementName>
       <elementAttributes/>
-      <pos x="500" y="300"/>
+      <pos x="540" y="300"/>
     </visualElement>
   </visualElements>
   <wires>
-    <wire><p1 x="100" y="200"/><p2 x="300" y="200"/></wire>
+    <wire><p1 x="140" y="260"/><p2 x="140" y="200"/></wire>
+    <wire><p1 x="140" y="200"/><p2 x="300" y="200"/></wire>
     <wire><p1 x="380" y="200"/><p2 x="460" y="200"/></wire>
-    <wire><p1 x="500" y="200"/><p2 x="500" y="300"/></wire>
-    <wire><p1 x="220" y="200"/><p2 x="220" y="300"/></wire>
+    <wire><p1 x="540" y="200"/><p2 x="540" y="300"/></wire>
+    <wire><p1 x="220" y="260"/><p2 x="220" y="300"/></wire>
   </wires>
 </circuit>`;
 

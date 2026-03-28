@@ -1,0 +1,10 @@
+{
+  "active": true,
+  "started_at": "2026-03-28T10:22:54.727Z",
+  "original_prompt": "this is a late stage of a project to be discoerinv fundamentals, but let's press on - I'll need to be extra vigilant and we'll need to set very tight verification criteria for this work. One aside - read spec\\spice-model-panel.md and let me know if it's orthogonal enough for me to implement while we ponder the final state of the models system. I'm trying to flesh out the best axes to use now that I know the internals. Let's walk through some ideas, discuss their implications. I think setting the model type on the component only makes sense now if we're picking between models - digital, behavioural, spice. Whether to model pin loading, at which boundaries, seems like a circuit mode concern. Each component is fundamentally either MNA or digital, and the actual contents of the MNA vary by model. I would like to allow users to add spice models to a component - here, add your particular opamp model to our general one and simulate away. If I have an RC filter feeding three inverters and then another RC filter, I think I have decisions to make that are orthogonal to how i model each and gate, and those are: model digital pin loading at [\"analog-digital boundaries\", \"all pins\", \"None\"]. I could set an AND gate to a spice model, and it would no longer simulate pin loading through a bridge, it'd be in the model. If I want a model with better parasitics, I'd add a SPICE model. Adding your own spice models gets difficult, we'd need to serialise them into the dts output, which is an added complication, but if we've got all of the rest of the machinery working, why not. What are your thoughts on these axes, what are the alternative, what does the shape of this implementation actually look like",
+  "session_id": "d5b8393e-80be-4208-83a0-ef38602c213f",
+  "project_path": "C:\\local_working_projects\\digital_in_browser",
+  "reinforcement_count": 0,
+  "awaiting_confirmation": true,
+  "last_checked_at": "2026-03-28T10:22:54.727Z"
+}

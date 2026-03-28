@@ -456,7 +456,9 @@ describe('compileUnified — resistor divider (analog only)', () => {
     const unified = compileUnified(circuit, registry);
 
     expect(unified.analog).not.toBeNull();
-    expect(unified.digital).toBeNull();
+    // Ground (neutral with analog model) always routes to digital; digital
+    // partition is non-null but the analog topology is unchanged.
+    expect(unified.digital).not.toBeNull();
     expect(unified.bridges).toHaveLength(0);
     expect(unified.analog!.nodeCount).toBe(reference.nodeCount);
   });

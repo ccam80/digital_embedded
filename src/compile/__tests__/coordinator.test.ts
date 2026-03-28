@@ -443,12 +443,14 @@ describe('DefaultSimulationCoordinator - digital-only', () => {
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analog-only', () => {
-  it('has null digital engine and non-null analog engine', () => {
+  it('has non-null digital engine and non-null analog engine', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
     expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.getDigitalEngine()).toBeNull();
+    // Ground (neutral with analog model) always routes to digital,
+    // so the digital engine is non-null even for analog-only circuits.
+    expect(coord.getDigitalEngine()).not.toBeNull();
     expect(coord.getAnalogEngine()).not.toBeNull();
     coord.dispose();
   });
@@ -462,13 +464,15 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
     coord.dispose();
   });
 
-  it('readSignal with digital address throws FacadeError on analog-only coordinator', () => {
+  it('readSignal with digital address does not throw when digital engine exists', () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const unified = compileUnified(circuit, registry);
     expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
     const addr: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1 };
-    expect(() => coord.readSignal(addr)).toThrow(FacadeError);
+    // Digital engine now exists (Ground routes to digital), so reading
+    // a digital address no longer throws.
+    expect(() => coord.readSignal(addr)).not.toThrow();
     coord.dispose();
   });
 });

@@ -26,11 +26,11 @@ const SPICE_REF = JSON.parse(
 // SPICE model override parameter sets — match ngspice reference models
 // ---------------------------------------------------------------------------
 
-const BJT_NPN_OVERRIDES: Record<string, number> = { IS: 1e-14, BF: 100, VAF: 100 };
-const BJT_PNP_OVERRIDES: Record<string, number> = { IS: 1e-14, BF: 100, VAF: 100 };
-const MOSFET_NMOS_OVERRIDES: Record<string, number> = { VTO: 1, KP: 2e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 };
-const MOSFET_PMOS_OVERRIDES: Record<string, number> = { VTO: -1, KP: 1e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 };
-const JFET_NJFET_OVERRIDES: Record<string, number> = { VTO: -2, BETA: 1.3e-3, LAMBDA: 0.01 };
+const BJT_NPN_OVERRIDES = JSON.stringify({ IS: 1e-14, BF: 100, VAF: 100 });
+const BJT_PNP_OVERRIDES = JSON.stringify({ IS: 1e-14, BF: 100, VAF: 100 });
+const MOSFET_NMOS_OVERRIDES = JSON.stringify({ VTO: 1, KP: 2e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 });
+const MOSFET_PMOS_OVERRIDES = JSON.stringify({ VTO: -1, KP: 1e-3, LAMBDA: 0.01, W: 10e-6, L: 1e-6 });
+const JFET_NJFET_OVERRIDES = JSON.stringify({ VTO: -2, BETA: 1.3e-3, LAMBDA: 0.01 });
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -447,7 +447,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Re', 'resistance', 1000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
 
       // Vcc:pos → Rc:A, Rc:B → Q1:C
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
@@ -512,8 +512,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc1', 'resistance', 4700);
       await builder.setComponentProperty('Rc2', 'resistance', 4700);
       await builder.setComponentProperty('Re', 'resistance', 10000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
 
       await builder.drawWire('Vcc', 'pos', 'Rc1', 'A');
       await builder.drawWire('Vcc', 'pos', 'Rc2', 'A');
@@ -568,8 +568,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rc', 'resistance', 1000);
       await builder.setComponentProperty('Re', 'resistance', 100);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
 
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
       await builder.drawWire('Rc', 'B', 'Q1', 'C');
@@ -619,8 +619,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Vee', 'voltage', -12);
       await builder.setComponentProperty('Vin', 'voltage', 3);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_PNP_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_PNP_OVERRIDES);
 
       // NPN: Vcc → Q1:C, Q1:B ← Vin, Q1:E → output node
       await builder.drawWire('Vcc', 'pos', 'Q1', 'C');
@@ -673,7 +673,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rd', 'resistance', 4700);
       await builder.setComponentProperty('Rg', 'resistance', 100000);
       await builder.setComponentProperty('Rs', 'resistance', 1000);
-      await builder.setSpiceOverrides('M1', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('M1', MOSFET_NMOS_OVERRIDES);
 
       await builder.drawWire('Vdd', 'pos', 'Rd', 'A');
       await builder.drawWire('Rd', 'B', 'M1', 'D');
@@ -817,7 +817,7 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rd', 'resistance', 2200);
       await builder.setComponentProperty('Rg', 'resistance', 1000000);
       await builder.setComponentProperty('Rs', 'resistance', 680);
-      await builder.setSpiceOverrides('J1', JFET_NJFET_OVERRIDES);
+      await builder.setComponentProperty('J1', JFET_NJFET_OVERRIDES);
 
       await builder.drawWire('Vdd', 'pos', 'Rd', 'A');
       await builder.drawWire('Rd', 'B', 'J1', 'D');
@@ -876,8 +876,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Re', 'resistance', 1000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
 
       // Vcc → Rc → Q2:C, Q2:E → Q1:C, Q1:E → Re → GND
       await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
@@ -927,9 +927,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Vcc', 'voltage', 12);
       await builder.setComponentProperty('Rref', 'resistance', 10000);
       await builder.setComponentProperty('Rload', 'resistance', 10000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q3', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q3', BJT_NPN_OVERRIDES);
 
       // Vcc → Rref → Q1:C, Vcc → Rload → Q2:C
       await builder.drawWire('Vcc', 'pos', 'Rref', 'A');
@@ -981,8 +981,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rref', 'resistance', 10000);
       await builder.setComponentProperty('Rload', 'resistance', 47000);
       await builder.setComponentProperty('Re', 'resistance', 5600);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
 
       // Vcc → Rref → Q1:C, Q1:B shorted to Q1:C (diode-connected)
       await builder.drawWire('Vcc', 'pos', 'Rref', 'A');
@@ -1035,10 +1035,10 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('Vfwd', 'voltage', 0);
       await builder.setComponentProperty('Vrev', 'voltage', 12);
-      await builder.setSpiceOverrides('Mp1', MOSFET_PMOS_OVERRIDES);
-      await builder.setSpiceOverrides('Mp2', MOSFET_PMOS_OVERRIDES);
-      await builder.setSpiceOverrides('Mn1', MOSFET_NMOS_OVERRIDES);
-      await builder.setSpiceOverrides('Mn2', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('Mp1', MOSFET_PMOS_OVERRIDES);
+      await builder.setComponentProperty('Mp2', MOSFET_PMOS_OVERRIDES);
+      await builder.setComponentProperty('Mn1', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('Mn2', MOSFET_NMOS_OVERRIDES);
 
       // Supply to PMOS sources
       await builder.drawWire('Vdd', 'pos', 'Mp1', 'S');
@@ -1100,8 +1100,8 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Rc', 'resistance', 4700);
       await builder.setComponentProperty('Rb', 'resistance', 100000);
       await builder.setComponentProperty('Rd', 'resistance', 1000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('M1', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('M1', MOSFET_NMOS_OVERRIDES);
 
       // BJT stage: Vin → Rb → Q1:B, Vdd → Rc → Q1:C
       await builder.drawWire('Vin', 'pos', 'Rb', 'A');
@@ -1177,9 +1177,9 @@ test.describe('Analog circuit assembly via UI', () => {
       await builder.setComponentProperty('Re1', 'resistance', 1000);
       await builder.setComponentProperty('Re2', 'resistance', 1000);
       await builder.setComponentProperty('Re3', 'resistance', 1000);
-      await builder.setSpiceOverrides('Q1', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q2', BJT_NPN_OVERRIDES);
-      await builder.setSpiceOverrides('Q3', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q1', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q2', BJT_NPN_OVERRIDES);
+      await builder.setComponentProperty('Q3', BJT_NPN_OVERRIDES);
 
       // Stage 1
       await builder.drawWire('Vcc', 'pos', 'Rc1', 'A');
@@ -1518,7 +1518,7 @@ test.describe('Analog circuit assembly via UI', () => {
 
       await builder.setComponentProperty('Vdd', 'voltage', 12);
       await builder.setComponentProperty('R1', 'resistance', 100);
-      await builder.setSpiceOverrides('M1', MOSFET_NMOS_OVERRIDES);
+      await builder.setComponentProperty('M1', MOSFET_NMOS_OVERRIDES);
 
       // Vdd → M1:D, M1:S → L1 → R1 → C1 → GND
       await builder.drawWire('Vdd', 'pos', 'M1', 'D');

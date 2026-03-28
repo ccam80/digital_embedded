@@ -47,9 +47,6 @@ const GMIN = 1e-12;
 /** Excess current voltage scale (V_x in spec). Determines rise rate past valley. */
 const VX = 0.1;
 
-/** Standard diode saturation current for thermal component. */
-const IS_THERMAL = 1e-14;
-
 /** Maximum voltage step per NR iteration in or near NDR region. */
 const NDR_VSTEP_MAX = 0.1;
 
@@ -121,13 +118,13 @@ export function createTunnelDiodeElement(
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  const modelParams = (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
-  const ip = modelParams?.IP ?? 5e-3;
-  const vp = modelParams?.VP ?? 0.08;
-  const iv = modelParams?.IV ?? 0.5e-3;
-  const vv = modelParams?.VV ?? 0.5;
-  const iS = modelParams?.IS ?? 1e-14;
-  const nCoeff = modelParams?.N ?? 1;
+  const modelParams = (props as Record<string, unknown>)["_modelParams"] as Record<string, number>;
+  const ip = modelParams.IP;
+  const vp = modelParams.VP;
+  const iv = modelParams.IV;
+  const vv = modelParams.VV;
+  const iS = modelParams.IS;
+  const nCoeff = modelParams.N;
 
   // NR linearization state
   let _vd = 0;

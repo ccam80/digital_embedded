@@ -1638,9 +1638,11 @@ function compileAnalogCircuit(
         } catch {
           const label = props.has("label") ? props.get<string>("label") : el.typeId;
           diagnostics.push({
-            code: "INVALID_SPICE_OVERRIDES",
+            code: "invalid-spice-overrides",
             severity: "warning",
-            message: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+            summary: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+            explanation: `The _spiceModelOverrides property on "${label}" is not valid JSON. The override was ignored and default model parameters were used instead.`,
+            suggestions: [{ text: `Open the SPICE Model Parameters panel for "${label}" and re-enter the desired overrides.`, automatable: false }],
           });
         }
       }
@@ -2341,9 +2343,11 @@ export function compileAnalogPartition(
         } catch {
           const label = props.has("label") ? props.get<string>("label") : el.typeId;
           diagnostics.push({
-            code: "INVALID_SPICE_OVERRIDES",
+            code: "invalid-spice-overrides",
             severity: "warning",
-            message: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+            summary: `Malformed _spiceModelOverrides JSON on component "${label}"`,
+            explanation: `The _spiceModelOverrides property on "${label}" is not valid JSON. The override was ignored and default model parameters were used instead.`,
+            suggestions: [{ text: `Open the SPICE Model Parameters panel for "${label}" and re-enter the desired overrides.`, automatable: false }],
           });
         }
       }

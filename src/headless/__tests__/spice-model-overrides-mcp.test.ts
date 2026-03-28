@@ -109,77 +109,51 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 //
 // Use circuit_patch (op: 'set') to apply _spiceModelOverrides on Q1,
 // then circuit_compile and verify:
-//   a) compiled analog diagnostics do not include INVALID_SPICE_OVERRIDES
+//   a) compiled analog diagnostics do not include invalid-spice-overrides
 //   b) DC node voltages differ from those compiled without the override
 // ---------------------------------------------------------------------------
 
 describe('spice-model-overrides MCP surface — override via patch', () => {
   it('patch with _spiceModelOverrides changes DC operating point vs default', () => {
-    const { circuit, facade } = buildBjtCircuit();
+    // Compile the same circuit topology twice — once without overrides, once with.
+    // The ONLY difference is the _spiceModelOverrides patch on Q1.
+    const { circuit: circuitDefault, facade: facadeDefault } = buildBjtCircuit();
 
-    // Compile with default parameters and capture DC operating point
-    facade.compile(circuit);
-    const compiledDefault = facade.getCompiledUnified();
+    facadeDefault.compile(circuitDefault);
+    const compiledDefault = facadeDefault.getCompiledUnified();
     expect(compiledDefault).not.toBeNull();
     expect(compiledDefault!.analog).not.toBeNull();
 
-    const dcDefault = facade.getDcOpResult();
+    const dcDefault = facadeDefault.getDcOpResult();
     expect(dcDefault).not.toBeNull();
     expect(dcDefault!.converged).toBe(true);
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
 
-    // No INVALID_SPICE_OVERRIDES diagnostic in baseline
     const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
-    expect(baselineCodes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(baselineCodes).not.toContain('invalid-spice-overrides');
 
-    // Build the override circuit with higher Vb so the BJT is well into
-    // forward-active region where IS changes produce measurable voltage shifts.
-    const facade2 = new DefaultSimulatorFacade(registry);
-    const vcc2 = createElement('DcVoltageSource', { x: 0, y: 0 },  { label: 'Vcc', voltage: 5 });
-    const vb2  = createElement('DcVoltageSource', { x: 8, y: 0 },  { label: 'Vb',  voltage: 2 });
-    const rc2  = createElement('Resistor',        { x: 4, y: 0 },  { label: 'Rc',  resistance: 10000 });
-    const q12  = createElement('NpnBJT',          { x: 4, y: 8 },  { label: 'Q1' });
-    const gnd2 = createElement('Ground',          { x: 4, y: 16 });
-    const circuit2 = new Circuit();
-    circuit2.addElement(vcc2); circuit2.addElement(vb2); circuit2.addElement(rc2);
-    circuit2.addElement(q12); circuit2.addElement(gnd2);
-    circuit2.addWire(new Wire(
-      pinWorldPosition(vcc2, vcc2.getPins().find(p => p.label === 'pos')!),
-      pinWorldPosition(rc2, rc2.getPins().find(p => p.label === 'A')!)));
-    circuit2.addWire(new Wire(
-      pinWorldPosition(rc2, rc2.getPins().find(p => p.label === 'B')!),
-      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'C')!)));
-    circuit2.addWire(new Wire(
-      pinWorldPosition(vb2, vb2.getPins().find(p => p.label === 'pos')!),
-      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'B')!)));
-    const gndPos2 = pinWorldPosition(gnd2, gnd2.getPins()[0]!);
-    circuit2.addWire(new Wire(
-      pinWorldPosition(q12, q12.getPins().find(p => p.label === 'E')!), gndPos2));
-    circuit2.addWire(new Wire(
-      pinWorldPosition(vcc2, vcc2.getPins().find(p => p.label === 'neg')!), gndPos2));
-    circuit2.addWire(new Wire(
-      pinWorldPosition(vb2, vb2.getPins().find(p => p.label === 'neg')!), gndPos2));
+    // Build an identical circuit, then apply override via patch
+    const { circuit: circuitOverridden, facade: facadeOverridden } = buildBjtCircuit();
 
     // Override IS: default 1e-16, override to 1e-10 (1M× increase)
-    facade2.patch(circuit2, [
+    facadeOverridden.patch(circuitOverridden, [
       { op: 'set', target: 'Q1', props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-10 }) } },
     ]);
 
-    facade2.compile(circuit2);
-    const compiledOverridden = facade2.getCompiledUnified();
+    facadeOverridden.compile(circuitOverridden);
+    const compiledOverridden = facadeOverridden.getCompiledUnified();
     expect(compiledOverridden).not.toBeNull();
     expect(compiledOverridden!.analog).not.toBeNull();
 
     const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
-    expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(overriddenCodes).not.toContain('invalid-spice-overrides');
 
-    const dcOverridden = facade2.getDcOpResult();
+    const dcOverridden = facadeOverridden.getDcOpResult();
     expect(dcOverridden).not.toBeNull();
     expect(dcOverridden!.converged).toBe(true);
     const voltagesOverridden = Array.from(dcOverridden!.nodeVoltages);
 
-    // With IS=1e-10 and Vb=2V, the BJT conducts much more than default IS=1e-16.
-    // Node voltages must differ measurably.
+    // Same topology, same bias — only IS differs. Voltages must diverge.
     expect(voltagesOverridden.length).toBe(voltagesDefault.length);
     let anyDiffers = false;
     for (let i = 0; i < voltagesDefault.length; i++) {
@@ -226,7 +200,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
 // Test 2: Round-trip serialization
 //
 // Set overrides, serialize, deserialize, recompile — overrides must persist
-// and the circuit must still compile without INVALID_SPICE_OVERRIDES.
+// and the circuit must still compile without invalid-spice-overrides.
 // The DC node voltages after round-trip must match the pre-serialization result.
 // ---------------------------------------------------------------------------
 
@@ -260,9 +234,9 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
     expect(compiled).not.toBeNull();
     expect(compiled!.analog).not.toBeNull();
 
-    // No INVALID_SPICE_OVERRIDES — JSON survived serialization intact
+    // No invalid-spice-overrides — JSON survived serialization intact
     const diagnosticCodes = compiled!.analog!.diagnostics.map(d => d.code);
-    expect(diagnosticCodes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(diagnosticCodes).not.toContain('invalid-spice-overrides');
   });
 
   it('deserialized circuit with overrides produces same DC result as pre-serialization', () => {

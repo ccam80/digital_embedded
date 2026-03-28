@@ -161,11 +161,13 @@ describe('DefaultSimulationCoordinator -- timingModel', () => {
     expect(coord.timingModel).toBe('discrete');
     coord.dispose();
   });
-  it('analog-only circuit has timingModel continuous', () => {
+  it('analog-only circuit has timingModel mixed (both engines via neutral components)', () => {
     const { circuit, registry } = buildAnalogCircuit();
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.timingModel).toBe('continuous');
+    // Neutral components (Ground) always route to digital, so both engines
+    // exist and timingModel is "mixed".
+    expect(coord.timingModel).toBe('mixed');
     coord.dispose();
   });
 });
