@@ -445,6 +445,30 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Right-click a labeled component and add a pin voltage trace to the viewer.
+   * This mimics the user action of right-clicking → "Trace Voltage: label.pin".
+   * The simulation must be running (or at least compiled) for trace items to appear.
+   */
+  async addTraceViaContextMenu(label: string, pinLabel: string): Promise<void> {
+    // Get component position from circuit info
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === label);
+    if (!el) throw new Error(`Element with label "${label}" not found`);
+
+    // Convert to page coordinates and right-click
+    const coords = await this.toPageCoords(el.center.screenX, el.center.screenY);
+    await this.page.mouse.click(coords.x, coords.y, { button: 'right' });
+    await this.page.waitForTimeout(200);
+
+    // Click the trace menu item
+    const menuText = `Trace Voltage: ${label}.${pinLabel}`;
+    const menuItem = this.page.locator('.ctx-menu-item').filter({ hasText: menuText });
+    await expect(menuItem).toBeVisible({ timeout: 3000 });
+    await menuItem.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  /**
    * Step to a sim-time offset and read peak/trough statistics from the scope
    * panel trace buffers. Uses stepToTimeViaUI for efficient bulk stepping and
    * getTraceStats to read pre-computed min/max/mean from scope channels.
@@ -476,16 +500,9 @@ export class UICircuitBuilder {
           nodeCount: stats.length,
         };
       }
-      // No trace stats — return analog state snapshot after stepping
-      const s1 = await this.getAnalogState();
-      if (!s1) return null;
-      const voltages = Object.values(s1.nodeVoltages);
-      return {
-        amplitudes: voltages,
-        peaks: voltages,
-        troughs: voltages,
-        nodeCount: s1.nodeCount,
-      };
+      // No trace stats available — caller must set up traces first
+      // via addTraceViaContextMenu() before calling measureAnalogPeaks()
+      return null;
     }
 
     return null;
@@ -1184,5 +1201,52 @@ export class UICircuitBuilder {
     // the palette's input listener fires even if fill('') alone doesn't.
     await searchInput.fill('');
     await searchInput.press('Backspace');
+  }
+
+  // =========================================================================
+  // SPICE model parameter overrides (via SPICE panel UI)
+  // =========================================================================
+
+  /**
+   * Set SPICE model parameter overrides on a component via the SPICE panel UI.
+   * Opens the property popup, expands the SPICE Model Parameters section,
+   * fills each parameter field, and closes the popup.
+   *
+   * @param elementLabel - component label (e.g. 'Q1')
+   * @param overrides - object of parameter key to value (e.g. { IS: 1e-14, BF: 100 })
+   */
+  async setSpiceOverrides(elementLabel: string, overrides: Record<string, number>): Promise<void> {
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === elementLabel);
+    expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
+
+    // Double-click to open property popup
+    await this._dblClickElementBody(el!);
+    const popup = this.page.locator('.prop-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+
+    // Expand the SPICE Model Parameters section
+    const toggle = popup.getByText('▶ SPICE Model Parameters');
+    await expect(toggle).toBeVisible({ timeout: 2000 });
+    await toggle.click();
+    await expect(popup.getByText('▼ SPICE Model Parameters')).toBeVisible({ timeout: 1000 });
+
+    // Fill each parameter field.
+    // Each SPICE row is: div[style*=display:flex] > span(key) + input + span(unit)
+    // We locate the span whose exact text matches the param key, then go to its
+    // parent div to find the sibling input. This avoids matching ancestor divs
+    // that also contain the key span as a descendant.
+    for (const [key, value] of Object.entries(overrides)) {
+      const keySpan = popup.locator(`span:text-is("${key}")`).first();
+      await expect(keySpan).toBeVisible({ timeout: 2000 });
+      const row = keySpan.locator('..');
+      const input = row.locator('input').first();
+      await expect(input).toBeVisible({ timeout: 2000 });
+      await input.fill(String(value));
+      await input.press('Tab');
+    }
+
+    // Close popup
+    await this.page.keyboard.press('Escape');
   }
 }

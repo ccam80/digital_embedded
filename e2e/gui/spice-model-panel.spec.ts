@@ -164,33 +164,61 @@ test.describe('SPICE Model Parameters panel', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 5: IS override stored via SPICE panel persists into _spiceModelOverrides
+  // Test 5: IS override affects BJT collector voltage vs default parameters
   // -------------------------------------------------------------------------
-  test('IS override stored via SPICE panel writes _spiceModelOverrides', async ({ page }) => {
-    // Place a BJT, open SPICE panel, enter IS=1e-14, verify the property is stored.
-    // The actual simulation effect is covered by headless tests (spice-model-overrides.test.ts).
-    await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
+  test('IS override affects BJT collector current', async () => {
+    // Build a BJT CE circuit identical to a8_bjt_ce but with IS=1e-14
+    // (100x larger than the engine default IS=1e-16). With higher IS the
+    // transistor conducts more, so the collector voltage drops.
+    //
+    // Circuit: Vcc (12V) -> Rc (4.7k) -> Q1:C, Vin (1V) -> Rb (100k) -> Q1:B,
+    //          Q1:E -> Re (1k) -> GND
 
-    await openPopupForLabel(builder, 'Q1');
-    await expandSpiceSection(page);
+    await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
+    await builder.placeLabeled('DcVoltageSource', 3, 15, 'Vin');
+    await builder.placeLabeled('Resistor', 10, 5, 'Rc');
+    await builder.placeLabeled('Resistor', 10, 12, 'Rb');
+    await builder.placeLabeled('NpnBJT', 16, 10, 'Q1');
+    await builder.placeLabeled('Resistor', 16, 16, 'Re');
+    await builder.placeComponent('Ground', 6, 20);
+    await builder.placeComponent('Ground', 18, 20);
+    await builder.placeComponent('Ground', 6, 10);
+    await builder.placeLabeled('Probe', 22, 8, 'Pc');
 
-    const isInput = await getSpiceParamInput(page, 'IS');
-    await expect(isInput).toBeVisible({ timeout: 2000 });
-    await isInput.fill('1e-14');
-    await isInput.press('Enter');
-    await page.keyboard.press('Escape');
+    await builder.setComponentProperty('Vcc', 'voltage', 12);
+    await builder.setComponentProperty('Vin', 'voltage', 1);
+    await builder.setComponentProperty('Rb', 'resistance', 100000);
+    await builder.setComponentProperty('Rc', 'resistance', 4700);
+    await builder.setComponentProperty('Re', 'resistance', 1000);
 
-    // Verify the override was stored by checking the component's internal property
-    const info = await builder.getCircuitInfo();
-    const q1 = info.elements.find(e => e.label === 'Q1');
-    expect(q1).toBeTruthy();
+    // Set IS=1e-14 override via SPICE panel BEFORE first step (included in compilation)
+    await builder.setSpiceOverrides('Q1', { IS: 1e-14, BF: 100, VAF: 100 });
 
-    // Reopen popup and verify value persists
-    await openPopupForLabel(builder, 'Q1');
-    await expandSpiceSection(page);
+    await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
+    await builder.drawWire('Rc', 'B', 'Q1', 'C');
+    await builder.drawWire('Vin', 'pos', 'Rb', 'A');
+    await builder.drawWire('Rb', 'B', 'Q1', 'B');
+    await builder.drawWire('Q1', 'E', 'Re', 'A');
+    await builder.drawWireFromPin('Re', 'B', 18, 20);
+    await builder.drawWireFromPin('Vcc', 'neg', 6, 20);
+    await builder.drawWireFromPin('Vin', 'neg', 6, 10);
+    await builder.drawWire('Rc', 'B', 'Pc', 'in');
 
-    const isInput2 = await getSpiceParamInput(page, 'IS');
-    const value = await isInput2.inputValue();
-    expect(value).not.toBe('');
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
+
+    const state = await builder.stepAndReadAnalog(300);
+    expect(state).not.toBeNull();
+    expect(state!.simTime).toBeGreaterThan(0);
+
+    const vc = state!.nodeVoltages['Pc'];
+    expect(vc).toBeDefined();
+
+    // With default IS=1e-16 the BJT barely conducts and Vc ~ 12V (near Vcc).
+    // With IS=1e-14 the BJT conducts significantly and Vc drops well below 12V.
+    // Verify collector voltage is below 11.5V (measurable conduction).
+    expect(vc).toBeLessThan(11.5);
+    // And above 0V (transistor not saturated to ground)
+    expect(vc).toBeGreaterThan(0);
   });
 });
