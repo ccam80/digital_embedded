@@ -132,7 +132,7 @@ function makeOutElement(
 }
 
 // ---------------------------------------------------------------------------
-// TestSubcircuitElement — supports optional simulationMode property
+// TestSubcircuitElement — supports optional simulationModel property
 // ---------------------------------------------------------------------------
 
 class TestSubcircuitElement extends AbstractCircuitElement implements SubcircuitHost {
@@ -343,8 +343,8 @@ describe("CrossEngine", () => {
     expect(flat.elements.filter((e) => e.typeId.startsWith("Subcircuit:")).length).toBe(0);
   });
 
-  it("simulation_mode_digital_overrides — analog-engine subcircuit with simulationMode=digital in analog outer circuit produces boundary", () => {
-    // Internal circuit is analog but instance has simulationMode='digital'
+  it("simulation_mode_digital_overrides — analog-engine subcircuit with simulationModel=digital in analog outer circuit produces boundary", () => {
+    // Internal circuit is analog but instance has simulationModel='digital'
     const internal = new Circuit({ name: "Gate" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 0 });
@@ -352,7 +352,7 @@ describe("CrossEngine", () => {
     internal.addElement(outEl);
 
     // Outer circuit is analog — contains Resistor (analog-only) to make domain detectable
-    // Instance has simulationMode='digital' which overrides internal circuit domain
+    // Instance has simulationModel='digital' which overrides internal circuit domain
     const outer = new Circuit({ name: "Top" });
     const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
     outer.addElement(resistor);
@@ -360,13 +360,13 @@ describe("CrossEngine", () => {
       { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
       { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
     ];
-    const subEl = makeSubcircuitElement("Gate", "sub-1", { x: 0, y: 0 }, internal, pins, { simulationMode: "digital" });
+    const subEl = makeSubcircuitElement("Gate", "sub-1", { x: 0, y: 0 }, internal, pins, { simulationModel: "digital" });
     outer.addElement(subEl);
 
     const registry = makeRegistryWithAnalog(["In", "Out"], ["Resistor"]);
     const { crossEngineBoundaries } = flattenCircuit(outer, registry);
 
-    // simulationMode='digital' on instance overrides, producing a boundary
+    // simulationModel='digital' on instance overrides, producing a boundary
     expect(crossEngineBoundaries.length).toBe(1);
     expect(crossEngineBoundaries[0]!.subcircuitElement).toBe(subEl);
   });

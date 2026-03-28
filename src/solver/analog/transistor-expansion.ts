@@ -156,7 +156,7 @@ export function expandTransistorModel(
       makeDiagnostic(
         "missing-transistor-model",
         "error",
-        `Component "${componentDef.name}" has simulationMode 'transistor' but no transistorModel defined`,
+        `Component "${componentDef.name}" has simulationModel 'transistor' but no transistorModel defined`,
         {
           explanation:
             `The component "${componentDef.name}" is configured for transistor-level simulation ` +

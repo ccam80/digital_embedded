@@ -125,7 +125,7 @@ export interface FlattenResult {
  *
  * Cross-engine subcircuits (where the internal domain differs from the
  * outer circuit's domain, or where the subcircuit instance has
- * simulationMode='digital' in an analog outer circuit) are preserved
+ * simulationModel='digital' in an analog outer circuit) are preserved
  * as opaque placeholder elements in the flat result. The compiler must handle
  * them separately via bridge adapters.
  *
@@ -221,11 +221,11 @@ function flattenCircuitScoped(
     const instanceName = buildInstanceName(el, elemIdx, scopePrefix);
 
     // Detect cross-engine boundary using model-based domain checks:
-    //   (a) the subcircuit instance has simulationMode='digital' in an analog
+    //   (a) the subcircuit instance has simulationModel='digital' in an analog
     //       outer context, OR
     //   (b) the internal circuit's components resolve to a different domain
     //       than the outer circuit (using activeModel/hasDigitalModel/hasAnalogModel).
-    const instanceSimMode = el.getAttribute("simulationMode");
+    const instanceSimMode = el.getAttribute("simulationModel");
     const internalDomain = resolveCircuitDomain(el.internalCircuit, registry);
     const isCrossEngine =
       (outerDomain === "analog" && instanceSimMode === "digital") ||

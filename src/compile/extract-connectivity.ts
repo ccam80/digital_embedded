@@ -78,10 +78,19 @@ export function resolveModelAssignments(
       continue;
     }
 
-    // Resolve model key: simulationModel prop > defaultModel > first key
+    // Resolve model key: simulationModel prop > defaultModel > first key.
+    // The simulationModel property may hold sub-mode values (e.g. "analog-pins",
+    // "logical", "analog-internals") that are NOT model registry keys — they are
+    // read by the analog compiler internally. Only treat the property value as a
+    // model key when it actually exists in def.models.
     const simulationModelProp = el.getAttribute('simulationModel');
+    const models = def.models as Record<string, import('../core/registry.js').DigitalModel | import('../core/registry.js').AnalogModel | undefined>;
     let modelKey: string;
-    if (typeof simulationModelProp === 'string' && simulationModelProp.length > 0) {
+    if (
+      typeof simulationModelProp === 'string' &&
+      simulationModelProp.length > 0 &&
+      models[simulationModelProp] !== undefined
+    ) {
       modelKey = simulationModelProp;
     } else if (def.defaultModel !== undefined) {
       modelKey = def.defaultModel;
@@ -102,7 +111,6 @@ export function resolveModelAssignments(
     }
 
     // Resolve the actual model object
-    const models = def.models as Record<string, import('../core/registry.js').DigitalModel | import('../core/registry.js').AnalogModel | undefined>;
     const model = models[modelKey] ?? null;
 
     // If the resolved key doesn't correspond to a real model, fall back to neutral

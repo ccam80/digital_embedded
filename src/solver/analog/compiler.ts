@@ -816,7 +816,7 @@ function runPassA_circuit(
               `can be placed in analog circuits.`,
             suggestions: [
               {
-                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                text: `Set simulationModel to 'behavioral' or add an analogFactory to "${el.typeId}".`,
                 automatable: false,
               },
             ],
@@ -831,8 +831,8 @@ function runPassA_circuit(
     // skip branch/node allocation here.
     if (hasBoth) {
       const passAProps = el.getProperties();
-      const passAMode = passAProps.has("simulationMode")
-        ? (passAProps.get("simulationMode") as string)
+      const passAMode = passAProps.has("simulationModel")
+        ? (passAProps.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
       if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
         elementMeta.push({ el, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
@@ -921,7 +921,7 @@ function runPassA_partition(
               `Only components with an analog model can be placed in analog circuits.`,
             suggestions: [
               {
-                text: `Set simulationMode to 'behavioral' or add an analogFactory to "${el.typeId}".`,
+                text: `Set simulationModel to 'behavioral' or add an analogFactory to "${el.typeId}".`,
                 automatable: false,
               },
             ],
@@ -934,8 +934,8 @@ function runPassA_partition(
 
     if (hasBoth) {
       const passAProps = el.getProperties();
-      const passAMode = passAProps.has("simulationMode")
-        ? (passAProps.get("simulationMode") as string)
+      const passAMode = passAProps.has("simulationModel")
+        ? (passAProps.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
       if ((passAMode === "analog-internals" && def.models?.analog?.transistorModel) || passAMode === "logical") {
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
@@ -1240,7 +1240,7 @@ function compileAnalogCircuit(
   // Updated again after Pass B completes (transistor expansion allocates more nodes).
   let totalNodeCount = nextInternalNode - 1;
 
-  // Inline bridges created for flat "logical" simulationMode components.
+  // Inline bridges created for flat "logical" simulationModel components.
   // Collected here and merged into the main bridges array after Step 7.
   const inlineBridges: BridgeInstance[] = [];
 
@@ -1279,21 +1279,21 @@ function compileAnalogCircuit(
       continue;
     }
 
-    // Handle simulationMode property for "both" components.
+    // Handle simulationModel property for "both" components.
     // The "logical" branch applies even when analogFactory is undefined
     // (the component will run as an inner digital engine, no analog stamping needed).
     if (hasBothModels) {
-      const simulationMode = props.has("simulationMode")
-        ? (props.get("simulationMode") as string)
+      const simulationModel = props.has("simulationModel")
+        ? (props.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
 
-      if (simulationMode === "analog-internals" && def.models?.analog?.transistorModel) {
+      if (simulationModel === "analog-internals" && def.models?.analog?.transistorModel) {
         if (!transistorModels) {
           diagnostics.push(
             makeDiagnostic(
               "missing-transistor-model",
               "error",
-              `Component "${el.typeId}" is set to simulationMode 'analog-internals' but no TransistorModelRegistry was provided`,
+              `Component "${el.typeId}" is set to simulationModel 'analog-internals' but no TransistorModelRegistry was provided`,
               {
                 explanation:
                   `Pass a TransistorModelRegistry as the third argument to compileAnalogCircuit() ` +
@@ -1381,7 +1381,7 @@ function compileAnalogCircuit(
           continue;
         }
         // No transistorModel — fall through to analogFactory path below
-      } else if (simulationMode === "logical") {
+      } else if (simulationModel === "logical") {
         // Logical bridge path: wrap this component in a minimal inner digital
         // circuit and create bridge adapters at each pin boundary.
 
@@ -1787,7 +1787,7 @@ function compileAnalogCircuit(
     diagnostics,
   );
 
-  // Stage 9c: Merge inline bridges (from flat "logical" simulationMode components).
+  // Stage 9c: Merge inline bridges (from flat "logical" simulationModel components).
   bridges.push(...inlineBridges);
 
   // Step 8: Build and return ConcreteCompiledAnalogCircuit
@@ -2043,17 +2043,17 @@ export function compileAnalogPartition(
     }
 
     if (hasBothModels) {
-      const simulationMode = props.has("simulationMode")
-        ? (props.get("simulationMode") as string)
+      const simulationModel = props.has("simulationModel")
+        ? (props.get("simulationModel") as string)
         : (def.defaultModel === "digital" ? "logical" : "analog-pins");
 
-      if (simulationMode === "analog-internals" && def.models?.analog?.transistorModel) {
+      if (simulationModel === "analog-internals" && def.models?.analog?.transistorModel) {
         if (!transistorModels) {
           diagnostics.push(
             makeDiagnostic(
               "missing-transistor-model",
               "error",
-              `Component "${el.typeId}" is set to simulationMode 'analog-internals' but no TransistorModelRegistry was provided`,
+              `Component "${el.typeId}" is set to simulationModel 'analog-internals' but no TransistorModelRegistry was provided`,
               {
                 explanation:
                   `Pass a TransistorModelRegistry as the third argument to compileAnalogPartition() ` +
@@ -2131,7 +2131,7 @@ export function compileAnalogPartition(
           }
           continue;
         }
-      } else if (simulationMode === "logical") {
+      } else if (simulationModel === "logical") {
         const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
 
         let hasUnconnectedPin = false;
@@ -2554,7 +2554,7 @@ function detectHighSourceImpedance(
  * Synthesize a minimal digital circuit from a single "both" component.
  *
  * Creates a Circuit containing:
- *   - One instance of the component (same type and props, minus simulationMode
+ *   - One instance of the component (same type and props, minus simulationModel
  *     and _pinElectrical)
  *   - One In element per input pin, labeled to match the component's pin label
  *   - One Out element per output pin, labeled to match the component's pin label
@@ -2588,7 +2588,7 @@ function synthesizeDigitalCircuit(
   const srcProps = el.getProperties();
   const innerProps = new PropertyBag();
   for (const [key, val] of srcProps.entries()) {
-    if (key === "simulationMode" || key === "_pinElectrical") continue;
+    if (key === "simulationModel" || key === "_pinElectrical") continue;
     innerProps.set(key, val);
   }
 

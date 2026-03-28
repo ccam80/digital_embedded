@@ -5,7 +5,7 @@
  * - Analog compiler accepts components with both digital and analog models
  * - Logic family resolution cascade: pin > component > circuit > default
  * - Pure-digital components in analog circuits produce unsupported-component-in-analog diagnostic
- * - simulationMode property handling: behavioral (default), digital stub, transistor stub
+ * - simulationModel property handling: behavioral (default), digital stub, transistor stub
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -200,7 +200,7 @@ function buildAndGateCircuit(propsMap: Map<string, PropertyValue> = new Map()): 
 
 describe("BehavioralCompilation", () => {
   it("compiles_and_gate_in_analog_circuit", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
     const { circuit, registry } = buildAndGateCircuit(propsMap);
     const compiled = compileUnified(circuit, registry).analog!;
 
@@ -210,7 +210,7 @@ describe("BehavioralCompilation", () => {
   });
 
   it("resolves_logic_family_defaults", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     compileUnified(circuit, registry);
 
@@ -243,7 +243,7 @@ describe("BehavioralCompilation", () => {
       { x: 10, y: 0, label: "In_1" },
       { x: 20, y: 0, label: "In_2" },
       { x: 30, y: 0, label: "out" },
-    ], new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]));
+    ], new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]));
     const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
     circuit.addElement(andGate);
     circuit.addElement(gnd);
@@ -341,7 +341,7 @@ describe("BehavioralCompilation", () => {
       { x: 10, y: 0, label: "In_1" },
       { x: 20, y: 0, label: "In_2" },
       { x: 30, y: 0, label: "out" },
-    ], new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]));
+    ], new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]));
     const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
 
     circuit.addElement(andGate);
@@ -370,18 +370,18 @@ describe("BehavioralCompilation", () => {
 // ---------------------------------------------------------------------------
 
 describe("SimulationMode", () => {
-  it("default_is_first_simulationMode_entry", () => {
-    // No simulationMode property set → defaults based on defaultModel.
+  it("default_is_first_simulationModel_entry", () => {
+    // No simulationModel property set → defaults based on defaultModel.
     // BehavioralAnd has defaultModel: 'digital', so default mode is 'logical'.
     // Set mode to 'analog-pins' explicitly and
     // verify the factory IS called — proving that without the explicit
     // property the compiler would NOT have taken the analog-pins path.
-    const analogPinsProps = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
+    const analogPinsProps = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
     const { circuit: c1, registry: r1, factorySpy: spy1 } = buildAndGateCircuit(analogPinsProps);
     compileUnified(c1, r1);
     expect(spy1).toHaveBeenCalledOnce(); // explicit analog-pins → factory called
 
-    // Without simulationMode set, default is 'logical' → factory NOT called
+    // Without simulationModel set, default is 'logical' → factory NOT called
     const { circuit: c2, registry: r2, factorySpy: spy2 } = buildAndGateCircuit();
     // The logical path needs In/Out in the registry to synthesize a bridge;
     // with the stub registry it emits diagnostics but still doesn't call analogFactory.
@@ -390,8 +390,8 @@ describe("SimulationMode", () => {
   });
 
   it("explicit_simplified_compiles", () => {
-    // simulationMode explicitly set to 'analog-pins' → compiles normally
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-pins"]]);
+    // simulationModel explicitly set to 'analog-pins' → compiles normally
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileUnified(circuit, registry).analog!;
     expect(factorySpy).toHaveBeenCalledOnce();
@@ -399,7 +399,7 @@ describe("SimulationMode", () => {
   });
 
   it("digital_mode_creates_bridge_instance", () => {
-    // simulationMode: "logical" synthesizes an inner digital circuit and
+    // simulationModel: "logical" synthesizes an inner digital circuit and
     // creates a BridgeInstance — the analogFactory is NOT called.
 
     // Build a fresh registry that includes In, Out, Ground, and BehavioralAnd
@@ -473,8 +473,8 @@ describe("SimulationMode", () => {
       },
     });
 
-    // Build the outer analog circuit with the AND gate set to simulationMode: "logical"
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "logical"]]);
+    // Build the outer analog circuit with the AND gate set to simulationModel: "logical"
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "logical"]]);
     const circuit = new Circuit();
 
     const andGate = makeElement("BehavioralAnd", "and1", [
@@ -511,7 +511,7 @@ describe("SimulationMode", () => {
   });
 
   it("analog_internals_with_transistorModel_but_no_registry_emits_diagnostic", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-internals"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-internals"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     // Add transistorModel to the registered definition so the transistor path is triggered
     const def = registry.get("BehavioralAnd")!;
@@ -538,7 +538,7 @@ describe("SimulationMode", () => {
 
   it("analog_internals_without_transistorModel_falls_through_to_analogFactory", () => {
     // Fuse/switch case: analog-internals but no transistorModel → use analogFactory
-    const propsMap = new Map<string, PropertyValue>([["simulationMode", "analog-internals"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-internals"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileUnified(circuit, registry).analog!;
 

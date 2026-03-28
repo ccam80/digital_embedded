@@ -103,3 +103,39 @@
 - **Files created**: src/headless/__tests__/spice-model-overrides-mcp.test.ts
 - **Files modified**: none
 - **Tests**: 4/4 passing
+
+## Task W0.1: Fix B1 — netlist.ts reads wrong attribute
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/headless/netlist.ts
+- **Tests**: 0/0 (no tests specific to netlist.ts; this is a single-line attribute name fix per spec model-unification.md:269-273)
+- **Details**: Changed `el.getAttribute('defaultModel')` to `el.getAttribute('simulationModel')` at line 393. The netlist display now correctly shows the active simulation model attribute rather than the non-existent defaultModel attribute.
+
+## Task W0.2: Fix B2: Rename all `simulationMode` to `simulationModel`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/compiler.ts` (21 occurrences renamed)
+  - `src/app/canvas-popup.ts` (2 occurrences renamed)
+  - `src/editor/property-panel.ts` (9 occurrences renamed)
+  - `src/solver/analog/__tests__/digital-bridge-path.test.ts` (10 occurrences renamed)
+  - `src/solver/analog/__tests__/compile-analog-partition.test.ts` (9 occurrences renamed)
+  - `src/solver/analog/__tests__/analog-compiler.test.ts` (16 occurrences renamed)
+  - `src/compile/extract-connectivity.ts` (5 occurrences renamed + bugfix in resolveModelAssignments)
+  - `src/solver/digital/__tests__/flatten-bridge.test.ts` (6 occurrences renamed)
+  - `src/solver/analog/__tests__/lrcxor-fixture.test.ts` (31 occurrences renamed)
+  - `src/compile/__tests__/extract-connectivity.test.ts` (4 occurrences renamed)
+  - `src/solver/digital/flatten.ts` (3 occurrences renamed)
+  - `src/solver/analog/transistor-expansion.ts` (1 occurrence renamed)
+  - `e2e/gui/spice-model-panel.spec.ts` (2 occurrences renamed)
+  - `e2e/gui/component-sweep.spec.ts` (1 occurrence renamed)
+- **Tests**: 9720/9730 passing (10 pre-existing failures from baseline, 0 new regressions)
+- **Additional fix**: `resolveModelAssignments` in `extract-connectivity.ts` was updated to only treat `simulationModel` property values as model keys when they actually exist in `def.models`. Sub-mode values like `"analog-pins"`, `"logical"`, and `"analog-internals"` are not model registry keys — they are handled internally by the analog compiler. Without this fix, the rename caused these values to be used as invalid model keys, routing components to neutral domain and returning null from `compileUnified(...).analog`.
+
+---
+## Wave 0 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1

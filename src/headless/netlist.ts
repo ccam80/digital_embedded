@@ -390,7 +390,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
     });
 
     const models = def.models ? Object.keys(def.models) : [];
-    const activeModelAttr = el.getAttribute('defaultModel');
+    const activeModelAttr = el.getAttribute('simulationModel');
     const activeModel = typeof activeModelAttr === 'string' ? activeModelAttr : undefined;
 
     if (activeModel !== undefined) {
