@@ -198,3 +198,36 @@
 - **Status**: complete
 - **Tasks completed**: 3/3
 - **Rounds**: 2 (W1.3 retried after lock conflict)
+
+## Task W2.1: Pipeline Reorder + Delete resolveCircuitDomain
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/digital/flatten.ts` — deleted `resolveCircuitDomain()`, updated `flattenCircuit()` to accept optional pre-resolved `ModelAssignment[]`, updated `flattenCircuitScoped()` to use `domainFromAssignments()` helper instead of `resolveCircuitDomain()`, added `domainFromAssignments()` helper, updated `inlineSubcircuit()` to propagate model assignments
+  - `src/compile/compile.ts` — reordered pipeline: `resolveModelAssignments` now runs first (step 1), `flattenCircuit` uses pre-resolved assignments (step 2), deleted `derivedEngineType` bootstrapping block, removed `hasAnalogModel`/`hasDigitalModel` imports
+  - `src/compile/extract-connectivity.ts` — deleted `forceAnalogDomain` override block and `engineType` parameter from `resolveModelAssignments`, removed unused `hasDigitalModel`/`hasAnalogModel` imports, added sub-mode routing logic (when `simulationModel` is a sub-mode like "analog-pins"/"logical"/"analog-internals" and component has an analog model, assign modelKey="analog")
+  - `src/solver/digital/__tests__/diag-rc-step.test.ts` — removed obsolete third `'analog'` argument from `resolveModelAssignments` call
+- **Tests**: 9736/9749 passing (13 pre-existing failures, 0 new failures introduced)
+- **Notes**: All 13 vitest failures are pre-existing (spice-model-overrides-mcp: 1, tunnel-diode: 5, behavioral_mode_still_calls_analog_factory: 1, and 6 others matching the pre-change test-failures.json). Playwright: 478/527 (49 pre-existing E2E failures). The sub-mode routing addition in extract-connectivity.ts preserves the "analog wins for dual-model components in analog context" behavior without the circuit-wide `forceAnalogDomain` flag.
+
+## Task W2.2: Tests: subcircuit with per-instance override, same-domain inline, cross-domain opaque, "analog wins" label precedence
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts`
+- **Files modified**: none
+- **Tests**: 7/7 passing
+  - `per_instance_override`: dual-model subcircuit with simulationModel="digital" in analog outer circuit produces cross-engine boundary
+  - `same_domain_inline`: analog subcircuit in analog outer circuit is flattened (inlined)
+  - `cross_domain_opaque`: digital subcircuit in analog outer circuit is preserved as opaque placeholder with boundary record
+  - `analog_wins_for_submode`: simulationModel="analog-pins" on dual-model component → modelKey="analog"
+  - `analog_wins_for_logical_submode`: simulationModel="logical" on dual-model component → modelKey="analog"
+  - `explicit_digital_key_respected`: simulationModel="digital" explicit key → modelKey="digital"
+  - `explicit_analog_key_respected`: simulationModel="analog" explicit key → modelKey="analog"
+- **Full vitest run**: 9745/9758 passing (13 pre-existing failures, 0 new failures)
+
+---
+## Wave 2 Summary
+- **Status**: complete
+- **Tasks completed**: 2/2
+- **Rounds**: 1

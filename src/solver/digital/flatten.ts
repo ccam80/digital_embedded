@@ -24,7 +24,8 @@ import { Circuit, Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
-import { hasDigitalModel, hasAnalogModel } from "../../core/registry.js";
+import type { ModelAssignment } from "../../compile/extract-connectivity.js";
+import { resolveModelAssignments } from "../../compile/extract-connectivity.js";
 import type { Pin } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
@@ -136,43 +137,15 @@ export interface FlattenResult {
  * @param registry  Component registry (used only for leaf component validation).
  * @returns         FlattenResult containing the flat circuit and any cross-engine boundaries.
  */
-export function flattenCircuit(circuit: Circuit, registry: ComponentRegistry): FlattenResult {
-  const boundaries: CrossEngineBoundary[] = [];
-  const flatCircuit = flattenCircuitScoped(circuit, "", registry, new Set(), boundaries);
-  return { circuit: flatCircuit, crossEngineBoundaries: boundaries };
-}
-
-// ---------------------------------------------------------------------------
-// Domain resolution helper
-// ---------------------------------------------------------------------------
-
-/**
- * Determine the active simulation domain of a circuit.
- *
- * The domain is inferred from the models available on the circuit's
- * non-subcircuit leaf components: if any component has only analog models,
- * the circuit is "analog"; if all have digital models, the circuit is
- * "digital". Returns "auto" when no leaf components are registered or the
- * domain is indeterminate.
- */
-function resolveCircuitDomain(
+export function flattenCircuit(
   circuit: Circuit,
   registry: ComponentRegistry,
-): "digital" | "analog" | "auto" {
-  let hasDigital = false;
-  let hasAnalog = false;
-
-  for (const el of circuit.elements) {
-    if (isSubcircuitHost(el)) continue;
-    const def = registry.get(el.typeId);
-    if (def === undefined) continue;
-    if (hasDigitalModel(def)) hasDigital = true;
-    if (hasAnalogModel(def)) hasAnalog = true;
-  }
-
-  if (hasAnalog && !hasDigital) return "analog";
-  if (hasDigital && !hasAnalog) return "digital";
-  return "auto";
+  modelAssignments?: ModelAssignment[],
+): FlattenResult {
+  const assignments = modelAssignments ?? resolveModelAssignments(circuit.elements, registry);
+  const boundaries: CrossEngineBoundary[] = [];
+  const flatCircuit = flattenCircuitScoped(circuit, "", registry, assignments, new Set(), boundaries);
+  return { circuit: flatCircuit, crossEngineBoundaries: boundaries };
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +162,7 @@ function flattenCircuitScoped(
   circuit: Circuit,
   scopePrefix: string,
   registry: ComponentRegistry,
+  modelAssignments: ModelAssignment[],
   seen: Set<Circuit>,
   boundaries: CrossEngineBoundary[],
 ): Circuit {
@@ -205,7 +179,10 @@ function flattenCircuitScoped(
   // subcircuit wires, then add bridge wires for subcircuit interface pins.
   const resultWires: Wire[] = [];
 
-  const outerDomain = resolveCircuitDomain(circuit, registry);
+  // Determine the outer domain from the pre-resolved model assignments.
+  // The outer domain is "analog" if any non-infrastructure leaf element resolves
+  // to "analog", "digital" if all resolve to "digital", "auto" otherwise.
+  const outerDomain = domainFromAssignments(circuit.elements, modelAssignments);
 
   // For each element, either pass it through (leaf) or inline it (subcircuit).
   for (let elemIdx = 0; elemIdx < circuit.elements.length; elemIdx++) {
@@ -220,13 +197,17 @@ function flattenCircuitScoped(
 
     const instanceName = buildInstanceName(el, elemIdx, scopePrefix);
 
-    // Detect cross-engine boundary using model-based domain checks:
+    // Detect cross-engine boundary using pre-resolved model assignments.
     //   (a) the subcircuit instance has simulationModel='digital' in an analog
-    //       outer context, OR
+    //       outer context (explicit per-instance override), OR
     //   (b) the internal circuit's components resolve to a different domain
-    //       than the outer circuit (using activeModel/hasDigitalModel/hasAnalogModel).
+    //       than the outer circuit.
+    const internalAssignments = resolveModelAssignments(
+      el.internalCircuit.elements,
+      registry,
+    );
+    const internalDomain = domainFromAssignments(el.internalCircuit.elements, internalAssignments);
     const instanceSimMode = el.getAttribute("simulationModel");
-    const internalDomain = resolveCircuitDomain(el.internalCircuit, registry);
     const isCrossEngine =
       (outerDomain === "analog" && instanceSimMode === "digital") ||
       (outerDomain !== internalDomain && internalDomain !== "auto" && outerDomain !== "auto");
@@ -254,6 +235,7 @@ function flattenCircuitScoped(
       instanceName,
       circuit,
       registry,
+      internalAssignments,
       seen,
       boundaries,
     );
@@ -278,6 +260,38 @@ function flattenCircuitScoped(
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Domain resolution from model assignments
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive the simulation domain for a circuit from its pre-resolved model assignments.
+ *
+ * Returns "analog" if any non-infrastructure element has modelKey "analog",
+ * "digital" if all non-infrastructure elements have modelKey "digital",
+ * "auto" when no non-infrastructure elements are present or domain is mixed.
+ */
+function domainFromAssignments(
+  elements: readonly CircuitElement[],
+  assignments: ModelAssignment[],
+): "digital" | "analog" | "auto" {
+  let hasDigital = false;
+  let hasAnalog = false;
+
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i]!;
+    if (isSubcircuitHost(el)) continue;
+    const assignment = assignments[i];
+    if (assignment === undefined || assignment.modelKey === "neutral") continue;
+    if (assignment.modelKey === "digital") hasDigital = true;
+    else hasAnalog = true;
+  }
+
+  if (hasAnalog && !hasDigital) return "analog";
+  if (hasDigital && !hasAnalog) return "digital";
+  return "auto";
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +325,7 @@ function inlineSubcircuit(
   instanceName: string,
   _parentCircuit: Circuit,
   registry: ComponentRegistry,
+  internalAssignments: ModelAssignment[],
   seen: Set<Circuit>,
   boundaries: CrossEngineBoundary[],
 ): InlineResult {
@@ -321,6 +336,7 @@ function inlineSubcircuit(
     internalCircuit,
     instanceName,
     registry,
+    internalAssignments,
     new Set(seen),
     boundaries,
   );

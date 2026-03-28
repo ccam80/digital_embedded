@@ -20,7 +20,6 @@
 
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import { hasAnalogModel, hasDigitalModel } from "../core/registry.js";
 import type { TransistorModelRegistry } from "../solver/analog/transistor-model-registry.js";
 import { resolveModelAssignments, extractConnectivityGroups, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
@@ -59,7 +58,14 @@ export function compileUnified(
   const diagnostics: Diagnostic[] = [];
 
   // -------------------------------------------------------------------------
-  // Step 1: Flatten subcircuits if present
+  // Step 1: Resolve model assignments for each element
+  // -------------------------------------------------------------------------
+
+  const inputModelAssignments = resolveModelAssignments(inputCircuit.elements, registry);
+
+  // -------------------------------------------------------------------------
+  // Step 2: Flatten subcircuits if present (uses pre-resolved model assignments
+  // for cross-engine boundary detection)
   // -------------------------------------------------------------------------
 
   let circuit: Circuit;
@@ -70,7 +76,7 @@ export function compileUnified(
   // references to the original Wire instances.
   const hasSubcircuits = inputCircuit.elements.some(isSubcircuitHost);
   if (hasSubcircuits) {
-    const flattenResult = flattenCircuit(inputCircuit, registry);
+    const flattenResult = flattenCircuit(inputCircuit, registry, inputModelAssignments);
     circuit = flattenResult.circuit;
     crossEngineBoundaries = flattenResult.crossEngineBoundaries;
   } else {
@@ -78,32 +84,22 @@ export function compileUnified(
     crossEngineBoundaries = [];
   }
 
-  // -------------------------------------------------------------------------
-  // Step 2: Detect whether the circuit targets the analog domain.
-  //
-  // A circuit is analog when any of its components — including infrastructure
-  // elements like Ground and VDD — has an analog model but no digital model.
-  // This drives two downstream decisions:
-  //   - Whether to skip digital-component validation (analog circuits may
-  //     contain types not in the digital registry).
-  //   - Whether to pass "analog" as the domain hint to resolveModelAssignments
-  //     so dual-model components default to the analog backend.
-  //
-  // Ground and VDD are analog-only infrastructure and serve as the canonical
-  // indicator that a circuit is wired for MNA simulation.
-  // -------------------------------------------------------------------------
+  // Resolve model assignments for the (possibly flattened) circuit.
+  // When there are no subcircuits the flat circuit equals the input circuit
+  // and we reuse the assignments already computed above.
+  const flatModelAssignments = hasSubcircuits
+    ? resolveModelAssignments(circuit.elements, registry)
+    : inputModelAssignments;
 
-  let hasAnalogOnlyComponent = false;
-  for (const el of circuit.elements) {
+  // Validate that all non-infrastructure components are registered when the
+  // circuit has no analog-only components (pure digital circuits).
+  const hasAnalogOnlyComponent = flatModelAssignments.some((a) => {
+    const el = circuit.elements[a.elementIndex];
+    if (!el) return false;
     const def = registry.get(el.typeId);
-    if (def === undefined) continue;
-    if (hasAnalogModel(def) && !hasDigitalModel(def)) {
-      hasAnalogOnlyComponent = true;
-      break;
-    }
-  }
-
-  const derivedEngineType = hasAnalogOnlyComponent ? "analog" : "digital";
+    if (!def) return false;
+    return a.modelKey !== 'digital' && a.modelKey !== 'neutral';
+  });
 
   if (!hasAnalogOnlyComponent) {
     for (const el of circuit.elements) {
@@ -116,12 +112,6 @@ export function compileUnified(
       }
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Step 2b: Resolve model assignments for each element
-  // -------------------------------------------------------------------------
-
-  const flatModelAssignments = resolveModelAssignments(circuit.elements, registry, derivedEngineType);
 
   // -------------------------------------------------------------------------
   // Step 3: Extract connectivity groups (unified netlist)

@@ -7,7 +7,7 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
-import { hasDigitalModel, hasAnalogModel, availableModels } from '../core/registry.js';
+import { availableModels } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
@@ -49,17 +49,11 @@ export interface ModelAssignment {
  *
  * Infrastructure components (Wire, Tunnel, Ground, etc.) are tagged as
  * neutral — they participate in connectivity but have no simulation model.
- *
- * When `forceAnalogDomain` is true, dual-model components that would otherwise
- * default to "digital" are overridden to "analog" so the analog partition
- * receives them.
  */
 export function resolveModelAssignments(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
-  engineType?: string,
 ): ModelAssignment[] {
-  const forceAnalogDomain = engineType === 'analog';
   const result: ModelAssignment[] = [];
 
   for (let i = 0; i < elements.length; i++) {
@@ -81,8 +75,10 @@ export function resolveModelAssignments(
     // Resolve model key: simulationModel prop > defaultModel > first key.
     // The simulationModel property may hold sub-mode values (e.g. "analog-pins",
     // "logical", "analog-internals") that are NOT model registry keys — they are
-    // read by the analog compiler internally. Only treat the property value as a
-    // model key when it actually exists in def.models.
+    // read by the analog compiler internally. When a sub-mode value is set and
+    // the component has an analog model, assign "analog" so the component is
+    // routed to the analog partition. Only treat the property value as a model
+    // key when it actually exists in def.models.
     const simulationModelProp = el.getAttribute('simulationModel');
     const models = def.models as Record<string, import('../core/registry.js').DigitalModel | import('../core/registry.js').AnalogModel | undefined>;
     let modelKey: string;
@@ -92,22 +88,19 @@ export function resolveModelAssignments(
       models[simulationModelProp] !== undefined
     ) {
       modelKey = simulationModelProp;
+    } else if (
+      typeof simulationModelProp === 'string' &&
+      simulationModelProp.length > 0 &&
+      models[simulationModelProp] === undefined &&
+      models['analog'] !== undefined
+    ) {
+      // Sub-mode value (e.g. "analog-pins", "analog-internals", "logical") — route to analog
+      modelKey = 'analog';
     } else if (def.defaultModel !== undefined) {
       modelKey = def.defaultModel;
     } else {
       const keys = availableModels(def);
       modelKey = keys.length > 0 ? keys[0]! : 'neutral';
-    }
-
-    // When the circuit has analog-only components and this component has an
-    // analog model, override a "digital" default to "analog" so the component
-    // is compiled by the analog backend.
-    if (
-      forceAnalogDomain &&
-      modelKey === 'digital' &&
-      def.models?.analog !== undefined
-    ) {
-      modelKey = 'analog';
     }
 
     // Resolve the actual model object

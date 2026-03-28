@@ -32,7 +32,7 @@ describe('RC XML partition diagnostics', () => {
       console.log(`  (${w.start.x},${w.start.y}) -> (${w.end.x},${w.end.y})`);
     }
     
-    const assignments = resolveModelAssignments(circuit.elements, registry, 'analog');
+    const assignments = resolveModelAssignments(circuit.elements, registry);
     console.log('Model assignments:');
     for (const a of assignments) {
       console.log(`  [${a.elementIndex}] modelKey=${a.modelKey} model=${a.model !== null}`);
