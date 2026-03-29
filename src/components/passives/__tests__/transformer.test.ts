@@ -574,8 +574,8 @@ describe("TransformerDefinition", () => {
     expect(TransformerDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
   });
 
-  it("requiresBranchRow is true", () => {
-    expect(TransformerDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+  it("branchCount is 1", () => {
+    expect(TransformerDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
   });
 
   it("category is PASSIVES", () => {

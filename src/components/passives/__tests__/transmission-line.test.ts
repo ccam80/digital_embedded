@@ -643,7 +643,7 @@ describe("TransmissionLine", () => {
     });
 
     it("requires branch row", () => {
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
     });
 
     it("has getInternalNodeCount", () => {

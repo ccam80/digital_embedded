@@ -346,8 +346,8 @@ describe("Crystal", () => {
       expect(CrystalDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     });
 
-    it("CrystalDefinition requiresBranchRow is true", () => {
-      expect(CrystalDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+    it("CrystalDefinition branchCount is 1", () => {
+      expect(CrystalDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
     });
 
     it("CrystalDefinition getInternalNodeCount returns 2", () => {

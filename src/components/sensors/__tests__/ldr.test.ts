@@ -185,8 +185,8 @@ describe("LDR", () => {
       expect(element.isReactive).toBe(false);
     });
 
-    it("requiresBranchRow is false", () => {
-      expect(LDRDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
+    it("branchCount is false", () => {
+      expect(LDRDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

@@ -489,7 +489,7 @@ export const TransformerDefinition: ComponentDefinition = {
     mnaModels: {
       behavioral: {
       factory: createTransformerElement,
-      requiresBranchRow: true,
+      branchCount: 1,
     },
     },
   },

@@ -162,8 +162,8 @@ describe("Inductor", () => {
       expect(InductorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
     });
 
-    it("InductorDefinition requiresBranchRow is true", () => {
-      expect(InductorDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+    it("InductorDefinition branchCount is 1", () => {
+      expect(InductorDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
     });
 
     it("InductorDefinition category is PASSIVES", () => {

@@ -271,8 +271,8 @@ describe("SparkGap", () => {
       expect(element.isReactive).toBe(false);
     });
 
-    it("requiresBranchRow is false", () => {
-      expect(SparkGapDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
+    it("branchCount is false", () => {
+      expect(SparkGapDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

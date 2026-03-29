@@ -725,7 +725,7 @@ export const TransmissionLineDefinition: ComponentDefinition = {
     mnaModels: {
       behavioral: {
       factory: createTransmissionLineElement,
-      requiresBranchRow: true,
+      branchCount: 1,
       getInternalNodeCount: (props: PropertyBag): number => {
         const N = props.getOrDefault<number>("segments", 10);
         return (N - 1) * 2;

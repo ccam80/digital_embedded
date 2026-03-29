@@ -570,7 +570,7 @@ export const TappedTransformerDefinition: ComponentDefinition = {
     mnaModels: {
       behavioral: {
       factory: createTappedTransformerElement,
-      requiresBranchRow: true,
+      branchCount: 1,
     },
     },
   },

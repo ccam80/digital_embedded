@@ -437,14 +437,14 @@ describe("ComponentRegistry", () => {
       expect(stored.models.digital!.switchPins).toEqual([0, 1]);
     });
 
-    it("models.mnaModels.behavioral.requiresBranchRow is preserved through register()", () => {
+    it("models.mnaModels.behavioral.branchCount is preserved through register()", () => {
       const def: ComponentDefinition = {
         ...makeDefinition("VSource"),
-        models: { mnaModels: { behavioral: { factory: stubAnalogFactory, requiresBranchRow: true } } },
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory, branchCount: 1 } } },
       };
       registry.register(def);
       const stored = registry.get("VSource")!;
-      expect(stored.models.mnaModels.behavioral!.requiresBranchRow).toBe(true);
+      expect(stored.models.mnaModels.behavioral!.branchCount).toBe(1);
     });
 
     it("register() preserves explicitly supplied models", () => {
@@ -691,7 +691,7 @@ describe("ComponentRegistry", () => {
       // they must also update ComponentDefinition (where it belongs).
       const mnaKeys: Array<keyof MnaModel> = [
         "factory", "subcircuitModel", "getInternalNodeCount",
-        "requiresBranchRow", "deviceType", "defaultParams",
+        "branchCount", "deviceType", "defaultParams",
       ];
       expect(mnaKeys).not.toContain("pinElectrical");
       expect(mnaKeys).not.toContain("pinElectricalOverrides");

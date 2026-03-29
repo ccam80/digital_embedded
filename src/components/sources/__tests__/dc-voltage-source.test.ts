@@ -99,7 +99,7 @@ describe("DcVoltageSource", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(DcVoltageSourceDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+    expect(DcVoltageSourceDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
   });
 
   it("definition_engine_type_analog", () => {

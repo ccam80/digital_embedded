@@ -239,8 +239,8 @@ describe("NTC", () => {
       expect(element.isNonlinear).toBe(true);
     });
 
-    it("requiresBranchRow is false", () => {
-      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
+    it("branchCount is false", () => {
+      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

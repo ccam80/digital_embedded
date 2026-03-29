@@ -461,7 +461,7 @@ export const CrystalDefinition: ComponentDefinition = {
     mnaModels: {
       behavioral: {
       factory: createCrystalElement,
-      requiresBranchRow: true,
+      branchCount: 1,
       getInternalNodeCount: () => 2,
     },
     },

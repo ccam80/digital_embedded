@@ -126,7 +126,7 @@ describe("VariableRail", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(VariableRailDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBe(true);
+    expect(VariableRailDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
   });
 
   it("definition_engine_type_analog", () => {

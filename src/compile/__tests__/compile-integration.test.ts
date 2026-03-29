@@ -188,7 +188,7 @@ function makeDigitalDef(name: string, pins: PinDeclaration[] = []): Omit<Compone
 
 function makeAnalogDef(
   name: string,
-  requiresBranchRow: boolean,
+  branchCount: boolean,
   factoryFn: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], branchIdx: number, _props: PropertyBagType, _getTime: () => number) => AnalogElement,
 ): Omit<ComponentDefinition, 'typeId'> {
   return {
@@ -203,7 +203,7 @@ function makeAnalogDef(
     models: {
       mnaModels: {
         behavioral: {
-          requiresBranchRow,
+          branchCount,
           factory: factoryFn,
         },
       },
@@ -306,7 +306,7 @@ function buildMixedRegistry(): ComponentRegistry {
       digital: { executeFn: noopExec },
       mnaModels: {
         behavioral: {
-          requiresBranchRow: false,
+          branchCount: 0,
           factory: (pinNodes) => {
             const [n0, n1] = [...pinNodes.values()];
             return makeResistorElement(n0 ?? 0, n1 ?? 0);

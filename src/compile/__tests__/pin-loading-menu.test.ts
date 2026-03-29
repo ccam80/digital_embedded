@@ -173,7 +173,7 @@ function buildMixedRegistry(): ComponentRegistry {
     models: {
       mnaModels: {
         behavioral: {
-          requiresBranchRow: false,
+          branchCount: 0,
           factory: (pinNodes: ReadonlyMap<string, number>) => {
             const [n0, n1] = [...pinNodes.values()];
             return makeResistorElement(n0 ?? 0, n1 ?? 0);
@@ -216,7 +216,7 @@ function buildMixedRegistry(): ComponentRegistry {
       digital: { executeFn: noopExec },
       mnaModels: {
         behavioral: {
-          requiresBranchRow: false,
+          branchCount: 0,
           factory: (pinNodes: ReadonlyMap<string, number>) => {
             const [n0, n1] = [...pinNodes.values()];
             return makeResistorElement(n0 ?? 0, n1 ?? 0);

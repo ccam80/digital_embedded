@@ -223,7 +223,7 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
   models: {
     mnaModels: {
       behavioral: {
-      requiresBranchRow: true,
+      branchCount: 1,
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],

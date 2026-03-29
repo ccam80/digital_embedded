@@ -266,7 +266,7 @@ export const InductorDefinition: ComponentDefinition = {
     mnaModels: {
       behavioral: {
       factory: createInductorElement,
-      requiresBranchRow: true,
+      branchCount: 1,
     },
     },
   },

@@ -144,7 +144,7 @@ function buildTestRegistry(): ComponentRegistry {
     models: {
       mnaModels: {
         behavioral: {
-          requiresBranchRow: true,
+          branchCount: 1,
           factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
             const [n0, n1] = [...pinNodes.values()];
             return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
@@ -159,7 +159,7 @@ function buildTestRegistry(): ComponentRegistry {
     models: {
       mnaModels: {
         behavioral: {
-          requiresBranchRow: false,
+          branchCount: 0,
           factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
             const [n0, n1] = [...pinNodes.values()];
             return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
@@ -175,7 +175,7 @@ function buildTestRegistry(): ComponentRegistry {
     models: {
       mnaModels: {
         behavioral: {
-          requiresBranchRow: true,
+          branchCount: 1,
           factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
             const [n0, n1] = [...pinNodes.values()];
             return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
@@ -447,7 +447,7 @@ describe("AnalogCompiler", () => {
       models: {
         mnaModels: {
           behavioral: {
-            requiresBranchRow: true,
+            branchCount: 1,
             factory: factorySpy,
           },
         },

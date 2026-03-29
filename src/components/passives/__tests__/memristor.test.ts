@@ -309,8 +309,8 @@ describe("Memristor", () => {
       expect(element.isReactive).toBe(false);
     });
 
-    it("requiresBranchRow is false", () => {
-      expect(MemristorDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
+    it("branchCount is false", () => {
+      expect(MemristorDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

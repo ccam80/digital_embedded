@@ -94,7 +94,7 @@ describe("CurrentSource", () => {
   });
 
   it("definition_does_not_require_branch_row", () => {
-    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral?.requiresBranchRow).toBeFalsy();
+    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
   });
 
   it("default_current_from_analog_factory", () => {
