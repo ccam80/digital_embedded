@@ -83,13 +83,17 @@ function elementToDtsElement(element: CircuitElement): DtsElement {
   const props = serializeProperties(
     element.getProperties().entries() as IterableIterator<[string, unknown]>,
   );
-  return {
+  const result: DtsElement = {
     type: element.typeId,
     id: element.instanceId,
     position: { x: element.position.x, y: element.position.y },
-    rotation: element.rotation * 90,
+    rotation: element.rotation * 90, // .dts stores degrees; internal Rotation is quarter-turns
     properties: props,
   };
+  if (element.mirror) {
+    result.mirror = true;
+  }
+  return result;
 }
 
 function wireToDtsWire(wire: Wire): DtsWire {
@@ -114,6 +118,10 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 
   if (circuit.metadata.isGeneric) {
     result.isGeneric = circuit.metadata.isGeneric;
+  }
+
+  if (circuit.metadata.measurementOrdering.length > 0) {
+    result.measurementOrdering = [...circuit.metadata.measurementOrdering];
   }
 
   if (

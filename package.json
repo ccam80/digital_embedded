@@ -17,7 +17,6 @@
     "@codemirror/view": "^6.39.16",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@xmldom/xmldom": "^0.8.11",
-    "fflate": "^0.8.2",
     "gifenc": "^1.0.3",
     "zod": "^3.23.8"
   },

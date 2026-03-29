@@ -17,6 +17,37 @@ import type { Diagnostic } from "../headless/netlist-types.js";
 import { parseCtzText as parseCtzTextFormat, mapCtzToCircuit } from "./ctz-format.js";
 
 // ---------------------------------------------------------------------------
+// CTZ URL detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Known CircuitJS URL host patterns that indicate a CTZ-encoded circuit URL.
+ *
+ * Matches both the canonical falstad.com host and the common GitHub Pages
+ * deployment path used by forks.
+ */
+const CTZ_URL_PATTERNS = [
+  /falstad\.com\/circuit/,
+  /circuitjs\.html/,
+  /\/circuit\/circuitjs/,
+];
+
+/**
+ * Return true when the given string looks like a CircuitJS CTZ URL.
+ *
+ * A CTZ URL is any URL that:
+ * - Matches a known CircuitJS host/path pattern, AND
+ * - Contains a `#` fragment (the compressed circuit data)
+ *
+ * This is used by the file loader and postMessage adapter to decide whether
+ * to route a string to `parseCtzUrl()` instead of the JSON or .dig pipeline.
+ */
+export function isCtzUrl(url: string): boolean {
+  if (!url.includes("#")) return false;
+  return CTZ_URL_PATTERNS.some((pattern) => pattern.test(url));
+}
+
+// ---------------------------------------------------------------------------
 // Decompression — browser-native DecompressionStream
 // ---------------------------------------------------------------------------
 

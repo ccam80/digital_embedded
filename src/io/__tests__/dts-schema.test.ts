@@ -394,3 +394,153 @@ describe('modelDefinitions', () => {
     expect(restored.metadata.modelDefinitions!['RDIV'].elementCount).toBe(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// mirror round-trip tests
+// ---------------------------------------------------------------------------
+
+describe('mirror', () => {
+  it('serializes_mirror_true_when_set', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'MirrorTest' });
+    const el = makeElement('In', 'id-1', 100, 200);
+    el.mirror = true;
+    circuit.addElement(el);
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const elements = (parsed['circuit'] as Record<string, unknown>)['elements'] as Array<Record<string, unknown>>;
+
+    expect(elements[0]['mirror']).toBe(true);
+  });
+
+  it('deserializes_mirror_true', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'MirrorTest' });
+    const el = makeElement('In', 'id-1', 100, 200);
+    el.mirror = true;
+    circuit.addElement(el);
+
+    const json = serializeCircuit(circuit);
+    const { circuit: restored } = deserializeDts(json, registry);
+
+    expect(restored.elements[0].mirror).toBe(true);
+  });
+
+  it('omits_mirror_field_when_false', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'NoMirrorTest' });
+    const el = makeElement('In', 'id-1', 100, 200);
+    el.mirror = false;
+    circuit.addElement(el);
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const elements = (parsed['circuit'] as Record<string, unknown>)['elements'] as Array<Record<string, unknown>>;
+
+    expect('mirror' in elements[0]).toBe(false);
+  });
+
+  it('defaults_mirror_to_false_when_absent', () => {
+    const registry = makeRegistry('In');
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: {
+        name: 'DefaultMirror',
+        elements: [
+          {
+            type: 'In',
+            id: 'id-1',
+            position: { x: 0, y: 0 },
+            rotation: 0,
+            properties: {},
+          },
+        ],
+        wires: [],
+      },
+    };
+
+    const { circuit } = deserializeDts(JSON.stringify(doc), registry);
+
+    expect(circuit.elements[0].mirror).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// measurementOrdering round-trip tests
+// ---------------------------------------------------------------------------
+
+describe('measurementOrdering', () => {
+  it('serializes_measurementOrdering_when_non_empty', () => {
+    const circuit = new Circuit({ name: 'OrdTest' });
+    circuit.metadata.measurementOrdering = ['probe1', 'probe2'];
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const circ = parsed['circuit'] as Record<string, unknown>;
+
+    expect(circ['measurementOrdering']).toEqual(['probe1', 'probe2']);
+  });
+
+  it('deserializes_measurementOrdering', () => {
+    const registry = makeRegistry();
+    const circuit = new Circuit({ name: 'OrdTest' });
+    circuit.metadata.measurementOrdering = ['probe1', 'probe2'];
+
+    const json = serializeCircuit(circuit);
+    const { circuit: restored } = deserializeDts(json, registry);
+
+    expect(restored.metadata.measurementOrdering).toEqual(['probe1', 'probe2']);
+  });
+
+  it('omits_measurementOrdering_when_empty', () => {
+    const circuit = new Circuit({ name: 'EmptyOrd' });
+    // measurementOrdering defaults to []
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const circ = parsed['circuit'] as Record<string, unknown>;
+
+    expect('measurementOrdering' in circ).toBe(false);
+  });
+
+  it('defaults_measurementOrdering_to_empty_when_absent', () => {
+    const registry = makeRegistry();
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: {
+        name: 'NoOrd',
+        elements: [],
+        wires: [],
+      },
+    };
+
+    const { circuit } = deserializeDts(JSON.stringify(doc), registry);
+
+    expect(circuit.metadata.measurementOrdering).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Parity: mirror + measurementOrdering together
+// ---------------------------------------------------------------------------
+
+describe('mirror_and_measurementOrdering_parity', () => {
+  it('round_trips_both_fields_together', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'Parity' });
+    circuit.metadata.measurementOrdering = ['out1', 'out2'];
+
+    const el = makeElement('In', 'id-1', 50, 50);
+    el.mirror = true;
+    circuit.addElement(el);
+
+    const json = serializeCircuit(circuit);
+    const { circuit: restored } = deserializeDts(json, registry);
+
+    expect(restored.metadata.measurementOrdering).toEqual(['out1', 'out2']);
+    expect(restored.elements[0].mirror).toBe(true);
+  });
+});

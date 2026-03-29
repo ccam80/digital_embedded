@@ -33,6 +33,8 @@ export interface DtsElement {
   rotation: number;
   /** Component-specific property values. */
   properties: Record<string, unknown>;
+  /** Whether the component is mirrored horizontally. Omitted when false. */
+  mirror?: boolean;
 }
 
 /**
@@ -55,12 +57,10 @@ export interface DtsCircuit {
   elements: DtsElement[];
   /** All wire polylines. */
   wires: DtsWire[];
-  /** Embedded test vectors in Digital test syntax. */
-  testData?: string;
+  /** Ordered list of measurement probe names for the data table. */
+  measurementOrdering?: string[];
   /** Whether this circuit uses generic (parameterised) resolution. */
   isGeneric?: boolean;
-  /** HGS initialisation script for generic circuits. */
-  genericInitCode?: string;
   /** Circuit-level attributes (freeform key-value metadata). */
   attributes?: Record<string, string>;
 }
@@ -269,21 +269,24 @@ function validateDtsCircuit(value: unknown, path: string): void {
     validateDtsWire((circuit['wires'] as unknown[])[i], `${path}.wires[${i}]`);
   }
 
-  if (circuit['testData'] !== undefined && typeof circuit['testData'] !== 'string') {
-    throw new Error(
-      `Invalid .dts document: "${path}.testData" must be a string when present`,
-    );
+  if (circuit['measurementOrdering'] !== undefined) {
+    if (!Array.isArray(circuit['measurementOrdering'])) {
+      throw new Error(
+        `Invalid .dts document: "${path}.measurementOrdering" must be an array when present`,
+      );
+    }
+    for (let i = 0; i < (circuit['measurementOrdering'] as unknown[]).length; i++) {
+      if (typeof (circuit['measurementOrdering'] as unknown[])[i] !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "${path}.measurementOrdering[${i}]" must be a string`,
+        );
+      }
+    }
   }
 
   if (circuit['isGeneric'] !== undefined && typeof circuit['isGeneric'] !== 'boolean') {
     throw new Error(
       `Invalid .dts document: "${path}.isGeneric" must be a boolean when present`,
-    );
-  }
-
-  if (circuit['genericInitCode'] !== undefined && typeof circuit['genericInitCode'] !== 'string') {
-    throw new Error(
-      `Invalid .dts document: "${path}.genericInitCode" must be a string when present`,
     );
   }
 
@@ -327,6 +330,9 @@ function validateDtsElement(value: unknown, path: string): void {
   }
   if (el['properties'] === null || typeof el['properties'] !== 'object' || Array.isArray(el['properties'])) {
     throw new Error(`Invalid .dts document: "${path}.properties" must be an object`);
+  }
+  if (el['mirror'] !== undefined && typeof el['mirror'] !== 'boolean') {
+    throw new Error(`Invalid .dts document: "${path}.mirror" must be a boolean when present`);
   }
 }
 

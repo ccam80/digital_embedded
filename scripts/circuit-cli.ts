@@ -27,8 +27,8 @@ import { executeTests } from '@/testing/executor.js';
 import { loadDig } from '@/io/dig-loader.js';
 import { loadWithSubcircuits } from '@/io/subcircuit-loader.js';
 import { NodeResolver } from '@/io/file-resolver.js';
-import { deserializeCircuit } from '@/io/load.js';
-import { serializeCircuit } from '@/io/save.js';
+import { deserializeDts } from '@/io/dts-deserializer.js';
+import { serializeCircuit } from '@/io/dts-serializer.js';
 import type {
   Netlist,
   ComponentDescriptor,
@@ -58,7 +58,7 @@ async function loadCircuit(filePath: string) {
   const trimmed = content.trimStart();
   if (trimmed.startsWith('{')) {
     // JSON format (from build --out or serialize)
-    return deserializeCircuit(content, registry);
+    return deserializeDts(content, registry).circuit;
   }
   // .dig XML format — use subcircuit-aware loader with a NodeResolver
   // rooted at the directory containing the file, so sibling .dig files

@@ -89,6 +89,10 @@ function deserializeDtsCircuit(
     metadata.isGeneric = dtsCircuit.isGeneric;
   }
 
+  if (dtsCircuit.measurementOrdering !== undefined) {
+    metadata.measurementOrdering = [...dtsCircuit.measurementOrdering];
+  }
+
   if (dtsCircuit.attributes !== undefined) {
     const attrs = dtsCircuit.attributes;
     const loadingRaw = attrs['digitalPinLoading'];
@@ -137,6 +141,7 @@ function createElement(
 
   element.position = { x: savedEl.position.x, y: savedEl.position.y };
   element.rotation = degreesToRotation(savedEl.rotation);
+  element.mirror = savedEl.mirror ?? false;
 
   // Restore the persisted instanceId (readonly on the class, but must be
   // restored exactly for round-trip fidelity).

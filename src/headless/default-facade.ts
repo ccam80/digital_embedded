@@ -33,8 +33,8 @@ import type { CompiledCircuitUnified } from '../compile/types.js';
 import { compileUnified } from '../compile/compile.js';
 import { getTransistorModels } from '../solver/analog/default-models.js';
 import { SimulationLoader } from './loader.js';
-import { serializeCircuit } from '../io/save.js';
-import { deserializeCircuit } from '../io/load.js';
+import { serializeCircuit } from '../io/dts-serializer.js';
+import { deserializeDts } from '../io/dts-deserializer.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
@@ -257,7 +257,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   deserialize(json: string): Circuit {
-    return deserializeCircuit(json, this._registry);
+    return deserializeDts(json, this._registry).circuit;
   }
 
   // =========================================================================

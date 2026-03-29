@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { join } from "path";
 import { readFileSync } from "fs";
 import { SimulationLoader } from "../loader.js";
-import { serializeCircuit } from "../../io/save.js";
+import { serializeCircuit } from "../../io/dts-serializer.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import { AbstractCircuitElement } from "../../core/element.js";

@@ -13,7 +13,7 @@ import type { ComponentRegistry } from "../core/registry.js";
 import type { Circuit } from "../core/circuit.js";
 import { parseDigXml } from "../io/dig-parser.js";
 import { loadDigCircuit } from "../io/dig-loader.js";
-import { deserializeCircuit } from "../io/load.js";
+import { deserializeDts } from "../io/dts-deserializer.js";
 
 // ---------------------------------------------------------------------------
 // Environment detection
@@ -104,6 +104,6 @@ export class SimulationLoader {
    * Synchronous — JSON parsing and element construction require no I/O.
    */
   loadJson(json: string): Circuit {
-    return deserializeCircuit(json, this._registry);
+    return deserializeDts(json, this._registry).circuit;
   }
 }

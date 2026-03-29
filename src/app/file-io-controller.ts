@@ -14,7 +14,6 @@ import { createModal } from './dialog-manager.js';
 import { Circuit } from '../core/circuit.js';
 import { HttpResolver, EmbeddedResolver, ChainResolver } from '../io/file-resolver.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
-import { deserializeCircuit } from '../io/load.js';
 import { parseCtzCircuitFromText } from '../io/ctz-parser.js';
 import { deserializeDts } from '../io/dts-deserializer.js';
 import { serializeCircuit as serializeDts } from '../io/dts-serializer.js';
@@ -23,7 +22,6 @@ import { storeFolder, loadFolder, clearFolder } from '../io/folder-store.js';
 import { exportSvg } from '../export/svg.js';
 import { exportPng } from '../export/png.js';
 import { exportGif } from '../export/gif.js';
-import { exportZip } from '../export/zip.js';
 import { EngineState } from '../core/engine-interface.js';
 
 // ---------------------------------------------------------------------------
@@ -157,13 +155,8 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         } else {
           const firstChar = text.replace(/^\s+/, '').charAt(0);
           if (firstChar === '{' || firstChar === '[') {
-            const parsed = JSON.parse(text);
-            if (parsed.format === 'dts' || parsed.format === 'digb') {
-              const result = deserializeDts(text, registry);
-              loaded = result.circuit;
-            } else {
-              loaded = deserializeCircuit(text, registry);
-            }
+            const result = deserializeDts(text, registry);
+            loaded = result.circuit;
           } else {
             loaded = await loadWithSubcircuits(text, httpResolver, registry);
           }
@@ -544,10 +537,6 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   }
   document.querySelector('.menu-item[data-menu="file"]')?.addEventListener('click', updateGifMenuState);
   updateGifMenuState();
-
-  document.getElementById('btn-export-zip')?.addEventListener('click', () => {
-    downloadExport(exportZip(ctx.getCircuit(), new Map()), `${circuitBaseName()}.zip`, 'ZIP');
-  });
 
   // -------------------------------------------------------------------------
   // Return public interface

@@ -1,6 +1,6 @@
 import { createDefaultRegistry } from '../src/components/register-all.js';
 import { CircuitBuilder } from '../src/headless/builder.js';
-import { serializeCircuit } from '../src/io/save.js';
+import { serializeCircuit } from '../src/io/dts-serializer.js';
 import { writeFileSync } from 'fs';
 import type { CircuitSpec } from '../src/headless/netlist-types.js';
 
