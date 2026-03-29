@@ -11,6 +11,10 @@ import type { CanvasInteractionDeps } from './canvas-interaction.js';
 import { PropertyPanel } from '../editor/property-panel.js';
 import { availableModels, getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
+import { openSpiceImportDialog } from './spice-import-dialog.js';
+import { openSpiceSubcktDialog } from './spice-subckt-dialog.js';
+import { applySpiceImportResult, applySpiceSubcktImportResult } from './spice-model-apply.js';
+import { getTransistorModels } from '../solver/analog/default-models.js';
 
 // ---------------------------------------------------------------------------
 // PopupController
@@ -98,6 +102,52 @@ export function createPopupController(
       // Component has no models — skip panel display.
     }
     activePopupPanel = propertyPopup;
+
+    // SPICE import buttons — shown for semiconductor components with deviceType models
+    {
+      let hasSemiconductorModel = false;
+      let hasSubcircuitModel = false;
+      if (def.models?.mnaModels) {
+        for (const mnaModel of Object.values(def.models.mnaModels)) {
+          if (mnaModel.deviceType) hasSemiconductorModel = true;
+          if ((mnaModel as { subcircuitModel?: string }).subcircuitModel !== undefined) hasSubcircuitModel = true;
+        }
+      }
+
+      if (hasSemiconductorModel) {
+        const spiceBtn = document.createElement('button');
+        spiceBtn.className = 'spice-import-apply';
+        spiceBtn.textContent = 'Import SPICE Model\u2026';
+        spiceBtn.disabled = ctx.isSimActive();
+        spiceBtn.addEventListener('click', () => {
+          closePopup();
+          void openSpiceImportDialog(elementHit, container).then((result) => {
+            if (!result) return;
+            applySpiceImportResult(elementHit, result, ctx.circuit);
+            ctx.invalidateCompiled();
+            ctx.showStatus(`Applied SPICE model "${result.modelName}" to ${elementHit.typeId}`);
+          });
+        });
+        propsContainer.appendChild(spiceBtn);
+      }
+
+      if (hasSubcircuitModel) {
+        const subcktBtn = document.createElement('button');
+        subcktBtn.className = 'spice-import-apply';
+        subcktBtn.textContent = 'Import SPICE Subcircuit\u2026';
+        subcktBtn.disabled = ctx.isSimActive();
+        subcktBtn.addEventListener('click', () => {
+          closePopup();
+          void openSpiceSubcktDialog(elementHit, container).then((result) => {
+            if (!result) return;
+            applySpiceSubcktImportResult(elementHit, result, getTransistorModels(), ctx.circuit);
+            ctx.invalidateCompiled();
+            ctx.showStatus(`Registered subcircuit "${result.subcktName}" and applied to ${elementHit.typeId}`);
+          });
+        });
+        propsContainer.appendChild(subcktBtn);
+      }
+    }
 
     popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
     popup.style.top = `${Math.min(screenPt.y + 10, container.clientHeight - 200)}px`;

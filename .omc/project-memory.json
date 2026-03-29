@@ -265,8 +265,8 @@
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 131,
-      "lastAccessed": 1774766436404,
+      "accessCount": 132,
+      "lastAccessed": 1774767714637,
       "type": "file"
     },
     {
@@ -295,8 +295,8 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 73,
-      "lastAccessed": 1774766632921,
+      "accessCount": 74,
+      "lastAccessed": 1774767685288,
       "type": "file"
     },
     {
@@ -304,6 +304,12 @@
       "accessCount": 63,
       "lastAccessed": 1774767166292,
       "type": "directory"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 45,
+      "lastAccessed": 1774768256815,
+      "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
@@ -318,15 +324,15 @@
       "type": "directory"
     },
     {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 43,
-      "lastAccessed": 1774766633857,
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 38,
+      "lastAccessed": 1774767690915,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 37,
-      "lastAccessed": 1774766633490,
+      "path": "src\\app\\canvas-popup.ts",
+      "accessCount": 34,
+      "lastAccessed": 1774768173131,
       "type": "file"
     },
     {
@@ -348,12 +354,6 @@
       "type": "file"
     },
     {
-      "path": "src\\app\\canvas-popup.ts",
-      "accessCount": 29,
-      "lastAccessed": 1774747613036,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\reviewer.md",
       "accessCount": 29,
       "lastAccessed": 1774764821001,
@@ -367,8 +367,8 @@
     },
     {
       "path": "src\\solver\\analog\\model-parser.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774765541590,
+      "accessCount": 25,
+      "lastAccessed": 1774767844049,
       "type": "directory"
     },
     {

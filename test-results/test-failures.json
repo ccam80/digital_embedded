@@ -1,0 +1,2437 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 48,
+      "failed": 0,
+      "skipped": 0,
+      "totalFiles": 3,
+      "durationSeconds": 1.3
+    },
+    "playwright": {
+      "passed": 160,
+      "failed": 382,
+      "skipped": 0,
+      "totalFiles": 22,
+      "durationSeconds": 585.8554920000001
+    },
+    "totalFailed": 382,
+    "totalPassed": 208
+  },
+  "failures": {
+    "vitest": [],
+    "playwright": [
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 4,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RC lowpass: steady-state amplitude matches analytical",
+            "line": 179,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC series: resonance frequency f0 = 1/(2pi*sqrt(LC))",
+            "line": 291,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC parallel: anti-resonance behavior",
+            "line": 335,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "capacitor shows property popup with float input",
+            "line": 260,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 9,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RL circuit: current rise with time constant L/R",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT differential pair: balanced outputs when inputs equal",
+            "line": 526,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET H-bridge: forward and reverse drive states",
+            "line": 1051,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched RC: charge on close, discharge on open",
+            "line": 1272,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SPDT source selector: toggles between two voltage sources",
+            "line": 1448,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SCR latch: trigger on and stays latched",
+            "line": 1774,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "triac dimmer: phase-angle AC control",
+            "line": 1828,
+            "column": 5
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SWITCHING/PFET can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SEMICONDUCTORS/NMOS can be placed from palette",
+            "line": 500,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "message": "Error: Vregulated: expected 5.140892 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "zener regulator: output clamps at Vz",
+            "line": 427,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcollector: expected 11.04672 ±0.1%, got 11.351330998353845",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT common-emitter: DC bias point Vce > 0, Ic > 0",
+            "line": 466,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcollector: expected 11.97211 ±0.1%, got 11.76093607300066",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT Darlington pair: high current gain",
+            "line": 586,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vout: expected 2.32547 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT push-pull: complementary output follows input",
+            "line": 639,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vdrain: expected 11.78713 ±0.1%, got 12.541626639009666",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "JFET amplifier: pinch-off region operation",
+            "line": 835,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Voutput: expected 11.10296 ±0.1%, got 11.357753478833986",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "cascode amplifier: two-stage BJT with higher output impedance",
+            "line": 890,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vref_leg: expected 1.212704 ±0.1%, got 0.7766215018699367",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "Wilson current mirror: output current tracks reference",
+            "line": 948,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vq1c: expected 10.25837 ±0.1%, got 10.773561233991135",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT+MOSFET mixed driver: NPN drives NMOS gate",
+            "line": 1116,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vc1: expected 10.72269 ±0.1%, got 12",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "multi-stage amplifier: three CE stages with overall gain",
+            "line": 1171,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 6,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LRC with switch: damped oscillation after closing",
+            "line": 1312,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "relay-driven LC: relay switches between load paths",
+            "line": 1351,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "crystal oscillator: oscillation builds at crystal frequency",
+            "line": 1580,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "555 astable: oscillation at expected frequency",
+            "line": 1722,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "RC lowpass steady-state amplitude matches analytical",
+            "line": 168,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched capacitor filter: clock-driven analog switches",
+            "line": 1400,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET PWM into RLC: filtered DC output",
+            "line": 1540,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LDR voltage divider: output varies with light level",
+            "line": 1876,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: No node voltages changed after 50 steps",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "node voltages change during transient simulation",
+            "line": 144,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SEMICONDUCTORS/PnpBJT can be placed from palette",
+            "line": 500,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/simulator.html",
+        "count": 325,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SOURCES/Ground can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/Timer555 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/VoltageComparator can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/SchmittInverting can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/SchmittNonInverting can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/DAC can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/ADC can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/Optocoupler can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/SwitchSPST can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/SwitchSPDT can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/VCVS can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/VCCS can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/CCVS can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/CCCS can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "GRAPHICS/LedMatrix can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "GRAPHICS/VGA can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "GRAPHICS/GraphicCard can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "TERMINAL/Keyboard can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "TERMINAL/Terminal can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7400 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7402 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7404 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7408 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7432 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7486 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/7474 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/74138 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/74161 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "74XX/74245 can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=3: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=3: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=5: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "PriorityEncoder at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "PriorityEncoder at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=8: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=2 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=2 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=3 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=4 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=1 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=1 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=2 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=2 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=3 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=4 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROMDualPort addr=2 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROMDualPort addr=4 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMDualPort addr=2 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMDualPort addr=4 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMAsync addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMAsync addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 4→8: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 8→16: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 16→32: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 4,4→8: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 8,8→16: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 4,4,4,4→16: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 16,16→32: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=1: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=4: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=8: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=16: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "VoltageComparator works in analog mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "VoltageComparator works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/diag-analog.spec.ts",
+            "test": "diagnostic: use import to create headless facade",
+            "line": 6,
+            "column": 1
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "AND gate: place, wire, simulate, verify truth table",
+            "line": 80,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "OR gate: place, wire, simulate, verify truth table",
+            "line": 108,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "NOT gate: inverter",
+            "line": 132,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "NAND gate: verify truth table",
+            "line": 152,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "XOR gate: verify truth table",
+            "line": 176,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "half adder: XOr for sum, And for carry (fan-out)",
+            "line": 201,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "full adder: sum and carry for all 8 input combos",
+            "line": 232,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "SR latch from NAND gates: set, hold, reset",
+            "line": 293,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "D flip-flop: clock-edge triggered latch",
+            "line": 321,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "JK flip-flop: hold, set, reset, toggle",
+            "line": 345,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "T flip-flop 4-bit ripple counter",
+            "line": 381,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "4-bit counter: count sequence via built-in Counter",
+            "line": 449,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "2:1 Mux: selector routes correct input to output",
+            "line": 485,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "4:1 Mux: 2-bit selector routes one of four inputs",
+            "line": 517,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Decoder: 2-bit input produces one-hot outputs",
+            "line": 558,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "4-bit adder: multi-bit arithmetic with carry",
+            "line": 594,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Comparator: less, equal, greater for 4-bit values",
+            "line": 635,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "ROM lookup: read preloaded data by address",
+            "line": 675,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "RAM write/read: store and retrieve values",
+            "line": 718,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Register file: write and read registers",
+            "line": 760,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Tunnel wiring: signal propagates through named tunnels",
+            "line": 808,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Bus splitter: 8-bit to 4+4 nibbles",
+            "line": 880,
+            "column": 3
+          },
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "Priority encoder: highest active input index",
+            "line": 927,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "File > New resets the circuit",
+            "line": 20,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "Edit > Undo/Redo menu items exist",
+            "line": 28,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "View > Fit to Content does not crash",
+            "line": 34,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "Simulation > View Traces opens viewer panel",
+            "line": 41,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "viewer panel close button works",
+            "line": 49,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "Simulation > Step menu item exists",
+            "line": 62,
+            "column": 3
+          },
+          {
+            "file": "gui/menu-actions.spec.ts",
+            "test": "View > Dark Mode toggle works via menu",
+            "line": 69,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "DAC + RC filter: digital input produces filtered analog voltage",
+            "line": 153,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital gate driving analog load: And output drives resistor",
+            "line": 218,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "comparator to logic: analog threshold drives digital gate",
+            "line": 318,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "ADC readout: analog waveform sampled to digital outputs",
+            "line": 377,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "Schmitt trigger to counter: analog sine drives digital count",
+            "line": 437,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "555 timer driving digital counter: analog oscillator to digital count",
+            "line": 495,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
+            "line": 563,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed transistor + gate: BJT level-shifts into digital And",
+            "line": 657,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital-controlled analog switch: In toggles analog path",
+            "line": 722,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "relay from digital logic: And gate drives relay coil",
+            "line": 768,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed switching transient: D_FF toggles SPDT with LRC load",
+            "line": 818,
+            "column": 5
+          },
+          {
+            "file": "gui/pin-loading-wire-override.spec.ts",
+            "test": "right-clicking a wire shows Pin Loading menu items",
+            "line": 68,
+            "column": 3
+          },
+          {
+            "file": "gui/pin-loading-wire-override.spec.ts",
+            "test": "clicking Pin Loading: Loaded adds override and canvas renders without error",
+            "line": 92,
+            "column": 3
+          },
+          {
+            "file": "gui/pin-loading-wire-override.spec.ts",
+            "test": "after setting Loaded, right-clicking wire shows checkmark on Loaded",
+            "line": 115,
+            "column": 3
+          },
+          {
+            "file": "gui/pin-loading-wire-override.spec.ts",
+            "test": "selecting Pin Loading: Default removes the override",
+            "line": 142,
+            "column": 3
+          },
+          {
+            "file": "gui/pin-loading-wire-override.spec.ts",
+            "test": "loading mode persists after recompile (canvas re-render)",
+            "line": 178,
+            "column": 3
+          },
+          {
+            "file": "gui/simulation-controls.spec.ts",
+            "test": "Step button is clickable and does not crash",
+            "line": 15,
+            "column": 3
+          },
+          {
+            "file": "gui/simulation-controls.spec.ts",
+            "test": "Run and Stop buttons toggle simulation state",
+            "line": 24,
+            "column": 3
+          },
+          {
+            "file": "gui/simulation-controls.spec.ts",
+            "test": "Fit button works",
+            "line": 41,
+            "column": 3
+          },
+          {
+            "file": "gui/simulation-controls.spec.ts",
+            "test": "Undo/Redo buttons exist and are initially disabled",
+            "line": 48,
+            "column": 3
+          },
+          {
+            "file": "gui/simulation-controls.spec.ts",
+            "test": "Speed controls exist",
+            "line": 57,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import menu item visible for NPN BJT",
+            "line": 45,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import dialog opens with textarea when menu item clicked",
+            "line": 56,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 70,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 91,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT import menu item visible for component with subcircuitModel support",
+            "line": 132,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT dialog opens and shows parse preview",
+            "line": 143,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": "no .MODEL import menu item for Resistor (no deviceType)",
+            "line": 163,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "panel visible for NPN BJT in analog mode",
+            "line": 72,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "panel not shown for resistor",
+            "line": 96,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "panel not shown when simulationModel is logical",
+            "line": 111,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "edited IS value persists after closing and reopening popup",
+            "line": 129,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "IS override affects BJT collector current",
+            "line": 165,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "partial selection shows correct boundary ports in the dialog",
+            "line": 165,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "dialog auto-generates subcircuit_1 name",
+            "line": 208,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "Create button rejects empty name",
+            "line": 228,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "changing a port face dropdown updates the chip preview",
+            "line": 254,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "creating a subcircuit replaces selection with correctly-sized chip",
+            "line": 304,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "subcircuit compiles and passes test vectors",
+            "line": 337,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "new subcircuit appears in the palette",
+            "line": 360,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "double-click on subcircuit navigates inside with breadcrumb",
+            "line": 392,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "right-click \"Open Subcircuit\" navigates into definition",
+            "line": 446,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "right-click \"Edit Symbol…\" re-opens dialog with existing port data",
+            "line": 485,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "Ctrl+Z undoes subcircuit creation, restoring original elements",
+            "line": 539,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "duplicate subcircuit name is rejected by the dialog",
+            "line": 573,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "second subcircuit auto-names as subcircuit_2",
+            "line": 626,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "subcircuit chip has pins distributed on left and right faces",
+            "line": 661,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "moving all ports to left face puts all pins on the left side",
+            "line": 703,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "place In, And, Out from palette onto canvas",
+            "line": 216,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "Escape cancels placement mode without placing",
+            "line": 246,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "R key rotates component during placement",
+            "line": 256,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "select component and edit label in property panel",
+            "line": 281,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "select component and edit numeric property",
+            "line": 314,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "place component, undo removes it, redo restores it",
+            "line": 356,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "delete component, undo restores it",
+            "line": 383,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed buttons change the displayed value",
+            "line": 465,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "manual speed entry via text field",
+            "line": 482,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "toolbar Run/Step/Stop cycle works without crash",
+            "line": 503,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "palette shows analog components without mode switching",
+            "line": 541,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "build RC, run simulation, select capacitor, see slider",
+            "line": 572,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "slider panel lifecycle: created on run, disposed on stop",
+            "line": 603,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 635,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SOURCES/VariableRail can be placed from palette",
+            "line": 500,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ACTIVE/RealOpAmp can be placed from palette",
+            "line": 500,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8080/",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "dual-model component shows Model dropdown with labels",
+            "line": 18,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "single-model component does not show Model dropdown",
+            "line": 37,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "selecting Behavioral model shows SPICE parameter panel",
+            "line": 53,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/e2e/fixtures/harness.html",
+        "count": 19,
+        "locations": [
+          {
+            "file": "gui/subcircuit-creation.spec.ts",
+            "test": "right-click with 2+ elements selected shows \"Make Subcircuit…\" menu item",
+            "line": 172,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-creation.spec.ts",
+            "test": "\"Make Subcircuit…\" is disabled when simulation is running",
+            "line": 186,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-creation.spec.ts",
+            "test": "dialog opens with auto-populated port table matching boundary wire count",
+            "line": 238,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-creation.spec.ts",
+            "test": "changing a port face in the dialog updates the chip preview",
+            "line": 268,
+            "column": 3
+          },
+          {
+            "file": "gui/subcircuit-creation.spec.ts",
+            "test": "clicking \"Create\" replaces selection with a subcircuit instance on the canvas",
+            "line": 379,
+            "column": 3
+          },
+          {
+            "file": "parity/error-handling.spec.ts",
+            "test": "loading invalid base64 data returns error",
+            "line": 18,
+            "column": 3
+          },
+          {
+            "file": "parity/error-handling.spec.ts",
+            "test": "loading empty data returns error",
+            "line": 27,
+            "column": 3
+          },
+          {
+            "file": "parity/error-handling.spec.ts",
+            "test": "running test with no testData returns error",
+            "line": 35,
+            "column": 3
+          },
+          {
+            "file": "parity/error-handling.spec.ts",
+            "test": "test with mismatched signal names returns error",
+            "line": 47,
+            "column": 3
+          },
+          {
+            "file": "parity/headless-simulation.spec.ts",
+            "test": "set-input + step + read-output — AND gate truth table",
+            "line": 27,
+            "column": 3
+          },
+          {
+            "file": "parity/headless-simulation.spec.ts",
+            "test": "read-all-signals returns labeled signals",
+            "line": 54,
+            "column": 3
+          },
+          {
+            "file": "parity/headless-simulation.spec.ts",
+            "test": "half adder — step-by-step signal verification",
+            "line": 72,
+            "column": 3
+          },
+          {
+            "file": "parity/headless-simulation.spec.ts",
+            "test": "set-input without loaded circuit returns error",
+            "line": 100,
+            "column": 3
+          },
+          {
+            "file": "parity/headless-simulation.spec.ts",
+            "test": "sim-run-tests also works (canonical message type)",
+            "line": 106,
+            "column": 3
+          },
+          {
+            "file": "parity/load-and-simulate.spec.ts",
+            "test": "AND gate — load .dig and run test vectors",
+            "line": 26,
+            "column": 3
+          },
+          {
+            "file": "parity/load-and-simulate.spec.ts",
+            "test": "Half adder — load .dig and run test vectors",
+            "line": 35,
+            "column": 3
+          },
+          {
+            "file": "parity/load-and-simulate.spec.ts",
+            "test": "AND gate — load via URL and run test vectors",
+            "line": 46,
+            "column": 3
+          },
+          {
+            "file": "parity/load-and-simulate.spec.ts",
+            "test": "AND gate — failing test vector detected",
+            "line": 54,
+            "column": 3
+          },
+          {
+            "file": "parity/load-and-simulate.spec.ts",
+            "test": "get-circuit round-trip — export then reimport",
+            "line": 64,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -33,10 +33,6 @@ import { snapToGrid } from '../editor/coordinates.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
 import { PropertyBag } from '../core/properties.js';
 import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
-import { openSpiceImportDialog } from './spice-import-dialog.js';
-import { openSpiceSubcktDialog } from './spice-subckt-dialog.js';
-import { applySpiceImportResult, applySpiceSubcktImportResult } from './spice-model-apply.js';
-import { getTransistorModels } from '../solver/analog/default-models.js';
 import { openSpiceModelLibraryDialog } from './spice-model-library-dialog.js';
 
 // ---------------------------------------------------------------------------
@@ -359,57 +355,6 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
               }
             }
           }
-        }
-      }
-
-      // "Import SPICE Model..." — for components with a deviceType in their active MNA model
-      {
-        const hitDef = registry.get(elementHit.typeId);
-        let hasSemiconductorModel = false;
-        if (hitDef?.models?.mnaModels) {
-          for (const mnaModel of Object.values(hitDef.models.mnaModels)) {
-            if (mnaModel.deviceType) { hasSemiconductorModel = true; break; }
-          }
-        }
-        if (hasSemiconductorModel) {
-          if (items.length > 0) items.push(separator());
-          items.push({
-            label: 'Import SPICE Model\u2026',
-            enabled: !ctx.isSimActive(),
-            action: () => {
-              void openSpiceImportDialog(elementHit, ctx.canvas.parentElement ?? document.body).then((result) => {
-                if (!result) return;
-                applySpiceImportResult(elementHit, result);
-                ctx.invalidateCompiled();
-                ctx.showStatus(`Applied SPICE model "${result.modelName}" to ${elementHit.typeId}`);
-              });
-            },
-          });
-        }
-      }
-
-      // "Import SPICE Subcircuit..." — for components with a subcircuitModel in their MNA model
-      {
-        const hitDef = registry.get(elementHit.typeId);
-        let hasSubcircuitModel = false;
-        if (hitDef?.models?.mnaModels) {
-          for (const mnaModel of Object.values(hitDef.models.mnaModels)) {
-            if (mnaModel.subcircuitModel !== undefined) { hasSubcircuitModel = true; break; }
-          }
-        }
-        if (hasSubcircuitModel) {
-          items.push({
-            label: 'Import SPICE Subcircuit\u2026',
-            enabled: !ctx.isSimActive(),
-            action: () => {
-              void openSpiceSubcktDialog(elementHit, ctx.canvas.parentElement ?? document.body).then((result) => {
-                if (!result) return;
-                applySpiceSubcktImportResult(elementHit, result, getTransistorModels());
-                ctx.invalidateCompiled();
-                ctx.showStatus(`Registered subcircuit "${result.subcktName}" and applied to ${elementHit.typeId}`);
-              });
-            },
-          });
         }
       }
 

@@ -9,23 +9,33 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Circuit } from '../core/circuit.js';
 import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
-
+import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 /** The result produced by the .MODEL import dialog. */
 export interface SpiceImportResult {
   /** Serialized JSON of parsed params — stored as _spiceModelOverrides. */
   overridesJson: string;
   /** Display name — stored as _spiceModelName. */
   modelName: string;
+  /** Parsed device type for library-level storage. */
+  deviceType: string;
 }
 
 /**
- * Apply the .MODEL import result to the element's PropertyBag in-place.
- * Called by the context menu handler after the dialog resolves.
+ * Apply the .MODEL import result:
+ *   1. Write to circuit.metadata.namedParameterSets (library-level).
+ *   2. Write _spiceModelOverrides and _spiceModelName on the element (per-instance).
+ * Both coexist: library provides shared defaults, instance overrides customize this component.
  */
 export function applySpiceImportResult(
   element: CircuitElement,
   result: SpiceImportResult,
+  circuit: Circuit,
 ): void {
+  if (!circuit.metadata.namedParameterSets) circuit.metadata.namedParameterSets = {};
+  circuit.metadata.namedParameterSets[result.modelName] = {
+    deviceType: result.deviceType,
+    params: JSON.parse(result.overridesJson) as Record<string, number>,
+  };
   element.getProperties().set('_spiceModelOverrides', result.overridesJson);
   element.getProperties().set('_spiceModelName', result.modelName);
 }
@@ -34,20 +44,24 @@ export function applySpiceImportResult(
 export interface SpiceSubcktImportResult {
   /** Subcircuit name (from the .SUBCKT header). */
   subcktName: string;
-  /** The built Circuit to register in SubcircuitModelRegistry. */
-  circuit: Circuit;
+  /** Compiled netlist — registered in SubcircuitModelRegistry and stored in circuit.metadata.modelDefinitions. */
+  netlist: MnaSubcircuitNetlist;
 }
 
 /**
  * Apply the .SUBCKT import result:
- *   1. Register the circuit in the provided SubcircuitModelRegistry.
- *   2. Set simulationModel on the instance to the subcircuit name.
+ *   1. Register the netlist in the provided SubcircuitModelRegistry.
+ *   2. Write the MnaSubcircuitNetlist to circuit.metadata.modelDefinitions.
+ *   3. Set simulationModel on the instance to the subcircuit name.
  */
 export function applySpiceSubcktImportResult(
   element: CircuitElement,
   result: SpiceSubcktImportResult,
   modelRegistry: SubcircuitModelRegistry,
+  circuit: Circuit,
 ): void {
-  modelRegistry.register(result.subcktName, result.circuit);
+  modelRegistry.register(result.subcktName, result.netlist);
+  if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
+  circuit.metadata.modelDefinitions[result.subcktName] = result.netlist;
   element.getProperties().set('simulationModel', result.subcktName);
 }

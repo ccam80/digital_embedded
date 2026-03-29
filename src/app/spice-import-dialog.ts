@@ -103,6 +103,7 @@ export function openSpiceImportDialog(
         finish({
           overridesJson: JSON.stringify(result.parsed.params),
           modelName: result.parsed.name,
+          deviceType: result.parsed.deviceType,
         });
       }
     });

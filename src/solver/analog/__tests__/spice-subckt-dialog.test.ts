@@ -11,9 +11,12 @@
 
 import { describe, it, expect } from "vitest";
 import { parseSubcircuit } from "../model-parser.js";
+import type { ParsedSubcircuit } from "../model-parser.js";
 import { buildSpiceSubcircuit } from "../../../io/spice-model-builder.js";
 import { applySpiceSubcktImportResult } from "../../../app/spice-model-apply.js";
 import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
+import { Circuit } from "../../../core/circuit.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../../core/mna-subcircuit-netlist.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -21,6 +24,23 @@ import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
+
+function makeNetlist(parsed: ParsedSubcircuit): MnaSubcircuitNetlist {
+  const typeMap: Record<string, string> = {
+    R: 'Resistor', C: 'Capacitor', L: 'Inductor',
+    D: 'Diode', Q: 'NpnBJT', M: 'NMOS',
+  };
+  return {
+    ports: parsed.ports,
+    elements: parsed.elements.map((e): SubcircuitElement => {
+      const el: SubcircuitElement = { typeId: typeMap[e.type] ?? e.type };
+      if (e.modelName !== undefined) el.modelRef = e.modelName;
+      return el;
+    }),
+    internalNetCount: 0,
+    netlist: parsed.elements.map(() => []),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Minimal element builder
@@ -188,10 +208,11 @@ describe("spice-subckt-dialog: buildSpiceSubcircuit", () => {
 // ---------------------------------------------------------------------------
 
 describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
-  it("registers the circuit in SubcircuitModelRegistry under the subcircuit name", () => {
+  it("registers the netlist in SubcircuitModelRegistry under the subcircuit name", () => {
     const parsed = parseSubcircuit(SIMPLE_SUBCKT);
-    const circuit = buildSpiceSubcircuit(parsed);
+    const netlist = makeNetlist(parsed);
     const registry = new SubcircuitModelRegistry();
+    const metaCircuit = new Circuit();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -199,15 +220,19 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
       { x: 0, y: 0, label: "E" },
     ]);
 
-    applySpiceSubcktImportResult(element, { subcktName: parsed.name, circuit }, registry);
+    applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
 
-    expect(registry.get("MYBJT")).toBe(circuit);
+    const stored = registry.get("MYBJT");
+    expect(stored).toBeDefined();
+    expect(stored!.ports).toEqual(["C", "B", "E"]);
+    expect(stored!.elements).toHaveLength(1);
   });
 
   it("sets simulationModel on the element to the subcircuit name", () => {
     const parsed = parseSubcircuit(SIMPLE_SUBCKT);
-    const circuit = buildSpiceSubcircuit(parsed);
+    const netlist = makeNetlist(parsed);
     const registry = new SubcircuitModelRegistry();
+    const metaCircuit = new Circuit();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -215,17 +240,18 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
       { x: 0, y: 0, label: "E" },
     ]);
 
-    applySpiceSubcktImportResult(element, { subcktName: parsed.name, circuit }, registry);
+    applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
 
     expect(element.getProperties().get("simulationModel")).toBe("MYBJT");
   });
 
-  it("re-registering with a new circuit overwrites the old one", () => {
+  it("re-registering with a new netlist overwrites the old one", () => {
     const parsed1 = parseSubcircuit(SIMPLE_SUBCKT);
-    const circuit1 = buildSpiceSubcircuit(parsed1);
+    const netlist1 = makeNetlist(parsed1);
     const parsed2 = parseSubcircuit(SIMPLE_SUBCKT);
-    const circuit2 = buildSpiceSubcircuit(parsed2);
+    const netlist2 = makeNetlist(parsed2);
     const registry = new SubcircuitModelRegistry();
+    const metaCircuit = new Circuit();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -233,13 +259,13 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
       { x: 0, y: 0, label: "E" },
     ]);
 
-    applySpiceSubcktImportResult(element, { subcktName: "MYBJT", circuit: circuit1 }, registry);
-    applySpiceSubcktImportResult(element, { subcktName: "MYBJT", circuit: circuit2 }, registry);
+    applySpiceSubcktImportResult(element, { subcktName: "MYBJT", netlist: netlist1 }, registry, metaCircuit);
+    applySpiceSubcktImportResult(element, { subcktName: "MYBJT", netlist: netlist2 }, registry, metaCircuit);
 
-    expect(registry.get("MYBJT")).toBe(circuit2);
+    expect(registry.get("MYBJT")).toBe(netlist2);
   });
 
-  it("full flow: parse → build → apply → simulationModel set and circuit registered", () => {
+  it("full flow: parse → make netlist → apply → simulationModel set and netlist registered", () => {
     const subcktText = `
 .SUBCKT TESTBJT C B E
 Q1 C B E QMOD
@@ -248,8 +274,9 @@ Q1 C B E QMOD
     `.trim();
 
     const parsed = parseSubcircuit(subcktText);
-    const circuit = buildSpiceSubcircuit(parsed);
+    const netlist = makeNetlist(parsed);
     const registry = new SubcircuitModelRegistry();
+    const metaCircuit = new Circuit();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -257,10 +284,34 @@ Q1 C B E QMOD
       { x: 0, y: 0, label: "E" },
     ]);
 
-    applySpiceSubcktImportResult(element, { subcktName: parsed.name, circuit }, registry);
+    applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
 
     expect(parsed.name).toBe("TESTBJT");
-    expect(registry.get("TESTBJT")).toBeDefined();
+    const stored = registry.get("TESTBJT");
+    expect(stored).toBeDefined();
+    expect(stored!.ports).toEqual(["C", "B", "E"]);
     expect(element.getProperties().get("simulationModel")).toBe("TESTBJT");
+  });
+
+  it("stores MnaSubcircuitNetlist in circuit.metadata.modelDefinitions", () => {
+    const parsed = parseSubcircuit(SIMPLE_SUBCKT);
+    const netlist = makeNetlist(parsed);
+    const registry = new SubcircuitModelRegistry();
+    const metaCircuit = new Circuit();
+
+    const element = makeElement("BJTStub", "q1", [
+      { x: 0, y: 0, label: "C" },
+      { x: 0, y: 0, label: "B" },
+      { x: 0, y: 0, label: "E" },
+    ]);
+
+    applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
+
+    const defs = metaCircuit.metadata.modelDefinitions;
+    expect(defs).toBeDefined();
+    expect(defs!["MYBJT"]).toBeDefined();
+    expect(defs!["MYBJT"].ports).toEqual(["C", "B", "E"]);
+    expect(defs!["MYBJT"].elements).toHaveLength(1);
+    expect(defs!["MYBJT"].elements[0].typeId).toBe("NpnBJT");
   });
 });

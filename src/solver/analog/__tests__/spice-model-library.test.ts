@@ -13,9 +13,8 @@
 
 import { describe, it, expect } from "vitest";
 import { Circuit } from "../../../core/circuit.js";
-import type { MnaSubcircuitNetlist } from "../../../core/mna-subcircuit-netlist.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../../core/mna-subcircuit-netlist.js";
 import { parseModelCard, parseSubcircuit } from "../model-parser.js";
-import { buildSpiceSubcircuit } from "../../../io/spice-model-builder.js";
 import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
@@ -48,15 +47,22 @@ function addSubcktDefinition(
     const err = e as { message?: string };
     return { error: err.message ?? String(e) };
   }
-  const builtCircuit = buildSpiceSubcircuit(parsed);
-  registry.register(parsed.name, builtCircuit);
-  if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
+  const typeMap: Record<string, string> = {
+    R: 'Resistor', C: 'Capacitor', L: 'Inductor',
+    D: 'Diode', Q: 'NpnBJT', M: 'NMOS',
+  };
   const nlDef: MnaSubcircuitNetlist = {
     ports: parsed.ports,
-    elements: parsed.elements.map(e => ({ typeId: e.type === 'R' ? 'Resistor' : e.type === 'Q' ? 'NpnBJT' : e.type })),
+    elements: parsed.elements.map((e): SubcircuitElement => {
+      const el: SubcircuitElement = { typeId: typeMap[e.type] ?? e.type };
+      if (e.modelName !== undefined) el.modelRef = e.modelName;
+      return el;
+    }),
     internalNetCount: 0,
     netlist: parsed.elements.map(() => []),
   };
+  registry.register(parsed.name, nlDef);
+  if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
   circuit.metadata.modelDefinitions[parsed.name] = nlDef;
   return { name: parsed.name };
 }
@@ -248,5 +254,121 @@ R2 OUT GND 1K
     const circuit = new Circuit();
     expect(circuit.metadata.namedParameterSets).toBeUndefined();
     expect(circuit.metadata.modelDefinitions).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: subcircuit bindings (W6.3)
+// ---------------------------------------------------------------------------
+
+describe("spice-model-library: subcircuitBindings", () => {
+  it("assigns a subcircuit definition to a component type via subcircuitBindings", () => {
+    const circuit = new Circuit();
+    const registry = new SubcircuitModelRegistry();
+    addSubcktDefinition(circuit, registry, `
+.SUBCKT MYGATE A B Y
+R1 A Y 1K
+R2 B Y 1K
+.ENDS MYGATE
+    `.trim());
+
+    if (!circuit.metadata.subcircuitBindings) circuit.metadata.subcircuitBindings = {};
+    circuit.metadata.subcircuitBindings["And:custom"] = "MYGATE";
+
+    expect(circuit.metadata.subcircuitBindings["And:custom"]).toBe("MYGATE");
+  });
+
+  it("multiple bindings can coexist for different component type:modelKey pairs", () => {
+    const circuit = new Circuit();
+    if (!circuit.metadata.subcircuitBindings) circuit.metadata.subcircuitBindings = {};
+    circuit.metadata.subcircuitBindings["And:cmos74hc"] = "74HC08";
+    circuit.metadata.subcircuitBindings["Or:cmos74hc"] = "74HC32";
+    circuit.metadata.subcircuitBindings["And:cd4000"] = "CD4081";
+
+    expect(Object.keys(circuit.metadata.subcircuitBindings).length).toBe(3);
+    expect(circuit.metadata.subcircuitBindings["And:cmos74hc"]).toBe("74HC08");
+    expect(circuit.metadata.subcircuitBindings["Or:cmos74hc"]).toBe("74HC32");
+    expect(circuit.metadata.subcircuitBindings["And:cd4000"]).toBe("CD4081");
+  });
+
+  it("removing a binding does not affect other bindings", () => {
+    const circuit = new Circuit();
+    circuit.metadata.subcircuitBindings = {
+      "And:cmos74hc": "74HC08",
+      "Or:cmos74hc": "74HC32",
+    };
+
+    delete circuit.metadata.subcircuitBindings["And:cmos74hc"];
+
+    expect(circuit.metadata.subcircuitBindings["And:cmos74hc"]).toBeUndefined();
+    expect(circuit.metadata.subcircuitBindings["Or:cmos74hc"]).toBe("74HC32");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: unresolved model refs (W6.3)
+// ---------------------------------------------------------------------------
+
+describe("spice-model-library: unresolved model refs", () => {
+  it("modelRef in subcircuit that is not in namedParameterSets is detectable as unresolved", () => {
+    const circuit = new Circuit();
+    const registry = new SubcircuitModelRegistry();
+    addSubcktDefinition(circuit, registry, `
+.SUBCKT MYBJT C B E
+Q1 C B E UNRESOLVED_MODEL
+.ENDS MYBJT
+    `.trim());
+
+    const defs = circuit.metadata.modelDefinitions!;
+    const netlist = defs["MYBJT"];
+    expect(netlist).toBeDefined();
+
+    const refs = netlist.elements
+      .filter(e => e.modelRef !== undefined)
+      .map(e => e.modelRef!);
+    expect(refs).toContain("UNRESOLVED_MODEL");
+
+    const sets = circuit.metadata.namedParameterSets ?? {};
+    const unresolved = refs.filter(r => !(r in sets));
+    expect(unresolved).toEqual(["UNRESOLVED_MODEL"]);
+  });
+
+  it("modelRef resolved when matching entry exists in namedParameterSets", () => {
+    const circuit = new Circuit();
+    const registry = new SubcircuitModelRegistry();
+    addNamedParameterSet(circuit, ".MODEL QMOD NPN(IS=1e-14 BF=200)");
+    addSubcktDefinition(circuit, registry, `
+.SUBCKT MYBJT C B E
+Q1 C B E QMOD
+.ENDS MYBJT
+    `.trim());
+
+    const defs = circuit.metadata.modelDefinitions!;
+    const netlist = defs["MYBJT"];
+    const refs = netlist.elements
+      .filter(e => e.modelRef !== undefined)
+      .map(e => e.modelRef!);
+    expect(refs).toContain("QMOD");
+
+    const sets = circuit.metadata.namedParameterSets!;
+    const unresolved = refs.filter(r => !(r in sets));
+    expect(unresolved).toHaveLength(0);
+  });
+
+  it("subcircuit with no model refs has empty unresolved set", () => {
+    const circuit = new Circuit();
+    const registry = new SubcircuitModelRegistry();
+    addSubcktDefinition(circuit, registry, `
+.SUBCKT RDIV IN OUT GND
+R1 IN OUT 1K
+R2 OUT GND 1K
+.ENDS RDIV
+    `.trim());
+
+    const netlist = circuit.metadata.modelDefinitions!["RDIV"];
+    const refs = netlist.elements
+      .filter(e => e.modelRef !== undefined)
+      .map(e => e.modelRef!);
+    expect(refs).toHaveLength(0);
   });
 });

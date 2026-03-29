@@ -12,10 +12,10 @@
 
 import { parseSubcircuit } from '../solver/analog/model-parser.js';
 import type { ParsedSubcircuit } from '../solver/analog/model-parser.js';
-import { buildSpiceSubcircuit } from '../io/spice-model-builder.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SpiceSubcktImportResult } from './spice-model-apply.js';
+import type { MnaSubcircuitNetlist, SubcircuitElement } from '../core/mna-subcircuit-netlist.js';
 
 /**
  * Open the .SUBCKT import dialog for the given element.
@@ -103,8 +103,22 @@ export function openSpiceSubcktDialog(
     applyBtn.addEventListener('click', () => {
       const result = tryParse(textarea.value);
       if (result.parsed) {
-        const circuit = buildSpiceSubcircuit(result.parsed);
-        finish({ subcktName: result.parsed.name, circuit });
+        const parsed = result.parsed;
+        const typeMap: Record<string, string> = {
+          R: 'Resistor', C: 'Capacitor', L: 'Inductor',
+          D: 'Diode', Q: 'NpnBJT', M: 'NMOS',
+        };
+        const netlist: MnaSubcircuitNetlist = {
+          ports: parsed.ports,
+          elements: parsed.elements.map((e): SubcircuitElement => {
+            const el: SubcircuitElement = { typeId: typeMap[e.type] ?? e.type };
+            if (e.modelName !== undefined) el.modelRef = e.modelName;
+            return el;
+          }),
+          internalNetCount: 0,
+          netlist: parsed.elements.map(() => []),
+        };
+        finish({ subcktName: parsed.name, netlist });
       }
     });
 

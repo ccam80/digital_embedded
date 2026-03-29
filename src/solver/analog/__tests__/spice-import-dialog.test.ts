@@ -109,11 +109,13 @@ describe("spice-import-dialog: parse and apply", () => {
       { x: 0, y: 0, label: "B" },
       { x: 0, y: 0, label: "E" },
     ]);
+    const circuit = new Circuit();
 
     applySpiceImportResult(element, {
       overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }),
       modelName: "2N2222",
-    });
+      deviceType: "NPN",
+    }, circuit);
 
     const stored = element.getProperties().get("_spiceModelOverrides");
     expect(typeof stored).toBe("string");
@@ -128,11 +130,13 @@ describe("spice-import-dialog: parse and apply", () => {
       { x: 0, y: 0, label: "B" },
       { x: 0, y: 0, label: "E" },
     ]);
+    const circuit = new Circuit();
 
     applySpiceImportResult(element, {
       overridesJson: JSON.stringify({ IS: 2e-14 }),
       modelName: "BC547",
-    });
+      deviceType: "NPN",
+    }, circuit);
 
     expect(element.getProperties().get("_spiceModelName")).toBe("BC547");
   });
@@ -147,16 +151,40 @@ describe("spice-import-dialog: parse and apply", () => {
       { x: 0, y: 0, label: "B" },
       { x: 0, y: 0, label: "E" },
     ], propsMap);
+    const circuit = new Circuit();
 
     applySpiceImportResult(element, {
       overridesJson: JSON.stringify({ IS: 5e-15, BF: 300 }),
       modelName: "2SC1815",
-    });
+      deviceType: "NPN",
+    }, circuit);
 
     expect(element.getProperties().get("_spiceModelName")).toBe("2SC1815");
     const overrides = JSON.parse(element.getProperties().get("_spiceModelOverrides") as string) as Record<string, number>;
     expect(overrides["IS"]).toBe(5e-15);
     expect(overrides["BF"]).toBe(300);
+  });
+
+  it("applySpiceImportResult writes to circuit.metadata.namedParameterSets (library-level)", () => {
+    const element = makeElement("NpnStub", "q1", [
+      { x: 0, y: 0, label: "C" },
+      { x: 0, y: 0, label: "B" },
+      { x: 0, y: 0, label: "E" },
+    ]);
+    const circuit = new Circuit();
+
+    applySpiceImportResult(element, {
+      overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }),
+      modelName: "2N2222",
+      deviceType: "NPN",
+    }, circuit);
+
+    const sets = circuit.metadata.namedParameterSets;
+    expect(sets).toBeDefined();
+    expect(sets!["2N2222"]).toBeDefined();
+    expect(sets!["2N2222"].deviceType).toBe("NPN");
+    expect(sets!["2N2222"].params["IS"]).toBe(1e-14);
+    expect(sets!["2N2222"].params["BF"]).toBe(200);
   });
 });
 
@@ -283,10 +311,12 @@ describe("spice-import-dialog: compile integration", () => {
       { x: 0, y: 0, label: "E" },
     ]);
 
+    const circuit = new Circuit();
     applySpiceImportResult(element, {
       overridesJson: JSON.stringify(parsed.params),
       modelName: parsed.name,
-    });
+      deviceType: parsed.deviceType,
+    }, circuit);
 
     expect(element.getProperties().get("_spiceModelName")).toBe("BC547");
     const overrides = JSON.parse(element.getProperties().get("_spiceModelOverrides") as string) as Record<string, number>;

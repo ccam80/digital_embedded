@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && python3 -c \\\"\\nimport json\\nwith open('.vitest-failures.json') as f:\\n    d = json.load(f)\\nfor fail in d['failures']:\\n    loc = fai...",
-  "error": "Exit code 1\n  File \"<string>\", line 7\r\n    fname = loc['file'].split('\\')[-1]\r\n                              ^\r\nSyntaxError: unterminated string literal (detected at line 7); perhaps you escaped the end quote?",
-  "timestamp": "2026-03-29T06:56:48.420Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/solver/analog/__tests__/spice-import-dialog.test.ts\\\" \\\"src/solver/analog/__tests__/spice-subckt-dialog.test.ts\\...",
+  "error": "Exit code 1\n...................F...................FFF..............\n\n============================================================\n  52 passed  4 failed  0 skipped  (0.6s)\n  3 test files\n============================================================\n\nFailures grouped by error:\n\n  [1] expected [] to include 'UNRESOLVED_MODEL'  (x1)\n      src\\solver\\analog\\__tests__\\spice-model-library.test.ts:323:18  \"modelRef in subcircuit that is not in namedParameterSets is detectable as unresolved\"\n\n  [2] expec...",
+  "timestamp": "2026-03-29T07:13:46.625Z",
   "retry_count": 1
 }

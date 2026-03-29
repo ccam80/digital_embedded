@@ -8,16 +8,15 @@
  * Storage:
  *   - Named parameter sets → circuit.metadata.namedParameterSets
  *   - Subcircuit definitions → circuit.metadata.modelDefinitions
- *     (the Circuit objects themselves live in SubcircuitModelRegistry)
  */
 
 import { createModal } from './dialog-manager.js';
 import { parseModelCard } from '../solver/analog/model-parser.js';
 import { parseSubcircuit } from '../solver/analog/model-parser.js';
-import { buildSpiceSubcircuit } from '../io/spice-model-builder.js';
 import type { Circuit } from '../core/circuit.js';
 import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import { getTransistorModels } from '../solver/analog/default-models.js';
+import type { MnaSubcircuitNetlist, SubcircuitElement } from '../core/mna-subcircuit-netlist.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -216,6 +215,14 @@ function renderModelPanel(
 // .SUBCKT panel
 // ---------------------------------------------------------------------------
 
+function collectModelRefs(netlist: MnaSubcircuitNetlist): string[] {
+  const refs = new Set<string>();
+  for (const el of netlist.elements) {
+    if (el.modelRef) refs.add(el.modelRef);
+  }
+  return [...refs].sort();
+}
+
 function renderSubcktPanel(
   panel: HTMLElement,
   circuit: Circuit,
@@ -226,6 +233,7 @@ function renderSubcktPanel(
 
   const defs = circuit.metadata.modelDefinitions ?? {};
   const names = Object.keys(defs);
+  const namedSets = circuit.metadata.namedParameterSets ?? {};
 
   if (names.length === 0) {
     const empty = document.createElement('p');
@@ -238,7 +246,7 @@ function renderSubcktPanel(
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    for (const col of ['Name', 'Ports', 'Elements', '']) {
+    for (const col of ['Name', 'Ports', 'Elements', 'Model Refs', '']) {
       const th = document.createElement('th');
       th.textContent = col;
       headerRow.appendChild(th);
@@ -248,8 +256,13 @@ function renderSubcktPanel(
 
     const tbody = document.createElement('tbody');
     for (const name of names) {
-      const entry = defs[name];
+      const entry = defs[name]!;
+      const modelRefs = collectModelRefs(entry);
+      const unresolvedRefs = modelRefs.filter(ref => !(ref in namedSets));
+      const hasUnresolved = unresolvedRefs.length > 0;
+
       const tr = document.createElement('tr');
+      if (hasUnresolved) tr.className = 'spice-library-row-warning';
 
       const tdName = document.createElement('td');
       tdName.textContent = name;
@@ -263,7 +276,47 @@ function renderSubcktPanel(
       tdCount.textContent = String(entry.elements.length);
       tr.appendChild(tdCount);
 
+      const tdRefs = document.createElement('td');
+      if (modelRefs.length === 0) {
+        tdRefs.textContent = '—';
+      } else {
+        for (const ref of modelRefs) {
+          const span = document.createElement('span');
+          span.textContent = ref;
+          if (!(ref in namedSets)) {
+            span.className = 'spice-library-ref-unresolved';
+            span.title = `Model "${ref}" not found in named parameter sets`;
+          } else {
+            span.className = 'spice-library-ref-resolved';
+          }
+          tdRefs.appendChild(span);
+          tdRefs.appendChild(document.createTextNode(' '));
+        }
+      }
+      tr.appendChild(tdRefs);
+
       const tdAction = document.createElement('td');
+
+      const assignBtn = document.createElement('button');
+      assignBtn.className = 'spice-library-assign';
+      assignBtn.textContent = 'Assign\u2026';
+      assignBtn.addEventListener('click', () => {
+        const compType = window.prompt(
+          `Assign subcircuit "${name}" to component type.\nEnter: ComponentType:modelKey (e.g. "And:cmos" or "NMOS:custom")`,
+        );
+        if (!compType) return;
+        const trimmed = compType.trim();
+        if (!trimmed.includes(':')) {
+          window.alert('Format must be ComponentType:modelKey');
+          return;
+        }
+        if (!circuit.metadata.subcircuitBindings) circuit.metadata.subcircuitBindings = {};
+        circuit.metadata.subcircuitBindings[trimmed] = name;
+        onChange();
+        renderSubcktPanel(panel, circuit, onChange);
+      });
+      tdAction.appendChild(assignBtn);
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'spice-library-remove';
       removeBtn.textContent = 'Remove';
@@ -279,6 +332,57 @@ function renderSubcktPanel(
     }
     table.appendChild(tbody);
     panel.appendChild(table);
+  }
+
+  // --- Subcircuit bindings section ---
+  const bindings = circuit.metadata.subcircuitBindings ?? {};
+  const bindingKeys = Object.keys(bindings);
+  if (bindingKeys.length > 0) {
+    const bindingsSection = document.createElement('div');
+    bindingsSection.className = 'spice-library-bindings';
+
+    const bindingsLabel = document.createElement('p');
+    bindingsLabel.className = 'spice-library-bindings-label';
+    bindingsLabel.textContent = 'Component type assignments:';
+    bindingsSection.appendChild(bindingsLabel);
+
+    const bindingsTable = document.createElement('table');
+    bindingsTable.className = 'spice-library-table';
+    const bthead = document.createElement('thead');
+    const bheaderRow = document.createElement('tr');
+    for (const col of ['ComponentType:ModelKey', 'Subcircuit', '']) {
+      const th = document.createElement('th');
+      th.textContent = col;
+      bheaderRow.appendChild(th);
+    }
+    bthead.appendChild(bheaderRow);
+    bindingsTable.appendChild(bthead);
+
+    const btbody = document.createElement('tbody');
+    for (const key of bindingKeys) {
+      const btr = document.createElement('tr');
+      const bk = document.createElement('td');
+      bk.textContent = key;
+      btr.appendChild(bk);
+      const bv = document.createElement('td');
+      bv.textContent = bindings[key]!;
+      btr.appendChild(bv);
+      const ba = document.createElement('td');
+      const bRemove = document.createElement('button');
+      bRemove.className = 'spice-library-remove';
+      bRemove.textContent = 'Remove';
+      bRemove.addEventListener('click', () => {
+        delete circuit.metadata.subcircuitBindings![key];
+        onChange();
+        renderSubcktPanel(panel, circuit, onChange);
+      });
+      ba.appendChild(bRemove);
+      btr.appendChild(ba);
+      btbody.appendChild(btr);
+    }
+    bindingsTable.appendChild(btbody);
+    bindingsSection.appendChild(bindingsTable);
+    panel.appendChild(bindingsSection);
   }
 
   // --- Add new .SUBCKT section ---
@@ -312,17 +416,32 @@ function renderSubcktPanel(
       addFeedback.className = 'spice-library-feedback spice-import-error';
       return;
     }
-    const builtCircuit: Circuit = buildSpiceSubcircuit(parsed);
-    modelRegistry.register(parsed.name, builtCircuit);
-    if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
-    circuit.metadata.modelDefinitions[parsed.name] = {
+    const typeMap: Record<string, string> = {
+      R: 'Resistor', C: 'Capacitor', L: 'Inductor',
+      D: 'Diode', Q: 'NpnBJT', M: 'NMOS',
+    };
+    const netlist: MnaSubcircuitNetlist = {
       ports: parsed.ports,
-      elements: parsed.elements.map(e => ({
-        typeId: e.type === 'R' ? 'Resistor' : e.type === 'C' ? 'Capacitor' : e.type === 'L' ? 'Inductor' : e.type === 'D' ? 'Diode' : e.type === 'Q' ? 'NpnBJT' : e.type === 'M' ? 'NMOS' : e.type,
-      })),
+      elements: parsed.elements.map((e): SubcircuitElement => {
+        const el: SubcircuitElement = { typeId: typeMap[e.type] ?? e.type };
+        if (e.modelName !== undefined) el.modelRef = e.modelName;
+        return el;
+      }),
       internalNetCount: 0,
       netlist: parsed.elements.map(() => []),
     };
+    modelRegistry.register(parsed.name, netlist);
+    if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
+    circuit.metadata.modelDefinitions[parsed.name] = netlist;
+    if (parsed.models.length > 0 && !circuit.metadata.namedParameterSets) {
+      circuit.metadata.namedParameterSets = {};
+    }
+    for (const model of parsed.models) {
+      circuit.metadata.namedParameterSets![model.name] = {
+        deviceType: model.deviceType,
+        params: model.params,
+      };
+    }
     addTextarea.value = '';
     addFeedback.textContent = `Added "${parsed.name}" (${parsed.ports.length} ports, ${parsed.elements.length} elements)`;
     addFeedback.className = 'spice-library-feedback';

@@ -773,3 +773,24 @@ What's already done:
 - **Tests**: 32/34 passing (2 pre-existing failures from baseline: digital_only_component_emits_diagnostic, analog_internals_without_transistorModel_falls_through_to_analogFactory)
 - **New tests added**: unresolved_modelRef_emits_unresolved_model_ref_diagnostic, subcircuitBindings_override_merges_with_static_subcircuitRefs, compiler_routes_only_stamp_bridge_skip_after_resolve, composite_factory_produces_single_element_from_subcircuit, composite_factory_element_stamps_all_sub_elements, unresolved_subcircuit_emits_diagnostic_and_skips, no_implicit_vdd_source_injected
 - **Updated tests**: analog_internals_with_transistorModel_but_no_registry_emits_diagnostic (now checks unresolved-model-ref instead of missing-transistor-model)
+
+## Task W6.1: applySpiceImportResult + applySpiceSubcktImportResult signature change
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/spice-model-apply.ts, src/app/spice-import-dialog.ts, src/app/spice-subckt-dialog.ts, src/app/menu-toolbar.ts, src/solver/analog/__tests__/spice-import-dialog.test.ts, src/solver/analog/__tests__/spice-subckt-dialog.test.ts
+- **Tests**: 48/48 passing
+
+## Task W6.2: SPICE import context menu move
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/canvas-popup.ts, src/app/menu-toolbar.ts, src/app/spice-subckt-dialog.ts
+- **Tests**: 48/48 passing (no new dedicated tests — UI wiring change covered by existing flow tests)
+
+## Task W6.3: Model library dialog updates
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/app/spice-model-library-dialog.ts, src/solver/analog/__tests__/spice-model-library.test.ts
+- **Tests**: 56/56 passing
