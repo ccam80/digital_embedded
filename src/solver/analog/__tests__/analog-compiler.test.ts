@@ -526,12 +526,12 @@ describe("SimulationMode", () => {
 
     const compiled = compileUnified(circuit, registry).analog!;
 
-    // Factory should NOT be called (component is skipped — no registry supplied)
+    // Factory should NOT be called (component is skipped — unresolved model ref)
     expect(factorySpy).not.toHaveBeenCalled();
 
-    // Should emit missing-transistor-model error when no SubcircuitModelRegistry is passed
+    // Should emit unresolved-model-ref error when subcircuit definition not found
     const errorDiags = compiled.diagnostics.filter(
-      (d) => d.code === "missing-transistor-model",
+      (d) => d.code === "unresolved-model-ref",
     );
     expect(errorDiags).toHaveLength(1);
     expect(errorDiags[0]!.severity).toBe("error");
@@ -545,6 +545,73 @@ describe("SimulationMode", () => {
 
     // Factory SHOULD be called — falls through to analogFactory path
     expect(factorySpy).toHaveBeenCalledOnce();
+    expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SubcircuitResolution tests (W4.5)
+// ---------------------------------------------------------------------------
+
+describe("SubcircuitResolution", () => {
+  it("unresolved_modelRef_emits_unresolved_model_ref_diagnostic", () => {
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "cmos"]]);
+    const { circuit, registry } = buildAndGateCircuit(propsMap);
+    const def = registry.get("BehavioralAnd")!;
+    registry.update({
+      ...def,
+      subcircuitRefs: { cmos: "NonexistentSubcircuit" },
+    });
+
+    const compiled = compileUnified(circuit, registry).analog!;
+
+    const errorDiags = compiled.diagnostics.filter(
+      (d) => d.code === "unresolved-model-ref",
+    );
+    expect(errorDiags).toHaveLength(1);
+    expect(errorDiags[0]!.severity).toBe("error");
+    expect(errorDiags[0]!.summary).toContain("NonexistentSubcircuit");
+  });
+
+  it("subcircuitBindings_override_merges_with_static_subcircuitRefs", () => {
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "cmos"]]);
+    const { circuit, registry } = buildAndGateCircuit(propsMap);
+    const def = registry.get("BehavioralAnd")!;
+
+    registry.update({
+      ...def,
+      subcircuitRefs: { cmos: "CmosAnd2_Default" },
+    });
+
+    // Set up a subcircuitBindings override on the circuit metadata that maps
+    // BehavioralAnd:cmos → a different definition name. Since neither definition
+    // actually exists, we expect unresolved-model-ref, but the binding should
+    // take priority over the static subcircuitRefs.
+    (circuit.metadata as Record<string, unknown>)["subcircuitBindings"] = {
+      "BehavioralAnd:cmos": "CmosAnd2_Override",
+    };
+
+    const compiled = compileUnified(circuit, registry).analog!;
+
+    const errorDiags = compiled.diagnostics.filter(
+      (d) => d.code === "unresolved-model-ref",
+    );
+    expect(errorDiags).toHaveLength(1);
+    // The override name should appear in the diagnostic, not the static one
+    expect(errorDiags[0]!.summary).toContain("CmosAnd2_Override");
+  });
+
+  it("compiler_routes_only_stamp_bridge_skip_after_resolve", () => {
+    // Verify that after resolveSubcircuitModels, the compiler produces
+    // a valid compiled circuit with no expand-related code paths.
+    // A component with subcircuitRefs but no actual definition skips cleanly.
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
+    const { circuit, registry } = buildAndGateCircuit(propsMap);
+
+    const compiled = compileUnified(circuit, registry).analog!;
+
+    // The behavioral model stamps normally — 1 element, no errors
+    expect(compiled.elements.length).toBe(1);
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 });

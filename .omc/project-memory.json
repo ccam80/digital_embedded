@@ -253,14 +253,14 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 391,
-      "lastAccessed": 1774766101062,
+      "accessCount": 433,
+      "lastAccessed": 1774767289235,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 205,
-      "lastAccessed": 1774766280405,
+      "accessCount": 208,
+      "lastAccessed": 1774766714172,
       "type": "directory"
     },
     {
@@ -276,15 +276,15 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 102,
-      "lastAccessed": 1774761249897,
+      "path": "src\\core\\registry.ts",
+      "accessCount": 105,
+      "lastAccessed": 1774766961572,
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 101,
-      "lastAccessed": 1774766391670,
+      "path": "",
+      "accessCount": 102,
+      "lastAccessed": 1774761249897,
       "type": "directory"
     },
     {
@@ -295,14 +295,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 72,
-      "lastAccessed": 1774765522968,
+      "accessCount": 73,
+      "lastAccessed": 1774766632921,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 55,
-      "lastAccessed": 1774766357452,
+      "accessCount": 63,
+      "lastAccessed": 1774767166292,
       "type": "directory"
     },
     {
@@ -319,14 +319,14 @@
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 42,
-      "lastAccessed": 1774766322843,
+      "accessCount": 43,
+      "lastAccessed": 1774766633857,
       "type": "file"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 36,
-      "lastAccessed": 1774765523913,
+      "accessCount": 37,
+      "lastAccessed": 1774766633490,
       "type": "file"
     },
     {
@@ -342,6 +342,12 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 31,
+      "lastAccessed": 1774766942979,
+      "type": "file"
+    },
+    {
       "path": "src\\app\\canvas-popup.ts",
       "accessCount": 29,
       "lastAccessed": 1774747613036,
@@ -354,15 +360,9 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 28,
-      "lastAccessed": 1774744317727,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\model-library.ts",
-      "accessCount": 26,
-      "lastAccessed": 1774759631589,
+      "accessCount": 27,
+      "lastAccessed": 1774766694296,
       "type": "file"
     },
     {

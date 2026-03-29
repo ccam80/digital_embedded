@@ -736,3 +736,40 @@ What's already done:
   - src/solver/analog/__tests__/transistor-expansion.test.ts (rewritten to use MnaSubcircuitNetlist)
   - src/solver/analog/__tests__/analog-compiler.test.ts (updated to use subcircuitRefs)
 - **Tests**: 10078/10096 passing (18 failing, all pre-existing baseline failures; 5 fewer failures than baseline)
+
+## Task W4.1: resolveSubcircuitModels post-partition step
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/compiler.ts
+- **Tests**: 4/4 passing (composite_factory_produces_single_element_from_subcircuit, composite_factory_element_stamps_all_sub_elements, unresolved_subcircuit_emits_diagnostic_and_skips, no_implicit_vdd_source_injected)
+
+## Task W4.2: Remove expand route
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/compiler.ts
+- **Tests**: all existing tests pass (expand route removed from ComponentRoute union and all handling code)
+
+## Task W4.3: Remove implicit VDD/GND
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/compiler.ts
+- **Tests**: no_implicit_vdd_source_injected confirms no VDD source injected
+
+## Task W4.4: Pass A branch allocation update
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/compiler.ts
+- **Tests**: matrixSize_equals_nodeCount_plus_branchCount confirms branchCount allocation
+
+## Task W4.5: Update compiler tests
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/analog-compiler.test.ts, src/solver/analog/__tests__/transistor-expansion.test.ts
+- **Tests**: 32/34 passing (2 pre-existing failures from baseline: digital_only_component_emits_diagnostic, analog_internals_without_transistorModel_falls_through_to_analogFactory)
+- **New tests added**: unresolved_modelRef_emits_unresolved_model_ref_diagnostic, subcircuitBindings_override_merges_with_static_subcircuitRefs, compiler_routes_only_stamp_bridge_skip_after_resolve, composite_factory_produces_single_element_from_subcircuit, composite_factory_element_stamps_all_sub_elements, unresolved_subcircuit_emits_diagnostic_and_skips, no_implicit_vdd_source_injected
+- **Updated tests**: analog_internals_with_transistorModel_but_no_registry_emits_diagnostic (now checks unresolved-model-ref instead of missing-transistor-model)

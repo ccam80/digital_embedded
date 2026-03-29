@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 10070,
-      "failed": 26,
+      "passed": 10078,
+      "failed": 18,
       "skipped": 0,
       "totalFiles": 341,
-      "durationSeconds": 13.5
+      "durationSeconds": 13.3
     },
     "playwright": {
       "passed": 487,
       "failed": 55,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 225.32744
+      "durationSeconds": 218.52787399999997
     },
-    "totalFailed": 81,
-    "totalPassed": 10557
+    "totalFailed": 73,
+    "totalPassed": 10565
   },
   "failures": {
     "vitest": [
@@ -28,60 +28,6 @@
             "test": "patch with _spiceModelOverrides changes DC operating point vs default",
             "line": 165,
             "column": 24
-          }
-        ]
-      },
-      {
-        "message": "Invalid .dts document: \"modelDefinitions[\"OPAMP\"].ports\" must be an array",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\io\\dts-schema.ts",
-            "test": "round-trip preserves modelDefinitions ports and elementCount",
-            "line": 452,
-            "column": 11
-          }
-        ]
-      },
-      {
-        "message": "Invalid .dts document: \"modelDefinitions[\"rdiv\"].ports\" must be an array",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\io\\dts-schema.ts",
-            "test": "round-trip with full circuit registers in SubcircuitModelRegistry",
-            "line": 452,
-            "column": 11
-          }
-        ]
-      },
-      {
-        "message": "Invalid .dts document: \"modelDefinitions[\"MyModel\"].ports\" must be an array",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\io\\dts-schema.ts",
-            "test": "modelDefinitions stub (no topology) does not register in SubcircuitModelRegistry",
-            "line": 452,
-            "column": 11
-          }
-        ]
-      },
-      {
-        "message": "Invalid .dts document: \"modelDefinitions[\"RDIV\"].ports\" must be an array",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\io\\dts-schema.ts",
-            "test": "round-trip preserves both namedParameterSets and modelDefinitions",
-            "line": 452,
-            "column": 11
-          },
-          {
-            "file": "src\\io\\dts-schema.ts",
-            "test": "both registries populated together on load",
-            "line": 452,
-            "column": 11
           }
         ]
       },
@@ -134,7 +80,7 @@
           {
             "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
             "test": "analog_internals_without_transistorModel_falls_through_to_analogFactory",
-            "line": 554,
+            "line": 547,
             "column": 24
           }
         ]

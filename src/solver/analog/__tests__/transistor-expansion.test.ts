@@ -26,8 +26,12 @@ import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import {
   expandTransistorModel,
   registerAnalogFactory,
-  getAnalogFactory,
 } from "../transistor-expansion.js";
+import { compileAnalogPartition } from "../compiler.js";
+import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
+import { ComponentRegistry } from "../../../core/registry.js";
+import type { MnaModel } from "../../../core/registry.js";
+import { Circuit } from "../../../core/circuit.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement builder
@@ -393,5 +397,211 @@ describe("Expansion", () => {
         expect(nodeId).not.toBe(2);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Composite factory tests (W4.5) — tests the new compileSubcircuitToMnaModel path
+// ---------------------------------------------------------------------------
+
+describe("CompositeFactory", () => {
+  function buildPartitionForCompositeTest(
+    subcircuitName: string,
+    modelRegistry: SubcircuitModelRegistry,
+    outerCircuit?: Circuit,
+  ): { partition: SolverPartition; registry: ComponentRegistry } {
+    const registry = new ComponentRegistry();
+
+    const gndDef = {
+      name: "Ground",
+      pinLayout: [{ label: "gnd", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.IO,
+      helpText: "",
+      factory: (_p: PropertyBag) => makeElement("Ground", crypto.randomUUID(), [{ x: 0, y: 0, label: "gnd" }]),
+      models: { mnaModels: { behavioral: {} } },
+    };
+    registry.register(gndDef);
+
+    const gatePinLayout = [
+      { label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 20, y: 0 }, isNegatable: false, isClockCapable: false },
+      { label: "VDD", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 10, y: -10 }, isNegatable: false, isClockCapable: false, kind: "power" as const },
+      { label: "GND", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 10, y: 10 }, isNegatable: false, isClockCapable: false, kind: "power" as const },
+    ];
+
+    const gateDef: ComponentDefinition = {
+      name: "CmosNot",
+      typeId: -1,
+      pinLayout: gatePinLayout,
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.LOGIC,
+      helpText: "",
+      factory: (_p: PropertyBag) => makeElement("CmosNot", crypto.randomUUID(), []),
+      subcircuitRefs: { cmos: subcircuitName },
+      models: {
+        digital: { executeFn: () => {} },
+        mnaModels: {
+          cmos: { factory: () => ({ branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {}, getPinCurrents: () => [] }) },
+        },
+      },
+      defaultModel: "cmos",
+    };
+    registry.register(gateDef);
+
+    const gndEl = makeElement("Ground", "gnd1", [{ x: 0, y: 0, label: "gnd" }]);
+    const gateEl = makeElement("CmosNot", "not1", [
+      { x: 10, y: 0, label: "in" },
+      { x: 20, y: 0, label: "out" },
+      { x: 15, y: -10, label: "VDD" },
+      { x: 15, y: 10, label: "GND" },
+    ], new Map([["simulationModel", "cmos"]]));
+
+    const storedGateDef = registry.get("CmosNot")!;
+
+    const groups: ConnectivityGroup[] = [
+      {
+        groupId: 0,
+        pins: [
+          { elementId: "gnd1", pinLabel: "gnd", worldPosition: { x: 0, y: 0 }, direction: PinDirection.BIDIRECTIONAL, bitWidth: 1, domain: "analog" },
+          { elementId: "not1", pinLabel: "GND", worldPosition: { x: 15, y: 10 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" },
+        ],
+        wires: [],
+      },
+      {
+        groupId: 1,
+        pins: [
+          { elementId: "not1", pinLabel: "in", worldPosition: { x: 10, y: 0 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" },
+        ],
+        wires: [],
+      },
+      {
+        groupId: 2,
+        pins: [
+          { elementId: "not1", pinLabel: "out", worldPosition: { x: 20, y: 0 }, direction: PinDirection.OUTPUT, bitWidth: 1, domain: "analog" },
+        ],
+        wires: [],
+      },
+      {
+        groupId: 3,
+        pins: [
+          { elementId: "not1", pinLabel: "VDD", worldPosition: { x: 15, y: -10 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" },
+        ],
+        wires: [],
+      },
+    ];
+
+    const gndPC: PartitionedComponent = {
+      element: gndEl,
+      definition: registry.get("Ground")!,
+      modelKey: "behavioral",
+      model: {} as MnaModel,
+      resolvedPins: [{ elementId: "gnd1", pinLabel: "gnd", worldPosition: { x: 0, y: 0 }, direction: PinDirection.BIDIRECTIONAL, bitWidth: 1, domain: "analog" as const }],
+    };
+
+    const gatePC: PartitionedComponent = {
+      element: gateEl,
+      definition: storedGateDef,
+      modelKey: "cmos",
+      model: storedGateDef.models!.mnaModels!["cmos"]!,
+      resolvedPins: [
+        { elementId: "not1", pinLabel: "in", worldPosition: { x: 10, y: 0 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" as const },
+        { elementId: "not1", pinLabel: "out", worldPosition: { x: 20, y: 0 }, direction: PinDirection.OUTPUT, bitWidth: 1, domain: "analog" as const },
+        { elementId: "not1", pinLabel: "VDD", worldPosition: { x: 15, y: -10 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" as const },
+        { elementId: "not1", pinLabel: "GND", worldPosition: { x: 15, y: 10 }, direction: PinDirection.INPUT, bitWidth: 1, domain: "analog" as const },
+      ],
+    };
+
+    const partition: SolverPartition = {
+      components: [gndPC, gatePC],
+      groups,
+      bridgeStubs: [],
+      crossEngineBoundaries: [],
+    };
+
+    return { partition, registry };
+  }
+
+  it("composite_factory_produces_single_element_from_subcircuit", () => {
+    const modelRegistry = new SubcircuitModelRegistry();
+    const subcircuit = buildCmosInverterNetlist();
+    modelRegistry.register("CmosInverter", subcircuit);
+
+    const { partition, registry } = buildPartitionForCompositeTest("CmosInverter", modelRegistry);
+
+    const compiled = compileAnalogPartition(
+      partition,
+      registry,
+      modelRegistry,
+    );
+
+    // The composite factory produces a SINGLE element (not 2 separate MOSFETs)
+    // Plus no VDD source injected — VDD flows through regular pins
+    const errors = compiled.diagnostics.filter(d => d.severity === "error");
+    expect(errors).toHaveLength(0);
+    expect(compiled.elements.length).toBe(1);
+  });
+
+  it("composite_factory_element_stamps_all_sub_elements", () => {
+    const modelRegistry = new SubcircuitModelRegistry();
+    const subcircuit = buildCmosInverterNetlist();
+    modelRegistry.register("CmosInverter", subcircuit);
+
+    const { partition, registry } = buildPartitionForCompositeTest("CmosInverter", modelRegistry);
+
+    const compiled = compileAnalogPartition(
+      partition,
+      registry,
+      modelRegistry,
+    );
+
+    expect(compiled.elements.length).toBe(1);
+    const compositeEl = compiled.elements[0];
+
+    // The composite element should have isNonlinear=true (MOSFETs are nonlinear)
+    expect(compositeEl.isNonlinear).toBe(true);
+  });
+
+  it("unresolved_subcircuit_emits_diagnostic_and_skips", () => {
+    const modelRegistry = new SubcircuitModelRegistry();
+
+    const { partition, registry } = buildPartitionForCompositeTest("NonexistentModel", modelRegistry);
+
+    const compiled = compileAnalogPartition(
+      partition,
+      registry,
+      modelRegistry,
+    );
+
+    const unresolvedDiags = compiled.diagnostics.filter(
+      d => d.code === "unresolved-model-ref",
+    );
+    expect(unresolvedDiags).toHaveLength(1);
+    expect(unresolvedDiags[0].severity).toBe("error");
+    expect(unresolvedDiags[0].summary).toContain("NonexistentModel");
+
+    // Component should be skipped — no elements produced
+    expect(compiled.elements).toHaveLength(0);
+  });
+
+  it("no_implicit_vdd_source_injected", () => {
+    const modelRegistry = new SubcircuitModelRegistry();
+    const subcircuit = buildCmosInverterNetlist();
+    modelRegistry.register("CmosInverter", subcircuit);
+
+    const { partition, registry } = buildPartitionForCompositeTest("CmosInverter", modelRegistry);
+
+    const compiled = compileAnalogPartition(
+      partition,
+      registry,
+      modelRegistry,
+    );
+
+    // Only 1 composite element — no implicit VDD voltage source
+    expect(compiled.elements.length).toBe(1);
+    // branchCount should be 0 since MOSFETs don't need branches
+    expect(compiled.branchCount).toBe(0);
   });
 });

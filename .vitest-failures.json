@@ -1,77 +1,10 @@
 {
   "summary": {
-    "passed": 10078,
-    "failed": 18,
+    "passed": 24,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 341,
-    "durationSeconds": 12.8
+    "totalFiles": 1,
+    "durationSeconds": 0.4
   },
-  "failures": [
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-          "test": "patch with _spiceModelOverrides changes DC operating point vs default",
-          "line": 165,
-          "column": 24
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of undefined (reading 'IP')",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "peak_current_at_vp",
-          "line": 125,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "valley_current_at_vv",
-          "line": 125,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "nr_converges_in_ndr_region",
-          "line": 125,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "expected [] to have a length of 1 but got +0",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "digital_only_component_emits_diagnostic",
-          "line": 311,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-          "test": "rejects_digital_only_component",
-          "line": 425,
-          "column": 24
-        }
-      ]
-    },
-    {
-      "message": "expected \"spy\" to be called once, but got 0 times",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "analog_internals_without_transistorModel_falls_through_to_analogFactory",
-          "line": 547,
-          "column": 24
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

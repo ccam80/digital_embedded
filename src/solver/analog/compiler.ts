@@ -6,17 +6,17 @@
  *
  * Steps:
  *  1. Build node map (wire groups → MNA node IDs, ground = 0)
- *  3. Assign sequential branch indices to components with requiresBranchRow
+ *  2. Resolve subcircuit-backed models into MnaModel factories
+ *  3. Assign sequential branch indices using branchCount
  *  4. Allocate internal nodes via getInternalNodeCount
  *  5. Resolve pin→node bindings for each element
- *  6. Call analogFactory for each element
+ *  6. Call factory for each element
  *  7. Topology validation (floating nodes, voltage-source loops, inductor loops)
  *  8. Return ConcreteCompiledAnalogCircuit
  */
 
 import { Circuit, Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
-import type { AnalogElement } from "./element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { pinWorldPosition, PinDirection } from "../../core/pin.js";
@@ -24,7 +24,8 @@ import type { PinDeclaration, ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { SubcircuitModelRegistry } from "./subcircuit-model-registry.js";
-import { expandTransistorModel } from "./transistor-expansion.js";
+import { getAnalogFactory } from "./transistor-expansion.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
@@ -39,8 +40,7 @@ import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
-import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
-import { INFRASTRUCTURE_TYPES } from "../../compile/extract-connectivity.js";
+import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel, DigitalModel } from "../../compile/types.js";
 
 function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
   return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
@@ -52,7 +52,6 @@ function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistr
 
 type ComponentRoute =
   | { kind: 'stamp';  model: MnaModel }
-  | { kind: 'expand'; subcircuitModel: string }
   | { kind: 'bridge' }
   | { kind: 'skip' };
 
@@ -63,11 +62,6 @@ function resolveComponentRoute(
 ): ComponentRoute {
   const hasMnaModels = def.models?.mnaModels !== undefined
     && Object.keys(def.models.mnaModels).length > 0;
-
-  const subcircuitName = def.subcircuitRefs?.[pc.modelKey];
-  if (subcircuitName) {
-    return { kind: 'expand', subcircuitModel: subcircuitName };
-  }
 
   if (pc.model === null) return { kind: 'skip' };
 
@@ -81,59 +75,192 @@ function resolveComponentRoute(
   }
 
   const mnaModel = pc.model as MnaModel;
-
-  if (mnaModel.factory) {
-    return { kind: 'stamp', model: mnaModel };
-  }
-
-  return { kind: 'skip' };
-}
-
-function findStampModel(def: ComponentDefinition): MnaModel | undefined {
-  const mnaModels = def.models?.mnaModels;
-  if (!mnaModels) return undefined;
-  for (const key of Object.keys(mnaModels)) {
-    const m = mnaModels[key];
-    if (m?.factory) return m;
-  }
-  return undefined;
+  return { kind: 'stamp', model: mnaModel };
 }
 
 // ---------------------------------------------------------------------------
-// VDD voltage source factory for transistor expansion
+// Subcircuit model resolution — post-partition step (W4.1)
 // ---------------------------------------------------------------------------
 
 /**
- * Create a minimal ideal DC voltage source AnalogElement for the shared VDD
- * rail injected when transistor-level components are present in the circuit.
+ * Resolve subcircuit-backed models into MnaModel factories.
  *
- * Uses the same MNA stamp convention as makeVoltageSource in test-elements.ts:
- * the branch row `branchIdx` is an absolute 0-based solver row index.
+ * For each PartitionedComponent whose active model key appears in
+ * `subcircuitRefs` or `subcircuitBindings`, look up the MnaSubcircuitNetlist
+ * and compile it into an MnaModel with a composite factory. Replaces
+ * `pc.model` in-place so the main compiler loop only sees stamp/bridge/skip.
  */
-function makeVddSource(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  voltage: number,
-): import("./element.js").AnalogElement {
+function resolveSubcircuitModels(
+  partition: SolverPartition,
+  transistorModels: SubcircuitModelRegistry | undefined,
+  modelLibrary: ModelLibrary,
+  subcircuitBindings: Record<string, string>,
+  modelDefinitions: Record<string, MnaSubcircuitNetlist>,
+  diagnostics: import("../../core/analog-engine-interface.js").SolverDiagnostic[],
+): void {
+  for (const pc of partition.components) {
+    const def = pc.definition;
+    const defName = subcircuitBindings[`${def.name}:${pc.modelKey}`]
+      ?? def.subcircuitRefs?.[pc.modelKey];
+    if (!defName) continue;
+
+    const netlist = modelDefinitions[defName]
+      ?? transistorModels?.get(defName);
+    if (!netlist) {
+      diagnostics.push(
+        makeDiagnostic(
+          "unresolved-model-ref" as unknown as import("../../core/analog-types.js").SolverDiagnosticCode,
+          "error",
+          `Subcircuit definition "${defName}" not found for component "${def.name}" model key "${pc.modelKey}"`,
+          {
+            explanation:
+              `Component "${def.name}" references subcircuit definition "${defName}" ` +
+              `via subcircuitRefs or subcircuitBindings, but no MnaSubcircuitNetlist ` +
+              `with that name was found in modelDefinitions or the SubcircuitModelRegistry.`,
+          },
+        ),
+      );
+      (pc as { model: DigitalModel | MnaModel | null }).model = null;
+      continue;
+    }
+
+    pc.model = compileSubcircuitToMnaModel(netlist, modelLibrary, pc);
+  }
+}
+
+/**
+ * Compile an MnaSubcircuitNetlist into an MnaModel with a composite factory.
+ *
+ * The factory returns a single AnalogElementCore that internally aggregates
+ * stamps from all sub-elements. The compiler treats it like any other single
+ * element.
+ */
+function compileSubcircuitToMnaModel(
+  netlist: MnaSubcircuitNetlist,
+  modelLibrary: ModelLibrary,
+  _pc: PartitionedComponent,
+): MnaModel {
+  let totalBranches = 0;
+  for (const subEl of netlist.elements) {
+    const factory = getAnalogFactory(subEl.typeId);
+    if (factory) {
+      const testCore = factory([], -1, new PropertyBag(), () => 0);
+      if (testCore.branchIndex >= 0) totalBranches++;
+    }
+  }
+
   return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
-    branchIndex: branchIdx,
-    isNonlinear: false,
-    isReactive: false,
-    stamp(solver: import("./sparse-solver.js").SparseSolver): void {
-      const k = branchIdx;
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
-      solver.stampRHS(k, voltage);
+    factory(
+      pinNodes: ReadonlyMap<string, number>,
+      internalNodeIds: readonly number[],
+      branchIdx: number,
+      _props: PropertyBag,
+      getTime: () => number,
+    ): import("../../core/analog-types.js").AnalogElementCore {
+      const portLabelToNode = new Map<string, number>();
+      for (const [label, nodeId] of pinNodes) {
+        portLabelToNode.set(label, nodeId);
+      }
+
+      const netRemap = new Map<number, number>();
+      for (let portIdx = 0; portIdx < netlist.ports.length; portIdx++) {
+        const portLabel = netlist.ports[portIdx];
+        const outerNode = portLabelToNode.get(portLabel);
+        if (outerNode !== undefined) {
+          netRemap.set(portIdx, outerNode);
+        }
+      }
+
+      const internalBase = netlist.ports.length;
+      for (let i = 0; i < netlist.internalNetCount; i++) {
+        if (i < internalNodeIds.length) {
+          netRemap.set(internalBase + i, internalNodeIds[i]);
+        }
+      }
+
+      function remapNet(netIdx: number): number {
+        const mapped = netRemap.get(netIdx);
+        if (mapped !== undefined) return mapped;
+        return -1;
+      }
+
+      const subElements: import("../../core/analog-types.js").AnalogElementCore[] = [];
+      let subBranchOffset = 0;
+
+      for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+        const subEl = netlist.elements[elIdx];
+        const connectivity = netlist.netlist[elIdx];
+        const remappedNodes = connectivity.map(remapNet);
+
+        const factory = getAnalogFactory(subEl.typeId);
+        if (!factory) continue;
+
+        const subProps = new PropertyBag();
+        if (subEl.params) {
+          for (const [k, v] of Object.entries(subEl.params)) {
+            if (typeof v === "number") subProps.set(k, v);
+          }
+        }
+
+        if (subEl.modelRef) {
+          const namedModel = modelLibrary.get(subEl.modelRef);
+          if (namedModel) {
+            subProps.set("_modelParams", namedModel.params as unknown as import("../../core/properties.js").PropertyValue);
+          }
+        }
+
+        const subBranchIdx = branchIdx >= 0 ? branchIdx + subBranchOffset : -1;
+        const core = factory(remappedNodes, subBranchIdx, subProps, getTime);
+        if (core.branchIndex >= 0) subBranchOffset++;
+        subElements.push(core);
+      }
+
+      const anyNonlinear = subElements.some(e => e.isNonlinear);
+      const anyReactive = subElements.some(e => e.isReactive);
+
+      const core: import("../../core/analog-types.js").AnalogElementCore = {
+        branchIndex: branchIdx >= 0 ? branchIdx : -1,
+        isNonlinear: anyNonlinear,
+        isReactive: anyReactive,
+
+        stamp(solver: import("../../core/analog-types.js").SparseSolverStamp): void {
+          for (const sub of subElements) sub.stamp(solver);
+        },
+
+        getPinCurrents(voltages: Float64Array): number[] {
+          const currents: number[] = [];
+          for (const sub of subElements) {
+            if (sub.getPinCurrents) {
+              currents.push(...sub.getPinCurrents(voltages));
+            }
+          }
+          return currents;
+        },
+      };
+
+      if (anyNonlinear) {
+        core.stampNonlinear = (solver: import("../../core/analog-types.js").SparseSolverStamp): void => {
+          for (const sub of subElements) sub.stampNonlinear?.(solver);
+        };
+        core.updateOperatingPoint = (voltages: Float64Array): void => {
+          for (const sub of subElements) sub.updateOperatingPoint?.(voltages);
+        };
+      }
+
+      if (anyReactive) {
+        core.stampCompanion = (dt: number, method: import("../../core/analog-types.js").IntegrationMethod, voltages: Float64Array): void => {
+          for (const sub of subElements) sub.stampCompanion?.(dt, method, voltages);
+        };
+      }
+
+      return core;
     },
-    getPinCurrents(voltages: Float64Array): number[] {
-      const I = voltages[branchIdx];
-      return [I, -I];
+
+    getInternalNodeCount(_props: PropertyBag): number {
+      return netlist.internalNetCount;
     },
+
+    branchCount: totalBranches,
   };
 }
 
@@ -581,8 +708,6 @@ type PassAPartitionResult = {
   elementMeta: PartitionElementMeta[];
   branchCount: number;
   nextInternalNode: number;
-  vddNodeId: number;
-  vddBranchIdx: number;
 };
 
 /**
@@ -601,8 +726,6 @@ function runPassA_partition(
 ): PassAPartitionResult {
   let nextInternalNode = externalNodeCount + 1;
   let branchCount = 0;
-  let vddNodeId = -1;
-  let vddBranchIdx = -1;
   const elementMeta: PartitionElementMeta[] = [];
 
   for (const pc of partition.components) {
@@ -645,14 +768,12 @@ function runPassA_partition(
         continue;
       }
       case 'bridge':
-      case 'expand':
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       case 'stamp': {
-        let branchIdx = -1;
-        if (route.model.requiresBranchRow) {
-          branchIdx = branchCount++;
-        }
+        const modelBranchCount = route.model.branchCount ?? 0;
+        const branchIdx = modelBranchCount > 0 ? branchCount : -1;
+        branchCount += modelBranchCount;
         const props = el.getProperties();
         const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
         const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
@@ -663,7 +784,7 @@ function runPassA_partition(
     }
   }
 
-  return { elementMeta, branchCount, nextInternalNode, vddNodeId, vddBranchIdx };
+  return { elementMeta, branchCount, nextInternalNode };
 }
 
 /**
@@ -970,14 +1091,19 @@ export function compileAnalogPartition(
     partition.crossEngineBoundaries.map((b) => (b.subcircuitElement as CircuitElement).instanceId),
   );
 
+  // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
+  const subcircuitBindings: Record<string, string> =
+    outerCircuit?.metadata.subcircuitBindings ?? {};
+  const modelDefinitions: Record<string, MnaSubcircuitNetlist> =
+    outerCircuit?.metadata.modelDefinitions ?? {};
+  resolveSubcircuitModels(partition, transistorModels, modelLibrary, subcircuitBindings, modelDefinitions, diagnostics);
+
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
   const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);
 
   const elementMeta = passA.elementMeta;
   let branchCount = passA.branchCount;
   let nextInternalNode = passA.nextInternalNode;
-  let vddNodeId = passA.vddNodeId;
-  let vddBranchIdx = passA.vddBranchIdx;
 
   let totalNodeCount = nextInternalNode - 1;
 
@@ -1021,94 +1147,6 @@ export function compileAnalogPartition(
 
     if (route.kind === 'skip') {
       continue;
-    }
-
-    if (route.kind === 'expand') {
-      if (!transistorModels) {
-        diagnostics.push(
-          makeDiagnostic(
-            "missing-transistor-model",
-            "error",
-            `Component "${el.typeId}" requires transistor expansion but no SubcircuitModelRegistry was provided`,
-            {
-              explanation:
-                `Pass a SubcircuitModelRegistry as the third argument to compileAnalogPartition() ` +
-                `when compiling circuits with transistor-level components.`,
-            },
-          ),
-        );
-        continue;
-      }
-
-      const stampModel = findStampModel(def);
-      if (stampModel?.factory !== undefined) {
-        const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
-          def.pinLayout.length,
-        ).fill(null);
-        const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, outerPinVertices, positionToNodeId);
-
-        const nodeIdToVertex = new Map<number, { x: number; y: number }>();
-        for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
-          const nid = outerPinNodeIds[pi];
-          const vtx = outerPinVertices[pi];
-          if (nid >= 0 && vtx) nodeIdToVertex.set(nid, vtx);
-        }
-
-        if (vddNodeId < 0) {
-          vddNodeId = nextInternalNode++;
-          vddBranchIdx = branchCount++;
-        }
-
-        const expResult = expandTransistorModel(
-          def,
-          outerPinNodeIds,
-          transistorModels,
-          vddNodeId,
-          0,
-          () => nextInternalNode++,
-          route.subcircuitModel,
-        );
-
-        diagnostics.push(...expResult.diagnostics);
-
-        for (const expEl of expResult.elements) {
-          const expElIdx = analogElements.length;
-          analogElements.push(expEl);
-          elementToCircuitElement.set(expElIdx, el);
-
-          const subVerts: Array<{ x: number; y: number } | null> = [];
-          for (const nid of expEl.pinNodeIds) {
-            subVerts.push(nodeIdToVertex.get(nid) ?? null);
-          }
-          elementPinVertices.set(expElIdx, subVerts);
-
-          {
-            const expResolvedPins: ResolvedPin[] = [];
-            for (let ni = 0; ni < expEl.pinNodeIds.length; ni++) {
-              const nid = expEl.pinNodeIds[ni];
-              const vtx = nodeIdToVertex.get(nid) ?? null;
-              expResolvedPins.push({
-                label: `node${ni}`,
-                direction: PinDirection.BIDIRECTIONAL,
-                localPosition: { x: 0, y: 0 },
-                worldPosition: vtx ?? { x: 0, y: 0 },
-                wireVertex: vtx,
-                nodeId: nid,
-                bitWidth: 1,
-              });
-            }
-            elementResolvedPins.set(expElIdx, expResolvedPins);
-          }
-          topologyInfo.push({
-            nodeIds: Array.from(expEl.pinNodeIds),
-            isBranch: expEl.branchIndex >= 0,
-            typeHint: expEl.branchIndex >= 0
-              ? expEl.isReactive ? "inductor" : "voltage"
-              : "other",
-          });
-        }
-        continue;
-      }
     }
 
     if (route.kind === 'bridge') {
@@ -1394,23 +1432,9 @@ export function compileAnalogPartition(
     });
   }
 
-  // After Pass B: recompute totalNodeCount to include transistor-expansion nodes
   totalNodeCount = nextInternalNode - 1;
 
-  // Stage 6: Inject shared VDD voltage source for transistor-expanded components.
-  if (vddNodeId >= 0 && vddBranchIdx >= 0) {
-    const vdd = circuitFamily.vdd;
-    const absoluteVddBranch = totalNodeCount + vddBranchIdx;
-    const vddSource = makeVddSource(vddNodeId, 0, absoluteVddBranch, vdd);
-    analogElements.push(vddSource);
-    topologyInfo.push({
-      nodeIds: [vddNodeId, 0],
-      isBranch: true,
-      typeHint: "voltage",
-    });
-  }
-
-  // Stage 7: Topology validation — orphan/floating nodes, source loops.
+  // Topology validation — orphan/floating nodes, source loops.
   validateTopologyAndEmitDiagnostics(topologyInfo, totalNodeCount, diagnostics);
 
   // Check for ground.
