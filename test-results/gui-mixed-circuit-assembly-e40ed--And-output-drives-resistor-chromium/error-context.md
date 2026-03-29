@@ -273,7 +273,7 @@
     - generic "Circuit editor canvas" [ref=e362]
   - generic [ref=e363]:
     - generic [ref=e364]: ⚠️
-    - generic [ref=e365]: "Circuit problem: Component \"In\" (d8df13cf-09a6-4523-b3ad-07ade48d6f48) is digital-only and cannot be simulated in an analog circuit | Component \"In\" (972c2466-c9cc-4d16-86f6-fa6e80cd634a) is digital-only and cannot be simulated in an analog circuit"
+    - generic [ref=e365]: "Circuit problem: Component \"In\" (85158876-f83e-4d76-8273-a2553634b562) is digital-only and cannot be simulated in an analog circuit | Component \"In\" (3fd913b2-72f3-4c1f-91aa-250fedb17d67) is digital-only and cannot be simulated in an analog circuit"
     - button "×" [ref=e366] [cursor=pointer]
     - button "100%" [ref=e368] [cursor=pointer]
     - generic [ref=e369]: 24, 8

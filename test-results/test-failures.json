@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 9987,
+      "passed": 10119,
       "failed": 10,
       "skipped": 0,
-      "totalFiles": 336,
-      "durationSeconds": 14.9
+      "totalFiles": 344,
+      "durationSeconds": 17.2
     },
     "playwright": {
-      "passed": 467,
-      "failed": 60,
+      "passed": 476,
+      "failed": 66,
       "skipped": 0,
-      "totalFiles": 19,
-      "durationSeconds": 219.262401
+      "totalFiles": 22,
+      "durationSeconds": 274.265187
     },
-    "totalFailed": 70,
-    "totalPassed": 10454
+    "totalFailed": 76,
+    "totalPassed": 10595
   },
   "failures": {
     "vitest": [
@@ -497,6 +497,54 @@
             "file": "gui/digital-circuit-assembly.spec.ts",
             "test": "T flip-flop 4-bit ripple counter",
             "line": 381,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8080/",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "dual-model component shows Model dropdown with labels",
+            "line": 18,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "single-model component does not show Model dropdown",
+            "line": 37,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "selecting Behavioral model shows SPICE parameter panel",
+            "line": 50,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import dialog opens with textarea when menu item clicked",
+            "line": 56,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 70,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 91,
             "column": 3
           }
         ]

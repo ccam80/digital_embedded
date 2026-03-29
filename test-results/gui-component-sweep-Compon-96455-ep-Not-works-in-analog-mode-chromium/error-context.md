@@ -284,11 +284,11 @@
             - generic [ref=e370]: Show value
             - checkbox [checked] [ref=e372]
           - generic [ref=e373]:
-            - generic [ref=e374]: Mode
+            - generic [ref=e374]: Model
             - combobox [ref=e375]:
-              - option "digital" [selected]
-              - option "behavioral"
-              - option "cmos"
+              - option "Digital" [selected]
+              - option "Behavioral (MNA)"
+              - option "CMOS (Subcircuit)"
           - generic [ref=e377] [cursor=pointer]: ▶ Pin Electrical
   - generic [ref=e378]:
     - generic [ref=e379]: Ready

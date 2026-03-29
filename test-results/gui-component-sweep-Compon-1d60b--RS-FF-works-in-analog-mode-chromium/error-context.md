@@ -278,10 +278,10 @@
             - generic [ref=e362]: Show value
             - checkbox [checked] [ref=e364]
           - generic [ref=e365]:
-            - generic [ref=e366]: Mode
+            - generic [ref=e366]: Model
             - combobox [ref=e367]:
-              - option "digital" [selected]
-              - option "behavioral"
+              - option "Digital" [selected]
+              - option "Behavioral (MNA)"
           - generic [ref=e369] [cursor=pointer]: ▶ Pin Electrical
   - generic [ref=e370]:
     - generic [ref=e371]: Ready

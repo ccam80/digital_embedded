@@ -1,12 +1,12 @@
 # digiTS
 
-A browser-based digital logic circuit simulator for embedding in university course tutorials. Native TypeScript port of [hneemann/Digital](https://github.com/hneemann/Digital) — purely static files, no server, no licensing dependencies.
+A browser-based mixed-domain digital logic and analog MNA-based simulator, statring from a TypeScript port of Helmut Neeman's [Digital](https://github.com/hneemann/Digital) and Paul Falstad's [circuitjs1](https://www.falstad.com/circuit/) — purely static files, no server, no licensing dependencies. I wanted to combine some digital/analog simulations for the ADC/DAC portion of a computer architecture course, and my life has been taken over by AI-agent-fuelled ambition, so I made one. 
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev          # Vite dev server on localhost:5173
+npx vite           # Vite dev server on localhost:5173
 ```
 
 Open `http://localhost:5173/simulator.html` in your browser.
@@ -17,19 +17,7 @@ Open `http://localhost:5173/simulator.html` in your browser.
 npm run build        # Production bundle -> dist/
 ```
 
-The build outputs all HTML pages, JS bundles, and copies `circuits/`, `tutorials/`, and `modules/` into `dist/`.
-
-## Deploy to GitHub Pages
-
-Deployment is automated via GitHub Actions. On every push to `main`, the workflow at `.github/workflows/deploy.yml`:
-
-1. Installs dependencies (`npm ci`)
-2. Builds the project (`npm run build`)
-3. Deploys `dist/` to GitHub Pages
-
-**Setup:** Go to your repo's Settings > Pages > Source and select **GitHub Actions**.
-
-Your site will be available at `https://<user>.github.io/<repo>/simulator.html`.
+##
 
 ## URL Parameters
 
@@ -257,8 +245,6 @@ npm run test:all     # Both
 | `modules/` | Course module configs |
 | `e2e/` | Playwright E2E tests |
 | `scripts/` | CLI tools and MCP server |
-| `spec/` | Implementation plan and progress |
-| `ref/Digital/` | Reference Java codebase (git submodule) |
 
 ## License
 

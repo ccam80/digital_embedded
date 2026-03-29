@@ -173,6 +173,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     );
     ctx.wireRenderer.renderJunctionDots(ctx.canvasRenderer, ctx.circuit.wires);
     ctx.wireRenderer.renderBusWidthMarkers(ctx.canvasRenderer, ctx.circuit.wires);
+    ctx.wireRenderer.renderOverrideIndicators(ctx.canvasRenderer, ctx.circuit.wires);
 
     if (state.currentFlowAnimator !== null) {
       state.currentFlowAnimator.render(ctx.canvasRenderer, ctx.circuit);

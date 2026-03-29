@@ -277,7 +277,7 @@
     - generic "Circuit editor canvas" [ref=e368]
   - generic [ref=e369]:
     - generic [ref=e370]: ⚠️
-    - generic [ref=e371]: "Circuit problem: Component \"Out\" (0ff0717c-c30f-4459-8c75-8b774e6f4800) is digital-only and cannot be simulated in an analog circuit"
+    - generic [ref=e371]: "Circuit problem: Component \"Out\" (a2f60211-586d-4f2c-b88e-2912c4c1e019) is digital-only and cannot be simulated in an analog circuit"
     - button "×" [ref=e372] [cursor=pointer]
     - button "100%" [ref=e374] [cursor=pointer]
     - generic [ref=e375]: 26, 8

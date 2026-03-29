@@ -37,8 +37,8 @@
         - generic [ref=e35]:
           - generic [ref=e36] [cursor=pointer]: Recent
           - list [ref=e37]:
-            - treeitem "And" [ref=e38] [cursor=pointer]:
-              - generic [ref=e40]: And
+            - treeitem "NpnBJT" [ref=e38] [cursor=pointer]:
+              - generic [ref=e40]: NpnBJT
         - tree [ref=e41]:
           - generic [ref=e42]:
             - generic [ref=e43] [cursor=pointer]:
@@ -262,42 +262,9 @@
                 - generic [ref=e346]: RAMSinglePort
       - button "‹" [ref=e347] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e348]
-    - generic [ref=e349]:
-      - generic "Circuit editor canvas" [ref=e350]
-      - generic [ref=e351]:
-        - generic [ref=e352]:
-          - generic [ref=e353]: And
-          - button "×" [ref=e354] [cursor=pointer]
-        - generic [ref=e355]:
-          - generic [ref=e356]:
-            - generic [ref=e357]: Inputs
-            - spinbutton [ref=e359]: "2"
-          - generic [ref=e360]:
-            - generic [ref=e361]: Bits
-            - spinbutton [ref=e363]: "1"
-          - generic [ref=e364]:
-            - generic [ref=e365]: Wide shape
-            - checkbox [ref=e367]
-          - generic [ref=e368]:
-            - generic [ref=e369]: Invert inputs
-            - textbox [ref=e371]
-          - generic [ref=e372]:
-            - generic [ref=e373]: Label
-            - generic [ref=e374]:
-              - textbox [ref=e375]: DUT
-              - checkbox "Show on canvas" [checked] [ref=e376]
-          - generic [ref=e377]:
-            - generic [ref=e378]: Show value
-            - checkbox [checked] [ref=e380]
-          - generic [ref=e381]:
-            - generic [ref=e382]: Model
-            - combobox [ref=e383]:
-              - option "Digital" [selected]
-              - option "Behavioral (MNA)"
-              - option "CMOS (Subcircuit)"
-          - generic [ref=e385] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e386]:
-    - generic [ref=e387]: Ready
-    - button "100%" [ref=e389] [cursor=pointer]
-    - generic [ref=e390]: 11.53, 9
+    - generic "Circuit editor canvas" [ref=e350]
+  - generic [ref=e351]:
+    - generic [ref=e352]: Ready
+    - button "100%" [ref=e354] [cursor=pointer]
+    - generic [ref=e355]: 12, 10
 ```
