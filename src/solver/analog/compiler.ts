@@ -109,7 +109,7 @@ function resolveSubcircuitModels(
     if (!netlist) {
       diagnostics.push(
         makeDiagnostic(
-          "unresolved-model-ref" as unknown as import("../../core/analog-types.js").SolverDiagnosticCode,
+          "unresolved-model-ref",
           "error",
           `Subcircuit definition "${defName}" not found for component "${def.name}" model key "${pc.modelKey}"`,
           {
@@ -315,7 +315,7 @@ function resolveElementNodes(
         }
       }
     }
-    // Fallback: look up by position (handles pin-overlap without a wire)
+    // Secondary: look up by position (handles pin-overlap without a wire)
     if (result[i] === -1 && positionToNodeId) {
       const key = `${pinPos.x},${pinPos.y}`;
       const nodeId = positionToNodeId.get(key);
@@ -1363,7 +1363,7 @@ export function compileAnalogPartition(
       // Resolution order for base params:
       // 1. Component-specific defaultParams (e.g. SCHOTTKY_DEFAULTS)
       // 2. Named model params (user-assigned .MODEL card)
-      // 3. Library default for the deviceType (generic fallback)
+      // 3. Library default for the deviceType (base of resolution chain)
       const baseParams = activeModel.defaultParams
         ?? resolvedModel.params;
       let finalParams = baseParams;

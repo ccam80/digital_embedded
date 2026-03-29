@@ -253,20 +253,20 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 433,
-      "lastAccessed": 1774767289235,
+      "accessCount": 453,
+      "lastAccessed": 1774769397051,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 209,
-      "lastAccessed": 1774767537885,
+      "accessCount": 211,
+      "lastAccessed": 1774769129889,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 132,
-      "lastAccessed": 1774767714637,
+      "accessCount": 136,
+      "lastAccessed": 1774769207037,
       "type": "file"
     },
     {
@@ -277,14 +277,14 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 105,
-      "lastAccessed": 1774766961572,
+      "accessCount": 108,
+      "lastAccessed": 1774769238194,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 102,
-      "lastAccessed": 1774761249897,
+      "accessCount": 106,
+      "lastAccessed": 1774769165602,
       "type": "directory"
     },
     {
@@ -295,14 +295,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 74,
-      "lastAccessed": 1774767685288,
+      "accessCount": 75,
+      "lastAccessed": 1774769121365,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 63,
-      "lastAccessed": 1774767166292,
+      "accessCount": 66,
+      "lastAccessed": 1774769180066,
       "type": "directory"
     },
     {
@@ -331,8 +331,14 @@
     },
     {
       "path": "src\\app\\canvas-popup.ts",
-      "accessCount": 34,
-      "lastAccessed": 1774768173131,
+      "accessCount": 38,
+      "lastAccessed": 1774769163749,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 36,
+      "lastAccessed": 1774769382027,
       "type": "file"
     },
     {
@@ -348,15 +354,9 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 31,
-      "lastAccessed": 1774766942979,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\reviewer.md",
-      "accessCount": 29,
-      "lastAccessed": 1774764821001,
+      "accessCount": 30,
+      "lastAccessed": 1774769121208,
       "type": "file"
     },
     {

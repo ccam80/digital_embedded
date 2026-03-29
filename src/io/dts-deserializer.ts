@@ -264,8 +264,6 @@ function mnaNetlistToCircuit(
         if (typeof v === 'number') props.push([k, v]);
       }
     }
-    if (subEl.modelRef !== undefined) props.push(['subcircuitModel', subEl.modelRef]);
-
     const pins = conn.map((ni: number, pIdx: number) => ({
       x: netToX(ni),
       y: yRow,

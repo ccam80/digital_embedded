@@ -197,6 +197,7 @@ export type SolverDiagnosticCode =
   | "ndr-convergence-assist"
   | "rs-flipflop-both-set"
   | "ac-no-source"
+  | "unresolved-model-ref"
   | "ac-linearization-failed"
   | "unsupported-ctz-component"
   | "monte-carlo-trial-failed"

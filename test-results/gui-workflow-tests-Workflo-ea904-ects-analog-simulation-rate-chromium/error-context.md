@@ -23,9 +23,9 @@
       - button "▶▶" [ref=e20] [cursor=pointer]
       - button "■" [ref=e21] [cursor=pointer]
       - button "−" [ref=e22] [cursor=pointer]
-      - textbox "Steps per second" [ref=e23]: "1000"
-      - button "+" [ref=e24] [cursor=pointer]
-      - generic [ref=e25]: steps/s
+      - textbox "Steps per second" [ref=e23]: "10000000"
+      - button "+" [active] [ref=e24] [cursor=pointer]
+      - generic [ref=e25]: s/s
       - button "Toggle light/dark mode" [ref=e27] [cursor=pointer]: ☽
   - generic [ref=e28]:
     - generic [ref=e29]:

@@ -690,7 +690,7 @@ describe("ComponentRegistry", () => {
       // This is enforced by TypeScript — if someone adds pinElectrical to MnaModel,
       // they must also update ComponentDefinition (where it belongs).
       const mnaKeys: Array<keyof MnaModel> = [
-        "factory", "subcircuitModel", "getInternalNodeCount",
+        "factory", "getInternalNodeCount",
         "branchCount", "deviceType", "defaultParams",
       ];
       expect(mnaKeys).not.toContain("pinElectrical");

@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx vitest run \\\"src/solver/analog/__tests__/spice-import-dialog.test.ts\\\" \\\"src/solver/analog/__tests__/spice-subckt-dialog.test.ts\\...",
-  "error": "Exit code 1\n...................F...................FFF..............\n\n============================================================\n  52 passed  4 failed  0 skipped  (0.6s)\n  3 test files\n============================================================\n\nFailures grouped by error:\n\n  [1] expected [] to include 'UNRESOLVED_MODEL'  (x1)\n      src\\solver\\analog\\__tests__\\spice-model-library.test.ts:323:18  \"modelRef in subcircuit that is not in namedParameterSets is detectable as unresolved\"\n\n  [2] expec...",
-  "timestamp": "2026-03-29T07:13:46.625Z",
-  "retry_count": 1
+  "tool_name": "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics",
+  "tool_input_preview": "{\"file\":\"C:/local_working_projects/digital_in_browser/src/core/__tests__/registry.test.ts\",\"severity\":\"error\"}",
+  "error": "Language server 'typescript-language-server' not found.\nInstall with: npm install -g typescript-language-server typescript",
+  "timestamp": "2026-03-29T07:26:41.849Z",
+  "retry_count": 5
 }

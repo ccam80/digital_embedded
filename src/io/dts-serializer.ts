@@ -261,10 +261,6 @@ function circuitToMnaNetlist(
         subEl.params[key] = props.get<number>(key);
       }
     }
-    const modelName = props.has('subcircuitModel')
-      ? props.get<string>('subcircuitModel') : undefined;
-    if (modelName !== undefined) subEl.modelRef = modelName;
-
     elements.push(subEl);
     const pinNets: number[] = [];
     for (const pin of el.getPins()) {

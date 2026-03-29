@@ -106,11 +106,10 @@ export function createPopupController(
     // SPICE import buttons — shown for semiconductor components with deviceType models
     {
       let hasSemiconductorModel = false;
-      let hasSubcircuitModel = false;
+      const hasSubcircuitModel = def.subcircuitRefs !== undefined && Object.keys(def.subcircuitRefs).length > 0;
       if (def.models?.mnaModels) {
         for (const mnaModel of Object.values(def.models.mnaModels)) {
           if (mnaModel.deviceType) hasSemiconductorModel = true;
-          if ((mnaModel as { subcircuitModel?: string }).subcircuitModel !== undefined) hasSubcircuitModel = true;
         }
       }
 

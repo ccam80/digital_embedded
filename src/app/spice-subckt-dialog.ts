@@ -1,8 +1,8 @@
 /**
  * SPICE .SUBCKT import dialog.
  *
- * Triggered from right-click context menu on components with a subcircuitModel
- * in their active MNA model definition.
+ * Triggered from right-click context menu on components with subcircuitRefs
+ * defined on their ComponentDefinition.
  *
  * Parses the pasted .SUBCKT block, shows a parse preview (name, port count,
  * element count), and on Apply:

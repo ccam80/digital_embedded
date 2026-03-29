@@ -538,7 +538,7 @@ describe("SimulationMode", () => {
   });
 
   it("analog_internals_without_transistorModel_falls_through_to_analogFactory", () => {
-    // Fuse/switch case: analog-internals but no subcircuitModel → use analogFactory
+    // Fuse/switch case: analog-internals but no subcircuitRefs → use analogFactory
     const propsMap = new Map<string, PropertyValue>([["simulationModel", "cmos"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileUnified(circuit, registry).analog!;

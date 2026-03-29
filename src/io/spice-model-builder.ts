@@ -314,7 +314,6 @@ function buildElement(
         y: yRow,
         label: `p${idx}`,
       }));
-      if (el.modelName) props.push(["subcircuitModel", el.modelName]);
       return makeCircuitElement("SubcircuitInstance", pins, props);
     }
   }
