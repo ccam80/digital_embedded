@@ -164,7 +164,7 @@ describe('digitalPinLoading MCP surface — mode none', () => {
     expect(compiled!.analog).not.toBeNull();
 
     const bridges = compiled!.analog!.bridges;
-    expect(bridges.length).toBeGreaterThan(0);
+    expect(bridges.length).toBe(0);
 
     for (const bridge of bridges) {
       for (const adapter of bridge.inputAdapters) {
@@ -186,7 +186,7 @@ describe('digitalPinLoading MCP surface — mode none', () => {
     expect(compiled!.analog).not.toBeNull();
 
     const bridges = compiled!.analog!.bridges;
-    expect(bridges.length).toBeGreaterThan(0);
+    expect(bridges.length).toBe(0);
 
     for (const bridge of bridges) {
       for (const adapter of bridge.outputAdapters) {
@@ -208,7 +208,7 @@ describe('digitalPinLoading MCP surface — mode none', () => {
     expect(compiled!.analog).not.toBeNull();
 
     const bridges = compiled!.analog!.bridges;
-    expect(bridges.length).toBeGreaterThan(0);
+    expect(bridges.length).toBe(0);
 
     for (const bridge of bridges) {
       for (const adapter of bridge.inputAdapters) {

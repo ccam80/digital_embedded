@@ -3,7 +3,7 @@
  *
  * Each factory function builds a Circuit containing MOSFET components
  * wired as standard CMOS logic topology. The subcircuits are registered
- * in the TransistorModelRegistry and referenced by the transistorModel
+ * in the SubcircuitModelRegistry and referenced by the transistorModel
  * field on the corresponding gate ComponentDefinition.
  *
  * Pin labeling conventions for interface elements:
@@ -26,7 +26,7 @@ import type { Pin, PinDeclaration } from "../../../core/pin.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import type { TransistorModelRegistry } from "../transistor-model-registry.js";
+import type { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement builder for subcircuit elements
@@ -138,7 +138,7 @@ function makeOutEl(label: string, xNet: number, yRow: number): CircuitElement {
 //   X=40: GND     — In "GND", NMOS source
 // ---------------------------------------------------------------------------
 
-export function createCmosInverter(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosInverter(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("in", 10, 0));
@@ -177,7 +177,7 @@ export function createCmosInverter(_modelRegistry: TransistorModelRegistry): Cir
 //   X=60: internal mid-node between NMOS series stack
 // ---------------------------------------------------------------------------
 
-export function createCmosNand2(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosNand2(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -231,7 +231,7 @@ export function createCmosNand2(_modelRegistry: TransistorModelRegistry): Circui
 //   X=60: PMOS series mid-node
 // ---------------------------------------------------------------------------
 
-export function createCmosNor2(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosNor2(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -288,7 +288,7 @@ export function createCmosNor2(_modelRegistry: TransistorModelRegistry): Circuit
 //   X=70: NAND internal mid-node (series NMOS stack)
 // ---------------------------------------------------------------------------
 
-export function createCmosAnd2(modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosAnd2(modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -355,7 +355,7 @@ export function createCmosAnd2(modelRegistry: TransistorModelRegistry): Circuit 
 //   X=70: PMOS series mid-node in NOR2
 // ---------------------------------------------------------------------------
 
-export function createCmosOr2(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosOr2(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -447,7 +447,7 @@ export function createCmosOr2(_modelRegistry: TransistorModelRegistry): Circuit 
 //   TG2_P: PMOS (D=out, G=A,     S=B_bar)
 // ---------------------------------------------------------------------------
 
-export function createCmosXor2(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosXor2(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -517,7 +517,7 @@ export function createCmosXor2(_modelRegistry: TransistorModelRegistry): Circuit
 //   X=80: final out
 // ---------------------------------------------------------------------------
 
-export function createCmosXnor2(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosXnor2(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("In_1", 10, 0));
@@ -598,7 +598,7 @@ export function createCmosXnor2(_modelRegistry: TransistorModelRegistry): Circui
 //   X=50: mid (between inverter 1 and inverter 2)
 // ---------------------------------------------------------------------------
 
-export function createCmosBuffer(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosBuffer(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   circuit.addElement(makeInEl("in", 10, 0));
@@ -635,13 +635,13 @@ export function createCmosBuffer(_modelRegistry: TransistorModelRegistry): Circu
 }
 
 // ---------------------------------------------------------------------------
-// registerAllCmosGateModels
+// registerBuiltinSubcircuitModels
 //
 // Creates and registers all CMOS gate subcircuit Circuit objects in the
-// TransistorModelRegistry. Called once at application startup or test setup.
+// SubcircuitModelRegistry. Called once at application startup or test setup.
 // ---------------------------------------------------------------------------
 
-export function registerAllCmosGateModels(modelRegistry: TransistorModelRegistry): void {
+export function registerBuiltinSubcircuitModels(modelRegistry: SubcircuitModelRegistry): void {
   modelRegistry.register("CmosInverter", createCmosInverter(modelRegistry));
   modelRegistry.register("CmosNand2", createCmosNand2(modelRegistry));
   modelRegistry.register("CmosNor2", createCmosNor2(modelRegistry));

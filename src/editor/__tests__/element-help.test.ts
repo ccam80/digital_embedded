@@ -54,6 +54,7 @@ function makePin(label: string, direction: PinDirection = PinDirection.INPUT): P
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: "signal",
   };
 }
 
@@ -64,7 +65,7 @@ function makePinWithDetails(
   isNegated: boolean,
   isClock: boolean,
 ): Pin {
-  return { direction, position: { x: 0, y: 0 }, label, bitWidth, isNegated, isClock };
+  return { direction, position: { x: 0, y: 0 }, label, bitWidth, isNegated, isClock, kind: "signal" };
 }
 
 function makeDefinition(

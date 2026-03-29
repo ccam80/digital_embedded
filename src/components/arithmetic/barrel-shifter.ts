@@ -54,9 +54,9 @@ const COMP_HEIGHT = 3;
 function buildBarrelShifterPinDeclarations(bitWidth: number, signed: boolean): PinDeclaration[] {
   const sBits = shiftBitsFor(bitWidth) + (signed ? 1 : 0);
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "shift", defaultBitWidth: sBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: bitWidth, position: { x: 3, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "shift", defaultBitWidth: sBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: bitWidth, position: { x: 3, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

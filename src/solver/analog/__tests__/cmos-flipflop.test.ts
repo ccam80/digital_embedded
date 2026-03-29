@@ -31,7 +31,7 @@ import { ComponentRegistry } from "../../../core/registry.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import { registerAnalogFactory } from "../transistor-expansion.js";
 import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
 import { EngineState } from "../../../core/engine-interface.js";
@@ -46,7 +46,7 @@ import { DDefinition } from "../../../components/flipflops/d.js";
 // One-time setup
 // ---------------------------------------------------------------------------
 
-const modelRegistry = new TransistorModelRegistry();
+const modelRegistry = new SubcircuitModelRegistry();
 
 beforeAll(() => {
   registerAnalogFactory("NMOS", (nodeIds, branchIdx, props, _getTime) =>

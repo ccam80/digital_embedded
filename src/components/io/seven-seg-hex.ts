@@ -75,6 +75,7 @@ function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: 7 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -83,6 +84,7 @@ function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
       position: { x: 3, y: 7 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

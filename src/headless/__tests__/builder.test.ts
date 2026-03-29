@@ -77,6 +77,7 @@ describe('CircuitBuilder', () => {
             bitWidth: 1,
             isNegated: false,
             isClock: false,
+            kind: "signal",
           },
           {
             label: 'out',
@@ -85,6 +86,7 @@ describe('CircuitBuilder', () => {
             bitWidth: 1,
             isNegated: false,
             isClock: false,
+            kind: "signal",
           },
         ];
         return new MockCircuitElement('Mock', position, pins);
@@ -114,6 +116,7 @@ describe('CircuitBuilder', () => {
             bitWidth: 1,
             isNegated: false,
             isClock: false,
+            kind: "signal",
           },
           {
             label: 'B',
@@ -122,6 +125,7 @@ describe('CircuitBuilder', () => {
             bitWidth: 1,
             isNegated: false,
             isClock: false,
+            kind: "signal",
           },
           {
             label: 'Y',
@@ -130,6 +134,7 @@ describe('CircuitBuilder', () => {
             bitWidth: 1,
             isNegated: false,
             isClock: false,
+            kind: "signal",
           },
         ];
         return new MockCircuitElement('And', position, pins);
@@ -246,6 +251,7 @@ describe('CircuitBuilder', () => {
               bitWidth: 8,
               isNegated: false,
               isClock: false,
+              kind: "signal",
             },
           ];
           return new MockCircuitElement('Wide', position, pins);

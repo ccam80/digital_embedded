@@ -341,7 +341,7 @@ function makeDigitalInDef(): ComponentDefinition {
     name: "In",
     typeId: -1,
     factory: (_props) => new GroundElement("auto", { x: 0, y: 0 }, []),
-    pinLayout: [{ label: "out", direction: PinDirection.OUTPUT }],
+    pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
@@ -377,6 +377,7 @@ describe("bridge-impedance-mismatch", () => {
           bitWidth: 1,
           isNegated: false,
           isClock: false,
+          kind: "signal",
         }];
       }
       getPins(): readonly Pin[] { return this._p; }
@@ -406,14 +407,15 @@ describe("bridge-impedance-mismatch", () => {
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     };
     const gnd = new GroundElement("gnd", { x: 0, y: 0 }, [gndPin]);
     outerCircuit.addElement(gnd);
 
     // High-Z resistor: 2 GΩ — R_source > 100 * rIn triggers mismatch
     const R_SOURCE = 2e9;
-    const rzp0: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false };
-    const rzp1: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 }, label: "p1", bitWidth: 1, isNegated: false, isClock: false };
+    const rzp0: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
+    const rzp1: Pin = { direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 }, label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
     const highZRes = new HighZResistorElement("hz1", { x: 0, y: 0 }, [rzp0, rzp1], R_SOURCE);
     outerCircuit.addElement(highZRes);
 
@@ -425,6 +427,7 @@ describe("bridge-impedance-mismatch", () => {
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     };
     // Pin position is LOCAL: pinWorldPosition(el, pin) = (8,0) + (2,0) = (10,0)
     const subcircuitEl = new BridgeSubcircuitElement(

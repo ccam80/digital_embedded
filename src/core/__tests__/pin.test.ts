@@ -64,6 +64,7 @@ describe("makePin", () => {
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   };
 
   it("creates a Pin with expected fields", () => {
@@ -195,6 +196,7 @@ describe("resolvePins", () => {
       position: { x: 0, y: 1 },
       isNegatable: true,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -203,6 +205,7 @@ describe("resolvePins", () => {
       position: { x: 2, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 

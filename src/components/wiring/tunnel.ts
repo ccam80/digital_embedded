@@ -50,6 +50,7 @@ function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

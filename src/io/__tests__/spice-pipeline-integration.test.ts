@@ -2,7 +2,7 @@
  * Integration tests for the SPICE .SUBCKT parsing + Circuit building pipeline.
  *
  * Tests W10.3: verify that parseSubcircuit() → buildSpiceSubcircuit() →
- * TransistorModelRegistry.register() works end-to-end and that the resulting
+ * SubcircuitModelRegistry.register() works end-to-end and that the resulting
  * Circuit has the correct structure for each element type mapping.
  *
  * These tests do NOT run the full compiler (that is tested in the transistor-
@@ -10,7 +10,7 @@
  *   1. The parsed subcircuit feeds into the builder without errors.
  *   2. The built Circuit is structurally valid (correct element counts, types,
  *      pin labels, net assignments, wire connectivity).
- *   3. The Circuit can be stored in TransistorModelRegistry and retrieved.
+ *   3. The Circuit can be stored in SubcircuitModelRegistry and retrieved.
  *   4. Port mapping is preserved end-to-end.
  *   5. _spiceModelOverrides round-trip: params encoded in JSON, decodable.
  */
@@ -18,7 +18,7 @@
 import { describe, it, expect } from "vitest";
 import { parseSubcircuit } from "../../solver/analog/model-parser.js";
 import { buildSpiceSubcircuit } from "../spice-model-builder.js";
-import { TransistorModelRegistry } from "../../solver/analog/transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../../solver/analog/subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,7 +34,7 @@ function pipeline(text: string) {
 // End-to-end: parse → build → register
 // ---------------------------------------------------------------------------
 
-describe("SPICE pipeline — register in TransistorModelRegistry", () => {
+describe("SPICE pipeline — register in SubcircuitModelRegistry", () => {
   it("registers a simple resistor subcircuit and makes it retrievable", () => {
     const { circuit } = pipeline(`
 .SUBCKT rdiv a b c
@@ -42,7 +42,7 @@ R1 a b 10k
 R2 b c 10k
 .ENDS rdiv
 `);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     registry.register("rdiv", circuit);
     expect(registry.has("rdiv")).toBe(true);
     expect(registry.get("rdiv")).toBe(circuit);
@@ -54,14 +54,14 @@ R2 b c 10k
 R1 inp out 1k
 .ENDS mymodel
 `);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     registry.register(sc.name, circuit);
     expect(registry.has("mymodel")).toBe(true);
     expect(registry.get("mymodel")).toBe(circuit);
   });
 
   it("has() returns false for unregistered name", () => {
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     expect(registry.has("notregistered")).toBe(false);
   });
 });

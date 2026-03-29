@@ -68,6 +68,7 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 
@@ -79,6 +80,7 @@ function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclara
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 
@@ -126,7 +128,7 @@ function singlePinGroup(
 ): ConnectivityGroup {
   return {
     groupId,
-    pins: [{ elementIndex, pinIndex, pinLabel, direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain }],
+    pins: [{ elementIndex, pinIndex, pinLabel, direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain, kind: "signal" }],
     wires: [],
     domains: new Set([domain]),
     bitWidth: 1,
@@ -147,8 +149,8 @@ describe('stableNetId', () => {
     const group: ConnectivityGroup = {
       groupId: 0,
       pins: [
-        { elementIndex: 0, pinIndex: 0, pinLabel: 'p', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral' },
-        { elementIndex: 1, pinIndex: 0, pinLabel: 'A', direction: PinDirection.INPUT,  bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'digital' },
+        { elementIndex: 0, pinIndex: 0, pinLabel: 'p', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral', kind: "signal" },
+        { elementIndex: 1, pinIndex: 0, pinLabel: 'A', direction: PinDirection.INPUT,  bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'digital', kind: "signal" },
       ],
       wires: [],
       domains: new Set(['digital']),
@@ -165,7 +167,7 @@ describe('stableNetId', () => {
     const group: ConnectivityGroup = {
       groupId: 0,
       pins: [
-        { elementIndex: 0, pinIndex: 0, pinLabel: 'p', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral' },
+        { elementIndex: 0, pinIndex: 0, pinLabel: 'p', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral', kind: "signal" },
       ],
       wires: [],
       domains: new Set(),
@@ -181,7 +183,7 @@ describe('stableNetId', () => {
     const group: ConnectivityGroup = {
       groupId: 0,
       pins: [
-        { elementIndex: 0, pinIndex: 0, pinLabel: 'p1', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'analog' },
+        { elementIndex: 0, pinIndex: 0, pinLabel: 'p1', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'analog', kind: "signal" },
       ],
       wires: [],
       domains: new Set(['analog']),
@@ -200,8 +202,8 @@ describe('stableNetId', () => {
     const group: ConnectivityGroup = {
       groupId: 0,
       pins: [
-        { elementIndex: 0, pinIndex: 0, pinLabel: 'out', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'digital' },
-        { elementIndex: 1, pinIndex: 0, pinLabel: 'in',  direction: PinDirection.INPUT,  bitWidth: 1, worldPosition: { x: 4, y: 0 }, wireVertex: null, domain: 'digital' },
+        { elementIndex: 0, pinIndex: 0, pinLabel: 'out', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'digital', kind: "signal" },
+        { elementIndex: 1, pinIndex: 0, pinLabel: 'in',  direction: PinDirection.INPUT,  bitWidth: 1, worldPosition: { x: 4, y: 0 }, wireVertex: null, domain: 'digital', kind: "signal" },
       ],
       wires: [],
       domains: new Set(['digital']),
@@ -221,8 +223,8 @@ describe('stableNetId', () => {
     const group: ConnectivityGroup = {
       groupId: 0,
       pins: [
-        { elementIndex: 0, pinIndex: 0, pinLabel: 'p',  direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral' },
-        { elementIndex: 1, pinIndex: 0, pinLabel: 'p1', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'analog' },
+        { elementIndex: 0, pinIndex: 0, pinLabel: 'p',  direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain: 'neutral', kind: "signal" },
+        { elementIndex: 1, pinIndex: 0, pinLabel: 'p1', direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 2, y: 0 }, wireVertex: null, domain: 'analog', kind: "signal" },
       ],
       wires: [],
       domains: new Set(['analog']),

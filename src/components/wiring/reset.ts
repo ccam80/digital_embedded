@@ -60,6 +60,7 @@ export function buildResetPinDeclarations(): PinDeclaration[] {
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [resetPin];

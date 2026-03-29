@@ -329,6 +329,7 @@ export function extractConnectivityGroups(
         worldPosition: wp,
         wireVertex: null,
         domain,
+        kind: pin.kind ?? "signal",
       });
     }
   }

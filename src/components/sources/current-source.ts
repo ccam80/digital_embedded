@@ -108,6 +108,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     label: "neg",
@@ -116,6 +117,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

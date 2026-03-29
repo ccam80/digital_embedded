@@ -23,6 +23,7 @@ import { makeNandAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
+  appendPowerPins,
   STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   buildStandardGatePropertyDefs,
   drawGateLabel,
@@ -49,7 +50,12 @@ export class NAndElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
-    const decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
+    let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
+    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
+    if (activeModel === "cmos") {
+      const w = compWidth(wideShape);
+      decls = appendPowerPins(decls, w / 2, -1, inputCount);
+    }
     return this.derivePins(decls, []);
   }
 
@@ -141,6 +147,7 @@ export const NAndDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
+  subcircuitRefs: { cmos: "CmosNand2" },
   models: {
     digital: {
       executeFn: executeNAnd,

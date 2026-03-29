@@ -9,7 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ModelLibrary, validateModel } from "../model-library.js";
 import type { DeviceModel } from "../model-library.js";
-import type { DeviceType } from "../model-parser.js";
+import type { DeviceType } from "../../../core/analog-types.js";
 import { DIODE_DEFAULTS } from "../model-defaults.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
@@ -255,7 +255,7 @@ describe("ModelBinding", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+            deviceType: "D" as import("../../../core/analog-types.js").DeviceType,
             factory: diodeFactory,
           },
         },

@@ -324,17 +324,20 @@ describe('modelDefinitions', () => {
       circuit: { name: 'Test', elements: [], wires: [] },
       modelDefinitions: {
         MYOPAMP: {
-          name: 'MYOPAMP',
-          elements: [],
-          wires: [],
-          attributes: { ports: '["INP","INN","OUT"]', elementCount: '5' },
+          ports: ['INP', 'INN', 'OUT'],
+          elements: [
+            { typeId: 'Resistor', modelRef: 'R1', params: { R: 1000 } },
+          ],
+          internalNetCount: 2,
+          netlist: [[0, 1]],
         },
       },
     };
     expect(() => validateDtsDocument(doc)).not.toThrow();
     const result = validateDtsDocument(doc);
     expect(result.modelDefinitions).toBeDefined();
-    expect(result.modelDefinitions!['MYOPAMP'].name).toBe('MYOPAMP');
+    expect(result.modelDefinitions!['MYOPAMP'].ports).toEqual(['INP', 'INN', 'OUT']);
+    expect(result.modelDefinitions!['MYOPAMP'].internalNetCount).toBe(2);
   });
 
   it('schema_rejects_modelDefinitions_not_object', () => {
@@ -348,21 +351,28 @@ describe('modelDefinitions', () => {
   });
 
   it('roundtrip_modelDefinitions', () => {
-    const registry = makeRegistry('In');
-    const circuit = new Circuit({ name: 'WithModel' });
-    circuit.metadata.modelDefinitions = {
-      MYOPAMP: { ports: ['INP', 'INN', 'OUT'], elementCount: 5 },
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'WithModel', elements: [], wires: [] },
+      modelDefinitions: {
+        MYOPAMP: {
+          ports: ['INP', 'INN', 'OUT'],
+          elements: [{ typeId: 'Resistor' }],
+          internalNetCount: 1,
+          netlist: [[0, 1]],
+        },
+      },
     };
 
-    const json = serializeCircuit(circuit);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed['modelDefinitions']).toBeDefined();
-
-    const { circuit: restored } = deserializeDts(json, registry);
-    expect(restored.metadata.modelDefinitions).toBeDefined();
-    const def = restored.metadata.modelDefinitions!['MYOPAMP'];
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
+    expect(result.modelDefinitions).toBeDefined();
+    const def = result.modelDefinitions!['MYOPAMP'];
     expect(def.ports).toEqual(['INP', 'INN', 'OUT']);
-    expect(def.elementCount).toBe(5);
+    expect(def.internalNetCount).toBe(1);
+    expect(def.elements).toHaveLength(1);
+    expect(def.elements[0].typeId).toBe('Resistor');
   });
 
   it('absent_modelDefinitions_not_serialized', () => {
@@ -377,21 +387,28 @@ describe('modelDefinitions', () => {
   });
 
   it('roundtrip_both_fields_together', () => {
-    const registry = makeRegistry('In');
-    const circuit = new Circuit({ name: 'BothFields' });
-    circuit.metadata.namedParameterSets = {
-      '2N2222': { deviceType: 'NPN', params: { BF: 200 } },
-    };
-    circuit.metadata.modelDefinitions = {
-      RDIV: { ports: ['A', 'B'], elementCount: 2 },
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'BothFields', elements: [], wires: [] },
+      namedParameterSets: {
+        '2N2222': { deviceType: 'NPN', params: { BF: 200 } },
+      },
+      modelDefinitions: {
+        RDIV: {
+          ports: ['A', 'B'],
+          elements: [{ typeId: 'Resistor', params: { R: 1000 } }],
+          internalNetCount: 0,
+          netlist: [[0, 1]],
+        },
+      },
     };
 
-    const json = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDts(json, registry);
-
-    expect(restored.metadata.namedParameterSets!['2N2222'].params['BF']).toBe(200);
-    expect(restored.metadata.modelDefinitions!['RDIV'].ports).toEqual(['A', 'B']);
-    expect(restored.metadata.modelDefinitions!['RDIV'].elementCount).toBe(2);
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
+    expect(result.namedParameterSets!['2N2222'].params['BF']).toBe(200);
+    expect(result.modelDefinitions!['RDIV'].ports).toEqual(['A', 'B']);
+    expect(result.modelDefinitions!['RDIV'].elements).toHaveLength(1);
   });
 });
 

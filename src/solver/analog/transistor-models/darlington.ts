@@ -40,7 +40,7 @@ import {
   ComponentCategory,
   type ComponentDefinition,
 } from "../../../core/registry.js";
-import type { TransistorModelRegistry } from "../transistor-model-registry.js";
+import type { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement builder for subcircuit elements
@@ -156,7 +156,7 @@ function makeInEl(label: string, xNet: number, yRow: number): CircuitElement {
 // BJT element rows: Q1 at y=2, Q2 at y=4, R_BE at y=6
 // ---------------------------------------------------------------------------
 
-export function createNpnDarlington(_registry: TransistorModelRegistry): Circuit {
+export function createNpnDarlington(_registry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   // Interface elements
@@ -198,7 +198,7 @@ export function createNpnDarlington(_registry: TransistorModelRegistry): Circuit
 // Same topology as NPN but with PnpBJT elements.
 // ---------------------------------------------------------------------------
 
-export function createPnpDarlington(_registry: TransistorModelRegistry): Circuit {
+export function createPnpDarlington(_registry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   // Interface elements
@@ -246,6 +246,7 @@ function buildDarlingtonPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -254,6 +255,7 @@ function buildDarlingtonPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: -1.5 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -262,6 +264,7 @@ function buildDarlingtonPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: 1.5 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }
@@ -271,13 +274,13 @@ function buildDarlingtonPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Register NPN and PNP Darlington subcircuits in the TransistorModelRegistry
+ * Register NPN and PNP Darlington subcircuits in the SubcircuitModelRegistry
  * and return the two ComponentDefinitions.
  *
  * The ComponentDefinitions are returned (not registered in ComponentRegistry)
  * so callers can choose when to add them to the component registry.
  */
-export function registerDarlingtonModels(registry: TransistorModelRegistry): void {
+export function registerDarlingtonModels(registry: SubcircuitModelRegistry): void {
   registry.register("DarlingtonNPN", createNpnDarlington(registry));
   registry.register("DarlingtonPNP", createPnpDarlington(registry));
 }

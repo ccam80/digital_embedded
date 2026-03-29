@@ -17,7 +17,7 @@ import {
   DarlingtonNpnDefinition,
   DarlingtonPnpDefinition,
 } from "../transistor-models/darlington.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import { expandTransistorModel, registerAnalogFactory } from "../transistor-expansion.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import { createBjtElement } from "../../../components/semiconductors/bjt.js";
@@ -49,8 +49,8 @@ beforeAll(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeRegistry(): TransistorModelRegistry {
-  const registry = new TransistorModelRegistry();
+function makeRegistry(): SubcircuitModelRegistry {
+  const registry = new SubcircuitModelRegistry();
   registerDarlingtonModels(registry);
   return registry;
 }
@@ -274,7 +274,7 @@ describe("Registration", () => {
     });
 
     it("registerDarlingtonModels registers both models in registry", () => {
-      const registry = new TransistorModelRegistry();
+      const registry = new SubcircuitModelRegistry();
       expect(registry.has("DarlingtonNPN")).toBe(false);
       expect(registry.has("DarlingtonPNP")).toBe(false);
 

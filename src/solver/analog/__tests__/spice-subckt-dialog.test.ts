@@ -3,7 +3,7 @@
  *
  * Verifies:
  * 1. parseSubcircuit() → buildSpiceSubcircuit() → produces a valid Circuit
- * 2. applySpiceSubcktImportResult() registers in TransistorModelRegistry
+ * 2. applySpiceSubcktImportResult() registers in SubcircuitModelRegistry
  * 3. simulationModel property is set on the element to the subcircuit name
  * 4. Invalid .SUBCKT text throws a parse error (not stored)
  * 5. Port count and element count are correct after build
@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { parseSubcircuit } from "../model-parser.js";
 import { buildSpiceSubcircuit } from "../../../io/spice-model-builder.js";
 import { applySpiceSubcktImportResult } from "../../../app/spice-model-apply.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -188,10 +188,10 @@ describe("spice-subckt-dialog: buildSpiceSubcircuit", () => {
 // ---------------------------------------------------------------------------
 
 describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
-  it("registers the circuit in TransistorModelRegistry under the subcircuit name", () => {
+  it("registers the circuit in SubcircuitModelRegistry under the subcircuit name", () => {
     const parsed = parseSubcircuit(SIMPLE_SUBCKT);
     const circuit = buildSpiceSubcircuit(parsed);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -207,7 +207,7 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
   it("sets simulationModel on the element to the subcircuit name", () => {
     const parsed = parseSubcircuit(SIMPLE_SUBCKT);
     const circuit = buildSpiceSubcircuit(parsed);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -225,7 +225,7 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
     const circuit1 = buildSpiceSubcircuit(parsed1);
     const parsed2 = parseSubcircuit(SIMPLE_SUBCKT);
     const circuit2 = buildSpiceSubcircuit(parsed2);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -249,7 +249,7 @@ Q1 C B E QMOD
 
     const parsed = parseSubcircuit(subcktText);
     const circuit = buildSpiceSubcircuit(parsed);
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     const element = makeElement("BJTStub", "q1", [
       { x: 0, y: 0, label: "C" },

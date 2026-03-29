@@ -96,11 +96,11 @@ const COMP_HEIGHT = 5;
 // S@(0,0), se@(0,1), ne@(0,3), C@(0,4), R@(3,2)
 function buildPRNGPinDeclarations(bitWidth: number): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "se", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "ne", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.OUTPUT, label: "R", defaultBitWidth: bitWidth, position: { x: 3, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "se", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "ne", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: true, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "R", defaultBitWidth: bitWidth, position: { x: 3, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

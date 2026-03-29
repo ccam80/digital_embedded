@@ -34,6 +34,7 @@ function makePin(x: number, y: number, label: string = "", direction: PinDirecti
     direction,
     isNegated: false,
     isClock: false,
+    kind: "signal",
     bitWidth: 1,
   };
 }
@@ -206,6 +207,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
         worldPosition: { x: 0, y: 0 },
         wireVertex: { x: 0, y: 0 },
         domain: "analog",
+        kind: "signal",
       },
     ],
     wires: [wireGnd],
@@ -226,6 +228,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
         worldPosition: { x: 10, y: 0 },
         wireVertex: { x: 10, y: 0 },
         domain: "analog",
+        kind: "signal",
       },
     ],
     wires: [wire1],
@@ -246,6 +249,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
         worldPosition: { x: 20, y: 0 },
         wireVertex: { x: 20, y: 0 },
         domain: "analog",
+        kind: "signal",
       },
     ],
     wires: [wire2],
@@ -266,6 +270,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
         worldPosition: { x: 30, y: 0 },
         wireVertex: { x: 30, y: 0 },
         domain: "analog",
+        kind: "signal",
       },
     ],
     wires: [wire3],
@@ -446,19 +451,19 @@ describe("compileAnalogPartition", () => {
       groups: [
         {
           groupId: 0,
-          pins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "In_1", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog" }],
+          pins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "In_1", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog", kind: "signal" }],
           wires: [new Wire({ x: 10, y: 0 }, { x: 10, y: 0 })],
           domains: new Set(["analog"]),
         },
         {
           groupId: 1,
-          pins: [{ elementIndex: 0, pinIndex: 1, pinLabel: "In_2", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 20, y: 0 }, wireVertex: { x: 20, y: 0 }, domain: "analog" }],
+          pins: [{ elementIndex: 0, pinIndex: 1, pinLabel: "In_2", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 20, y: 0 }, wireVertex: { x: 20, y: 0 }, domain: "analog", kind: "signal" }],
           wires: [new Wire({ x: 20, y: 0 }, { x: 20, y: 0 })],
           domains: new Set(["analog"]),
         },
         {
           groupId: 2,
-          pins: [{ elementIndex: 0, pinIndex: 2, pinLabel: "out", direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 30, y: 0 }, wireVertex: { x: 30, y: 0 }, domain: "analog" }],
+          pins: [{ elementIndex: 0, pinIndex: 2, pinLabel: "out", direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 30, y: 0 }, wireVertex: { x: 30, y: 0 }, domain: "analog", kind: "signal" }],
           wires: [new Wire({ x: 30, y: 0 }, { x: 30, y: 0 })],
           domains: new Set(["analog"]),
         },
@@ -506,6 +511,7 @@ describe("compileAnalogPartition", () => {
             worldPosition: { x: 10, y: 0 },
             wireVertex: { x: 10, y: 0 },
             domain: "digital",
+            kind: "signal",
           }],
         },
         {
@@ -521,6 +527,7 @@ describe("compileAnalogPartition", () => {
             worldPosition: { x: 0, y: 0 },
             wireVertex: { x: 0, y: 0 },
             domain: "analog",
+            kind: "signal",
           }],
         },
       ],

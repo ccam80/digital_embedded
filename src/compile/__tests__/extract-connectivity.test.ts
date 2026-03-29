@@ -65,6 +65,7 @@ function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclara
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 
@@ -76,6 +77,7 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 
@@ -87,6 +89,7 @@ function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclarat
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 

@@ -51,6 +51,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   const selPin: PinDeclaration = {
@@ -60,6 +61,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     position: { x: 1, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   const outPin: PinDeclaration = {
@@ -69,6 +71,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [inPin, selPin, outPin];

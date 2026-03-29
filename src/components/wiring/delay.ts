@@ -50,6 +50,7 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   const outPin: PinDeclaration = {
@@ -59,6 +60,7 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [inPin, outPin];

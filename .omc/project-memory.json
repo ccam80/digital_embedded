@@ -253,20 +253,20 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 382,
-      "lastAccessed": 1774757196271,
+      "accessCount": 383,
+      "lastAccessed": 1774759298403,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 192,
-      "lastAccessed": 1774759107576,
+      "accessCount": 196,
+      "lastAccessed": 1774759868381,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 119,
-      "lastAccessed": 1774758524318,
+      "accessCount": 121,
+      "lastAccessed": 1774761106980,
       "type": "file"
     },
     {
@@ -277,14 +277,14 @@
     },
     {
       "path": "",
-      "accessCount": 88,
-      "lastAccessed": 1774755710267,
+      "accessCount": 98,
+      "lastAccessed": 1774759830393,
       "type": "directory"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 85,
-      "lastAccessed": 1774759103812,
+      "accessCount": 89,
+      "lastAccessed": 1774759850887,
       "type": "directory"
     },
     {
@@ -295,21 +295,21 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 62,
-      "lastAccessed": 1774759024994,
+      "accessCount": 67,
+      "lastAccessed": 1774759334673,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
+      "accessCount": 49,
+      "lastAccessed": 1774759586407,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
       "accessCount": 44,
       "lastAccessed": 1774751930570,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 43,
-      "lastAccessed": 1774751938132,
-      "type": "directory"
     },
     {
       "path": "src\\components",
@@ -319,8 +319,14 @@
     },
     {
       "path": "spec\\test-baseline.md",
+      "accessCount": 39,
+      "lastAccessed": 1774759338888,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 34,
-      "lastAccessed": 1774759028999,
+      "lastAccessed": 1774759334713,
       "type": "file"
     },
     {
@@ -342,12 +348,6 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 29,
-      "lastAccessed": 1774759025023,
-      "type": "file"
-    },
-    {
       "path": "src\\core\\analog-types.ts",
       "accessCount": 28,
       "lastAccessed": 1774744317727,
@@ -361,8 +361,8 @@
     },
     {
       "path": "src\\solver\\analog\\model-library.ts",
-      "accessCount": 24,
-      "lastAccessed": 1774751765787,
+      "accessCount": 26,
+      "lastAccessed": 1774759631589,
       "type": "file"
     },
     {
@@ -385,8 +385,8 @@
     },
     {
       "path": "src\\solver\\analog\\model-parser.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774747734547,
+      "accessCount": 21,
+      "lastAccessed": 1774759620871,
       "type": "directory"
     },
     {
@@ -414,6 +414,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\core\\element.ts",
+      "accessCount": 11,
+      "lastAccessed": 1774759860060,
+      "type": "directory"
+    },
+    {
       "path": "src\\headless",
       "accessCount": 10,
       "lastAccessed": 1774698222610,
@@ -426,10 +432,10 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\element.ts",
+      "path": "src\\solver\\analog\\__tests__\\model-binding.test.ts",
       "accessCount": 10,
-      "lastAccessed": 1774757664722,
-      "type": "directory"
+      "lastAccessed": 1774759632657,
+      "type": "file"
     },
     {
       "path": "src\\core\\properties.ts",
@@ -441,12 +447,6 @@
       "path": "src\\components\\semiconductors\\zener.ts",
       "accessCount": 9,
       "lastAccessed": 1774751825288,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\model-binding.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774744466629,
       "type": "file"
     },
     {

@@ -216,7 +216,7 @@ describe("spice-import-dialog: compile integration", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "NPN" as import("../../analog/model-parser.js").DeviceType,
+            deviceType: "NPN" as import("../../../core/analog-types.js").DeviceType,
             factory: npnFactory,
           },
         },

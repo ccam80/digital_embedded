@@ -139,19 +139,22 @@ export function compileDigitalPartition(
     pinIndex: number;
     direction: import("@/core/pin.js").PinDirection;
     bitWidth: number;
+    kind: "signal" | "power";
   }
 
   const allPinRefs: PartitionPinReference[][] = [];
   for (let i = 0; i < componentCount; i++) {
     const pc = partitionedComponents[i]!;
-    const refs: PartitionPinReference[] = pc.resolvedPins.map((rp, j) => ({
-      element: pc.element,
-      elementIndex: i,
-      pinLabel: rp.pinLabel,
-      pinIndex: j,
-      direction: rp.direction,
-      bitWidth: rp.bitWidth,
-    }));
+    const refs: PartitionPinReference[] = pc.resolvedPins
+      .map((rp, j) => ({
+        element: pc.element,
+        elementIndex: i,
+        pinLabel: rp.pinLabel,
+        pinIndex: j,
+        direction: rp.direction,
+        bitWidth: rp.bitWidth,
+        kind: rp.kind,
+      }));
     allPinRefs.push(refs);
   }
 
@@ -351,6 +354,7 @@ export function compileDigitalPartition(
           const outputs: number[] = [];
           for (let j = 0; j < refs.length; j++) {
             const ref = refs[j]!;
+            if (ref.kind === "power") continue;
             if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
               outputs.push(slotToNetId(i, j));
             }
@@ -361,6 +365,7 @@ export function compileDigitalPartition(
         const inputs: number[] = [];
         for (let j = 0; j < refs.length; j++) {
           const ref = refs[j]!;
+          if (ref.kind === "power") continue;
           if (ref.direction !== PinDirection.OUTPUT && ref.direction !== PinDirection.BIDIRECTIONAL) {
             inputs.push(slotToNetId(i, j));
           }
@@ -380,6 +385,7 @@ export function compileDigitalPartition(
           const outputs: number[] = [];
           for (let j = 0; j < refs.length; j++) {
             const ref = refs[j]!;
+            if (ref.kind === "power") continue;
             if (ref.direction === PinDirection.OUTPUT || ref.direction === PinDirection.BIDIRECTIONAL) {
               outputs.push(slotToNetId(i, j));
             }

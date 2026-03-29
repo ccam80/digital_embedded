@@ -45,7 +45,7 @@ class StubElement extends AbstractCircuitElement {
 }
 
 function makePin(label: string, direction: PinDirection, x: number, y: number): Pin {
-  return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false };
+  return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
 }
 
 function noop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}

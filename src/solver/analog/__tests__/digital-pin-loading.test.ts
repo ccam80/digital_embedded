@@ -116,6 +116,7 @@ function buildRegistry(
       bitWidth: props.getOrDefault<number>("bitWidth", 1),
       isNegated: false,
       isClock: false,
+      kind: "signal",
     }]),
     pinLayout: [{
       label: "out",
@@ -124,6 +125,7 @@ function buildRegistry(
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
@@ -142,6 +144,7 @@ function buildRegistry(
       bitWidth: props.getOrDefault<number>("bitWidth", 1),
       isNegated: false,
       isClock: false,
+      kind: "signal",
     }]),
     pinLayout: [{
       label: "in",
@@ -150,6 +153,7 @@ function buildRegistry(
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     }],
     propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
     attributeMap: [],
@@ -163,12 +167,12 @@ function buildRegistry(
     name: "Resistor",
     typeId: -1,
     factory: makeStubElFactory("Resistor", () => [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 2, y: 0 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 2, y: 0 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]),
     pinLayout: [
-      { label: "A", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-      { label: "B", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { label: "A", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { label: "B", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ],
     propertyDefs: [{ key: "resistance", defaultValue: 1000 }],
     attributeMap: [],
@@ -185,17 +189,17 @@ function buildRegistry(
   });
 
   const xorPinLayout: PinDeclaration[] = [
-    { label: "A",   direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { label: "B",   direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
-    { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 1 }, isNegatable: false, isClockCapable: false },
+    { label: "A",   direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { label: "B",   direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
   registry.register({
     name: "DigitalXor",
     typeId: -1,
     factory: makeStubElFactory("DigitalXor", (_props) => [
-      { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A",   bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "B",   bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A",   bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "B",   bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]),
     pinLayout: xorPinLayout,
     propertyDefs: [],
@@ -240,14 +244,15 @@ function buildCircuit(
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: "signal",
   }])(new PropertyBag());
   gndEl.position = { x: 0, y: 0 };
   circuit.addElement(gndEl);
 
   // Resistor at position (20, 0) — pin A at world (20,0), pin B at world (22,0)
   const resEl = makeStubElFactory("Resistor", () => [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 2, y: 0 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 2, y: 0 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ])(new PropertyBag());
   resEl.position = { x: 20, y: 0 };
   circuit.addElement(resEl);
@@ -256,9 +261,9 @@ function buildCircuit(
   const xorProps = new PropertyBag();
   for (const [k, v] of propsMap) xorProps.set(k, v);
   const xorEl = makeStubElFactory("DigitalXor", (_props) => [
-    { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A",   bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "B",   bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A",   bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "B",   bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ])(xorProps);
   xorEl.position = { x: 10, y: 0 };
   circuit.addElement(xorEl);

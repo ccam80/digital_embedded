@@ -143,6 +143,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -151,6 +152,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -159,6 +161,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -167,6 +170,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: -2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -175,6 +179,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

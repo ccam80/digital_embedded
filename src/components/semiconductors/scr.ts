@@ -340,6 +340,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -348,6 +349,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -356,6 +358,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       position: { x: 3, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

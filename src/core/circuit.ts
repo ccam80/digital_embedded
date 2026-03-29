@@ -98,6 +98,21 @@ export interface CustomShapeData {
 // CircuitMetadata
 // ---------------------------------------------------------------------------
 
+/**
+ * Persisted trace entry — captures signal identity and panel assignment
+ * so watched signals survive save/load cycles.
+ */
+export interface SavedTrace {
+  /** Resolution key: component label for labeled signals, "instanceId:pinLabel" for unlabeled. */
+  name: string;
+  /** Signal domain at time of save. */
+  domain: 'digital' | 'analog';
+  /** Which scope panel this trace belongs to. */
+  panelIndex: number;
+  /** Signal grouping in the data table. */
+  group: 'input' | 'output' | 'probe';
+}
+
 export interface CircuitMetadata {
   /** Display name for this circuit. */
   name: string;
@@ -166,11 +181,14 @@ export interface CircuitMetadata {
   modelDefinitions?: Record<string, {
     /** Port names in order (from the .SUBCKT header). */
     ports: string[];
-    /** Serialized element count — informational only; the full Circuit is in TransistorModelRegistry. */
+    /** Serialized element count — informational only; the full Circuit is in SubcircuitModelRegistry. */
     elementCount: number;
   }>;
   /** Maps component instance IDs to their resolved subcircuit model name. */
   subcircuitBindings?: Record<string, string>;
+
+  /** Persisted scope traces — restored after compilation. */
+  traces?: SavedTrace[];
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

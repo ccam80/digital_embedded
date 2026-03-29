@@ -73,6 +73,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -81,6 +82,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -89,6 +91,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       position: { x: 6, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -97,6 +100,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
       position: { x: 6, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

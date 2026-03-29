@@ -8,7 +8,7 @@
 
 import type { CircuitElement } from '../core/element.js';
 import type { Circuit } from '../core/circuit.js';
-import { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
+import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 
 /** The result produced by the .MODEL import dialog. */
 export interface SpiceImportResult {
@@ -34,19 +34,19 @@ export function applySpiceImportResult(
 export interface SpiceSubcktImportResult {
   /** Subcircuit name (from the .SUBCKT header). */
   subcktName: string;
-  /** The built Circuit to register in TransistorModelRegistry. */
+  /** The built Circuit to register in SubcircuitModelRegistry. */
   circuit: Circuit;
 }
 
 /**
  * Apply the .SUBCKT import result:
- *   1. Register the circuit in the provided TransistorModelRegistry.
+ *   1. Register the circuit in the provided SubcircuitModelRegistry.
  *   2. Set simulationModel on the instance to the subcircuit name.
  */
 export function applySpiceSubcktImportResult(
   element: CircuitElement,
   result: SpiceSubcktImportResult,
-  modelRegistry: TransistorModelRegistry,
+  modelRegistry: SubcircuitModelRegistry,
 ): void {
   modelRegistry.register(result.subcktName, result.circuit);
   element.getProperties().set('simulationModel', result.subcktName);

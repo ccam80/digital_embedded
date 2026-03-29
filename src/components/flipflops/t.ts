@@ -61,6 +61,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: true,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -69,6 +70,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -77,6 +79,7 @@ const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 
@@ -88,6 +91,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -96,6 +100,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: true,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -104,6 +109,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -112,6 +118,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

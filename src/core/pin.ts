@@ -26,6 +26,7 @@ export interface Pin {
   readonly bitWidth: number;
   readonly isNegated: boolean;
   readonly isClock: boolean;
+  readonly kind: "signal" | "power";
 }
 
 /**
@@ -109,6 +110,7 @@ export function makePin(
     bitWidth: decl.defaultBitWidth,
     isNegated: decl.isNegatable && isPinInverted(inverterConfig, decl.label),
     isClock: decl.isClockCapable && isPinClock(clockConfig, decl.label),
+    kind: decl.kind,
   };
 }
 
@@ -332,6 +334,7 @@ export function standardGatePinLayout(
       position: { x: 0, y: i + correct },
       isNegatable: true,
       isClockCapable: false,
+      kind: "signal",
     };
   });
 
@@ -345,6 +348,7 @@ export function standardGatePinLayout(
     position: { x: componentW + outputBubbleOffset, y: outputY },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [...inputs, output];

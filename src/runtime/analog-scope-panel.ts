@@ -742,7 +742,3 @@ function formatTime(t: number): string {
 function formatStepCount(t: number): string {
   return Math.round(t).toLocaleString();
 }
-
-// Backward-compatibility alias
-/** @deprecated Use `ScopePanel` instead. */
-export { ScopePanel as AnalogScopePanel };

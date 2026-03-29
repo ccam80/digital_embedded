@@ -147,7 +147,6 @@ describe("property-diversity pin audit — non-default props from fixtures", () 
   });
 
   if (fixtures.length === 0) {
-    it.skip("no fixtures found", () => {});
     return;
   }
 

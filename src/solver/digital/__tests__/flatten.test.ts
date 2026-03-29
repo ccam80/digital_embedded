@@ -66,6 +66,7 @@ function makeLeaf(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement(typeId, instanceId, position, props, pins);
@@ -86,6 +87,7 @@ function makeInElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("In", instanceId, position, props, pins);
@@ -106,6 +108,7 @@ function makeOutElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Out", instanceId, position, props, pins);
@@ -130,6 +133,7 @@ function makePortElement(
       bitWidth,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Port", instanceId, position, props, pins);
@@ -264,6 +268,7 @@ describe("flattenCircuit", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -272,6 +277,7 @@ describe("flattenCircuit", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subcircuitInstance = makeSubcircuitElement(
@@ -310,12 +316,12 @@ describe("flattenCircuit", () => {
     const parent = new Circuit({ name: "Top" });
 
     const pinsA: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const pinsB: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
 
     const sub0 = makeSubcircuitElement("HalfAdder", "sub-0", { x: 0, y: 0 }, internal, pinsA);
@@ -357,8 +363,8 @@ describe("flattenCircuit", () => {
     const middleIn = makeInElement("in-m", "A", { x: 0, y: 0 });
     const middleOut = makeOutElement("out-m", "Y", { x: 20, y: 0 });
     const innerPins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 11, y: 1 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 11, y: 1 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const innerSub = makeSubcircuitElement("Inner", "inner-sub", { x: 5, y: 0 }, inner, innerPins);
     middle.addElement(middleIn);
@@ -368,8 +374,8 @@ describe("flattenCircuit", () => {
     // Top: contains middle as a subcircuit
     const top = new Circuit({ name: "Top" });
     const middlePins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const middleSub = makeSubcircuitElement("Middle", "mid-sub", { x: 0, y: 0 }, middle, middlePins);
     top.addElement(middleSub);
@@ -408,6 +414,7 @@ describe("flattenCircuit", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -416,6 +423,7 @@ describe("flattenCircuit", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = makeSubcircuitElement(
@@ -470,7 +478,7 @@ describe("flattenCircuit", () => {
 
     const parent = new Circuit({ name: "Top" });
     const subPins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("Sub", "sub-1", { x: 0, y: 0 }, internal, subPins);
     parent.addElement(subEl);
@@ -520,6 +528,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.BIDIRECTIONAL,
@@ -528,6 +537,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = makeSubcircuitElement("PortWrapper", "sub-1", { x: 20, y: 0 }, internal, subcircuitPins);
@@ -567,8 +577,8 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     const middlePortA = makePortElement("port-A", "A", { x: 0, y: 0 });
     const middlePortY = makePortElement("port-Y", "Y", { x: 20, y: 0 });
     const innerPins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 11, y: 1 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 11, y: 1 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const innerSub = makeSubcircuitElement("Inner", "inner-sub", { x: 5, y: 0 }, inner, innerPins);
     middle.addElement(middlePortA);
@@ -578,8 +588,8 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // Top: contains middle as a subcircuit with BIDIRECTIONAL pins
     const top = new Circuit({ name: "Top" });
     const middlePins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const middleSub = makeSubcircuitElement("Middle", "mid-sub", { x: 0, y: 0 }, middle, middlePins);
     top.addElement(middleSub);
@@ -612,12 +622,12 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     const parent = new Circuit({ name: "Top" });
 
     const pinsA: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const pinsB: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
 
     const sub0 = makeSubcircuitElement("PortGate", "sub-0", { x: 0, y: 0 }, internal, pinsA);
@@ -665,6 +675,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
         bitWidth: 8,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = makeSubcircuitElement("BusSub", "sub-1", { x: 10, y: 0 }, internal, subcircuitPins);
@@ -720,6 +731,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.BIDIRECTIONAL,
@@ -728,6 +740,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = makeSubcircuitElement("TwoGates", "sub-1", { x: 30, y: 0 }, internal, subcircuitPins);

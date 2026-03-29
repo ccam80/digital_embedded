@@ -727,6 +727,7 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -735,6 +736,7 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -743,6 +745,7 @@ function buildNmosPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }
@@ -756,6 +759,7 @@ function buildPmosPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -764,6 +768,7 @@ function buildPmosPinDeclarations(): PinDeclaration[] {
       position: { x: 4.0, y: 1.0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -772,6 +777,7 @@ function buildPmosPinDeclarations(): PinDeclaration[] {
       position: { x: 4.0, y: -1.0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

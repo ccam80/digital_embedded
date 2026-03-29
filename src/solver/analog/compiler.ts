@@ -23,7 +23,7 @@ import { pinWorldPosition, PinDirection } from "../../core/pin.js";
 import type { PinDeclaration, ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
-import { TransistorModelRegistry } from "./transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "./subcircuit-model-registry.js";
 import { expandTransistorModel } from "./transistor-expansion.js";
 import {
   ConcreteCompiledAnalogCircuit,
@@ -558,7 +558,7 @@ function populateModelLibrary(
     for (const [name, entry] of Object.entries(sets)) {
       modelLibrary.add({
         name,
-        type: entry.deviceType as import("./model-parser.js").DeviceType,
+        type: entry.deviceType as import("../../core/analog-types.js").DeviceType,
         level: 1,
         params: entry.params,
       });
@@ -923,7 +923,7 @@ function buildAnalogNodeMapFromPartition(
 export function compileAnalogPartition(
   partition: SolverPartition,
   registry: ComponentRegistry,
-  transistorModels?: TransistorModelRegistry,
+  transistorModels?: SubcircuitModelRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
@@ -1027,10 +1027,10 @@ export function compileAnalogPartition(
           makeDiagnostic(
             "missing-transistor-model",
             "error",
-            `Component "${el.typeId}" requires transistor expansion but no TransistorModelRegistry was provided`,
+            `Component "${el.typeId}" requires transistor expansion but no SubcircuitModelRegistry was provided`,
             {
               explanation:
-                `Pass a TransistorModelRegistry as the third argument to compileAnalogPartition() ` +
+                `Pass a SubcircuitModelRegistry as the third argument to compileAnalogPartition() ` +
                 `when compiling circuits with transistor-level components.`,
             },
           ),

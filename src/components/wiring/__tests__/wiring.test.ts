@@ -32,7 +32,7 @@ import {
   executeSplitterMergeWithWidths,
   SplitterDefinition,
   SPLITTER_ATTRIBUTE_MAPPINGS,
-  parseSplittingPattern,
+  parsePorts,
   totalBitsFromPattern,
   extractBits,
   insertBits,
@@ -345,21 +345,21 @@ describe("DriverInvSel", () => {
 // ===========================================================================
 
 describe("SplitterUtilities", () => {
-  describe("parseSplittingPattern", () => {
-    it("'4,4' → [4, 4]", () => {
-      expect(parseSplittingPattern("4,4")).toEqual([4, 4]);
+  describe("parsePorts", () => {
+    it("'4,4' → two ports of 4 bits each", () => {
+      expect(parsePorts("4,4").map((p) => p.bits)).toEqual([4, 4]);
     });
 
-    it("'1,1,1,1,4' → [1, 1, 1, 1, 4]", () => {
-      expect(parseSplittingPattern("1,1,1,1,4")).toEqual([1, 1, 1, 1, 4]);
+    it("'1,1,1,1,4' → five ports with widths [1,1,1,1,4]", () => {
+      expect(parsePorts("1,1,1,1,4").map((p) => p.bits)).toEqual([1, 1, 1, 1, 4]);
     });
 
-    it("'8' → [8]", () => {
-      expect(parseSplittingPattern("8")).toEqual([8]);
+    it("'8' → one port of 8 bits", () => {
+      expect(parsePorts("8").map((p) => p.bits)).toEqual([8]);
     });
 
-    it("empty string → [1]", () => {
-      expect(parseSplittingPattern("")).toEqual([1]);
+    it("empty string → one port of 1 bit", () => {
+      expect(parsePorts("").map((p) => p.bits)).toEqual([1]);
     });
   });
 

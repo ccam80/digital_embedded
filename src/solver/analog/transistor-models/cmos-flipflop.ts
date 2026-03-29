@@ -57,7 +57,7 @@ import type { Pin, PinDeclaration } from "../../../core/pin.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import type { TransistorModelRegistry } from "../transistor-model-registry.js";
+import type { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement builder (same pattern as cmos-gates.ts)
@@ -172,7 +172,7 @@ function makeOutEl(label: string, xNet: number, yRow: number): CircuitElement {
 //   X=110: nQ
 // ---------------------------------------------------------------------------
 
-export function createCmosDFlipflop(_modelRegistry: TransistorModelRegistry): Circuit {
+export function createCmosDFlipflop(_modelRegistry: SubcircuitModelRegistry): Circuit {
   const circuit = new Circuit();
 
   // Interface elements
@@ -301,6 +301,6 @@ export function createCmosDFlipflop(_modelRegistry: TransistorModelRegistry): Ci
 // registerCmosDFlipflop
 // ---------------------------------------------------------------------------
 
-export function registerCmosDFlipflop(modelRegistry: TransistorModelRegistry): void {
+export function registerCmosDFlipflop(modelRegistry: SubcircuitModelRegistry): void {
   modelRegistry.register("CmosDFlipflop", createCmosDFlipflop(modelRegistry));
 }

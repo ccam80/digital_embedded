@@ -44,8 +44,8 @@ const COMP_HEIGHT = 1;
 // in@(0,0), out@(3,0)
 function buildBitCountPinDeclarations(bitWidth: number): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: outBitsFor(bitWidth), position: { x: 3, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: outBitsFor(bitWidth), position: { x: 3, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

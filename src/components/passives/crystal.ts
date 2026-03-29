@@ -87,6 +87,7 @@ function buildCrystalPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -95,6 +96,7 @@ function buildCrystalPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

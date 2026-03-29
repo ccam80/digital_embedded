@@ -528,4 +528,77 @@ describe("AndGate", () => {
       expect(registered!.typeId).toBeGreaterThanOrEqual(0);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Power pins (W2.2)
+  // ---------------------------------------------------------------------------
+
+  describe("powerPins", () => {
+    it("no power pins when simulationModel is not set (digital mode)", () => {
+      const el = makeAnd({ inputCount: 2 });
+      const pins = el.getPins();
+      const powerPins = pins.filter((p) => p.label === "VDD" || p.label === "GND");
+      expect(powerPins).toHaveLength(0);
+    });
+
+    it("VDD and GND pins appended when simulationModel is cmos", () => {
+      const props = new PropertyBag();
+      props.set("inputCount", 2);
+      props.set("bitWidth", 1);
+      props.set("wideShape", false);
+      props.set("simulationModel", "cmos");
+      const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
+      const pins = el.getPins();
+      const vdd = pins.find((p) => p.label === "VDD");
+      const gnd = pins.find((p) => p.label === "GND");
+      expect(vdd).toBeDefined();
+      expect(gnd).toBeDefined();
+    });
+
+    it("VDD pin has kind power and direction INPUT", () => {
+      const props = new PropertyBag();
+      props.set("inputCount", 2);
+      props.set("bitWidth", 1);
+      props.set("wideShape", false);
+      props.set("simulationModel", "cmos");
+      const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
+      const vdd = el.getPins().find((p) => p.label === "VDD");
+      expect(vdd?.direction).toBe(PinDirection.INPUT);
+    });
+
+    it("GND pin has kind power and direction INPUT", () => {
+      const props = new PropertyBag();
+      props.set("inputCount", 2);
+      props.set("bitWidth", 1);
+      props.set("wideShape", false);
+      props.set("simulationModel", "cmos");
+      const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
+      const gnd = el.getPins().find((p) => p.label === "GND");
+      expect(gnd?.direction).toBe(PinDirection.INPUT);
+    });
+
+    it("signal pin count is unchanged with cmos model (2 inputs + 1 output)", () => {
+      const props = new PropertyBag();
+      props.set("inputCount", 2);
+      props.set("bitWidth", 1);
+      props.set("wideShape", false);
+      props.set("simulationModel", "cmos");
+      const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
+      const pins = el.getPins();
+      const signalPins = pins.filter((p) => p.label !== "VDD" && p.label !== "GND");
+      expect(signalPins).toHaveLength(3);
+    });
+
+    it("VDD is above GND (VDD y < GND y)", () => {
+      const props = new PropertyBag();
+      props.set("inputCount", 2);
+      props.set("bitWidth", 1);
+      props.set("wideShape", false);
+      props.set("simulationModel", "cmos");
+      const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
+      const vdd = el.getPins().find((p) => p.label === "VDD");
+      const gnd = el.getPins().find((p) => p.label === "GND");
+      expect(vdd!.position.y).toBeLessThan(gnd!.position.y);
+    });
+  });
 });

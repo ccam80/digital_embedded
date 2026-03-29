@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ModelLibrary, validateModel } from "../model-library.js";
 import type { DeviceModel } from "../model-library.js";
-import type { DeviceType } from "../model-parser.js";
+import type { DeviceType } from "../../../core/analog-types.js";
 import { DIODE_DEFAULTS } from "../model-defaults.js";
 
 describe("ModelLibrary", () => {

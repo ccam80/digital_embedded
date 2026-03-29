@@ -2,7 +2,7 @@
  * Transistor model expansion — compile-time analog circuit expansion.
  *
  * expandTransistorModel() takes a ComponentDefinition whose subcircuitModel
- * field names a registered subcircuit in the TransistorModelRegistry, and
+ * field names a registered subcircuit in the SubcircuitModelRegistry, and
  * expands it into a flat list of AnalogElement instances.
  *
  * The subcircuit's In/Out interface elements are mapped to the outer circuit's
@@ -22,7 +22,7 @@ import type { AnalogElement, AnalogElementCore } from "./element.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import type { Circuit, Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
-import type { TransistorModelRegistry } from "./transistor-model-registry.js";
+import type { SubcircuitModelRegistry } from "./subcircuit-model-registry.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { PropertyBag } from "../../core/properties.js";
 import { pinWorldPosition } from "../../core/pin.js";
@@ -142,7 +142,7 @@ function buildWireToNodeId(subcircuit: Circuit): Map<Wire, number> {
 export function expandTransistorModel(
   componentDef: ComponentDefinition,
   outerPinNodeIds: number[],
-  modelRegistry: TransistorModelRegistry,
+  modelRegistry: SubcircuitModelRegistry,
   vddNodeId: number,
   gndNodeId: number,
   nextNodeId: () => number,
@@ -186,7 +186,7 @@ export function expandTransistorModel(
           explanation:
             `Component "${componentDef.name}" references transistor model ` +
             `"${transistorModelName}" which has not been registered ` +
-            `in the TransistorModelRegistry. Call registerAllCmosGateModels() before compiling.`,
+            `in the SubcircuitModelRegistry. Call registerBuiltinSubcircuitModels() before compiling.`,
         },
       ),
     );

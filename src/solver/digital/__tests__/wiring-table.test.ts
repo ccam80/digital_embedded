@@ -57,18 +57,18 @@ class TestElement extends AbstractCircuitElement {
 
 function twoInputOneOutput(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function dffPins(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: true },
-    { direction: PinDirection.OUTPUT, label: "Q", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "~Q", defaultBitWidth: 1, position: { x: 2, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: true, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "Q", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "~Q", defaultBitWidth: 1, position: { x: 2, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -171,23 +171,23 @@ describe("WiringIndirection", () => {
     // AND.out -> Out (x=8,y=0)
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
     registry.register(makeDef("Out", [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeOut));
 
     const circuit = new Circuit();
     const in0 = new TestElement("In", "in0", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const in1 = new TestElement("In", "in1", { x: 0, y: 4 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const andGate = new TestElement("And", "and0", { x: 4, y: 0 }, twoInputOneOutput());
     const outComp = new TestElement("Out", "out0", { x: 8, y: 0 }, [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
 
     circuit.addElement(in0);
@@ -224,16 +224,16 @@ describe("WiringIndirection", () => {
     // AND gate whose output net is non-contiguous with its inputs.
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
 
     const circuit = new Circuit();
     const in0 = new TestElement("In", "in0", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const in1 = new TestElement("In", "in1", { x: 0, y: 4 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const andGate = new TestElement("And", "and0", { x: 4, y: 0 }, twoInputOneOutput());
 
@@ -263,16 +263,16 @@ describe("WiringIndirection", () => {
     // Compile a circuit with a D flip-flop. Verify state slots are direct.
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("DFF", dffPins(), executeDFF, { stateSlotCount: 2 }));
 
     const circuit = new Circuit();
     const dIn = new TestElement("In", "din", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const clkIn = new TestElement("In", "clk", { x: 0, y: 1 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const dff = new TestElement("DFF", "dff0", { x: 4, y: 0 }, dffPins());
 
@@ -313,29 +313,29 @@ describe("WiringIndirection", () => {
     // Half adder: In0->XOR->Sum, In0->AND->Carry, In1->XOR, In1->AND
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("Xor", twoInputOneOutput(), executeXor));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
     registry.register(makeDef("Out", [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeOut));
 
     const circuit = new Circuit();
     // Place components with enough spacing to avoid pin collisions
     const in0 = new TestElement("In", "a", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const in1 = new TestElement("In", "b", { x: 0, y: 4 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const xorGate = new TestElement("Xor", "xor0", { x: 6, y: 0 }, twoInputOneOutput());
     const andGate = new TestElement("And", "and0", { x: 6, y: 4 }, twoInputOneOutput());
     const sumOut = new TestElement("Out", "sum", { x: 10, y: 0 }, [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const carryOut = new TestElement("Out", "carry", { x: 10, y: 4 }, [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
 
     circuit.addElement(in0);
@@ -394,16 +394,16 @@ describe("WiringIndirection", () => {
     // OR gate with non-contiguous input nets
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("Or", twoInputOneOutput(), executeOr));
 
     const circuit = new Circuit();
     const in0 = new TestElement("In", "in0", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const in1 = new TestElement("In", "in1", { x: 0, y: 4 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const orGate = new TestElement("Or", "or0", { x: 4, y: 0 }, twoInputOneOutput());
 
@@ -432,16 +432,16 @@ describe("WiringIndirection", () => {
     // D flip-flop: verify input/output access uses wiringTable, state is direct
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ], executeIn));
     registry.register(makeDef("DFF", dffPins(), executeDFF, { stateSlotCount: 2 }));
 
     const circuit = new Circuit();
     const dIn = new TestElement("In", "din", { x: 0, y: 0 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const clkIn = new TestElement("In", "clk", { x: 0, y: 1 }, [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ]);
     const dff = new TestElement("DFF", "dff0", { x: 4, y: 0 }, dffPins());
 

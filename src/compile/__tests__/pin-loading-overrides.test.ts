@@ -57,11 +57,11 @@ class TestElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function inputPin(x: number, y: number, label: string): PinDeclaration {
-  return { direction: PinDirection.INPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false };
+  return { direction: PinDirection.INPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
 }
 
 function outputPin(x: number, y: number, label: string): PinDeclaration {
-  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false };
+  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
 }
 
 // ---------------------------------------------------------------------------

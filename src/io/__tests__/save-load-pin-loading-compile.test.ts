@@ -40,6 +40,7 @@ function pinDecl(
     position: { x, y },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 }
 

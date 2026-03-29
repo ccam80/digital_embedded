@@ -71,6 +71,7 @@ const FIXED_PINS: Pin[] = [
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -79,6 +80,7 @@ const FIXED_PINS: Pin[] = [
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: "signal",
   },
 ];
 

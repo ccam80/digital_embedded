@@ -46,7 +46,7 @@ class MockElement extends AbstractCircuitElement {
 }
 
 function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
-  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false };
+  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
 }
 
 function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x: number; y: number; label: string }[]): MockElement {
@@ -163,6 +163,7 @@ function makeAnalogEl(
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
+    kind: "signal",
     bitWidth: 1,
   }));
   const propertyBag = new PropertyBag(propsMap.entries());

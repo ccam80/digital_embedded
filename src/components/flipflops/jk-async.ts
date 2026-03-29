@@ -53,6 +53,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -61,6 +62,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -69,6 +71,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 2 },
     isNegatable: true,
     isClockCapable: true,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -77,6 +80,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 3 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -85,6 +89,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 4 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -93,6 +98,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -101,6 +107,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 
@@ -129,6 +136,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: 0, y: 0 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -137,6 +145,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: 0, y: 1 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -145,6 +154,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: 0, y: 2 },
         isNegatable: true,
         isClockCapable: true,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -153,6 +163,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: 0, y: 3 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -161,6 +172,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: 0, y: 4 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -169,6 +181,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 0 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -177,6 +190,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 1 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
     ];
     return this.derivePins(decls, ["C"]);

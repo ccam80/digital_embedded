@@ -112,21 +112,21 @@ function makeAnalogElement(
 
 function twoInputOnePinDecls(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function inPinDecl(label: string, pos: { x: number; y: number }): PinDeclaration[] {
   return [
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function outPinDecl(label: string, pos: { x: number; y: number }): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -234,6 +234,7 @@ function makeAnalogDef(
       position: p,
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     })),
     propertyDefs: [],
     attributeMap: [],
@@ -263,6 +264,7 @@ function makeGroundDef(): ComponentDefinition {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     }],
     propertyDefs: [],
     attributeMap: [],

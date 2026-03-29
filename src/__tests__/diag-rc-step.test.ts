@@ -52,7 +52,7 @@ describe('RC XML partition diagnostics', () => {
     }
     
     expect(unified.analog).not.toBeNull();
-    expect(unified.analog!.elements.length).toBeGreaterThan(0);
-    expect(unified.analog!.nodeCount).toBeGreaterThan(0);
+    expect(unified.analog!.elements.length).toBe(3);
+    expect(unified.analog!.nodeCount).toBe(2);
   });
 });

@@ -119,7 +119,7 @@ function makeDigitalInDef(): ComponentDefinition {
     name: "In",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("In", "auto", { x: 0, y: 0 }, []),
-    pinLayout: [{ label: "out", direction: PinDirection.OUTPUT }],
+    pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
@@ -133,7 +133,7 @@ function makeDigitalOutDef(): ComponentDefinition {
     name: "Out",
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("Out", "auto", { x: 0, y: 0 }, []),
-    pinLayout: [{ label: "in", direction: PinDirection.INPUT }],
+    pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
     propertyDefs: [{ key: "label", defaultValue: "" }],
     attributeMap: [],
     category: ComponentCategory.IO,
@@ -148,9 +148,9 @@ function makeAndDef(): ComponentDefinition {
     typeId: -1,
     factory: (_props) => new MinimalLeafElement("And", "auto", { x: 0, y: 0 }, []),
     pinLayout: [
-      { label: "In_1", direction: PinDirection.INPUT },
-      { label: "In_2", direction: PinDirection.INPUT },
-      { label: "out", direction: PinDirection.OUTPUT },
+      { label: "In_1", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { label: "In_2", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ],
     propertyDefs: [],
     attributeMap: [],
@@ -213,6 +213,7 @@ function makeInElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ], props);
 }
@@ -231,6 +232,7 @@ function makeOutElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ], props);
 }
@@ -239,9 +241,9 @@ function makeAndElement(
   instanceId: string,
 ): MinimalLeafElement {
   return new MinimalLeafElement("And", instanceId, { x: 5, y: 3 }, [
-    { direction: PinDirection.INPUT,  position: { x: 5, y: 2 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.INPUT,  position: { x: 5, y: 4 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.OUTPUT, position: { x: 8, y: 3 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.INPUT,  position: { x: 5, y: 2 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  position: { x: 5, y: 4 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, position: { x: 8, y: 3 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
 }
 
@@ -322,7 +324,7 @@ function buildOuterAnalogCircuit(innerCircuit: Circuit): TestOuterCircuit {
 
   // Ground element — gives us node 0 (ground)
   const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(groundEl);
 
@@ -331,31 +333,31 @@ function buildOuterAnalogCircuit(innerCircuit: Circuit): TestOuterCircuit {
   // Pin positions are LOCAL (relative to element origin) — pinWorldPosition
   // adds el.position to get world coords that match wire endpoints.
   const res1El = new MinimalLeafElement("Resistor", "res1", { x: 1, y: 1 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res1El);
 
   // Resistor from node2 to ground
   const res2El = new MinimalLeafElement("Resistor", "res2", { x: 2, y: 6 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res2El);
 
   // Resistor from node3 to ground
   const res3El = new MinimalLeafElement("Resistor", "res3", { x: 3, y: 3 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -3, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 27, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -3, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 27, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res3El);
 
   // Subcircuit element — its interface pins are at outer positions
   // Pin positions are LOCAL: pinWorldPosition(el, pin) = (15,0) + pin = world pos
   const subcircuitPins: Pin[] = [
-    { direction: PinDirection.INPUT,  position: { x: 5, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.INPUT,  position: { x: 5, y: 6 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.OUTPUT, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.INPUT,  position: { x: 5, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  position: { x: 5, y: 6 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ];
   const subcircuitEl = new TestSubcircuitHost(
     "AndGate",
@@ -403,6 +405,7 @@ function makePortElement(
       bitWidth,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new MinimalLeafElement("Port", instanceId, position, pins, props);
@@ -494,34 +497,34 @@ function buildOuterAnalogCircuitPort(innerCircuit: Circuit): TestOuterCircuit {
 
   // Ground element
   const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(groundEl);
 
   // Resistors from each node to ground (makes MNA system solvable)
   const res1El = new MinimalLeafElement("Resistor", "res1", { x: 1, y: 1 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res1El);
 
   const res2El = new MinimalLeafElement("Resistor", "res2", { x: 2, y: 6 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res2El);
 
   const res3El = new MinimalLeafElement("Resistor", "res3", { x: 3, y: 3 }, [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: -3, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 27, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: -3, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 27, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ]);
   outer.addElement(res3El);
 
   // Subcircuit element — all pins BIDIRECTIONAL (Port convention)
   const subcircuitPins: Pin[] = [
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
-    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
   ];
   const subcircuitEl = new TestSubcircuitHost(
     "AndPortGate",
@@ -632,22 +635,22 @@ describe("BridgeCompilation", () => {
 
     // Ground element
     const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]);
     outer.addElement(groundEl);
 
     // Resistor from node to ground
     // Pin positions are LOCAL: pinWorldPosition(el, pin) = (1,3) + pin = world pos
     const resEl = new MinimalLeafElement("Resistor", "res1", { x: 1, y: 3 }, [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -3 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]);
     outer.addElement(resEl);
 
     // Subcircuit with a single output pin "Y"
     // Pin positions are LOCAL: pinWorldPosition(el, pin) = (15,0) + pin = world pos
     const subcircuitPins: Pin[] = [
-      { direction: PinDirection.OUTPUT, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.OUTPUT, position: { x: 5, y: 3 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subcircuitEl = new TestSubcircuitHost(
       "SingleOut",
@@ -745,27 +748,27 @@ describe("bridge compilation — Port-based subcircuits", () => {
     const outer = new Circuit({ name: "OuterTwoPort" });
 
     const groundEl = new MinimalLeafElement("Ground", "gnd", { x: 0, y: 0 }, [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "gnd", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]);
     outer.addElement(groundEl);
 
     // Resistor from nodeX (30,1) to ground (0,0)
     const resXEl = new MinimalLeafElement("Resistor", "resX", { x: 1, y: 1 }, [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: -1, y: -1 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 29, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]);
     outer.addElement(resXEl);
 
     // Resistor from nodeZ (30,6) to ground (0,0)
     const resZEl = new MinimalLeafElement("Resistor", "resZ", { x: 2, y: 6 }, [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: -2, y: -6 }, label: "p0", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 28, y: 0 },  label: "p1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ]);
     outer.addElement(resZEl);
 
     const subcircuitPins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 1 }, label: "X", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 5, y: 6 }, label: "Z", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subcircuitEl = new TestSubcircuitHost(
       "TwoPort",

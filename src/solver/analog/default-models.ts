@@ -1,22 +1,16 @@
-/**
- * Shared lazily-built TransistorModelRegistry with all known models.
- *
- * Provides a single getTransistorModels() entry point for all compilation
- * paths (facade, runner, and direct compiler calls).
- */
-import { TransistorModelRegistry } from './transistor-model-registry.js';
-import { registerAllCmosGateModels } from './transistor-models/cmos-gates.js';
+import { SubcircuitModelRegistry } from './subcircuit-model-registry.js';
+import { registerBuiltinSubcircuitModels } from './transistor-models/cmos-gates.js';
 import { registerCmosDFlipflop } from './transistor-models/cmos-flipflop.js';
 import { registerDarlingtonModels } from './transistor-models/darlington.js';
 
-let _transistorModels: TransistorModelRegistry | null = null;
+let _subcircuitModels: SubcircuitModelRegistry | null = null;
 
-export function getTransistorModels(): TransistorModelRegistry {
-  if (!_transistorModels) {
-    _transistorModels = new TransistorModelRegistry();
-    registerAllCmosGateModels(_transistorModels);
-    registerCmosDFlipflop(_transistorModels);
-    registerDarlingtonModels(_transistorModels);
+export function getTransistorModels(): SubcircuitModelRegistry {
+  if (!_subcircuitModels) {
+    _subcircuitModels = new SubcircuitModelRegistry();
+    registerBuiltinSubcircuitModels(_subcircuitModels);
+    registerCmosDFlipflop(_subcircuitModels);
+    registerDarlingtonModels(_subcircuitModels);
   }
-  return _transistorModels;
+  return _subcircuitModels;
 }

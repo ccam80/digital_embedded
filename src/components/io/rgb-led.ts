@@ -41,6 +41,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -49,6 +50,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -57,6 +59,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

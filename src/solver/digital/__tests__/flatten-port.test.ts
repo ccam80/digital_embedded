@@ -66,6 +66,7 @@ function makePortElement(
       bitWidth,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Port", instanceId, position, props, pins);
@@ -86,6 +87,7 @@ function makeInElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("In", instanceId, position, props, pins);
@@ -106,6 +108,7 @@ function makeOutElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Out", instanceId, position, props, pins);
@@ -129,6 +132,7 @@ function makeLeaf(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement(typeId, instanceId, position, props, pins);
@@ -216,6 +220,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = new TestSubcircuitElement("PortSub", "sub1", { x: 10, y: 0 }, internal, subcircuitPins);
@@ -256,6 +261,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -264,6 +270,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = new TestSubcircuitElement("InOutSub", "sub1", { x: 20, y: 0 }, internal, subcircuitPins);
@@ -298,6 +305,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = new TestSubcircuitElement("MismatchSub", "sub1", { x: 30, y: 0 }, internal, subcircuitPins);
@@ -341,6 +349,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 8,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = new TestSubcircuitElement("BusSub", "sub1", { x: 10, y: 0 }, internal, subcircuitPins);
@@ -387,6 +396,7 @@ describe("flattenCircuit — Port interface elements", () => {
         bitWidth: 1,
         isNegated: false,
         isClock: false,
+        kind: "signal",
       },
     ];
     const subEl = new TestSubcircuitElement("PosSub", "sub1", subElPos, internal, subcircuitPins);

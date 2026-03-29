@@ -56,6 +56,7 @@ function buildSixteenSegPinDeclarations(): PinDeclaration[] {
       position: { x: 2, y: COMP_HEIGHT },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -64,6 +65,7 @@ function buildSixteenSegPinDeclarations(): PinDeclaration[] {
       position: { x: 3, y: COMP_HEIGHT },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

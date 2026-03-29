@@ -110,15 +110,15 @@ class TestElement extends AbstractCircuitElement {
 
 function outputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {
   return [
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function nfetPins(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 1.5 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.BIDIRECTIONAL, label: "D", defaultBitWidth: 1, position: { x: 3, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.BIDIRECTIONAL, label: "S", defaultBitWidth: 1, position: { x: 3, y: 3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 1.5 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, label: "D", defaultBitWidth: 1, position: { x: 3, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, label: "S", defaultBitWidth: 1, position: { x: 3, y: 3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

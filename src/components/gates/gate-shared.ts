@@ -8,6 +8,7 @@
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { PinDeclaration } from "../../core/pin.js";
 import {
+  PinDirection,
   standardGatePinLayout,
   gateBodyMetrics,
 } from "../../core/pin.js";
@@ -156,6 +157,46 @@ export function drawGateLabel(ctx: RenderContext, visibleLabel: string, w: numbe
   ctx.setColor("TEXT");
   ctx.setFont({ family: "sans-serif", size: 1.0 });
   ctx.drawText(visibleLabel, w / 2, -0.5, { horizontal: "center", vertical: "bottom" });
+}
+
+/**
+ * Append VDD (top) and GND (bottom) power pins to a pin declaration array.
+ *
+ * Used by getPins() when the active simulation model is a subcircuit key
+ * (e.g., "cmos"). Power pins are centered horizontally on the component body.
+ *
+ * @param decls   Existing signal pin declarations.
+ * @param centerX Horizontal center of the component in grid units.
+ * @param topY    Y coordinate for VDD pin (above body).
+ * @param bottomY Y coordinate for GND pin (below body).
+ */
+export function appendPowerPins(
+  decls: PinDeclaration[],
+  centerX: number,
+  topY: number,
+  bottomY: number,
+): PinDeclaration[] {
+  return [
+    ...decls,
+    {
+      direction: PinDirection.INPUT,
+      label: "VDD",
+      defaultBitWidth: 1,
+      position: { x: centerX, y: topY },
+      isNegatable: false,
+      isClockCapable: false,
+      kind: "power",
+    },
+    {
+      direction: PinDirection.INPUT,
+      label: "GND",
+      defaultBitWidth: 1,
+      position: { x: centerX, y: bottomY },
+      isNegatable: false,
+      isClockCapable: false,
+      kind: "power",
+    },
+  ];
 }
 
 /**

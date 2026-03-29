@@ -68,6 +68,7 @@ export function buildPriorityEncoderPinDeclarations(
       position: { x: 0, y: i },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     });
   }
 
@@ -78,6 +79,7 @@ export function buildPriorityEncoderPinDeclarations(
     position: { x: 3.9, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   const anyPin: PinDeclaration = {
@@ -87,6 +89,7 @@ export function buildPriorityEncoderPinDeclarations(
     position: { x: 3.9, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [...inputPins, numPin, anyPin];

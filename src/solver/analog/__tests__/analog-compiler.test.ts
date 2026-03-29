@@ -36,6 +36,7 @@ function makePin(x: number, y: number, label: string = ""): Pin {
     direction: PinDirection.BIDIRECTIONAL,
     isInverted: false,
     isClock: false,
+    kind: "signal",
     bitWidth: 1,
   };
 }
@@ -223,10 +224,8 @@ describe("BehavioralCompilation", () => {
     const pinElec = propsTyped.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>;
 
     // Check In_1 pin electrical has CMOS 3.3V values
-    expect(pinElec["In_1"]).toBeDefined();
     expect(pinElec["In_1"]!.vIH).toBe(2.0);
     expect(pinElec["In_1"]!.vOH).toBe(3.3);
-    expect(pinElec["out"]).toBeDefined();
     expect(pinElec["out"]!.vOH).toBe(3.3);
   });
 
@@ -442,8 +441,9 @@ describe("SimulationMode", () => {
         bitWidth: props.getOrDefault<number>("bitWidth", 1),
         isNegated: false,
         isClock: false,
+        kind: "signal",
       }]),
-      pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      pinLayout: [{ label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
       propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
       models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
@@ -457,8 +457,9 @@ describe("SimulationMode", () => {
         bitWidth: props.getOrDefault<number>("bitWidth", 1),
         isNegated: false,
         isClock: false,
+        kind: "signal",
       }]),
-      pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      pinLayout: [{ label: "in", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
       propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
       models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
     });
@@ -467,9 +468,9 @@ describe("SimulationMode", () => {
       ...makeBaseDef("BehavioralAnd"),
       pinLayout: makeGatePinLayout(2),
       factory: makeStubElFactory("BehavioralAnd", (_props) => [
-        { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false },
-        { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false },
-        { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false },
+        { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "In_1", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+        { direction: PinDirection.INPUT,  position: { x: 0, y: 2 }, label: "In_2", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+        { direction: PinDirection.OUTPUT, position: { x: 2, y: 1 }, label: "out",  bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
       ]),
       models: {
         digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
@@ -535,7 +536,7 @@ describe("SimulationMode", () => {
     // Factory should NOT be called (component is skipped — no registry supplied)
     expect(factorySpy).not.toHaveBeenCalled();
 
-    // Should emit missing-transistor-model error when no TransistorModelRegistry is passed
+    // Should emit missing-transistor-model error when no SubcircuitModelRegistry is passed
     const errorDiags = compiled.diagnostics.filter(
       (d) => d.code === "missing-transistor-model",
     );

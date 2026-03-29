@@ -43,6 +43,7 @@ function buildNotConnectedPinDeclarations(): PinDeclaration[] {
       position: positions[0],
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

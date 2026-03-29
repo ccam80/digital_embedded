@@ -102,6 +102,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -110,6 +111,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -118,6 +120,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: true,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -126,6 +129,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -134,6 +138,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -142,6 +147,7 @@ function buildGraphicCardPinDeclarations(
       position: { x: COMP_WIDTH, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

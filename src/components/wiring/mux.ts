@@ -54,6 +54,7 @@ export function buildMuxPinDeclarations(
     position: { x: 1, y: flipSelPos ? 0 : inputCount },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   // Data input pins: left side
@@ -67,6 +68,7 @@ export function buildMuxPinDeclarations(
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     });
     inputPins.push({
       direction: PinDirection.INPUT,
@@ -75,6 +77,7 @@ export function buildMuxPinDeclarations(
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     });
   } else {
     for (let i = 0; i < inputCount; i++) {
@@ -85,6 +88,7 @@ export function buildMuxPinDeclarations(
         position: { x: 0, y: i },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       });
     }
   }
@@ -97,6 +101,7 @@ export function buildMuxPinDeclarations(
     position: { x: 2, y: Math.floor(inputCount / 2) },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   };
 
   return [selPin, ...inputPins, outPin];

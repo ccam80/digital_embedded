@@ -95,6 +95,7 @@ const VARIABLE_RAIL_PIN_LAYOUT: PinDeclaration[] = [
     defaultBitWidth: 1,
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

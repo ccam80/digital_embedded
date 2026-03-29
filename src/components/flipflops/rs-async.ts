@@ -56,6 +56,7 @@ const RS_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -64,6 +65,7 @@ const RS_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -72,6 +74,7 @@ const RS_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -80,6 +83,7 @@ const RS_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

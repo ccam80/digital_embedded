@@ -131,7 +131,7 @@ function makeDualDef(typeId: string): ComponentDefinition {
 }
 
 function makePin(label: string, dir: PinDirection, x: number, y: number): Pin {
-  return { direction: dir, position: { x, y }, label, bitWidth: 1, isNegated: false, isClock: false };
+  return { direction: dir, position: { x, y }, label, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
 }
 
 // ---------------------------------------------------------------------------

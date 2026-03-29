@@ -99,15 +99,6 @@ export function parsePorts(definition: string): SplitterPort[] {
   return ports;
 }
 
-// ---------------------------------------------------------------------------
-// Splitting pattern utilities (kept for backward compatibility)
-// ---------------------------------------------------------------------------
-
-/** Parse a splitting pattern into an array of bit widths (legacy helper). */
-export function parseSplittingPattern(pattern: string): number[] {
-  return parsePorts(pattern).map((p) => p.bits);
-}
-
 /** Total bits from an array of widths. */
 export function totalBitsFromPattern(parts: number[]): number {
   return parts.reduce((sum, n) => sum + n, 0);

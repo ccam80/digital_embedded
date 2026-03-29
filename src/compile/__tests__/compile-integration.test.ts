@@ -67,6 +67,7 @@ function makeAnalogPin(x: number, y: number): Pin {
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
+    kind: "signal",
     bitWidth: 1,
   };
 }
@@ -118,11 +119,11 @@ function makeAnalogElement(
 // ---------------------------------------------------------------------------
 
 function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclaration {
-  return { direction: PinDirection.INPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false };
+  return { direction: PinDirection.INPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
 }
 
 function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclaration {
-  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false };
+  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
 }
 
 // ---------------------------------------------------------------------------
@@ -704,10 +705,10 @@ describe('compileUnified — tunnel merging', () => {
 describe('compileUnified — width mismatch diagnostic', () => {
   it('emits diagnostic when 1-bit output drives 8-bit input', () => {
     const oneBitOutPins: PinDeclaration[] = [
-      { direction: PinDirection.OUTPUT, label: 'out', defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: 'out', defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
     const eightBitInPins: PinDeclaration[] = [
-      { direction: PinDirection.INPUT, label: 'in', defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: 'in', defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
 
     const registry = new ComponentRegistry();
@@ -985,7 +986,7 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
       name: 'Ground',
       typeId: -1,
       factory: () => { throw new Error('not used'); },
-      pinLayout: [{ label: 'gnd', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+      pinLayout: [{ label: 'gnd', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" }],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
@@ -999,8 +1000,8 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       }),
       pinLayout: [
-        { label: 'a', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-        { label: 'b', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+        { label: 'a', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+        { label: 'b', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       ],
     } as ComponentDefinition);
 

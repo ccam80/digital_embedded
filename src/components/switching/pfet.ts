@@ -57,6 +57,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -65,6 +66,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -73,6 +75,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: COMP_HEIGHT },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

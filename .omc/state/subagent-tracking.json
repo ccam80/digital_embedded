@@ -458,10 +458,62 @@
       "status": "completed",
       "completed_at": "2026-03-29T04:39:17.994Z",
       "duration_ms": 136373
+    },
+    {
+      "agent_id": "a7145a05e594c9a77",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-29T04:40:56.971Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-29T04:49:13.969Z",
+      "duration_ms": 496998
+    },
+    {
+      "agent_id": "af622b458d6a53da9",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-03-29T04:41:11.929Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "a04cc1c5659a25d68",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-29T04:41:15.146Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-29T05:12:20.136Z",
+      "duration_ms": 1864990
+    },
+    {
+      "agent_id": "af3aee3f40d7e9377",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-29T04:41:33.732Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-29T04:47:26.650Z",
+      "duration_ms": 352918
+    },
+    {
+      "agent_id": "a241620022806d0e8",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-29T04:41:47.744Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-29T04:49:07.497Z",
+      "duration_ms": 439753
+    },
+    {
+      "agent_id": "a8c2ed478d4bce4cd",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-29T04:42:10.796Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-29T04:47:32.537Z",
+      "duration_ms": 321741
     }
   ],
-  "total_spawned": 54,
-  "total_completed": 54,
+  "total_spawned": 60,
+  "total_completed": 59,
   "total_failed": 0,
-  "last_updated": "2026-03-29T04:39:18.113Z"
+  "last_updated": "2026-03-29T05:12:20.247Z"
 }

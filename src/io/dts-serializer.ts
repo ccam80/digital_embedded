@@ -8,7 +8,7 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
-import type { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
+import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import type {
   DtsDocument,
   DtsCircuit,
@@ -124,6 +124,15 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
     result.measurementOrdering = [...circuit.metadata.measurementOrdering];
   }
 
+  if (circuit.metadata.traces !== undefined && circuit.metadata.traces.length > 0) {
+    result.traces = circuit.metadata.traces.map(t => ({
+      name: t.name,
+      domain: t.domain,
+      panelIndex: t.panelIndex,
+      group: t.group,
+    }));
+  }
+
   if (
     circuit.metadata.digitalPinLoading !== undefined ||
     (circuit.metadata.digitalPinLoadingOverrides !== undefined &&
@@ -154,13 +163,13 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 /**
  * Build the model-related fields of a DtsDocument from circuit metadata.
  *
- * When a `TransistorModelRegistry` is provided, model definition circuits are
+ * When a `SubcircuitModelRegistry` is provided, model definition circuits are
  * serialized in full from the registry. Without the registry, only the metadata
  * stub (ports + elementCount in attributes) is stored.
  */
 function buildModelFields(
   circuit: Circuit,
-  transistorModels?: TransistorModelRegistry,
+  transistorModels?: SubcircuitModelRegistry,
 ): Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets'> {
   const result: Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets'> = {};
 
@@ -210,7 +219,7 @@ function buildModelFields(
  */
 export function serializeCircuit(
   circuit: Circuit,
-  transistorModels?: TransistorModelRegistry,
+  transistorModels?: SubcircuitModelRegistry,
 ): string {
   const doc: DtsDocument = {
     format: 'dts',
@@ -236,7 +245,7 @@ export function serializeCircuit(
 export function serializeWithSubcircuits(
   circuit: Circuit,
   subcircuits: Map<string, Circuit>,
-  transistorModels?: TransistorModelRegistry,
+  transistorModels?: SubcircuitModelRegistry,
 ): string {
   const subcircuitDefinitions: Record<string, DtsCircuit> = {};
   for (const [name, sub] of subcircuits) {

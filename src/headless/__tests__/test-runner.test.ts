@@ -51,7 +51,7 @@ class MockElement extends AbstractCircuitElement {
 }
 
 function makePin(label: string, direction: PinDirection, worldX: number, worldY: number): Pin {
-  return { label, direction, position: { x: worldX, y: worldY }, bitWidth: 1, isNegated: false, isClock: false };
+  return { label, direction, position: { x: worldX, y: worldY }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
 }
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {

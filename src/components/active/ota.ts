@@ -86,6 +86,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: -2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -94,6 +95,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -102,6 +104,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -110,6 +113,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       position: { x: 4.875, y: -2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -118,6 +122,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
       position: { x: 5.875, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

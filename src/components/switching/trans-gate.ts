@@ -52,6 +52,7 @@ const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 1, y: -1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -60,6 +61,7 @@ const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 1, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -68,6 +70,7 @@ const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -76,6 +79,7 @@ const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 2, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

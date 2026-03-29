@@ -17,6 +17,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   gateBodyMetrics,
   standardGatePinLayout,
+  PinDirection,
 } from "../../core/pin.js";
 import { drawUprightText } from "../../core/upright-text.js";
 import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
@@ -71,7 +72,33 @@ export class NotElement extends AbstractCircuitElement {
   getPins(): readonly Pin[] {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
-    const decls = buildPinDeclarations(bitWidth, wideShape);
+    let decls: PinDeclaration[] = buildPinDeclarations(bitWidth, wideShape);
+    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
+    if (activeModel === "cmos") {
+      const w = compWidth(wideShape);
+      const centerX = w / 2;
+      decls = [
+        ...decls,
+        {
+          direction: PinDirection.INPUT,
+          label: "VDD",
+          defaultBitWidth: 1,
+          position: { x: centerX, y: -1 },
+          isNegatable: false,
+          isClockCapable: false,
+          kind: "power",
+        },
+        {
+          direction: PinDirection.INPUT,
+          label: "GND",
+          defaultBitWidth: 1,
+          position: { x: centerX, y: 1 },
+          isNegatable: false,
+          isClockCapable: false,
+          kind: "power",
+        },
+      ];
+    }
     return this.derivePins(decls, []);
   }
 
@@ -222,6 +249,7 @@ export const NotDefinition: ComponentDefinition = {
     "Not gate — performs bitwise NOT (inversion) of the input.\n" +
     "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
+  subcircuitRefs: { cmos: "CmosInverter" },
   models: {
     digital: {
       executeFn: executeNot,

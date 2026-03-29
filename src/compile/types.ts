@@ -108,6 +108,7 @@ export interface ResolvedGroupPin {
   worldPosition: Point;
   wireVertex: Point | null;
   domain: string;
+  kind: "signal" | "power";
 }
 
 /**

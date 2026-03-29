@@ -15,7 +15,7 @@ import { describe, it, expect } from "vitest";
 import { Circuit } from "../../../core/circuit.js";
 import { parseModelCard, parseSubcircuit } from "../model-parser.js";
 import { buildSpiceSubcircuit } from "../../../io/spice-model-builder.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,7 +37,7 @@ function addNamedParameterSet(
 
 function addSubcktDefinition(
   circuit: Circuit,
-  registry: TransistorModelRegistry,
+  registry: SubcircuitModelRegistry,
   subcktText: string,
 ): { name: string } | { error: string } {
   let parsed;
@@ -129,7 +129,7 @@ describe("spice-model-library: namedParameterSets", () => {
 describe("spice-model-library: modelDefinitions", () => {
   it("adds a parsed .SUBCKT definition to circuit.metadata.modelDefinitions", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     const result = addSubcktDefinition(circuit, registry, `
 .SUBCKT MYBJT C B E
 Q1 C B E QMOD
@@ -145,9 +145,9 @@ Q1 C B E QMOD
     expect(defs!["MYBJT"].elementCount).toBe(1);
   });
 
-  it("registers the circuit in TransistorModelRegistry when adding a subcircuit", () => {
+  it("registers the circuit in SubcircuitModelRegistry when adding a subcircuit", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     addSubcktDefinition(circuit, registry, `
 .SUBCKT RDIV IN OUT GND
 R1 IN OUT 1K
@@ -160,7 +160,7 @@ R2 OUT GND 1K
 
   it("multiple .SUBCKT definitions coexist", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     addSubcktDefinition(circuit, registry, `
 .SUBCKT BJT1 C B E
@@ -184,7 +184,7 @@ R2 OUT GND 1K
 
   it("removing a subcircuit definition does not affect other entries", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     addSubcktDefinition(circuit, registry, `
 .SUBCKT BJT1 C B E
@@ -210,7 +210,7 @@ R2 OUT GND 1K
 
   it("returns error for invalid .SUBCKT text without storing anything", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
     const result = addSubcktDefinition(circuit, registry, ".MODEL 2N2222 NPN(IS=1e-14)");
 
     expect("error" in result).toBe(true);
@@ -226,7 +226,7 @@ R2 OUT GND 1K
 describe("spice-model-library: combined", () => {
   it("circuit can hold both namedParameterSets and modelDefinitions simultaneously", () => {
     const circuit = new Circuit();
-    const registry = new TransistorModelRegistry();
+    const registry = new SubcircuitModelRegistry();
 
     addNamedParameterSet(circuit, ".MODEL 2N2222 NPN(IS=1e-14 BF=200)");
     addSubcktDefinition(circuit, registry, `

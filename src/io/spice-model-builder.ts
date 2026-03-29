@@ -2,7 +2,7 @@
  * SPICE subcircuit-to-Circuit builder.
  *
  * Converts a `ParsedSubcircuit` (from `parseSubcircuit()`) into a `Circuit`
- * object that can be registered in `TransistorModelRegistry` and expanded at
+ * object that can be registered in `SubcircuitModelRegistry` and expanded at
  * compile time by `expandTransistorModel()`.
  *
  * The resulting Circuit follows the same conventions as the hand-written
@@ -326,7 +326,7 @@ function buildElement(
 
 /**
  * Convert a `ParsedSubcircuit` into a `Circuit` suitable for registration in
- * `TransistorModelRegistry`.
+ * `SubcircuitModelRegistry`.
  *
  * The Circuit follows the same wire-coordinate-as-net-ID convention used by
  * `cmos-gates.ts` and `darlington.ts`:

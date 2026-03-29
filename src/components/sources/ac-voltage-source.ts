@@ -258,6 +258,7 @@ const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -266,6 +267,7 @@ const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     position: { x: 4, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

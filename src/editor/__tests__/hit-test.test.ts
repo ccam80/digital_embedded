@@ -51,6 +51,7 @@ function makePin(x: number, y: number): Pin {
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: "signal",
   };
 }
 

@@ -5,8 +5,6 @@
  * Factory functions build relevant actions for element, wire, and canvas targets.
  */
 
-import type { Point } from "@/core/renderer-interface";
-
 // ---------------------------------------------------------------------------
 // MenuItem — actions and separators
 // ---------------------------------------------------------------------------
@@ -91,11 +89,6 @@ export class ContextMenu {
       document.addEventListener("pointerdown", dismiss);
       document.addEventListener("keydown", dismiss);
     }, 0);
-  }
-
-  /** Legacy overload kept for any existing callers. */
-  show(position: Point, _target: unknown, actions: MenuAction[]): void {
-    this.showItems(position.x, position.y, actions);
   }
 
   /**

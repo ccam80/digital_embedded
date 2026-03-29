@@ -299,6 +299,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -307,6 +308,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 1.0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -315,6 +317,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: -1.0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

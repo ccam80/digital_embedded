@@ -100,6 +100,7 @@ function makePin(
     worldPosition: { x: 0, y: 0 },
     wireVertex: null,
     domain,
+    kind: "signal",
   };
 }
 

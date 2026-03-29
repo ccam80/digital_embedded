@@ -42,6 +42,7 @@ function makePin(
     bitWidth: 1,
     isNegated,
     isClock,
+    kind: "signal",
   };
 }
 

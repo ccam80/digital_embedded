@@ -62,6 +62,7 @@ function makeLeaf(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement(typeId, instanceId, position, props, pins);
@@ -82,6 +83,7 @@ function makeInElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("In", instanceId, position, props, pins);
@@ -106,6 +108,7 @@ function makePortElement(
       bitWidth,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Port", instanceId, position, props, pins);
@@ -126,6 +129,7 @@ function makeOutElement(
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     },
   ];
   return new TestLeafElement("Out", instanceId, position, props, pins);
@@ -253,8 +257,8 @@ describe("CrossEngine", () => {
     const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
     outer.addElement(andEl);
     const pins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("AnalogFilter", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -292,8 +296,8 @@ describe("CrossEngine", () => {
     const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
     outer.addElement(resistor);
     const pins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Q", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Q", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("Counter", "sub-1", { x: 0, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -323,8 +327,8 @@ describe("CrossEngine", () => {
 
     const outer = new Circuit({ name: "Top" });
     const pins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("AndWrapper", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -357,8 +361,8 @@ describe("CrossEngine", () => {
     const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
     outer.addElement(resistor);
     const pins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("Gate", "sub-1", { x: 0, y: 0 }, internal, pins, { simulationModel: "digital" });
     outer.addElement(subEl);
@@ -385,9 +389,9 @@ describe("CrossEngine", () => {
     const resistor = makeLeaf("Resistor", "r-outer", { x: 0, y: 10 });
     outer.addElement(resistor);
     const pins: Pin[] = [
-      { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.INPUT,  position: { x: 0, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT,  position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.INPUT,  position: { x: 0, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("ALU", "sub-1", { x: 0, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -428,8 +432,8 @@ describe("CrossEngine", () => {
 
     const parent = new Circuit({ name: "Top" });
     const subcircuitPins: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subcircuitInstance = makeSubcircuitElement("AndWrapper", "sub-1", { x: 20, y: 0 }, internal, subcircuitPins);
     parent.addElement(subcircuitInstance);
@@ -458,12 +462,12 @@ describe("CrossEngine", () => {
 
     const parent2 = new Circuit({ name: "Top2" });
     const pinsA: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 0, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 6, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const pinsB: Pin[] = [
-      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 26, y: 1 }, label: "S", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     parent2.addElement(makeSubcircuitElement("HalfAdder", "sub-0", { x: 0, y: 0 }, internal2, pinsA));
     parent2.addElement(makeSubcircuitElement("HalfAdder", "sub-1", { x: 20, y: 0 }, internal2, pinsB));
@@ -493,8 +497,8 @@ describe("cross-engine boundary — Port-based subcircuits", () => {
 
     const outer = new Circuit({ name: "Top" });
     const pins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("PortWrapper", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -528,8 +532,8 @@ describe("cross-engine boundary — Port-based subcircuits", () => {
     const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
     outer.addElement(andEl);
     const pins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 26, y: 1 }, label: "Y", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("AnalogPortFilter", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -564,8 +568,8 @@ describe("cross-engine boundary — Port-based subcircuits", () => {
     const andEl = makeLeaf("And", "and-outer", { x: 0, y: 10 });
     outer.addElement(andEl);
     const pins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 3 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subEl = makeSubcircuitElement("AnalogBlock", "sub-1", { x: 20, y: 0 }, internal, pins);
     outer.addElement(subEl);
@@ -616,15 +620,15 @@ describe("cross-engine boundary — Port-based subcircuits", () => {
 
     // Port-based subcircuit instance
     const portPins: Pin[] = [
-      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "SIG", bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.BIDIRECTIONAL, position: { x: 20, y: 1 }, label: "SIG", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subPort = makeSubcircuitElement("PortFilter", "sub-port", { x: 20, y: 0 }, internalPort, portPins);
     outer.addElement(subPort);
 
     // In/Out-based subcircuit instance
     const ioPins: Pin[] = [
-      { direction: PinDirection.INPUT,  position: { x: 40, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false },
-      { direction: PinDirection.OUTPUT, position: { x: 46, y: 1 }, label: "Q",   bitWidth: 1, isNegated: false, isClock: false },
+      { direction: PinDirection.INPUT,  position: { x: 40, y: 1 }, label: "CLK", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, position: { x: 46, y: 1 }, label: "Q",   bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     ];
     const subIO = makeSubcircuitElement("IOFilter", "sub-io", { x: 40, y: 0 }, internalIO, ioPins);
     outer.addElement(subIO);

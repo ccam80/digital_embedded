@@ -13,6 +13,7 @@ import { ScopePanel } from '../runtime/analog-scope-panel.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import type { Wire } from '../core/circuit.js';
+import type { SavedTrace } from '../core/circuit.js';
 import type { MenuItem } from '../editor/context-menu.js';
 import { separator } from '../editor/context-menu.js';
 import type { CircuitElement } from '../core/element.js';
@@ -45,7 +46,9 @@ export interface ViewerController {
   attachScopeContextMenu(cvs: HTMLCanvasElement, panel: ScopePanel, signals: WatchedSignal[]): void;
   readonly watchedSignals: WatchedSignal[];
   /** Re-resolve signal addresses after recompilation, then rebuild panels if viewer is open. */
-  resolveWatchedSignalAddresses(unified: { labelSignalMap: Map<string, SignalAddress> }): void;
+  resolveWatchedSignalAddresses(unified: { labelSignalMap: ReadonlyMap<string, SignalAddress>; pinSignalMap?: ReadonlyMap<string, SignalAddress> }): void;
+  /** Restore watched signals from persisted trace metadata after a load/compile cycle. */
+  restoreTraces(traces: SavedTrace[] | undefined): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +60,7 @@ export interface ViewerController {
  * Falls back to "node<id>" or "net<id>" if no label is found.
  */
 export function resolveSignalName(
-  labelSignalMap: Map<string, SignalAddress>,
+  labelSignalMap: ReadonlyMap<string, SignalAddress>,
   addr: SignalAddress,
 ): string {
   if (addr.domain === 'analog') {
@@ -95,6 +98,17 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
   let activeDataTable: DataTablePanel | null = null;
   const watchedSignals: WatchedSignal[] = [];
+
+  function _syncTracesToMetadata(): void {
+    const circuit = ctx.getCircuit();
+    if (!circuit) return;
+    circuit.metadata.traces = watchedSignals.map(sig => ({
+      name: sig.name,
+      domain: sig.addr.domain,
+      panelIndex: sig.panelIndex,
+      group: sig.group,
+    }));
+  }
 
   // -------------------------------------------------------------------------
   // Core viewer lifecycle
@@ -159,6 +173,8 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       activeDataTable = new DataTablePanel(viewerValuesContainer, coordinator, signals);
       coordinator.addMeasurementObserver(activeDataTable);
     }
+
+    _syncTracesToMetadata();
   }
 
   // -------------------------------------------------------------------------
@@ -248,6 +264,7 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
   function closeViewer(): void {
     viewerPanel?.classList.remove('open');
     disposeViewers();
+    _syncTracesToMetadata();
   }
 
   // -------------------------------------------------------------------------
@@ -538,15 +555,50 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
   // Signal address re-resolution after recompile
   // -------------------------------------------------------------------------
 
-  function resolveWatchedSignalAddresses(unified: { labelSignalMap: Map<string, SignalAddress> }): void {
+  function resolveWatchedSignalAddresses(unified: { labelSignalMap: ReadonlyMap<string, SignalAddress>; pinSignalMap?: ReadonlyMap<string, SignalAddress> }): void {
     if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
       for (const sig of watchedSignals) {
-        const addr = unified.labelSignalMap.get(sig.name);
+        let addr = unified.labelSignalMap.get(sig.name);
+        if (!addr) addr = unified.pinSignalMap?.get(sig.name);
         if (addr !== undefined) {
           sig.addr = addr;
           sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
         }
       }
+      rebuildViewers();
+    }
+  }
+
+  let tracesHydrated = false;
+
+  function restoreTraces(traces: SavedTrace[] | undefined): void {
+    if (tracesHydrated || !traces?.length) return;
+    tracesHydrated = true;
+
+    const coordinator = facade.getCoordinator();
+    if (!coordinator) return;
+    const compiledFull = coordinator.compiled as typeof coordinator.compiled & { pinSignalMap?: ReadonlyMap<string, SignalAddress> };
+    const labelSignalMap = compiledFull.labelSignalMap;
+    const pinSignalMap = compiledFull.pinSignalMap;
+
+    for (const trace of traces) {
+      let addr = labelSignalMap.get(trace.name);
+      if (!addr) addr = pinSignalMap?.get(trace.name);
+      if (!addr) {
+        console.warn(`[trace-restore] Signal "${trace.name}" not found, skipping`);
+        continue;
+      }
+
+      watchedSignals.push({
+        name: trace.name,
+        addr,
+        width: addr.domain === 'digital' ? addr.bitWidth : 1,
+        group: trace.group as SignalGroup,
+        panelIndex: trace.panelIndex,
+      });
+    }
+
+    if (watchedSignals.length > 0) {
       rebuildViewers();
     }
   }
@@ -568,5 +620,6 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
     attachScopeContextMenu,
     get watchedSignals() { return watchedSignals; },
     resolveWatchedSignalAddresses,
+    restoreTraces,
   };
 }

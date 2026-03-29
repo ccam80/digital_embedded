@@ -50,6 +50,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -58,6 +59,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 1, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.BIDIRECTIONAL,
@@ -66,6 +68,7 @@ const FGPFET_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 1, y: 2 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 

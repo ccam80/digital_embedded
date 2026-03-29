@@ -6,6 +6,10 @@
  * format for Digital compatibility only.
  */
 
+import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
+
+export type { MnaSubcircuitNetlist };
+
 // ---------------------------------------------------------------------------
 // Schema interfaces
 // ---------------------------------------------------------------------------
@@ -63,6 +67,13 @@ export interface DtsCircuit {
   isGeneric?: boolean;
   /** Circuit-level attributes (freeform key-value metadata). */
   attributes?: Record<string, string>;
+  /** Persisted scope traces for viewer restoration. */
+  traces?: Array<{
+    name: string;
+    domain: string;
+    panelIndex: number;
+    group: string;
+  }>;
 }
 
 /**
@@ -88,7 +99,7 @@ export interface DtsDocument {
    * "user_opamp_741"). Expanded inline by the compiler; not instantiated
    * as subcircuit elements.
    */
-  modelDefinitions?: Record<string, DtsCircuit>;
+  modelDefinitions?: Record<string, MnaSubcircuitNetlist>;
   /**
    * Named SPICE .MODEL parameter sets keyed by model name (e.g. "1N4148",
    * "2N2222"). Populated on load into the ModelLibrary.
@@ -97,6 +108,11 @@ export interface DtsDocument {
     deviceType: string;
     params: Record<string, number>;
   }>;
+  /**
+   * Per-component-instance subcircuit model bindings.
+   * Maps component instance IDs to their resolved subcircuit model name.
+   */
+  subcircuitBindings?: Record<string, string>;
   /**
    * Embedded FSM (finite state machine) definition.
    * Present when the document contains an FSM editor state.
@@ -176,7 +192,28 @@ export function validateDtsDocument(data: unknown): DtsDocument {
     for (const [key, value] of Object.entries(
       doc['modelDefinitions'] as Record<string, unknown>,
     )) {
-      validateDtsCircuit(value, `modelDefinitions["${key}"]`);
+      validateMnaSubcircuitNetlist(value, `modelDefinitions["${key}"]`);
+    }
+  }
+
+  if ('subcircuitBindings' in doc && doc['subcircuitBindings'] !== undefined) {
+    if (
+      typeof doc['subcircuitBindings'] !== 'object' ||
+      doc['subcircuitBindings'] === null ||
+      Array.isArray(doc['subcircuitBindings'])
+    ) {
+      throw new Error(
+        'Invalid .dts document: "subcircuitBindings" must be an object',
+      );
+    }
+    for (const [key, value] of Object.entries(
+      doc['subcircuitBindings'] as Record<string, unknown>,
+    )) {
+      if (typeof value !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "subcircuitBindings["${key}"]" must be a string`,
+        );
+      }
     }
   }
 
@@ -290,6 +327,43 @@ function validateDtsCircuit(value: unknown, path: string): void {
     );
   }
 
+  if (circuit['traces'] !== undefined) {
+    if (!Array.isArray(circuit['traces'])) {
+      throw new Error(
+        `Invalid .dts document: "${path}.traces" must be an array when present`,
+      );
+    }
+    for (let i = 0; i < (circuit['traces'] as unknown[]).length; i++) {
+      const t = (circuit['traces'] as unknown[])[i];
+      if (t === null || typeof t !== 'object' || Array.isArray(t)) {
+        throw new Error(
+          `Invalid .dts document: "${path}.traces[${i}]" must be an object`,
+        );
+      }
+      const tr = t as Record<string, unknown>;
+      if (typeof tr['name'] !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "${path}.traces[${i}].name" must be a string`,
+        );
+      }
+      if (typeof tr['domain'] !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "${path}.traces[${i}].domain" must be a string`,
+        );
+      }
+      if (typeof tr['panelIndex'] !== 'number') {
+        throw new Error(
+          `Invalid .dts document: "${path}.traces[${i}].panelIndex" must be a number`,
+        );
+      }
+      if (typeof tr['group'] !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "${path}.traces[${i}].group" must be a string`,
+        );
+      }
+    }
+  }
+
   if (circuit['attributes'] !== undefined) {
     if (
       typeof circuit['attributes'] !== 'object' ||
@@ -363,5 +437,104 @@ function validateDtsPoint(value: unknown, path: string): void {
   }
   if (typeof pt['y'] !== 'number') {
     throw new Error(`Invalid .dts document: "${path}.y" must be a number`);
+  }
+}
+
+/** Validate an MnaSubcircuitNetlist value at the given JSON path for error messages. */
+function validateMnaSubcircuitNetlist(value: unknown, path: string): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid .dts document: "${path}" must be an object`);
+  }
+
+  const netlist = value as Record<string, unknown>;
+
+  if (!Array.isArray(netlist['ports'])) {
+    throw new Error(`Invalid .dts document: "${path}.ports" must be an array`);
+  }
+  for (let i = 0; i < (netlist['ports'] as unknown[]).length; i++) {
+    if (typeof (netlist['ports'] as unknown[])[i] !== 'string') {
+      throw new Error(
+        `Invalid .dts document: "${path}.ports[${i}]" must be a string`,
+      );
+    }
+  }
+
+  if (netlist['params'] !== undefined) {
+    if (
+      typeof netlist['params'] !== 'object' ||
+      netlist['params'] === null ||
+      Array.isArray(netlist['params'])
+    ) {
+      throw new Error(`Invalid .dts document: "${path}.params" must be an object when present`);
+    }
+    for (const [pk, pv] of Object.entries(netlist['params'] as Record<string, unknown>)) {
+      if (typeof pv !== 'number') {
+        throw new Error(
+          `Invalid .dts document: "${path}.params["${pk}"]" must be a number`,
+        );
+      }
+    }
+  }
+
+  if (!Array.isArray(netlist['elements'])) {
+    throw new Error(`Invalid .dts document: "${path}.elements" must be an array`);
+  }
+  for (let i = 0; i < (netlist['elements'] as unknown[]).length; i++) {
+    validateSubcircuitElement((netlist['elements'] as unknown[])[i], `${path}.elements[${i}]`);
+  }
+
+  if (typeof netlist['internalNetCount'] !== 'number') {
+    throw new Error(`Invalid .dts document: "${path}.internalNetCount" must be a number`);
+  }
+
+  if (!Array.isArray(netlist['netlist'])) {
+    throw new Error(`Invalid .dts document: "${path}.netlist" must be an array`);
+  }
+  for (let i = 0; i < (netlist['netlist'] as unknown[]).length; i++) {
+    const row = (netlist['netlist'] as unknown[])[i];
+    if (!Array.isArray(row)) {
+      throw new Error(`Invalid .dts document: "${path}.netlist[${i}]" must be an array`);
+    }
+    for (let j = 0; j < (row as unknown[]).length; j++) {
+      if (typeof (row as unknown[])[j] !== 'number') {
+        throw new Error(
+          `Invalid .dts document: "${path}.netlist[${i}][${j}]" must be a number`,
+        );
+      }
+    }
+  }
+}
+
+/** Validate a SubcircuitElement value at the given JSON path for error messages. */
+function validateSubcircuitElement(value: unknown, path: string): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid .dts document: "${path}" must be an object`);
+  }
+
+  const el = value as Record<string, unknown>;
+
+  if (typeof el['typeId'] !== 'string') {
+    throw new Error(`Invalid .dts document: "${path}.typeId" must be a string`);
+  }
+
+  if (el['modelRef'] !== undefined && typeof el['modelRef'] !== 'string') {
+    throw new Error(`Invalid .dts document: "${path}.modelRef" must be a string when present`);
+  }
+
+  if (el['params'] !== undefined) {
+    if (
+      typeof el['params'] !== 'object' ||
+      el['params'] === null ||
+      Array.isArray(el['params'])
+    ) {
+      throw new Error(`Invalid .dts document: "${path}.params" must be an object when present`);
+    }
+    for (const [pk, pv] of Object.entries(el['params'] as Record<string, unknown>)) {
+      if (typeof pv !== 'number' && typeof pv !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "${path}.params["${pk}"]" must be a number or string`,
+        );
+      }
+    }
   }
 }

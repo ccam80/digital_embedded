@@ -67,6 +67,7 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.BIDIRECTIONAL,
@@ -75,6 +76,7 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }
@@ -88,6 +90,7 @@ function buildDiodeBackwardPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -96,6 +99,7 @@ function buildDiodeBackwardPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }
@@ -109,6 +113,7 @@ function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -117,6 +122,7 @@ function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

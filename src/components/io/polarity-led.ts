@@ -44,6 +44,7 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -52,6 +53,7 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 4 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

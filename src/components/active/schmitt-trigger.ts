@@ -208,6 +208,7 @@ function buildSchmittPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -216,6 +217,7 @@ function buildSchmittPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

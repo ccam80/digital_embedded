@@ -59,6 +59,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -67,6 +68,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -75,6 +77,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -83,6 +86,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: COMP_WIDTH, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -91,6 +95,7 @@ function buildSubPinDeclarations(bitWidth: number): PinDeclaration[] {
       position: { x: COMP_WIDTH, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

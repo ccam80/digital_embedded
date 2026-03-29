@@ -370,6 +370,10 @@ export function initApp(search?: string): void {
     disposeViewers(): void { viewerController.disposeViewers(); },
     rebuildViewersIfOpen(): void {
       viewerController.resolveWatchedSignalAddresses(facade.getCoordinator().compiled);
+      const circuit = ctx.getCircuit();
+      if (circuit?.metadata.traces) {
+        viewerController.restoreTraces(circuit.metadata.traces);
+      }
     },
   });
 

@@ -8,7 +8,7 @@
  * Storage:
  *   - Named parameter sets → circuit.metadata.namedParameterSets
  *   - Subcircuit definitions → circuit.metadata.modelDefinitions
- *     (the Circuit objects themselves live in TransistorModelRegistry)
+ *     (the Circuit objects themselves live in SubcircuitModelRegistry)
  */
 
 import { createModal } from './dialog-manager.js';
@@ -16,7 +16,7 @@ import { parseModelCard } from '../solver/analog/model-parser.js';
 import { parseSubcircuit } from '../solver/analog/model-parser.js';
 import { buildSpiceSubcircuit } from '../io/spice-model-builder.js';
 import type { Circuit } from '../core/circuit.js';
-import { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
+import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import { getTransistorModels } from '../solver/analog/default-models.js';
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ function renderSubcktPanel(
   onChange: () => void,
 ): void {
   panel.innerHTML = '';
-  const modelRegistry: TransistorModelRegistry = getTransistorModels();
+  const modelRegistry: SubcircuitModelRegistry = getTransistorModels();
 
   const defs = circuit.metadata.modelDefinitions ?? {};
   const names = Object.keys(defs);

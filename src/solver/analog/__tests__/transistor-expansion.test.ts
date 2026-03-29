@@ -27,7 +27,7 @@ import type { ComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import {
   expandTransistorModel,
   registerAnalogFactory,
@@ -209,7 +209,7 @@ function buildCmosInverterSubcircuit(): Circuit {
 
 describe("Expansion", () => {
   it("expands_inverter_to_two_mosfets", () => {
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
     const subcircuit = buildCmosInverterSubcircuit();
     modelRegistry.register("CmosInverter", subcircuit);
 
@@ -230,7 +230,7 @@ describe("Expansion", () => {
   });
 
   it("interface_pins_mapped_correctly", () => {
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
     const subcircuit = buildCmosInverterSubcircuit();
     modelRegistry.register("CmosInverter", subcircuit);
 
@@ -290,7 +290,7 @@ describe("Expansion", () => {
   it("internal_nodes_get_unique_ids", () => {
     // For the CMOS inverter, there are no internal nodes — all nodes are interface.
     // Use a version with an internal node (simulate by checking nextNode increments).
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
     const subcircuit = buildCmosInverterSubcircuit();
     modelRegistry.register("CmosInverter", subcircuit);
 
@@ -327,7 +327,7 @@ describe("Expansion", () => {
   });
 
   it("missing_transistor_model_emits_diagnostic", () => {
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
 
     // Component with no transistorModel set
     const def = makeComponentDef("Not", ["in", "out"], undefined);
@@ -349,7 +349,7 @@ describe("Expansion", () => {
   });
 
   it("invalid_model_with_digital_components_emits_diagnostic", () => {
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
 
     // Subcircuit containing a digital-only component (FlipflopD has no analogFactory)
     const subcircuit = new Circuit();
@@ -387,7 +387,7 @@ describe("Expansion", () => {
   it("multiple_expansions_independent", () => {
     // Two NOT gates expanded from same model, sharing the same nextNodeId closure.
     // Each must get independent internal node IDs (no sharing).
-    const modelRegistry = new TransistorModelRegistry();
+    const modelRegistry = new SubcircuitModelRegistry();
     const subcircuit = buildCmosInverterSubcircuit();
     modelRegistry.register("CmosInverter", subcircuit);
 

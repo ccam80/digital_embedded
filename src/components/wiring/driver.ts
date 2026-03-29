@@ -61,6 +61,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invert
       position: { x: -1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -69,6 +70,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invert
       position: { x: 0, y: flipSelPos ? 1 : -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -77,6 +79,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invert
       position: { x: invertOutput ? 2 : 1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

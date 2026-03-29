@@ -41,6 +41,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -49,6 +50,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

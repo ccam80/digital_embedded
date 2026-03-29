@@ -26,8 +26,8 @@ import { ComponentRegistry } from "../../../core/registry.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
-import { TransistorModelRegistry } from "../transistor-model-registry.js";
-import { registerAllCmosGateModels } from "../transistor-models/cmos-gates.js";
+import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
+import { registerBuiltinSubcircuitModels } from "../transistor-models/cmos-gates.js";
 import { registerAnalogFactory } from "../transistor-expansion.js";
 import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
 import { EngineState } from "../../../core/engine-interface.js";
@@ -50,7 +50,7 @@ import { NmosfetDefinition, PmosfetDefinition } from "../../../components/semico
 // One-time setup: register real MOSFET analog factories and gate models
 // ---------------------------------------------------------------------------
 
-const modelRegistry = new TransistorModelRegistry();
+const modelRegistry = new SubcircuitModelRegistry();
 
 beforeAll(() => {
   registerAnalogFactory("NMOS", (nodeIds, branchIdx, props, _getTime) =>
@@ -59,7 +59,7 @@ beforeAll(() => {
   registerAnalogFactory("PMOS", (nodeIds, branchIdx, props, _getTime) =>
     createMosfetElement(-1, new Map([["D", nodeIds[0] ?? 0], ["G", nodeIds[1] ?? 0], ["S", nodeIds[2] ?? 0]]), [], branchIdx, props),
   );
-  registerAllCmosGateModels(modelRegistry);
+  registerBuiltinSubcircuitModels(modelRegistry);
 });
 
 // ---------------------------------------------------------------------------

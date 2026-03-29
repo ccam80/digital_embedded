@@ -56,6 +56,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -64,6 +65,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: true,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -72,6 +74,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 2 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -80,6 +83,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -88,6 +92,7 @@ export const JK_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 
@@ -116,6 +121,7 @@ export class JKElement extends AbstractCircuitElement {
         position: { x: 0, y: 0 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -124,6 +130,7 @@ export class JKElement extends AbstractCircuitElement {
         position: { x: 0, y: 1 },
         isNegatable: true,
         isClockCapable: true,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -132,6 +139,7 @@ export class JKElement extends AbstractCircuitElement {
         position: { x: 0, y: 2 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -140,6 +148,7 @@ export class JKElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 0 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -148,6 +157,7 @@ export class JKElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 1 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
     ];
     return this.derivePins(decls, ["C"]);

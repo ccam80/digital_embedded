@@ -222,7 +222,6 @@ function requireCircuit(loadError: Error | null, circuit: Circuit | undefined): 
 
 describe("fixture audit", () => {
   if (fixtures.length === 0) {
-    it.skip("no fixtures found", () => {});
     return;
   }
 

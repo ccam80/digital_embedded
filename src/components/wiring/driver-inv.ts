@@ -46,6 +46,7 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
       position: { x: -1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -54,6 +55,7 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
       position: { x: 0, y: flipSelPos ? 1 : -1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -62,6 +64,7 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
       position: { x: 1, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

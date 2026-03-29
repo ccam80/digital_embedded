@@ -6,7 +6,7 @@
  * override defaults by name.
  */
 
-import type { DeviceType } from "./model-parser.js";
+import type { DeviceType } from "../../core/analog-types.js";
 import {
   DIODE_DEFAULTS,
   BJT_NPN_DEFAULTS,

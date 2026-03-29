@@ -35,11 +35,11 @@ const COMP_WIDTH = 3;
 // Inputs at y=0,1; Outputs at y=0,1,2
 function buildComparatorPinDeclarations(bitWidth: number): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: bitWidth, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: ">", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "=", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "<", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: bitWidth, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: bitWidth, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: ">", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "=", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "<", defaultBitWidth: 1, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

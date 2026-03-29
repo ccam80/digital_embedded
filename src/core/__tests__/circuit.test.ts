@@ -103,6 +103,7 @@ describe("Net", () => {
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     };
     net.addPin(pin);
     expect(net.size).toBe(1);
@@ -118,6 +119,7 @@ describe("Net", () => {
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     };
     net.addPin(pin);
     net.removePin(pin);
@@ -133,6 +135,7 @@ describe("Net", () => {
       bitWidth: 1,
       isNegated: false,
       isClock: false,
+      kind: "signal",
     };
     net.addPin(pin);
     const pins = net.getPins();

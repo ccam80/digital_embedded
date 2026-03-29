@@ -12,7 +12,7 @@ import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { Rotation } from '../core/pin.js';
 import type { ModelLibrary } from '../solver/analog/model-library.js';
-import type { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
+import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import { validateDtsDocument } from './dts-schema.js';
 import type { DtsCircuit, DtsElement, DtsWire } from './dts-schema.js';
 
@@ -91,6 +91,15 @@ function deserializeDtsCircuit(
 
   if (dtsCircuit.measurementOrdering !== undefined) {
     metadata.measurementOrdering = [...dtsCircuit.measurementOrdering];
+  }
+
+  if (dtsCircuit.traces !== undefined && dtsCircuit.traces.length > 0) {
+    metadata.traces = dtsCircuit.traces.map(t => ({
+      name: t.name,
+      domain: t.domain as 'digital' | 'analog',
+      panelIndex: t.panelIndex,
+      group: t.group as 'input' | 'output' | 'probe',
+    }));
   }
 
   if (dtsCircuit.attributes !== undefined) {
@@ -181,7 +190,7 @@ export interface DtsDeserializeOptions {
    * When provided, model definition circuits from the document are
    * deserialized and registered here so they can be expanded at compile time.
    */
-  transistorModelRegistry?: TransistorModelRegistry;
+  transistorModelRegistry?: SubcircuitModelRegistry;
 }
 
 /**
@@ -221,7 +230,7 @@ export function deserializeDts(
       for (const [name, entry] of Object.entries(doc.namedParameterSets)) {
         options.modelLibrary.add({
           name,
-          type: entry.deviceType as import('../solver/analog/model-parser.js').DeviceType,
+          type: entry.deviceType as import('../core/analog-types.js').DeviceType,
           level: 1,
           params: entry.params,
         });

@@ -53,6 +53,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 0 },
     isNegatable: true,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.INPUT,
@@ -61,6 +62,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: 0, y: 1 },
     isNegatable: true,
     isClockCapable: true,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -69,6 +71,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 0 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT,
@@ -77,6 +80,7 @@ const D_FF_PIN_DECLARATIONS: PinDeclaration[] = [
     position: { x: COMP_WIDTH, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal",
   },
 ];
 
@@ -97,7 +101,7 @@ export class DElement extends AbstractCircuitElement {
 
   getPins(): readonly Pin[] {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
-    const decls: PinDeclaration[] = [
+    let decls: PinDeclaration[] = [
       {
         direction: PinDirection.INPUT,
         label: "D",
@@ -105,6 +109,7 @@ export class DElement extends AbstractCircuitElement {
         position: { x: 0, y: 0 },
         isNegatable: true,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -113,6 +118,7 @@ export class DElement extends AbstractCircuitElement {
         position: { x: 0, y: 1 },
         isNegatable: true,
         isClockCapable: true,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -121,6 +127,7 @@ export class DElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 0 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.OUTPUT,
@@ -129,8 +136,33 @@ export class DElement extends AbstractCircuitElement {
         position: { x: COMP_WIDTH, y: 1 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
     ];
+    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
+    if (activeModel === "cmos") {
+      decls = [
+        ...decls,
+        {
+          direction: PinDirection.INPUT,
+          label: "VDD",
+          defaultBitWidth: 1,
+          position: { x: COMP_WIDTH / 2, y: -1 },
+          isNegatable: false,
+          isClockCapable: false,
+          kind: "power",
+        },
+        {
+          direction: PinDirection.INPUT,
+          label: "GND",
+          defaultBitWidth: 1,
+          position: { x: COMP_WIDTH / 2, y: 2 },
+          isNegatable: false,
+          isClockCapable: false,
+          kind: "power",
+        },
+      ];
+    }
     return this.derivePins(decls, ["C"]);
   }
 
@@ -246,6 +278,7 @@ export const DDefinition: ComponentDefinition = {
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
+  subcircuitRefs: { cmos: "CmosDFlipflop" },
   models: {
     digital: {
       executeFn: executeD,

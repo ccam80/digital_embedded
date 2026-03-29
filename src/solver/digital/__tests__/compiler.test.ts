@@ -67,31 +67,31 @@ class TestElement extends AbstractCircuitElement {
 /** Single-input, single-output component (e.g. NOT gate). */
 function notPins(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 /** Two-input, single-output component (e.g. AND, NOR gate). */
 function twoInputPins(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "a", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "b", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 /** Input pin only (e.g. In component). */
 function inputOnlyPin(label: string, position: { x: number; y: number }): PinDeclaration[] {
   return [
-    { direction: PinDirection.OUTPUT, label, defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label, defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 /** Output pin only (e.g. Out component). */
 function outputOnlyPin(label: string, position: { x: number; y: number }): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label, defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label, defaultBitWidth: 1, position, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -402,10 +402,10 @@ describe("Compiler", () => {
     // width-mismatch diagnostic instead of throwing so the caller receives
     // a structured error report rather than an uncaught exception.
     const singleBitOutPins: PinDeclaration[] = [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
     const eightBitInPins: PinDeclaration[] = [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 8, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
 
     const srcDef = makeDefinition("Src", singleBitOutPins);
@@ -970,10 +970,10 @@ describe("compileDigitalPartition", () => {
   it("bitWidthMismatchThrowsInPartition", () => {
     // 1-bit output connected to 8-bit input in the same group → BitsException
     const singleBitOutPins: PinDeclaration[] = [
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
     const eightBitInPins: PinDeclaration[] = [
-      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 8, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
 
     const srcDef = makeDefinition("Src", singleBitOutPins);
@@ -1089,9 +1089,9 @@ describe("Compiler — feedback wire mapping", () => {
     // Feedback: NOR2.out (14,2) → NOR1.in1 (0,3) via corners
 
     const norPins: PinDeclaration[] = [
-      { direction: PinDirection.INPUT, label: "in0", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-      { direction: PinDirection.INPUT, label: "in1", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false },
-      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 4, y: 2 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.INPUT, label: "in0", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { direction: PinDirection.INPUT, label: "in1", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 4, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
 
     const norDef = makeDefinition("NOr", norPins);
@@ -1140,5 +1140,57 @@ describe("Compiler — feedback wire mapping", () => {
 
     // Forward and feedback are different nets
     expect(fwdNet).not.toBe(fbNet);
+  });
+
+  // -------------------------------------------------------------------------
+  // powerPinsFilteredFromDigitalCompiler (W2.3)
+  // -------------------------------------------------------------------------
+  it("powerPinsFilteredFromDigitalCompiler", () => {
+    // Build an AND-like gate whose resolvedPins include VDD and GND power pins
+    // alongside the normal signal pins. The digital compiler must silently
+    // ignore power pins: inputCount and outputCount must equal those of an
+    // equivalent gate with no power pins.
+
+    const signalPins: PinDeclaration[] = [
+      { direction: PinDirection.INPUT,  label: "a",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { direction: PinDirection.INPUT,  label: "b",   defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    ];
+
+    const signalAndPowerPins: PinDeclaration[] = [
+      ...signalPins,
+      { direction: PinDirection.INPUT, label: "VDD", defaultBitWidth: 1, position: { x: 1, y: -1 }, isNegatable: false, isClockCapable: false, kind: "power" },
+      { direction: PinDirection.INPUT, label: "GND", defaultBitWidth: 1, position: { x: 1, y:  2 }, isNegatable: false, isClockCapable: false, kind: "power" },
+    ];
+
+    const andDefSignalOnly = makeDefinition("AndSignal",        signalPins,          noopExecute);
+    const andDefWithPower   = makeDefinition("AndWithPower",    signalAndPowerPins,  noopExecute);
+
+    const registryA = makeRegistry(andDefSignalOnly);
+    const registryB = makeRegistry(andDefWithPower);
+
+    const circuitA = new Circuit();
+    circuitA.addElement(new TestElement("AndSignal",     "a-1", { x: 0, y: 0 }, signalPins));
+
+    const circuitB = new Circuit();
+    circuitB.addElement(new TestElement("AndWithPower",  "b-1", { x: 0, y: 0 }, signalAndPowerPins));
+
+    const compiledA = compileUnified(circuitA, registryA).digital!;
+    const compiledB = compileUnified(circuitB, registryB).digital!;
+
+    // Both circuits have 1 component.
+    expect(compiledA.componentCount).toBe(1);
+    expect(compiledB.componentCount).toBe(1);
+
+    const layoutA = compiledA.layout;
+    const layoutB = compiledB.layout;
+
+    // Power pins must be silently ignored: input/output counts must match.
+    expect(layoutB.inputCount(0)).toBe(layoutA.inputCount(0));
+    expect(layoutB.outputCount(0)).toBe(layoutA.outputCount(0));
+
+    // Both have 2 inputs (a, b) and 1 output (out).
+    expect(layoutB.inputCount(0)).toBe(2);
+    expect(layoutB.outputCount(0)).toBe(1);
   });
 });

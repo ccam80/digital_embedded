@@ -55,6 +55,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -63,6 +64,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 6 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -71,6 +73,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 0, y: 8 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -79,6 +82,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: -2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -87,6 +91,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 4, y: 10 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -95,6 +100,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 8, y: 4 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -103,6 +109,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 8, y: 2 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -111,6 +118,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       position: { x: 6, y: 10 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

@@ -46,7 +46,7 @@ function makePin(
   y: number,
   bitWidth = 1,
 ): Pin {
-  return { label, direction, position: { x, y }, bitWidth, isNegated: false, isClock: false };
+  return { label, direction, position: { x, y }, bitWidth, isNegated: false, isClock: false, kind: "signal" };
 }
 
 // ---------------------------------------------------------------------------

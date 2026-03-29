@@ -4,7 +4,7 @@
  *
  * Covers W12.3: verifies that save → load preserves SPICE model data and that
  * deserialization with options populates ModelLibrary and
- * TransistorModelRegistry.
+ * SubcircuitModelRegistry.
  */
 
 import { describe, it, expect } from "vitest";
@@ -18,7 +18,7 @@ import { Wire } from "../../core/circuit.js";
 import { serializeCircuit } from "../dts-serializer.js";
 import { deserializeDts } from "../dts-deserializer.js";
 import { ModelLibrary } from "../../solver/analog/model-library.js";
-import { TransistorModelRegistry } from "../../solver/analog/transistor-model-registry.js";
+import { SubcircuitModelRegistry } from "../../solver/analog/subcircuit-model-registry.js";
 import { parseSubcircuit } from "../../solver/analog/model-parser.js";
 import { buildSpiceSubcircuit } from "../spice-model-builder.js";
 
@@ -164,7 +164,7 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
     expect(restored.metadata.modelDefinitions).toBeUndefined();
   });
 
-  it("round-trip with full circuit registers in TransistorModelRegistry", () => {
+  it("round-trip with full circuit registers in SubcircuitModelRegistry", () => {
     // Build a SPICE subcircuit and register it in a source registry
     const parsed = parseSubcircuit(`.SUBCKT rdiv a b c
 R1 a b 10k
@@ -179,13 +179,13 @@ R2 b c 10k
     };
 
     // Serialize with the full circuit topology
-    const sourceRegistry = new TransistorModelRegistry();
+    const sourceRegistry = new SubcircuitModelRegistry();
     sourceRegistry.register("rdiv", subCircuit);
     const json = serializeCircuit(circuit, sourceRegistry);
 
-    // On load, supply a new TransistorModelRegistry — it should be populated
+    // On load, supply a new SubcircuitModelRegistry — it should be populated
     const componentRegistry = makeRegistry("In", "Resistor", "Capacitor");
-    const destRegistry = new TransistorModelRegistry();
+    const destRegistry = new SubcircuitModelRegistry();
     const { circuit: restored } = deserializeDts(json, componentRegistry, {
       transistorModelRegistry: destRegistry,
     });
@@ -197,7 +197,7 @@ R2 b c 10k
     expect(retrievedCircuit.elements.length).toBe(5);
   });
 
-  it("modelDefinitions stub (no topology) does not register in TransistorModelRegistry", () => {
+  it("modelDefinitions stub (no topology) does not register in SubcircuitModelRegistry", () => {
     // Store only metadata, no full circuit
     const registry = makeRegistry("In");
     const circuit = new Circuit({ name: "MetadataOnly" });
@@ -206,7 +206,7 @@ R2 b c 10k
     };
 
     const json = serializeCircuit(circuit);
-    const transistorRegistry = new TransistorModelRegistry();
+    const transistorRegistry = new SubcircuitModelRegistry();
     const { circuit: restored } = deserializeDts(json, registry, { transistorModelRegistry: transistorRegistry });
 
     // Metadata preserved
@@ -251,7 +251,7 @@ describe("dts-model-roundtrip: both fields together", () => {
 
     const json = serializeCircuit(circuit);
     const modelLibrary = new ModelLibrary();
-    const transistorRegistry = new TransistorModelRegistry();
+    const transistorRegistry = new SubcircuitModelRegistry();
     deserializeDts(json, registry, { modelLibrary, transistorModelRegistry: transistorRegistry });
 
     expect(modelLibrary.get("1N4148")).toBeDefined();
@@ -277,7 +277,7 @@ R1 vin vout 1k
       "myfilt": { ports: parsed.ports, elementCount: parsed.elements.length },
     };
 
-    const transistorModels = new TransistorModelRegistry();
+    const transistorModels = new SubcircuitModelRegistry();
     transistorModels.register("myfilt", subCircuit);
 
     const json = serializeCircuit(circuit, transistorModels);
@@ -297,7 +297,7 @@ R1 vin vout 1k
       "orphan": { ports: ["a", "b"], elementCount: 5 },
     };
 
-    const emptyRegistry = new TransistorModelRegistry();
+    const emptyRegistry = new SubcircuitModelRegistry();
     const json = serializeCircuit(circuit, emptyRegistry);
     const parsed = JSON.parse(json) as Record<string, unknown>;
     const modelDefs = parsed["modelDefinitions"] as Record<string, unknown>;

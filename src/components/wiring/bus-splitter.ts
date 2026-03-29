@@ -60,6 +60,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
         position: { x: 0, y: 0 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
       {
         direction: PinDirection.INPUT,
@@ -68,6 +69,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
         position: { x: 0, y: 1 },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       },
     ];
     for (let i = 0; i < bits; i++) {
@@ -78,6 +80,7 @@ export class BusSplitterElement extends AbstractCircuitElement {
         position: { x: 1, y: i * spreading },
         isNegatable: false,
         isClockCapable: false,
+        kind: "signal",
       });
     }
     return resolvePins(
@@ -243,6 +246,7 @@ function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[
       position: { x: 0, y: 0 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -251,6 +255,7 @@ function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[
       position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
   for (let i = 0; i < bits; i++) {
@@ -261,6 +266,7 @@ function buildDefaultPinLayout(bits: number, spreading: number): PinDeclaration[
       position: { x: 1, y: i * spreading },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     });
   }
   return decls;

@@ -141,9 +141,9 @@ function buildROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
   // GenericShape: 2 inputs, 1 output → symmetric=true, even=true
   // offs = 2/2 = 1; A at y=0, sel at y=2 (even gap), D at y=offs=1
   return [
-    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "sel", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "sel", defaultBitWidth: 1, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -262,9 +262,9 @@ function buildROMDualPortPins(addrBits: number, dataBits: number): PinDeclaratio
   // GenericShape: 4 inputs, 2 outputs → symmetric=false (outputs!=1)
   // No gap, no offset: inputs y=0,1,2,3; outputs y=0,1
   return [
-    { direction: PinDirection.INPUT, label: "A1", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "s1", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT, label: "A2", defaultBitWidth: addrBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT, label: "A1", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "s1", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "A2", defaultBitWidth: addrBits, position: { x: 0, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     {
       direction: PinDirection.INPUT,
       label: "s2",
@@ -272,9 +272,10 @@ function buildROMDualPortPins(addrBits: number, dataBits: number): PinDeclaratio
       position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
-    { direction: PinDirection.OUTPUT, label: "D1", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "D2", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.OUTPUT, label: "D1", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "D2", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

@@ -75,24 +75,24 @@ export const UNIPOLAR_STEP_SEQUENCE: readonly [number, number, number, number][]
 
 function buildBipolarPinDeclarations(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT,  label: "A+",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "A-",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "B+",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "B-",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "A+",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "A-",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "B+",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "B-",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function buildUnipolarPinDeclarations(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT,  label: "P0",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "P1",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "P2",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "P3",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.INPUT,  label: "com", defaultBitWidth: 1, position: { x: -2, y:  3 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false },
-    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false },
+    { direction: PinDirection.INPUT,  label: "P0",  defaultBitWidth: 1, position: { x: -2, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "P1",  defaultBitWidth: 1, position: { x: -2, y:  0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "P2",  defaultBitWidth: 1, position: { x: -2, y:  1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "P3",  defaultBitWidth: 1, position: { x: -2, y:  2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "com", defaultBitWidth: 1, position: { x: -2, y:  3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "S0",  defaultBitWidth: 1, position: { x:  3, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "S1",  defaultBitWidth: 1, position: { x:  3, y:  3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 

@@ -75,6 +75,7 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
       position: inputPositions[0],
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -83,6 +84,7 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
       position: inputPositions[1],
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
     {
       direction: PinDirection.INPUT,
@@ -91,6 +93,7 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
       position: inputPositions[2],
       isNegatable: false,
       isClockCapable: true,
+      kind: "signal",
     },
     {
       direction: PinDirection.OUTPUT,
@@ -99,6 +102,7 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
       position: outputPositions[0],
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal",
     },
   ];
 }

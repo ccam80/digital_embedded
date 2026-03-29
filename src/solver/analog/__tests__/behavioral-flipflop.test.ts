@@ -342,10 +342,9 @@ describe("Registration", () => {
       [], -1, props, () => 0,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
-    expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBeGreaterThanOrEqual(4);
+    expect(element.pinNodeIds.length).toBe(4);
   });
 });

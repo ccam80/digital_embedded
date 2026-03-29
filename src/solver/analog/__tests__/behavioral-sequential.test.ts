@@ -415,11 +415,10 @@ describe("Registration", () => {
       [], -1, props, () => 0,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
-    expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBeGreaterThanOrEqual(5);
+    expect(element.pinNodeIds.length).toBe(5);
   });
 
   it("register_analog_factory_returns_analog_element", () => {
@@ -435,10 +434,9 @@ describe("Registration", () => {
       [], -1, props, () => 0,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
-    expect(element).toBeDefined();
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBeGreaterThanOrEqual(4);
+    expect(element.pinNodeIds.length).toBe(4);
   });
 });
