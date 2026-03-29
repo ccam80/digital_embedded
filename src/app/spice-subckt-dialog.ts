@@ -16,8 +16,6 @@ import { buildSpiceSubcircuit } from '../io/spice-model-builder.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SpiceSubcktImportResult } from './spice-model-apply.js';
-export type { SpiceSubcktImportResult } from './spice-model-apply.js';
-export { applySpiceSubcktImportResult } from './spice-model-apply.js';
 
 /**
  * Open the .SUBCKT import dialog for the given element.

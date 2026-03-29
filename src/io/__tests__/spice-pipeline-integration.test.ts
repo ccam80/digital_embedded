@@ -35,7 +35,7 @@ function pipeline(text: string) {
 // ---------------------------------------------------------------------------
 
 describe("SPICE pipeline — register in TransistorModelRegistry", () => {
-  it("registers a simple resistor subcircuit without throwing", () => {
+  it("registers a simple resistor subcircuit and makes it retrievable", () => {
     const { circuit } = pipeline(`
 .SUBCKT rdiv a b c
 R1 a b 10k
@@ -43,7 +43,9 @@ R2 b c 10k
 .ENDS rdiv
 `);
     const registry = new TransistorModelRegistry();
-    expect(() => registry.register("rdiv", circuit)).not.toThrow();
+    registry.register("rdiv", circuit);
+    expect(registry.has("rdiv")).toBe(true);
+    expect(registry.get("rdiv")).toBe(circuit);
   });
 
   it("retrieves registered circuit by name", () => {
@@ -86,13 +88,17 @@ I1 e f DC 1m
 .ENDS alltype
 `;
 
-  it("parses without throwing", () => {
-    expect(() => parseSubcircuit(FULL_SUBCKT.trim())).not.toThrow();
+  it("parses to a subcircuit named 'alltype' with 6 ports and 9 elements", () => {
+    const sc = parseSubcircuit(FULL_SUBCKT.trim());
+    expect(sc.name).toBe("alltype");
+    expect(sc.ports).toHaveLength(6);
+    expect(sc.elements).toHaveLength(9);
   });
 
-  it("builds without throwing", () => {
-    const sc = parseSubcircuit(FULL_SUBCKT.trim());
-    expect(() => buildSpiceSubcircuit(sc)).not.toThrow();
+  it("builds to a Circuit with 6 In elements and 9 non-In elements", () => {
+    const { sc, circuit } = pipeline(FULL_SUBCKT);
+    expect(circuit.elements.filter((e) => e.typeId === "In")).toHaveLength(sc.ports.length);
+    expect(circuit.elements.filter((e) => e.typeId !== "In")).toHaveLength(sc.elements.length);
   });
 
   it("circuit has In elements equal to port count", () => {
@@ -230,10 +236,7 @@ Q1 c b e NPN2N2222
 .ENDS bjtstage
 `);
     const bjt = circuit.elements.find((e) => e.typeId === "NpnBJT");
-    expect(bjt).toBeDefined();
-    const raw = bjt!.getAttribute("_spiceModelOverrides") as string;
-    expect(raw).toBeDefined();
-    const overrides = JSON.parse(raw);
+    const overrides = JSON.parse(bjt!.getAttribute("_spiceModelOverrides") as string);
     expect(overrides["IS"]).toBeCloseTo(3.1e-14);
     expect(overrides["BF"]).toBe(255);
     expect(overrides["NF"]).toBeCloseTo(1.0);
@@ -247,7 +250,6 @@ M1 d g s b CMOS0 W=5u L=0.35u
 .ENDS mosstage
 `);
     const mos = circuit.elements.find((e) => e.typeId === "NMOS");
-    expect(mos).toBeDefined();
     const overrides = JSON.parse(mos!.getAttribute("_spiceModelOverrides") as string);
     expect(overrides["W"]).toBeCloseTo(5e-6);
     expect(overrides["L"]).toBeCloseTo(0.35e-6);
@@ -273,9 +275,7 @@ D1 a k 1N4148
 .ENDS dstage
 `);
     const diode = circuit.elements.find((e) => e.typeId === "Diode");
-    const raw = diode!.getAttribute("_spiceModelOverrides") as string;
-    expect(raw).toBeDefined();
-    const overrides = JSON.parse(raw);
+    const overrides = JSON.parse(diode!.getAttribute("_spiceModelOverrides") as string);
     expect(overrides["IS"]).toBeCloseTo(2.52e-9);
     expect(overrides["N"]).toBeCloseTo(1.752);
   });
@@ -286,23 +286,23 @@ D1 a k 1N4148
 // ---------------------------------------------------------------------------
 
 describe("SPICE pipeline — wire connectivity", () => {
-  it("a voltage divider has wires connecting to the mid-node net", () => {
+  it("a voltage divider has 4 wires and exactly 2 connect to the mid-node net", () => {
     const { circuit } = pipeline(`
 .SUBCKT vdiv vin vout gnd
 R1 vin vout 10k
 R2 vout gnd 10k
 .ENDS vdiv
 `);
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    expect(circuit.wires).toHaveLength(4);
 
-    // The vout net should appear as endpoints in at least 2 different wires
+    // The vout net appears as an endpoint in exactly 2 wires: one from R1.B and one from R2.A
     const voutEl = circuit.elements.filter((e) => e.typeId === "In")
       .find((e) => e.getAttribute("label") === "vout");
     const voutX = voutEl!.getPins()[0].position.x;
     const wiresOnVout = circuit.wires.filter(
       (w) => w.start.x === voutX || w.end.x === voutX
     );
-    expect(wiresOnVout.length).toBeGreaterThanOrEqual(2);
+    expect(wiresOnVout).toHaveLength(2);
   });
 
   it("no wires have start === end (degenerate wires)", () => {

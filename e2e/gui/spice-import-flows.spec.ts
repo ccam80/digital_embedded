@@ -121,54 +121,40 @@ test.describe('SPICE import flows', () => {
       await toggle.click();
     }
 
-    // The SPICE panel should show IS = 1e-14
+    // The SPICE panel should show IS with value 1e-14
     const spiceSection = page.locator('.prop-popup');
-    await expect(spiceSection).toContainText('IS', { timeout: 2000 });
+    await expect(spiceSection).toContainText('1e-14', { timeout: 2000 });
   });
 
   // -------------------------------------------------------------------------
   // 5. .SUBCKT import menu item visible for components with subcircuitModel
   // -------------------------------------------------------------------------
   test('.SUBCKT import menu item visible for component with subcircuitModel support', async ({ page }) => {
-    // NpnBJT has a cmos model with subcircuitModel — right-click to check
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
     await rightClickLabeled(builder, 'Q1');
 
-    const menuItems = page.locator('.ctx-menu-item');
-    const allText = await menuItems.allTextContents();
-
-    // At minimum the context menu opened and has items
-    expect(allText.length).toBeGreaterThan(0);
+    const subcktMenuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Subcircuit' });
+    await expect(subcktMenuItem).toBeVisible({ timeout: 3000 });
   });
 
   // -------------------------------------------------------------------------
   // 6. .SUBCKT import dialog opens and parses block
   // -------------------------------------------------------------------------
   test('.SUBCKT dialog opens and shows parse preview', async ({ page }) => {
-    // Find a component with subcircuitModel — NpnBJT has cmos model with subcircuitModel
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
     await rightClickLabeled(builder, 'Q1');
 
-    // Check if "Import SPICE Subcircuit..." is present
     const subcktMenuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Subcircuit' });
-    const subcktVisible = await subcktMenuItem.isVisible().catch(() => false);
+    await expect(subcktMenuItem).toBeVisible({ timeout: 3000 });
 
-    if (subcktVisible) {
-      await subcktMenuItem.click();
-      await expect(page.locator('.spice-subckt-dialog')).toBeVisible({ timeout: 3000 });
+    await subcktMenuItem.click();
+    await expect(page.locator('.spice-subckt-dialog')).toBeVisible({ timeout: 3000 });
 
-      const textarea = page.locator('.spice-subckt-dialog .spice-import-textarea');
-      await textarea.fill('.SUBCKT TESTBJT C B E\nQ1 C B E QMOD\n.MODEL QMOD NPN(IS=1e-14)\n.ENDS TESTBJT');
+    const textarea = page.locator('.spice-subckt-dialog .spice-import-textarea');
+    await textarea.fill('.SUBCKT TESTBJT C B E\nQ1 C B E QMOD\n.MODEL QMOD NPN(IS=1e-14)\n.ENDS TESTBJT');
 
-      await expect(page.locator('.spice-import-summary')).toBeVisible({ timeout: 2000 });
-      await expect(page.locator('.spice-import-summary')).toContainText('TESTBJT');
-    } else {
-      // Component doesn't expose subcircuitModel in its menu — skip gracefully
-      test.info().annotations.push({
-        type: 'note',
-        description: 'NpnBJT does not expose "Import SPICE Subcircuit..." menu item in this build',
-      });
-    }
+    await expect(page.locator('.spice-import-summary')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.spice-import-summary')).toContainText('TESTBJT');
   });
 
   // -------------------------------------------------------------------------

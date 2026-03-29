@@ -106,16 +106,22 @@ function buildAnalogAndCircuit(
 // ---------------------------------------------------------------------------
 
 describe('digitalPinLoading MCP surface — mode all', () => {
-  it('circuit_compile with digitalPinLoading="all" compiles without errors', () => {
+  it('circuit_compile with digitalPinLoading="all" produces bridge adapters for the And gate', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit({ digitalPinLoading: "all" });
 
-    expect(() => facade.compile(circuit)).not.toThrow();
+    facade.compile(circuit);
 
     const compiled = facade.getCompiledUnified();
     expect(compiled).not.toBeNull();
     const errors = compiled!.diagnostics.filter(d => d.severity === 'error');
     expect(errors).toHaveLength(0);
+
+    const totalAdapters = (compiled!.analog?.bridges ?? []).reduce(
+      (n, b) => n + b.inputAdapters.length + b.outputAdapters.length,
+      0,
+    );
+    expect(totalAdapters).toBeGreaterThan(0);
   });
 
   it('digitalPinLoading="all" produces more bridge adapters than cross-domain for same circuit', () => {

@@ -125,9 +125,10 @@ describe("dts-model-roundtrip: namedParameterSets", () => {
     };
     const json = serializeCircuit(circuit);
     const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed["namedParameterSets"]).toBeDefined();
-    const sets = parsed["namedParameterSets"] as Record<string, unknown>;
-    expect(sets["TEST"]).toBeDefined();
+    const sets = parsed["namedParameterSets"] as Record<string, { deviceType: string; params: Record<string, number> }>;
+    expect(typeof sets).toBe("object");
+    expect(sets["TEST"].deviceType).toBe("D");
+    expect(sets["TEST"].params["IS"]).toBe(1e-9);
   });
 });
 
@@ -193,7 +194,7 @@ R2 b c 10k
     expect(restored.metadata.modelDefinitions!["rdiv"].ports).toEqual(parsed.ports);
     expect(destRegistry.has("rdiv")).toBe(true);
     const retrievedCircuit = destRegistry.get("rdiv")!;
-    expect(retrievedCircuit.elements.length).toBeGreaterThan(0);
+    expect(retrievedCircuit.elements.length).toBe(5);
   });
 
   it("modelDefinitions stub (no topology) does not register in TransistorModelRegistry", () => {
@@ -282,11 +283,12 @@ R1 vin vout 1k
     const json = serializeCircuit(circuit, transistorModels);
     const parsed2 = JSON.parse(json) as Record<string, unknown>;
     const modelDefs = parsed2["modelDefinitions"] as Record<string, unknown>;
-    expect(modelDefs).toBeDefined();
+    expect(modelDefs).not.toBeNull();
+    expect(typeof modelDefs).toBe("object");
     const myfiltDef = modelDefs["myfilt"] as Record<string, unknown>;
+    expect(myfiltDef).toBeDefined();
     const elements = myfiltDef["elements"] as unknown[];
-    // Full topology: In elements + Resistor element
-    expect(elements.length).toBeGreaterThan(0);
+    expect(elements.length).toBe(3);
   });
 
   it("falls back to metadata stub when registry does not have matching model", () => {

@@ -204,7 +204,8 @@ R2 OUT GND 1K
 
     const defs = circuit.metadata.modelDefinitions!;
     expect(defs["BJT1"]).toBeUndefined();
-    expect(defs["RDIV"]).toBeDefined();
+    expect(defs["RDIV"].ports).toEqual(["IN", "OUT", "GND"]);
+    expect(defs["RDIV"].elementCount).toBe(2);
   });
 
   it("returns error for invalid .SUBCKT text without storing anything", () => {

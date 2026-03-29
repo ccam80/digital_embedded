@@ -109,7 +109,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 //
 // Use circuit_patch (op: 'set') to apply _spiceModelOverrides on Q1,
 // then circuit_compile and verify:
-//   a) compiled analog diagnostics do not include invalid-spice-overrides
+//   a) compiled analog diagnostics do not include INVALID_SPICE_OVERRIDES
 //   b) DC node voltages differ from those compiled without the override
 // ---------------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
 
     const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
-    expect(baselineCodes).not.toContain('invalid-spice-overrides');
+    expect(baselineCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
     // Build an identical circuit, then apply override via patch
     const { circuit: circuitOverridden, facade: facadeOverridden } = buildBjtCircuit();
@@ -146,7 +146,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     expect(compiledOverridden!.analog).not.toBeNull();
 
     const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
-    expect(overriddenCodes).not.toContain('invalid-spice-overrides');
+    expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
     const dcOverridden = facadeOverridden.getDcOpResult();
     expect(dcOverridden).not.toBeNull();
@@ -200,7 +200,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
 // Test 2: Round-trip serialization
 //
 // Set overrides, serialize, deserialize, recompile — overrides must persist
-// and the circuit must still compile without invalid-spice-overrides.
+// and the circuit must still compile without INVALID_SPICE_OVERRIDES.
 // The DC node voltages after round-trip must match the pre-serialization result.
 // ---------------------------------------------------------------------------
 
@@ -234,9 +234,9 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
     expect(compiled).not.toBeNull();
     expect(compiled!.analog).not.toBeNull();
 
-    // No invalid-spice-overrides — JSON survived serialization intact
+    // No INVALID_SPICE_OVERRIDES — JSON survived serialization intact
     const diagnosticCodes = compiled!.analog!.diagnostics.map(d => d.code);
-    expect(diagnosticCodes).not.toContain('invalid-spice-overrides');
+    expect(diagnosticCodes).not.toContain('INVALID_SPICE_OVERRIDES');
   });
 
   it('deserialized circuit with overrides produces same DC result as pre-serialization', () => {

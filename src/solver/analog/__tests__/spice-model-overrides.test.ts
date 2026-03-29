@@ -221,7 +221,7 @@ describe("spice-model-overrides compiler merge", () => {
   it("malformed_json: emits invalid-spice-overrides warning and falls back to defaults", () => {
     const { capturedModelParams, diagnostics } = buildAndCompile("not json");
 
-    const warning = diagnostics.find((d) => d.code === "invalid-spice-overrides");
+    const warning = diagnostics.find((d) => d.code === "INVALID_SPICE_OVERRIDES");
     expect(warning).toBeDefined();
     expect(warning!.severity).toBe("warning");
     expect(warning!.summary).toContain("q1");

@@ -157,14 +157,10 @@ describe('stableNetId — format matches PinLoadingOverride anchor format', () =
     const assignments = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
-    for (const group of groups) {
-      const netId = stableNetId(group, circuit.elements);
-      expect(netId).toMatch(/^(label:|pin:)/);
-      if (netId.startsWith('pin:')) {
-        const parts = netId.slice('pin:'.length).split(':');
-        expect(parts.length).toBeGreaterThanOrEqual(2);
-      }
-    }
+    const netIds = groups.map(g => stableNetId(g, circuit.elements));
+    expect(netIds).toContain('pin:and-fixed:a');
+    expect(netIds).toContain('pin:and-fixed:b');
+    expect(netIds).toContain('pin:and-fixed:out');
   });
 });
 
@@ -311,6 +307,6 @@ describe('connectivity groups — wires field is populated for connected groups'
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const matchingGroups = groups.filter(g => g.wires.includes(floatingWire));
-    expect(matchingGroups.length).toBeLessThanOrEqual(1);
+    expect(matchingGroups.length).toBe(1);
   });
 });

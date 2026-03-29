@@ -279,27 +279,32 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
     expect(resultDefault.bridges.length).toBe(resultExplicit.bridges.length);
   });
 
-  it('cross-domain mode produces at least one bridge adapter for mixed circuit', () => {
+  it('cross-domain mode produces exactly one bridge for the DABridge element', () => {
     const { circuit, registry } = buildMixedCircuit();
     circuit.metadata.digitalPinLoading = 'cross-domain';
 
     const result = compileUnified(circuit, registry);
 
-    expect(result.bridges.length).toBeGreaterThan(0);
+    expect(result.bridges).toHaveLength(1);
   });
 
-  it('all mode routes dual-model components to the analog partition', () => {
+  it('all mode routes dual-model components to the analog partition, reducing digital component count', () => {
     const { circuit, registry } = buildMixedCircuit();
+
+    circuit.metadata.digitalPinLoading = 'cross-domain';
+    const crossResult = compileUnified(circuit, registry);
+
     circuit.metadata.digitalPinLoading = 'all';
+    const allResult = compileUnified(circuit, registry);
 
-    const result = compileUnified(circuit, registry);
-
-    // In "all" mode the DABridge (dual-model) is rerouted to the analog
-    // partition, so the analog domain must be non-null.
-    expect(result.analog).not.toBeNull();
+    // In "all" mode the DABridge is rerouted to the analog partition, so
+    // the digital partition loses that component — componentCount drops by 1.
+    const crossDigital = crossResult.digital?.componentCount ?? 0;
+    const allDigital = allResult.digital?.componentCount ?? 0;
+    expect(allDigital).toBe(crossDigital - 1);
   });
 
-  it('all mode produces more analog elements than cross-domain mode', () => {
+  it('all mode removes the DABridge from the digital partition (strict all > cross-domain)', () => {
     const { circuit, registry } = buildMixedCircuit();
 
     circuit.metadata.digitalPinLoading = 'cross-domain';
@@ -308,11 +313,11 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
     circuit.metadata.digitalPinLoading = 'all';
     const all = compileUnified(circuit, registry);
 
-    // "all" routes the DABridge's MNA model into the analog partition,
-    // so the analog element count must be greater than or equal to cross-domain.
-    const crossElements = crossDomain.analog?.elements.length ?? 0;
-    const allElements = all.analog?.elements.length ?? 0;
-    expect(allElements).toBeGreaterThanOrEqual(crossElements);
+    // "all" routes the DABridge to analog — digital partition loses exactly that
+    // component. The cross-domain count must be strictly greater than all.
+    const crossDigital = crossDomain.digital?.componentCount ?? 0;
+    const allDigital = all.digital?.componentCount ?? 0;
+    expect(crossDigital).toBeGreaterThan(allDigital);
   });
 
   it('none mode produces zero bridges for a circuit with only digital-model pins at the boundary', () => {
@@ -345,12 +350,15 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
     expect(allDigital).toBeLessThan(crossDigital);
   });
 
-  it('none mode on mixed circuit produces valid compilation — analog domain is non-null', () => {
+  it('none mode on mixed circuit preserves the analog partition with exactly one base element', () => {
     const { circuit, registry } = buildMixedCircuit();
     circuit.metadata.digitalPinLoading = 'none';
 
     const result = compileUnified(circuit, registry);
 
+    // The analog partition must exist and contain the AnalogR element (1 element).
+    // Ground is a zero-pin sentinel and does not contribute an analog element.
     expect(result.analog).not.toBeNull();
+    expect(result.analog!.elements).toHaveLength(1);
   });
 });

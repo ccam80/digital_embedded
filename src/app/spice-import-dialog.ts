@@ -13,8 +13,6 @@ import { validateModel } from '../solver/analog/model-library.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SpiceImportResult } from './spice-model-apply.js';
-export type { SpiceImportResult } from './spice-model-apply.js';
-export { applySpiceImportResult } from './spice-model-apply.js';
 
 /**
  * Open the .MODEL import dialog for the given element.

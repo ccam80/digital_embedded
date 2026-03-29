@@ -493,13 +493,6 @@ function resolveLogicFamily(
       : defaultLogicFamily();
 }
 
-/**
- * Populate a ModelLibrary from a circuit's metadata.
- *
- * Reads from `metadata.namedParameterSets` (the typed DTS/JSON field) and
- * from the legacy `metadata.models` Map (older .dig/.json format).
- * No-ops when neither source is present.
- */
 function populateModelLibrary(
   modelLibrary: ModelLibrary,
   metadataSource: Record<string, unknown>,
@@ -519,21 +512,6 @@ function populateModelLibrary(
         params: entry.params,
       });
     }
-  }
-
-  if (!(metadataSource["models"] instanceof Map)) return;
-  const circuitModels = metadataSource["models"] as Map<string, DeviceModel>;
-  for (const model of circuitModels.values()) {
-    const params: Record<string, number> =
-      model.params instanceof Map
-        ? Object.fromEntries(model.params.entries())
-        : (model.params as unknown as Record<string, number>);
-    modelLibrary.add({
-      name: model.name,
-      type: model.type as import("./model-parser.js").DeviceType,
-      level: 1,
-      params,
-    });
   }
 }
 
@@ -1300,7 +1278,7 @@ export function compileAnalogPartition(
         } catch {
           const label = props.has("label") ? props.get<string>("label") : el.typeId;
           diagnostics.push({
-            code: "invalid-spice-overrides",
+            code: "INVALID_SPICE_OVERRIDES",
             severity: "warning",
             summary: `Malformed _spiceModelOverrides JSON on component "${label}"`,
             explanation: `The _spiceModelOverrides property on "${label}" is not valid JSON. The override was ignored and default model parameters were used instead.`,

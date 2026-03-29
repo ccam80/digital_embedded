@@ -286,7 +286,7 @@ export function extractConnectivityGroups(
   // Step 4: Walk union-find to assign group IDs (pin slots only)
   // -------------------------------------------------------------------------
 
-  // Map from union-find root → sequential group ID (based on pin slots only)
+  // Map from union-find root → sequential group ID
   const rootToGroupId = new Map<number, number>();
   let nextGroupId = 0;
 
@@ -294,6 +294,18 @@ export function extractConnectivityGroups(
     const root = uf.find(slot);
     if (!rootToGroupId.has(root)) {
       rootToGroupId.set(root, nextGroupId++);
+    }
+  }
+
+  // Wire-only groups: wires whose both endpoints share no position with any pin,
+  // but only when the circuit has elements (wire-only circuits have no groups).
+  if (totalPinSlots > 0) {
+    for (let k = 0; k < wires.length; k++) {
+      const startSlot = wireVirtualBase + k * 2;
+      const root = uf.find(startSlot);
+      if (!rootToGroupId.has(root)) {
+        rootToGroupId.set(root, nextGroupId++);
+      }
     }
   }
 

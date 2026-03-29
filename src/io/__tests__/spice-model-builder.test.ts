@@ -22,10 +22,11 @@ R1 a b 1k
 .ENDS simple
 `;
 
-  it("returns a Circuit object (has elements array)", () => {
+  it("returns a Circuit with 3 elements: 2 In ports and 1 Resistor", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements).toBeDefined();
-    expect(Array.isArray(circuit.elements)).toBe(true);
+    expect(circuit.elements).toHaveLength(3);
+    expect(circuit.elements.filter((e) => e.typeId === "In")).toHaveLength(2);
+    expect(circuit.elements.filter((e) => e.typeId === "Resistor")).toHaveLength(1);
   });
 
   it("circuit name is set from subcircuit name", () => {
@@ -53,9 +54,9 @@ R1 a b 1k
     expect(resistors).toHaveLength(1);
   });
 
-  it("adds wires to the circuit", () => {
+  it("adds exactly 2 wires for a single-resistor two-port circuit", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    expect(circuit.wires).toHaveLength(2);
   });
 });
 
@@ -105,10 +106,13 @@ R1 a 0 1k
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — R element mapping", () => {
-  it("maps R to Resistor", () => {
+  it("maps R to Resistor with pins A and B", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 10k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
     expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("A");
+    expect(pinLabels).toContain("B");
   });
 
   it("sets resistance property from value", () => {
@@ -131,9 +135,11 @@ describe("buildSpiceSubcircuit — R element mapping", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — C element mapping", () => {
-  it("maps C to Capacitor", () => {
+  it("maps C to Capacitor with capacitance=100n", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nC1 a b 100n\n.ENDS`));
-    expect(circuit.elements.find((e) => e.typeId === "Capacitor")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "Capacitor");
+    expect(el).toBeDefined();
+    expect(el!.getAttribute("capacitance")).toBeCloseTo(100e-9);
   });
 
   it("sets capacitance property", () => {
@@ -148,9 +154,11 @@ describe("buildSpiceSubcircuit — C element mapping", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — L element mapping", () => {
-  it("maps L to Inductor", () => {
+  it("maps L to Inductor with inductance=1u", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nL1 a b 1u\n.ENDS`));
-    expect(circuit.elements.find((e) => e.typeId === "Inductor")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "Inductor");
+    expect(el).toBeDefined();
+    expect(el!.getAttribute("inductance")).toBeCloseTo(1e-6);
   });
 
   it("sets inductance property", () => {
@@ -165,9 +173,13 @@ describe("buildSpiceSubcircuit — L element mapping", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — D element mapping", () => {
-  it("maps D to Diode", () => {
+  it("maps D to Diode with pins A and K", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a k\nD1 a k 1N4148\n.ENDS`));
-    expect(circuit.elements.find((e) => e.typeId === "Diode")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "Diode");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("A");
+    expect(pinLabels).toContain("K");
   });
 
   it("Diode has pins A and K", () => {
@@ -191,9 +203,14 @@ Q1 c b e NPN
 .ENDS test
 `;
 
-  it("maps Q with NPN model to NpnBJT", () => {
+  it("maps Q with NPN model to NpnBJT with pins B, C, E", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "NpnBJT")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "NpnBJT");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("B");
+    expect(pinLabels).toContain("C");
+    expect(pinLabels).toContain("E");
   });
 
   it("NpnBJT has pins B, C, E", () => {
@@ -208,9 +225,7 @@ Q1 c b e NPN
   it("NpnBJT has _spiceModelOverrides with IS and BF", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NpnBJT");
-    const overridesRaw = el!.getAttribute("_spiceModelOverrides") as string;
-    expect(overridesRaw).toBeDefined();
-    const overrides = JSON.parse(overridesRaw);
+    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
     expect(overrides["IS"]).toBeCloseTo(1e-14);
     expect(overrides["BF"]).toBe(200);
   });
@@ -224,9 +239,17 @@ Q1 c b e PNP
 .ENDS test
 `;
 
-  it("maps Q with PNP model to PnpBJT", () => {
+  it("maps Q with PNP model to PnpBJT with pins B, C, E and IS/BF overrides", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "PnpBJT")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "PnpBJT");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("B");
+    expect(pinLabels).toContain("C");
+    expect(pinLabels).toContain("E");
+    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    expect(overrides["IS"]).toBeCloseTo(2e-14);
+    expect(overrides["BF"]).toBe(100);
   });
 });
 
@@ -242,9 +265,14 @@ M1 d g s b NMOS W=10u L=1u
 .ENDS test
 `;
 
-  it("maps M with NMOS model to NMOS", () => {
+  it("maps M with NMOS model to NMOS with pins G, D, S", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "NMOS")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "NMOS");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("G");
+    expect(pinLabels).toContain("D");
+    expect(pinLabels).toContain("S");
   });
 
   it("NMOS has pins G, D, S", () => {
@@ -275,9 +303,18 @@ M1 d g s b PMOS W=5u L=1u
 .ENDS test
 `;
 
-  it("maps M with PMOS model to PMOS", () => {
+  it("maps M with PMOS model to PMOS with pins G, D, S and W/L/VTO overrides", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "PMOS")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "PMOS");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("G");
+    expect(pinLabels).toContain("D");
+    expect(pinLabels).toContain("S");
+    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    expect(overrides["W"]).toBeCloseTo(5e-6);
+    expect(overrides["L"]).toBeCloseTo(1e-6);
+    expect(overrides["VTO"]).toBeCloseTo(-0.7);
   });
 });
 
@@ -293,9 +330,14 @@ J1 d g s NJFET
 .ENDS test
 `;
 
-  it("maps J with NJFET model to NJFET", () => {
+  it("maps J with NJFET model to NJFET with pins G, S, D", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "NJFET")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "NJFET");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("G");
+    expect(pinLabels).toContain("S");
+    expect(pinLabels).toContain("D");
   });
 
   it("NJFET has pins G, S, D", () => {
@@ -316,9 +358,16 @@ J1 d g s PJFET
 .ENDS test
 `;
 
-  it("maps J with PJFET model to PJFET", () => {
+  it("maps J with PJFET model to PJFET with pins G, S, D and VTO override", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.elements.find((e) => e.typeId === "PJFET")).toBeDefined();
+    const el = circuit.elements.find((e) => e.typeId === "PJFET");
+    expect(el).toBeDefined();
+    const pinLabels = el!.getPins().map((p) => p.label);
+    expect(pinLabels).toContain("G");
+    expect(pinLabels).toContain("S");
+    expect(pinLabels).toContain("D");
+    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    expect(overrides["VTO"]).toBeCloseTo(2);
   });
 });
 
@@ -495,7 +544,7 @@ V1 vcc 0 DC 5
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — wires", () => {
-  it("adds wires for a two-resistor subcircuit", () => {
+  it("adds exactly 4 wires for a two-resistor three-port subcircuit", () => {
     const TEXT = `
 .SUBCKT test a b c
 R1 a b 1k
@@ -503,7 +552,7 @@ R2 b c 2k
 .ENDS test
 `;
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    expect(circuit.wires).toHaveLength(4);
   });
 
   it("wire endpoints are at the element pin x-coordinate", () => {

@@ -42,6 +42,9 @@ test.describe("Model selector dropdown", () => {
     const canvas = page.locator("canvas");
     await canvas.click({ position: { x: 200, y: 200 } });
 
+    // Verify the property panel opened by confirming the Label row is present
+    await expect(page.locator("text=Label").first()).toBeVisible({ timeout: 3000 });
+
     // No Model dropdown should appear for single-model components
     const modelRow = page.locator("text=Model").locator("xpath=ancestor::div[1]").locator("select");
     await expect(modelRow).toHaveCount(0);
@@ -57,9 +60,8 @@ test.describe("Model selector dropdown", () => {
 
     // Switch to Behavioral if not already selected
     const modelSelect = page.locator("select").filter({ hasText: /Digital|Behavioral/ });
-    if (await modelSelect.isVisible()) {
-      await modelSelect.selectOption({ label: "Behavioral (MNA)" });
-    }
+    await expect(modelSelect).toBeVisible({ timeout: 3000 });
+    await modelSelect.selectOption({ label: "Behavioral (MNA)" });
 
     // SPICE parameter section should appear for semiconductor in behavioral mode
     await expect(page.locator("text=SPICE")).toBeVisible({ timeout: 3000 });

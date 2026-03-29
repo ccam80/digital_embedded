@@ -163,8 +163,7 @@ describe("spice-subckt-dialog: buildSpiceSubcircuit", () => {
     const parsed = parseSubcircuit(SIMPLE_SUBCKT);
     const circuit = buildSpiceSubcircuit(parsed);
 
-    expect(circuit).toBeDefined();
-    expect(circuit.elements.length).toBeGreaterThan(0);
+    expect(circuit.elements.length).toBe(parsed.ports.length + parsed.elements.length);
   });
 
   it("circuit has one interface element per port", () => {
@@ -175,11 +174,12 @@ describe("spice-subckt-dialog: buildSpiceSubcircuit", () => {
     expect(interfaceEls.length).toBe(parsed.ports.length);
   });
 
-  it("circuit has wire connections", () => {
+  it("circuit has one wire per pin of each internal element", () => {
     const parsed = parseSubcircuit(RESISTOR_SUBCKT);
     const circuit = buildSpiceSubcircuit(parsed);
 
-    expect(circuit.wires.length).toBeGreaterThan(0);
+    // RDIV has 2 resistors, each with 2 pins → 4 wires total
+    expect(circuit.wires.length).toBe(4);
   });
 });
 

@@ -201,7 +201,7 @@ export type SolverDiagnosticCode =
   | "unsupported-ctz-component"
   | "monte-carlo-trial-failed"
   | "unconnected-analog-pin"
-  | "invalid-spice-overrides";
+  | "INVALID_SPICE_OVERRIDES";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

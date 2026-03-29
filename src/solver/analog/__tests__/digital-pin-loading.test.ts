@@ -318,13 +318,12 @@ describe("digitalPinLoading: cross-domain (default)", () => {
 });
 
 describe("digitalPinLoading: all", () => {
-  it("all mode: dual-model component in digital partition gets bridge adapters", () => {
+  it("all mode: dual-model component in digital partition gets exactly one bridge", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     const compiled = compileUnified(circuit, registry).analog!;
-    // The DigitalXor is now treated as a bridge component
-    expect(compiled.bridges.length).toBeGreaterThan(0);
+    expect(compiled.bridges).toHaveLength(1);
   });
 
   it("all mode: bridge has correct adapter counts (2 inputs + 1 output)", () => {
@@ -332,13 +331,9 @@ describe("digitalPinLoading: all", () => {
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     const compiled = compileUnified(circuit, registry).analog!;
-    // Find inline bridges (those from the all-mode processing)
-    const inlineBridges = compiled.bridges.filter(
-      b => b.inputAdapters.length > 0 || b.outputAdapters.length > 0,
-    );
-    expect(inlineBridges.length).toBeGreaterThan(0);
-
-    const bridge = inlineBridges[0]!;
+    // Exactly one bridge expected (from the DigitalXor component)
+    expect(compiled.bridges).toHaveLength(1);
+    const bridge = compiled.bridges[0]!;
     // DigitalXor: 2 inputs → 2 BridgeInputAdapters; 1 output → 1 BridgeOutputAdapter
     expect(bridge.inputAdapters).toHaveLength(2);
     expect(bridge.outputAdapters).toHaveLength(1);
@@ -479,7 +474,7 @@ describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", (
     );
   });
 
-  it("none bridge count equals cross-domain bridge count (same partition boundary detection)", () => {
+  it("none mode input adapters have rIn=Infinity while cross-domain adapters have finite rIn", () => {
     const registry = buildRegistry();
 
     const circuitNone = buildCircuit(
@@ -494,6 +489,9 @@ describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", (
     const compiledNone = compileUnified(circuitNone, registry).analog!;
     const compiledCross = compileUnified(circuitCross, registry).analog!;
 
-    expect(compiledNone.bridges).toHaveLength(compiledCross.bridges.length);
+    const noneAdapter = compiledNone.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
+    const crossAdapter = compiledCross.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
+    expect(noneAdapter.rIn).toBe(Infinity);
+    expect(isFinite(crossAdapter.rIn)).toBe(true);
   });
 });

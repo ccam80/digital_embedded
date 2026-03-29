@@ -277,16 +277,10 @@ describe("ModelBinding", () => {
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
 
-    // Register a custom model via circuit.metadata.models
-    const customModel: DeviceModel = {
-      name: "D1N4148",
-      type: "D",
-      level: 1,
-      params: { IS: 2.52e-9, N: 1.752 },
+    // Register a custom model via circuit.metadata.namedParameterSets
+    circuit.metadata.namedParameterSets = {
+      "D1N4148": { deviceType: "D", params: { IS: 2.52e-9, N: 1.752 } },
     };
-    (circuit.metadata as Record<string, unknown>)["models"] = new Map([
-      ["D1N4148", customModel],
-    ]);
 
     // Compile — this triggers model binding
     const compiled = compileUnified(circuit, registry).analog!;
