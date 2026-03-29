@@ -1,13 +1,13 @@
-import type { Circuit } from "../../core/circuit.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 export class SubcircuitModelRegistry {
-  private readonly models = new Map<string, Circuit>();
+  private readonly models = new Map<string, MnaSubcircuitNetlist>();
 
-  register(name: string, circuit: Circuit): void {
-    this.models.set(name, circuit);
+  register(name: string, netlist: MnaSubcircuitNetlist): void {
+    this.models.set(name, netlist);
   }
 
-  get(name: string): Circuit | undefined {
+  get(name: string): MnaSubcircuitNetlist | undefined {
     return this.models.get(name);
   }
 

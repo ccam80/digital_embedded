@@ -141,8 +141,21 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
     const registry = makeRegistry("In");
     const circuit = new Circuit({ name: "WithSubckt" });
     circuit.metadata.modelDefinitions = {
-      "RDIV": { ports: ["a", "b", "c"], elementCount: 2 },
-      "OPAMP": { ports: ["inp", "inn", "out"], elementCount: 10 },
+      "RDIV": {
+        ports: ["a", "b", "c"],
+        elements: [
+          { typeId: "Resistor" },
+          { typeId: "Resistor" },
+        ],
+        internalNetCount: 0,
+        netlist: [[0, 1], [1, 2]],
+      },
+      "OPAMP": {
+        ports: ["inp", "inn", "out"],
+        elements: Array.from({ length: 10 }, () => ({ typeId: "Resistor" })),
+        internalNetCount: 7,
+        netlist: Array.from({ length: 10 }, (_, i) => [i % 3, (i + 1) % 3]),
+      },
     };
 
     const json = serializeCircuit(circuit);
@@ -151,9 +164,9 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
     expect(restored.metadata.modelDefinitions).toBeDefined();
     const defs = restored.metadata.modelDefinitions!;
     expect(defs["RDIV"].ports).toEqual(["a", "b", "c"]);
-    expect(defs["RDIV"].elementCount).toBe(2);
+    expect(defs["RDIV"].elements).toHaveLength(2);
     expect(defs["OPAMP"].ports).toEqual(["inp", "inn", "out"]);
-    expect(defs["OPAMP"].elementCount).toBe(10);
+    expect(defs["OPAMP"].elements).toHaveLength(10);
   });
 
   it("absent modelDefinitions yields undefined on loaded circuit.metadata", () => {
@@ -165,25 +178,26 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
   });
 
   it("round-trip with full circuit registers in SubcircuitModelRegistry", () => {
-    // Build a SPICE subcircuit and register it in a source registry
     const parsed = parseSubcircuit(`.SUBCKT rdiv a b c
 R1 a b 10k
 R2 b c 10k
 .ENDS rdiv`);
     const subCircuit = buildSpiceSubcircuit(parsed);
 
-    // Set up the circuit metadata
     const circuit = new Circuit({ name: "WithSubckt" });
     circuit.metadata.modelDefinitions = {
-      "rdiv": { ports: parsed.ports, elementCount: parsed.elements.length },
+      "rdiv": {
+        ports: parsed.ports,
+        elements: [{ typeId: "Resistor" }, { typeId: "Resistor" }],
+        internalNetCount: 0,
+        netlist: [[0, 1], [1, 2]],
+      },
     };
 
-    // Serialize with the full circuit topology
     const sourceRegistry = new SubcircuitModelRegistry();
     sourceRegistry.register("rdiv", subCircuit);
     const json = serializeCircuit(circuit, sourceRegistry);
 
-    // On load, supply a new SubcircuitModelRegistry — it should be populated
     const componentRegistry = makeRegistry("In", "Resistor", "Capacitor");
     const destRegistry = new SubcircuitModelRegistry();
     const { circuit: restored } = deserializeDts(json, componentRegistry, {
@@ -194,25 +208,28 @@ R2 b c 10k
     expect(restored.metadata.modelDefinitions!["rdiv"].ports).toEqual(parsed.ports);
     expect(destRegistry.has("rdiv")).toBe(true);
     const retrievedCircuit = destRegistry.get("rdiv")!;
+    // 3 In elements (ports a,b,c) + 2 Resistor elements = 5
     expect(retrievedCircuit.elements.length).toBe(5);
   });
 
   it("modelDefinitions stub (no topology) does not register in SubcircuitModelRegistry", () => {
-    // Store only metadata, no full circuit
     const registry = makeRegistry("In");
     const circuit = new Circuit({ name: "MetadataOnly" });
     circuit.metadata.modelDefinitions = {
-      "MyModel": { ports: ["a", "b"], elementCount: 3 },
+      "MyModel": {
+        ports: ["a", "b"],
+        elements: [],
+        internalNetCount: 0,
+        netlist: [],
+      },
     };
 
     const json = serializeCircuit(circuit);
     const transistorRegistry = new SubcircuitModelRegistry();
     const { circuit: restored } = deserializeDts(json, registry, { transistorModelRegistry: transistorRegistry });
 
-    // Metadata preserved
     expect(restored.metadata.modelDefinitions!["MyModel"].ports).toEqual(["a", "b"]);
-    expect(restored.metadata.modelDefinitions!["MyModel"].elementCount).toBe(3);
-    // Registry NOT populated (no topology was stored)
+    expect(restored.metadata.modelDefinitions!["MyModel"].elements).toHaveLength(0);
     expect(transistorRegistry.has("MyModel")).toBe(false);
   });
 });
@@ -229,7 +246,12 @@ describe("dts-model-roundtrip: both fields together", () => {
       "2N2222": { deviceType: "NPN", params: { BF: 200, IS: 1e-14 } },
     };
     circuit.metadata.modelDefinitions = {
-      "RDIV": { ports: ["a", "b", "c"], elementCount: 2 },
+      "RDIV": {
+        ports: ["a", "b", "c"],
+        elements: [{ typeId: "Resistor" }, { typeId: "Resistor" }],
+        internalNetCount: 0,
+        netlist: [[0, 1], [1, 2]],
+      },
     };
 
     const json = serializeCircuit(circuit);
@@ -246,7 +268,12 @@ describe("dts-model-roundtrip: both fields together", () => {
       "1N4148": { deviceType: "D", params: { IS: 2.52e-9 } },
     };
     circuit.metadata.modelDefinitions = {
-      "RDIV": { ports: ["a", "b"], elementCount: 1 },
+      "RDIV": {
+        ports: ["a", "b"],
+        elements: [],
+        internalNetCount: 0,
+        netlist: [],
+      },
     };
 
     const json = serializeCircuit(circuit);
@@ -256,7 +283,6 @@ describe("dts-model-roundtrip: both fields together", () => {
 
     expect(modelLibrary.get("1N4148")).toBeDefined();
     expect(modelLibrary.get("1N4148")!.type).toBe("D");
-    // RDIV has no topology so not in transistorRegistry
     expect(transistorRegistry.has("RDIV")).toBe(false);
   });
 });
@@ -274,7 +300,12 @@ R1 vin vout 1k
 
     const circuit = new Circuit({ name: "Main" });
     circuit.metadata.modelDefinitions = {
-      "myfilt": { ports: parsed.ports, elementCount: parsed.elements.length },
+      "myfilt": {
+        ports: parsed.ports,
+        elements: [{ typeId: "Resistor" }],
+        internalNetCount: 0,
+        netlist: [[0, 1]],
+      },
     };
 
     const transistorModels = new SubcircuitModelRegistry();
@@ -287,14 +318,21 @@ R1 vin vout 1k
     expect(typeof modelDefs).toBe("object");
     const myfiltDef = modelDefs["myfilt"] as Record<string, unknown>;
     expect(myfiltDef).toBeDefined();
-    const elements = myfiltDef["elements"] as unknown[];
-    expect(elements.length).toBe(3);
+    expect((myfiltDef["ports"] as string[]).length).toBe(2);
+    expect((myfiltDef["elements"] as unknown[]).length).toBe(1);
+    expect(typeof myfiltDef["internalNetCount"]).toBe("number");
+    expect(Array.isArray(myfiltDef["netlist"])).toBe(true);
   });
 
   it("falls back to metadata stub when registry does not have matching model", () => {
     const circuit = new Circuit({ name: "Main" });
     circuit.metadata.modelDefinitions = {
-      "orphan": { ports: ["a", "b"], elementCount: 5 },
+      "orphan": {
+        ports: ["a", "b"],
+        elements: [],
+        internalNetCount: 0,
+        netlist: [],
+      },
     };
 
     const emptyRegistry = new SubcircuitModelRegistry();
@@ -302,9 +340,9 @@ R1 vin vout 1k
     const parsed = JSON.parse(json) as Record<string, unknown>;
     const modelDefs = parsed["modelDefinitions"] as Record<string, unknown>;
     const orphan = modelDefs["orphan"] as Record<string, unknown>;
-    const attrs = orphan["attributes"] as Record<string, string>;
-    // Stub form: attributes contain ports and elementCount
-    expect(attrs["elementCount"]).toBe("5");
-    expect(JSON.parse(attrs["ports"])).toEqual(["a", "b"]);
+    expect((orphan["ports"] as string[])).toEqual(["a", "b"]);
+    expect((orphan["elements"] as unknown[])).toHaveLength(0);
+    expect(orphan["internalNetCount"]).toBe(0);
+    expect((orphan["netlist"] as unknown[])).toHaveLength(0);
   });
 });

@@ -256,21 +256,21 @@ describe("PNP", () => {
 
 describe("Registration", () => {
   describe("npn_darlington_registered", () => {
-    it("DarlingtonNPN has subcircuitModel set", () => {
-      expect(DarlingtonNpnDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonNPN");
+    it("DarlingtonNPN has subcircuitRefs set", () => {
+      expect(DarlingtonNpnDefinition.subcircuitRefs?.cmos).toBe("DarlingtonNPN");
     });
 
     it("DarlingtonNPN is in SEMICONDUCTORS category", () => {
       expect(DarlingtonNpnDefinition.category).toBe(ComponentCategory.SEMICONDUCTORS);
     });
 
-    it("DarlingtonNPN has analog model only", () => {
-      expect(DarlingtonNpnDefinition.models?.mnaModels?.cmos).toBeDefined();
+    it("DarlingtonNPN has subcircuitRefs only", () => {
+      expect(DarlingtonNpnDefinition.subcircuitRefs?.cmos).toBeDefined();
       expect(DarlingtonNpnDefinition.models?.digital).toBeUndefined();
     });
 
-    it("DarlingtonPNP has subcircuitModel set", () => {
-      expect(DarlingtonPnpDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonPNP");
+    it("DarlingtonPNP has subcircuitRefs set", () => {
+      expect(DarlingtonPnpDefinition.subcircuitRefs?.cmos).toBe("DarlingtonPNP");
     });
 
     it("registerDarlingtonModels registers both models in registry", () => {
@@ -286,17 +286,15 @@ describe("Registration", () => {
 
     it("NPN Darlington subcircuit has R_BE resistor element", () => {
       const registry = makeRegistry();
-      const subcircuit = registry.get("DarlingtonNPN");
-      expect(subcircuit).toBeDefined();
+      const netlist = registry.get("DarlingtonNPN");
+      expect(netlist).toBeDefined();
 
-      const resistors = subcircuit!.elements.filter(
+      const resistors = netlist!.elements.filter(
         (el) => el.typeId === "Resistor",
       );
       expect(resistors).toHaveLength(1);
 
-      // R_BE should be 10kΩ
-      const rbeProps = resistors[0].getProperties();
-      expect(rbeProps.getOrDefault<number>("resistance", 0)).toBe(10000);
+      expect(resistors[0].params?.resistance).toBe(10000);
     });
 
     it("NPN Darlington interface pins are B, C, E", () => {

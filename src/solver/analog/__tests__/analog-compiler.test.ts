@@ -518,17 +518,10 @@ describe("SimulationMode", () => {
   it("analog_internals_with_transistorModel_but_no_registry_emits_diagnostic", () => {
     const propsMap = new Map<string, PropertyValue>([["simulationModel", "cmos"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
-    // Add subcircuitModel to the registered definition so the transistor path is triggered
     const def = registry.get("BehavioralAnd")!;
     registry.update({
       ...def,
-      models: {
-        ...def.models,
-        mnaModels: {
-          behavioral: { ...def.models.mnaModels?.behavioral },
-          cmos: { subcircuitModel: "CmosAnd2" },
-        },
-      },
+      subcircuitRefs: { cmos: "CmosAnd2" },
     });
 
     const compiled = compileUnified(circuit, registry).analog!;

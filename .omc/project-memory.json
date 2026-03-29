@@ -253,20 +253,20 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 383,
-      "lastAccessed": 1774759298403,
+      "accessCount": 391,
+      "lastAccessed": 1774766101062,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 196,
-      "lastAccessed": 1774759868381,
+      "accessCount": 205,
+      "lastAccessed": 1774766280405,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 121,
-      "lastAccessed": 1774761106980,
+      "accessCount": 131,
+      "lastAccessed": 1774766436404,
       "type": "file"
     },
     {
@@ -277,14 +277,14 @@
     },
     {
       "path": "",
-      "accessCount": 98,
-      "lastAccessed": 1774759830393,
+      "accessCount": 102,
+      "lastAccessed": 1774761249897,
       "type": "directory"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 89,
-      "lastAccessed": 1774759850887,
+      "accessCount": 101,
+      "lastAccessed": 1774766391670,
       "type": "directory"
     },
     {
@@ -295,14 +295,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 67,
-      "lastAccessed": 1774759334673,
+      "accessCount": 72,
+      "lastAccessed": 1774765522968,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 49,
-      "lastAccessed": 1774759586407,
+      "accessCount": 55,
+      "lastAccessed": 1774766357452,
       "type": "directory"
     },
     {
@@ -313,20 +313,20 @@
     },
     {
       "path": "src\\components",
-      "accessCount": 41,
-      "lastAccessed": 1774752208339,
+      "accessCount": 44,
+      "lastAccessed": 1774766427737,
       "type": "directory"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 39,
-      "lastAccessed": 1774759338888,
+      "accessCount": 42,
+      "lastAccessed": 1774766322843,
       "type": "file"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 34,
-      "lastAccessed": 1774759334713,
+      "accessCount": 36,
+      "lastAccessed": 1774765523913,
       "type": "file"
     },
     {
@@ -348,15 +348,15 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 28,
-      "lastAccessed": 1774744317727,
+      "path": "spec\\.context\\reviewer.md",
+      "accessCount": 29,
+      "lastAccessed": 1774764821001,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 26,
-      "lastAccessed": 1774747611302,
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 28,
+      "lastAccessed": 1774744317727,
       "type": "file"
     },
     {
@@ -364,6 +364,12 @@
       "accessCount": 26,
       "lastAccessed": 1774759631589,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\model-parser.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774765541590,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
@@ -381,12 +387,6 @@
       "path": "src\\headless\\default-facade.ts",
       "accessCount": 21,
       "lastAccessed": 1774758418390,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\model-parser.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774759620871,
       "type": "directory"
     },
     {
@@ -480,6 +480,12 @@
       "type": "file"
     },
     {
+      "path": "src\\headless\\__tests__",
+      "accessCount": 7,
+      "lastAccessed": 1774761307782,
+      "type": "directory"
+    },
+    {
       "path": "src\\headless\\__tests__\\default-facade.test.ts",
       "accessCount": 6,
       "lastAccessed": 1774696224789,
@@ -490,12 +496,6 @@
       "accessCount": 6,
       "lastAccessed": 1774747574583,
       "type": "file"
-    },
-    {
-      "path": "src\\headless\\__tests__",
-      "accessCount": 6,
-      "lastAccessed": 1774747691551,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\triac.ts",

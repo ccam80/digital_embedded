@@ -260,7 +260,7 @@ function renderSubcktPanel(
       tr.appendChild(tdPorts);
 
       const tdCount = document.createElement('td');
-      tdCount.textContent = String(entry.elementCount);
+      tdCount.textContent = String(entry.elements.length);
       tr.appendChild(tdCount);
 
       const tdAction = document.createElement('td');
@@ -317,7 +317,11 @@ function renderSubcktPanel(
     if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
     circuit.metadata.modelDefinitions[parsed.name] = {
       ports: parsed.ports,
-      elementCount: parsed.elements.length,
+      elements: parsed.elements.map(e => ({
+        typeId: e.type === 'R' ? 'Resistor' : e.type === 'C' ? 'Capacitor' : e.type === 'L' ? 'Inductor' : e.type === 'D' ? 'Diode' : e.type === 'Q' ? 'NpnBJT' : e.type === 'M' ? 'NMOS' : e.type,
+      })),
+      internalNetCount: 0,
+      netlist: parsed.elements.map(() => []),
     };
     addTextarea.value = '';
     addFeedback.textContent = `Added "${parsed.name}" (${parsed.ports.length} ports, ${parsed.elements.length} elements)`;

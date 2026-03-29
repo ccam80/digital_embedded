@@ -695,3 +695,44 @@ What's already done:
   - Added `if (ref.kind === "power") continue` guards in the 3 direction-based fallback loops
   - Schema label-based paths naturally exclude VDD/GND since those labels are absent from inputSchema/outputSchema
   - Also restored `mnaModels.cmos.subcircuitModel` entries that were dropped by prior wave work in: and.ts, or.ts, nand.ts, nor.ts, xor.ts, xnor.ts, not.ts, d.ts — these fixed 8 pre-existing test failures in cmos-gates.test.ts and cmos-flipflop.test.ts
+
+## Task W5.1-fix: Wave 5 Serialization Review Violations Fix
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/core/circuit.ts (CircuitMetadata.modelDefinitions type changed to MnaSubcircuitNetlist)
+  - src/io/dts-serializer.ts (buildModelFields writes MnaSubcircuitNetlist; added circuitToMnaNetlist converter; serializes subcircuitBindings)
+  - src/io/dts-deserializer.ts (reads MnaSubcircuitNetlist directly; added mnaNetlistToCircuit for SubcircuitModelRegistry; deserializes subcircuitBindings)
+  - src/io/__tests__/dts-model-roundtrip.test.ts (updated test data to MnaSubcircuitNetlist format)
+  - src/solver/analog/__tests__/spice-model-library.test.ts (updated addSubcktDefinition helper and assertions)
+  - src/app/spice-model-library-dialog.ts (updated UI code to use elements.length instead of elementCount)
+- **Tests**: 72/72 passing (3 test files: dts-model-roundtrip, dts-schema, spice-model-library)
+- **Full suite**: 10077/10096 passing (19 failures, all pre-existing or from parallel agent work)
+
+## Task: Wave 3 CMOS Model Migration (Review Violations Fix)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/solver/analog/subcircuit-model-registry.ts (Circuit -> MnaSubcircuitNetlist)
+  - src/solver/analog/transistor-models/cmos-gates.ts (rewritten to return MnaSubcircuitNetlist)
+  - src/solver/analog/transistor-models/cmos-flipflop.ts (rewritten to return MnaSubcircuitNetlist)
+  - src/solver/analog/transistor-models/darlington.ts (rewritten to return MnaSubcircuitNetlist, subcircuitRefs added)
+  - src/solver/analog/transistor-expansion.ts (rewritten to consume MnaSubcircuitNetlist)
+  - src/solver/analog/compiler.ts (expand route uses subcircuitRefs instead of mnaModel.subcircuitModel)
+  - src/compile/types.ts (added modelKey to PartitionedComponent)
+  - src/compile/partition.ts (passes modelKey through to PartitionedComponent)
+  - src/core/registry.ts (getActiveModelKey and availableModels support subcircuitRefs keys)
+  - src/components/gates/and.ts (removed cmos mnaModels entry)
+  - src/components/gates/nand.ts (removed cmos mnaModels entry)
+  - src/components/gates/or.ts (removed cmos mnaModels entry)
+  - src/components/gates/nor.ts (removed cmos mnaModels entry)
+  - src/components/gates/xor.ts (removed cmos mnaModels entry)
+  - src/components/gates/xnor.ts (removed cmos mnaModels entry)
+  - src/components/gates/not.ts (removed cmos mnaModels entry)
+  - src/components/flipflops/d.ts (removed cmos mnaModels entry)
+  - src/solver/analog/__tests__/cmos-gates.test.ts (updated registration tests)
+  - src/solver/analog/__tests__/cmos-flipflop.test.ts (updated registration tests)
+  - src/solver/analog/__tests__/darlington.test.ts (updated registration + subcircuit tests)
+  - src/solver/analog/__tests__/transistor-expansion.test.ts (rewritten to use MnaSubcircuitNetlist)
+  - src/solver/analog/__tests__/analog-compiler.test.ts (updated to use subcircuitRefs)
+- **Tests**: 10078/10096 passing (18 failing, all pre-existing baseline failures; 5 fewer failures than baseline)

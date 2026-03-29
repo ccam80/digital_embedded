@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 10062,
-      "failed": 34,
+      "passed": 10070,
+      "failed": 26,
       "skipped": 0,
       "totalFiles": 341,
-      "durationSeconds": 40.7
+      "durationSeconds": 13.5
     },
     "playwright": {
-      "passed": 480,
-      "failed": 62,
+      "passed": 487,
+      "failed": 55,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 282.9961349999999
+      "durationSeconds": 225.32744
     },
-    "totalFailed": 96,
-    "totalPassed": 10542
+    "totalFailed": 81,
+    "totalPassed": 10557
   },
   "failures": {
     "vitest": [
@@ -136,54 +136,6 @@
             "test": "analog_internals_without_transistorModel_falls_through_to_analogFactory",
             "line": 554,
             "column": 24
-          }
-        ]
-      },
-      {
-        "message": "expected undefined to be 'CmosDFlipflop' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-            "test": "d_flipflop_has_transistor_model",
-            "line": 551,
-            "column": 66
-          }
-        ]
-      },
-      {
-        "message": "expected undefined to be defined",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-            "test": "d_flipflop_has_analog_mode",
-            "line": 555,
-            "column": 66
-          }
-        ]
-      },
-      {
-        "message": "expected undefined to be 'CmosInverter' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\cmos-gates.test.ts",
-            "test": "not_has_transistor_model",
-            "line": 801,
-            "column": 68
-          }
-        ]
-      },
-      {
-        "message": "Not transistorModel: expected undefined to be defined",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\cmos-gates.test.ts",
-            "test": "all_gates_have_transistor_mode",
-            "line": 816,
-            "column": 87
           }
         ]
       }
@@ -533,55 +485,13 @@
       },
       {
         "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "count": 9,
+        "count": 2,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "triac dimmer: phase-angle AC control",
             "line": 1828,
             "column": 5
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "And works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Or works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Not works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NAnd works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XNOr works in cmos mode",
-            "line": 766,
-            "column": 9
           },
           {
             "file": "gui/mixed-circuit-assembly.spec.ts",

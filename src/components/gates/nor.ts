@@ -177,9 +177,6 @@ export const NOrDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeNorAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosNor2",
-      },
     },
   },
   defaultModel: "digital",

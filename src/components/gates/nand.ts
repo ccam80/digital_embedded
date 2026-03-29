@@ -161,9 +161,6 @@ export const NAndDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeNandAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosNand2",
-      },
     },
   },
   defaultModel: "digital",

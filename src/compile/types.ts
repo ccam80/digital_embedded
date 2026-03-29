@@ -134,6 +134,7 @@ export interface ConnectivityGroup {
 export interface PartitionedComponent {
   element: CircuitElement;
   definition: ComponentDefinition;
+  modelKey: string;
   model: DigitalModel | MnaModel;
   resolvedPins: ResolvedGroupPin[];
 }

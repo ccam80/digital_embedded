@@ -171,9 +171,6 @@ export const OrDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeOrAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosOr2",
-      },
     },
   },
   defaultModel: "digital",

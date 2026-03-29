@@ -260,9 +260,6 @@ export const NotDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeNotAnalogFactory(),
     },
-      cmos: {
-        subcircuitModel: "CmosInverter",
-      },
     },
   },
   defaultModel: "digital",

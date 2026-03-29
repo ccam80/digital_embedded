@@ -161,9 +161,6 @@ export const AndDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeAndAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosAnd2",
-      },
     },
   },
   defaultModel: "digital",

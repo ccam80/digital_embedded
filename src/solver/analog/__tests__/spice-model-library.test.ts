@@ -13,6 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Circuit } from "../../../core/circuit.js";
+import type { MnaSubcircuitNetlist } from "../../../core/mna-subcircuit-netlist.js";
 import { parseModelCard, parseSubcircuit } from "../model-parser.js";
 import { buildSpiceSubcircuit } from "../../../io/spice-model-builder.js";
 import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
@@ -50,10 +51,13 @@ function addSubcktDefinition(
   const builtCircuit = buildSpiceSubcircuit(parsed);
   registry.register(parsed.name, builtCircuit);
   if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
-  circuit.metadata.modelDefinitions[parsed.name] = {
+  const nlDef: MnaSubcircuitNetlist = {
     ports: parsed.ports,
-    elementCount: parsed.elements.length,
+    elements: parsed.elements.map(e => ({ typeId: e.type === 'R' ? 'Resistor' : e.type === 'Q' ? 'NpnBJT' : e.type })),
+    internalNetCount: 0,
+    netlist: parsed.elements.map(() => []),
   };
+  circuit.metadata.modelDefinitions[parsed.name] = nlDef;
   return { name: parsed.name };
 }
 
@@ -142,7 +146,7 @@ Q1 C B E QMOD
     expect(defs).toBeDefined();
     expect(defs!["MYBJT"]).toBeDefined();
     expect(defs!["MYBJT"].ports).toEqual(["C", "B", "E"]);
-    expect(defs!["MYBJT"].elementCount).toBe(1);
+    expect(defs!["MYBJT"].elements).toHaveLength(1);
   });
 
   it("registers the circuit in SubcircuitModelRegistry when adding a subcircuit", () => {
@@ -205,7 +209,7 @@ R2 OUT GND 1K
     const defs = circuit.metadata.modelDefinitions!;
     expect(defs["BJT1"]).toBeUndefined();
     expect(defs["RDIV"].ports).toEqual(["IN", "OUT", "GND"]);
-    expect(defs["RDIV"].elementCount).toBe(2);
+    expect(defs["RDIV"].elements).toHaveLength(2);
   });
 
   it("returns error for invalid .SUBCKT text without storing anything", () => {

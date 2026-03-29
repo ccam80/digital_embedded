@@ -278,6 +278,11 @@ export function availableModels(def: ComponentDefinition): string[] {
   const keys: string[] = [];
   if (def.models?.digital) keys.push('digital');
   if (def.models?.mnaModels) keys.push(...Object.keys(def.models.mnaModels));
+  if (def.subcircuitRefs) {
+    for (const k of Object.keys(def.subcircuitRefs)) {
+      if (!keys.includes(k)) keys.push(k);
+    }
+  }
   return keys;
 }
 
@@ -301,9 +306,11 @@ export function getActiveModelKey(
   if (typeof prop === 'string' && prop.length > 0) {
     if (prop === 'digital' && def.models.digital) return prop;
     if (def.models.mnaModels?.[prop]) return prop;
+    if (def.subcircuitRefs?.[prop]) return prop;
     const validKeys: string[] = [];
     if (def.models.digital) validKeys.push('digital');
     validKeys.push(...Object.keys(def.models.mnaModels ?? {}));
+    validKeys.push(...Object.keys(def.subcircuitRefs ?? {}));
     throw new Error(
       `Unknown simulationModel "${prop}" on ${el.instanceId}; valid keys: ${validKeys.join(', ')}`,
     );

@@ -169,9 +169,6 @@ export const XOrDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeXorAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosXor2",
-      },
     },
   },
   defaultModel: "digital",

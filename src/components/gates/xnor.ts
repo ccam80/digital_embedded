@@ -177,9 +177,6 @@ export const XNOrDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeXnorAnalogFactory(0),
     },
-      cmos: {
-        subcircuitModel: "CmosXnor2",
-      },
     },
   },
   defaultModel: "digital",

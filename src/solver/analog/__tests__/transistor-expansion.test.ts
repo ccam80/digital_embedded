@@ -4,19 +4,13 @@
  * Tests call expandTransistorModel() directly to verify the expansion logic
  * independently from the full compiler pipeline.
  *
- * A minimal CMOS inverter model is used:
- *   - PMOS: source→VDD, gate→in, drain→out
- *   - NMOS: source→GND, gate→in, drain→out
- *   - In "in" (interface pin, maps to outer input node)
- *   - In "VDD" (VDD rail, maps to vddNodeId)
- *   - In "GND" (GND rail, maps to gndNodeId = 0)
- *   - Out "out" (interface pin, maps to outer output node)
- *
- * The subcircuit Circuit uses wires to connect pins; wire positions encode connectivity.
+ * A minimal CMOS inverter MnaSubcircuitNetlist is used:
+ *   - PMOS: gate=in, drain=out, source=VDD, body=VDD
+ *   - NMOS: gate=in, drain=out, source=GND, body=GND
+ *   - Ports: in=0, out=1, VDD=2, GND=3
  */
 
 import { describe, it, expect } from "vitest";
-import { Circuit, Wire } from "../../../core/circuit.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import type { Pin } from "../../../core/pin.js";
@@ -27,6 +21,7 @@ import type { ComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import type { MnaSubcircuitNetlist } from "../../../core/mna-subcircuit-netlist.js";
 import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
 import {
   expandTransistorModel,
@@ -128,79 +123,35 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "",
+    subcircuitRefs: transistorModel ? { cmos: transistorModel } : undefined,
     models: {
       digital: { executeFn: () => {} },
-      mnaModels: {
-        cmos: { subcircuitModel: transistorModel },
-      },
     },
     defaultModel: "digital",
   };
 }
 
 // ---------------------------------------------------------------------------
-// CMOS inverter subcircuit builder
+// CMOS inverter MnaSubcircuitNetlist
 //
-// Connectivity (all positions encode wire endpoints):
-//   in node  — x=10: wire group for "in" input + PMOS gate + NMOS gate
-//   out node — x=20: wire group for PMOS drain + NMOS drain + "out" output
-//   VDD node — x=30: wire group for VDD In + PMOS source
-//   GND node — x=40: wire group for GND In + NMOS source
-//
-// Wire protocol: connect pin to wire if pin.x == wire.start.x
-// (We place components at unique X positions so their pins sit at wire endpoints.)
+// Ports: in=0, out=1, VDD=2, GND=3
+// PMOS: gate=in, drain=out, source=VDD, body=VDD
+// NMOS: gate=in, drain=out, source=GND, body=GND
 // ---------------------------------------------------------------------------
 
-function buildCmosInverterSubcircuit(): Circuit {
-  const circuit = new Circuit();
-
-  // Interface elements
-  // In "in": has pin at x=10
-  const inEl = makeElement("In", "in-el", [{ x: 10, y: 0, label: "out" }], [["label", "in"]]);
-  // In "VDD": has pin at x=30
-  const vddEl = makeElement("In", "vdd-el", [{ x: 30, y: 0, label: "out" }], [["label", "VDD"]]);
-  // In "GND": has pin at x=40
-  const gndEl = makeElement("In", "gnd-el", [{ x: 40, y: 0, label: "out" }], [["label", "GND"]]);
-  // Out "out": has pin at x=20
-  const outEl = makeElement("Out", "out-el", [{ x: 20, y: 0, label: "in" }], [["label", "out"]]);
-
-  // PMOS: D=x=20, G=x=10, S=x=30
-  const pmosEl = makeElement("PMOS", "pmos-el", [
-    { x: 20, y: 2, label: "D" },
-    { x: 10, y: 2, label: "G" },
-    { x: 30, y: 2, label: "S" },
-  ]);
-
-  // NMOS: D=x=20, G=x=10, S=x=40
-  const nmosEl = makeElement("NMOS", "nmos-el", [
-    { x: 20, y: 4, label: "D" },
-    { x: 10, y: 4, label: "G" },
-    { x: 40, y: 4, label: "S" },
-  ]);
-
-  circuit.addElement(inEl);
-  circuit.addElement(vddEl);
-  circuit.addElement(gndEl);
-  circuit.addElement(outEl);
-  circuit.addElement(pmosEl);
-  circuit.addElement(nmosEl);
-
-  // Wires connecting components on the same net by shared X coordinate
-  // Net: x=10 (in) — connects In "in" and both gates
-  circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 2 }));
-  circuit.addWire(new Wire({ x: 10, y: 2 }, { x: 10, y: 4 }));
-
-  // Net: x=20 (out) — connects PMOS drain, NMOS drain, Out "out"
-  circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 2 }));
-  circuit.addWire(new Wire({ x: 20, y: 2 }, { x: 20, y: 4 }));
-
-  // Net: x=30 (VDD) — connects VDD In and PMOS source
-  circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 2 }));
-
-  // Net: x=40 (GND) — connects GND In and NMOS source
-  circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 4 }));
-
-  return circuit;
+function buildCmosInverterNetlist(): MnaSubcircuitNetlist {
+  return {
+    ports: ["in", "out", "VDD", "GND"],
+    elements: [
+      { typeId: "PMOS", modelRef: "PMOS_DEFAULT" },
+      { typeId: "NMOS", modelRef: "NMOS_DEFAULT" },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 2],  // PMOS: gate=in, drain=out, source=VDD, body=VDD
+      [0, 1, 3, 3],  // NMOS: gate=in, drain=out, source=GND, body=GND
+    ],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +161,7 @@ function buildCmosInverterSubcircuit(): Circuit {
 describe("Expansion", () => {
   it("expands_inverter_to_two_mosfets", () => {
     const modelRegistry = new SubcircuitModelRegistry();
-    const subcircuit = buildCmosInverterSubcircuit();
+    const subcircuit = buildCmosInverterNetlist();
     modelRegistry.register("CmosInverter", subcircuit);
 
     const def = makeComponentDef("Not", ["in", "out"], "CmosInverter");
@@ -231,7 +182,7 @@ describe("Expansion", () => {
 
   it("interface_pins_mapped_correctly", () => {
     const modelRegistry = new SubcircuitModelRegistry();
-    const subcircuit = buildCmosInverterSubcircuit();
+    const subcircuit = buildCmosInverterNetlist();
     modelRegistry.register("CmosInverter", subcircuit);
 
     const def = makeComponentDef("Not", ["in", "out"], "CmosInverter");
@@ -267,19 +218,20 @@ describe("Expansion", () => {
     }
 
     // PMOS gate and NMOS gate must both connect to the outer input node
-    const gateNodes = result.elements.map((el) => el.pinNodeIds[1]); // G is index 1 (D,G,S)
+    // Netlist pin order: gate=0, drain=1, source=2, body=3
+    const gateNodes = result.elements.map((el) => el.pinNodeIds[0]);
     for (const gNode of gateNodes) {
       expect(gNode).toBe(outerInNode);
     }
 
     // PMOS drain and NMOS drain must both connect to the outer output node
-    const drainNodes = result.elements.map((el) => el.pinNodeIds[0]); // D is index 0
+    const drainNodes = result.elements.map((el) => el.pinNodeIds[1]);
     for (const dNode of drainNodes) {
       expect(dNode).toBe(outerOutNode);
     }
 
     // PMOS source must be VDD
-    const pmosSource = result.elements[0].pinNodeIds[2]; // S is index 2
+    const pmosSource = result.elements[0].pinNodeIds[2];
     expect(pmosSource).toBe(vddNodeId);
 
     // NMOS source must be GND
@@ -291,7 +243,7 @@ describe("Expansion", () => {
     // For the CMOS inverter, there are no internal nodes — all nodes are interface.
     // Use a version with an internal node (simulate by checking nextNode increments).
     const modelRegistry = new SubcircuitModelRegistry();
-    const subcircuit = buildCmosInverterSubcircuit();
+    const subcircuit = buildCmosInverterNetlist();
     modelRegistry.register("CmosInverter", subcircuit);
 
     const def = makeComponentDef("Not", ["in", "out"], "CmosInverter");
@@ -351,20 +303,18 @@ describe("Expansion", () => {
   it("invalid_model_with_digital_components_emits_diagnostic", () => {
     const modelRegistry = new SubcircuitModelRegistry();
 
-    // Subcircuit containing a digital-only component (FlipflopD has no analogFactory)
-    const subcircuit = new Circuit();
-    // In "in" interface element
-    const inEl = makeElement("In", "in-el", [{ x: 10, y: 0, label: "out" }], [["label", "in"]]);
-    // FlipflopD — digital-only (no analogFactory registered)
-    const flipflop = makeElement("FlipflopD", "ff-el", [
-      { x: 10, y: 2, label: "D" },
-      { x: 20, y: 2, label: "Q" },
-    ]);
-    subcircuit.addElement(inEl);
-    subcircuit.addElement(flipflop);
-    subcircuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 2 }));
+    const badNetlist: MnaSubcircuitNetlist = {
+      ports: ["in"],
+      elements: [
+        { typeId: "FlipflopD" },
+      ],
+      internalNetCount: 1,
+      netlist: [
+        [0, 1],
+      ],
+    };
 
-    modelRegistry.register("BadModel", subcircuit);
+    modelRegistry.register("BadModel", badNetlist);
 
     const def = makeComponentDef("BadGate", ["in"], "BadModel");
 
@@ -388,7 +338,7 @@ describe("Expansion", () => {
     // Two NOT gates expanded from same model, sharing the same nextNodeId closure.
     // Each must get independent internal node IDs (no sharing).
     const modelRegistry = new SubcircuitModelRegistry();
-    const subcircuit = buildCmosInverterSubcircuit();
+    const subcircuit = buildCmosInverterNetlist();
     modelRegistry.register("CmosInverter", subcircuit);
 
     const def = makeComponentDef("Not", ["in", "out"], "CmosInverter");

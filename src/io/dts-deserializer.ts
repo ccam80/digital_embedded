@@ -10,9 +10,13 @@ import type { CircuitMetadata } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
-import type { Rotation } from '../core/pin.js';
+import type { Rotation, Pin } from '../core/pin.js';
+import { PinDirection, pinWorldPosition } from '../core/pin.js';
+import type { CircuitElement } from '../core/element.js';
+import type { Rect, RenderContext } from '../core/renderer-interface.js';
 import type { ModelLibrary } from '../solver/analog/model-library.js';
 import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
+import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import { validateDtsDocument } from './dts-schema.js';
 import type { DtsCircuit, DtsElement, DtsWire } from './dts-schema.js';
 
@@ -174,6 +178,112 @@ function createWire(savedWire: DtsWire): Wire {
 }
 
 // ---------------------------------------------------------------------------
+// MnaSubcircuitNetlist -> Circuit conversion (for SubcircuitModelRegistry)
+// ---------------------------------------------------------------------------
+
+const TYPE_PIN_LABELS: Record<string, string[]> = {
+  Resistor: ['A', 'B'],
+  Capacitor: ['A', 'B'],
+  Inductor: ['A', 'B'],
+  Diode: ['A', 'K'],
+  NpnBJT: ['B', 'C', 'E'],
+  PnpBJT: ['B', 'C', 'E'],
+  NMOS: ['G', 'D', 'S'],
+  PMOS: ['G', 'D', 'S'],
+  NJFET: ['G', 'S', 'D'],
+  PJFET: ['G', 'S', 'D'],
+  DcVoltageSource: ['neg', 'pos'],
+  CurrentSource: ['pos', 'neg'],
+};
+
+let _nlCounter = 0;
+
+function makeNlPin(x: number, y: number, label: string): Pin {
+  return {
+    position: { x, y },
+    label,
+    direction: PinDirection.BIDIRECTIONAL,
+    isInverted: false,
+    isClock: false,
+    bitWidth: 1,
+  };
+}
+
+function makeNlElement(
+  typeId: string,
+  pins: Array<{ x: number; y: number; label: string }>,
+  propsEntries: Array<[string, string | number | boolean]> = [],
+): CircuitElement {
+  const instanceId = typeId + '-nl-' + (++_nlCounter);
+  const resolvedPins = pins.map(p => makeNlPin(p.x, p.y, p.label));
+  const propsMap = new Map<string, PropertyValue>(
+    propsEntries as Array<[string, PropertyValue]>,
+  );
+  const propertyBag = new PropertyBag(propsMap.entries());
+  return {
+    typeId,
+    instanceId,
+    position: { x: 0, y: 0 },
+    rotation: 0 as Rotation,
+    mirror: false,
+    getPins() { return resolvedPins; },
+    getProperties() { return propertyBag; },
+    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
+    draw(_ctx: RenderContext) {},
+    serialize() {
+      return { typeId, instanceId, position: { x: 0, y: 0 }, rotation: 0 as 0, mirror: false, properties: {} };
+    },
+    getAttribute(k: string) { return propsMap.get(k); },
+  } as CircuitElement;
+}
+
+function mnaNetlistToCircuit(
+  def: MnaSubcircuitNetlist,
+  name: string,
+): Circuit {
+  const circuit = new Circuit({ name });
+
+  function netToX(n: number): number { return n + 1; }
+
+  for (let i = 0; i < def.ports.length; i++) {
+    circuit.addElement(makeNlElement('In', [
+      { x: netToX(i), y: 0, label: 'out' },
+    ], [['label', def.ports[i]]]));
+  }
+
+  let yRow = 2;
+  for (let eIdx = 0; eIdx < def.elements.length; eIdx++) {
+    const subEl = def.elements[eIdx];
+    const conn = def.netlist[eIdx];
+    const labels = TYPE_PIN_LABELS[subEl.typeId] ?? conn.map((_: number, i: number) => 'p' + i);
+
+    const props: Array<[string, string | number | boolean]> = [];
+    if (subEl.params !== undefined) {
+      props.push(['_spiceModelOverrides', JSON.stringify(subEl.params)]);
+      for (const [k, v] of Object.entries(subEl.params)) {
+        if (typeof v === 'number') props.push([k, v]);
+      }
+    }
+    if (subEl.modelRef !== undefined) props.push(['subcircuitModel', subEl.modelRef]);
+
+    const pins = conn.map((ni: number, pIdx: number) => ({
+      x: netToX(ni),
+      y: yRow,
+      label: labels[pIdx] ?? ('p' + pIdx),
+    }));
+
+    circuit.addElement(makeNlElement(subEl.typeId, pins, props));
+
+    for (const pin of pins) {
+      circuit.addWire(new Wire({ x: pin.x, y: 0 }, { x: pin.x, y: yRow }));
+    }
+    yRow += 2;
+  }
+
+  return circuit;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -239,32 +349,19 @@ export function deserializeDts(
   }
 
   if (doc.modelDefinitions !== undefined) {
-    const modelDefinitions: Record<string, { ports: string[]; elementCount: number }> = {};
-    for (const [name, dtsDef] of Object.entries(doc.modelDefinitions)) {
-      const attrs = dtsDef.attributes ?? {};
-      const hasTopology = dtsDef.elements.length > 0 || dtsDef.wires.length > 0;
-      let ports: string[];
-      let elementCount: number;
-      if (hasTopology) {
-        const modelCircuit = deserializeDtsCircuit(dtsDef, registry);
-        elementCount = modelCircuit.elements.length;
-        ports = attrs['ports'] !== undefined
-          ? (JSON.parse(attrs['ports']) as string[])
-          : [];
-        if (options?.transistorModelRegistry !== undefined) {
-          options.transistorModelRegistry.register(name, modelCircuit);
-        }
-      } else {
-        ports = attrs['ports'] !== undefined
-          ? (JSON.parse(attrs['ports']) as string[])
-          : [];
-        elementCount = attrs['elementCount'] !== undefined
-          ? parseInt(attrs['elementCount'], 10)
-          : 0;
+    const modelDefinitions: Record<string, MnaSubcircuitNetlist> = {};
+    for (const [name, nlDef] of Object.entries(doc.modelDefinitions)) {
+      modelDefinitions[name] = nlDef;
+      if (options?.transistorModelRegistry !== undefined && nlDef.elements.length > 0) {
+        const modelCircuit = mnaNetlistToCircuit(nlDef, name);
+        options.transistorModelRegistry.register(name, modelCircuit);
       }
-      modelDefinitions[name] = { ports, elementCount };
     }
     circuit.metadata.modelDefinitions = modelDefinitions;
+  }
+
+  if (doc.subcircuitBindings !== undefined) {
+    circuit.metadata.subcircuitBindings = doc.subcircuitBindings as Record<string, string>;
   }
 
   return { circuit, subcircuits };

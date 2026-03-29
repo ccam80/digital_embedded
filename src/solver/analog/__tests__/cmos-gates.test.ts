@@ -798,7 +798,7 @@ describe("CmosBuffer", () => {
 
 describe("Registration", () => {
   it("not_has_transistor_model", () => {
-    expect(NotDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("CmosInverter");
+    expect(NotDefinition.subcircuitRefs?.cmos).toBe("CmosInverter");
   });
 
   it("all_gates_have_transistor_mode", () => {
@@ -813,7 +813,7 @@ describe("Registration", () => {
     ];
 
     for (const { name, def } of gateTypes) {
-      expect(def.models?.mnaModels?.cmos?.subcircuitModel, `${name} transistorModel`).toBeDefined();
+      expect(def.subcircuitRefs?.cmos, `${name} transistorModel`).toBeDefined();
     }
   });
 

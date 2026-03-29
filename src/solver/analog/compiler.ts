@@ -52,7 +52,7 @@ function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistr
 
 type ComponentRoute =
   | { kind: 'stamp';  model: MnaModel }
-  | { kind: 'expand'; model: MnaModel; subcircuitModel: string }
+  | { kind: 'expand'; subcircuitModel: string }
   | { kind: 'bridge' }
   | { kind: 'skip' };
 
@@ -61,11 +61,17 @@ function resolveComponentRoute(
   pc: PartitionedComponent,
   digitalPinLoading: "cross-domain" | "all" | "none",
 ): ComponentRoute {
+  const hasMnaModels = def.models?.mnaModels !== undefined
+    && Object.keys(def.models.mnaModels).length > 0;
+
+  const subcircuitName = def.subcircuitRefs?.[pc.modelKey];
+  if (subcircuitName) {
+    return { kind: 'expand', subcircuitModel: subcircuitName };
+  }
+
   if (pc.model === null) return { kind: 'skip' };
 
   const isDigitalModel = 'executeFn' in pc.model;
-  const hasMnaModels = def.models?.mnaModels !== undefined
-    && Object.keys(def.models.mnaModels).length > 0;
 
   if (isDigitalModel) {
     if (digitalPinLoading === "all" && hasMnaModels) {
@@ -75,10 +81,6 @@ function resolveComponentRoute(
   }
 
   const mnaModel = pc.model as MnaModel;
-
-  if (mnaModel.subcircuitModel !== undefined) {
-    return { kind: 'expand', model: mnaModel, subcircuitModel: mnaModel.subcircuitModel };
-  }
 
   if (mnaModel.factory) {
     return { kind: 'stamp', model: mnaModel };
@@ -1064,6 +1066,7 @@ export function compileAnalogPartition(
           vddNodeId,
           0,
           () => nextInternalNode++,
+          route.subcircuitModel,
         );
 
         diagnostics.push(...expResult.diagnostics);

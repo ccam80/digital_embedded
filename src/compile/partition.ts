@@ -152,6 +152,7 @@ export function partitionByDomain(
     const partComp: PartitionedComponent = {
       element: el,
       definition: def,
+      modelKey: ma.modelKey,
       model: ma.model,
       resolvedPins,
     };

@@ -292,9 +292,6 @@ export const DDefinition: ComponentDefinition = {
       behavioral: {
       factory: makeDFlipflopAnalogFactory(),
     },
-      cmos: {
-        subcircuitModel: "CmosDFlipflop",
-      },
     },
   },
   defaultModel: "digital",

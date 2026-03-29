@@ -176,14 +176,9 @@ export interface CircuitMetadata {
   /**
    * Subcircuit model definitions imported from .SUBCKT blocks.
    * Keys are subcircuit names (e.g. "OPAMP", "MYBJT").
-   * Values are serialized Circuit JSON for persistence.
+   * Values are MnaSubcircuitNetlist objects for persistence.
    */
-  modelDefinitions?: Record<string, {
-    /** Port names in order (from the .SUBCKT header). */
-    ports: string[];
-    /** Serialized element count — informational only; the full Circuit is in SubcircuitModelRegistry. */
-    elementCount: number;
-  }>;
+  modelDefinitions?: Record<string, import("./mna-subcircuit-netlist.js").MnaSubcircuitNetlist>;
   /** Maps component instance IDs to their resolved subcircuit model name. */
   subcircuitBindings?: Record<string, string>;
 
