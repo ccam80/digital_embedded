@@ -16,6 +16,7 @@ import { parseSubcircuit } from '../solver/analog/model-parser.js';
 import type { Circuit } from '../core/circuit.js';
 import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import { getTransistorModels } from '../solver/analog/default-models.js';
+import { buildNetConnectivity } from '../core/mna-subcircuit-netlist.js';
 import type { MnaSubcircuitNetlist, SubcircuitElement } from '../core/mna-subcircuit-netlist.js';
 
 // ---------------------------------------------------------------------------
@@ -301,19 +302,9 @@ function renderSubcktPanel(
       assignBtn.className = 'spice-library-assign';
       assignBtn.textContent = 'Assign\u2026';
       assignBtn.addEventListener('click', () => {
-        const compType = window.prompt(
-          `Assign subcircuit "${name}" to component type.\nEnter: ComponentType:modelKey (e.g. "And:cmos" or "NMOS:custom")`,
-        );
-        if (!compType) return;
-        const trimmed = compType.trim();
-        if (!trimmed.includes(':')) {
-          window.alert('Format must be ComponentType:modelKey');
-          return;
-        }
-        if (!circuit.metadata.subcircuitBindings) circuit.metadata.subcircuitBindings = {};
-        circuit.metadata.subcircuitBindings[trimmed] = name;
-        onChange();
-        renderSubcktPanel(panel, circuit, onChange);
+        openAssignDialog(name, circuit, onChange, () => {
+          renderSubcktPanel(panel, circuit, onChange);
+        });
       });
       tdAction.appendChild(assignBtn);
 
@@ -420,6 +411,10 @@ function renderSubcktPanel(
       R: 'Resistor', C: 'Capacitor', L: 'Inductor',
       D: 'Diode', Q: 'NpnBJT', M: 'NMOS',
     };
+    const connectivity = buildNetConnectivity(
+      parsed.ports,
+      parsed.elements.map((e) => e.nodes),
+    );
     const netlist: MnaSubcircuitNetlist = {
       ports: parsed.ports,
       elements: parsed.elements.map((e): SubcircuitElement => {
@@ -427,8 +422,8 @@ function renderSubcktPanel(
         if (e.modelName !== undefined) el.modelRef = e.modelName;
         return el;
       }),
-      internalNetCount: 0,
-      netlist: parsed.elements.map(() => []),
+      internalNetCount: connectivity.internalNetCount,
+      netlist: connectivity.netlist,
     };
     modelRegistry.register(parsed.name, netlist);
     if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
@@ -454,4 +449,74 @@ function renderSubcktPanel(
   addSection.appendChild(addFeedback);
   addSection.appendChild(addBtn);
   panel.appendChild(addSection);
+}
+
+// ---------------------------------------------------------------------------
+// Assign-to-component-type modal
+// ---------------------------------------------------------------------------
+
+function openAssignDialog(
+  subcktName: string,
+  circuit: Circuit,
+  onChange: () => void,
+  onRefresh: () => void,
+): void {
+  const modal = createModal({
+    title: `Assign "${subcktName}"`,
+    className: 'spice-library-assign-dialog',
+  });
+
+  const { body } = modal;
+
+  const desc = document.createElement('p');
+  desc.textContent = 'Enter the component type and model key to bind this subcircuit to.';
+  body.appendChild(desc);
+
+  const inputLabel = document.createElement('label');
+  inputLabel.className = 'spice-library-assign-label';
+  inputLabel.textContent = 'ComponentType:modelKey';
+  body.appendChild(inputLabel);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'spice-library-assign-input';
+  input.placeholder = 'And:cmos or NMOS:custom';
+  body.appendChild(input);
+
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'spice-import-error';
+  errorDiv.style.display = 'none';
+  body.appendChild(errorDiv);
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'spice-import-buttons';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'spice-import-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => modal.close());
+
+  const okBtn = document.createElement('button');
+  okBtn.className = 'spice-import-apply';
+  okBtn.textContent = 'OK';
+  okBtn.addEventListener('click', () => {
+    const value = input.value.trim();
+    if (!value.includes(':')) {
+      errorDiv.textContent = 'Format must be ComponentType:modelKey';
+      errorDiv.style.display = '';
+      return;
+    }
+    if (!circuit.metadata.subcircuitBindings) circuit.metadata.subcircuitBindings = {};
+    circuit.metadata.subcircuitBindings[value] = subcktName;
+    onChange();
+    modal.close();
+    onRefresh();
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(okBtn);
+  body.appendChild(btnRow);
+
+  document.body.appendChild(modal.overlay);
+  input.focus();
 }

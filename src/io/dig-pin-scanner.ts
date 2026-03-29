@@ -68,6 +68,7 @@ export function scanDigPins(xml: string): PinDeclaration[] {
     }
 
     pins.push({
+      kind: "signal",
       direction: isIn ? PinDirection.INPUT : PinDirection.OUTPUT,
       label: label || (isIn ? `in_${pins.length}` : `out_${pins.length}`),
       defaultBitWidth: bits,

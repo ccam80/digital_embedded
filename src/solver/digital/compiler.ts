@@ -334,7 +334,7 @@ export function compileDigitalPartition(
       if (resolvedInputSchema) {
         const inputs: number[] = [];
         for (const label of resolvedInputSchema) {
-          const refIdx = refs.findIndex(r => r.pinLabel === label);
+          const refIdx = refs.findIndex(r => r.pinLabel === label && r.kind === "signal");
           if (refIdx >= 0) {
             inputs.push(slotToNetId(i, refIdx));
           }
@@ -344,7 +344,7 @@ export function compileDigitalPartition(
         if (resolvedOutputSchema) {
           const outputs: number[] = [];
           for (const label of resolvedOutputSchema) {
-            const refIdx = refs.findIndex(r => r.pinLabel === label);
+            const refIdx = refs.findIndex(r => r.pinLabel === label && r.kind === "signal");
             if (refIdx >= 0) {
               outputs.push(slotToNetId(i, refIdx));
             }

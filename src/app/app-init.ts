@@ -379,7 +379,7 @@ export function initApp(search?: string): void {
 
   // Initialize file I/O controller
   fileIOController = initFileIOController(ctx, {
-    onCircuitLoaded(): void { menuToolbar.rebuildInsertMenu(); },
+    onCircuitLoaded(): void { menuToolbar.rebuildInsertMenu(); menuToolbar.refreshPinLoadingIndicators(); },
   });
 
   // Initialize canvas interaction

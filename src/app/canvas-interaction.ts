@@ -35,6 +35,7 @@ export interface CanvasInteractionDeps {
 
 export interface CanvasInteraction {
   closePopup(): void;
+  openPopup(elementHit: CircuitElement, screenPt: { x: number; y: number }, container: HTMLElement): void;
   navigateBack(): void;
   openSubcircuit(name: string, subCircuit: Circuit): void;
   openMemoryEditor(element: CircuitElement): Promise<void>;
@@ -68,6 +69,7 @@ export function initCanvasInteraction(
 
   return {
     closePopup: popup.closePopup,
+    openPopup: popup.openPopup,
     navigateBack: navigator.navigateBack,
     openSubcircuit: navigator.openSubcircuit,
     openMemoryEditor: memoryEditor.openMemoryEditor,

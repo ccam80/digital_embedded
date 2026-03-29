@@ -397,6 +397,20 @@ describe("ComponentRegistry", () => {
       expect(models).toHaveLength(2);
     });
 
+    it("availableModels includes subcircuitRefs keys alongside mnaModels keys", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("GateWithSubcircuit"),
+        models: { mnaModels: { behavioral: { factory: stubAnalogFactory } } },
+        subcircuitRefs: { cmos: "CmosAnd2" },
+      };
+      registry.register(def);
+      const stored = registry.get("GateWithSubcircuit")!;
+      const models = availableModels(stored);
+      expect(models).toContain("behavioral");
+      expect(models).toContain("cmos");
+      expect(models).toHaveLength(2);
+    });
+
     it("models field is preserved through register()", () => {
       const def = makeDefinition("AutoPop");
       registry.register(def);
@@ -635,6 +649,20 @@ describe("ComponentRegistry", () => {
       };
       const el = makeMockElementWithProp("e1", undefined);
       expect(() => getActiveModelKey(el, def)).toThrow(/no models/);
+    });
+
+    it("returns simulationModel prop when it resolves via subcircuitRefs", () => {
+      const def: ComponentDefinition = {
+        ...makeDefinition("CmosAndGate"),
+        models: {
+          digital: { executeFn: noopExecuteFn },
+          mnaModels: { behavioral: { factory: stubMnaFactory } },
+        },
+        subcircuitRefs: { cmos: "CmosAnd2" },
+        defaultModel: "digital",
+      };
+      const el = makeMockElementWithProp("and-cmos", "cmos");
+      expect(getActiveModelKey(el, def)).toBe("cmos");
     });
   });
 

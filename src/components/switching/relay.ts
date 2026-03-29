@@ -65,6 +65,7 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
 
   // Coil input pins above (negative y): in1 at (0,-2), in2 at (2,-2)
   decls.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "in1",
     defaultBitWidth: 1,
@@ -73,6 +74,7 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
     isClockCapable: false,
   });
   decls.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "in2",
     defaultBitWidth: 1,
@@ -85,6 +87,7 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
   for (let p = 0; p < poles; p++) {
     const yPos = p * 2;
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `A${p + 1}`,
       defaultBitWidth: bitWidth,
@@ -93,6 +96,7 @@ function buildRelayPins(poles: number, bitWidth: number): PinDeclaration[] {
       isClockCapable: false,
     });
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `B${p + 1}`,
       defaultBitWidth: bitWidth,

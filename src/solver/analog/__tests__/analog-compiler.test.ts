@@ -4,7 +4,6 @@
  * Verifies:
  * - Analog compiler accepts components with both digital and analog models
  * - Logic family resolution cascade: pin > component > circuit > default
- * - Pure-digital components in analog circuits produce unsupported-component-in-analog diagnostic
  * - simulationModel property handling: behavioral (default), digital stub, transistor stub
  */
 
@@ -264,54 +263,6 @@ describe("BehavioralCompilation", () => {
     expect(pinElec["out"]!.vOH).toBe(3.4);
   });
 
-  it("digital_only_component_emits_diagnostic", () => {
-    const circuit = new Circuit();
-    const registry = new ComponentRegistry();
-
-    registry.register({
-      ...makeBaseDef("Ground"),
-      models: { mnaModels: { behavioral: {} } },
-    });
-
-    // Analog resistor so the analog partition is non-empty
-    registry.register({
-      ...makeBaseDef("AnalogR"),
-      models: {
-        mnaModels: {
-          behavioral: {
-            factory: vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()])),
-          },
-        },
-      },
-    });
-
-    // Digital-only component — only digital model, no analog
-    registry.register({
-      ...makeBaseDef("PureDigital"),
-      models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
-    });
-
-    const analogR = makeElement("AnalogR", "r1", [{ x: 30, y: 0 }, { x: 0, y: 0 }]);
-    const digitalComp = makeElement("PureDigital", "d1", [{ x: 10, y: 0 }]);
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
-
-    circuit.addElement(analogR);
-    circuit.addElement(digitalComp);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
-
-    // Compiler should not throw — emits diagnostic instead
-    expect(() => compileUnified(circuit, registry)).not.toThrow();
-    const compiled = compileUnified(circuit, registry);
-    const errorDiags = compiled.diagnostics.filter(
-      (d) => d.code === "unsupported-component-in-analog",
-    );
-    expect(errorDiags).toHaveLength(1);
-    expect(errorDiags[0]!.severity).toBe("error");
-  });
-
   it("pin_override_applied", () => {
     const circuit = new Circuit();
 
@@ -375,16 +326,15 @@ describe("BehavioralCompilation", () => {
 describe("SimulationMode", () => {
   it("default_is_first_simulationModel_entry", () => {
     // No simulationModel property set → defaults based on defaultModel.
-    // BehavioralAnd has defaultModel: 'digital', so default mode is 'logical'.
-    // Set mode to 'analog-pins' explicitly and
-    // verify the factory IS called — proving that without the explicit
-    // property the compiler would NOT have taken the analog-pins path.
-    const analogPinsProps = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
-    const { circuit: c1, registry: r1, factorySpy: spy1 } = buildAndGateCircuit(analogPinsProps);
+    // BehavioralAnd has defaultModel: 'digital', so default mode is 'digital'.
+    // Set mode to 'behavioral' explicitly to verify the factory IS called —
+    // proving that without the explicit property the compiler uses digital mode.
+    const behavioralProps = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
+    const { circuit: c1, registry: r1, factorySpy: spy1 } = buildAndGateCircuit(behavioralProps);
     compileUnified(c1, r1);
-    expect(spy1).toHaveBeenCalledOnce(); // explicit analog-pins → factory called
+    expect(spy1).toHaveBeenCalledOnce(); // explicit behavioral → factory called
 
-    // Without simulationModel set, default is 'logical' → factory NOT called
+    // Without simulationModel set, default is 'digital' → factory NOT called
     const { circuit: c2, registry: r2, factorySpy: spy2 } = buildAndGateCircuit();
     // The logical path needs In/Out in the registry to synthesize a bridge;
     // with the stub registry it emits diagnostics but still doesn't call analogFactory.
@@ -393,7 +343,7 @@ describe("SimulationMode", () => {
   });
 
   it("explicit_simplified_compiles", () => {
-    // simulationModel explicitly set to 'analog-pins' → compiles normally
+    // simulationModel explicitly set to 'behavioral' → compiles normally
     const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
     const compiled = compileUnified(circuit, registry).analog!;
@@ -505,7 +455,7 @@ describe("SimulationMode", () => {
     // Should produce exactly one bridge instance for the digital component
     expect(compiled.bridges).toHaveLength(1);
     const bridge = compiled.bridges[0]!;
-    expect(bridge.compiledInner).toBeDefined();
+    expect(bridge.compiledInner.netCount).toBeGreaterThan(0);
 
     // BehavioralAnd has 2 inputs and 1 output
     expect(bridge.inputAdapters).toHaveLength(2);
@@ -537,15 +487,19 @@ describe("SimulationMode", () => {
     expect(errorDiags[0]!.severity).toBe("error");
   });
 
-  it("analog_internals_without_transistorModel_falls_through_to_analogFactory", () => {
-    // Fuse/switch case: analog-internals but no subcircuitRefs → use analogFactory
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "cmos"]]);
+  it("invalid_model_key_emits_diagnostic_and_skips_factory", () => {
+    // A simulationModel value that matches no mnaModels key or subcircuitRefs
+    // produces an invalid-simulation-model diagnostic and the factory is not called.
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "nonexistent"]]);
     const { circuit, registry, factorySpy } = buildAndGateCircuit(propsMap);
-    const compiled = compileUnified(circuit, registry).analog!;
+    const compiled = compileUnified(circuit, registry);
 
-    // Factory SHOULD be called — falls through to analogFactory path
-    expect(factorySpy).toHaveBeenCalledOnce();
-    expect(compiled.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    expect(factorySpy).not.toHaveBeenCalled();
+    const errorDiags = compiled.diagnostics.filter(
+      (d) => d.code === "invalid-simulation-model",
+    );
+    expect(errorDiags).toHaveLength(1);
+    expect(errorDiags[0]!.severity).toBe("error");
   });
 });
 

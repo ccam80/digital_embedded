@@ -78,8 +78,6 @@ describe("spice-model-library: namedParameterSets", () => {
 
     expect("error" in result).toBe(false);
     const sets = circuit.metadata.namedParameterSets;
-    expect(sets).toBeDefined();
-    expect(sets!["2N2222"]).toBeDefined();
     expect(sets!["2N2222"].deviceType).toBe("NPN");
     expect(sets!["2N2222"].params["IS"]).toBe(1e-14);
     expect(sets!["2N2222"].params["BF"]).toBe(200);
@@ -107,7 +105,6 @@ describe("spice-model-library: namedParameterSets", () => {
 
     const sets = circuit.metadata.namedParameterSets!;
     expect(sets["2N2222"]).toBeUndefined();
-    expect(sets["BC547"]).toBeDefined();
     expect(sets["BC547"].params["BF"]).toBe(110);
   });
 
@@ -149,8 +146,6 @@ Q1 C B E QMOD
 
     expect("error" in result).toBe(false);
     const defs = circuit.metadata.modelDefinitions;
-    expect(defs).toBeDefined();
-    expect(defs!["MYBJT"]).toBeDefined();
     expect(defs!["MYBJT"].ports).toEqual(["C", "B", "E"]);
     expect(defs!["MYBJT"].elements).toHaveLength(1);
   });
@@ -165,7 +160,7 @@ R2 OUT GND 1K
 .ENDS RDIV
     `.trim());
 
-    expect(registry.get("RDIV")).toBeDefined();
+    expect(registry.get("RDIV")).toMatchObject({ ports: ["IN", "OUT", "GND"] });
   });
 
   it("multiple .SUBCKT definitions coexist", () => {
@@ -246,8 +241,8 @@ R2 OUT GND 1K
 .ENDS RDIV
     `.trim());
 
-    expect(circuit.metadata.namedParameterSets!["2N2222"]).toBeDefined();
-    expect(circuit.metadata.modelDefinitions!["RDIV"]).toBeDefined();
+    expect(circuit.metadata.namedParameterSets!["2N2222"].deviceType).toBe("NPN");
+    expect(circuit.metadata.modelDefinitions!["RDIV"].ports).toEqual(["IN", "OUT", "GND"]);
   });
 
   it("new Circuit() has no model library fields by default", () => {
@@ -321,7 +316,7 @@ Q1 C B E UNRESOLVED_MODEL
 
     const defs = circuit.metadata.modelDefinitions!;
     const netlist = defs["MYBJT"];
-    expect(netlist).toBeDefined();
+    expect(netlist.ports).toEqual(["C", "B", "E"]);
 
     const refs = netlist.elements
       .filter(e => e.modelRef !== undefined)

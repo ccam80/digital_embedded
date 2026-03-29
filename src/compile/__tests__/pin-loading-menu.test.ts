@@ -318,7 +318,7 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
     // component. The cross-domain count must be strictly greater than all.
     const crossDigital = crossDomain.digital?.componentCount ?? 0;
     const allDigital = all.digital?.componentCount ?? 0;
-    expect(crossDigital).toBeGreaterThan(allDigital);
+    expect(crossDigital).toBe(allDigital + 1);
   });
 
   it('none mode produces zero bridges for a circuit with only digital-model pins at the boundary', () => {
@@ -359,7 +359,6 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
 
     // The analog partition must exist and contain the AnalogR element (1 element).
     // Ground is a zero-pin sentinel and does not contribute an analog element.
-    expect(result.analog).not.toBeNull();
     expect(result.analog!.elements).toHaveLength(1);
   });
 });

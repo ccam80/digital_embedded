@@ -135,7 +135,7 @@ export interface PartitionedComponent {
   element: CircuitElement;
   definition: ComponentDefinition;
   modelKey: string;
-  model: DigitalModel | MnaModel;
+  model: DigitalModel | MnaModel | null;
   resolvedPins: ResolvedGroupPin[];
 }
 

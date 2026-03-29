@@ -17,10 +17,6 @@
           <string>Label</string>
           <string>CLK</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="60" y="140"/>
     </visualElement>
@@ -30,10 +26,6 @@
         <entry>
           <string>Label</string>
           <string>T1</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="200" y="100"/>
@@ -45,10 +37,6 @@
           <string>Label</string>
           <string>T2</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="200" y="200"/>
     </visualElement>
@@ -59,10 +47,6 @@
           <string>Label</string>
           <string>T3</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="200" y="300"/>
     </visualElement>
@@ -72,10 +56,6 @@
         <entry>
           <string>Label</string>
           <string>T4</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="200" y="400"/>

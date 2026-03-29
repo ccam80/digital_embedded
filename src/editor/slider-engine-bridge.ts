@@ -48,6 +48,12 @@ export class SliderEngineBridge {
     const element = ctx.elementToCircuitElement.get(elementId);
     if (!element) return;
 
+    // Update the CircuitElement's PropertyBag so the value persists across
+    // recompilations and is serialized with the circuit.
+    if (typeof element.getProperties === 'function') {
+      element.getProperties().set(propertyKey, value);
+    }
+
     this._coordinator.setComponentProperty(element, propertyKey, value);
   }
 }

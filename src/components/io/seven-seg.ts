@@ -158,6 +158,7 @@ function buildSevenSegPinDeclarations(): PinDeclaration[] {
   // Java SevenSegShape: 4 pins across top (y=0), 4 across bottom (y=7)
   // a@(0,0), b@(1,0), c@(2,0), d@(3,0), e@(0,7), f@(1,7), g@(2,7), dp@(3,7)
   return SEGMENT_LABELS.map((label, i) => ({
+    kind: "signal" as const,
     direction: PinDirection.INPUT,
     label,
     defaultBitWidth: 1,

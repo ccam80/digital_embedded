@@ -121,12 +121,10 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
 
     facadeDefault.compile(circuitDefault);
     const compiledDefault = facadeDefault.getCompiledUnified();
-    expect(compiledDefault).not.toBeNull();
-    expect(compiledDefault!.analog).not.toBeNull();
+    expect(compiledDefault?.analog?.diagnostics).toBeInstanceOf(Array);
 
     const dcDefault = facadeDefault.getDcOpResult();
-    expect(dcDefault).not.toBeNull();
-    expect(dcDefault!.converged).toBe(true);
+    expect(dcDefault?.converged).toBe(true);
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
 
     const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
@@ -142,15 +140,13 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
 
     facadeOverridden.compile(circuitOverridden);
     const compiledOverridden = facadeOverridden.getCompiledUnified();
-    expect(compiledOverridden).not.toBeNull();
-    expect(compiledOverridden!.analog).not.toBeNull();
+    expect(compiledOverridden?.analog?.diagnostics).toBeInstanceOf(Array);
 
     const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
     expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
 
     const dcOverridden = facadeOverridden.getDcOpResult();
-    expect(dcOverridden).not.toBeNull();
-    expect(dcOverridden!.converged).toBe(true);
+    expect(dcOverridden?.converged).toBe(true);
     const voltagesOverridden = Array.from(dcOverridden!.nodeVoltages);
 
     // Same topology, same bias — only IS differs. Voltages must diverge.
@@ -185,7 +181,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
       const bag = el.getProperties();
       return bag.has('label') && bag.get('label') === 'Q1';
     });
-    expect(q1Element).toBeDefined();
+    expect(q1Element).not.toBeUndefined();
 
     const bag = q1Element!.getProperties();
     expect(bag.has('_spiceModelOverrides')).toBe(true);
@@ -219,20 +215,16 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
 
     const json = facade.serialize(circuit);
     expect(typeof json).toBe('string');
-    expect(json.length).toBeGreaterThan(0);
-
-    // The override must be present in the serialized JSON
     expect(json).toContain('_spiceModelOverrides');
     expect(json).toContain('1e-14');
 
     // Deserialize and recompile (circuit_load equivalent)
     const reloaded = facade.deserialize(json);
-    expect(reloaded).toBeDefined();
+    expect(reloaded).not.toBeUndefined();
 
     facade.compile(reloaded);
     const compiled = facade.getCompiledUnified();
-    expect(compiled).not.toBeNull();
-    expect(compiled!.analog).not.toBeNull();
+    expect(compiled?.analog?.diagnostics).toBeInstanceOf(Array);
 
     // No INVALID_SPICE_OVERRIDES — JSON survived serialization intact
     const diagnosticCodes = compiled!.analog!.diagnostics.map(d => d.code);
@@ -256,16 +248,14 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
     // Compile original and capture DC operating point
     facade.compile(circuit);
     const dcOriginal = facade.getDcOpResult();
-    expect(dcOriginal).not.toBeNull();
-    expect(dcOriginal!.converged).toBe(true);
+    expect(dcOriginal?.converged).toBe(true);
     const voltagesOriginal = Array.from(dcOriginal!.nodeVoltages);
 
     // Deserialize and recompile (circuit_load + circuit_compile equivalent)
     const reloaded = facade.deserialize(json);
     facade.compile(reloaded);
     const dcReloaded = facade.getDcOpResult();
-    expect(dcReloaded).not.toBeNull();
-    expect(dcReloaded!.converged).toBe(true);
+    expect(dcReloaded?.converged).toBe(true);
     const voltagesReloaded = Array.from(dcReloaded!.nodeVoltages);
 
     // Node voltage arrays must have the same length

@@ -1,49 +1,23 @@
 /**
- * Tests for the NPN/PNP Darlington transistor pair subcircuit expansion.
+ * Tests for the NPN/PNP Darlington transistor pair subcircuit models.
  *
  * Covers:
- *   - NPN high current gain: β_total ≈ β₁ · β₂
- *   - NPN V_BE doubled: V_BE_total ≈ 2 · V_BE_single
- *   - NPN emitter follower: V_out ≈ V_in − 2·V_BE
+ *   - NPN high current gain: beta_total ~ beta_1 * beta_2
+ *   - NPN V_BE doubled: V_BE_total ~ 2 * V_BE_single
+ *   - NPN emitter follower: V_out ~ V_in - 2*V_BE
  *   - PNP polarity: current flows in opposite direction
- *   - Registration: DarlingtonNPN registered with transistorModel set
+ *   - Registration: DarlingtonNPN registered with subcircuitRefs set
+ *   - Subcircuit netlist structure verification
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
-  createNpnDarlington,
-  createPnpDarlington,
   registerDarlingtonModels,
   DarlingtonNpnDefinition,
   DarlingtonPnpDefinition,
 } from "../transistor-models/darlington.js";
 import { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
-import { expandTransistorModel, registerAnalogFactory } from "../transistor-expansion.js";
 import { ComponentCategory } from "../../../core/registry.js";
-import { createBjtElement } from "../../../components/semiconductors/bjt.js";
-import { ResistorDefinition } from "../../../components/passives/resistor.js";
-import { PropertyBag } from "../../../core/properties.js";
-
-// ---------------------------------------------------------------------------
-// Register BJT and Resistor analog factories so expandTransistorModel works
-// ---------------------------------------------------------------------------
-
-beforeAll(() => {
-  // nodeIds order matches BJT pinLayout: [B, C, E]
-  registerAnalogFactory("NpnBJT", (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
-  registerAnalogFactory("PnpBJT", (nodeIds, branchIdx, props, _getTime) =>
-    createBjtElement(-1, new Map([["B", nodeIds[0] ?? 0], ["C", nodeIds[1] ?? 0], ["E", nodeIds[2] ?? 0]]), branchIdx, props));
-  // Adapter: AnalogFactory (old nodeIds[]) → createResistorElement (new Map signature)
-  registerAnalogFactory("Resistor", (nodeIds, _branchIdx, props, _getTime) =>
-    ResistorDefinition.models!.mnaModels!.behavioral!.factory(
-      new Map([["A", nodeIds[0] ?? 0], ["B", nodeIds[1] ?? 0]]),
-      [],
-      _branchIdx,
-      props,
-      _getTime,
-    ));
-});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,22 +67,18 @@ describe("NPN", () => {
       expect(betaTotal).toBe(10000);
     });
 
-    it("subcircuit expands to 3 analog elements (Q1, Q2, R_BE)", () => {
+    it("subcircuit netlist contains 3 elements (Q1, Q2, R_BE)", () => {
       const registry = makeRegistry();
+      const netlist = registry.get("DarlingtonNPN");
+      expect(netlist).toBeDefined();
 
-      let nextNode = 10;
-      const result = expandTransistorModel(
-        DarlingtonNpnDefinition,
-        [1, 2, 3], // B=1, C=2, E=3
-        registry,
-        100, // vddNodeId (not used for BJTs)
-        0,   // gndNodeId
-        () => ++nextNode,
-      );
-
-      expect(result.diagnostics).toHaveLength(0);
       // 2 BJTs + 1 R_BE resistor = 3 elements
-      expect(result.elements).toHaveLength(3);
+      expect(netlist!.elements).toHaveLength(3);
+
+      const bjtCount = netlist!.elements.filter(el => el.typeId === "NpnBJT").length;
+      const resistorCount = netlist!.elements.filter(el => el.typeId === "Resistor").length;
+      expect(bjtCount).toBe(2);
+      expect(resistorCount).toBe(1);
     });
   });
 
@@ -131,45 +101,27 @@ describe("NPN", () => {
   });
 
   describe("emitter_follower", () => {
-    it("expansion produces internal node connecting Q1E to Q2B", () => {
-      // In the emitter follower configuration, V_out ≈ V_in − 2·V_BE.
-      // Verify the subcircuit has the Q1E-Q2B internal net properly connected.
-
+    it("netlist has internal node connecting Q1E to Q2B", () => {
       const registry = makeRegistry();
+      const netlist = registry.get("DarlingtonNPN");
+      expect(netlist).toBeDefined();
 
-      let nextNode = 10;
-      const internalNodes: number[] = [];
-      const result = expandTransistorModel(
-        DarlingtonNpnDefinition,
-        [1, 2, 3], // B=1, C=2, E=3
-        registry,
-        100,
-        0,
-        () => {
-          const n = ++nextNode;
-          internalNodes.push(n);
-          return n;
-        },
-      );
+      // Should have at least 1 internal node (Q1E_Q2B junction)
+      expect(netlist!.internalNetCount).toBeGreaterThanOrEqual(1);
 
-      // Should have allocated at least 1 internal node (Q1E_Q2B junction)
-      expect(result.internalNodeCount).toBeGreaterThanOrEqual(1);
-      expect(result.diagnostics).toHaveLength(0);
+      // Find the two BJT elements in the netlist
+      const bjtIndices = netlist!.elements
+        .map((el, i) => ({ el, i }))
+        .filter(({ el }) => el.typeId === "NpnBJT");
+      expect(bjtIndices).toHaveLength(2);
 
-      // The internal node connects Q1's emitter to Q2's base
-      // Verify by checking that two BJT elements share this internal node
-      const bjts = result.elements.filter(
-        (el) => el.pinNodeIds.length === 3,
-      );
-      expect(bjts.length).toBe(2);
+      const q1Connectivity = netlist!.netlist[bjtIndices[0].i];
+      const q2Connectivity = netlist!.netlist[bjtIndices[1].i];
 
-      // Q1 emitter node (index 2) should equal Q2 base node (index 0),
-      // because pinNodeIds = [nodeB, nodeC, nodeE] and the internal node
-      // connects Q1's emitter (E=index 2) to Q2's base (B=index 0).
-      const q1 = bjts[0];
-      const q2 = bjts[1];
-      const q1Emitter = q1.pinNodeIds[2];
-      const q2Base = q2.pinNodeIds[0];
+      // BJT connectivity order: [B, C, E]
+      // Q1 emitter (index 2) should equal Q2 base (index 0) via the internal net
+      const q1Emitter = q1Connectivity[2];
+      const q2Base = q2Connectivity[0];
       expect(q1Emitter).toBe(q2Base);
     });
 
@@ -202,50 +154,37 @@ describe("PNP", () => {
       expect(pnpCount).toBe(2);
     });
 
-    it("PNP expansion produces correct element types", () => {
+    it("PNP subcircuit netlist contains correct element types", () => {
       const registry = makeRegistry();
+      const netlist = registry.get("DarlingtonPNP");
+      expect(netlist).toBeDefined();
 
-      let nextNode = 10;
-      const result = expandTransistorModel(
-        DarlingtonPnpDefinition,
-        [1, 2, 3], // B=1, C=2, E=3
-        registry,
-        100,
-        0,
-        () => ++nextNode,
-      );
+      // Q1 + Q2 + R_BE = 3 elements
+      expect(netlist!.elements).toHaveLength(3);
 
-      expect(result.diagnostics).toHaveLength(0);
-      expect(result.elements).toHaveLength(3); // Q1 + Q2 + R_BE
+      const pnpCount = netlist!.elements.filter(el => el.typeId === "PnpBJT").length;
+      const resistorCount = netlist!.elements.filter(el => el.typeId === "Resistor").length;
+      expect(pnpCount).toBe(2);
+      expect(resistorCount).toBe(1);
     });
 
-    it("PNP Darlington current flows in opposite direction vs NPN", () => {
-      // PNP has polarity=-1 in the BJT model: collector current flows from
-      // emitter to collector (conventional) vs NPN which flows collector to emitter.
-      // We verify by expanding both and checking that PNP BJT elements are different
-      // from NPN BJT elements (different polarity in the analog model).
-
+    it("PNP Darlington uses PnpBJT while NPN uses NpnBJT", () => {
       const registry = makeRegistry();
 
-      let nodeCounter = 10;
-      const npnResult = expandTransistorModel(
-        DarlingtonNpnDefinition, [1, 2, 3], registry, 100, 0, () => ++nodeCounter,
-      );
+      const npnNetlist = registry.get("DarlingtonNPN");
+      const pnpNetlist = registry.get("DarlingtonPNP");
+      expect(npnNetlist).toBeDefined();
+      expect(pnpNetlist).toBeDefined();
 
-      nodeCounter = 10;
-      const pnpResult = expandTransistorModel(
-        DarlingtonPnpDefinition, [1, 2, 3], registry, 100, 0, () => ++nodeCounter,
-      );
-
-      // Both produce 3 elements
-      expect(npnResult.elements).toHaveLength(3);
-      expect(pnpResult.elements).toHaveLength(3);
-
-      // The BJT elements should exist in both
-      const npnBjts = npnResult.elements.filter((el) => el.pinNodeIds.length === 3);
-      const pnpBjts = pnpResult.elements.filter((el) => el.pinNodeIds.length === 3);
+      // NPN uses NpnBJT elements, PNP uses PnpBJT elements
+      const npnBjts = npnNetlist!.elements.filter(el => el.typeId === "NpnBJT");
+      const pnpBjts = pnpNetlist!.elements.filter(el => el.typeId === "PnpBJT");
       expect(npnBjts.length).toBe(2);
       expect(pnpBjts.length).toBe(2);
+
+      // Both netlists have the same structure (same number of elements, ports, internal nets)
+      expect(npnNetlist!.elements.length).toBe(pnpNetlist!.elements.length);
+      expect(npnNetlist!.ports.length).toBe(pnpNetlist!.ports.length);
     });
   });
 });
@@ -257,7 +196,7 @@ describe("PNP", () => {
 describe("Registration", () => {
   describe("npn_darlington_registered", () => {
     it("DarlingtonNPN has subcircuitRefs set", () => {
-      expect(DarlingtonNpnDefinition.subcircuitRefs?.cmos).toBe("DarlingtonNPN");
+      expect(DarlingtonNpnDefinition.subcircuitRefs?.darlington).toBe("DarlingtonNPN");
     });
 
     it("DarlingtonNPN is in SEMICONDUCTORS category", () => {
@@ -265,12 +204,12 @@ describe("Registration", () => {
     });
 
     it("DarlingtonNPN has subcircuitRefs only", () => {
-      expect(DarlingtonNpnDefinition.subcircuitRefs?.cmos).toBeDefined();
+      expect(DarlingtonNpnDefinition.subcircuitRefs?.darlington).toBeDefined();
       expect(DarlingtonNpnDefinition.models?.digital).toBeUndefined();
     });
 
     it("DarlingtonPNP has subcircuitRefs set", () => {
-      expect(DarlingtonPnpDefinition.subcircuitRefs?.cmos).toBe("DarlingtonPNP");
+      expect(DarlingtonPnpDefinition.subcircuitRefs?.darlington).toBe("DarlingtonPNP");
     });
 
     it("registerDarlingtonModels registers both models in registry", () => {

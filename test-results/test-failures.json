@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 10097,
-      "failed": 18,
+      "passed": 10116,
+      "failed": 10,
       "skipped": 0,
-      "totalFiles": 341,
-      "durationSeconds": 13.4
+      "totalFiles": 342,
+      "durationSeconds": 26.8
     },
     "playwright": {
-      "passed": 486,
-      "failed": 56,
+      "passed": 485,
+      "failed": 57,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 233.100655
+      "durationSeconds": 326.65831
     },
-    "totalFailed": 74,
-    "totalPassed": 10583
+    "totalFailed": 67,
+    "totalPassed": 10601
   },
   "failures": {
     "vitest": [
@@ -26,7 +26,7 @@
           {
             "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
             "test": "patch with _spiceModelOverrides changes DC operating point vs default",
-            "line": 165,
+            "line": 161,
             "column": 24
           }
         ]
@@ -54,42 +54,12 @@
             "column": 26
           }
         ]
-      },
-      {
-        "message": "expected [] to have a length of 1 but got +0",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-            "test": "digital_only_component_emits_diagnostic",
-            "line": 311,
-            "column": 24
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "rejects_digital_only_component",
-            "line": 425,
-            "column": 24
-          }
-        ]
-      },
-      {
-        "message": "expected \"spy\" to be called once, but got 0 times",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-            "test": "analog_internals_without_transistorModel_falls_through_to_analogFactory",
-            "line": 547,
-            "column": 24
-          }
-        ]
       }
     ],
     "playwright": [
       {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 7,
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 12,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
@@ -110,51 +80,69 @@
             "column": 5
           },
           {
-            "file": "gui/analog-ui-fixup.spec.ts",
-            "test": "capacitor shows property popup with float input",
-            "line": 260,
-            "column": 3
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "555 timer driving digital counter: analog oscillator to digital count",
-            "line": 495,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "mixed transistor + gate: BJT level-shifts into digital And",
-            "line": 657,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "mixed switching transient: D_FF toggles SPDT with LRC load",
-            "line": 818,
-            "column": 5
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 13,
-        "locations": [
-          {
             "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "RL circuit: current rise with time constant L/R",
-            "line": 257,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "switched RC: charge on close, discharge on open",
-            "line": 1272,
+            "test": "diode rectifier: output near Vpeak minus Vf with ripple",
+            "line": 384,
             "column": 5
           },
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "LRC with switch: damped oscillation after closing",
             "line": 1312,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "555 astable: oscillation at expected frequency",
+            "line": 1722,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "triac dimmer: phase-angle AC control",
+            "line": 1828,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "RC lowpass steady-state amplitude matches analytical",
+            "line": 168,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed switching transient: D_FF toggles SPDT with LRC load",
+            "line": 818,
+            "column": 5
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import menu item visible for NPN BJT",
+            "line": 45,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT import menu item visible for component with subcircuitModel support",
+            "line": 132,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT dialog opens and shows parse preview",
+            "line": 143,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 9,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RL circuit: current rise with time constant L/R",
+            "line": 257,
             "column": 5
           },
           {
@@ -174,18 +162,6 @@
             "test": "crystal oscillator: oscillation builds at crystal frequency",
             "line": 1580,
             "column": 5
-          },
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "555 astable: oscillation at expected frequency",
-            "line": 1722,
-            "column": 5
-          },
-          {
-            "file": "gui/analog-rc-circuit.spec.ts",
-            "test": "RC lowpass steady-state amplitude matches analytical",
-            "line": 168,
-            "column": 3
           },
           {
             "file": "gui/analog-ui-fixup.spec.ts",
@@ -352,6 +328,42 @@
         ]
       },
       {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 5,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched RC: charge on close, discharge on open",
+            "line": 1272,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import dialog opens with textarea when menu item clicked",
+            "line": 56,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 70,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 91,
+            "column": 3
+          }
+        ]
+      },
+      {
         "message": "Error: Status bar shows an error",
         "count": 9,
         "locations": [
@@ -430,42 +442,6 @@
         ]
       },
       {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "count": 5,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "triac dimmer: phase-angle AC control",
-            "line": 1828,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
-            "line": 257,
-            "column": 5
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import dialog opens with textarea when menu item clicked",
-            "line": 56,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
-            "line": 70,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL Apply stores overrides visible in SPICE panel",
-            "line": 91,
-            "column": 3
-          }
-        ]
-      },
-      {
         "message": "Error: No node voltages changed after 50 steps",
         "count": 1,
         "locations": [
@@ -474,6 +450,30 @@
             "test": "node voltages change during transient simulation",
             "line": 144,
             "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "capacitor shows property popup with float input",
+            "line": 260,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "555 timer driving digital counter: analog oscillator to digital count",
+            "line": 495,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed transistor + gate: BJT level-shifts into digital And",
+            "line": 657,
+            "column": 5
           }
         ]
       },
@@ -509,30 +509,6 @@
             "file": "gui/model-selector.spec.ts",
             "test": "selecting Behavioral model shows SPICE parameter panel",
             "line": 53,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
-        "count": 3,
-        "locations": [
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import menu item visible for NPN BJT",
-            "line": 45,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".SUBCKT import menu item visible for component with subcircuitModel support",
-            "line": 132,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".SUBCKT dialog opens and shows parse preview",
-            "line": 143,
             "column": 3
           }
         ]

@@ -140,16 +140,16 @@ function makeResistorDef(): ComponentDefinition {
   } as unknown as ComponentDefinition;
 }
 
-function makeLogicalGateDef(): ComponentDefinition {
+function makeDigitalOnlyGateDef(): ComponentDefinition {
   return {
     typeId: "and",
     label: "AND",
     category: "gates" as never,
     propertyDefs: [],
     pinLayout: [],
-    defaultModel: "logical",
+    defaultModel: "digital",
     models: {
-      logical: {} as never,
+      digital: {} as never,
     },
   } as unknown as ComponentDefinition;
 }
@@ -202,9 +202,9 @@ describe("showSpiceModelParameters", () => {
     expect(doc.findInputs().length).toBe(0);
   });
 
-  it("does not render when def has no mnaModels (logical gate)", () => {
+  it("does not render when def has no mnaModels (digital-only gate)", () => {
     const element = makeElement();
-    const def = makeLogicalGateDef();
+    const def = makeDigitalOnlyGateDef();
     panel.showSpiceModelParameters(element, def);
 
     expect(doc.findInputs().length).toBe(0);
@@ -218,7 +218,7 @@ describe("showSpiceModelParameters", () => {
     const inputs = doc.findInputs();
     const isInput = inputs[0];
     expect(isInput).toBeDefined();
-    expect(isInput!.value).not.toBe("");
+    expect(isInput!.value).toBe("10.0 f");
   });
 
   it("leaves input empty when no override is stored for a param", () => {

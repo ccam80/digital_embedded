@@ -148,6 +148,7 @@ export function buildSplitterPinDeclarations(
   for (let i = 0; i < inputPorts.length; i++) {
     const p = inputPorts[i];
     decls.push({
+      kind: "signal",
       direction: PinDirection.INPUT,
       label: p.name,
       defaultBitWidth: p.bits,
@@ -160,6 +161,7 @@ export function buildSplitterPinDeclarations(
   for (let i = 0; i < outputPorts.length; i++) {
     const p = outputPorts[i];
     decls.push({
+      kind: "signal",
       direction: PinDirection.OUTPUT,
       label: p.name,
       defaultBitWidth: p.bits,
@@ -204,7 +206,6 @@ export class SplitterElement extends AbstractCircuitElement {
   }
   get spreading(): number { return this._properties.getOrDefault<number>("spreading", 1); }
 
-  // Legacy accessors used by engine consumers
   get parts(): number[] { return this.outputPorts.map((p) => p.bits); }
   get totalBits(): number { return totalBitsFromPattern(this.parts); }
 

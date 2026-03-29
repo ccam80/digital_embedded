@@ -130,6 +130,7 @@ export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
   // Emit in document order. Store sortPos in placeholder position.y so that
   // buildLayoutPositions can sort within each face group for LAYOUT mode.
   return facedPins.map(p => ({
+    kind: "signal" as const,
     direction: p.direction,
     label: p.label,
     defaultBitWidth: p.bitWidth,

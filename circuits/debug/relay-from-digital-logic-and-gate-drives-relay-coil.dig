@@ -37,10 +37,6 @@
           <string>Label</string>
           <string>G1</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="160" y="160"/>
     </visualElement>
@@ -50,10 +46,6 @@
         <entry>
           <string>Label</string>
           <string>RLY</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="280" y="160"/>
@@ -96,10 +88,6 @@
         <entry>
           <string>Label</string>
           <string>P1</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="520" y="280"/>

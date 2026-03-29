@@ -167,6 +167,13 @@ export interface AnalogElement {
   setSourceScale?(factor: number): void;
 
   /**
+   * Update a mutable parameter on a live compiled element without
+   * recompilation. Called by the coordinator for slider/property-panel
+   * hot-patching.
+   */
+  setParam?(key: string, value: number): void;
+
+  /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.
    *
    * Called once per frequency point during an AC sweep. Resistors stamp

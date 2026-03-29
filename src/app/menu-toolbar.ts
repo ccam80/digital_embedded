@@ -45,6 +45,8 @@ export interface MenuToolbarController {
   openSearchBar(): void;
   togglePresentation(): void;
   exitPresentation(): void;
+  /** Recompute per-pin loading indicators from circuit mode + overrides. */
+  refreshPinLoadingIndicators(): void;
   isPresentationMode(): boolean;
 }
 
@@ -210,7 +212,12 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
 
       if (!locked) {
         items.push(
-          { label: 'Properties\u2026', action: () => { selection.select(elementHit); }, enabled: true },
+          { label: 'Properties\u2026', action: () => {
+            selection.select(elementHit);
+            const screenPt = renderPipeline.canvasToScreen(e);
+            const container = canvas.parentElement!;
+            canvasInteraction.openPopup(elementHit, screenPt, container);
+          }, enabled: true },
           { label: 'Rotate', shortcut: 'R', action: () => {
             const cmd = rotateSelection([...selection.getSelectedElements()]);
             undoStack.push(cmd);
@@ -1416,16 +1423,13 @@ function stableNetIdToAnchor(id: string): PinLoadingOverride['anchor'] {
 }
 
 /**
- * Recompute which wires belong to nets with per-net overrides and push the
- * result to the wireRenderer's override indicator set. Called after any
- * change to circuit.metadata.digitalPinLoadingOverrides.
+ * Recompute per-pin loading indicators (∞ = ideal, Z = loaded) from the
+ * circuit-level digitalPinLoading mode, per-net overrides, and domain
+ * boundaries.  Called after any change to loading mode or overrides.
  */
 function refreshOverrideIndicators(ctx: AppContext): void {
-  const overrides = ctx.circuit.metadata.digitalPinLoadingOverrides;
-  if (!overrides || overrides.length === 0) {
-    ctx.wireRenderer.setOverrideIndicators(new Set());
-    return;
-  }
+  const mode = ctx.circuit.metadata.digitalPinLoading ?? 'cross-domain';
+  const overrides = ctx.circuit.metadata.digitalPinLoadingOverrides ?? [];
 
   const [modelAssignments] = resolveModelAssignments(ctx.circuit.elements, ctx.palette.getRegistry());
   const [groups] = extractConnectivityGroups(
@@ -1435,21 +1439,55 @@ function refreshOverrideIndicators(ctx: AppContext): void {
     modelAssignments,
   );
 
-  const overrideNetIdSet = new Set<string>(overrides.map(o => {
-    if (o.anchor.type === 'label') return `label:${o.anchor.label}`;
-    return `pin:${o.anchor.instanceId}:${o.anchor.pinLabel}`;
-  }));
+  // Build per-net override lookup
+  const netIdToOverride = new Map<string, 'loaded' | 'ideal'>();
+  for (const o of overrides) {
+    const netId = o.anchor.type === 'label'
+      ? `label:${o.anchor.label}`
+      : `pin:${o.anchor.instanceId}:${o.anchor.pinLabel}`;
+    netIdToOverride.set(netId, o.loading);
+  }
 
-  const overrideWires = new Set<Wire>();
+  // Identify digital element indices for boundary detection
+  const digitalIndices = new Set<number>();
+  for (const ma of modelAssignments) {
+    if (ma.modelKey === 'digital') digitalIndices.add(ma.elementIndex);
+  }
+
+  const pinLoadingMap = new Map<string, 'loaded' | 'ideal'>();
+
   for (const group of groups) {
     const netId = stableNetId(group, ctx.circuit.elements);
-    if (!overrideNetIdSet.has(netId)) continue;
-    for (const wire of group.wires) {
-      overrideWires.add(wire);
+    const override = netIdToOverride.get(netId);
+
+    const isBoundary = group.domains.has('digital') && group.domains.has('analog');
+
+    // Determine effective loading for this net
+    let loading: 'loaded' | 'ideal' | undefined;
+    if (override !== undefined) {
+      loading = override;
+    } else if (mode === 'none' && isBoundary) {
+      loading = 'ideal';
+    } else if (mode === 'cross-domain' && isBoundary) {
+      loading = 'loaded';
+    } else if (mode === 'all' && group.domains.has('digital')) {
+      loading = 'loaded';
+    }
+
+    if (loading === undefined) continue;
+
+    // Annotate digital-domain pins on the net
+    for (const pin of group.pins) {
+      if (!digitalIndices.has(pin.elementIndex)) continue;
+      const element = ctx.circuit.elements[pin.elementIndex];
+      if (element) {
+        pinLoadingMap.set(`${element.instanceId}:${pin.pinLabel}`, loading);
+      }
     }
   }
 
-  ctx.wireRenderer.setOverrideIndicators(overrideWires);
+  ctx.wireRenderer.setOverrideIndicators(new Set());
+  ctx.elementRenderer.setPinLoadingIndicators(pinLoadingMap);
 }
 
 // ---------------------------------------------------------------------------
@@ -1484,6 +1522,7 @@ function buildSimulationPinLoadingMenu(ctx: AppContext, deps: MTDeps): void {
         execute() {
           ctx.circuit.metadata.digitalPinLoading = next;
           updateCheckmarks();
+          refreshOverrideIndicators(ctx);
           simController.invalidateCompiled();
         },
         undo() {
@@ -1493,6 +1532,7 @@ function buildSimulationPinLoadingMenu(ctx: AppContext, deps: MTDeps): void {
             ctx.circuit.metadata.digitalPinLoading = prev;
           }
           updateCheckmarks();
+          refreshOverrideIndicators(ctx);
           simController.invalidateCompiled();
         },
       };
@@ -1553,6 +1593,9 @@ export function initMenuAndToolbar(
   buildSimulationPinLoadingMenu(ctx, deps);
   buildSpiceModelLibrary(ctx, deps);
 
+  // Compute initial pin loading indicators for the loaded circuit
+  refreshOverrideIndicators(ctx);
+
   return {
     rebuildInsertMenu,
     updateZoomDisplay,
@@ -1560,6 +1603,7 @@ export function initMenuAndToolbar(
     togglePresentation: presentation.togglePresentation,
     exitPresentation: presentation.exitPresentation,
     isPresentationMode: presentation.isPresentationMode,
+    refreshPinLoadingIndicators: () => refreshOverrideIndicators(ctx),
   };
 }
 

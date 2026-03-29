@@ -54,7 +54,7 @@ export class XOrElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildStandardPinDeclarations(inputCount, bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel === "cmos") {
+    if (activeModel && XOrDefinition.subcircuitRefs?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }

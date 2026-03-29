@@ -30,7 +30,7 @@ import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
 } from "./compiled-analog-circuit.js";
-import { ModelLibrary, validateModel } from "./model-library.js";
+import { ModelLibrary, registerDefaultNamedModels, validateModel } from "./model-library.js";
 import { defaultLogicFamily, getLogicFamilyPreset } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -92,7 +92,7 @@ function resolveComponentRoute(
  */
 function resolveSubcircuitModels(
   partition: SolverPartition,
-  transistorModels: SubcircuitModelRegistry | undefined,
+  subcircuitModels: SubcircuitModelRegistry | undefined,
   modelLibrary: ModelLibrary,
   subcircuitBindings: Record<string, string>,
   modelDefinitions: Record<string, MnaSubcircuitNetlist>,
@@ -105,7 +105,7 @@ function resolveSubcircuitModels(
     if (!defName) continue;
 
     const netlist = modelDefinitions[defName]
-      ?? transistorModels?.get(defName);
+      ?? subcircuitModels?.get(defName);
     if (!netlist) {
       diagnostics.push(
         makeDiagnostic(
@@ -120,7 +120,7 @@ function resolveSubcircuitModels(
           },
         ),
       );
-      (pc as { model: DigitalModel | MnaModel | null }).model = null;
+      pc.model = null;
       continue;
     }
 
@@ -743,27 +743,6 @@ function runPassA_partition(
 
     switch (route.kind) {
       case 'skip': {
-        const isDigitalModel = pc.model !== null && 'executeFn' in pc.model;
-        if (isDigitalModel) {
-          diagnostics.push(
-            makeDiagnostic(
-              "unsupported-component-in-analog",
-              "error",
-              `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-              {
-                explanation:
-                  `Component "${el.typeId}" has no analog model. ` +
-                  `Only components with an analog model can be placed in analog circuits.`,
-                suggestions: [
-                  {
-                    text: `Add an MNA model to "${el.typeId}" or change its simulationModel.`,
-                    automatable: false,
-                  },
-                ],
-              },
-            ),
-          );
-        }
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       }
@@ -1046,7 +1025,7 @@ function buildAnalogNodeMapFromPartition(
 export function compileAnalogPartition(
   partition: SolverPartition,
   registry: ComponentRegistry,
-  transistorModels?: SubcircuitModelRegistry,
+  subcircuitModels?: SubcircuitModelRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
@@ -1082,6 +1061,7 @@ export function compileAnalogPartition(
 
   // Stage 2: Build model library from outer circuit metadata (if provided).
   const modelLibrary = new ModelLibrary();
+  registerDefaultNamedModels(modelLibrary);
   if (outerCircuit !== undefined) {
     populateModelLibrary(modelLibrary, outerCircuit.metadata as Record<string, unknown>);
   }
@@ -1096,7 +1076,7 @@ export function compileAnalogPartition(
     outerCircuit?.metadata.subcircuitBindings ?? {};
   const modelDefinitions: Record<string, MnaSubcircuitNetlist> =
     outerCircuit?.metadata.modelDefinitions ?? {};
-  resolveSubcircuitModels(partition, transistorModels, modelLibrary, subcircuitBindings, modelDefinitions, diagnostics);
+  resolveSubcircuitModels(partition, subcircuitModels, modelLibrary, subcircuitBindings, modelDefinitions, diagnostics);
 
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
   const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);

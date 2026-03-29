@@ -4,7 +4,7 @@
  * Verifies that the three loading modes produce the correct bridge adapter
  * behaviour when compiling a mixed digital/analog circuit:
  *
- *   cross-domain (default): bridge adapters only where simulationModel=logical
+ *   cross-domain (default): bridge adapters only where simulationModel=digital
  *                            is set (or at real cross-engine boundaries)
  *   all:                     every dual-model component gets bridge adapters
  *                            regardless of per-component simulationModel

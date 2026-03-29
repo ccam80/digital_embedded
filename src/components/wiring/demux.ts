@@ -67,6 +67,7 @@ export function buildDemuxPinDeclarations(
 
   // 1. Selector pin (Java: inputs.get(0))
   pins.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
@@ -79,16 +80,19 @@ export function buildDemuxPinDeclarations(
   if (outputCount === 2) {
     // Java special case: 2 outputs at y=0 and y=2*SIZE
     pins.push({
+      kind: "signal",
       direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: bitWidth,
       position: { x: COMP_WIDTH, y: 0 }, isNegatable: false, isClockCapable: false,
     });
     pins.push({
+      kind: "signal",
       direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: bitWidth,
       position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false,
     });
   } else {
     for (let i = 0; i < outputCount; i++) {
       pins.push({
+        kind: "signal",
         direction: PinDirection.OUTPUT,
         label: `out_${i}`,
         defaultBitWidth: bitWidth,
@@ -101,6 +105,7 @@ export function buildDemuxPinDeclarations(
 
   // 3. Input pin LAST (Java: inputs.get(1), added after outputs)
   pins.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "in",
     defaultBitWidth: bitWidth,

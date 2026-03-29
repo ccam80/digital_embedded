@@ -85,10 +85,6 @@
           <string>Label</string>
           <string>CNT</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="480" y="160"/>
     </visualElement>

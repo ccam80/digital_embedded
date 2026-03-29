@@ -149,6 +149,7 @@ function buildMidiPinDeclarations(progChangeEnable: boolean): PinDeclaration[] {
     : ["N", "V", "OnOff", "en", "C"];
 
   return labels.map((label, i) => ({
+    kind: "signal" as const,
     direction: PinDirection.INPUT,
     label,
     defaultBitWidth: label === "N" || label === "V" ? 7 : 1,

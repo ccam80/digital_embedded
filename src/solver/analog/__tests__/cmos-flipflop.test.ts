@@ -1,5 +1,5 @@
 /**
- * CMOS D flip-flop transistor-level model tests (Phase 4c.3).
+ * CMOS D flip-flop transistor-level model tests.
  *
  * Tests compile the 20-MOSFET transmission-gate master-slave D flip-flop
  * directly through the full analog pipeline.

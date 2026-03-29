@@ -51,6 +51,7 @@ export function buildDecoderPinDeclarations(selectorBits: number, flipSelPos = f
 
   // Selector pin
   pins.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "sel",
     defaultBitWidth: selectorBits,
@@ -61,11 +62,11 @@ export function buildDecoderPinDeclarations(selectorBits: number, flipSelPos = f
 
   // Output pins — 2 outputs get gap (y=0, y=2), otherwise sequential
   if (outCount === 2) {
-    pins.push({ direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false });
-    pins.push({ direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: 1, position: { x: 2, y: 2 }, isNegatable: false, isClockCapable: false });
+    pins.push({ kind: "signal", direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false });
+    pins.push({ kind: "signal", direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: 1, position: { x: 2, y: 2 }, isNegatable: false, isClockCapable: false });
   } else {
     for (let i = 0; i < outCount; i++) {
-      pins.push({ direction: PinDirection.OUTPUT, label: `out_${i}`, defaultBitWidth: 1, position: { x: 2, y: i }, isNegatable: false, isClockCapable: false });
+      pins.push({ kind: "signal", direction: PinDirection.OUTPUT, label: `out_${i}`, defaultBitWidth: 1, position: { x: 2, y: i }, isNegatable: false, isClockCapable: false });
     }
   }
 

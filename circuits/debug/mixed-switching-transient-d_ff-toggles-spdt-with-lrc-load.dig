@@ -17,10 +17,6 @@
           <string>Label</string>
           <string>CLK</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="60" y="120"/>
     </visualElement>
@@ -30,10 +26,6 @@
         <entry>
           <string>Label</string>
           <string>FF</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="160" y="160"/>
@@ -122,10 +114,6 @@
         <entry>
           <string>Label</string>
           <string>P1</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="640" y="200"/>

@@ -343,10 +343,9 @@ describe("TwoPhaseStep", () => {
 
     // 2. Now directly write state slots. We can access the compiled circuit's
     //    signalArraySize to know the array dimensions. The engine's internal
-    //    _values array is not directly accessible, but we can use a workaround:
-    //    set A's Q output net to 1, set state slot for A to 1 manually.
-    //    Since state slots are at indices >= netCount, we can use setSignalValue
-    //    with the state offset as if it were a net ID.
+    //    _values array is not directly accessible; use setSignalValue with
+    //    the state slot index (>= netCount) to write state directly.
+    //    Set A's Q output net to 1, set state slot for A to 1 manually.
     engine.setSignalValue(stBaseA, BitVector.fromNumber(1, 1));   // A.storedQ = 1
     engine.setSignalValue(stBaseA + 1, BitVector.fromNumber(0, 1)); // A.prevClk = 0
     engine.setSignalValue(stBaseB, BitVector.fromNumber(0, 1));   // B.storedQ = 0

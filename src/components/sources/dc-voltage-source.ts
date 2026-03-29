@@ -158,11 +158,18 @@ export function makeDcVoltageSource(
   voltage: number,
 ): AnalogElementCore {
   let scale = 1;
+  let V = voltage;
 
   return {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
+
+    setParam(key: string, value: number): void {
+      if (key === "voltage") {
+        V = value;
+      }
+    },
 
     setSourceScale(factor: number): void {
       scale = factor;
@@ -180,7 +187,7 @@ export function makeDcVoltageSource(
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
 
       // RHS voltage constraint (scaled for source stepping)
-      solver.stampRHS(k, voltage * scale);
+      solver.stampRHS(k, V * scale);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

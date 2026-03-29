@@ -180,8 +180,6 @@ describe("spice-import-dialog: parse and apply", () => {
     }, circuit);
 
     const sets = circuit.metadata.namedParameterSets;
-    expect(sets).toBeDefined();
-    expect(sets!["2N2222"]).toBeDefined();
     expect(sets!["2N2222"].deviceType).toBe("NPN");
     expect(sets!["2N2222"].params["IS"]).toBe(1e-14);
     expect(sets!["2N2222"].params["BF"]).toBe(200);
@@ -293,7 +291,6 @@ describe("spice-import-dialog: compile integration", () => {
     const errors = diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
 
-    expect(capturedModelParams).toBeDefined();
     expect(capturedModelParams!["IS"]).toBe(1e-14);
     expect(capturedModelParams!["BF"]).toBe(200);
   });
@@ -333,7 +330,6 @@ describe("spice-import-dialog: compile integration", () => {
 
     const { capturedModelParams } = buildRegistryAndCircuit(JSON.stringify(parsed.params));
 
-    expect(capturedModelParams).toBeDefined();
     expect(capturedModelParams!["IS"]).toBe(2e-15);
     expect(capturedModelParams!["BF"]).toBe(BJT_NPN_DEFAULTS["BF"]);
     expect(capturedModelParams!["NF"]).toBe(BJT_NPN_DEFAULTS["NF"]);
@@ -360,7 +356,6 @@ describe("spice-import-dialog: compile integration", () => {
 
     const { capturedModelParams } = buildRegistryAndCircuit(JSON.stringify(parsed.params));
 
-    expect(capturedModelParams).toBeDefined();
     expect(capturedModelParams!["IS"]).toBeCloseTo(6.734e-15, 20);
     expect(capturedModelParams!["BF"]).toBeCloseTo(416.4, 5);
   });

@@ -74,7 +74,7 @@ export class NotElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls: PinDeclaration[] = buildPinDeclarations(bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel === "cmos") {
+    if (activeModel && NotDefinition.subcircuitRefs?.[activeModel]) {
       const w = compWidth(wideShape);
       const centerX = w / 2;
       decls = [

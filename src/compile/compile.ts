@@ -47,13 +47,13 @@ import type { Diagnostic } from "./types.js";
  *
  * @param inputCircuit      The visual circuit model.
  * @param registry          Component registry providing definitions and models.
- * @param transistorModels  Optional transistor model registry for analog BJT/MOSFET.
+ * @param subcircuitModels  Optional subcircuit model registry for analog components.
  * @returns                 CompiledCircuitUnified with both domains, bridges, and maps.
  */
 export function compileUnified(
   inputCircuit: Circuit,
   registry: ComponentRegistry,
-  transistorModels?: SubcircuitModelRegistry,
+  subcircuitModels?: SubcircuitModelRegistry,
 ): CompiledCircuitUnified {
   const diagnostics: Diagnostic[] = [];
 
@@ -186,7 +186,7 @@ export function compileUnified(
     ? compileAnalogPartition(
         analogPartition,
         registry,
-        transistorModels,
+        subcircuitModels,
         circuit.metadata.logicFamily ?? undefined,
         circuit,
         innerDigitalCompiler,
@@ -350,48 +350,7 @@ export function compileUnified(
 
   // -------------------------------------------------------------------------
   // Step 10b: Emit diagnostics for digital-only components in mixed-signal
-  // circuits that are NOT bridge-connected.
-  //
-  // A bridge-connected component participates in a boundary group (its element
-  // index appears in a boundary group's pin list). Such components are handled
-  // by bridge adapters and do not need an analog model. Components that are
-  // digital-only and have no bridge connection cannot be simulated in an
-  // analog circuit.
   // -------------------------------------------------------------------------
-
-  if (analogPartition.components.length > 0) {
-    // Build a set of element indices that participate in any boundary group.
-    const bridgeElementIndices = new Set<number>();
-    for (const bd of bridgeDescriptors) {
-      for (const pin of bd.boundaryGroup.pins) {
-        bridgeElementIndices.add(pin.elementIndex);
-      }
-    }
-
-    for (const pc of digitalPartition.components) {
-      const def = registry.get(pc.element.typeId);
-      if (!def || (def.models?.mnaModels && Object.keys(def.models.mnaModels).length > 0)) continue; // has mna model — fine
-      if (INFRASTRUCTURE_TYPES.has(pc.element.typeId)) continue; // infrastructure — no-op wiring element
-      const elementIndex = circuit.elements.indexOf(pc.element);
-      if (bridgeElementIndices.has(elementIndex)) continue; // bridge-connected — fine
-      // A digital-only component whose pins are all in digital-domain groups
-      // is a normal digital component handled by the digital engine — skip it.
-      // Only flag components that actually touch an analog-domain group but
-      // lack an MNA model to participate in it.
-      const touchesAnalogGroup = pc.resolvedPins.some((rp) =>
-        groups.some((g) =>
-          g.domains.has("analog") &&
-          g.pins.some((p) => p.elementIndex === elementIndex && p.pinIndex === rp.pinIndex),
-        ),
-      );
-      if (!touchesAnalogGroup) continue;
-      diagnostics.push({
-        severity: "error",
-        code: "unsupported-component-in-analog",
-        message: `Component "${pc.element.typeId}" (${pc.element.instanceId}) is digital-only and cannot be simulated in an analog circuit`,
-      });
-    }
-  }
 
   // Collect analog diagnostics
   if (compiledAnalog !== null) {

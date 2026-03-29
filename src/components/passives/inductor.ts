@@ -140,7 +140,7 @@ class AnalogInductorElement implements AnalogElementCore {
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
 
-  private readonly L: number;
+  private L: number;
   private geq: number = 0;
   private ieq: number = 0;
   private iPrev: number = 0;
@@ -150,6 +150,12 @@ class AnalogInductorElement implements AnalogElementCore {
   constructor(branchIdx: number, inductance: number) {
     this.branchIndex = branchIdx;
     this.L = inductance;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "inductance") {
+      this.L = value;
+    }
   }
 
   stamp(solver: SparseSolver): void {

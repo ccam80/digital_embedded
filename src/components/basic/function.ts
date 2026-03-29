@@ -105,6 +105,7 @@ function buildFunctionPinDeclarations(inputCount: number, outputCount: number): 
   const inputs: PinDeclaration[] = inputLabels.map((label, i) => {
     const correct = (symmetric && even && i >= inputCount / 2) ? 1 : 0;
     return {
+      kind: "signal" as const,
       direction: PinDirection.INPUT,
       label,
       defaultBitWidth: 1,
@@ -115,6 +116,7 @@ function buildFunctionPinDeclarations(inputCount: number, outputCount: number): 
   });
 
   const outputs: PinDeclaration[] = outputLabels.map((label, i) => ({
+    kind: "signal" as const,
     direction: PinDirection.OUTPUT,
     label,
     defaultBitWidth: 1,

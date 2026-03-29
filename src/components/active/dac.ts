@@ -59,6 +59,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
   // Digital input pins D0..D(N-1) on the left, evenly spaced
   for (let i = 0; i < bits; i++) {
     pins.push({
+      kind: "signal",
       direction: PinDirection.INPUT,
       label: `D${i}`,
       defaultBitWidth: 1,
@@ -70,6 +71,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
 
   // VREF — reference voltage input
   pins.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "VREF",
     defaultBitWidth: 1,
@@ -80,6 +82,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
 
   // OUT — analog output
   pins.push({
+    kind: "signal",
     direction: PinDirection.OUTPUT,
     label: "OUT",
     defaultBitWidth: 1,
@@ -90,6 +93,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
 
   // GND — ground reference
   pins.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "GND",
     defaultBitWidth: 1,

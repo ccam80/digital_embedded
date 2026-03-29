@@ -14,13 +14,10 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { Pin } from "../../core/pin.js";
-import { Wire } from "../../core/circuit.js";
 import { serializeCircuit } from "../dts-serializer.js";
 import { deserializeDts } from "../dts-deserializer.js";
 import { ModelLibrary } from "../../solver/analog/model-library.js";
 import { SubcircuitModelRegistry } from "../../solver/analog/subcircuit-model-registry.js";
-import { parseSubcircuit } from "../../solver/analog/model-parser.js";
-import { buildSpiceSubcircuit } from "../spice-model-builder.js";
 
 // ---------------------------------------------------------------------------
 // Test doubles
@@ -69,7 +66,6 @@ describe("dts-model-roundtrip: namedParameterSets", () => {
     const json = serializeCircuit(circuit);
     const { circuit: restored } = deserializeDts(json, registry);
 
-    expect(restored.metadata.namedParameterSets).toBeDefined();
     const sets = restored.metadata.namedParameterSets!;
     expect(sets["1N4148"].deviceType).toBe("D");
     expect(sets["1N4148"].params["IS"]).toBe(2.52e-9);
@@ -91,12 +87,10 @@ describe("dts-model-roundtrip: namedParameterSets", () => {
     deserializeDts(json, registry, { modelLibrary });
 
     const model4148 = modelLibrary.get("1N4148");
-    expect(model4148).toBeDefined();
     expect(model4148!.type).toBe("D");
     expect(model4148!.params["IS"]).toBe(2.52e-9);
 
     const model2222 = modelLibrary.get("2N2222");
-    expect(model2222).toBeDefined();
     expect(model2222!.type).toBe("NPN");
     expect(model2222!.params["BF"]).toBe(300);
   });
@@ -161,7 +155,6 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
     const json = serializeCircuit(circuit);
     const { circuit: restored } = deserializeDts(json, registry);
 
-    expect(restored.metadata.modelDefinitions).toBeDefined();
     const defs = restored.metadata.modelDefinitions!;
     expect(defs["RDIV"].ports).toEqual(["a", "b", "c"]);
     expect(defs["RDIV"].elements).toHaveLength(2);
@@ -177,39 +170,37 @@ describe("dts-model-roundtrip: modelDefinitions", () => {
     expect(restored.metadata.modelDefinitions).toBeUndefined();
   });
 
-  it("round-trip with full circuit registers in SubcircuitModelRegistry", () => {
-    const parsed = parseSubcircuit(`.SUBCKT rdiv a b c
-R1 a b 10k
-R2 b c 10k
-.ENDS rdiv`);
-    const subCircuit = buildSpiceSubcircuit(parsed);
+  it("round-trip with full netlist registers in SubcircuitModelRegistry", () => {
+    const rdivNetlist = {
+      ports: ["a", "b", "c"],
+      elements: [
+        { typeId: "Resistor", params: { resistance: 10000 } },
+        { typeId: "Resistor", params: { resistance: 10000 } },
+      ],
+      internalNetCount: 0,
+      netlist: [[0, 1], [1, 2]],
+    };
 
     const circuit = new Circuit({ name: "WithSubckt" });
     circuit.metadata.modelDefinitions = {
-      "rdiv": {
-        ports: parsed.ports,
-        elements: [{ typeId: "Resistor" }, { typeId: "Resistor" }],
-        internalNetCount: 0,
-        netlist: [[0, 1], [1, 2]],
-      },
+      "rdiv": rdivNetlist,
     };
 
     const sourceRegistry = new SubcircuitModelRegistry();
-    sourceRegistry.register("rdiv", subCircuit);
+    sourceRegistry.register("rdiv", rdivNetlist);
     const json = serializeCircuit(circuit, sourceRegistry);
 
     const componentRegistry = makeRegistry("In", "Resistor", "Capacitor");
     const destRegistry = new SubcircuitModelRegistry();
     const { circuit: restored } = deserializeDts(json, componentRegistry, {
-      transistorModelRegistry: destRegistry,
+      subcircuitModelRegistry: destRegistry,
     });
 
-    expect(restored.metadata.modelDefinitions).toBeDefined();
-    expect(restored.metadata.modelDefinitions!["rdiv"].ports).toEqual(parsed.ports);
+    expect(restored.metadata.modelDefinitions!["rdiv"].ports).toEqual(["a", "b", "c"]);
     expect(destRegistry.has("rdiv")).toBe(true);
-    const retrievedCircuit = destRegistry.get("rdiv")!;
-    // 3 In elements (ports a,b,c) + 2 Resistor elements = 5
-    expect(retrievedCircuit.elements.length).toBe(5);
+    const retrievedNetlist = destRegistry.get("rdiv")!;
+    expect(retrievedNetlist.elements).toHaveLength(2);
+    expect(retrievedNetlist.ports).toEqual(["a", "b", "c"]);
   });
 
   it("modelDefinitions stub (no topology) does not register in SubcircuitModelRegistry", () => {
@@ -226,7 +217,7 @@ R2 b c 10k
 
     const json = serializeCircuit(circuit);
     const transistorRegistry = new SubcircuitModelRegistry();
-    const { circuit: restored } = deserializeDts(json, registry, { transistorModelRegistry: transistorRegistry });
+    const { circuit: restored } = deserializeDts(json, registry, { subcircuitModelRegistry: transistorRegistry });
 
     expect(restored.metadata.modelDefinitions!["MyModel"].ports).toEqual(["a", "b"]);
     expect(restored.metadata.modelDefinitions!["MyModel"].elements).toHaveLength(0);
@@ -279,45 +270,44 @@ describe("dts-model-roundtrip: both fields together", () => {
     const json = serializeCircuit(circuit);
     const modelLibrary = new ModelLibrary();
     const transistorRegistry = new SubcircuitModelRegistry();
-    deserializeDts(json, registry, { modelLibrary, transistorModelRegistry: transistorRegistry });
+    deserializeDts(json, registry, { modelLibrary, subcircuitModelRegistry: transistorRegistry });
 
-    expect(modelLibrary.get("1N4148")).toBeDefined();
     expect(modelLibrary.get("1N4148")!.type).toBe("D");
     expect(transistorRegistry.has("RDIV")).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// serializeCircuit with transistorModels parameter
+// serializeCircuit with subcircuitModels parameter
 // ---------------------------------------------------------------------------
 
-describe("dts-model-roundtrip: serializeCircuit with transistorModels", () => {
-  it("serializes full circuit topology when registry has matching model", () => {
-    const parsed = parseSubcircuit(`.SUBCKT myfilt vin vout
-R1 vin vout 1k
-.ENDS myfilt`);
-    const subCircuit = buildSpiceSubcircuit(parsed);
+describe("dts-model-roundtrip: serializeCircuit with subcircuitModels", () => {
+  it("serializes netlist directly from registry when matching model exists", () => {
+    const myfiltNetlist = {
+      ports: ["vin", "vout"],
+      elements: [{ typeId: "Resistor", params: { resistance: 1000 } }],
+      internalNetCount: 0,
+      netlist: [[0, 1]],
+    };
 
     const circuit = new Circuit({ name: "Main" });
     circuit.metadata.modelDefinitions = {
       "myfilt": {
-        ports: parsed.ports,
+        ports: ["vin", "vout"],
         elements: [{ typeId: "Resistor" }],
         internalNetCount: 0,
         netlist: [[0, 1]],
       },
     };
 
-    const transistorModels = new SubcircuitModelRegistry();
-    transistorModels.register("myfilt", subCircuit);
+    const subcircuitModels = new SubcircuitModelRegistry();
+    subcircuitModels.register("myfilt", myfiltNetlist);
 
-    const json = serializeCircuit(circuit, transistorModels);
+    const json = serializeCircuit(circuit, subcircuitModels);
     const parsed2 = JSON.parse(json) as Record<string, unknown>;
     const modelDefs = parsed2["modelDefinitions"] as Record<string, unknown>;
-    expect(modelDefs).not.toBeNull();
     expect(typeof modelDefs).toBe("object");
     const myfiltDef = modelDefs["myfilt"] as Record<string, unknown>;
-    expect(myfiltDef).toBeDefined();
     expect((myfiltDef["ports"] as string[]).length).toBe(2);
     expect((myfiltDef["elements"] as unknown[]).length).toBe(1);
     expect(typeof myfiltDef["internalNetCount"]).toBe("number");

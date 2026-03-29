@@ -12,6 +12,7 @@ import type { ParsedModel, ParseError } from '../solver/analog/model-parser.js';
 import { validateModel } from '../solver/analog/model-library.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
+import type { ComponentDefinition } from '../core/registry.js';
 import type { SpiceImportResult } from './spice-model-apply.js';
 
 /**
@@ -23,6 +24,7 @@ import type { SpiceImportResult } from './spice-model-apply.js';
 export function openSpiceImportDialog(
   element: CircuitElement,
   container: HTMLElement,
+  definition?: ComponentDefinition,
 ): Promise<SpiceImportResult | null> {
   return new Promise<SpiceImportResult | null>((resolve) => {
     let resolved = false;
@@ -199,7 +201,7 @@ export function openSpiceImportDialog(
       try {
         const params = JSON.parse(existingOverrides) as Record<string, number>;
         const name = typeof existingName === 'string' ? existingName : 'IMPORTED';
-        const deviceType = resolveDeviceTypeFromElement(element);
+        const deviceType = resolveDeviceTypeFromDefinition(definition);
         if (deviceType) {
           const lines = [`.MODEL ${name} ${deviceType}(`];
           const paramPairs = Object.entries(params).map(([k, v]) => `${k}=${v}`);
@@ -231,11 +233,10 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Attempt to infer the device type from the element's component definition.
+ * Attempt to infer the device type from the component definition's MNA models.
  * Used only for pre-populating the textarea with existing overrides.
  */
-function resolveDeviceTypeFromElement(element: CircuitElement): string | null {
-  const def = (element as unknown as { definition?: { models?: { mnaModels?: Record<string, { deviceType?: string }> } } }).definition;
+function resolveDeviceTypeFromDefinition(def?: ComponentDefinition): string | null {
   if (!def?.models?.mnaModels) return null;
   for (const model of Object.values(def.models.mnaModels)) {
     if (model.deviceType) return model.deviceType;

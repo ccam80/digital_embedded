@@ -9,8 +9,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
-import type { MnaSubcircuitNetlist, SubcircuitElement } from '../core/mna-subcircuit-netlist.js';
-import { pinWorldPosition } from '../core/pin.js';
+import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import type {
   DtsDocument,
   DtsCircuit,
@@ -159,148 +158,28 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 }
 
 // ---------------------------------------------------------------------------
-// Circuit -> MnaSubcircuitNetlist conversion
-// ---------------------------------------------------------------------------
-
-function circuitToMnaNetlist(
-  subcircuit: Circuit,
-  portNames: string[],
-): MnaSubcircuitNetlist {
-  const pointToId = new Map<string, number>();
-  let nextPointId = 0;
-
-  function getId(x: number, y: number): number {
-    const k = x + ',' + y;
-    let id = pointToId.get(k);
-    if (id === undefined) {
-      id = nextPointId++;
-      pointToId.set(k, id);
-    }
-    return id;
-  }
-
-  for (const wire of subcircuit.wires) {
-    getId(wire.start.x, wire.start.y);
-    getId(wire.end.x, wire.end.y);
-  }
-  for (const el of subcircuit.elements) {
-    for (const pin of el.getPins()) {
-      const wp = pinWorldPosition(el, pin);
-      getId(wp.x, wp.y);
-    }
-  }
-
-  const parent = Array.from({ length: nextPointId }, (_, i) => i);
-  const rnk = new Array<number>(nextPointId).fill(0);
-
-  function find(i: number): number {
-    while (parent[i] !== i) { parent[i] = parent[parent[i]!]!; i = parent[i]!; }
-    return i;
-  }
-  function union(a: number, b: number): void {
-    const ra = find(a), rb = find(b);
-    if (ra === rb) return;
-    if (rnk[ra]! < rnk[rb]!) parent[ra] = rb;
-    else if (rnk[ra]! > rnk[rb]!) parent[rb] = ra;
-    else { parent[rb] = ra; rnk[ra]!++; }
-  }
-
-  for (const wire of subcircuit.wires) {
-    union(getId(wire.start.x, wire.start.y), getId(wire.end.x, wire.end.y));
-  }
-
-  const portLabelToRoot = new Map<string, number>();
-  const ifaceIds = new Set<string>();
-
-  for (const el of subcircuit.elements) {
-    if (el.typeId !== 'In' && el.typeId !== 'Out') continue;
-    const props = el.getProperties();
-    const label = props.has('label') ? props.get<string>('label') : '';
-    if (!label) continue;
-    ifaceIds.add(el.instanceId);
-    const pins = el.getPins();
-    if (pins.length === 0) continue;
-    const wp = pinWorldPosition(el, pins[0]);
-    portLabelToRoot.set(label, find(getId(wp.x, wp.y)));
-  }
-
-  const rootToNet = new Map<number, number>();
-  let nextNet = 0;
-  for (const portName of portNames) {
-    const root = portLabelToRoot.get(portName);
-    if (root !== undefined && !rootToNet.has(root)) {
-      rootToNet.set(root, nextNet);
-    }
-    nextNet++;
-  }
-
-  function netIdx(pid: number): number {
-    const root = find(pid);
-    let idx = rootToNet.get(root);
-    if (idx === undefined) { idx = nextNet++; rootToNet.set(root, idx); }
-    return idx;
-  }
-
-  const elements: SubcircuitElement[] = [];
-  const netlistArr: number[][] = [];
-
-  for (const el of subcircuit.elements) {
-    if (ifaceIds.has(el.instanceId)) continue;
-    const subEl: SubcircuitElement = { typeId: el.typeId };
-    const props = el.getProperties();
-
-    const overrides = props.has('_spiceModelOverrides')
-      ? props.get<string>('_spiceModelOverrides') : undefined;
-    if (overrides !== undefined) {
-      subEl.params = JSON.parse(overrides) as Record<string, number>;
-    }
-    const pKeys = ['resistance', 'capacitance', 'inductance', 'voltage', 'current'];
-    for (const key of pKeys) {
-      if (props.has(key)) {
-        if (!subEl.params) subEl.params = {};
-        subEl.params[key] = props.get<number>(key);
-      }
-    }
-    elements.push(subEl);
-    const pinNets: number[] = [];
-    for (const pin of el.getPins()) {
-      const wp = pinWorldPosition(el, pin);
-      pinNets.push(netIdx(getId(wp.x, wp.y)));
-    }
-    netlistArr.push(pinNets);
-  }
-
-  return {
-    ports: portNames,
-    elements,
-    internalNetCount: nextNet - portNames.length,
-    netlist: netlistArr,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Build the model-related fields of a DtsDocument from circuit metadata.
  *
- * When a `SubcircuitModelRegistry` is provided, model definition circuits are
- * converted to MnaSubcircuitNetlist format. Without the registry, the metadata
- * MnaSubcircuitNetlist is written directly.
+ * When a `SubcircuitModelRegistry` is provided, its MnaSubcircuitNetlist
+ * objects are written directly. Without the registry, the metadata
+ * MnaSubcircuitNetlist is written as-is.
  */
 function buildModelFields(
   circuit: Circuit,
-  transistorModels?: SubcircuitModelRegistry,
+  subcircuitModels?: SubcircuitModelRegistry,
 ): Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets' | 'subcircuitBindings'> {
   const result: Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets' | 'subcircuitBindings'> = {};
 
   if (circuit.metadata.modelDefinitions !== undefined) {
     const modelDefinitions: Record<string, MnaSubcircuitNetlist> = {};
     for (const [name, def] of Object.entries(circuit.metadata.modelDefinitions)) {
-      const fullCircuit = transistorModels?.get(name);
-      if (fullCircuit !== undefined) {
-        modelDefinitions[name] = circuitToMnaNetlist(fullCircuit, def.ports);
+      const registryNetlist = subcircuitModels?.get(name);
+      if (registryNetlist !== undefined) {
+        modelDefinitions[name] = registryNetlist;
       } else {
         modelDefinitions[name] = def;
       }
@@ -325,20 +204,20 @@ function buildModelFields(
  * Produces a self-contained document with `format: "dts"`, `version: 1`,
  * and no `subcircuitDefinitions` key (standalone circuit).
  *
- * When `transistorModels` is provided, model definition circuits are serialized
- * in full topology from the registry.
+ * When `subcircuitModels` is provided, MnaSubcircuitNetlist objects from the
+ * registry are serialized directly.
  *
  * Output is deterministic: same circuit always produces byte-identical JSON.
  */
 export function serializeCircuit(
   circuit: Circuit,
-  transistorModels?: SubcircuitModelRegistry,
+  subcircuitModels?: SubcircuitModelRegistry,
 ): string {
   const doc: DtsDocument = {
     format: 'dts',
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
-    ...buildModelFields(circuit, transistorModels),
+    ...buildModelFields(circuit, subcircuitModels),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);
@@ -352,13 +231,13 @@ export function serializeCircuit(
  * placed under `subcircuitDefinitions` keyed by its name. The result is a
  * fully self-contained document — no external files are required to load it.
  *
- * When `transistorModels` is provided, model definition circuits are serialized
- * in full topology from the registry.
+ * When `subcircuitModels` is provided, MnaSubcircuitNetlist objects from the
+ * registry are serialized directly.
  */
 export function serializeWithSubcircuits(
   circuit: Circuit,
   subcircuits: Map<string, Circuit>,
-  transistorModels?: SubcircuitModelRegistry,
+  subcircuitModels?: SubcircuitModelRegistry,
 ): string {
   const subcircuitDefinitions: Record<string, DtsCircuit> = {};
   for (const [name, sub] of subcircuits) {
@@ -370,7 +249,7 @@ export function serializeWithSubcircuits(
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
     subcircuitDefinitions,
-    ...buildModelFields(circuit, transistorModels),
+    ...buildModelFields(circuit, subcircuitModels),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);

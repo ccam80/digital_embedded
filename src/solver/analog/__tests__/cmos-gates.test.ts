@@ -1,5 +1,5 @@
 /**
- * CMOS gate transistor-level model tests (Phase 4c.2).
+ * CMOS gate transistor-level model tests.
  *
  * Tests compile CMOS gate topologies directly through the full analog pipeline:
  *   compileUnified(flat MOSFET circuit) → MNAEngine → DC operating point
@@ -793,6 +793,35 @@ describe("CmosBuffer", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Different VDD voltage tests
+// ---------------------------------------------------------------------------
+
+describe("DifferentVddVoltages", () => {
+  it("two_inverters_at_5V_and_3V3_produce_different_output_levels", () => {
+    // Two CMOS inverters with input LOW (0V) → output should be HIGH at VDD.
+    // Inverter 1: VDD=5V   → output ~ 5V
+    // Inverter 2: VDD=3.3V → output ~ 3.3V
+
+    const { circuit: c1, registry: r1, outX: out1 } = buildInverter(0, 5.0);
+    const dc1 = solveDc(c1, r1);
+    expect(dc1.converged, "5V inverter should converge").toBe(true);
+    const vout5 = getVoltageAtX(dc1.engine, dc1.compiled, out1);
+
+    const { circuit: c2, registry: r2, outX: out2 } = buildInverter(0, 3.3);
+    const dc2 = solveDc(c2, r2);
+    expect(dc2.converged, "3.3V inverter should converge").toBe(true);
+    const vout3 = getVoltageAtX(dc2.engine, dc2.compiled, out2);
+
+    // Both outputs HIGH since input=0V
+    expect(vout5, "5V inverter output should be near 5V").toBeGreaterThan(4.5);
+    expect(vout3, "3.3V inverter output should be near 3.3V").toBeGreaterThan(2.8);
+
+    // The 5V output should be significantly higher than the 3.3V output
+    expect(vout5 - vout3).toBeGreaterThan(1.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Registration tests
 // ---------------------------------------------------------------------------
 
@@ -813,7 +842,7 @@ describe("Registration", () => {
     ];
 
     for (const { name, def } of gateTypes) {
-      expect(def.subcircuitRefs?.cmos, `${name} transistorModel`).toBeDefined();
+      expect(def.subcircuitRefs?.cmos, `${name} subcircuitRefs.cmos`).toBeDefined();
     }
   });
 

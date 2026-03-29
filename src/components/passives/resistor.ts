@@ -145,8 +145,7 @@ function createResistorElement(
   props: PropertyBag,
 ): AnalogElementCore {
   const rawR = props.getOrDefault<number>("resistance", 1000);
-  const R = Math.max(rawR, MIN_RESISTANCE);
-  const G = 1 / R;
+  let G = 1 / Math.max(rawR, MIN_RESISTANCE);
   const n0 = pinNodes.get("A")!;
   const n1 = pinNodes.get("B")!;
 
@@ -154,6 +153,12 @@ function createResistorElement(
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+
+    setParam(key: string, value: number): void {
+      if (key === "resistance") {
+        G = 1 / Math.max(value, MIN_RESISTANCE);
+      }
+    },
 
     stamp(solver: SparseSolver): void {
       stampG(solver, n0, n0, G);

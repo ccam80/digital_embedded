@@ -20,6 +20,12 @@ export type PinVoltageAccessFactory = (element: CircuitElement) => PinVoltageAcc
 /** Radius of the filled circle drawn at each pin position (grid units). */
 const PIN_CIRCLE_RADIUS = 0.15;
 
+/** Font size for pin loading indicator symbols (grid units). */
+const PIN_LOADING_FONT_SIZE = 0.45;
+
+/** Offset from pin center to loading indicator center (grid units). */
+const PIN_LOADING_OFFSET = 0.4;
+
 /**
  * Radius of the unfilled negation bubble (grid units).
  * Java: drawCircle from (pinX+2, pinY-SIZE2+2) to (pinX+SIZE-2, pinY+SIZE2-2)
@@ -52,6 +58,9 @@ export class ElementRenderer {
   private _overlapCache: Set<CircuitElement> | null = null;
   private _overlapCacheVersion = -1;
 
+  /** Per-pin loading indicator: `instanceId:pinLabel` → 'loaded' | 'ideal'. */
+  private _pinLoadingMap: ReadonlyMap<string, 'loaded' | 'ideal'> = new Map();
+
   /** True when analog voltage coloring is active. */
   hasAnalogContext(): boolean {
     return this._pinVoltageFactory !== null;
@@ -63,6 +72,14 @@ export class ElementRenderer {
    */
   setAnalogContext(factory: PinVoltageAccessFactory | null): void {
     this._pinVoltageFactory = factory;
+  }
+
+  /**
+   * Set per-pin loading indicators. Each key is `instanceId:pinLabel`.
+   * 'ideal' renders ∞ (no loading), 'loaded' renders Z — both in COMPONENT colour.
+   */
+  setPinLoadingIndicators(indicators: ReadonlyMap<string, 'loaded' | 'ideal'>): void {
+    this._pinLoadingMap = indicators;
   }
 
   /**
@@ -142,6 +159,12 @@ export class ElementRenderer {
       if (pin.isClock) {
         this._renderClockTriangle(ctx, pin, element);
       }
+
+      const loadingKey = `${element.instanceId}:${pin.label}`;
+      const loading = this._pinLoadingMap.get(loadingKey);
+      if (loading !== undefined) {
+        this._renderPinLoadingIndicator(ctx, pin, element, loading);
+      }
     }
   }
 
@@ -175,6 +198,39 @@ export class ElementRenderer {
       ],
       true,
     );
+  }
+
+  /**
+   * Draw a small ∞ (ideal/no loading) or Z (loaded) symbol on the wire side
+   * of the pin, offset outward from the component body along the pin axis.
+   */
+  private _renderPinLoadingIndicator(
+    ctx: RenderContext,
+    pin: Pin,
+    element: CircuitElement,
+    loading: 'loaded' | 'ideal',
+  ): void {
+    const wp = pinWorldPosition(element, pin);
+
+    // Outward direction: element center → pin position (local space)
+    const px = pin.position.x;
+    const py = pin.position.y;
+    const len = Math.sqrt(px * px + py * py);
+    if (len < 0.01) return;
+    const localDir = { x: px / len, y: py / len };
+    if (element.mirror) localDir.y = -localDir.y;
+    const worldDir = rotatePoint(localDir, element.rotation as Rotation);
+
+    const symbol = loading === 'ideal' ? '\u221E' : 'Z';
+    ctx.setColor('COMPONENT');
+    ctx.setFont({ family: 'sans-serif', size: PIN_LOADING_FONT_SIZE });
+    ctx.drawText(
+      symbol,
+      wp.x + worldDir.x * PIN_LOADING_OFFSET,
+      wp.y + worldDir.y * PIN_LOADING_OFFSET,
+      { horizontal: 'center', vertical: 'middle' },
+    );
+    ctx.setColor('PIN');
   }
 
   /** Draw a selection highlight outline around the element's world bounding box. */

@@ -139,6 +139,15 @@ export class PropertyPanel {
       // Capture key at callback registration time.
       const capturedKey = def.key;
       input.onChange((newValue) => {
+        // Commit value to the PropertyBag immediately
+        const oldValue = bag.has(capturedKey) ? bag.get(capturedKey) : def.defaultValue;
+        if (!_valuesEqual(oldValue, newValue)) {
+          bag.set(capturedKey, newValue);
+          for (const cb of this._changeCallbacks) {
+            cb(capturedKey, oldValue ?? newValue, newValue);
+          }
+        }
+
         // Update conditional visibility of dependent rows
         const deps = conditionalRows.get(capturedKey);
         if (deps) {
@@ -256,8 +265,6 @@ export class PropertyPanel {
    * the selected component has simulationModels with more than one entry. The
    * dropdown is appended after the regular property rows.
    *
-   * Default is "analog-pins" (read at call time, never persisted on the element
-   * until the user changes it).
    *
    * @param element   The selected circuit element.
    * @param def       The component definition declaring simulationModels.
@@ -270,7 +277,7 @@ export class PropertyPanel {
     if (modes.length <= 1) return;
 
     const bag = element.getProperties();
-    const defaultMode = def.defaultModel ?? modes[0] ?? "analog-pins";
+    const defaultMode = def.defaultModel ?? modes[0];
     const current = bag.has("simulationModel")
       ? (bag.get("simulationModel") as string)
       : defaultMode;

@@ -16,12 +16,15 @@
 
 import type { MnaSubcircuitNetlist } from "../../../core/mna-subcircuit-netlist.js";
 import { PinDirection } from "../../../core/pin.js";
-import type { PinDeclaration } from "../../../core/pin.js";
+import type { PinDeclaration, Pin, Rotation } from "../../../core/pin.js";
 import {
   ComponentCategory,
   type ComponentDefinition,
 } from "../../../core/registry.js";
 import type { SubcircuitModelRegistry } from "../subcircuit-model-registry.js";
+import { AbstractCircuitElement } from "../../../core/element.js";
+import type { RenderContext, Rect } from "../../../core/renderer-interface.js";
+import type { PropertyBag } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // createNpnDarlington
@@ -129,15 +132,50 @@ export function registerDarlingtonModels(registry: SubcircuitModelRegistry): voi
 }
 
 // ---------------------------------------------------------------------------
+// DarlingtonElement — minimal CircuitElement for editor placement
+// ---------------------------------------------------------------------------
+
+class DarlingtonElement extends AbstractCircuitElement {
+  constructor(
+    typeName: string,
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super(typeName, instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(buildDarlingtonPinDeclarations(), []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y - 1.5, width: 2, height: 3 };
+  }
+
+  draw(_ctx: RenderContext): void {
+    // Rendering delegated to subcircuit expansion; no direct draw.
+  }
+}
+
+function darlingtonNpnFactory(props: PropertyBag): DarlingtonElement {
+  return new DarlingtonElement("DarlingtonNPN", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+}
+
+function darlingtonPnpFactory(props: PropertyBag): DarlingtonElement {
+  return new DarlingtonElement("DarlingtonPNP", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+}
+
+// ---------------------------------------------------------------------------
 // ComponentDefinitions
 // ---------------------------------------------------------------------------
 
 export const DarlingtonNpnDefinition: ComponentDefinition = {
   name: "DarlingtonNPN",
   typeId: -1,
-  factory: (_props) => {
-    throw new Error("DarlingtonNPN uses transistor-level expansion; no circuit element factory needed");
-  },
+  factory: darlingtonNpnFactory,
   pinLayout: buildDarlingtonPinDeclarations(),
   propertyDefs: [],
   attributeMap: [],
@@ -146,16 +184,14 @@ export const DarlingtonNpnDefinition: ComponentDefinition = {
     "NPN Darlington transistor pair.\n" +
     "Two NPN BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
-  subcircuitRefs: { cmos: "DarlingtonNPN" },
+  subcircuitRefs: { darlington: "DarlingtonNPN" },
   models: {},
 };
 
 export const DarlingtonPnpDefinition: ComponentDefinition = {
   name: "DarlingtonPNP",
   typeId: -1,
-  factory: (_props) => {
-    throw new Error("DarlingtonPNP uses transistor-level expansion; no circuit element factory needed");
-  },
+  factory: darlingtonPnpFactory,
   pinLayout: buildDarlingtonPinDeclarations(),
   propertyDefs: [],
   attributeMap: [],
@@ -164,6 +200,6 @@ export const DarlingtonPnpDefinition: ComponentDefinition = {
     "PNP Darlington transistor pair.\n" +
     "Two PNP BJTs in Darlington configuration with R_BE = 10 kΩ.\n" +
     "Pins: B (base), C (collector), E (emitter).",
-  subcircuitRefs: { cmos: "DarlingtonPNP" },
+  subcircuitRefs: { darlington: "DarlingtonPNP" },
   models: {},
 };

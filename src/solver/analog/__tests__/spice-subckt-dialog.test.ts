@@ -223,7 +223,6 @@ describe("spice-subckt-dialog: applySpiceSubcktImportResult", () => {
     applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
 
     const stored = registry.get("MYBJT");
-    expect(stored).toBeDefined();
     expect(stored!.ports).toEqual(["C", "B", "E"]);
     expect(stored!.elements).toHaveLength(1);
   });
@@ -288,7 +287,6 @@ Q1 C B E QMOD
 
     expect(parsed.name).toBe("TESTBJT");
     const stored = registry.get("TESTBJT");
-    expect(stored).toBeDefined();
     expect(stored!.ports).toEqual(["C", "B", "E"]);
     expect(element.getProperties().get("simulationModel")).toBe("TESTBJT");
   });
@@ -308,8 +306,6 @@ Q1 C B E QMOD
     applySpiceSubcktImportResult(element, { subcktName: parsed.name, netlist }, registry, metaCircuit);
 
     const defs = metaCircuit.metadata.modelDefinitions;
-    expect(defs).toBeDefined();
-    expect(defs!["MYBJT"]).toBeDefined();
     expect(defs!["MYBJT"].ports).toEqual(["C", "B", "E"]);
     expect(defs!["MYBJT"].elements).toHaveLength(1);
     expect(defs!["MYBJT"].elements[0].typeId).toBe("NpnBJT");

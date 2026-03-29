@@ -290,8 +290,8 @@ describe("spice-model-overrides compiler merge", () => {
       },
     } as unknown as ComponentDefinition);
 
-    // Override IS to exactly DIODE_DEFAULTS.IS (1e-14) — previously this was
-    // indistinguishable from "no override" in the lossy-diff approach.
+    // Override IS to exactly DIODE_DEFAULTS.IS (1e-14) — verifies that an
+    // override matching the default value is stored and applied correctly.
     const propsMap = new Map<string, PropertyValue>([
       ["label", "d1"],
       ["_spiceModelOverrides", JSON.stringify({ IS: DIODE_DEFAULTS["IS"] })],

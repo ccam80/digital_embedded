@@ -145,10 +145,6 @@
           <string>Label</string>
           <string>CLK</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="440" y="60"/>
     </visualElement>

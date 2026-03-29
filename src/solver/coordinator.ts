@@ -42,15 +42,6 @@ import { SpeedControl } from '../integration/speed-control.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyType } from '../core/properties.js';
 
-/** Elements that support live parameter mutation via setParam(key, value). */
-interface ParameterMutableElement {
-  setParam(key: string, value: number): void;
-}
-
-function isParameterMutable(el: unknown): el is ParameterMutableElement {
-  return typeof (el as ParameterMutableElement).setParam === 'function';
-}
-
 /** SI unit strings for common analog property keys. */
 const ANALOG_PROPERTY_UNITS: Record<string, string> = {
   resistance: '\u03A9',
@@ -751,7 +742,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
     const el = compiledAnalog.elements[elementIndex];
     if (el === undefined) return;
-    if (isParameterMutable(el)) {
+    if (el.setParam) {
       el.setParam(key, value);
     }
     this._analog.configure({});

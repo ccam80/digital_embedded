@@ -31,6 +31,12 @@ export interface WatchedSignal {
   width: number;
   group: SignalGroup;
   panelIndex: number;
+  /** 'voltage' (default) or 'current' — determines which scope channel type is created. */
+  kind?: 'voltage' | 'current';
+  /** For current signals: the element label used to re-resolve the element index after recompile. */
+  elementLabel?: string;
+  /** For current signals: the resolved element index in the compiled analog circuit. */
+  elementIndex?: number;
 }
 
 export interface ViewerController {
@@ -43,7 +49,7 @@ export interface ViewerController {
   showViewerTab(tabName: string): void;
   appendWireViewerItems(items: MenuItem[], wire: Wire, coordinator: SimulationCoordinator): void;
   appendComponentTraceItems(items: MenuItem[], element: CircuitElement, resolverCtx: CurrentResolverContext | null): void;
-  attachScopeContextMenu(cvs: HTMLCanvasElement, panel: ScopePanel, signals: WatchedSignal[]): void;
+  attachScopeContextMenu(cvs: HTMLCanvasElement, panel: ScopePanel): void;
   readonly watchedSignals: WatchedSignal[];
   /** Re-resolve signal addresses after recompilation, then rebuild panels if viewer is open. */
   resolveWatchedSignalAddresses(unified: { labelSignalMap: ReadonlyMap<string, SignalAddress>; pinSignalMap?: ReadonlyMap<string, SignalAddress> }): void;
@@ -107,6 +113,7 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       domain: sig.addr.domain,
       panelIndex: sig.panelIndex,
       group: sig.group,
+      ...(sig.kind === 'current' ? { kind: 'current' as const, elementLabel: sig.elementLabel } : {}),
     }));
   }
 
@@ -118,7 +125,13 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
     const coordinator = facade.getCoordinator();
     for (const entry of renderPipeline.state.scopePanels) {
       entry.panel.dispose();
-      entry.canvas.remove();
+      // Canvas may be inside a .scope-panel-wrapper div
+      const wrapper = entry.canvas.parentElement;
+      if (wrapper?.classList.contains('scope-panel-wrapper')) {
+        wrapper.remove();
+      } else {
+        entry.canvas.remove();
+      }
     }
     renderPipeline.state.scopePanels.length = 0;
     if (activeDataTable) {
@@ -146,19 +159,48 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       const sortedIndices = [...panelGroups.keys()].sort((a, b) => a - b);
       for (const idx of sortedIndices) {
         const signals = panelGroups.get(idx)!;
+
+        // Wrapper div with close button
+        const wrapper = document.createElement('div');
+        wrapper.className = 'scope-panel-wrapper';
+        wrapper.style.position = 'relative';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'scope-panel-close';
+        closeBtn.textContent = '\u00d7';
+        closeBtn.title = 'Close panel';
+        closeBtn.style.cssText = 'position:absolute;top:2px;right:4px;z-index:10;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:14px;line-height:1;padding:1px 5px;';
+        closeBtn.addEventListener('click', () => {
+          // Remove all signals belonging to this panel group
+          for (let i = watchedSignals.length - 1; i >= 0; i--) {
+            if ((watchedSignals[i].panelIndex ?? 0) === idx) {
+              watchedSignals.splice(i, 1);
+            }
+          }
+          if (watchedSignals.length === 0) {
+            closeViewer();
+          } else {
+            rebuildViewers();
+          }
+        });
+
         const cvs = document.createElement('canvas');
-        viewerTimingContainer.appendChild(cvs);
+        wrapper.appendChild(closeBtn);
+        wrapper.appendChild(cvs);
+        viewerTimingContainer.appendChild(wrapper);
         // Size after DOM insertion so clientWidth/Height are available
         requestAnimationFrame(() => renderPipeline.sizeCanvasInContainer(cvs));
         const panel = new ScopePanel(cvs, coordinator);
         for (const s of signals) {
-          if (s.addr.domain === 'analog') {
+          if (s.kind === 'current' && s.elementIndex !== undefined) {
+            panel.addElementCurrentChannel(s.elementIndex, s.name);
+          } else if (s.addr.domain === 'analog') {
             panel.addVoltageChannel(s.addr, s.name);
           } else {
             panel.addDigitalChannel(s.addr, s.name);
           }
         }
-        attachScopeContextMenu(cvs, panel, signals);
+        attachScopeContextMenu(cvs, panel);
         renderPipeline.state.scopePanels.push({ canvas: cvs, panel });
       }
     }
@@ -357,67 +399,107 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
       if (items.length > 0) items.push(separator());
 
-      // Per-pin voltage traces — resolve node IDs by pin world position,
-      // not by indexing pinNodeIds (which may differ in order from pins,
-      // e.g. FET pinNodeIds = [D,G,S] but pins = [G,S,D]).
+      // Resolve pin node IDs by world position (not by indexing pinNodeIds,
+      // which may differ in order from pins, e.g. FET pinNodeIds = [D,G,S]
+      // but pins = [G,S,D]).
+      const pinNodeMap: { pinLabel: string; nodeId: number }[] = [];
       for (const pin of pins) {
-        const pinLabel = pin.label;
         const wp = pinWorldPosition(element, pin);
-        let nodeId: number | undefined;
         for (const [wire, nid] of resolverCtx.wireToNodeId) {
           if (
             (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
             (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
           ) {
-            nodeId = nid;
+            pinNodeMap.push({ pinLabel: pin.label, nodeId: nid });
             break;
           }
         }
-        if (nodeId === undefined) continue;
+      }
+
+      const existingPanels = getPanelList();
+      const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
+      const firstNodeAddr: SignalAddress = pinNodeIds.length > 0
+        ? { domain: 'analog' as const, nodeId: pinNodeIds[0]! }
+        : { domain: 'analog' as const, nodeId: 0 };
+
+      // Helper: add a voltage trace to a specific panel
+      const addVoltageTrace = (pinLabel: string, nodeId: number, panelIdx: number) => {
+        const name = `${label}.${pinLabel}`;
+        const addr: SignalAddress = { domain: 'analog' as const, nodeId };
+        if (!watchedSignals.some(s => s.name === name)) {
+          watchedSignals.push({ name, addr, width: 1, group: 'probe', panelIndex: panelIdx });
+        }
+        rebuildViewers();
+        viewerPanel?.classList.add('open');
+        showViewerTab('timing');
+      };
+
+      // Helper: add a current trace to a specific panel
+      const addCurrentTrace = (panelIdx: number) => {
+        const name = `${label} I`;
+        if (!watchedSignals.some(s => s.name === name)) {
+          watchedSignals.push({
+            name, addr: firstNodeAddr, width: 1, group: 'probe',
+            panelIndex: panelIdx, kind: 'current',
+            elementLabel: label, elementIndex: elementIndex,
+          });
+        }
+        rebuildViewers();
+        viewerPanel?.classList.add('open');
+        showViewerTab('timing');
+      };
+
+      // For 2-terminal components: "Trace Voltage: Label" (across the component)
+      // For 3+ terminal: per-pin "Trace Voltage: Label.Pin"
+      if (pinNodeMap.length <= 2 && pinNodeMap.length > 0) {
+        // Use first pin for the voltage trace
+        const { pinLabel, nodeId } = pinNodeMap[0];
         items.push({
-          label: `Trace Voltage: ${label}.${pinLabel}`,
-          action: () => {
-            const panelIdx = nextPanelIndex();
-            if (renderPipeline.state.scopePanels.length > 0) {
-              renderPipeline.state.scopePanels[0].panel.addVoltageChannel(
-                { domain: 'analog' as const, nodeId: nodeId! },
-                `${label}.${pinLabel}`,
-              );
-              renderPipeline.state.scopePanels[0].panel.render();
-            } else {
-              watchedSignals.push({ name: `${label}.${pinLabel}`, addr: { domain: 'analog', nodeId: nodeId! }, width: 1, group: 'probe', panelIndex: panelIdx });
-              rebuildViewers();
-            }
-            viewerPanel?.classList.add('open');
-            showViewerTab('timing');
-          },
+          label: `Trace Voltage: ${label}`,
+          action: () => addVoltageTrace(pinLabel, nodeId, existingPanels[0]?.index ?? nextPanelIndex()),
           enabled: true,
         });
+        if (existingPanels.length > 0) {
+          items.push({
+            label: `Trace Voltage: ${label} (New Panel)`,
+            action: () => addVoltageTrace(pinLabel, nodeId, nextPanelIndex()),
+            enabled: true,
+          });
+        }
+      } else {
+        for (const { pinLabel, nodeId } of pinNodeMap) {
+          items.push({
+            label: `Trace Voltage: ${label}.${pinLabel}`,
+            action: () => addVoltageTrace(pinLabel, nodeId, existingPanels[0]?.index ?? nextPanelIndex()),
+            enabled: true,
+          });
+        }
+        if (existingPanels.length > 0 && pinNodeMap.length > 0) {
+          items.push(separator());
+          for (const { pinLabel, nodeId } of pinNodeMap) {
+            items.push({
+              label: `Trace Voltage: ${label}.${pinLabel} (New Panel)`,
+              action: () => addVoltageTrace(pinLabel, nodeId, nextPanelIndex()),
+              enabled: true,
+            });
+          }
+        }
       }
 
       // Element current trace
+      items.push(separator());
       items.push({
         label: `Trace Current: ${label}`,
-        action: () => {
-          if (renderPipeline.state.scopePanels.length > 0) {
-            renderPipeline.state.scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
-            renderPipeline.state.scopePanels[0].panel.render();
-          } else {
-            const panelIdx = nextPanelIndex();
-            const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
-            if (pinNodeIds.length > 0) {
-              watchedSignals.push({ name: `${label}.${pins[0]?.label ?? 'pin0'}`, addr: { domain: 'analog', nodeId: pinNodeIds[0]! }, width: 1, group: 'probe', panelIndex: panelIdx });
-              rebuildViewers();
-              if (renderPipeline.state.scopePanels.length > 0) {
-                renderPipeline.state.scopePanels[0].panel.addElementCurrentChannel(elementIndex, `${label} I`);
-              }
-            }
-          }
-          viewerPanel?.classList.add('open');
-          showViewerTab('timing');
-        },
+        action: () => addCurrentTrace(existingPanels[0]?.index ?? nextPanelIndex()),
         enabled: true,
       });
+      if (existingPanels.length > 0) {
+        items.push({
+          label: `Trace Current: ${label} (New Panel)`,
+          action: () => addCurrentTrace(nextPanelIndex()),
+          enabled: true,
+        });
+      }
     } else {
       if (pins.length === 0) return;
       if (items.length > 0) items.push(separator());
@@ -435,7 +517,6 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
   function attachScopeContextMenu(
     cvs: HTMLCanvasElement,
     panel: ScopePanel,
-    signals: WatchedSignal[],
   ): void {
     cvs.addEventListener('contextmenu', (e: MouseEvent) => {
       e.preventDefault();
@@ -483,44 +564,30 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       if (channels.length > 0) {
         items.push(separator());
         for (const ch of channels) {
-          items.push({
-            label: ch.autoRange ? `${ch.label}: Fix Y Range` : `${ch.label}: Auto Y Range`,
-            action: () => {
-              if (ch.autoRange) panel.setYRange(ch.label, ch.yMin, ch.yMax);
-              else panel.setAutoYRange(ch.label);
-              panel.render();
-            },
-            enabled: true,
-          });
-        }
-      }
-
-      // Add current for elements connected to viewed signals
-      const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
-      if (resolverCtx) {
-        const currentItems: MenuItem[] = [];
-        const seen = new Set<number>();
-        for (const sig of signals) {
-          for (let idx = 0; idx < resolverCtx.elements.length; idx++) {
-            if (seen.has(idx)) continue;
-            const analogEl = resolverCtx.elements[idx];
-            if (sig.addr.domain !== 'analog' || !analogEl.pinNodeIds.includes(sig.addr.nodeId)) continue;
-            seen.add(idx);
-            const ce = resolverCtx.elementToCircuitElement.get(idx);
-            const elLabel = ce ? _elementLabel(ce) : `element${idx}`;
-            const alreadyHas = channels.some(c => (c.kind === 'current' || c.kind === 'elementCurrent') && c.label === `${elLabel} I`);
-            if (!alreadyHas) {
-              currentItems.push({
-                label: `Add Current: ${elLabel}`,
-                action: () => { panel.addElementCurrentChannel(idx, `${elLabel} I`); panel.render(); },
-                enabled: true,
-              });
-            }
+          if (ch.autoRange) {
+            items.push({
+              label: `${ch.label}: Set Y Range\u2026`,
+              action: () => {
+                const input = prompt(`Y range for "${ch.label}" (min, max):`, `${ch.yMin.toPrecision(3)}, ${ch.yMax.toPrecision(3)}`);
+                if (!input) return;
+                const parts = input.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length === 2 && isFinite(parts[0]) && isFinite(parts[1])) {
+                  panel.setYRange(ch.label, parts[0], parts[1]);
+                  panel.render();
+                }
+              },
+              enabled: true,
+            });
+          } else {
+            items.push({
+              label: `${ch.label}: Auto Y Range`,
+              action: () => {
+                panel.setAutoYRange(ch.label);
+                panel.render();
+              },
+              enabled: true,
+            });
           }
-        }
-        if (currentItems.length > 0) {
-          items.push(separator());
-          items.push(...currentItems);
         }
       }
 
@@ -532,12 +599,16 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
             label: `Remove "${ch.label}"`,
             action: () => {
               panel.removeChannel(ch.label);
-              // Also remove from watchedSignals if it's a voltage channel
-              const sig = signals.find(s => s.name === ch.label);
-              if (sig) {
-                const sigIdx = watchedSignals.indexOf(sig);
-                if (sigIdx >= 0) watchedSignals.splice(sigIdx, 1);
-                if (watchedSignals.length === 0) closeViewer(); else rebuildViewers();
+              // Remove matching entry from watchedSignals (voltage or current)
+              const sigIdx = watchedSignals.findIndex(s => s.name === ch.label);
+              if (sigIdx >= 0) watchedSignals.splice(sigIdx, 1);
+              _syncTracesToMetadata();
+              // Close viewer only when no channels remain at all
+              const remaining = panel.getChannelDescriptors();
+              if (remaining.length === 0 && watchedSignals.length === 0) {
+                closeViewer();
+              } else {
+                panel.render();
               }
             },
             enabled: true,
@@ -557,12 +628,29 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
   function resolveWatchedSignalAddresses(unified: { labelSignalMap: ReadonlyMap<string, SignalAddress>; pinSignalMap?: ReadonlyMap<string, SignalAddress> }): void {
     if (viewerPanel?.classList.contains('open') && watchedSignals.length > 0) {
+      const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
       for (const sig of watchedSignals) {
-        let addr = unified.labelSignalMap.get(sig.name);
-        if (!addr) addr = unified.pinSignalMap?.get(sig.name);
-        if (addr !== undefined) {
-          sig.addr = addr;
-          sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
+        if (sig.kind === 'current' && sig.elementLabel && resolverCtx) {
+          // Re-resolve element index by label after recompile
+          for (let i = 0; i < resolverCtx.elements.length; i++) {
+            const ce = resolverCtx.elementToCircuitElement.get(i);
+            if (ce && _elementLabel(ce) === sig.elementLabel) {
+              sig.elementIndex = i;
+              // Also refresh the addr anchor from the element's pin nodes
+              const pinNodeIds = resolverCtx.elements[i].pinNodeIds ?? [];
+              if (pinNodeIds.length > 0) {
+                sig.addr = { domain: 'analog', nodeId: pinNodeIds[0]! };
+              }
+              break;
+            }
+          }
+        } else {
+          let addr = unified.labelSignalMap.get(sig.name);
+          if (!addr) addr = unified.pinSignalMap?.get(sig.name);
+          if (addr !== undefined) {
+            sig.addr = addr;
+            sig.width = addr.domain === 'digital' ? addr.bitWidth : 1;
+          }
         }
       }
       rebuildViewers();
@@ -581,21 +669,55 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
     const labelSignalMap = compiledFull.labelSignalMap;
     const pinSignalMap = compiledFull.pinSignalMap;
 
-    for (const trace of traces) {
-      let addr = labelSignalMap.get(trace.name);
-      if (!addr) addr = pinSignalMap?.get(trace.name);
-      if (!addr) {
-        console.warn(`[trace-restore] Signal "${trace.name}" not found, skipping`);
-        continue;
-      }
+    const resolverCtx = coordinator.getCurrentResolverContext?.() ?? null;
 
-      watchedSignals.push({
-        name: trace.name,
-        addr,
-        width: addr.domain === 'digital' ? addr.bitWidth : 1,
-        group: trace.group as SignalGroup,
-        panelIndex: trace.panelIndex,
-      });
+    for (const trace of traces) {
+      if (trace.kind === 'current' && trace.elementLabel) {
+        // Resolve element index by label
+        let elementIndex: number | undefined;
+        let addr: SignalAddress = { domain: 'analog', nodeId: 0 };
+        if (resolverCtx) {
+          for (let i = 0; i < resolverCtx.elements.length; i++) {
+            const ce = resolverCtx.elementToCircuitElement.get(i);
+            if (ce && _elementLabel(ce) === trace.elementLabel) {
+              elementIndex = i;
+              const pinNodeIds = resolverCtx.elements[i].pinNodeIds ?? [];
+              if (pinNodeIds.length > 0) {
+                addr = { domain: 'analog', nodeId: pinNodeIds[0]! };
+              }
+              break;
+            }
+          }
+        }
+        if (elementIndex === undefined) {
+          console.warn(`[trace-restore] Current element "${trace.elementLabel}" not found, skipping`);
+          continue;
+        }
+        watchedSignals.push({
+          name: trace.name,
+          addr,
+          width: 1,
+          group: trace.group as SignalGroup,
+          panelIndex: trace.panelIndex,
+          kind: 'current',
+          elementLabel: trace.elementLabel,
+          elementIndex,
+        });
+      } else {
+        let addr = labelSignalMap.get(trace.name);
+        if (!addr) addr = pinSignalMap?.get(trace.name);
+        if (!addr) {
+          console.warn(`[trace-restore] Signal "${trace.name}" not found, skipping`);
+          continue;
+        }
+        watchedSignals.push({
+          name: trace.name,
+          addr,
+          width: addr.domain === 'digital' ? addr.bitWidth : 1,
+          group: trace.group as SignalGroup,
+          panelIndex: trace.panelIndex,
+        });
+      }
     }
 
     if (watchedSignals.length > 0) {

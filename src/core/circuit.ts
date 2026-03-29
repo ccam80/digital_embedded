@@ -111,6 +111,10 @@ export interface SavedTrace {
   panelIndex: number;
   /** Signal grouping in the data table. */
   group: 'input' | 'output' | 'probe';
+  /** 'voltage' (default) or 'current'. */
+  kind?: 'voltage' | 'current';
+  /** For current traces: element label for re-resolution after recompile. */
+  elementLabel?: string;
 }
 
 export interface CircuitMetadata {
@@ -179,7 +183,7 @@ export interface CircuitMetadata {
    * Values are MnaSubcircuitNetlist objects for persistence.
    */
   modelDefinitions?: Record<string, import("./mna-subcircuit-netlist.js").MnaSubcircuitNetlist>;
-  /** Maps component instance IDs to their resolved subcircuit model name. */
+  /** Maps 'ComponentType:modelKey' strings to subcircuit definition names. */
   subcircuitBindings?: Record<string, string>;
 
   /** Persisted scope traces — restored after compilation. */

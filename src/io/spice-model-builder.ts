@@ -1,9 +1,10 @@
 /**
- * SPICE subcircuit-to-Circuit builder.
+ * SPICE subcircuit-to-MnaSubcircuitNetlist builder.
  *
- * Converts a `ParsedSubcircuit` (from `parseSubcircuit()`) into a `Circuit`
- * object that can be registered in `SubcircuitModelRegistry` and expanded at
- * compile time by `expandTransistorModel()`.
+ * Converts a `ParsedSubcircuit` (from `parseSubcircuit()`) into an
+ * `MnaSubcircuitNetlist` that can be registered in `SubcircuitModelRegistry`
+ * and compiled at compile time by the composite factory path
+ * (`compileSubcircuitToMnaModel` in compiler.ts).
  *
  * The resulting Circuit follows the same conventions as the hand-written
  * subcircuit definitions in `transistor-models/`:

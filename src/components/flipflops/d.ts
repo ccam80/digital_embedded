@@ -140,7 +140,7 @@ export class DElement extends AbstractCircuitElement {
       },
     ];
     const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel === "cmos") {
+    if (activeModel && DDefinition.subcircuitRefs?.[activeModel]) {
       decls = [
         ...decls,
         {

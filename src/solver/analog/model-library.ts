@@ -181,6 +181,24 @@ export class ModelLibrary {
 }
 
 // ---------------------------------------------------------------------------
+// registerDefaultNamedModels — seed a library with well-known _DEFAULT refs
+// ---------------------------------------------------------------------------
+
+/**
+ * Register the four well-known `_DEFAULT` named models so that subcircuit
+ * netlists referencing `modelRef: "NMOS_DEFAULT"` (etc.) resolve at compile
+ * time without requiring an explicit `.MODEL` card.
+ *
+ * Called once per compilation after constructing a fresh `ModelLibrary`.
+ */
+export function registerDefaultNamedModels(library: ModelLibrary): void {
+  library.add({ name: "NMOS_DEFAULT", type: "NMOS", level: 1, params: { ...MOSFET_NMOS_DEFAULTS } });
+  library.add({ name: "PMOS_DEFAULT", type: "PMOS", level: 1, params: { ...MOSFET_PMOS_DEFAULTS } });
+  library.add({ name: "NPN_DEFAULT",  type: "NPN",  level: 1, params: { ...BJT_NPN_DEFAULTS } });
+  library.add({ name: "PNP_DEFAULT",  type: "PNP",  level: 1, params: { ...BJT_PNP_DEFAULTS } });
+}
+
+// ---------------------------------------------------------------------------
 // validateModel — emit diagnostics for unknown params and unsupported levels
 // ---------------------------------------------------------------------------
 

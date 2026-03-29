@@ -31,22 +31,8 @@ export function createPopupController(
   deps: CanvasInteractionDeps,
 ): PopupController {
   let activePopup: HTMLElement | null = null;
-  let activePopupPanel: PropertyPanel | null = null;
-
   function closePopup(): void {
     if (activePopup) {
-      if (activePopupPanel?.commitAll()) {
-        if (ctx.facade.getCoordinator().timingModel !== 'discrete' && ctx.isSimActive()) {
-          ctx.compiledDirty = true;
-          if (deps.compileAndBind()) {
-            deps.startSimulation();
-          }
-        } else {
-          ctx.invalidateCompiled();
-        }
-        renderPipeline.scheduleRender();
-      }
-      activePopupPanel = null;
       activePopup.remove();
       activePopup = null;
     }
@@ -101,7 +87,23 @@ export function createPopupController(
     } catch {
       // Component has no models — skip panel display.
     }
-    activePopupPanel = propertyPopup;
+    // Live-update: numeric parameter changes are hot-patched into the running
+    // engine via coordinator.setComponentProperty() (updates conductances
+    // in-place, no recompile). Non-numeric changes (waveform, expression, etc.)
+    // are compile-sensitive — recompile and continue automatically.
+    propertyPopup.onPropertyChange((key, _oldValue, newValue) => {
+      if (ctx.isSimActive()) {
+        if (typeof newValue === 'number') {
+          ctx.facade.getCoordinator().setComponentProperty(elementHit, key, newValue);
+        } else {
+          // Compile-sensitive change — recompile and resume simulation
+          if (ctx.compileAndBind()) {
+            deps.startSimulation();
+          }
+        }
+      }
+      renderPipeline.scheduleRender();
+    });
 
     // SPICE import buttons — shown for semiconductor components with deviceType models
     {
@@ -120,7 +122,7 @@ export function createPopupController(
         spiceBtn.disabled = ctx.isSimActive();
         spiceBtn.addEventListener('click', () => {
           closePopup();
-          void openSpiceImportDialog(elementHit, container).then((result) => {
+          void openSpiceImportDialog(elementHit, container, def).then((result) => {
             if (!result) return;
             applySpiceImportResult(elementHit, result, ctx.circuit);
             ctx.invalidateCompiled();

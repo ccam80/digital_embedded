@@ -344,20 +344,17 @@ describe("Decoder", () => {
 
 describe("Registration", () => {
   it("mux_has_analog_factory", () => {
-    expect(MuxDefinition.models?.digital).toBeDefined();
-    expect(MuxDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(MuxDefinition.models?.digital).not.toBeUndefined();
     expect(typeof MuxDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("demux_has_analog_factory", () => {
-    expect(DemuxDefinition.models?.digital).toBeDefined();
-    expect(DemuxDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(DemuxDefinition.models?.digital).not.toBeUndefined();
     expect(typeof DemuxDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 
   it("decoder_has_analog_factory", () => {
-    expect(DecoderDefinition.models?.digital).toBeDefined();
-    expect(DecoderDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(DecoderDefinition.models?.digital).not.toBeUndefined();
     expect(typeof DecoderDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
   });
 

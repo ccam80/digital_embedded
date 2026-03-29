@@ -156,7 +156,7 @@ describe("multipleSnapshots", () => {
   it("restores the correct state when multiple snapshots exist", () => {
     // Three-net circuit; use execute fns that write controllable values
     // We control values by resetting and writing via setSignalValue (BitVector-free
-    // workaround: use a circuit that writes specific values per step iteration).
+    // use a circuit that writes specific values per step iteration.
 
     // Strategy: build a circuit whose execute fn increments net 0 by 1 each step.
     let counter = 0;

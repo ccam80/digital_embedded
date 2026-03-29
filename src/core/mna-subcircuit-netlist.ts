@@ -21,3 +21,35 @@ export interface MnaSubcircuitNetlist {
       Net indices ports.length.. are internal nets. */
   netlist: number[][];
 }
+
+/**
+ * Build net connectivity arrays from parsed subcircuit node names.
+ *
+ * Port names are assigned net indices 0..N-1 (in declaration order).
+ * Internal node names are assigned sequential indices starting at N.
+ * Returns `{ internalNetCount, netlist }` ready for MnaSubcircuitNetlist.
+ */
+export function buildNetConnectivity(
+  ports: string[],
+  elementNodes: string[][],
+): { internalNetCount: number; netlist: number[][] } {
+  const nodeIndex = new Map<string, number>();
+  for (let i = 0; i < ports.length; i++) {
+    nodeIndex.set(ports[i]!, i);
+  }
+  let nextNet = ports.length;
+  const netlist: number[][] = [];
+  for (const nodes of elementNodes) {
+    const pinNets: number[] = [];
+    for (const nodeName of nodes) {
+      let idx = nodeIndex.get(nodeName);
+      if (idx === undefined) {
+        idx = nextNet++;
+        nodeIndex.set(nodeName, idx);
+      }
+      pinNets.push(idx);
+    }
+    netlist.push(pinNets);
+  }
+  return { internalNetCount: nextNet - ports.length, netlist };
+}

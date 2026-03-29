@@ -162,18 +162,25 @@ export function makeCurrentSource(
   current: number,
 ): AnalogElementCore {
   let scale = 1;
+  let Isrc = current;
 
   return {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
 
+    setParam(key: string, value: number): void {
+      if (key === "current") {
+        Isrc = value;
+      }
+    },
+
     setSourceScale(factor: number): void {
       scale = factor;
     },
 
     stamp(solver: SparseSolver): void {
-      const I = current * scale;
+      const I = Isrc * scale;
       if (nodePos !== 0) solver.stampRHS(nodePos - 1, I);
       if (nodeNeg !== 0) solver.stampRHS(nodeNeg - 1, -I);
     },
@@ -184,7 +191,7 @@ export function makeCurrentSource(
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into pos = -I (current exits element at pos into the circuit).
       // Current into neg = +I (current enters element at neg from the circuit).
-      const I = current * scale;
+      const I = Isrc * scale;
       return [-I, I];
     },
   };

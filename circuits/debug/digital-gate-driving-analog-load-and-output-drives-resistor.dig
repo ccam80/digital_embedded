@@ -37,10 +37,6 @@
           <string>Label</string>
           <string>G1</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="200" y="160"/>
     </visualElement>
@@ -66,10 +62,6 @@
         <entry>
           <string>Label</string>
           <string>P1</string>
-        </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
         </entry>
       </elementAttributes>
       <pos x="480" y="160"/>

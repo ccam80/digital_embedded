@@ -125,7 +125,7 @@ class AnalogCapacitorElement implements AnalogElementCore {
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
 
-  private readonly C: number;
+  private C: number;
   private geq: number = 0;
   private ieq: number = 0;
   private vPrev: number = 0;
@@ -133,6 +133,12 @@ class AnalogCapacitorElement implements AnalogElementCore {
 
   constructor(capacitance: number) {
     this.C = capacitance;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "capacitance") {
+      this.C = value;
+    }
   }
 
   stamp(solver: SparseSolver): void {

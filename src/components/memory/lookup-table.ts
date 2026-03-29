@@ -57,6 +57,7 @@ function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
   for (let i = 0; i < inputCount; i++) {
     const gap = even && i >= offs ? 1 : 0;
     decls.push({
+      kind: "signal",
       direction: PinDirection.INPUT,
       label: String(i),
       defaultBitWidth: 1,
@@ -66,6 +67,7 @@ function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
     });
   }
   decls.push({
+    kind: "signal",
     direction: PinDirection.OUTPUT,
     label: "out",
     defaultBitWidth: dataBits,

@@ -55,6 +55,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
     const yBase = p * POLE_HEIGHT;
     // A: common terminal (left)
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `A${p + 1}`,
       defaultBitWidth: bitWidth,
@@ -64,6 +65,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
     });
     // B: upper-right contact
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `B${p + 1}`,
       defaultBitWidth: bitWidth,
@@ -73,6 +75,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
     });
     // C: lower-right contact (C_OFFSET below B)
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `C${p + 1}`,
       defaultBitWidth: bitWidth,

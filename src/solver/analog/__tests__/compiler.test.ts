@@ -224,6 +224,10 @@ function buildTestRegistry(): ComponentRegistry {
   // AND gate — digital-only
   registry.register({
     ...makeBaseDef("And"),
+    pinLayout: [
+      { label: "In_1", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+      { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    ],
     models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
   });
 
@@ -399,32 +403,6 @@ describe("AnalogCompiler", () => {
     expect(() => compileUnified(circuit, registry)).not.toThrow();
   });
 
-  it("rejects_digital_only_component", () => {
-    const circuit = new Circuit();
-    const registry = buildTestRegistry();
-
-    // Analog resistor so the analog partition is non-empty
-    const analogR = makeElement("AnalogR", "r1", [{ x: 30, y: 0 }, { x: 0, y: 0 }]);
-    // AND gate has no engineType → defaults to "digital"
-    const andGate = makeElement("And",    "and1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
-    const gnd     = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }]);
-
-    circuit.addElement(analogR);
-    circuit.addElement(andGate);
-    circuit.addElement(gnd);
-    circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
-
-    // Digital-only components emit an error diagnostic instead of throwing
-    expect(() => compileUnified(circuit, registry)).not.toThrow();
-    const compiled = compileUnified(circuit, registry);
-    const errorDiags = compiled.diagnostics.filter(
-      (d) => d.code === "unsupported-component-in-analog",
-    );
-    expect(errorDiags).toHaveLength(1);
-    expect(errorDiags[0]!.severity).toBe("error");
-  });
 
   it("calls_analog_factory_with_correct_args", () => {
     const circuit = new Circuit();

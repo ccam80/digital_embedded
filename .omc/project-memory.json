@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774693467504,
+  "lastScanned": 1774780325953,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -82,7 +82,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774693467461,
+      "lastAccessed": 1774780325911,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -94,7 +94,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1774693467462,
+      "lastAccessed": 1774780325911,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -107,14 +107,14 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774693467462,
+      "lastAccessed": 1774780325911,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 10,
-      "lastAccessed": 1774693467482,
+      "lastAccessed": 1774780325912,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -127,28 +127,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774693467482,
+      "lastAccessed": 1774780325912,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774693467483,
+      "lastAccessed": 1774780325913,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774693467483,
+      "lastAccessed": 1774780325935,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 13,
-      "lastAccessed": 1774693467483,
+      "lastAccessed": 1774780325935,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
@@ -160,21 +160,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 6,
-      "lastAccessed": 1774693467483,
+      "fileCount": 9,
+      "lastAccessed": 1774780325936,
       "keyFiles": [
         "analog-snapshot-analysis.md",
         "app-modules-test-plan.md",
+        "model-unification-v2.md",
         "model-unification.md",
-        "spice-model-panel.md",
-        "timed-simulation.md"
+        "plan-v2.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774693467484,
+      "lastAccessed": 1774780325936,
       "keyFiles": [
         "main.ts"
       ]
@@ -183,7 +183,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1774693467484,
+      "lastAccessed": 1774780325936,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -193,7 +193,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774693467485,
+      "lastAccessed": 1774780325937,
       "keyFiles": [
         "index.json"
       ]
@@ -202,7 +202,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1774693467485,
+      "lastAccessed": 1774780325938,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
@@ -213,7 +213,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 4,
-      "lastAccessed": 1774693467486,
+      "lastAccessed": 1774780325938,
       "keyFiles": [
         "harness.html",
         "simulator-harness.ts",
@@ -223,8 +223,8 @@
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
-      "fileCount": 21,
-      "lastAccessed": 1774693467487,
+      "fileCount": 25,
+      "lastAccessed": 1774780325940,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -235,7 +235,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1774693467487,
+      "lastAccessed": 1774780325940,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -246,28 +246,46 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774693467487,
+      "lastAccessed": 1774780325940,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 453,
-      "lastAccessed": 1774769397051,
+      "accessCount": 521,
+      "lastAccessed": 1774813948484,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 211,
-      "lastAccessed": 1774769129889,
+      "accessCount": 304,
+      "lastAccessed": 1774813968309,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 136,
-      "lastAccessed": 1774769207037,
+      "accessCount": 176,
+      "lastAccessed": 1774774329231,
       "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 132,
+      "lastAccessed": 1774813822851,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 127,
+      "lastAccessed": 1774813738498,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
+      "accessCount": 126,
+      "lastAccessed": 1774776850394,
+      "type": "directory"
     },
     {
       "path": "e2e\\gui\\analog-circuit-assembly.spec.ts",
@@ -276,34 +294,40 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 108,
-      "lastAccessed": 1774769238194,
-      "type": "directory"
-    },
-    {
-      "path": "",
-      "accessCount": 106,
-      "lastAccessed": 1774769165602,
-      "type": "directory"
-    },
-    {
       "path": "src\\editor\\property-panel.ts",
-      "accessCount": 84,
-      "lastAccessed": 1774751232321,
+      "accessCount": 92,
+      "lastAccessed": 1774813053090,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 75,
-      "lastAccessed": 1774769121365,
+      "accessCount": 86,
+      "lastAccessed": 1774774319563,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 66,
-      "lastAccessed": 1774769180066,
+      "path": "src\\app\\canvas-popup.ts",
+      "accessCount": 76,
+      "lastAccessed": 1774813742056,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 65,
+      "lastAccessed": 1774813816587,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
+      "accessCount": 47,
+      "lastAccessed": 1774813757775,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 47,
+      "lastAccessed": 1774813843428,
+      "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
@@ -312,16 +336,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 44,
-      "lastAccessed": 1774751930570,
+      "path": "spec\\.context\\reviewer.md",
+      "accessCount": 41,
+      "lastAccessed": 1774774319392,
       "type": "file"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 44,
-      "lastAccessed": 1774766427737,
-      "type": "directory"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
@@ -330,51 +348,51 @@
       "type": "file"
     },
     {
-      "path": "src\\app\\canvas-popup.ts",
-      "accessCount": 38,
-      "lastAccessed": 1774769163749,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 36,
-      "lastAccessed": 1774769382027,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
-      "accessCount": 33,
-      "lastAccessed": 1774751869790,
+      "accessCount": 37,
+      "lastAccessed": 1774775022241,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\model-defaults.ts",
-      "accessCount": 31,
-      "lastAccessed": 1774751747066,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 30,
-      "lastAccessed": 1774769121208,
+      "accessCount": 33,
+      "lastAccessed": 1774813756760,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\model-library.ts",
-      "accessCount": 27,
-      "lastAccessed": 1774766694296,
+      "accessCount": 30,
+      "lastAccessed": 1774772108901,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\model-parser.ts",
-      "accessCount": 25,
-      "lastAccessed": 1774767844049,
+      "accessCount": 30,
+      "lastAccessed": 1774774362879,
       "type": "directory"
     },
     {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 28,
+      "lastAccessed": 1774806198439,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 28,
+      "lastAccessed": 1774813934519,
+      "type": "directory"
+    },
+    {
+      "path": "src\\editor\\__tests__\\property-panel-spice.test.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774775352863,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774751359356,
+      "accessCount": 22,
+      "lastAccessed": 1774771828763,
       "type": "file"
     },
     {
@@ -384,15 +402,9 @@
       "type": "file"
     },
     {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774758418390,
-      "type": "directory"
-    },
-    {
       "path": "CLAUDE.md",
-      "accessCount": 19,
-      "lastAccessed": 1774758616441,
+      "accessCount": 21,
+      "lastAccessed": 1774774286058,
       "type": "file"
     },
     {
@@ -402,34 +414,34 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\element.ts",
+      "accessCount": 18,
+      "lastAccessed": 1774813371135,
+      "type": "directory"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 17,
+      "lastAccessed": 1774777494132,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 12,
       "lastAccessed": 1774751358610,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog",
+      "path": "src\\core\\properties.ts",
       "accessCount": 12,
-      "lastAccessed": 1774755685437,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\element.ts",
-      "accessCount": 11,
-      "lastAccessed": 1774759860060,
-      "type": "directory"
+      "lastAccessed": 1774813543060,
+      "type": "file"
     },
     {
       "path": "src\\headless",
-      "accessCount": 10,
-      "lastAccessed": 1774698222610,
+      "accessCount": 11,
+      "lastAccessed": 1774771790546,
       "type": "directory"
-    },
-    {
-      "path": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774747533755,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\model-binding.test.ts",
@@ -438,22 +450,16 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774736032362,
-      "type": "file"
+      "path": "src\\components\\semiconductors",
+      "accessCount": 10,
+      "lastAccessed": 1774771812892,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\zener.ts",
       "accessCount": 9,
       "lastAccessed": 1774751825288,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors",
-      "accessCount": 8,
-      "lastAccessed": 1774746645976,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\diac.ts",
@@ -474,27 +480,21 @@
       "type": "file"
     },
     {
-      "path": ".vitest-failures.json",
-      "accessCount": 7,
-      "lastAccessed": 1774758925574,
-      "type": "file"
-    },
-    {
       "path": "src\\headless\\__tests__",
       "accessCount": 7,
       "lastAccessed": 1774761307782,
       "type": "directory"
     },
     {
-      "path": "src\\headless\\__tests__\\default-facade.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1774696224789,
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774813751266,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
+      "path": "src\\headless\\__tests__\\default-facade.test.ts",
       "accessCount": 6,
-      "lastAccessed": 1774747574583,
+      "lastAccessed": 1774696224789,
       "type": "file"
     },
     {

@@ -59,6 +59,7 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
   // Coil input pins above the body (in1 left, in2 right)
   // Java RelayDTShape: coil pins at y=-2 (above component origin), x=0 and x=2
   decls.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "in1",
     defaultBitWidth: 1,
@@ -67,6 +68,7 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
     isClockCapable: false,
   });
   decls.push({
+    kind: "signal",
     direction: PinDirection.INPUT,
     label: "in2",
     defaultBitWidth: 1,
@@ -79,6 +81,7 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
   // Java RelayDTShape: per pole p: A${p+1}@(0, 2*p), B${p+1}@(2, 2*p), C${p+1}@(2, 1+2*p)
   for (let p = 0; p < poles; p++) {
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `A${p + 1}`,
       defaultBitWidth: bitWidth,
@@ -87,6 +90,7 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
       isClockCapable: false,
     });
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `B${p + 1}`,
       defaultBitWidth: bitWidth,
@@ -95,6 +99,7 @@ function buildRelayDTPins(poles: number, bitWidth: number): PinDeclaration[] {
       isClockCapable: false,
     });
     decls.push({
+      kind: "signal",
       direction: PinDirection.BIDIRECTIONAL,
       label: `C${p + 1}`,
       defaultBitWidth: bitWidth,

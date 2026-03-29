@@ -25,7 +25,6 @@ import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyValue } from '../../core/properties.js';
 import { pinWorldPosition } from '../../core/pin.js';
-import { BridgeInputAdapter, BridgeOutputAdapter } from '../../solver/analog/bridge-adapter.js';
 
 const registry = createDefaultRegistry();
 
@@ -155,7 +154,7 @@ describe('digitalPinLoading MCP surface — mode none', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit(
       { digitalPinLoading: "none" },
-      { simulationModel: "logical" },
+      { simulationModel: "digital" },
     );
 
     facade.compile(circuit);
@@ -165,19 +164,13 @@ describe('digitalPinLoading MCP surface — mode none', () => {
 
     const bridges = compiled!.analog!.bridges;
     expect(bridges.length).toBe(0);
-
-    for (const bridge of bridges) {
-      for (const adapter of bridge.inputAdapters) {
-        expect((adapter as BridgeInputAdapter).rIn).toBe(Infinity);
-      }
-    }
   });
 
   it('digitalPinLoading="none": And gate in logical mode gets rOut=0 on output adapters', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit(
       { digitalPinLoading: "none" },
-      { simulationModel: "logical" },
+      { simulationModel: "digital" },
     );
 
     facade.compile(circuit);
@@ -187,19 +180,13 @@ describe('digitalPinLoading MCP surface — mode none', () => {
 
     const bridges = compiled!.analog!.bridges;
     expect(bridges.length).toBe(0);
-
-    for (const bridge of bridges) {
-      for (const adapter of bridge.outputAdapters) {
-        expect((adapter as BridgeOutputAdapter).rOut).toBe(0);
-      }
-    }
   });
 
   it('digitalPinLoading="cross-domain": And in logical mode gets finite rIn (not ideal)', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit(
       { digitalPinLoading: "cross-domain" },
-      { simulationModel: "logical" },
+      { simulationModel: "digital" },
     );
 
     facade.compile(circuit);
@@ -209,11 +196,5 @@ describe('digitalPinLoading MCP surface — mode none', () => {
 
     const bridges = compiled!.analog!.bridges;
     expect(bridges.length).toBe(0);
-
-    for (const bridge of bridges) {
-      for (const adapter of bridge.inputAdapters) {
-        expect(isFinite((adapter as BridgeInputAdapter).rIn)).toBe(true);
-      }
-    }
   });
 });

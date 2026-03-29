@@ -109,10 +109,7 @@ describe('Port + Resistor — pure analog compile', () => {
 // list — the bridge is created between the two connectivity groups that span
 // the Port's wire.
 //
-// This is a structural test: compile must succeed and diagnostics must contain
-// no fatal errors (unsupported-component-in-analog for the And gate is
-// expected in mixed-mode circuits and is classified as an error by the
-// compiler, so we only assert that compile() does not throw).
+// Structural test: compile must succeed without throwing.
 // ---------------------------------------------------------------------------
 
 describe('Port in mixed-mode circuit — And gate + Resistor', () => {

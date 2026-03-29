@@ -1,10 +1,47 @@
 {
   "summary": {
-    "passed": 130,
-    "failed": 0,
+    "passed": 10116,
+    "failed": 10,
     "skipped": 0,
-    "totalFiles": 3,
-    "durationSeconds": 0.5
+    "totalFiles": 342,
+    "durationSeconds": 26.8
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "patch with _spiceModelOverrides changes DC operating point vs default",
+          "line": 161,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'IP')",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "peak_current_at_vp",
+          "line": 125,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "valley_current_at_vv",
+          "line": 125,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+          "test": "nr_converges_in_ndr_region",
+          "line": 125,
+          "column": 26
+        }
+      ]
+    }
+  ]
 }

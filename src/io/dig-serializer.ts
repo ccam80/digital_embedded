@@ -153,7 +153,7 @@ function digValueToXml(v: DigValue): string {
       return `<romList>\n            ${roms}\n          </romList>`;
     }
     case "customShape":
-      // Custom shapes are complex; preserve as empty for now
+      // Custom shapes are not serialized; preserve as empty placeholder
       return `<string>[customShape]</string>`;
   }
 }

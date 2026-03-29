@@ -54,7 +54,7 @@ export class NOrElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel === "cmos") {
+    if (activeModel && NOrDefinition.subcircuitRefs?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }

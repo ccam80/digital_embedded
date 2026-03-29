@@ -73,10 +73,6 @@
           <string>Label</string>
           <string>G1d</string>
         </entry>
-        <entry>
-          <string>simulationModel</string>
-          <string>digital</string>
-        </entry>
       </elementAttributes>
       <pos x="400" y="160"/>
     </visualElement>

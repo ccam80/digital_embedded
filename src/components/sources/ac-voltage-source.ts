@@ -413,6 +413,8 @@ export interface AcVoltageSourceAnalogElement extends AnalogElement {
   _parsedExpr: ExprNode | null;
   /** Parse error message if expression parsing failed; null otherwise. */
   _parseError: string | null;
+  /** Live parameter mutation. */
+  setParam(key: string, value: number): void;
 }
 
 function createAcVoltageSourceElement(
@@ -424,10 +426,10 @@ function createAcVoltageSourceElement(
 ): AcVoltageSourceAnalogElement {
   const nodePos = pinNodes.get("pos")!;
   const nodeNeg = pinNodes.get("neg")!;
-  const amplitude = props.getOrDefault<number>("amplitude", 5);
-  const frequency = props.getOrDefault<number>("frequency", 1000);
-  const phase = props.getOrDefault<number>("phase", 0);
-  const dcOffset = props.getOrDefault<number>("dcOffset", 0);
+  let amplitude = props.getOrDefault<number>("amplitude", 5);
+  let frequency = props.getOrDefault<number>("frequency", 1000);
+  let phase = props.getOrDefault<number>("phase", 0);
+  let dcOffset = props.getOrDefault<number>("dcOffset", 0);
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
     freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -460,6 +462,13 @@ function createAcVoltageSourceElement(
 
     _parsedExpr: parsedExpr,
     _parseError: parseError,
+
+    setParam(key: string, value: number): void {
+      if (key === "amplitude") amplitude = value;
+      else if (key === "frequency") frequency = value;
+      else if (key === "phase") phase = value;
+      else if (key === "dcOffset") dcOffset = value;
+    },
 
     setSourceScale(factor: number): void {
       scale = factor;

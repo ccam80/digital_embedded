@@ -114,6 +114,14 @@ export interface AnalogElementCore {
   setSourceScale?(factor: number): void;
 
   /**
+   * Update a mutable parameter on a live compiled element without
+   * recompilation. Called by the coordinator for slider/property-panel
+   * hot-patching. Optional — elements that don't support live mutation
+   * simply omit it.
+   */
+  setParam?(key: string, value: number): void;
+
+  /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.
    */
   stampAc?(solver: ComplexSparseSolver, omega: number): void;
@@ -182,15 +190,12 @@ export type SolverDiagnosticCode =
   | "unknown-component"
   | "model-param-ignored"
   | "model-level-unsupported"
-  | "unsupported-component-in-analog"
   | "bridge-inner-compile-error"
   | "bridge-unconnected-pin"
   | "bridge-missing-inner-pin"
   | "bridge-indeterminate-input"
   | "bridge-oscillating-input"
   | "bridge-impedance-mismatch"
-  | "missing-transistor-model"
-  | "invalid-transistor-model"
   | "transmission-line-low-segments"
   | "reverse-biased-cap"
   | "fuse-blown"

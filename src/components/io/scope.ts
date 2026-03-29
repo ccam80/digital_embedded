@@ -76,6 +76,7 @@ export interface WaveformChannel {
 function buildScopePinDeclarations(channelCount: number, bitWidth: number): PinDeclaration[] {
   // Java Scope: single pin "clk" at (0,0). Multi-channel pins at (0, i).
   return Array.from({ length: channelCount }, (_, i) => ({
+    kind: "signal" as const,
     direction: PinDirection.INPUT,
     label: channelCount === 1 ? "clk" : `in${i}`,
     defaultBitWidth: bitWidth,
