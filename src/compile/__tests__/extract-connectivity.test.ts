@@ -150,7 +150,7 @@ describe('resolveModelAssignments', () => {
     const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
-    const assignments = resolveModelAssignments([andEl], registry);
+    const [assignments] = resolveModelAssignments([andEl], registry);
     expect(assignments).toHaveLength(1);
     expect(assignments[0]!.modelKey).toBe('digital');
     expect(assignments[0]!.model).not.toBeNull();
@@ -161,7 +161,7 @@ describe('resolveModelAssignments', () => {
     const res = new TestElement('Resistor', 'r1', { x: 0, y: 0 }, [
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
     ]);
-    const assignments = resolveModelAssignments([res], registry);
+    const [assignments] = resolveModelAssignments([res], registry);
     expect(assignments[0]!.modelKey).toBe('behavioral');
   });
 
@@ -169,7 +169,7 @@ describe('resolveModelAssignments', () => {
     const registry = buildDigitalRegistry();
     const tunnel = new TestElement('Tunnel', 't1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')]);
     const ground = new TestElement('Ground', 'g1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')]);
-    const assignments = resolveModelAssignments([tunnel, ground], registry);
+    const [assignments] = resolveModelAssignments([tunnel, ground], registry);
     expect(assignments[0]!.modelKey).toBe('neutral');
     expect(assignments[1]!.modelKey).toBe('neutral');
   });
@@ -180,7 +180,7 @@ describe('resolveModelAssignments', () => {
     // Override via simulationModel property to behavioral mna model
     const props = new PropertyBag(new Map([['simulationModel', 'behavioral']]));
     const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, [], props);
-    const assignments = resolveModelAssignments([bridge], registry);
+    const [assignments] = resolveModelAssignments([bridge], registry);
     expect(assignments[0]!.modelKey).toBe('behavioral');
   });
 
@@ -192,7 +192,7 @@ describe('resolveModelAssignments', () => {
     }, ) as ComponentDefinition);
     // defaultModel not set — first key is used
     const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, []);
-    const assignments = resolveModelAssignments([bridge], registry);
+    const [assignments] = resolveModelAssignments([bridge], registry);
     // First key of { digital, mnaModels } is "digital"
     expect(assignments[0]!.modelKey).toBe('digital');
   });
@@ -200,7 +200,7 @@ describe('resolveModelAssignments', () => {
   it('assigns neutral for unknown component types', () => {
     const registry = new ComponentRegistry();
     const unknown = new TestElement('NoSuchType', 'u1', { x: 0, y: 0 }, []);
-    const assignments = resolveModelAssignments([unknown], registry);
+    const [assignments] = resolveModelAssignments([unknown], registry);
     expect(assignments[0]!.modelKey).toBe('neutral');
     expect(assignments[0]!.model).toBeNull();
   });
@@ -217,7 +217,7 @@ describe('extractConnectivityGroups — pure digital', () => {
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [el];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -233,7 +233,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     // inEl  pin world pos: element(2,0) + pin(0,0) = (2,0) — same position
 
     const elements: CircuitElement[] = [outEl, inEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -248,7 +248,7 @@ describe('extractConnectivityGroups — pure digital', () => {
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     for (const group of groups) {
@@ -269,7 +269,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     const wire = new Wire({ x: 2, y: 0 }, { x: 4, y: 0 });
 
     const elements: CircuitElement[] = [andEl, probeEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [wire], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -298,7 +298,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     const narrowEl = new TestElement('NarrowIn',  'n1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 1)]);
 
     const elements: CircuitElement[] = [wideEl, narrowEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [_groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const widthDiags = diags.filter((d) => d.code === 'width-mismatch');
@@ -312,7 +312,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     const inEl  = new TestElement('In',  'i1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 4)]);
 
     const elements: CircuitElement[] = [outEl, inEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [_groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags.filter((d) => d.code === 'width-mismatch')).toHaveLength(0);
@@ -324,7 +324,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     const inEl  = new TestElement('In',  'i1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 8)]);
 
     const elements: CircuitElement[] = [outEl, inEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const merged = groups.find((g) => g.pins.length === 2);
@@ -348,7 +348,7 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     const tB = new TestElement('Tunnel', 'tB', { x: 100, y: 0 }, [outputPin(0, 0, 'p')], propsB);
 
     const elements: CircuitElement[] = [tA, tB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -366,7 +366,7 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     const tB = new TestElement('Tunnel', 'tB', { x: 10, y: 0 }, [outputPin(0, 0, 'p')], propsB);
 
     const elements: CircuitElement[] = [tA, tB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(groups).toHaveLength(2);
@@ -381,7 +381,7 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     const tB = new TestElement('Tunnel', 'tB', { x: 200, y: 0 }, [outputPin(0, 0, 'p')], propsB);
 
     const elements: CircuitElement[] = [tA, tB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -395,7 +395,7 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     const tB = new TestElement('Tunnel', 'tB', { x: 5, y: 0 }, [outputPin(0, 0, 'p')]);
 
     const elements: CircuitElement[] = [tA, tB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     // Both tunnels have no label — they stay separate
@@ -417,7 +417,7 @@ describe('extractConnectivityGroups — Port label-merge', () => {
     const pB = new TestElement('Port', 'pB', { x: 100, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
 
     const elements: CircuitElement[] = [pA, pB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -434,7 +434,7 @@ describe('extractConnectivityGroups — Port label-merge', () => {
     const pB = new TestElement('Port', 'pB', { x: 10, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
 
     const elements: CircuitElement[] = [pA, pB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(groups).toHaveLength(2);
@@ -447,7 +447,7 @@ describe('extractConnectivityGroups — Port label-merge', () => {
     const pB = new TestElement('Port', 'pB', { x: 5, y: 0 }, [bidiPin(0, 0, 'port')]);
 
     const elements: CircuitElement[] = [pA, pB];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(groups).toHaveLength(2);
@@ -462,7 +462,7 @@ describe('extractConnectivityGroups — Port label-merge', () => {
     const tunnel = new TestElement('Tunnel', 't1', { x: 50, y: 0 }, [outputPin(0, 0, 'p')], tunProps);
 
     const elements: CircuitElement[] = [port, tunnel];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags).toHaveLength(0);
@@ -482,7 +482,7 @@ describe('extractConnectivityGroups — pure analog', () => {
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
     ]);
     const elements: CircuitElement[] = [r1];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     for (const group of groups) {
@@ -502,7 +502,7 @@ describe('extractConnectivityGroups — pure analog', () => {
       { ...inputPin(0, 0, 'p2', 1), direction: PinDirection.BIDIRECTIONAL },
     ]);
     const elements: CircuitElement[] = [r1, r2];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [_groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
     expect(diags.filter((d) => d.code === 'width-mismatch')).toHaveLength(0);
@@ -526,7 +526,7 @@ describe('extractConnectivityGroups — mixed circuit', () => {
     ]);
 
     const elements: CircuitElement[] = [andEl, resEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     // The group at (2,0) should have both digital and analog domains
@@ -548,7 +548,7 @@ describe('extractConnectivityGroups — mixed circuit', () => {
     ]);
 
     const elements: CircuitElement[] = [andEl, resEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const digitalOnlyGroups = groups.filter(
@@ -590,7 +590,7 @@ describe('extractConnectivityGroups — group metadata', () => {
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const [groups] = extractConnectivityGroups([andEl], [], registry,
-      resolveModelAssignments([andEl], registry));
+      resolveModelAssignments([andEl], registry)[0]);
 
     const ids = groups.map((g) => g.groupId).sort((a, b) => a - b);
     for (let i = 0; i < ids.length; i++) {
@@ -607,7 +607,7 @@ describe('extractConnectivityGroups — group metadata', () => {
     const wire = new Wire({ x: 2, y: 0 }, { x: 4, y: 0 });
 
     const elements: CircuitElement[] = [andEl, probeEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [wire], registry, assignments);
 
     // Total pins across all elements
@@ -628,7 +628,7 @@ describe('extractConnectivityGroups — group metadata', () => {
     ]);
 
     const elements: CircuitElement[] = [groundEl, andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     // The group containing Ground pin (neutral) and And input (digital)

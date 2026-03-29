@@ -450,6 +450,7 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };
 
 export const SwitchSPDTDefinition: ComponentDefinition = {
@@ -483,4 +484,5 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };

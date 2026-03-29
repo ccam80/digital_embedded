@@ -600,3 +600,39 @@ What's already done:
 - **Total tasks**: 34/34
 - **Vitest**: 10119/10129 (10 pre-existing failures, 0 new regressions)
 - **Playwright E2E**: 476/542 (66 pre-existing failures, 0 new regressions)
+
+## Task W0.1: `MnaSubcircuitNetlist` type
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/core/mna-subcircuit-netlist.ts
+- **Files modified**: (none)
+- **Tests**: 108/108 passing (targeted: registry.test.ts + compile-integration.test.ts)
+
+## Task W0.2: `PinDeclaration.kind` required field
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/core/pin.ts
+- **Tests**: 108/108 passing (targeted: registry.test.ts + compile-integration.test.ts)
+
+## Task W0.3: `MnaModel` updates in registry.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/core/registry.ts
+- **Tests**: 108/108 passing (targeted: registry.test.ts + compile-integration.test.ts)
+- **Notes**: factory made required, subcircuitModel deleted, requiresBranchRow replaced with branchCount, subcircuitRefs added to ComponentDefinition
+
+## Task W0.4: `CircuitMetadata` updates
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/core/circuit.ts
+- **Tests**: 108/108 passing (targeted: registry.test.ts + compile-integration.test.ts)
+
+## Task W0.5: `DiagnosticCode` addition
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/compile/types.ts
+- **Tests**: 108/108 passing (targeted: registry.test.ts + compile-integration.test.ts)

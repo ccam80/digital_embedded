@@ -169,6 +169,8 @@ export interface CircuitMetadata {
     /** Serialized element count — informational only; the full Circuit is in TransistorModelRegistry. */
     elementCount: number;
   }>;
+  /** Maps component instance IDs to their resolved subcircuit model name. */
+  subcircuitBindings?: Record<string, string>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

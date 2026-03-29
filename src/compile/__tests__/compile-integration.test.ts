@@ -959,11 +959,11 @@ describe('compileUnified — model resolution via getActiveModelKey', () => {
     expect(result.analog).toBeNull();
   });
 
-  it('dual-model component with simulationModel="analog" produces analog domain with elements', () => {
+  it('dual-model component with simulationModel="behavioral" produces analog domain with elements', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
-    const propsMap = new Map<string, PropertyValue>([['simulationModel', 'analog']]);
+    const propsMap = new Map<string, PropertyValue>([['simulationModel', 'behavioral']]);
     const props = new PropertyBag(propsMap);
     const circuit = new Circuit();
     circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn, props));

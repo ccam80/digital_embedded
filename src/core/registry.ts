@@ -180,7 +180,7 @@ export interface DigitalModel {
  */
 export interface MnaModel {
   /** Produces AnalogElementCore stamp objects for this component. */
-  factory?: (
+  factory: (
     pinNodes: ReadonlyMap<string, number>,
     internalNodeIds: readonly number[],
     branchIdx: number,
@@ -188,14 +188,11 @@ export interface MnaModel {
     getTime: () => number,
   ) => AnalogElementCore;
 
-  /** Named subcircuit in TransistorModelRegistry to expand instead of using factory. */
-  subcircuitModel?: string;
-
   /** Number of internal MNA nodes needed. */
   getInternalNodeCount?: (props: PropertyBag) => number;
 
-  /** Whether this model needs an MNA branch row (voltage sources, inductors). */
-  requiresBranchRow?: boolean;
+  /** Number of MNA branch rows needed (voltage sources, inductors). */
+  branchCount?: number;
 
   /** Device type for SPICE parameter lookup (e.g., "NPN", "D", "NMOS"). */
   deviceType?: DeviceType;
@@ -258,6 +255,8 @@ export interface ComponentDefinition {
   pinElectrical?: PinElectricalSpec;
   /** Per-pin overrides for bridge adapter specs. */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+  /** Named subcircuit model references for MNA expansion. Keys are model names, values are subcircuit names. */
+  subcircuitRefs?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,9 +272,6 @@ export function hasDigitalModel(def: ComponentDefinition): boolean {
 export function hasAnalogModel(def: ComponentDefinition): boolean {
   return def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
 }
-
-/** Alias for hasAnalogModel — returns true when the component has any named MNA model. */
-export const hasMnaModel = hasAnalogModel;
 
 /** Returns the list of model keys available on this component definition. */
 export function availableModels(def: ComponentDefinition): string[] {

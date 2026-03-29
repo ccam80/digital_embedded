@@ -257,7 +257,7 @@ describe("FlattenPipelineReorder", () => {
     expect(subEls).toHaveLength(1);
   });
 
-  it("analog_wins_for_submode: resolveModelAssignments assigns first mna model key when simulationModel is a sub-mode value on a dual-model component", () => {
+  it("invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey", () => {
     const props = new PropertyBag();
     props.set("simulationModel", "analog-pins");
     const el = new TestLeafElement(
@@ -268,15 +268,16 @@ describe("FlattenPipelineReorder", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDualDef("DualGate"));
 
-    const assignments = resolveModelAssignments([el], registry);
+    const [assignments, diagnostics] = resolveModelAssignments([el], registry);
 
-    // "analog-pins" is not a model key but the component has mnaModels —
-    // resolveModelAssignments must route it to the first mna model key ("behavioral")
+    // "analog-pins" is not a valid model key — must produce a diagnostic and neutral
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]!.modelKey).toBe("behavioral");
+    expect(assignments[0]!.modelKey).toBe("neutral");
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
-  it("analog_wins_for_logical_submode: simulationModel=logical routes dual-model component to first mna model key", () => {
+  it("invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic", () => {
     const props = new PropertyBag();
     props.set("simulationModel", "logical");
     const el = new TestLeafElement(
@@ -287,9 +288,10 @@ describe("FlattenPipelineReorder", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDualDef("DualGate"));
 
-    const assignments = resolveModelAssignments([el], registry);
+    const [assignments, diagnostics] = resolveModelAssignments([el], registry);
 
-    expect(assignments[0]!.modelKey).toBe("behavioral");
+    expect(assignments[0]!.modelKey).toBe("neutral");
+    expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
   it("explicit_digital_key_respected: simulationModel=digital on dual-model component routes to digital", () => {
@@ -303,7 +305,7 @@ describe("FlattenPipelineReorder", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDualDef("DualGate"));
 
-    const assignments = resolveModelAssignments([el], registry);
+    const [assignments] = resolveModelAssignments([el], registry);
 
     expect(assignments[0]!.modelKey).toBe("digital");
   });
@@ -319,7 +321,7 @@ describe("FlattenPipelineReorder", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDualDef("DualGate"));
 
-    const assignments = resolveModelAssignments([el], registry);
+    const [assignments] = resolveModelAssignments([el], registry);
 
     expect(assignments[0]!.modelKey).toBe("behavioral");
   });

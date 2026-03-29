@@ -50,6 +50,9 @@ const VX = 0.1;
 /** Maximum voltage step per NR iteration in or near NDR region. */
 const NDR_VSTEP_MAX = 0.1;
 
+/** Thermal saturation current (A) — default for Shockley component. */
+const IS_THERMAL = 1e-14;
+
 
 // ---------------------------------------------------------------------------
 // tunnelDiodeIV — compute I(V) and dI/dV for the tunnel diode model

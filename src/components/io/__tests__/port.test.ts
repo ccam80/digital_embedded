@@ -178,7 +178,7 @@ describe("resolveModelAssignments — Port is neutral infrastructure", () => {
     const registry = createDefaultRegistry();
     const el = makePort({ label: "p" });
 
-    const assignments = resolveModelAssignments([el], registry);
+    const [assignments] = resolveModelAssignments([el], registry);
 
     expect(assignments).toHaveLength(1);
     expect(assignments[0]!.modelKey).toBe("neutral");

@@ -39,11 +39,62 @@ import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
-import type { SolverPartition, PartitionedComponent, DigitalCompilerFn } from "../../compile/types.js";
+import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import { INFRASTRUCTURE_TYPES } from "../../compile/extract-connectivity.js";
 
 function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
   return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
+}
+
+// ---------------------------------------------------------------------------
+// Component routing — shared decision logic for Pass A and Pass B
+// ---------------------------------------------------------------------------
+
+type ComponentRoute =
+  | { kind: 'stamp';  model: MnaModel }
+  | { kind: 'expand'; model: MnaModel; subcircuitModel: string }
+  | { kind: 'bridge' }
+  | { kind: 'skip' };
+
+function resolveComponentRoute(
+  def: ComponentDefinition,
+  pc: PartitionedComponent,
+  digitalPinLoading: "cross-domain" | "all" | "none",
+): ComponentRoute {
+  if (pc.model === null) return { kind: 'skip' };
+
+  const isDigitalModel = 'executeFn' in pc.model;
+  const hasMnaModels = def.models?.mnaModels !== undefined
+    && Object.keys(def.models.mnaModels).length > 0;
+
+  if (isDigitalModel) {
+    if (digitalPinLoading === "all" && hasMnaModels) {
+      return { kind: 'bridge' };
+    }
+    return { kind: 'skip' };
+  }
+
+  const mnaModel = pc.model as MnaModel;
+
+  if (mnaModel.subcircuitModel !== undefined) {
+    return { kind: 'expand', model: mnaModel, subcircuitModel: mnaModel.subcircuitModel };
+  }
+
+  if (mnaModel.factory) {
+    return { kind: 'stamp', model: mnaModel };
+  }
+
+  return { kind: 'skip' };
+}
+
+function findStampModel(def: ComponentDefinition): MnaModel | undefined {
+  const mnaModels = def.models?.mnaModels;
+  if (!mnaModels) return undefined;
+  for (const key of Object.keys(mnaModels)) {
+    const m = mnaModels[key];
+    if (m?.factory) return m;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -563,65 +614,51 @@ function runPassA_partition(
     }
 
     const def = pc.definition;
-    if (pc.model === null) {
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-      continue;
-    }
-    const isDigitalModel = 'executeFn' in pc.model;
+    const route = resolveComponentRoute(def, pc, digitalPinLoading);
 
-    if (isDigitalModel) {
-      const hasMnaModels = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
-      if (digitalPinLoading === "all" && hasMnaModels) {
-        // Dual-model component rerouted to analog partition for bridge synthesis —
-        // treat the same as simulationModel="logical" in Pass A.
-        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-        continue;
-      }
-      diagnostics.push(
-        makeDiagnostic(
-          "unsupported-component-in-analog",
-          "error",
-          `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
-          {
-            explanation:
-              `Component "${el.typeId}" has no analog model. ` +
-              `Only components with an analog model can be placed in analog circuits.`,
-            suggestions: [
+    switch (route.kind) {
+      case 'skip': {
+        const isDigitalModel = pc.model !== null && 'executeFn' in pc.model;
+        if (isDigitalModel) {
+          diagnostics.push(
+            makeDiagnostic(
+              "unsupported-component-in-analog",
+              "error",
+              `Component "${el.typeId}" is digital-only and cannot be placed in an analog circuit`,
               {
-                text: `Set simulationModel to 'behavioral' or add an analogFactory to "${el.typeId}".`,
-                automatable: false,
+                explanation:
+                  `Component "${el.typeId}" has no analog model. ` +
+                  `Only components with an analog model can be placed in analog circuits.`,
+                suggestions: [
+                  {
+                    text: `Add an MNA model to "${el.typeId}" or change its simulationModel.`,
+                    automatable: false,
+                  },
+                ],
               },
-            ],
-          },
-        ),
-      );
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-      continue;
-    }
-
-    if (def.models?.digital !== undefined) {
-      const passAProps = el.getProperties();
-      const passAMode = passAProps.has("simulationModel")
-        ? (passAProps.get("simulationModel") as string)
-        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-      if ((passAMode === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) || passAMode === "logical" || digitalPinLoading === "all") {
+            ),
+          );
+        }
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       }
+      case 'bridge':
+      case 'expand':
+        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        continue;
+      case 'stamp': {
+        let branchIdx = -1;
+        if (route.model.requiresBranchRow) {
+          branchIdx = branchCount++;
+        }
+        const props = el.getProperties();
+        const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
+        const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
+        nextInternalNode += internalCount;
+        elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
+        continue;
+      }
     }
-
-    let branchIdx = -1;
-    const activeMnaModel = def.models?.mnaModels?.behavioral;
-    if (activeMnaModel?.requiresBranchRow) {
-      branchIdx = branchCount++;
-    }
-
-    const props = el.getProperties();
-    const internalCount = activeMnaModel?.getInternalNodeCount?.(props) ?? 0;
-    const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
-    nextInternalNode += internalCount;
-
-    elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
   }
 
   return { elementMeta, branchCount, nextInternalNode, vddNodeId, vddBranchIdx };
@@ -891,7 +928,7 @@ export function compileAnalogPartition(
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
-  _perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
+  perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: SolverDiagnostic[] = [];
 
@@ -903,6 +940,19 @@ export function compileAnalogPartition(
     labelToNodeId,
     positionToNodeId,
   } = buildAnalogNodeMapFromPartition(partition, diagnostics);
+
+  // Build a reverse map from MNA node ID → per-net loading override so that
+  // bridge synthesis sites can consult per-net overrides instead of relying
+  // solely on the circuit-level digitalPinLoading setting.
+  const nodeIdToLoadingOverride = new Map<number, "loaded" | "ideal">();
+  if (perNetLoadingOverrides) {
+    for (const [groupId, override] of perNetLoadingOverrides) {
+      const nodeId = groupToNodeId.get(groupId);
+      if (nodeId !== undefined) {
+        nodeIdToLoadingOverride.set(nodeId, override);
+      }
+    }
+  }
 
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
@@ -965,218 +1015,217 @@ export function compileAnalogPartition(
     const def = pc.definition;
     const props = el.getProperties();
 
-    const isDigitalOnlyModel = meta.pc.model === null || 'executeFn' in meta.pc.model;
-    if (isDigitalOnlyModel) {
-      // When digitalPinLoading is "all", dual-model components rerouted to the
-      // analog partition must proceed to bridge synthesis below, not be skipped.
-      const hasMnaModels = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
-      if (digitalPinLoading !== "all" || !hasMnaModels) {
-        continue;
-      }
+    const route = resolveComponentRoute(def, pc, digitalPinLoading);
+
+    if (route.kind === 'skip') {
+      continue;
     }
 
-    if (def.models?.digital !== undefined) {
-      const simulationModel = props.has("simulationModel")
-        ? (props.get("simulationModel") as string)
-        : (def.defaultModel === "digital" ? "logical" : "analog-pins");
-
-      if (simulationModel === "analog-internals" && def.models?.mnaModels?.cmos?.subcircuitModel) {
-        if (!transistorModels) {
-          diagnostics.push(
-            makeDiagnostic(
-              "missing-transistor-model",
-              "error",
-              `Component "${el.typeId}" is set to simulationModel 'analog-internals' but no TransistorModelRegistry was provided`,
-              {
-                explanation:
-                  `Pass a TransistorModelRegistry as the third argument to compileAnalogPartition() ` +
-                  `when compiling circuits with transistor-level components.`,
-              },
-            ),
-          );
-          continue;
-        }
-
-        if (def.models?.mnaModels?.behavioral?.factory !== undefined) {
-          const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
-            def.pinLayout.length,
-          ).fill(null);
-          const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, outerPinVertices, positionToNodeId);
-
-          const nodeIdToVertex = new Map<number, { x: number; y: number }>();
-          for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
-            const nid = outerPinNodeIds[pi];
-            const vtx = outerPinVertices[pi];
-            if (nid >= 0 && vtx) nodeIdToVertex.set(nid, vtx);
-          }
-
-          if (vddNodeId < 0) {
-            vddNodeId = nextInternalNode++;
-            vddBranchIdx = branchCount++;
-          }
-
-          const expResult = expandTransistorModel(
-            def,
-            outerPinNodeIds,
-            transistorModels,
-            vddNodeId,
-            0,
-            () => nextInternalNode++,
-          );
-
-          diagnostics.push(...expResult.diagnostics);
-
-          for (const expEl of expResult.elements) {
-            const expElIdx = analogElements.length;
-            analogElements.push(expEl);
-            elementToCircuitElement.set(expElIdx, el);
-
-            const subVerts: Array<{ x: number; y: number } | null> = [];
-            for (const nid of expEl.pinNodeIds) {
-              subVerts.push(nodeIdToVertex.get(nid) ?? null);
-            }
-            elementPinVertices.set(expElIdx, subVerts);
-
+    if (route.kind === 'expand') {
+      if (!transistorModels) {
+        diagnostics.push(
+          makeDiagnostic(
+            "missing-transistor-model",
+            "error",
+            `Component "${el.typeId}" requires transistor expansion but no TransistorModelRegistry was provided`,
             {
-              const expResolvedPins: ResolvedPin[] = [];
-              for (let ni = 0; ni < expEl.pinNodeIds.length; ni++) {
-                const nid = expEl.pinNodeIds[ni];
-                const vtx = nodeIdToVertex.get(nid) ?? null;
-                expResolvedPins.push({
-                  label: `node${ni}`,
-                  direction: PinDirection.BIDIRECTIONAL,
-                  localPosition: { x: 0, y: 0 },
-                  worldPosition: vtx ?? { x: 0, y: 0 },
-                  wireVertex: vtx,
-                  nodeId: nid,
-                  bitWidth: 1,
-                });
-              }
-              elementResolvedPins.set(expElIdx, expResolvedPins);
-            }
-            topologyInfo.push({
-              nodeIds: Array.from(expEl.pinNodeIds),
-              isBranch: expEl.branchIndex >= 0,
-              typeHint: expEl.branchIndex >= 0
-                ? expEl.isReactive ? "inductor" : "voltage"
-                : "other",
-            });
-          }
-          continue;
-        }
-      } else if (simulationModel === "logical" || digitalPinLoading === "all") {
-        const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
+              explanation:
+                `Pass a TransistorModelRegistry as the third argument to compileAnalogPartition() ` +
+                `when compiling circuits with transistor-level components.`,
+            },
+          ),
+        );
+        continue;
+      }
 
-        let hasUnconnectedPin = false;
+      const stampModel = findStampModel(def);
+      if (stampModel?.factory !== undefined) {
+        const outerPinVertices: Array<{ x: number; y: number } | null> = new Array(
+          def.pinLayout.length,
+        ).fill(null);
+        const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, outerPinVertices, positionToNodeId);
+
+        const nodeIdToVertex = new Map<number, { x: number; y: number }>();
         for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
-          if (outerPinNodeIds[pi]! < 0) {
-            hasUnconnectedPin = true;
-            const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
-            const pinLabel = def.pinLayout[pi]?.label ?? `pin ${pi}`;
-            diagnostics.push(
-              makeDiagnostic(
-                "unconnected-analog-pin",
-                "error",
-                `The "${pinLabel}" pin on "${elLabel}" (${el.typeId}) is not connected to any wire`,
-                {
-                  explanation:
-                    `Component "${elLabel}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
-                    `endpoint in the circuit. The digital bridge path requires all pins to be connected.`,
-                },
-              ),
-            );
-          }
-        }
-        if (hasUnconnectedPin) continue;
-
-        const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
-        let compiledInner: CompiledCircuitImpl;
-        try {
-          compiledInner = compileInnerDigitalCircuit(innerCircuit, registry, digitalCompiler!);
-        } catch (err) {
-          diagnostics.push(
-            makeDiagnostic(
-              "bridge-inner-compile-error",
-              "error",
-              `Failed to compile inner digital circuit for "${el.typeId}": ${String(err)}`,
-              {},
-            ),
-          );
-          continue;
+          const nid = outerPinNodeIds[pi];
+          const vtx = outerPinVertices[pi];
+          if (nid >= 0 && vtx) nodeIdToVertex.set(nid, vtx);
         }
 
-        const outputAdapters: BridgeOutputAdapter[] = [];
-        const inputAdapters: BridgeInputAdapter[] = [];
-        const outputPinNetIds: number[] = [];
-        const inputPinNetIds: number[] = [];
-
-        const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
-        let adapterError = false;
-
-        for (let pi = 0; pi < def.pinLayout.length; pi++) {
-          const pinDecl = def.pinLayout[pi]!;
-          const outerNodeId = outerPinNodeIds[pi]!;
-          const innerNetId = compiledInner.labelToNetId.get(pinDecl.label) ?? -1;
-
-          if (innerNetId < 0) {
-            diagnostics.push(
-              makeDiagnostic(
-                "bridge-missing-inner-pin",
-                "warning",
-                `Digital bridge: inner circuit has no net for pin label "${pinDecl.label}" on "${elLabel}"`,
-                {},
-              ),
-            );
-            adapterError = true;
-            continue;
-          }
-
-          const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
-          const componentOverride = def.pinElectrical;
-          let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
-          if (props.has("_pinElectricalOverrides")) {
-            try {
-              userBridgeOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
-            } catch { /* ignore malformed JSON */ }
-          }
-          const userPinOverride = userBridgeOverrides[pinDecl.label];
-          const mergedPinOverride = userPinOverride
-            ? { ...defPinOverride, ...userPinOverride }
-            : defPinOverride;
-          const spec = digitalPinLoading === "none"
-            ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0, ...mergedPinOverride }, componentOverride)
-            : resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
-
-          if (pinDecl.direction === PinDirection.OUTPUT) {
-            const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
-            adapter.label = `${elLabel}:${pinDecl.label}`;
-            outputAdapters.push(adapter);
-            outputPinNetIds.push(innerNetId);
-            analogElements.push(adapter);
-            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
-          } else {
-            const adapter = makeBridgeInputAdapter(spec, outerNodeId);
-            adapter.label = `${elLabel}:${pinDecl.label}`;
-            inputAdapters.push(adapter);
-            inputPinNetIds.push(innerNetId);
-            analogElements.push(adapter);
-            topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
-          }
+        if (vddNodeId < 0) {
+          vddNodeId = nextInternalNode++;
+          vddBranchIdx = branchCount++;
         }
 
-        if (!adapterError && (outputAdapters.length > 0 || inputAdapters.length > 0)) {
-          inlineBridges.push({
-            compiledInner,
-            outputAdapters,
-            inputAdapters,
-            outputPinNetIds,
-            inputPinNetIds,
-            instanceName: typeof elLabel === "string" ? elLabel : el.instanceId,
+        const expResult = expandTransistorModel(
+          def,
+          outerPinNodeIds,
+          transistorModels,
+          vddNodeId,
+          0,
+          () => nextInternalNode++,
+        );
+
+        diagnostics.push(...expResult.diagnostics);
+
+        for (const expEl of expResult.elements) {
+          const expElIdx = analogElements.length;
+          analogElements.push(expEl);
+          elementToCircuitElement.set(expElIdx, el);
+
+          const subVerts: Array<{ x: number; y: number } | null> = [];
+          for (const nid of expEl.pinNodeIds) {
+            subVerts.push(nodeIdToVertex.get(nid) ?? null);
+          }
+          elementPinVertices.set(expElIdx, subVerts);
+
+          {
+            const expResolvedPins: ResolvedPin[] = [];
+            for (let ni = 0; ni < expEl.pinNodeIds.length; ni++) {
+              const nid = expEl.pinNodeIds[ni];
+              const vtx = nodeIdToVertex.get(nid) ?? null;
+              expResolvedPins.push({
+                label: `node${ni}`,
+                direction: PinDirection.BIDIRECTIONAL,
+                localPosition: { x: 0, y: 0 },
+                worldPosition: vtx ?? { x: 0, y: 0 },
+                wireVertex: vtx,
+                nodeId: nid,
+                bitWidth: 1,
+              });
+            }
+            elementResolvedPins.set(expElIdx, expResolvedPins);
+          }
+          topologyInfo.push({
+            nodeIds: Array.from(expEl.pinNodeIds),
+            isBranch: expEl.branchIndex >= 0,
+            typeHint: expEl.branchIndex >= 0
+              ? expEl.isReactive ? "inductor" : "voltage"
+              : "other",
           });
         }
         continue;
       }
     }
+
+    if (route.kind === 'bridge') {
+      const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
+
+      let hasUnconnectedPin = false;
+      for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
+        if (outerPinNodeIds[pi]! < 0) {
+          hasUnconnectedPin = true;
+          const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
+          const pinLabel = def.pinLayout[pi]?.label ?? `pin ${pi}`;
+          diagnostics.push(
+            makeDiagnostic(
+              "unconnected-analog-pin",
+              "error",
+              `The "${pinLabel}" pin on "${elLabel}" (${el.typeId}) is not connected to any wire`,
+              {
+                explanation:
+                  `Component "${elLabel}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
+                  `endpoint in the circuit. The digital bridge path requires all pins to be connected.`,
+              },
+            ),
+          );
+        }
+      }
+      if (hasUnconnectedPin) continue;
+
+      const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
+      let compiledInner: CompiledCircuitImpl;
+      try {
+        compiledInner = compileInnerDigitalCircuit(innerCircuit, registry, digitalCompiler!);
+      } catch (err) {
+        diagnostics.push(
+          makeDiagnostic(
+            "bridge-inner-compile-error",
+            "error",
+            `Failed to compile inner digital circuit for "${el.typeId}": ${String(err)}`,
+            {},
+          ),
+        );
+        continue;
+      }
+
+      const outputAdapters: BridgeOutputAdapter[] = [];
+      const inputAdapters: BridgeInputAdapter[] = [];
+      const outputPinNetIds: number[] = [];
+      const inputPinNetIds: number[] = [];
+
+      const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
+      let adapterError = false;
+
+      for (let pi = 0; pi < def.pinLayout.length; pi++) {
+        const pinDecl = def.pinLayout[pi]!;
+        const outerNodeId = outerPinNodeIds[pi]!;
+        const innerNetId = compiledInner.labelToNetId.get(pinDecl.label) ?? -1;
+
+        if (innerNetId < 0) {
+          diagnostics.push(
+            makeDiagnostic(
+              "bridge-missing-inner-pin",
+              "warning",
+              `Digital bridge: inner circuit has no net for pin label "${pinDecl.label}" on "${elLabel}"`,
+              {},
+            ),
+          );
+          adapterError = true;
+          continue;
+        }
+
+        const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
+        const componentOverride = def.pinElectrical;
+        let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
+        if (props.has("_pinElectricalOverrides")) {
+          try {
+            userBridgeOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
+          } catch { /* ignore malformed JSON */ }
+        }
+        const userPinOverride = userBridgeOverrides[pinDecl.label];
+        const mergedPinOverride = userPinOverride
+          ? { ...defPinOverride, ...userPinOverride }
+          : defPinOverride;
+        // Per-net override takes precedence over circuit-level digitalPinLoading.
+        const netOverride = nodeIdToLoadingOverride.get(outerNodeId);
+        const useIdeal = netOverride === "ideal" || (netOverride === undefined && digitalPinLoading === "none");
+        const spec = useIdeal
+          ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0, ...mergedPinOverride }, componentOverride)
+          : resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
+
+        if (pinDecl.direction === PinDirection.OUTPUT) {
+          const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
+          adapter.label = `${elLabel}:${pinDecl.label}`;
+          outputAdapters.push(adapter);
+          outputPinNetIds.push(innerNetId);
+          analogElements.push(adapter);
+          topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
+        } else {
+          const adapter = makeBridgeInputAdapter(spec, outerNodeId);
+          adapter.label = `${elLabel}:${pinDecl.label}`;
+          inputAdapters.push(adapter);
+          inputPinNetIds.push(innerNetId);
+          analogElements.push(adapter);
+          topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
+        }
+      }
+
+      if (!adapterError && (outputAdapters.length > 0 || inputAdapters.length > 0)) {
+        inlineBridges.push({
+          compiledInner,
+          outputAdapters,
+          inputAdapters,
+          outputPinNetIds,
+          inputPinNetIds,
+          instanceName: typeof elLabel === "string" ? elLabel : el.instanceId,
+        });
+      }
+      continue;
+    }
+
+    // route.kind === 'stamp'
+    const activeModel = route.model;
 
     // Resolve pin → node ID bindings
     const pinVertices: Array<{ x: number; y: number } | null> = new Array(
@@ -1236,7 +1285,7 @@ export function compileAnalogPartition(
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
-    if (def.models?.digital !== undefined && def.models?.mnaModels?.behavioral?.factory !== undefined) {
+    if (def.models?.digital !== undefined && activeModel.factory !== undefined) {
       let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       if (props.has("_pinElectricalOverrides")) {
         try {
@@ -1262,19 +1311,28 @@ export function compileAnalogPartition(
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    if (def.models?.mnaModels?.behavioral?.deviceType !== undefined) {
+    if (activeModel.deviceType !== undefined) {
       const modelName = props.has("model") ? props.get<string>("model") : "";
-      const resolvedModel =
-        (modelName !== "" ? modelLibrary.get(modelName) : undefined) ??
-        modelLibrary.getDefault(def.models!.mnaModels!.behavioral!.deviceType!);
+      const namedModel = modelName !== "" ? modelLibrary.get(modelName) : undefined;
+      const resolvedModel = namedModel ?? modelLibrary.getDefault(activeModel.deviceType);
 
       const modelDiags = validateModel(resolvedModel);
       diagnostics.push(...modelDiags);
-      let finalParams = resolvedModel.params;
+
+      // Resolution order for base params:
+      // 1. Component-specific defaultParams (e.g. SCHOTTKY_DEFAULTS)
+      // 2. Named model params (user-assigned .MODEL card)
+      // 3. Library default for the deviceType (generic fallback)
+      const baseParams = activeModel.defaultParams
+        ?? resolvedModel.params;
+      let finalParams = baseParams;
+      if (namedModel && activeModel.defaultParams) {
+        finalParams = { ...baseParams, ...namedModel.params };
+      }
       if (props.has("_spiceModelOverrides")) {
         try {
           const overrides = JSON.parse(props.get("_spiceModelOverrides") as string) as Record<string, number>;
-          finalParams = { ...resolvedModel.params, ...overrides };
+          finalParams = { ...finalParams, ...overrides };
         } catch {
           const label = props.has("label") ? props.get<string>("label") : el.typeId;
           diagnostics.push({
@@ -1289,7 +1347,7 @@ export function compileAnalogPartition(
       props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    const analogFactory = def.models!.mnaModels!.behavioral!.factory;
+    const analogFactory = activeModel.factory;
     if (!analogFactory) continue;
     const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
     const element: import("./element.js").AnalogElement = Object.assign(core, {
@@ -1393,6 +1451,7 @@ export function compileAnalogPartition(
         diagnostics,
         digitalCompiler!,
         digitalPinLoading,
+        nodeIdToLoadingOverride,
       );
       if (bridgeInstance !== null) {
         for (const adapter of bridgeInstance.outputAdapters) {
@@ -1613,6 +1672,7 @@ function compileBridgeInstance(
   diagnostics: SolverDiagnostic[],
   digitalCompiler: DigitalCompilerFn,
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
+  nodeIdToLoadingOverride: ReadonlyMap<number, "loaded" | "ideal"> = new Map(),
 ): BridgeInstance | null {
   // Step 1: Compile the inner digital circuit.
   let compiledInner: CompiledCircuitImpl;
@@ -1675,7 +1735,10 @@ function compileBridgeInstance(
     }
 
     // Resolve the pin electrical spec from the circuit logic family.
-    const spec = digitalPinLoading === "none"
+    // Per-net override takes precedence over circuit-level digitalPinLoading.
+    const netOverride = nodeIdToLoadingOverride.get(outerNodeId);
+    const useIdeal = netOverride === "ideal" || (netOverride === undefined && digitalPinLoading === "none");
+    const spec = useIdeal
       ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0 })
       : resolvePinElectrical(circuitFamily);
 

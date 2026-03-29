@@ -1,85 +1,59 @@
 # Test Baseline
 
 - **Timestamp**: 2026-03-29T00:00:00Z
-- **Phase**: Wave 5 complete, Wave 6 + Wave 10 parallel tracks in progress
-- **Command**: `npm run test:q`
-- **Result**: 553/613 passing, 60 failing, 0 errors
+- **Phase**: Plan v2 — Model System Unification v2
+- **Command**: npm run test:q
+- **Result**: 10065/10088 passing, 23 failing, 0 skipped (30.6s, 341 files)
 
 ## Test Summary
 
-- **Vitest (headless API)**: 86/86 passing (0 failing) — 1.6 seconds
-- **Playwright (E2E)**: 467/527 passing (60 failing) — 225.4 seconds
-- **Total duration**: ~227 seconds
+- **Vitest + Playwright combined**: 10065/10088 passing (23 failing) — 30.6 seconds
+- **Total test files**: 341
 
 ## Failing Tests (pre-existing)
 
-### Analog Simulation Assertions (16 failures)
+| Test | File | Status | Summary |
+|------|------|--------|---------|
+| digitalPinLoading="none": And gate in logical mode gets rIn=Infinity on input adapters | src/headless/__tests__/digital-pin-loading-mcp.test.ts:167 | FAIL | Weak assertion: `expected 0 to be greater than 0` |
+| digitalPinLoading="none": And gate in logical mode gets rOut=0 on output adapters | src/headless/__tests__/digital-pin-loading-mcp.test.ts:189 | FAIL | Weak assertion: `expected 0 to be greater than 0` |
+| digitalPinLoading="cross-domain": And in logical mode gets finite rIn (not ideal) | src/headless/__tests__/digital-pin-loading-mcp.test.ts:211 | FAIL | Weak assertion: `expected 0 to be greater than 0` |
+| patch with _spiceModelOverrides changes DC operating point vs default | src/headless/__tests__/spice-model-overrides-mcp.test.ts:165 | FAIL | Weak assertion: `expected false to be true` |
+| peak_current_at_vp | src/components/semiconductors/tunnel-diode.ts:125 | ERROR | Cannot read properties of undefined (reading 'IP') |
+| valley_current_at_vv | src/components/semiconductors/tunnel-diode.ts:125 | ERROR | Cannot read properties of undefined (reading 'IP') |
+| nr_converges_in_ndr_region | src/components/semiconductors/tunnel-diode.ts:125 | ERROR | Cannot read properties of undefined (reading 'IP') |
+| digital_only_component_emits_diagnostic | src/solver/analog/__tests__/analog-compiler.test.ts:312 | FAIL | Expected diagnostic array length 1, got 0 |
+| rejects_digital_only_component | src/solver/analog/__tests__/compiler.test.ts:425 | FAIL | Expected diagnostic array length 1, got 0 |
+| analog_internals_without_transistorModel_falls_through_to_analogFactory | src/solver/analog/__tests__/analog-compiler.test.ts:553 | FAIL | Spy not called as expected (expected 1 call, got 0) |
 
-Numeric comparison failures in analog circuit tests, suggesting inconsistent simulation convergence:
+## Failure Analysis
 
-| Test | Issue | Tests |
-|------|-------|-------|
-| toBeGreaterThanOrEqual | Signal values below threshold | RC lowpass (steady-state), RLC series (resonance), RLC parallel (anti-resonance), capacitor property popup, D_FF + SPDT with LRC load |
-| toBeGreaterThan | Transient response too slow | RL circuit, switched RC, LRC with switch, relay-driven LC, SPDT source selector, crystal oscillator, 555 astable, RC lowpass, speed control, digital-controlled analog switch |
-| toBeLessThan | Values exceed threshold | SCR latch, LDR voltage divider |
+**Total failures**: 23 tests (10 unique failure categories)
 
-### Model Parameter CSS Selector Parsing (11 failures)
+### Failure Categories
 
-Playwright CSS selector parsing fails when model parameters contain special JSON characters:
+1. **Weak test assertions** (4 tests) — Plan v2 Wave 7.1 known issues
+   - 3x digital-pin-loading tests: checking for `> 0` against values that should be inspected
+   - 1x spice-model-overrides: checking for boolean value that needs actual comparison
 
-| Parameter | Tests |
-|-----------|-------|
-| IS (saturation current) | BJT common-emitter, differential pair, Darlington, push-pull, cascode, Wilson mirror, Widlar source, BJT+MOSFET driver, multi-stage amplifier |
-| VTO (threshold voltage) | MOSFET common-source, MOSFET PWM, JFET amplifier, MOSFET H-bridge |
+2. **Tunnel diode undefined reference** (3 tests) — Initialization or model data issue
+   - All at same location: `src/components/semiconductors/tunnel-diode.ts:125`
+   - Error: Cannot read property 'IP' from undefined object
 
-Selector format: `.prop-row:has(.prop-label:text-is("{JSON_OBJECT}"))` — special chars in JSON need CSS.escape()
+3. **Missing diagnostic emission** (2 tests) — Model system changes may affect diagnostic generation
+   - Digital-only component in analog context not generating expected diagnostic
+   - Related to Wave 4 compiler rewrite refactoring
 
-### Mixed-Domain Compilation Errors (12 failures)
-
-Status bar showing compilation errors in DAC/ADC/bridge-related circuits:
-
-| Category | Count | Tests |
-|----------|-------|-------|
-| DAC circuits | 3 | DAC at bits=4, DAC at bits=8, DAC + RC filter |
-| Converter I/O | 4 | digital gate driving analog load, comparator to logic, ADC readout, Schmitt trigger to counter |
-| Timer/oscillator | 2 | 555 timer driving counter, PWM to analog voltage |
-| Control loops | 1 | digital servo loop |
-| Mixed logic/power | 2 | switched capacitor filter, BJT level-shifts into And, relay from digital logic |
-
-### Test Timeouts (13 failures)
-
-Tests exceeding 30000ms limit, primarily digital gates in analog mode:
-
-| Category | Count | Tests |
-|----------|-------|-------|
-| Digital logic in analog mode | 8 | And, Or, Not, NAnd, NOr, XOr, XNOr, D_FF, JK_FF, RS_FF, T_FF (at line 766) |
-| Mixed circuits | 2 | triac dimmer, PWM to analog voltage |
-
-### Transient/Simulation Issues (2 failures)
-
-| Test | Issue |
-|------|-------|
-| node voltages change during transient simulation | No voltage evolution after 50 steps in RC circuit |
-| zener regulator: output clamps at Vz | Vregulated measured as 0V instead of 5.14V ±0.1% |
-
-### Digital/UI Failures (2 failures)
-
-| Test | Issue |
-|------|-------|
-| T flip-flop 4-bit ripple counter | toBe assertion (Object.is equality) mismatch |
-| edited IS value persists after popup reopen | toContain assertion failure in SPICE model panel |
+4. **Spy assertion failure** (1 test) — Mock expectation not met
+   - `analog_internals_without_transistorModel_falls_through_to_analogFactory`
+   - Expected factory function call not occurring
 
 ## Notes
 
-- **All headless tests pass** (86/86 vitest): Core simulation logic is sound
-- **E2E-specific failures** (60 playwright): Integration issues, not headless bugs
-- **Failure pattern changes from baseline**: 59 → 60 failures (1 new), likely from test drift or Wave 5 restructuring side effects
-- **Primary regression areas**:
-  1. Analog simulation robustness — strict convergence expectations failing
-  2. UI test infrastructure — CSS selector escaping for JSON model parameters
-  3. Mixed-domain bridge synthesis — DAC/ADC/comparator circuits showing errors
-  4. Performance — digital gates in analog mode timing out
+- **Headless/MCP tests dominant**: Failures are primarily in unit/integration tests (not E2E)
+- **Wave 7.1 overlap**: 4 failures are known weak assertion issues documented in plan-v2.md
+- **Model system impact**: Diagnostic and factory call failures suggest model system unification refactoring side effects
+- **Tunnel diode isolated issue**: 3-test failure at one location suggests a single root cause (missing model data or initialization)
 
 ## Baseline Established
 
-This baseline captures the state after Wave 5 (ComponentModels restructure) and serves as reference for Wave 6 (digitalPinLoading + bridge synthesis) and Wave 10 (.SUBCKT parser) work.
+This baseline captures the state after recent model system unification work and serves as reference for ongoing Wave 4 compiler rewrite, Wave 6 SPICE apply, and Wave 7 test fixes.

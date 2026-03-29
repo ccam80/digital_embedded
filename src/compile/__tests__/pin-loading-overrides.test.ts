@@ -135,7 +135,7 @@ describe('stableNetId — format matches PinLoadingOverride anchor format', () =
     const tunnel = new TestElement('Tunnel', 'tunnel-1', { x: 0, y: 0 }, [outputPin(0, 0, 'out')], tunnelProps);
     circuit.addElement(tunnel);
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const tunnelGroup = groups.find(g =>
@@ -154,7 +154,7 @@ describe('stableNetId — format matches PinLoadingOverride anchor format', () =
       inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out'),
     ]));
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const netIds = groups.map(g => stableNetId(g, circuit.elements));
@@ -175,7 +175,7 @@ describe('resolveLoadingOverrides — matches overrides to connectivity groups',
     const circuit = new Circuit();
     circuit.addElement(new TestElement('Tunnel', 'tun-1', { x: 0, y: 0 }, [outputPin(0, 0, 'out')], tunnelProps));
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const overrides: PinLoadingOverride[] = [
@@ -196,7 +196,7 @@ describe('resolveLoadingOverrides — matches overrides to connectivity groups',
     const circuit = new Circuit();
     circuit.addElement(new TestElement('And', 'and-fixed-id', { x: 0, y: 0 }, andPins));
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     // Find the group containing the 'out' pin of 'and-fixed-id'
@@ -228,7 +228,7 @@ describe('resolveLoadingOverrides — matches overrides to connectivity groups',
       inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out'),
     ]));
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const overrides: PinLoadingOverride[] = [
@@ -251,7 +251,7 @@ describe('resolveLoadingOverrides — matches overrides to connectivity groups',
     circuit.addElement(new TestElement('Tunnel', 'tun-a', { x: 0, y: 0 }, [outputPin(0, 0, 'out')], t1Props));
     circuit.addElement(new TestElement('Tunnel', 'tun-b', { x: 10, y: 0 }, [outputPin(0, 0, 'out')], t2Props));
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const overrides: PinLoadingOverride[] = [
@@ -286,7 +286,7 @@ describe('connectivity groups — wires field is populated for connected groups'
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
     circuit.addWire(wire);
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const groupWithWire = groups.find(g => g.wires.includes(wire));
@@ -303,7 +303,7 @@ describe('connectivity groups — wires field is populated for connected groups'
     const floatingWire = new Wire({ x: 5, y: 5 }, { x: 10, y: 5 });
     circuit.addWire(floatingWire);
 
-    const assignments = resolveModelAssignments(circuit.elements, registry);
+    const [assignments] = resolveModelAssignments(circuit.elements, registry);
     const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
 
     const matchingGroups = groups.filter(g => g.wires.includes(floatingWire));

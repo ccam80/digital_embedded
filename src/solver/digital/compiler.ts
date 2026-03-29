@@ -74,7 +74,7 @@ function compileCircuit(
     }
   }
 
-  const assignments = resolveModelAssignments(circuit.elements, registry);
+  const [assignments] = resolveModelAssignments(circuit.elements, registry);
   const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
   const { digital: partition } = partitionByDomain(groups, circuit.elements, registry, assignments, []);
   return compileDigitalPartition(partition, registry);

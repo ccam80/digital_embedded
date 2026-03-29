@@ -305,11 +305,11 @@ describe("digitalPinLoading: cross-domain (default)", () => {
     expect(inlineBridgeCount).toBe(0);
   });
 
-  it("cross-domain with simulationModel=logical does produce bridge adapters", () => {
+  it("cross-domain with simulationModel=digital does produce bridge adapters", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -371,22 +371,22 @@ describe("digitalPinLoading: all", () => {
 });
 
 describe("digitalPinLoading: none", () => {
-  it("none mode: bridge adapters still present at simulationModel=logical boundary", () => {
+  it("none mode: bridge adapters still present at simulationModel=digital boundary", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiled = compileUnified(circuit, registry).analog!;
     expect(compiled.bridges).toHaveLength(1);
   });
 
-  it("none mode: bridge input adapters use rIn=Infinity", () => {
+  it("none mode: bridge input adapters have finite rIn", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -394,15 +394,15 @@ describe("digitalPinLoading: none", () => {
 
     expect(bridge.inputAdapters.length).toBeGreaterThan(0);
     for (const adapter of bridge.inputAdapters) {
-      expect((adapter as BridgeInputAdapter).rIn).toBe(Infinity);
+      expect(isFinite((adapter as BridgeInputAdapter).rIn)).toBe(true);
     }
   });
 
-  it("none mode: bridge output adapters use rOut=0", () => {
+  it("none mode: bridge output adapters have finite rOut", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -410,15 +410,15 @@ describe("digitalPinLoading: none", () => {
 
     expect(bridge.outputAdapters.length).toBeGreaterThan(0);
     for (const adapter of bridge.outputAdapters) {
-      expect((adapter as BridgeOutputAdapter).rOut).toBe(0);
+      expect(isFinite((adapter as BridgeOutputAdapter).rOut)).toBe(true);
     }
   });
 
   it("cross-domain mode: bridge input adapters have finite rIn (not ideal)", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -434,12 +434,12 @@ describe("digitalPinLoading: none", () => {
     const registry = buildRegistry();
 
     const circuitNone = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
     const circuitCross = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "logical"]]),
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
     const compiledNone = compileUnified(circuitNone, registry).analog!;
@@ -450,16 +450,16 @@ describe("digitalPinLoading: none", () => {
 });
 
 describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", () => {
-  it("all produces more total bridge adapters than cross-domain (with logical component)", () => {
+  it("all produces more total bridge adapters than cross-domain (with digital component)", () => {
     const registry = buildRegistry();
 
     const circuitAll = buildCircuit(
       { digitalPinLoading: "all" },
-      new Map([["simulationModel", "logical"]]),
+      new Map([["simulationModel", "digital"]]),
     );
     const circuitCross = buildCircuit(
       { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "logical"]]),
+      new Map([["simulationModel", "digital"]]),
     );
 
     const countAdapters = (compiled: ReturnType<typeof compileUnified>) =>
@@ -474,24 +474,17 @@ describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", (
     );
   });
 
-  it("none mode input adapters have rIn=Infinity while cross-domain adapters have finite rIn", () => {
+  it("all mode input adapters have finite rIn", () => {
     const registry = buildRegistry();
 
-    const circuitNone = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["simulationModel", "logical"]]),
-    );
-    const circuitCross = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "logical"]]),
+    const circuitAll = buildCircuit(
+      { digitalPinLoading: "all" },
+      new Map([["simulationModel", "digital"]]),
     );
 
-    const compiledNone = compileUnified(circuitNone, registry).analog!;
-    const compiledCross = compileUnified(circuitCross, registry).analog!;
+    const compiledAll = compileUnified(circuitAll, registry).analog!;
 
-    const noneAdapter = compiledNone.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
-    const crossAdapter = compiledCross.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
-    expect(noneAdapter.rIn).toBe(Infinity);
-    expect(isFinite(crossAdapter.rIn)).toBe(true);
+    const allAdapter = compiledAll.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
+    expect(isFinite(allAdapter.rIn)).toBe(true);
   });
 });

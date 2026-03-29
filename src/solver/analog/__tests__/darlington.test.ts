@@ -256,7 +256,7 @@ describe("PNP", () => {
 
 describe("Registration", () => {
   describe("npn_darlington_registered", () => {
-    it("DarlingtonNPN has transistorModel set", () => {
+    it("DarlingtonNPN has subcircuitModel set", () => {
       expect(DarlingtonNpnDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonNPN");
     });
 
@@ -269,7 +269,7 @@ describe("Registration", () => {
       expect(DarlingtonNpnDefinition.models?.digital).toBeUndefined();
     });
 
-    it("DarlingtonPNP has transistorModel set", () => {
+    it("DarlingtonPNP has subcircuitModel set", () => {
       expect(DarlingtonPnpDefinition.models?.mnaModels?.cmos?.subcircuitModel).toBe("DarlingtonPNP");
     });
 

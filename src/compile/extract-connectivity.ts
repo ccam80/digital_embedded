@@ -7,7 +7,7 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
-import { availableModels } from '../core/registry.js';
+import { getActiveModelKey } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
@@ -53,8 +53,9 @@ export interface ModelAssignment {
 export function resolveModelAssignments(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
-): ModelAssignment[] {
+): [ModelAssignment[], Diagnostic[]] {
   const result: ModelAssignment[] = [];
+  const diagnostics: Diagnostic[] = [];
 
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i]!;
@@ -72,34 +73,20 @@ export function resolveModelAssignments(
       continue;
     }
 
-    // Resolve model key: simulationModel prop > defaultModel > first key.
-    // Resolve model key: check simulationModel prop against known model keys,
-    // then fall back to defaultModel, then first available key.
-    // Unknown prop values with mnaModels present route to the first mna key.
-    const simulationModelProp = el.getAttribute('simulationModel');
+    // Delegate to getActiveModelKey — throws on invalid simulationModel prop values.
     let modelKey: string;
-
-    const mnaModelKeys = def.models.mnaModels ? Object.keys(def.models.mnaModels) : [];
-    const firstMnaKey = mnaModelKeys[0];
-
-    if (
-      typeof simulationModelProp === 'string' &&
-      simulationModelProp.length > 0 &&
-      (simulationModelProp === 'digital' ? def.models.digital !== undefined : def.models.mnaModels?.[simulationModelProp] !== undefined)
-    ) {
-      modelKey = simulationModelProp;
-    } else if (
-      typeof simulationModelProp === 'string' &&
-      simulationModelProp.length > 0 &&
-      firstMnaKey !== undefined
-    ) {
-      // Unrecognized prop value but component has mna models — route to first mna key
-      modelKey = firstMnaKey;
-    } else if (def.defaultModel !== undefined) {
-      modelKey = def.defaultModel;
-    } else {
-      const keys = availableModels(def);
-      modelKey = keys.length > 0 ? keys[0]! : 'neutral';
+    try {
+      modelKey = getActiveModelKey(el, def);
+    } catch (err) {
+      // Invalid simulationModel property — record a diagnostic and continue with neutral
+      // so the rest of compilation can proceed and report all errors at once.
+      diagnostics.push({
+        severity: 'error',
+        code: 'invalid-simulation-model',
+        message: err instanceof Error ? err.message : String(err),
+      });
+      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
+      continue;
     }
 
     // Resolve the actual model object
@@ -110,16 +97,10 @@ export function resolveModelAssignments(
       model = def.models.mnaModels?.[modelKey] ?? null;
     }
 
-    // If the resolved key doesn't correspond to a real model, fall back to neutral
-    if (model === null) {
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
-      continue;
-    }
-
     result.push({ elementIndex: i, modelKey, model });
   }
 
-  return result;
+  return [result, diagnostics];
 }
 
 // ---------------------------------------------------------------------------
@@ -127,8 +108,12 @@ export function resolveModelAssignments(
 // ---------------------------------------------------------------------------
 
 /**
- * Map a model key to a domain string.
- * "digital" → "digital", any mna model key → "analog", "neutral" → "neutral".
+ * Map a model key to a domain string used by the partition system.
+ *
+ * Returns "analog" (not "mna") for all non-digital, non-neutral keys because
+ * partition.ts checks `g.domains.has("analog")` and `ma.modelKey === "analog"`.
+ * The canonical registry.modelKeyToDomain() returns "mna", which is incompatible
+ * with those checks, so this local version is intentionally kept.
  */
 function modelKeyToDomain(modelKey: string): string {
   if (modelKey === 'digital') return 'digital';

@@ -3,7 +3,7 @@ import {
   ComponentRegistry,
   ComponentCategory,
   hasDigitalModel,
-  hasMnaModel,
+  hasAnalogModel,
   availableModels,
   getActiveModelKey,
   modelKeyToDomain,
@@ -16,7 +16,6 @@ import type {
   DigitalModel,
   MnaModel,
   ComponentModels,
-  MnaModel,
 } from "../registry.js";
 import { PropertyBag } from "../properties.js";
 import type { PinElectricalSpec } from "../pin-electrical.js";
@@ -358,14 +357,14 @@ describe("ComponentRegistry", () => {
       };
       registry.register(def);
       const stored = registry.get("WithAnalog")!;
-      expect(hasMnaModel(stored)).toBe(true);
+      expect(hasAnalogModel(stored)).toBe(true);
     });
 
-    it("hasMnaModel returns false for digital-only component", () => {
+    it("hasAnalogModel returns false for digital-only component", () => {
       const def = makeDefinition("DigOnly2");
       registry.register(def);
       const stored = registry.get("DigOnly2")!;
-      expect(hasMnaModel(stored)).toBe(false);
+      expect(hasAnalogModel(stored)).toBe(false);
     });
 
     it("availableModels returns ['digital'] for digital-only component", () => {

@@ -503,7 +503,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       }
 
       if (!locked) {
-        const modelAssignments = resolveModelAssignments(ctx.circuit.elements, registry);
+        const [modelAssignments] = resolveModelAssignments(ctx.circuit.elements, registry);
         const [groups] = extractConnectivityGroups(
           ctx.circuit.elements,
           ctx.circuit.wires,
@@ -1482,7 +1482,7 @@ function refreshOverrideIndicators(ctx: AppContext): void {
     return;
   }
 
-  const modelAssignments = resolveModelAssignments(ctx.circuit.elements, ctx.palette.getRegistry());
+  const [modelAssignments] = resolveModelAssignments(ctx.circuit.elements, ctx.palette.getRegistry());
   const [groups] = extractConnectivityGroups(
     ctx.circuit.elements,
     ctx.circuit.wires,

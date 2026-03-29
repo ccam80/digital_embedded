@@ -344,7 +344,6 @@ export function extractCircuitMetadata(parsed: DigCircuit): Partial<CircuitMetad
     if (entry.key === "customShape" && entry.value.type === "customShape") {
       metadata.customShape = convertCustomShapeData(entry.value.value);
     }
-    // engineType is silently ignored — the unified compiler derives domain from component models.
   }
 
   return metadata;

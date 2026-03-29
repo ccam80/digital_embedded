@@ -39,6 +39,8 @@ export interface PinDeclaration {
   readonly position: Point;
   readonly isNegatable: boolean;
   readonly isClockCapable: boolean;
+  /** Whether this pin carries a signal or a power rail. */
+  readonly kind: "signal" | "power";
   /** Which face of a subcircuit chip this pin is on (left/right/top/bottom). */
   readonly face?: "left" | "right" | "top" | "bottom";
 }

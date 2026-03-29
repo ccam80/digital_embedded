@@ -327,7 +327,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
 
 describe("compileAnalogPartition", () => {
   it("produces_compiled_circuit_for_simple_analog_partition", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
@@ -337,7 +337,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("node_count_matches_expected_for_and_gate_partition", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
 
     // Build via partition path (which explicitly includes Ground)
     const { partition, registry } = buildAndGatePartition(propsMap);
@@ -351,7 +351,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("factory_called_once_for_and_gate", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry, factorySpy } = buildAndGatePartition(propsMap);
     compileAnalogPartition(partition, registry);
 
@@ -359,7 +359,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("wireToNodeId_populated_for_all_wires", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
@@ -372,7 +372,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("ground_group_assigned_node_zero", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
@@ -382,7 +382,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("non_ground_groups_assigned_sequential_node_ids", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
@@ -421,7 +421,7 @@ describe("compileAnalogPartition", () => {
       { x: 10, y: 0, label: "In_1", direction: PinDirection.INPUT },
       { x: 20, y: 0, label: "In_2", direction: PinDirection.INPUT },
       { x: 30, y: 0, label: "out",  direction: PinDirection.OUTPUT },
-    ], new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]));
+    ], new Map<string, PropertyValue>([["simulationModel", "behavioral"]]));
 
     const andDef = registry.get("BehavioralAnd")!;
     const andResolvedPins = andGate.getPins().map((pin, idx) => ({
@@ -539,7 +539,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("matrixSize_equals_nodeCount_plus_branchCount", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
@@ -547,7 +547,7 @@ describe("compileAnalogPartition", () => {
   });
 
   it("pin_node_ids_passed_to_factory_match_group_node_ids", () => {
-    const propsMap = new Map<string, PropertyValue>([["simulationModel", "analog-pins"]]);
+    const propsMap = new Map<string, PropertyValue>([["simulationModel", "behavioral"]]);
     const { partition, registry, factorySpy } = buildAndGatePartition(propsMap);
     compileAnalogPartition(partition, registry);
 

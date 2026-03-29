@@ -1,7 +1,7 @@
 /**
- * Tests for the simulationModel: "logical" compiler path (inline bridge).
+ * Tests for the simulationModel: "digital" compiler path (inline bridge).
  *
- * Verifies that when a "both"-engine component has simulationModel: "logical",
+ * Verifies that when a "both"-engine component has simulationModel: "digital",
  * the analog compiler:
  *   1. Does NOT call the analogFactory
  *   2. Produces exactly one BridgeInstance in compiled.bridges
@@ -189,7 +189,7 @@ function buildRegistry(analogFactory?: (pinNodes: ReadonlyMap<string, number>, i
  * builder assigns it a unique non-zero MNA node ID.
  */
 function buildCircuit(propsMap: Map<string, PropertyValue> = new Map()) {
-  const circuit = new Circuit();
+  const circuit = new Circuit({ digitalPinLoading: "all" });
 
   // DigitalXor element at position (10, 0), rotation=0
   const xorProps = new PropertyBag();
@@ -233,7 +233,7 @@ describe("DigitalBridgePath", () => {
   it("analog_factory_not_called_in_digital_mode", () => {
     const analogFactory = vi.fn(makeStubAnalogElement);
     const registry = buildRegistry(analogFactory);
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     compileUnified(circuit, registry);
 
@@ -242,7 +242,7 @@ describe("DigitalBridgePath", () => {
 
   it("creates_one_bridge_instance", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
 
@@ -251,7 +251,7 @@ describe("DigitalBridgePath", () => {
 
   it("bridge_has_correct_adapter_counts", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
@@ -266,7 +266,7 @@ describe("DigitalBridgePath", () => {
 
   it("inner_net_ids_are_valid", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
@@ -286,7 +286,7 @@ describe("DigitalBridgePath", () => {
 
   it("adapter_outer_node_ids_are_non_negative", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;
@@ -304,7 +304,7 @@ describe("DigitalBridgePath", () => {
 
   it("no_errors_emitted_in_digital_mode", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
@@ -325,7 +325,7 @@ describe("DigitalBridgePath", () => {
 
   it("adapter_labels_include_pin_name", () => {
     const registry = buildRegistry();
-    const circuit = buildCircuit(new Map([["simulationModel", "logical"]]));
+    const circuit = buildCircuit(new Map([["simulationModel", "digital"]]));
 
     const compiled = compileUnified(circuit, registry).analog!;
     const bridge = compiled.bridges[0]!;

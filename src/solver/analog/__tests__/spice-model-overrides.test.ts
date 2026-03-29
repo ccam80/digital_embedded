@@ -26,7 +26,7 @@ import type { SerializedElement } from "../../../core/element.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { BJT_NPN_DEFAULTS, TUNNEL_DIODE_DEFAULTS } from "../model-defaults.js";
+import { BJT_NPN_DEFAULTS, TUNNEL_DIODE_DEFAULTS, DIODE_DEFAULTS, SCHOTTKY_DEFAULTS, ZENER_DEFAULTS } from "../model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Shared circuit-building helpers
@@ -229,6 +229,271 @@ describe("spice-model-overrides compiler merge", () => {
     // Falls back to unmodified defaults
     expect(capturedModelParams).toBeDefined();
     expect(capturedModelParams!["IS"]).toBe(BJT_NPN_DEFAULTS["IS"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Per-component defaultParams resolution tests
+  // -------------------------------------------------------------------------
+
+  it("schottky_lossy_diff_regression: override IS to DIODE_DEFAULTS.IS preserves that value", () => {
+    let capturedModelParams: Record<string, number> | undefined;
+
+    const schottkyFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+      capturedModelParams = props.has("_modelParams")
+        ? (props.get("_modelParams") as unknown as Record<string, number>)
+        : undefined;
+      const stub: AnalogElement = {
+        pinNodeIds: [],
+        allNodeIds: [],
+        branchIndex: -1,
+        isNonlinear: false,
+        isReactive: false,
+        stamp(_s: SparseSolver) {},
+      };
+      return stub;
+    };
+
+    const registry = new ComponentRegistry();
+
+    registry.register({
+      name: "Ground",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Ground",
+      models: { mnaModels: { behavioral: {} } },
+    } as unknown as ComponentDefinition);
+
+    registry.register({
+      name: "SchottkyStub",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [
+        { label: "A", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
+        { label: "K", direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 } },
+      ],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Schottky Stub",
+      models: {
+        mnaModels: {
+          behavioral: {
+            deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+            factory: schottkyFactory,
+            defaultParams: SCHOTTKY_DEFAULTS,
+          },
+        },
+      },
+    } as unknown as ComponentDefinition);
+
+    // Override IS to exactly DIODE_DEFAULTS.IS (1e-14) — previously this was
+    // indistinguishable from "no override" in the lossy-diff approach.
+    const propsMap = new Map<string, PropertyValue>([
+      ["label", "d1"],
+      ["_spiceModelOverrides", JSON.stringify({ IS: DIODE_DEFAULTS["IS"] })],
+    ]);
+
+    const circuit = new Circuit();
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const schottky = makeElement(
+      "SchottkyStub",
+      "d1",
+      [
+        { x: 0, y: 0, label: "A" },
+        { x: 10, y: 0, label: "K" },
+      ],
+      propsMap,
+    );
+
+    circuit.addElement(gnd);
+    circuit.addElement(schottky);
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+
+    const compiled = compileUnified(circuit, registry).analog!;
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    expect(capturedModelParams).toBeDefined();
+    // The override IS=1e-14 must be preserved, NOT replaced by SCHOTTKY_DEFAULTS.IS
+    expect(capturedModelParams!["IS"]).toBe(DIODE_DEFAULTS["IS"]);
+    expect(capturedModelParams!["IS"]).not.toBe(SCHOTTKY_DEFAULTS["IS"]);
+  });
+
+  it("zener_defaults: no overrides resolves ZENER_DEFAULTS, not DIODE_DEFAULTS", () => {
+    let capturedModelParams: Record<string, number> | undefined;
+
+    const zenerFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+      capturedModelParams = props.has("_modelParams")
+        ? (props.get("_modelParams") as unknown as Record<string, number>)
+        : undefined;
+      const stub: AnalogElement = {
+        pinNodeIds: [],
+        allNodeIds: [],
+        branchIndex: -1,
+        isNonlinear: false,
+        isReactive: false,
+        stamp(_s: SparseSolver) {},
+      };
+      return stub;
+    };
+
+    const registry = new ComponentRegistry();
+
+    registry.register({
+      name: "Ground",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Ground",
+      models: { mnaModels: { behavioral: {} } },
+    } as unknown as ComponentDefinition);
+
+    registry.register({
+      name: "ZenerStub",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [
+        { label: "A", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
+        { label: "K", direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 } },
+      ],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Zener Stub",
+      models: {
+        mnaModels: {
+          behavioral: {
+            deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+            factory: zenerFactory,
+            defaultParams: ZENER_DEFAULTS,
+          },
+        },
+      },
+    } as unknown as ComponentDefinition);
+
+    const propsMap = new Map<string, PropertyValue>([["label", "z1"]]);
+
+    const circuit = new Circuit();
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const zener = makeElement(
+      "ZenerStub",
+      "z1",
+      [
+        { x: 0, y: 0, label: "A" },
+        { x: 10, y: 0, label: "K" },
+      ],
+      propsMap,
+    );
+
+    circuit.addElement(gnd);
+    circuit.addElement(zener);
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+
+    const compiled = compileUnified(circuit, registry).analog!;
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    expect(capturedModelParams).toBeDefined();
+    // BV must be finite (ZENER_DEFAULTS.BV = 5.1), not Infinity (DIODE_DEFAULTS.BV)
+    expect(capturedModelParams!["BV"]).toBe(ZENER_DEFAULTS["BV"]);
+    expect(Number.isFinite(capturedModelParams!["BV"])).toBe(true);
+    // IS should match ZENER_DEFAULTS (same as DIODE_DEFAULTS in this case)
+    expect(capturedModelParams!["IS"]).toBe(ZENER_DEFAULTS["IS"]);
+  });
+
+  it("schottky_base_defaults: no overrides resolves SCHOTTKY_DEFAULTS.IS, not DIODE_DEFAULTS.IS", () => {
+    let capturedModelParams: Record<string, number> | undefined;
+
+    const schottkyFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+      capturedModelParams = props.has("_modelParams")
+        ? (props.get("_modelParams") as unknown as Record<string, number>)
+        : undefined;
+      const stub: AnalogElement = {
+        pinNodeIds: [],
+        allNodeIds: [],
+        branchIndex: -1,
+        isNonlinear: false,
+        isReactive: false,
+        stamp(_s: SparseSolver) {},
+      };
+      return stub;
+    };
+
+    const registry = new ComponentRegistry();
+
+    registry.register({
+      name: "Ground",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Ground",
+      models: { mnaModels: { behavioral: {} } },
+    } as unknown as ComponentDefinition);
+
+    registry.register({
+      name: "SchottkyStub2",
+      typeId: -1,
+      factory: (_props) => { throw new Error("unused"); },
+      pinLayout: [
+        { label: "A", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
+        { label: "K", direction: PinDirection.BIDIRECTIONAL, position: { x: 10, y: 0 } },
+      ],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "Schottky Stub 2",
+      models: {
+        mnaModels: {
+          behavioral: {
+            deviceType: "D" as import("../../analog/model-parser.js").DeviceType,
+            factory: schottkyFactory,
+            defaultParams: SCHOTTKY_DEFAULTS,
+          },
+        },
+      },
+    } as unknown as ComponentDefinition);
+
+    const propsMap = new Map<string, PropertyValue>([["label", "d2"]]);
+
+    const circuit = new Circuit();
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const schottky = makeElement(
+      "SchottkyStub2",
+      "d2",
+      [
+        { x: 0, y: 0, label: "A" },
+        { x: 10, y: 0, label: "K" },
+      ],
+      propsMap,
+    );
+
+    circuit.addElement(gnd);
+    circuit.addElement(schottky);
+    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
+    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+
+    const compiled = compileUnified(circuit, registry).analog!;
+    const errors = compiled.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toHaveLength(0);
+
+    expect(capturedModelParams).toBeDefined();
+    // IS must be SCHOTTKY_DEFAULTS.IS (1e-8), not DIODE_DEFAULTS.IS (1e-14)
+    expect(capturedModelParams!["IS"]).toBe(SCHOTTKY_DEFAULTS["IS"]);
+    expect(capturedModelParams!["IS"]).not.toBe(DIODE_DEFAULTS["IS"]);
+    // N must be SCHOTTKY_DEFAULTS.N
+    expect(capturedModelParams!["N"]).toBe(SCHOTTKY_DEFAULTS["N"]);
   });
 
   it("tunnel_diode_migration: _modelParams contains IP, VP, IV, VV from TUNNEL_DIODE_DEFAULTS", () => {

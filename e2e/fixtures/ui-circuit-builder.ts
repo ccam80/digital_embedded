@@ -248,6 +248,72 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Set a SPICE model parameter for a semiconductor component through the UI.
+   *
+   * Opens the property popup, expands the "SPICE Model Parameters" collapsible
+   * section if needed, finds the parameter row by its SPICE key label (e.g.
+   * "VTO", "KP", "IS", "BF"), fills the value, and commits via Tab.
+   */
+  async setSpiceParameter(
+    elementLabel: string,
+    paramKey: string,
+    value: string | number,
+  ): Promise<void> {
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === elementLabel);
+    expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
+
+    await this._dblClickElementBody(el!);
+
+    const popup = this.page.locator('.prop-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+
+    // Expand the "SPICE Model Parameters" collapsible section if collapsed,
+    // then locate the input for the given paramKey — all in one evaluate call
+    // to avoid fragile locator chains on custom DOM.
+    await popup.evaluate((popupEl, key) => {
+      // Find the toggle by scanning for the "SPICE Model Parameters" text
+      const allDivs = popupEl.querySelectorAll('div');
+      for (const div of allDivs) {
+        if (div.childNodes.length === 1
+            && div.textContent?.includes('SPICE Model Parameters')) {
+          const content = div.nextElementSibling as HTMLElement | null;
+          if (content && content.style.display === 'none') {
+            div.click();  // expand
+          }
+          break;
+        }
+      }
+    }, paramKey);
+
+    // Small wait for the section to expand
+    await this.page.waitForTimeout(100);
+
+    // Now find the input via evaluate — match span text to paramKey
+    const inputHandle = await popup.evaluateHandle((popupEl, key) => {
+      const spans = popupEl.querySelectorAll('span');
+      for (const span of spans) {
+        if (span.textContent?.trim() === key) {
+          const row = span.parentElement;
+          if (row) {
+            const input = row.querySelector('input');
+            if (input) return input;
+          }
+        }
+      }
+      return null;
+    }, paramKey);
+
+    const input = inputHandle.asElement();
+    expect(input, `SPICE parameter "${paramKey}" input not found in popup`).not.toBeNull();
+
+    await input!.fill(String(value));
+    await input!.press('Tab');  // triggers blur → commitOverride
+
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
    * Open the property popup for an element found by type and index.
    * Useful for components like Tunnel that have no label.
    */

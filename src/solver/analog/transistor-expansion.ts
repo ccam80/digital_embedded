@@ -1,7 +1,7 @@
 /**
  * Transistor model expansion — compile-time analog circuit expansion.
  *
- * expandTransistorModel() takes a ComponentDefinition whose transistorModel
+ * expandTransistorModel() takes a ComponentDefinition whose subcircuitModel
  * field names a registered subcircuit in the TransistorModelRegistry, and
  * expands it into a flat list of AnalogElement instances.
  *
@@ -47,7 +47,7 @@ export interface TransistorExpansionResult {
 /**
  * Expand a single component's transistor model into flat AnalogElement instances.
  *
- * @param componentDef     - The ComponentDefinition with transistorModel set
+ * @param componentDef     - The ComponentDefinition with subcircuitModel set
  * @param outerPinNodeIds  - MNA node IDs for each of the component's pins (by pin order)
  * @param modelRegistry    - Registry of transistor model subcircuits
  * @param vddNodeId        - The shared VDD node ID injected by the compiler

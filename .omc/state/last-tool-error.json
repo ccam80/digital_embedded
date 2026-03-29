@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:/local_working_projects/digital_in_browser/spec/progress.md\"}",
-  "error": "File content (13910 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-03-29T00:21:55.482Z",
-  "retry_count": 2
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\spec\\\\.hybrid-state.json\"}",
+  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
+  "timestamp": "2026-03-29T04:28:28.616Z",
+  "retry_count": 1
 }

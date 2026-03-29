@@ -24,7 +24,6 @@ interface SavedTrace {
   vdd: number | null;              // VDD level for digital channels
 }
 ```
-
 Panel-level FFT state is saved alongside:
 
 ```ts

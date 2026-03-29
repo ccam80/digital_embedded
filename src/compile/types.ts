@@ -33,7 +33,9 @@ export type DiagnosticCode =
   | 'missing-property'
   | 'unknown-component'
   | 'unsupported-ctz-component'
-  | 'orphaned-pin-loading-override';
+  | 'orphaned-pin-loading-override'
+  | 'invalid-simulation-model'
+  | 'unresolved-model-ref';
 
 /**
  * A single diagnostic: an error, warning, or informational note about

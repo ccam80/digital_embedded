@@ -135,7 +135,6 @@ function makeComponentDef(name: string, pinLabels: string[], transistorModel?: s
       },
     },
     defaultModel: "digital",
-    transistorModel,
   };
 }
 

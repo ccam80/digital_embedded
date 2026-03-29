@@ -873,6 +873,7 @@ export const NmosfetDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };
 
 export const PmosfetDefinition: ComponentDefinition = {

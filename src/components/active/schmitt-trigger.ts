@@ -456,6 +456,7 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };
 
 export const SchmittNonInvertingDefinition: ComponentDefinition = {
@@ -489,4 +490,5 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };

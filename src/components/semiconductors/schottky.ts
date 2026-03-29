@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { DIODE_DEFAULTS, SCHOTTKY_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { SCHOTTKY_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import { createDiodeElement } from "./diode.js";
 
 // ---------------------------------------------------------------------------
@@ -40,27 +40,6 @@ export function createSchottkyElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  // The compiler injects _modelParams from the "D" model library entry (DIODE_DEFAULTS).
-  // For Schottky diodes we need SCHOTTKY_DEFAULTS as the base instead.
-  // User overrides from _spiceModelOverrides are already merged into _modelParams by the
-  // compiler, so we layer: SCHOTTKY_DEFAULTS ← user overrides (extracted from _modelParams
-  // by diffing against DIODE_DEFAULTS).
-  const injected =
-    (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
-
-  if (injected) {
-    // Start from Schottky defaults, overlay only params the user explicitly changed
-    const merged = { ...SCHOTTKY_DEFAULTS };
-    for (const [k, v] of Object.entries(injected)) {
-      if (k in DIODE_DEFAULTS && v !== DIODE_DEFAULTS[k]) {
-        merged[k] = v;
-      }
-    }
-    (props as Record<string, unknown>)["_modelParams"] = merged;
-  } else {
-    (props as Record<string, unknown>)["_modelParams"] = { ...SCHOTTKY_DEFAULTS };
-  }
-
   return createDiodeElement(pinNodes, internalNodeIds, branchIdx, props);
 }
 
@@ -226,9 +205,10 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
   models: {
     mnaModels: {
       behavioral: {
-      factory: createSchottkyElement,
-      deviceType: "D",
-    },
+        factory: createSchottkyElement,
+        deviceType: "D",
+        defaultParams: SCHOTTKY_DEFAULTS,
+      },
     },
   },
   defaultModel: "behavioral",

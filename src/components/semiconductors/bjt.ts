@@ -590,6 +590,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     },
   },
+  defaultModel: "behavioral",
 };
 
 export const PnpBjtDefinition: ComponentDefinition = {

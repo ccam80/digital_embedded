@@ -386,17 +386,17 @@ interface DualEngineEntry {
 }
 
 const DUAL_ENGINE_TYPES: DualEngineEntry[] = [
-  { type: 'And', modes: ['digital', 'analog'] },
-  { type: 'Or', modes: ['digital', 'analog'] },
-  { type: 'Not', modes: ['digital', 'analog'] },
-  { type: 'NAnd', modes: ['digital', 'analog'] },
-  { type: 'NOr', modes: ['digital', 'analog'] },
-  { type: 'XOr', modes: ['digital', 'analog'] },
-  { type: 'XNOr', modes: ['digital', 'analog'] },
-  { type: 'D_FF', modes: ['digital', 'analog'] },
-  { type: 'JK_FF', modes: ['digital', 'analog'] },
-  { type: 'RS_FF', modes: ['digital', 'analog'] },
-  { type: 'T_FF', modes: ['digital', 'analog'] },
+  { type: 'And', modes: ['digital', 'cmos'] },
+  { type: 'Or', modes: ['digital', 'cmos'] },
+  { type: 'Not', modes: ['digital', 'cmos'] },
+  { type: 'NAnd', modes: ['digital', 'cmos'] },
+  { type: 'NOr', modes: ['digital', 'cmos'] },
+  { type: 'XOr', modes: ['digital', 'cmos'] },
+  { type: 'XNOr', modes: ['digital', 'cmos'] },
+  { type: 'D_FF', modes: ['digital', 'behavioral'] },
+  { type: 'JK_FF', modes: ['digital', 'behavioral'] },
+  { type: 'RS_FF', modes: ['digital', 'behavioral'] },
+  { type: 'T_FF', modes: ['digital', 'behavioral'] },
   { type: 'VoltageComparator', modes: ['analog', 'mixed'] },
   { type: 'DAC', modes: ['mixed'] },
   { type: 'ADC', modes: ['mixed'] },
@@ -767,13 +767,12 @@ test.describe('Component sweep tests', () => {
           // Place the component
           await builder.placeLabeled(entry.type, 10, 8, 'DUT');
 
-          // For gates/flip-flops in analog mode, set simulation model via the
-          // property panel row labelled "Mode" (added dynamically by
-          // showSimulationModeDropdown; internal key is 'simulationModel').
-          const analogModeTypes = ['And', 'Or', 'Not', 'NAnd', 'NOr', 'XOr', 'XNOr',
-                                   'D_FF', 'JK_FF', 'RS_FF', 'T_FF'];
-          if (mode === 'analog' && analogModeTypes.includes(entry.type)) {
-            await builder.setComponentProperty('DUT', 'Mode', 'analog');
+          // For gates/flip-flops in non-digital mode, set simulation model
+          // via the property panel row labelled "Model" (added dynamically by
+          // showModelSelector; internal key is 'simulationModel').
+          // Gates have "cmos" model, flip-flops have "behavioral" model.
+          if (mode !== 'digital' && (mode === 'cmos' || mode === 'behavioral')) {
+            await builder.setComponentProperty('DUT', 'Model', mode);
           }
 
           // Verify placement succeeded

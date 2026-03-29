@@ -61,7 +61,8 @@ export function compileUnified(
   // Step 1: Resolve model assignments for each element
   // -------------------------------------------------------------------------
 
-  const inputModelAssignments = resolveModelAssignments(inputCircuit.elements, registry);
+  const [inputModelAssignments, inputModelDiags] = resolveModelAssignments(inputCircuit.elements, registry);
+  diagnostics.push(...inputModelDiags);
 
   // -------------------------------------------------------------------------
   // Step 2: Flatten subcircuits if present (uses pre-resolved model assignments
@@ -87,9 +88,14 @@ export function compileUnified(
   // Resolve model assignments for the (possibly flattened) circuit.
   // When there are no subcircuits the flat circuit equals the input circuit
   // and we reuse the assignments already computed above.
-  const flatModelAssignments = hasSubcircuits
-    ? resolveModelAssignments(circuit.elements, registry)
-    : inputModelAssignments;
+  let flatModelAssignments: import('./extract-connectivity.js').ModelAssignment[];
+  if (hasSubcircuits) {
+    const [flatAssignments, flatModelDiags] = resolveModelAssignments(circuit.elements, registry);
+    diagnostics.push(...flatModelDiags);
+    flatModelAssignments = flatAssignments;
+  } else {
+    flatModelAssignments = inputModelAssignments;
+  }
 
   // Validate that all non-infrastructure components are registered when the
   // circuit has no analog-only components (pure digital circuits).
@@ -368,6 +374,17 @@ export function compileUnified(
       if (INFRASTRUCTURE_TYPES.has(pc.element.typeId)) continue; // infrastructure — no-op wiring element
       const elementIndex = circuit.elements.indexOf(pc.element);
       if (bridgeElementIndices.has(elementIndex)) continue; // bridge-connected — fine
+      // A digital-only component whose pins are all in digital-domain groups
+      // is a normal digital component handled by the digital engine — skip it.
+      // Only flag components that actually touch an analog-domain group but
+      // lack an MNA model to participate in it.
+      const touchesAnalogGroup = pc.resolvedPins.some((rp) =>
+        groups.some((g) =>
+          g.domains.has("analog") &&
+          g.pins.some((p) => p.elementIndex === elementIndex && p.pinIndex === rp.pinIndex),
+        ),
+      );
+      if (!touchesAnalogGroup) continue;
       diagnostics.push({
         severity: "error",
         code: "unsupported-component-in-analog",

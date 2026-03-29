@@ -245,7 +245,7 @@ describe('resolveLoadingOverrides', () => {
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const { resolved, diagnostics } = resolveLoadingOverrides([], groups, elements);
@@ -263,7 +263,7 @@ describe('resolveLoadingOverrides', () => {
     ]);
 
     const elements: CircuitElement[] = [tunnel, andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const override: PinLoadingOverride = {
@@ -287,7 +287,7 @@ describe('resolveLoadingOverrides', () => {
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     // Find the group for pin "out" of element "fixed-id-123"
@@ -312,7 +312,7 @@ describe('resolveLoadingOverrides', () => {
       outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const override: PinLoadingOverride = {
@@ -334,7 +334,7 @@ describe('resolveLoadingOverrides', () => {
       outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const override: PinLoadingOverride = {
@@ -356,7 +356,7 @@ describe('resolveLoadingOverrides', () => {
     const tunnel = new TestElement('Tunnel', 'tunnel-clk', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], tunnelProps);
     const andEl  = new TestElement('And', 'and-fixed', { x: 0, y: 0 }, [outputPin(2, 0, 'out')]);
     const elements: CircuitElement[] = [tunnel, andEl];
-    const assignments = resolveModelAssignments(elements, registry);
+    const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
     const overrides: PinLoadingOverride[] = [

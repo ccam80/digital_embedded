@@ -227,7 +227,7 @@ interface XorCircuitResult {
 }
 
 interface XorCircuitOpts {
-  simulationModel: "analog-pins" | "logical";
+  simulationModel: "behavioral" | "digital";
   /** Optional per-pin override for the "out" pin */
   outPinOverride?: { vOH?: number; rOut?: number };
   /** Optional component-level electrical override */
@@ -247,8 +247,8 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
     in2High = false,
   } = opts;
 
-  const circuit = new Circuit();
-  const registry = simulationModel === "logical"
+  const circuit = new Circuit(simulationModel === "digital" ? { digitalPinLoading: "all" } : {});
+  const registry = simulationModel === "digital"
     ? buildDigitalRegistry()
     : buildBehavioralRegistry();
 
@@ -348,7 +348,7 @@ function compiledAndRunDcOp(
   circuit: Circuit,
   registry: ComponentRegistry,
   outputWire: Wire,
-  mode: "analog-pins" | "logical" = "analog-pins",
+  mode: "behavioral" | "digital" = "behavioral",
 ): DcResult {
   const unified = compileUnified(circuit, registry);
   const compiled = unified.analog!;
@@ -359,7 +359,7 @@ function compiledAndRunDcOp(
   const outNodeId = compiled.wireToNodeId.get(outputWire);
   expect(outNodeId, "Output wire should be mapped to an MNA node").toBeDefined();
 
-  if (mode === "analog-pins") {
+  if (mode === "behavioral") {
     // Behavioral: MNAEngine directly, dcOperatingPoint gives steady-state
     const engine = new MNAEngine();
     engine.init(compiled);
@@ -392,7 +392,7 @@ describe("lrcxor fixture — behavioral mode", () => {
   it("xor_output_high_when_inputs_differ", () => {
     // In_1=HIGH, In_2=LOW → XOR=HIGH → V_out ≈ vOH × R_load/(rOut+R_load)
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: true,
       in2High: false,
     });
@@ -406,7 +406,7 @@ describe("lrcxor fixture — behavioral mode", () => {
   it("xor_output_low_when_inputs_match_both_high", () => {
     // In_1=HIGH, In_2=HIGH → XOR=LOW → V_out ≈ vOL = 0V
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: true,
       in2High: true,
     });
@@ -418,7 +418,7 @@ describe("lrcxor fixture — behavioral mode", () => {
   it("xor_output_low_when_inputs_match_both_low", () => {
     // In_1=LOW, In_2=LOW → XOR=LOW → V_out ≈ 0V
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: false,
       in2High: false,
     });
@@ -430,7 +430,7 @@ describe("lrcxor fixture — behavioral mode", () => {
   it("xor_output_high_when_in2_high_in1_low", () => {
     // In_1=LOW, In_2=HIGH → XOR=HIGH
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: false,
       in2High: true,
     });
@@ -445,7 +445,7 @@ describe("lrcxor fixture — behavioral mode", () => {
     // Component-level vOH=5.0V: XOR(HIGH,LOW) output ≈ 5.0 × R_load/(rOut+R_load)
     const customVOH = 5.0;
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: true,
       in2High: false,
       componentOverride: { vOH: customVOH },
@@ -465,7 +465,7 @@ describe("lrcxor fixture — behavioral mode", () => {
     // Per-pin vOH=4.0V beats component-level vOH=5.0V
     const pinVOH = 4.0;
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: true,
       in2High: false,
       componentOverride: { vOH: 5.0 },
@@ -480,7 +480,7 @@ describe("lrcxor fixture — behavioral mode", () => {
 
   it("output_converges_through_transient_steps", () => {
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "analog-pins",
+      simulationModel: "behavioral",
       in1High: true,
       in2High: false,
     });
@@ -503,7 +503,7 @@ describe("lrcxor fixture — behavioral mode", () => {
 describe("lrcxor fixture — digital mode", () => {
   it("xor_compiles_to_bridge_instance", () => {
     const { circuit, registry } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
     });
@@ -522,11 +522,11 @@ describe("lrcxor fixture — digital mode", () => {
   it("xor_output_high_when_inputs_differ", () => {
     // In_1=HIGH, In_2=LOW → XOR=HIGH via bridge
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
     });
-    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     const expected = DEFAULT_VOH * R_LOAD / (DEFAULT_ROUT + R_LOAD);
     expect(vOut).toBeGreaterThan(expected * 0.98);
@@ -536,22 +536,22 @@ describe("lrcxor fixture — digital mode", () => {
   it("xor_output_low_when_inputs_match_both_high", () => {
     // In_1=HIGH, In_2=HIGH → XOR=LOW via bridge
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: true,
     });
-    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     expect(vOut).toBeCloseTo(DEFAULT_VOL, 2);
   });
 
   it("xor_output_low_when_inputs_match_both_low", () => {
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: false,
       in2High: false,
     });
-    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     expect(vOut).toBeCloseTo(DEFAULT_VOL, 2);
   });
@@ -562,12 +562,12 @@ describe("lrcxor fixture — digital mode", () => {
     // Before the fix, this would always use the default vOH=3.3V.
     const customVOH = 5.0;
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
       componentOverride: { vOH: customVOH },
     });
-    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     const expected = customVOH * R_LOAD / (DEFAULT_ROUT + R_LOAD); // ≈ 4.975V
     expect(vOut).toBeGreaterThan(expected * 0.98);
@@ -582,12 +582,12 @@ describe("lrcxor fixture — digital mode", () => {
     // Per-pin override on "out" takes priority in the bridge path too.
     const pinVOH = 4.0;
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
       outPinOverride: { vOH: pinVOH },
     });
-    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { vOut } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     const expected = pinVOH * R_LOAD / (DEFAULT_ROUT + R_LOAD); // ≈ 3.980V
     expect(vOut).toBeGreaterThan(expected * 0.98);
@@ -596,11 +596,11 @@ describe("lrcxor fixture — digital mode", () => {
 
   it("converges_through_transient_steps", () => {
     const { circuit, registry, outputWire } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
     });
-    const { engine } = compiledAndRunDcOp(circuit, registry, outputWire, "logical");
+    const { engine } = compiledAndRunDcOp(circuit, registry, outputWire, "digital");
 
     for (let i = 0; i < 10; i++) {
       engine.step();
@@ -618,11 +618,11 @@ describe("lrcxor fixture — digital mode", () => {
 
 describe("lrcxor fixture — simplified vs digital consistency", () => {
   it("both_modes_agree_on_output_high_for_differing_inputs", () => {
-    const bResult = buildXorCircuit({ simulationModel: "analog-pins", in1High: true, in2High: false });
-    const dResult = buildXorCircuit({ simulationModel: "logical", in1High: true, in2High: false });
+    const bResult = buildXorCircuit({ simulationModel: "behavioral", in1High: true, in2High: false });
+    const dResult = buildXorCircuit({ simulationModel: "digital", in1High: true, in2High: false });
 
-    const { vOut: bVOut } = compiledAndRunDcOp(bResult.circuit, bResult.registry, bResult.outputWire, "analog-pins");
-    const { vOut: dVOut } = compiledAndRunDcOp(dResult.circuit, dResult.registry, dResult.outputWire, "logical");
+    const { vOut: bVOut } = compiledAndRunDcOp(bResult.circuit, bResult.registry, bResult.outputWire, "behavioral");
+    const { vOut: dVOut } = compiledAndRunDcOp(dResult.circuit, dResult.registry, dResult.outputWire, "digital");
 
     const expected = DEFAULT_VOH * R_LOAD / (DEFAULT_ROUT + R_LOAD);
 
@@ -634,11 +634,11 @@ describe("lrcxor fixture — simplified vs digital consistency", () => {
   });
 
   it("both_modes_agree_on_output_low_for_matching_inputs", () => {
-    const bResult = buildXorCircuit({ simulationModel: "analog-pins", in1High: true, in2High: true });
-    const dResult = buildXorCircuit({ simulationModel: "logical", in1High: true, in2High: true });
+    const bResult = buildXorCircuit({ simulationModel: "behavioral", in1High: true, in2High: true });
+    const dResult = buildXorCircuit({ simulationModel: "digital", in1High: true, in2High: true });
 
-    const { vOut: bVOut } = compiledAndRunDcOp(bResult.circuit, bResult.registry, bResult.outputWire, "analog-pins");
-    const { vOut: dVOut } = compiledAndRunDcOp(dResult.circuit, dResult.registry, dResult.outputWire, "logical");
+    const { vOut: bVOut } = compiledAndRunDcOp(bResult.circuit, bResult.registry, bResult.outputWire, "behavioral");
+    const { vOut: dVOut } = compiledAndRunDcOp(dResult.circuit, dResult.registry, dResult.outputWire, "digital");
 
     // Both outputs should be near LOW (0V)
     expect(bVOut).toBeCloseTo(DEFAULT_VOL, 2);
@@ -657,7 +657,7 @@ describe("lrcxor fixture — simplified vs digital consistency", () => {
     const expectedHighV = DEFAULT_VOH * R_LOAD / (DEFAULT_ROUT + R_LOAD);
 
     for (const tc of cases) {
-      for (const mode of ["analog-pins", "logical"] as const) {
+      for (const mode of ["behavioral", "digital"] as const) {
         const r = buildXorCircuit({ simulationModel: mode, in1High: tc.in1, in2High: tc.in2 });
         const { vOut } = compiledAndRunDcOp(r.circuit, r.registry, r.outputWire, mode);
 
@@ -834,7 +834,7 @@ describe("lrcxor.dig fixture file integration", () => {
   });
 
   it("xor_responds_to_ac_source_in_simplified_mode", () => {
-    // Override simulationModel to "analog-pins" on the XOR element after loading,
+    // Override simulationModel to "behavioral" on the XOR element after loading,
     // then verify the engine runs without error and produces non-zero voltages.
     const registry = buildFixtureRegistry();
     const circuit = loadDig(FIXTURE_XML, registry);
@@ -843,7 +843,7 @@ describe("lrcxor.dig fixture file integration", () => {
     // Switch the XOR element to simplified mode
     const xorEl = circuit.elements.find((el) => el.typeId === "XOr");
     expect(xorEl, "XOR element should be present in fixture").toBeDefined();
-    xorEl!.getProperties().set("simulationModel", "analog-pins");
+    xorEl!.getProperties().set("simulationModel", "behavioral");
 
     const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
@@ -890,7 +890,8 @@ describe("lrcxor.dig fixture file integration", () => {
     (xorEl as { typeId: string }).typeId = "XOrVohOverride";
     // Use digital mode so bridge adapters are created (that's the path the
     // fix-under-test covers)
-    xorEl!.getProperties().set("simulationModel", "logical");
+    xorEl!.getProperties().set("simulationModel", "digital");
+    circuit.metadata.digitalPinLoading = "all";
 
     const compiled = compileUnified(circuit, registry).analog!;
     const errors = compiled.diagnostics.filter((d) => d.severity === "error");
@@ -951,7 +952,7 @@ describe("bridge error paths", () => {
         { x: 30, y: 0, label: "In_2" },  // <-- no wire at x=30
         { x: 40, y: 0, label: "out" },
       ],
-      new Map<string, PropertyValue>([["simulationModel", "logical"]]),
+      new Map<string, PropertyValue>([["simulationModel", "digital"]]),
     );
     const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
@@ -1009,7 +1010,7 @@ describe("bridge error paths", () => {
         { x: 30, y: 0, label: "In_2" },
         { x: 40, y: 0, label: "out" },
       ],
-      new Map<string, PropertyValue>([["simulationModel", "logical"]]),
+      new Map<string, PropertyValue>([["simulationModel", "digital"]]),
     );
     const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
@@ -1048,7 +1049,7 @@ describe("bridge error paths", () => {
 
   it("both_modes_survive_zero_voltage_inputs", () => {
     // Both inputs at 0V — neither simplified nor digital mode should crash.
-    for (const mode of ["analog-pins", "logical"] as const) {
+    for (const mode of ["behavioral", "digital"] as const) {
       const { circuit, registry, outputWire } = buildXorCircuit({
         simulationModel: mode,
         in1High: false,
@@ -1081,7 +1082,7 @@ describe("bridge error paths", () => {
     // Structural check: after compiling in digital mode, each bridge adapter's
     // outputNodeId/inputNodeId must be a valid MNA node (>= 1, < totalNodeCount).
     const { circuit, registry } = buildXorCircuit({
-      simulationModel: "logical",
+      simulationModel: "digital",
       in1High: true,
       in2High: false,
     });

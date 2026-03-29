@@ -51,17 +51,15 @@ export function createZenerElement(
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  // Resolve model parameters from _modelParams (injected by compiler) or defaults
-  const modelParams =
-    (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
-  const mp = modelParams ?? ZENER_DEFAULTS;
+  // Resolve model parameters from _modelParams (injected by compiler with ZENER_DEFAULTS base)
+  const mp =
+    ((props as Record<string, unknown>)["_modelParams"] as Record<string, number>) ?? ZENER_DEFAULTS;
 
-  const IS = mp["IS"] ?? ZENER_DEFAULTS["IS"];
-  const N = mp["N"] ?? ZENER_DEFAULTS["N"];
-  // If BV is infinite (i.e. unset by user model), use the Zener default
-  const rawBV = mp["BV"] ?? ZENER_DEFAULTS["BV"];
-  const BV = Number.isFinite(rawBV) ? rawBV : ZENER_DEFAULTS["BV"];
-  const IBV = mp["IBV"] ?? ZENER_DEFAULTS["IBV"];
+  const IS = mp["IS"];
+  const N = mp["N"];
+  const rawBV = mp["BV"];
+  const BV = Number.isFinite(rawBV) ? rawBV : ZENER_DEFAULTS["BV"]; // keep BV guard
+  const IBV = mp["IBV"];
 
   const nVt = N * VT;
   const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
@@ -329,9 +327,10 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
   models: {
     mnaModels: {
       behavioral: {
-      factory: createZenerElement,
-      deviceType: "D",
-    },
+        factory: createZenerElement,
+        deviceType: "D",
+        defaultParams: ZENER_DEFAULTS,
+      },
     },
   },
   defaultModel: "behavioral",
