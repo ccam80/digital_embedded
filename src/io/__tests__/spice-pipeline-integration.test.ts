@@ -236,7 +236,7 @@ Q1 c b e NPN2N2222
 .ENDS bjtstage
 `);
     const bjt = circuit.elements.find((e) => e.typeId === "NpnBJT");
-    const overrides = JSON.parse(bjt!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = bjt!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBeCloseTo(3.1e-14);
     expect(overrides["BF"]).toBe(255);
     expect(overrides["NF"]).toBeCloseTo(1.0);
@@ -250,7 +250,7 @@ M1 d g s b CMOS0 W=5u L=0.35u
 .ENDS mosstage
 `);
     const mos = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = JSON.parse(mos!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = mos!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["W"]).toBeCloseTo(5e-6);
     expect(overrides["L"]).toBeCloseTo(0.35e-6);
     expect(overrides["VTO"]).toBeCloseTo(0.5);
@@ -275,7 +275,7 @@ D1 a k 1N4148
 .ENDS dstage
 `);
     const diode = circuit.elements.find((e) => e.typeId === "Diode");
-    const overrides = JSON.parse(diode!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = diode!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBeCloseTo(2.52e-9);
     expect(overrides["N"]).toBeCloseTo(1.752);
   });

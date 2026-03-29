@@ -45,8 +45,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
 
   const serialized: SerializedElement = {

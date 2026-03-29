@@ -235,6 +235,9 @@ function createDACElement(
     inputModels.push(model);
   }
 
+  // Solver cached from stamp() for use in stampCompanion()
+  let _solver: SparseSolver | null = null;
+
   // Current output voltage (updated by updateOperatingPoint)
   let _vOut = 0;
 
@@ -272,6 +275,8 @@ function createDACElement(
     isReactive: true,
 
     stamp(solver: SparseSolver): void {
+      // Cache solver for use in stampCompanion (interface does not pass it there)
+      _solver = solver;
       // Stamp G_out from OUT to GND (Norton output resistance)
       if (nOut > 0) {
         solver.stamp(nOut - 1, nOut - 1, G_out);
@@ -322,18 +327,14 @@ function createDACElement(
       return currents;
     },
 
-    stampCompanion(
-      solver: SparseSolver,
-      dt: number,
-      method: IntegrationMethod,
-      voltages: Float64Array,
-    ): void {
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+      if (_solver === null) return;
       // Stamp C_in companion model for each digital input
       for (let i = 0; i < bits; i++) {
         const nD = nDigitalBits[i];
         if (nD > 0) {
           const vD = readNode(voltages, nD);
-          inputModels[i].stampCompanion(solver, dt, method);
+          inputModels[i].stampCompanion(_solver, dt, method);
           inputModels[i].updateCompanion(dt, method, vD);
         }
       }

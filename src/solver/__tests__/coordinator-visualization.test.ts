@@ -41,10 +41,12 @@ function makeAnalogEl(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins: Pin[] = pins.map(p => ({
+  const def = registry?.get(typeId);
+  const resolvedPins: Pin[] = pins.map((p, i) => ({
     position: { x: p.x, y: p.y },
-    label: p.label ?? '',
+    label: p.label || def?.pinLayout[i]?.label || '',
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
@@ -88,18 +90,18 @@ function buildRcCoordinator() {
   // gnd at (0,0) clamps neg to 0V; pos at (4,0) is the +5V rail.
   const vcc = makeAnalogEl('DcVoltageSource', 'vcc1',
     [{ x: 0, y: 0 }, { x: 4, y: 0 }],
-    new Map<string, PropertyValue>([['voltage', 5]]),
+    new Map<string, PropertyValue>([['voltage', 5]]), registry,
   );
   const r1 = makeAnalogEl('Resistor', 'r1',
     [{ x: 4, y: 0 }, { x: 8, y: 0 }],
-    new Map<string, PropertyValue>([['resistance', 1000]]),
+    new Map<string, PropertyValue>([['resistance', 1000]]), registry,
   );
   const r2 = makeAnalogEl('Resistor', 'r2',
     [{ x: 8, y: 0 }, { x: 12, y: 0 }],
-    new Map<string, PropertyValue>([['resistance', 1000]]),
+    new Map<string, PropertyValue>([['resistance', 1000]]), registry,
   );
-  const gnd = makeAnalogEl('Ground', 'gnd1', [{ x: 0, y: 0 }]);
-  const gnd2 = makeAnalogEl('Ground', 'gnd2', [{ x: 12, y: 0 }]);
+  const gnd = makeAnalogEl('Ground', 'gnd1', [{ x: 0, y: 0 }], new Map(), registry);
+  const gnd2 = makeAnalogEl('Ground', 'gnd2', [{ x: 12, y: 0 }], new Map(), registry);
 
   circuit.addElement(vcc);
   circuit.addElement(r1);

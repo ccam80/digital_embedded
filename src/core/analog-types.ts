@@ -206,8 +206,7 @@ export type SolverDiagnosticCode =
   | "ac-linearization-failed"
   | "unsupported-ctz-component"
   | "monte-carlo-trial-failed"
-  | "unconnected-analog-pin"
-  | "INVALID_SPICE_OVERRIDES";
+  | "unconnected-analog-pin";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

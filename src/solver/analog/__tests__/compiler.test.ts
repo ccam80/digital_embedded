@@ -24,10 +24,10 @@ import { compileUnified } from "@/compile/compile.js";
 // Minimal CircuitElement factory for tests
 // ---------------------------------------------------------------------------
 
-function makePin(x: number, y: number): Pin {
+function makePin(x: number, y: number, label = ""): Pin {
   return {
     position: { x, y },
-    label: "",
+    label,
     direction: PinDirection.BIDIRECTIONAL,
     isInverted: false,
     isClock: false,
@@ -38,10 +38,12 @@ function makePin(x: number, y: number): Pin {
 function makeElement(
   typeId: string,
   instanceId: string,
-  pins: Array<{ x: number; y: number }>,
+  pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag: PropertyBag = {
     has(k: string) { return propsMap.has(k); },
     get<T>(k: string): T { return propsMap.get(k) as T; },
@@ -252,10 +254,10 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
   const circuit = new Circuit();
   const registry = buildTestRegistry();
 
-  const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
-  const r1  = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
-  const r2  = makeElement("AnalogR",  "r2",   [{ x: 20, y: 0 }, { x: 0,  y: 0 }]);
-  const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }]);
+  const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
+  const r1  = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }], new Map(), registry);
+  const r2  = makeElement("AnalogR",  "r2",   [{ x: 20, y: 0 }, { x: 0,  y: 0 }], new Map(), registry);
+  const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
   circuit.addElement(vs);
   circuit.addElement(r1);
@@ -312,11 +314,11 @@ describe("AnalogCompiler", () => {
     // touches an analog-domain connectivity group and participates in the
     // analog partition. Without them, Ground is excluded (neutral +
     // touchesAnalog check) and node numbering has no ground reference.
-    const vs   = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
-    const r1   = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
-    const inEl  = makeElement("In",     "in1",  [{ x: 10, y: 0 }], labelIn);
-    const outEl = makeElement("Out",    "out1", [{ x: 20, y: 0 }], labelOut);
-    const gnd   = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }]);
+    const vs   = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
+    const r1   = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }], new Map(), registry);
+    const inEl  = makeElement("In",     "in1",  [{ x: 10, y: 0 }], labelIn, registry);
+    const outEl = makeElement("Out",    "out1", [{ x: 20, y: 0 }], labelOut, registry);
+    const gnd   = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);
@@ -342,9 +344,9 @@ describe("AnalogCompiler", () => {
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
-    const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
-    const r1  = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 30, y: 0 }]);
-    const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }]);
+    const vs  = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
+    const r1  = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 30, y: 0 }], new Map(), registry);
+    const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);
@@ -368,9 +370,9 @@ describe("AnalogCompiler", () => {
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
-    const vs1 = makeElement("AnalogVs", "vs1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
-    const vs2 = makeElement("AnalogVs", "vs2", [{ x: 20, y: 0 }, { x: 10, y: 0 }]);
-    const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }]);
+    const vs1 = makeElement("AnalogVs", "vs1", [{ x: 10, y: 0 }, { x: 20, y: 0 }], new Map(), registry);
+    const vs2 = makeElement("AnalogVs", "vs2", [{ x: 20, y: 0 }, { x: 10, y: 0 }], new Map(), registry);
+    const gnd = makeElement("Ground",   "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
     circuit.addElement(vs1);
     circuit.addElement(vs2);
@@ -394,7 +396,7 @@ describe("AnalogCompiler", () => {
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
-    const r1 = makeElement("AnalogR", "r1", [{ x: 10, y: 0 }, { x: 20, y: 0 }]);
+    const r1 = makeElement("AnalogR", "r1", [{ x: 10, y: 0 }, { x: 20, y: 0 }], new Map(), registry);
     circuit.addElement(r1);
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
@@ -439,8 +441,8 @@ describe("AnalogCompiler", () => {
     });
 
     // Vs: pos at (10,0), neg at (0,0) = ground
-    const vs  = makeElement("SpyVs",  "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }]);
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }]);
+    const vs  = makeElement("SpyVs",  "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(gnd);

@@ -110,6 +110,9 @@ function createSchmittTriggerElement(
   if (nOut > 0) outModel.init(nOut, -1);
   if (nIn  > 0) inModel.init(nIn, 0);
 
+  // Solver cached from stamp() for use in stampCompanion()
+  let _solver: SparseSolver | null = null;
+
   // Initial state: output low
   let _outputHigh = false;
   outModel.setLogicLevel(inverting ? _outputHigh : _outputHigh);
@@ -134,6 +137,8 @@ function createSchmittTriggerElement(
     isReactive: true,
 
     stamp(solver: SparseSolver): void {
+      // Cache solver for use in stampCompanion (interface does not pass it there)
+      _solver = solver;
       // Linear loading: input resistance + output drive (Norton equivalent)
       if (nIn > 0)  inModel.stamp(solver);
       if (nOut > 0) outModel.stamp(solver);
@@ -175,20 +180,16 @@ function createSchmittTriggerElement(
       return [iIn, iOut];
     },
 
-    stampCompanion(
-      solver: SparseSolver,
-      dt: number,
-      method: IntegrationMethod,
-      voltages: Float64Array,
-    ): void {
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+      if (_solver === null) return;
       if (nOut > 0) {
         const vOut = readNode(voltages, nOut);
-        outModel.stampCompanion(solver, dt, method);
+        outModel.stampCompanion(_solver, dt, method);
         outModel.updateCompanion(dt, method, vOut);
       }
       if (nIn > 0) {
         const vIn = readNode(voltages, nIn);
-        inModel.stampCompanion(solver, dt, method);
+        inModel.stampCompanion(_solver, dt, method);
         inModel.updateCompanion(dt, method, vIn);
       }
     },

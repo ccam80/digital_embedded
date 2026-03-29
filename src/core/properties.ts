@@ -21,7 +21,7 @@ export const enum PropertyType {
 // PropertyValue — the union of all valid property value types
 // ---------------------------------------------------------------------------
 
-export type PropertyValue = number | string | boolean | bigint | number[];
+export type PropertyValue = number | string | boolean | bigint | number[] | Record<string, number>;
 
 // ---------------------------------------------------------------------------
 // PropertyDefinition — static description of one property slot
@@ -112,7 +112,7 @@ export class PropertyBag {
   clone(): PropertyBag {
     const cloned = new PropertyBag();
     for (const [k, v] of this._map) {
-      cloned._map.set(k, Array.isArray(v) ? [...v] : v);
+      cloned._map.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
     }
     return cloned;
   }
@@ -127,7 +127,7 @@ export class PropertyBag {
   }
 }
 
-export type SerializedPropertyBag = Record<string, number | string | boolean | number[]>;
+export type SerializedPropertyBag = Record<string, number | string | boolean | number[] | Record<string, number>>;
 
 /**
  * Serialize a PropertyBag to a plain object suitable for JSON.stringify.

@@ -177,8 +177,10 @@ describe("ModelBinding", () => {
       instanceId: string,
       pins: Array<{ x: number; y: number; label?: string }>,
       propsMap: Map<string, PropertyValue> = new Map(),
+      reg?: typeof registry,
     ): CircuitElement {
-      const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+      const def = reg?.get(typeId);
+      const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
       const propertyBag = new PropertyBag(propsMap.entries());
       const serialized: SerializedElement = {
         typeId,
@@ -266,10 +268,11 @@ describe("ModelBinding", () => {
     // model property = "D1N4148" (custom model)
     const circuit = new Circuit();
 
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const diode = makeElement("DiodeStub", "d1",
       [{ x: 10, y: 0, label: "A" }, { x: 0, y: 0, label: "K" }],
       new Map<string, PropertyValue>([["model", "D1N4148"]]),
+      registry,
     );
 
     circuit.addElement(gnd);

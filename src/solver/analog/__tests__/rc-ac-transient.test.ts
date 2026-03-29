@@ -332,8 +332,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
 
   const serialized: SerializedElement = {
@@ -384,16 +386,19 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["amplitude", A], ["frequency", F], ["phase", 0],
         ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
       ]),
+      registry,
     );
     const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
+      registry,
     );
     const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
+      registry,
     );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);
@@ -437,16 +442,19 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["amplitude", A], ["frequency", F], ["phase", 0],
         ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
       ]),
+      registry,
     );
     const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
+      registry,
     );
     const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
+      registry,
     );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);
@@ -517,6 +525,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["waveform", "sine"],
         ["label", "Vs"],
       ]),
+      registry,
     );
     const r1 = makeElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],  // A, B
@@ -524,6 +533,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["resistance", R],
         ["label", "R1"],
       ]),
+      registry,
     );
     const c1 = makeElement("Capacitor", "c1",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],  // A, B
@@ -531,8 +541,9 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
         ["capacitance", C],
         ["label", "C1"],
       ]),
+      registry,
     );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);

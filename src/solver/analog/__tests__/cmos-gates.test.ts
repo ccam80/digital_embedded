@@ -82,8 +82,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
   const serialized: SerializedElement = {
     typeId,
@@ -127,10 +129,10 @@ function buildRegistry(): ComponentRegistry {
 
 // DcVoltageSourceDefinition pinLayout order: [neg, pos]
 // analogFactory: makeDcVoltageSource(nodeIds[1]=pos, nodeIds[0]=neg, ...)
-function voltSrc(circuit: Circuit, id: string, xPos: number, xNeg: number, y: number, voltage: number): void {
+function voltSrc(circuit: Circuit, id: string, xPos: number, xNeg: number, y: number, voltage: number, registry?: ComponentRegistry): void {
   circuit.addElement(makeElement("DcVoltageSource", id,
     [{ x: xNeg, y }, { x: xPos, y }],
-    new Map<string, PropertyValue>([["voltage", voltage]])));
+    new Map<string, PropertyValue>([["voltage", voltage]]), registry));
 }
 
 // Pin order must match the component pinLayout order so the compiler maps nodes correctly.
@@ -148,8 +150,8 @@ function nmos(circuit: Circuit, id: string, xD: number, xG: number, xS: number, 
     new Map<string, PropertyValue>([["W", w]])));
 }
 
-function gnd(circuit: Circuit, xG: number): void {
-  circuit.addElement(makeElement("Ground", `gnd-${xG}`, [{ x: xG, y: 0 }]));
+function gnd(circuit: Circuit, xG: number, registry?: ComponentRegistry): void {
+  circuit.addElement(makeElement("Ground", `gnd-${xG}`, [{ x: xG, y: 0 }], new Map(), registry));
 }
 
 // ---------------------------------------------------------------------------
@@ -204,11 +206,11 @@ function buildInverter(vin: number, vdd = 3.3): { circuit: Circuit; registry: Co
 
   const X_VDD = 10, X_IN = 20, X_GND = 30, X_OUT = 40;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "vin_src", X_IN, X_GND, 0, vin);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "vin_src", X_IN, X_GND, 0, vin, registry);
   pmos(circuit, "p1", X_OUT, X_IN, X_VDD, 2);
   nmos(circuit, "n1", X_OUT, X_IN, X_GND, 4);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   // Connect all nets via wires spanning pin positions
   w(circuit, X_VDD, 0, X_VDD, 2); // VDD source pos → PMOS source
@@ -235,14 +237,14 @@ function buildNand2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regi
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_OUT = 40, X_GND = 50, X_MID = 60;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
   pmos(circuit, "pa", X_OUT, X_A, X_VDD, 2);
   pmos(circuit, "pb", X_OUT, X_B, X_VDD, 3);
   nmos(circuit, "na", X_OUT, X_A, X_MID, 5, 100e-6);  // 2x width for series stack
   nmos(circuit, "nb", X_MID, X_B, X_GND, 6, 100e-6);  // 2x width for series stack
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 3);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 5);
@@ -267,14 +269,14 @@ function buildNor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_OUT = 40, X_GND = 50, X_MID = 60;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
   pmos(circuit, "pa", X_MID, X_A, X_VDD, 2, 200e-6);  // 2x width for series stack
   pmos(circuit, "pb", X_OUT, X_B, X_MID, 3, 200e-6);  // 2x width for series stack
   nmos(circuit, "na", X_OUT, X_A, X_GND, 5);
   nmos(circuit, "nb", X_OUT, X_B, X_GND, 6);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 5);
@@ -298,9 +300,9 @@ function buildAnd2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_NOUT = 40, X_GND = 50, X_MID = 60, X_OUT = 70;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
   // NAND2 (series NMOS use 2x width)
   pmos(circuit, "pa", X_NOUT, X_A, X_VDD, 2);
   pmos(circuit, "pb", X_NOUT, X_B, X_VDD, 3);
@@ -309,7 +311,7 @@ function buildAnd2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
   // Inverter
   pmos(circuit, "pi", X_OUT, X_NOUT, X_VDD, 8);
   nmos(circuit, "ni", X_OUT, X_NOUT, X_GND, 9);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 3); w(circuit, X_VDD, 3, X_VDD, 8);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 5);
@@ -332,9 +334,9 @@ function buildOr2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regist
 
   const X_VDD = 10, X_A = 20, X_B = 30, X_NOUT = 40, X_GND = 50, X_MID = 60, X_OUT = 70;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
   // NOR2 core (series PMOS use 4x width — wider for compound gate convergence)
   pmos(circuit, "pa", X_MID,  X_A, X_VDD, 2, 400e-6);
   pmos(circuit, "pb", X_NOUT, X_B, X_MID, 3, 400e-6);
@@ -343,7 +345,7 @@ function buildOr2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regist
   // Output inverter
   pmos(circuit, "pi", X_OUT, X_NOUT, X_VDD, 8);
   nmos(circuit, "ni", X_OUT, X_NOUT, X_GND, 9);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 8);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 5);
@@ -374,9 +376,9 @@ function buildXor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
 
   const X_VDD = 10, X_A = 20, X_B = 25, X_OUT = 30, X_GND = 50, X_ABAR = 60, X_BBAR = 70;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
 
   pmos(circuit, "pa_inv", X_ABAR, X_A, X_VDD, 2);
   nmos(circuit, "na_inv", X_ABAR, X_A, X_GND, 3);
@@ -390,7 +392,7 @@ function buildXor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regis
   nmos(circuit, "tg2n", X_OUT, X_A,    X_BBAR, 8);
   pmos(circuit, "tg2p", X_OUT, X_ABAR, X_BBAR, 9);
 
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 4);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 3);   w(circuit, X_A, 3, X_A, 7);   w(circuit, X_A, 7, X_A, 8);
@@ -415,9 +417,9 @@ function buildXnor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regi
 
   const X_VDD = 10, X_A = 20, X_B = 25, X_XOR = 30, X_GND = 50, X_ABAR = 60, X_BBAR = 70, X_OUT = 80;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA);
-  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "va_src",  X_A,   X_GND, 0, vA,  registry);
+  voltSrc(circuit, "vb_src",  X_B,   X_GND, 0, vB,  registry);
 
   // XOR core
   pmos(circuit, "pa_inv", X_ABAR, X_A, X_VDD, 2);
@@ -435,7 +437,7 @@ function buildXnor2(vA: number, vB: number, vdd = 3.3): { circuit: Circuit; regi
   pmos(circuit, "pi", X_OUT, X_XOR, X_VDD, 11);
   nmos(circuit, "ni", X_OUT, X_XOR, X_GND, 12);
 
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 4); w(circuit, X_VDD, 4, X_VDD, 11);
   w(circuit, X_A, 0, X_A, 2);     w(circuit, X_A, 2, X_A, 3);   w(circuit, X_A, 3, X_A, 7);   w(circuit, X_A, 7, X_A, 8);
@@ -461,13 +463,13 @@ function buildBuffer(vin: number, vdd = 3.3): { circuit: Circuit; registry: Comp
 
   const X_VDD = 10, X_IN = 20, X_GND = 30, X_MID = 50, X_OUT = 60;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "vin_src", X_IN,  X_GND, 0, vin);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "vin_src", X_IN,  X_GND, 0, vin, registry);
   pmos(circuit, "p1", X_MID, X_IN,  X_VDD, 2);
   nmos(circuit, "n1", X_MID, X_IN,  X_GND, 3);
   pmos(circuit, "p2", X_OUT, X_MID, X_VDD, 5);
   nmos(circuit, "n2", X_OUT, X_MID, X_GND, 6);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   w(circuit, X_VDD, 0, X_VDD, 2); w(circuit, X_VDD, 2, X_VDD, 5);
   w(circuit, X_IN, 0, X_IN, 2);   w(circuit, X_IN, 2, X_IN, 3);

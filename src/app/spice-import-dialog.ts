@@ -103,7 +103,7 @@ export function openSpiceImportDialog(
       const result = parseAndValidate(textarea.value);
       if (result.parsed && !('message' in result.parsed)) {
         finish({
-          overridesJson: JSON.stringify(result.parsed.params),
+          overrides: result.parsed.params,
           modelName: result.parsed.name,
           deviceType: result.parsed.deviceType,
         });
@@ -197,21 +197,17 @@ export function openSpiceImportDialog(
     // Pre-populate with existing overrides if any
     const existingOverrides = element.getProperties().get('_spiceModelOverrides');
     const existingName = element.getProperties().get('_spiceModelName');
-    if (typeof existingOverrides === 'string' && existingOverrides) {
-      try {
-        const params = JSON.parse(existingOverrides) as Record<string, number>;
-        const name = typeof existingName === 'string' ? existingName : 'IMPORTED';
-        const deviceType = resolveDeviceTypeFromDefinition(definition);
-        if (deviceType) {
-          const lines = [`.MODEL ${name} ${deviceType}(`];
-          const paramPairs = Object.entries(params).map(([k, v]) => `${k}=${v}`);
-          lines.push(paramPairs.join(' '));
-          lines.push(')');
-          textarea.value = lines.join('\n');
-          updatePreview();
-        }
-      } catch {
-        // Non-parseable existing overrides — leave textarea empty
+    if (existingOverrides && typeof existingOverrides === 'object' && !Array.isArray(existingOverrides)) {
+      const params = existingOverrides as Record<string, number>;
+      const name = typeof existingName === 'string' ? existingName : 'IMPORTED';
+      const deviceType = resolveDeviceTypeFromDefinition(definition);
+      if (deviceType && Object.keys(params).length > 0) {
+        const lines = [`.MODEL ${name} ${deviceType}(`];
+        const paramPairs = Object.entries(params).map(([k, v]) => `${k}=${v}`);
+        lines.push(paramPairs.join(' '));
+        lines.push(')');
+        textarea.value = lines.join('\n');
+        updatePreview();
       }
     }
 

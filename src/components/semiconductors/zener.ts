@@ -53,16 +53,16 @@ export function createZenerElement(
 
   // Resolve model parameters from _modelParams (injected by compiler with ZENER_DEFAULTS base)
   const mp =
-    ((props as Record<string, unknown>)["_modelParams"] as Record<string, number>) ?? ZENER_DEFAULTS;
+    (props.has("_modelParams")
+      ? props.get<Record<string, number>>("_modelParams")
+      : undefined) ?? ZENER_DEFAULTS;
 
-  const IS = mp["IS"];
-  const N = mp["N"];
-  const rawBV = mp["BV"];
-  const BV = Number.isFinite(rawBV) ? rawBV : ZENER_DEFAULTS["BV"]; // keep BV guard
-  const IBV = mp["IBV"];
-
-  const nVt = N * VT;
-  const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
+  const params: Record<string, number> = {
+    IS: mp["IS"],
+    N: mp["N"],
+    BV: Number.isFinite(mp["BV"]) ? mp["BV"] : ZENER_DEFAULTS["BV"],
+    IBV: mp["IBV"],
+  };
 
   // NR linearization state
   let vd = 0;
@@ -93,6 +93,10 @@ export function createZenerElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
+      // Recompute derived values from mutable params
+      const nVt = params.N * VT;
+      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+
       // Apply pnjlim to prevent exponential runaway in forward region
       const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
 
@@ -103,23 +107,23 @@ export function createZenerElement(
       vd = vdLimited;
 
       // Compute diode current and linearized conductance
-      if (vd >= -BV) {
+      if (vd >= -params.BV) {
         // Forward region and normal reverse region: standard Shockley
         const expArg = Math.min(vd / nVt, 700);
         const expVal = Math.exp(expArg);
-        const id = IS * (expVal - 1);
+        const id = params.IS * (expVal - 1);
         _id = id;
-        geq = (IS * expVal) / nVt + GMIN;
+        geq = (params.IS * expVal) / nVt + GMIN;
         ieq = id - geq * vd;
       } else {
         // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
         // IBV is the reference current at the breakdown voltage BV.
-        const bdExpArg = Math.min(-(vd + BV) / nVt, 700);
+        const bdExpArg = Math.min(-(vd + params.BV) / nVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
-        const id = -IBV * bdExpVal;
+        const id = -params.IBV * bdExpVal;
         _id = id;
         // geq = |dId/dVd| = IBV * exp(-(Vd+BV)/nVt) / nVt
-        geq = (IBV * bdExpVal) / nVt + GMIN;
+        geq = (params.IBV * bdExpVal) / nVt + GMIN;
         ieq = id - geq * vd;
       }
     },
@@ -133,6 +137,7 @@ export function createZenerElement(
       const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       const vdPrevVal = vaPrev - vcPrev;
 
+      const nVt = params.N * VT;
       return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
     },
 
@@ -140,6 +145,10 @@ export function createZenerElement(
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
       return [_id, -_id];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) params[key] = value;
     },
   };
 }
@@ -283,8 +292,8 @@ const ZENER_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

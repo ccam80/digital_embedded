@@ -100,7 +100,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
     expect(q1).toBeDefined();
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     expect(circuit.metadata.namedParameterSets).toBeDefined();
@@ -116,12 +116,12 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     const bag = q1.getProperties();
     expect(bag.has('_spiceModelOverrides')).toBe(true);
-    const stored = JSON.parse(bag.get('_spiceModelOverrides') as string) as Record<string, number>;
+    const stored = bag.get('_spiceModelOverrides') as Record<string, number>;
     expect(stored['IS']).toBeCloseTo(1e-14, 20);
     expect(stored['BF']).toBe(200);
   });
@@ -131,7 +131,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     const bag = q1.getProperties();
@@ -150,7 +150,7 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200, VAF: 100 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     facade.compile(circuit);
@@ -170,7 +170,7 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify(parsedModel.params), modelName: parsedModel.name, deviceType: parsedModel.deviceType },
+      { overrides: parsedModel.params, modelName: parsedModel.name, deviceType: parsedModel.deviceType },
       circuit,
     );
     facade.compile(circuit);
@@ -199,7 +199,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200, VAF: 100 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     const json = facade.serialize(circuit);
@@ -220,7 +220,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200, VAF: 100 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     const json = facade.serialize(circuit);
@@ -238,7 +238,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
-      { overridesJson: JSON.stringify({ IS: 1e-14, BF: 200, VAF: 100 }), modelName: 'Q2N2222', deviceType: 'NPN' },
+      { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
     );
     facade.compile(circuit);

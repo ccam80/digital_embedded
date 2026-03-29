@@ -170,10 +170,9 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
 // ---------------------------------------------------------------------------
 
 function resolveJfetParams(props: PropertyBag, defaults: Record<string, number>) {
-  const hasFn = typeof props.has === "function";
-  const modelParams = hasFn
-    ? (props.has("_modelParams") ? props.get<Record<string, number>>("_modelParams") : undefined)
-    : (props as unknown as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
   const mp = modelParams ?? defaults;
 
   return {
@@ -339,8 +338,8 @@ const JFET_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

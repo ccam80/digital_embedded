@@ -33,6 +33,7 @@ import {
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { TUNNEL_DIODE_DEFAULTS } from "../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -121,13 +122,18 @@ export function createTunnelDiodeElement(
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  const modelParams = (props as Record<string, unknown>)["_modelParams"] as Record<string, number>;
-  const ip = modelParams.IP;
-  const vp = modelParams.VP;
-  const iv = modelParams.IV;
-  const vv = modelParams.VV;
-  const iS = modelParams.IS;
-  const nCoeff = modelParams.N;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
+  const mp = modelParams ?? TUNNEL_DIODE_DEFAULTS;
+  const params: Record<string, number> = {
+    IP: mp["IP"] ?? TUNNEL_DIODE_DEFAULTS["IP"],
+    VP: mp["VP"] ?? TUNNEL_DIODE_DEFAULTS["VP"],
+    IV: mp["IV"] ?? TUNNEL_DIODE_DEFAULTS["IV"],
+    VV: mp["VV"] ?? TUNNEL_DIODE_DEFAULTS["VV"],
+    IS: mp["IS"] ?? TUNNEL_DIODE_DEFAULTS["IS"],
+    N: mp["N"] ?? TUNNEL_DIODE_DEFAULTS["N"],
+  };
 
   // NR linearization state
   let _vd = 0;
@@ -136,14 +142,14 @@ export function createTunnelDiodeElement(
   let _id = 0; // cached junction current for getPinCurrents
 
   function recompute(v: number): void {
-    const { i, dIdV } = tunnelDiodeIV(v, ip, vp, iv, vv, iS, nCoeff);
+    const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
     _id = i;
     _geq = dIdV; // dI/dV is the conductance (can be negative in NDR)
     _ieq = i - _geq * v;
   }
 
   function isInNdrRegion(v: number): boolean {
-    return v > vp * 0.8 && v < vv * 1.2;
+    return v > params.VP * 0.8 && v < params.VV * 1.2;
   }
 
   return {
@@ -207,6 +213,10 @@ export function createTunnelDiodeElement(
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
       return [_id, -_id];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) params[key] = value;
     },
   };
 }
@@ -319,8 +329,8 @@ const TUNNEL_DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

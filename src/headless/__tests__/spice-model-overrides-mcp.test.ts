@@ -135,7 +135,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
 
     // Override IS: default 1e-16, override to 1e-10 (1M× increase)
     facadeOverridden.patch(circuitOverridden, [
-      { op: 'set', target: 'Q1', props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-10 }) } },
+      { op: 'set', target: 'Q1', props: { _spiceModelOverrides: { IS: 1e-10 } } },
     ]);
 
     facadeOverridden.compile(circuitOverridden);
@@ -169,7 +169,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
       {
         op: 'set',
         target: 'Q1',
-        props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-14, BF: 100 }) },
+        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100 } },
       },
     ]);
 
@@ -186,7 +186,7 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     const bag = q1Element!.getProperties();
     expect(bag.has('_spiceModelOverrides')).toBe(true);
 
-    const stored = JSON.parse(bag.get('_spiceModelOverrides') as string) as Record<string, number>;
+    const stored = bag.get('_spiceModelOverrides') as Record<string, number>;
     expect(stored['IS']).toBe(1e-14);
     expect(stored['BF']).toBe(100);
   });
@@ -209,7 +209,7 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
       {
         op: 'set',
         target: 'Q1',
-        props: { _spiceModelOverrides: JSON.stringify({ IS: 1e-14, BF: 100 }) },
+        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100 } },
       },
     ]);
 
@@ -234,12 +234,11 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
   it('deserialized circuit with overrides produces same DC result as pre-serialization', () => {
     const { circuit, facade } = buildBjtCircuit();
 
-    const overrides = JSON.stringify({ IS: 1e-14, BF: 100, VAF: 100 });
     facade.patch(circuit, [
       {
         op: 'set',
         target: 'Q1',
-        props: { _spiceModelOverrides: overrides },
+        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100, VAF: 100 } },
       },
     ]);
 

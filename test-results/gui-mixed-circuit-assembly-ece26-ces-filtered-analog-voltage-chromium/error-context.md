@@ -276,9 +276,7 @@
     - generic "Drag to resize palette" [ref=e366]
     - generic "Circuit editor canvas" [ref=e368]
   - generic [ref=e369]:
-    - generic [ref=e370]: ⚠️
-    - generic [ref=e371]: "Simulation error: Cannot read properties of undefined (reading '0')"
-    - button "×" [ref=e372] [cursor=pointer]
-    - button "100%" [ref=e374] [cursor=pointer]
-    - generic [ref=e375]: 30, 8
+    - generic [ref=e370]: Ready
+    - button "100%" [ref=e372] [cursor=pointer]
+    - generic [ref=e373]: 30, 8
 ```

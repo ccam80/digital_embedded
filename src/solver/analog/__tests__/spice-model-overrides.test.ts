@@ -48,8 +48,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
   const serialized: SerializedElement = {
     typeId,
@@ -80,7 +82,7 @@ function makeElement(
  *
  * Returns { capturedModelParams, diagnostics } from compileUnified.
  */
-function buildAndCompile(spiceModelOverrides?: string): {
+function buildAndCompile(spiceModelOverrides?: Record<string, number> | string): {
   capturedModelParams: Record<string, number> | undefined;
   diagnostics: Array<{ code: string; severity: string; message?: string; summary?: string }>;
 } {
@@ -149,7 +151,7 @@ function buildAndCompile(spiceModelOverrides?: string): {
   }
 
   const circuit = new Circuit();
-  const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+  const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
   // Three pins all sharing node 0 (self-wired) — minimal valid topology
   const npn = makeElement(
     "NpnStub",
@@ -160,6 +162,7 @@ function buildAndCompile(spiceModelOverrides?: string): {
       { x: 0, y: 0, label: "E" },
     ],
     propsMap,
+    registry,
   );
 
   circuit.addElement(gnd);
@@ -182,8 +185,7 @@ function buildAndCompile(spiceModelOverrides?: string): {
 
 describe("spice-model-overrides compiler merge", () => {
   it("override_merge: IS overridden to 1e-14, other params stay at NPN defaults", () => {
-    const overrides = JSON.stringify({ IS: 1e-14 });
-    const { capturedModelParams, diagnostics } = buildAndCompile(overrides);
+    const { capturedModelParams, diagnostics } = buildAndCompile({ IS: 1e-14 });
 
     const errors = diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
@@ -197,7 +199,7 @@ describe("spice-model-overrides compiler merge", () => {
   });
 
   it("empty_overrides: {} leaves _modelParams equal to raw defaults", () => {
-    const { capturedModelParams, diagnostics } = buildAndCompile("{}");
+    const { capturedModelParams, diagnostics } = buildAndCompile({});
 
     const errors = diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
@@ -216,19 +218,6 @@ describe("spice-model-overrides compiler merge", () => {
     expect(capturedModelParams).toBeDefined();
     expect(capturedModelParams!["IS"]).toBe(BJT_NPN_DEFAULTS["IS"]);
     expect(capturedModelParams!["BF"]).toBe(BJT_NPN_DEFAULTS["BF"]);
-  });
-
-  it("malformed_json: emits invalid-spice-overrides warning and falls back to defaults", () => {
-    const { capturedModelParams, diagnostics } = buildAndCompile("not json");
-
-    const warning = diagnostics.find((d) => d.code === "INVALID_SPICE_OVERRIDES");
-    expect(warning).toBeDefined();
-    expect(warning!.severity).toBe("warning");
-    expect(warning!.summary).toContain("q1");
-
-    // Falls back to unmodified defaults
-    expect(capturedModelParams).toBeDefined();
-    expect(capturedModelParams!["IS"]).toBe(BJT_NPN_DEFAULTS["IS"]);
   });
 
   // -------------------------------------------------------------------------
@@ -294,11 +283,11 @@ describe("spice-model-overrides compiler merge", () => {
     // override matching the default value is stored and applied correctly.
     const propsMap = new Map<string, PropertyValue>([
       ["label", "d1"],
-      ["_spiceModelOverrides", JSON.stringify({ IS: DIODE_DEFAULTS["IS"] })],
+      ["_spiceModelOverrides", { IS: DIODE_DEFAULTS["IS"] }],
     ]);
 
     const circuit = new Circuit();
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const schottky = makeElement(
       "SchottkyStub",
       "d1",
@@ -307,6 +296,7 @@ describe("spice-model-overrides compiler merge", () => {
         { x: 10, y: 0, label: "K" },
       ],
       propsMap,
+      registry,
     );
 
     circuit.addElement(gnd);
@@ -382,7 +372,7 @@ describe("spice-model-overrides compiler merge", () => {
     const propsMap = new Map<string, PropertyValue>([["label", "z1"]]);
 
     const circuit = new Circuit();
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const zener = makeElement(
       "ZenerStub",
       "z1",
@@ -391,6 +381,7 @@ describe("spice-model-overrides compiler merge", () => {
         { x: 10, y: 0, label: "K" },
       ],
       propsMap,
+      registry,
     );
 
     circuit.addElement(gnd);
@@ -468,7 +459,7 @@ describe("spice-model-overrides compiler merge", () => {
     const propsMap = new Map<string, PropertyValue>([["label", "d2"]]);
 
     const circuit = new Circuit();
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const schottky = makeElement(
       "SchottkyStub2",
       "d2",
@@ -477,6 +468,7 @@ describe("spice-model-overrides compiler merge", () => {
         { x: 10, y: 0, label: "K" },
       ],
       propsMap,
+      registry,
     );
 
     circuit.addElement(gnd);
@@ -551,7 +543,7 @@ describe("spice-model-overrides compiler merge", () => {
     } as unknown as ComponentDefinition);
 
     const circuit = new Circuit();
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const td = makeElement(
       "TunnelDiodeStub",
       "td1",
@@ -560,6 +552,7 @@ describe("spice-model-overrides compiler merge", () => {
         { x: 10, y: 0, label: "K" },
       ],
       new Map<string, PropertyValue>([["label", "TD1"]]),
+      registry,
     );
 
     circuit.addElement(gnd);

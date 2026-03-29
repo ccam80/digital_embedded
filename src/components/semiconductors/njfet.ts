@@ -80,10 +80,9 @@ function resolveJfetParams(
   props: PropertyBag,
   defaults: Record<string, number>,
 ): JfetParams {
-  const hasFn = typeof props.has === "function";
-  const modelParams = hasFn
-    ? (props.has("_modelParams") ? props.get<Record<string, number>>("_modelParams") : undefined)
-    : (props as unknown as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
   const mp = modelParams ?? defaults;
 
   return {
@@ -216,6 +215,10 @@ export class NJfetAnalogElement extends AbstractFetElement {
 
   computeCapacitances(_vgs: number, _vds: number): FetCapacitances {
     return { cgs: this._p.CGS, cgd: this._p.CGD };
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) (this._p as unknown as Record<string, number>)[key] = value;
   }
 
   override updateOperatingPoint(voltages: Float64Array): void {
@@ -436,8 +439,8 @@ const JFET_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

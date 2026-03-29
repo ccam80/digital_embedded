@@ -6,7 +6,7 @@
  * - Section is absent when deviceType is missing
  * - Stored overrides populate input values
  * - Placeholder shows default value for unset fields
- * - Committing an input writes to _spiceModelOverrides JSON
+ * - Committing an input writes to _spiceModelOverrides as Record<string, number>
  * - Clearing an input deletes the key from overrides
  * - Fires change callbacks on commit
  */
@@ -84,11 +84,11 @@ function makeDocument() {
 // Minimal CircuitElement stub
 // ---------------------------------------------------------------------------
 
-function makeElement(overrides?: Record<string, string>): CircuitElement {
+function makeElement(overrides?: Record<string, unknown>): CircuitElement {
   const bag = new PropertyBag();
   if (overrides) {
     for (const [k, v] of Object.entries(overrides)) {
-      bag.set(k, v);
+      bag.set(k, v as never);
     }
   }
   return {
@@ -211,7 +211,7 @@ describe("showSpiceModelParameters", () => {
   });
 
   it("populates input value from stored _spiceModelOverrides", () => {
-    const element = makeElement({ _spiceModelOverrides: JSON.stringify({ IS: 1e-14 }) });
+    const element = makeElement({ _spiceModelOverrides: { IS: 1e-14 } });
     const def = makeNpnDef();
     panel.showSpiceModelParameters(element, def);
 
@@ -253,7 +253,7 @@ describe("showSpiceModelParameters", () => {
 
     const bag = element.getProperties();
     expect(bag.has("_spiceModelOverrides")).toBe(true);
-    const stored = JSON.parse(bag.get("_spiceModelOverrides") as string) as Record<string, number>;
+    const stored = bag.get("_spiceModelOverrides") as Record<string, number>;
     expect(stored["IS"]).toBeCloseTo(1e-14, 20);
   });
 
@@ -273,7 +273,7 @@ describe("showSpiceModelParameters", () => {
   });
 
   it("deletes key from overrides when input is cleared", () => {
-    const element = makeElement({ _spiceModelOverrides: JSON.stringify({ IS: 1e-14 }) });
+    const element = makeElement({ _spiceModelOverrides: { IS: 1e-14 } });
     const def = makeNpnDef();
     panel.showSpiceModelParameters(element, def);
 
@@ -283,7 +283,7 @@ describe("showSpiceModelParameters", () => {
     isInput.dispatchEvent("blur");
 
     const bag = element.getProperties();
-    const stored = JSON.parse(bag.get("_spiceModelOverrides") as string) as Record<string, number>;
+    const stored = bag.get("_spiceModelOverrides") as Record<string, number>;
     expect(stored["IS"]).toBeUndefined();
   });
 });

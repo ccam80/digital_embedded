@@ -334,8 +334,8 @@ export class PropertyPanel {
     if (!pins || pins.length === 0) return;
 
     const bag = element.getProperties();
-    const stored: Record<string, PinElectricalSpec> = bag.has("_pinElectricalOverrides")
-      ? JSON.parse(bag.get("_pinElectricalOverrides") as string)
+    const stored: Record<string, number> = bag.has("_pinElectricalOverrides")
+      ? (bag.get("_pinElectricalOverrides") as Record<string, number>)
       : {};
 
     // Section header (collapsible)
@@ -383,7 +383,7 @@ export class PropertyPanel {
       pinDiv.appendChild(pinHeader);
 
       for (const field of fields) {
-        const overrideVal = stored[pinLabel]?.[field];
+        const overrideVal = stored[`${pinLabel}.${field}`];
         const resolvedVal = resolved[field as keyof typeof resolved] as number;
         const unit = fieldUnits[field] ?? "";
 
@@ -409,36 +409,30 @@ export class PropertyPanel {
         input.addEventListener("focus", () => input.select());
 
         const commitOverride = () => {
-          const current: Record<string, PinElectricalSpec> = bag.has("_pinElectricalOverrides")
-            ? JSON.parse(bag.get("_pinElectricalOverrides") as string)
+          const current: Record<string, number> = bag.has("_pinElectricalOverrides")
+            ? { ...(bag.get("_pinElectricalOverrides") as Record<string, number>) }
             : {};
-          if (!current[pinLabel]) current[pinLabel] = {};
+          const compositeKey = `${pinLabel}.${field}`;
           const raw = input.value.trim();
           if (raw === "") {
-            delete current[pinLabel]![field];
-            if (Object.keys(current[pinLabel]!).length === 0) delete current[pinLabel];
+            delete current[compositeKey];
             input.value = "";
           } else {
             const parsed = unit ? parseSI(raw) : parseFloat(raw);
             if (isNaN(parsed)) {
-              // Revert on bad input
               input.value = overrideVal !== undefined
                 ? (unit ? formatSI(overrideVal, "", 3).trim() : String(overrideVal))
                 : "";
               return;
             }
-            current[pinLabel]![field] = parsed;
+            current[compositeKey] = parsed;
             input.value = unit ? formatSI(parsed, "", 3).trim() : String(parsed);
           }
           const oldValue = bag.has("_pinElectricalOverrides") ? bag.get("_pinElectricalOverrides") : undefined;
-          const newValue = Object.keys(current).length > 0 ? JSON.stringify(current) : undefined;
-          if (newValue !== undefined) {
-            bag.set("_pinElectricalOverrides", newValue);
-          } else if (bag.has("_pinElectricalOverrides")) {
-            bag.set("_pinElectricalOverrides", "{}");
-          }
+          const newValue = Object.keys(current).length > 0 ? current : {};
+          bag.set("_pinElectricalOverrides", newValue as Record<string, number>);
           for (const cb of this._changeCallbacks) {
-            cb("_pinElectricalOverrides", oldValue ?? "{}", newValue ?? "{}");
+            cb("_pinElectricalOverrides", oldValue ?? {}, newValue);
           }
         };
 
@@ -481,7 +475,7 @@ export class PropertyPanel {
 
     const bag = element.getProperties();
     const stored: Record<string, number> = bag.has("_spiceModelOverrides")
-      ? JSON.parse(bag.get("_spiceModelOverrides") as string)
+      ? (bag.get("_spiceModelOverrides") as Record<string, number>)
       : {};
     const defaults = getDeviceDefaults(deviceType);
 
@@ -539,7 +533,7 @@ export class PropertyPanel {
 
       const commitOverride = () => {
         const current: Record<string, number> = bag.has("_spiceModelOverrides")
-          ? JSON.parse(bag.get("_spiceModelOverrides") as string)
+          ? { ...(bag.get("_spiceModelOverrides") as Record<string, number>) }
           : {};
         const raw = input.value.trim();
         if (raw === "") {
@@ -557,10 +551,10 @@ export class PropertyPanel {
           input.value = unit ? formatSI(parsed, "", 3).trim() : String(parsed);
         }
         const oldValue = bag.has("_spiceModelOverrides") ? bag.get("_spiceModelOverrides") : undefined;
-        const newValue = Object.keys(current).length > 0 ? JSON.stringify(current) : "{}";
-        bag.set("_spiceModelOverrides", newValue);
+        const newValue = Object.keys(current).length > 0 ? current : {};
+        bag.set("_spiceModelOverrides", newValue as Record<string, number>);
         for (const cb of this._changeCallbacks) {
-          cb("_spiceModelOverrides", oldValue ?? "{}", newValue);
+          cb("_spiceModelOverrides", oldValue ?? {}, newValue);
         }
       };
 
@@ -663,7 +657,7 @@ export class PropertyPanel {
   }
 }
 
-/** Shallow equality for PropertyValue, handling number[] arrays. */
+/** Shallow equality for PropertyValue, handling number[] arrays and Record<string,number>. */
 function _valuesEqual(a: PropertyValue | undefined, b: PropertyValue | undefined): boolean {
   if (a === b) return true;
   if (a === undefined || b === undefined) return false;
@@ -671,6 +665,15 @@ function _valuesEqual(a: PropertyValue | undefined, b: PropertyValue | undefined
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
       if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+    const keysA = Object.keys(a as Record<string, number>);
+    const keysB = Object.keys(b as Record<string, number>);
+    if (keysA.length !== keysB.length) return false;
+    for (const k of keysA) {
+      if ((a as Record<string, number>)[k] !== (b as Record<string, number>)[k]) return false;
     }
     return true;
   }

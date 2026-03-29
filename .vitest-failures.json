@@ -1,45 +1,63 @@
 {
   "summary": {
     "passed": 10116,
-    "failed": 10,
+    "failed": 9,
     "skipped": 0,
     "totalFiles": 342,
-    "durationSeconds": 26.8
+    "durationSeconds": 14.8
   },
   "failures": [
     {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
+      "message": "Transient should converge: expected false to be true // Object.is equality",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-          "test": "patch with _spiceModelOverrides changes DC operating point vs default",
-          "line": 161,
-          "column": 24
+          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+          "test": "latches_on_rising_edge",
+          "line": 392,
+          "column": 52
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+          "test": "holds_on_falling_edge",
+          "line": 409,
+          "column": 52
         }
       ]
     },
     {
-      "message": "Cannot read properties of undefined (reading 'IP')",
-      "count": 3,
+      "message": "Should converge D=H: expected false to be true // Object.is equality",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "peak_current_at_vp",
-          "line": 125,
-          "column": 26
-        },
+          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+          "test": "q_bar_complement",
+          "line": 427,
+          "column": 40
+        }
+      ]
+    },
+    {
+      "message": "DC OP should converge: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "valley_current_at_vv",
-          "line": 125,
-          "column": 26
-        },
+          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+          "test": "clock_to_q_delay",
+          "line": 459,
+          "column": 51
+        }
+      ]
+    },
+    {
+      "message": "Step 1 should converge: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "nr_converges_in_ndr_region",
-          "line": 125,
-          "column": 26
+          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+          "test": "toggle_mode",
+          "line": 520,
+          "column": 43
         }
       ]
     }

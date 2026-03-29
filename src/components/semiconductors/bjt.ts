@@ -170,33 +170,33 @@ export function createBjtElement(
   const nodeE = pinNodes.get("E")!; // emitter
 
   // Resolve model parameters
-  const modelParams =
-    (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
   const defaults = polarity === 1 ? BJT_NPN_DEFAULTS : BJT_PNP_DEFAULTS;
   const mp = modelParams ?? defaults;
 
-  const IS = mp["IS"] ?? defaults["IS"];
-  const BF = mp["BF"] ?? defaults["BF"];
-  const NF = mp["NF"] ?? defaults["NF"];
-  const BR = mp["BR"] ?? defaults["BR"];
-  const NR = mp["NR"] ?? defaults["NR"];
-  const ISE = mp["ISE"] ?? defaults["ISE"];
-  const ISC = mp["ISC"] ?? defaults["ISC"];
-  const VAF = mp["VAF"] ?? defaults["VAF"];
-  const VAR = mp["VAR"] ?? defaults["VAR"];
-  const IKF = mp["IKF"] ?? defaults["IKF"];
-  const IKR = mp["IKR"] ?? defaults["IKR"];
-
-  const nfVt = NF * VT;
-  const nrVt = NR * VT;
-  const vcritBE = nfVt * Math.log(nfVt / (IS * Math.SQRT2));
-  const vcritBC = nrVt * Math.log(nrVt / (IS * Math.SQRT2));
+  const params: Record<string, number> = {
+    IS: mp["IS"] ?? defaults["IS"],
+    BF: mp["BF"] ?? defaults["BF"],
+    NF: mp["NF"] ?? defaults["NF"],
+    BR: mp["BR"] ?? defaults["BR"],
+    NR: mp["NR"] ?? defaults["NR"],
+    ISE: mp["ISE"] ?? defaults["ISE"],
+    ISC: mp["ISC"] ?? defaults["ISC"],
+    VAF: mp["VAF"] ?? defaults["VAF"],
+    VAR: mp["VAR"] ?? defaults["VAR"],
+    IKF: mp["IKF"] ?? defaults["IKF"],
+    IKR: mp["IKR"] ?? defaults["IKR"],
+  };
 
   // Operating point state (initialized to zero = all junctions at 0V)
   let vbe = 0;
   let vbc = 0;
   let op: BjtOperatingPoint = computeBjtOp(
-    vbe, vbc, IS, BF, NF, BR, NR, ISE, ISC, VAF, VAR, IKF, IKR,
+    vbe, vbc,
+    params.IS, params.BF, params.NF, params.BR, params.NR,
+    params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
   );
 
   return {
@@ -268,6 +268,12 @@ export function createBjtElement(
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
 
+      // Recompute derived values from mutable params
+      const nfVt = params.NF * VT;
+      const nrVt = params.NR * VT;
+      const vcritBE = nfVt * Math.log(nfVt / (params.IS * Math.SQRT2));
+      const vcritBC = nrVt * Math.log(nrVt / (params.IS * Math.SQRT2));
+
       // Junction voltages (polarity-corrected for PNP)
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
@@ -292,7 +298,11 @@ export function createBjtElement(
       vbe = vbeLimited;
       vbc = vbcLimited;
 
-      op = computeBjtOp(vbe, vbc, IS, BF, NF, BR, NR, ISE, ISC, VAF, VAR, IKF, IKR);
+      op = computeBjtOp(
+        vbe, vbc,
+        params.IS, params.BF, params.NF, params.BR, params.NR,
+        params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
+      );
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -308,6 +318,8 @@ export function createBjtElement(
       const vbePrev = polarity * (vBp - vEp);
       const vbcPrev = polarity * (vBp - vCp);
 
+      const nfVt = params.NF * VT;
+      const nrVt = params.NR * VT;
       return (
         Math.abs(vbeNew - vbePrev) <= 2 * nfVt &&
         Math.abs(vbcNew - vbcPrev) <= 2 * nrVt
@@ -321,6 +333,10 @@ export function createBjtElement(
       const ib = polarity * op.ib;
       const ie = -(ic + ib); // KCL: ib + ic + ie = 0
       return [ib, ic, ie];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) params[key] = value;
     },
   };
 }
@@ -540,8 +556,8 @@ const BJT_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

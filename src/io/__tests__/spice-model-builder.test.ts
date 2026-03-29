@@ -225,7 +225,7 @@ Q1 c b e NPN
   it("NpnBJT has _spiceModelOverrides with IS and BF", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NpnBJT");
-    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBeCloseTo(1e-14);
     expect(overrides["BF"]).toBe(200);
   });
@@ -247,7 +247,7 @@ Q1 c b e PNP
     expect(pinLabels).toContain("B");
     expect(pinLabels).toContain("C");
     expect(pinLabels).toContain("E");
-    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBeCloseTo(2e-14);
     expect(overrides["BF"]).toBe(100);
   });
@@ -287,8 +287,7 @@ M1 d g s b NMOS W=10u L=1u
   it("NMOS _spiceModelOverrides contains W, L, VTO", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overridesRaw = el!.getAttribute("_spiceModelOverrides") as string;
-    const overrides = JSON.parse(overridesRaw);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["W"]).toBeCloseTo(10e-6);
     expect(overrides["L"]).toBeCloseTo(1e-6);
     expect(overrides["VTO"]).toBeCloseTo(0.7);
@@ -311,7 +310,7 @@ M1 d g s b PMOS W=5u L=1u
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("D");
     expect(pinLabels).toContain("S");
-    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["W"]).toBeCloseTo(5e-6);
     expect(overrides["L"]).toBeCloseTo(1e-6);
     expect(overrides["VTO"]).toBeCloseTo(-0.7);
@@ -366,7 +365,7 @@ J1 d g s PJFET
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("S");
     expect(pinLabels).toContain("D");
-    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["VTO"]).toBeCloseTo(2);
   });
 });
@@ -478,7 +477,7 @@ M1 d g s b NMOS W=20u L=2u
 `;
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = JSON.parse(el!.getAttribute("_spiceModelOverrides") as string);
+    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["W"]).toBeCloseTo(20e-6);
     expect(overrides["L"]).toBeCloseTo(2e-6);
     expect(overrides["VTO"]).toBeCloseTo(0.5);
@@ -532,7 +531,7 @@ V1 vcc 0 DC 5
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const bjts = circuit.elements.filter((e) => e.typeId === "NpnBJT");
     for (const bjt of bjts) {
-      const overrides = JSON.parse(bjt.getAttribute("_spiceModelOverrides") as string);
+      const overrides = bjt.getAttribute("_spiceModelOverrides") as Record<string, number>;
       expect(overrides["IS"]).toBeCloseTo(1e-14);
       expect(overrides["BF"]).toBe(200);
     }

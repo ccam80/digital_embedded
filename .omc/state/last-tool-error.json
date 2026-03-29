@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\cca79\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--local-working-projects-digital-in-browser\\\\2f1ddcdc-a3f0-43c1-aeab-35a306ff63f0\\\\tasks\\\\aafa6593ea8d4292e.output\",\"offset\":1,\"limit\":20...",
-  "error": "File content (141283 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-03-29T19:53:29.440Z",
-  "retry_count": 1
-}

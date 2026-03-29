@@ -2,56 +2,74 @@
   "summary": {
     "vitest": {
       "passed": 10116,
-      "failed": 10,
+      "failed": 9,
       "skipped": 0,
       "totalFiles": 342,
-      "durationSeconds": 26.8
+      "durationSeconds": 14.8
     },
     "playwright": {
-      "passed": 485,
-      "failed": 57,
+      "passed": 489,
+      "failed": 53,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 326.65831
+      "durationSeconds": 237.713437
     },
-    "totalFailed": 67,
-    "totalPassed": 10601
+    "totalFailed": 62,
+    "totalPassed": 10605
   },
   "failures": {
     "vitest": [
       {
-        "message": "expected false to be true // Object.is equality",
-        "count": 1,
+        "message": "Transient should converge: expected false to be true // Object.is equality",
+        "count": 2,
         "locations": [
           {
-            "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-            "test": "patch with _spiceModelOverrides changes DC operating point vs default",
-            "line": 161,
-            "column": 24
+            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+            "test": "latches_on_rising_edge",
+            "line": 392,
+            "column": 52
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+            "test": "holds_on_falling_edge",
+            "line": 409,
+            "column": 52
           }
         ]
       },
       {
-        "message": "Cannot read properties of undefined (reading 'IP')",
-        "count": 3,
+        "message": "Should converge D=H: expected false to be true // Object.is equality",
+        "count": 1,
         "locations": [
           {
-            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-            "test": "peak_current_at_vp",
-            "line": 125,
-            "column": 26
-          },
+            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+            "test": "q_bar_complement",
+            "line": 427,
+            "column": 40
+          }
+        ]
+      },
+      {
+        "message": "DC OP should converge: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
           {
-            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-            "test": "valley_current_at_vv",
-            "line": 125,
-            "column": 26
-          },
+            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+            "test": "clock_to_q_delay",
+            "line": 459,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "message": "Step 1 should converge: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
           {
-            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-            "test": "nr_converges_in_ndr_region",
-            "line": 125,
-            "column": 26
+            "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
+            "test": "toggle_mode",
+            "line": 520,
+            "column": 43
           }
         ]
       }
@@ -137,12 +155,18 @@
       },
       {
         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 9,
+        "count": 10,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
             "test": "RL circuit: current rise with time constant L/R",
             "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched RC: charge on close, discharge on open",
+            "line": 1272,
             "column": 5
           },
           {
@@ -208,7 +232,7 @@
         ]
       },
       {
-        "message": "Error: Vcollector: expected 11.04672 ±0.1%, got 11.351330998353845",
+        "message": "Error: Vcollector: expected 11.04672 ±0.1%, got 11.096188849737203",
         "count": 1,
         "locations": [
           {
@@ -220,19 +244,7 @@
         ]
       },
       {
-        "message": "Error: Vcol1: expected 11.89609 ±0.1%, got 11.922662686399741",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "BJT differential pair: balanced outputs when inputs equal",
-            "line": 526,
-            "column": 5
-          }
-        ]
-      },
-      {
-        "message": "Error: Vcollector: expected 11.97211 ±0.1%, got 11.76093607300066",
+        "message": "Error: Vcollector: expected 11.97211 ±0.1%, got 11.66295766732042",
         "count": 1,
         "locations": [
           {
@@ -268,19 +280,7 @@
         ]
       },
       {
-        "message": "Error: Voutput: expected 11.10296 ±0.1%, got 11.357753478833986",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "cascode amplifier: two-stage BJT with higher output impedance",
-            "line": 890,
-            "column": 5
-          }
-        ]
-      },
-      {
-        "message": "Error: Vref_leg: expected 1.212704 ±0.1%, got 0.7766215018699367",
+        "message": "Error: Vref_leg: expected 1.212704 ±0.1%, got 0.6578348525309987",
         "count": 1,
         "locations": [
           {
@@ -304,7 +304,7 @@
         ]
       },
       {
-        "message": "Error: Vq1c: expected 10.25837 ±0.1%, got 10.773561233991135",
+        "message": "Error: Vdrain: expected 0.6316434 ±0.1%, got 0.06457571245146483",
         "count": 1,
         "locations": [
           {
@@ -328,44 +328,8 @@
         ]
       },
       {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-        "count": 5,
-        "locations": [
-          {
-            "file": "gui/analog-circuit-assembly.spec.ts",
-            "test": "switched RC: charge on close, discharge on open",
-            "line": 1272,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
-            "line": 257,
-            "column": 5
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import dialog opens with textarea when menu item clicked",
-            "line": 56,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
-            "line": 70,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL Apply stores overrides visible in SPICE panel",
-            "line": 91,
-            "column": 3
-          }
-        ]
-      },
-      {
         "message": "Error: Status bar shows an error",
-        "count": 9,
+        "count": 4,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
@@ -380,24 +344,6 @@
             "column": 5
           },
           {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DAC at bits=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DAC at bits=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "DAC + RC filter: digital input produces filtered analog voltage",
-            "line": 153,
-            "column": 5
-          },
-          {
             "file": "gui/mixed-circuit-assembly.spec.ts",
             "test": "comparator to logic: analog threshold drives digital gate",
             "line": 318,
@@ -407,18 +353,6 @@
             "file": "gui/mixed-circuit-assembly.spec.ts",
             "test": "ADC readout: analog waveform sampled to digital outputs",
             "line": 377,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "Schmitt trigger to counter: analog sine drives digital count",
-            "line": 437,
-            "column": 5
-          },
-          {
-            "file": "gui/mixed-circuit-assembly.spec.ts",
-            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
-            "line": 563,
             "column": 5
           }
         ]
@@ -485,6 +419,54 @@
             "file": "gui/digital-circuit-assembly.spec.ts",
             "test": "T flip-flop 4-bit ripple counter",
             "line": 381,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 7,
+        "locations": [
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "DAC + RC filter: digital input produces filtered analog voltage",
+            "line": 153,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "Schmitt trigger to counter: analog sine drives digital count",
+            "line": 437,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
+            "line": 563,
+            "column": 5
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import dialog opens with textarea when menu item clicked",
+            "line": 56,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 70,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 91,
             "column": 3
           }
         ]

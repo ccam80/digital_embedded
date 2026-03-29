@@ -53,11 +53,11 @@ describe("_spiceModelOverrides PropertyDef on semiconductor components", () => {
       expect(overridesDef!.type).toBe(PropertyType.STRING);
     });
 
-    it(`${def.name}: _spiceModelOverrides has empty string default`, () => {
+    it(`${def.name}: _spiceModelOverrides has empty Record default`, () => {
       const overridesDef = def.propertyDefs.find(
         (pd) => pd.key === "_spiceModelOverrides",
       );
-      expect(overridesDef!.defaultValue).toBe("");
+      expect(overridesDef!.defaultValue).toEqual({});
     });
 
     it(`${def.name}: _spiceModelOverrides is marked hidden`, () => {

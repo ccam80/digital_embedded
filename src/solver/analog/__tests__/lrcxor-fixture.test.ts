@@ -84,8 +84,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
 
   const serialized: SerializedElement = {
@@ -260,18 +262,21 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
   const vs1 = makeElement("DcVoltageSource", "vs1",
     [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
     new Map<string, PropertyValue>([["voltage", v1]]),
+    registry,
   );
 
   // DC voltage source driving In_2 (neg=x=50/GND, pos=x=30)
   const vs2 = makeElement("DcVoltageSource", "vs2",
     [{ x: 50, y: 0, label: "neg" }, { x: 30, y: 0, label: "pos" }],
     new Map<string, PropertyValue>([["voltage", v2]]),
+    registry,
   );
 
   // Series resistor on In_1 path (x=10 → x=20)
   const rDrive = makeElement("Resistor", "r_drive",
     [{ x: 10, y: 0 }, { x: 20, y: 0 }],
     new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
+    registry,
   );
 
   // XOR gate — In_1 at x=20, In_2 at x=30, out at x=40
@@ -295,16 +300,18 @@ function buildXorCircuit(opts: XorCircuitOpts): XorCircuitResult {
       { x: 40, y: 0, label: "out" },
     ],
     new Map<string, PropertyValue>([["simulationModel", simulationModel]]),
+    registry,
   );
 
   // Load resistor (x=40 → x=50)
   const rLoad = makeElement("Resistor", "r_load",
     [{ x: 40, y: 0 }, { x: 50, y: 0 }],
     new Map<string, PropertyValue>([["resistance", R_LOAD]]),
+    registry,
   );
 
   // Ground at x=50
-  const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
+  const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }], new Map(), registry);
 
   circuit.addElement(vs1);
   circuit.addElement(vs2);
@@ -940,10 +947,12 @@ describe("bridge error paths", () => {
     const vs1 = makeElement("DcVoltageSource", "vs1",
       [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", V_HIGH]]),
+      registry,
     );
     const rDrive = makeElement("Resistor", "r_drive",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
+      registry,
     );
     // XOR with In_2 (x=30) left unconnected — only In_1 and out are wired
     const xorEl = makeElement("XOr", "xor1",
@@ -953,12 +962,14 @@ describe("bridge error paths", () => {
         { x: 40, y: 0, label: "out" },
       ],
       new Map<string, PropertyValue>([["simulationModel", "digital"]]),
+      registry,
     );
     const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_LOAD]]),
+      registry,
     );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }], new Map(), registry);
 
     circuit.addElement(vs1);
     circuit.addElement(rDrive);
@@ -995,14 +1006,17 @@ describe("bridge error paths", () => {
     const vs1 = makeElement("DcVoltageSource", "vs1",
       [{ x: 50, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", vIndeterminate]]),
+      registry,
     );
     const vs2 = makeElement("DcVoltageSource", "vs2",
       [{ x: 50, y: 0, label: "neg" }, { x: 30, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", V_LOW]]),
+      registry,
     );
     const rDrive = makeElement("Resistor", "r_drive",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_DRIVE]]),
+      registry,
     );
     const xorEl = makeElement("XOr", "xor1",
       [
@@ -1011,12 +1025,14 @@ describe("bridge error paths", () => {
         { x: 40, y: 0, label: "out" },
       ],
       new Map<string, PropertyValue>([["simulationModel", "digital"]]),
+      registry,
     );
     const rLoad = makeElement("Resistor", "r_load",
       [{ x: 40, y: 0 }, { x: 50, y: 0 }],
       new Map<string, PropertyValue>([["resistance", R_LOAD]]),
+      registry,
     );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 50, y: 0 }], new Map(), registry);
 
     circuit.addElement(vs1);
     circuit.addElement(vs2);

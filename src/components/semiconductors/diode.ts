@@ -94,22 +94,22 @@ export function createDiodeElement(
   const nodeCathode = pinNodes.get("K")!;
 
   // Resolve model parameters from _modelParams (injected by compiler) or defaults
-  const modelParams =
-    (props as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
   const mp = modelParams ?? DIODE_DEFAULTS;
 
-  const IS = mp["IS"] ?? DIODE_DEFAULTS["IS"];
-  const N = mp["N"] ?? DIODE_DEFAULTS["N"];
-  const CJO = mp["CJO"] ?? DIODE_DEFAULTS["CJO"];
-  const VJ = mp["VJ"] ?? DIODE_DEFAULTS["VJ"];
-  const M_param = mp["M"] ?? DIODE_DEFAULTS["M"];
-  const TT = mp["TT"] ?? DIODE_DEFAULTS["TT"];
-  const FC = mp["FC"] ?? DIODE_DEFAULTS["FC"];
+  const params: Record<string, number> = {
+    IS: mp["IS"] ?? DIODE_DEFAULTS["IS"],
+    N: mp["N"] ?? DIODE_DEFAULTS["N"],
+    CJO: mp["CJO"] ?? DIODE_DEFAULTS["CJO"],
+    VJ: mp["VJ"] ?? DIODE_DEFAULTS["VJ"],
+    M: mp["M"] ?? DIODE_DEFAULTS["M"],
+    TT: mp["TT"] ?? DIODE_DEFAULTS["TT"],
+    FC: mp["FC"] ?? DIODE_DEFAULTS["FC"],
+  };
 
-  const nVt = N * VT;
-  const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
-
-  const hasCapacitance = CJO > 0 || TT > 0;
+  const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
   // NR linearization state
   let vd = 0;
@@ -156,6 +156,10 @@ export function createDiodeElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
+      // Recompute derived values from mutable params
+      const nVt = params.N * VT;
+      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+
       // Apply pnjlim to prevent exponential runaway
       const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
 
@@ -169,9 +173,9 @@ export function createDiodeElement(
       // Shockley equation and NR linearization at limited operating point
       const expArg = Math.min(vd / nVt, 700);
       const expVal = Math.exp(expArg);
-      const id = IS * (expVal - 1);
+      const id = params.IS * (expVal - 1);
       _id = id;
-      geq = (IS * expVal) / nVt + GMIN;
+      geq = (params.IS * expVal) / nVt + GMIN;
       ieq = id - geq * vd;
     },
 
@@ -184,6 +188,7 @@ export function createDiodeElement(
       const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       const vdPrevVal = vaPrev - vcPrev;
 
+      const nVt = params.N * VT;
       return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
     },
 
@@ -191,6 +196,10 @@ export function createDiodeElement(
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
       return [_id, -_id];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) params[key] = value;
     },
   };
 
@@ -205,12 +214,15 @@ export function createDiodeElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vNow = va - vc;
 
+      // Recompute derived values from mutable params
+      const nVt = params.N * VT;
+
       // Depletion + transit-time capacitance at current operating point
-      const Cj = computeJunctionCapacitance(vNow, CJO, VJ, M_param, FC);
+      const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
       const expArg = Math.min(vNow / nVt, 700);
       const expVal = Math.exp(expArg);
-      const gDiode = (IS * expVal) / nVt;
-      const Ct = TT * gDiode;
+      const gDiode = (params.IS * expVal) / nVt;
+      const Ct = params.TT * gDiode;
       const Ctotal = Cj + Ct;
 
       // Recover capacitor current at previous accepted step
@@ -338,8 +350,8 @@ const DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

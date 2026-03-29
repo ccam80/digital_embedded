@@ -77,8 +77,8 @@ function makeBjtAtOp(
   modelParams?: Record<string, number>,
 ): AnalogElement {
   const params = { ...NPN_DEFAULT_PARAMS, ...modelParams };
-  const propsObj = { _modelParams: params };
-  const element = createBjtElement(polarity, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+  const propsObj = new PropertyBag([["_modelParams", params]]);
+  const element = createBjtElement(polarity, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
 
   // Drive to operating point iteratively using updateOperatingPoint.
   // nodeC=1, nodeB=2, nodeE=3 → voltages[0]=Vc, voltages[1]=Vb, voltages[2]=Ve
@@ -256,8 +256,8 @@ describe("NPN", () => {
 
   it("voltage_limiting_both_junctions", () => {
     // Start at a moderate Vbe operating point
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
 
     const voltages = new Float64Array(3);
     // Set initial operating point: Vbe ≈ 0.3V (B=0.3, E=0, C=5)
@@ -321,26 +321,26 @@ describe("NPN", () => {
   });
 
   it("isNonlinear_true", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("pinNodeIds_correct", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj as unknown as PropertyBag), [3, 5, 7]);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj), [3, 5, 7]);
     expect(element.pinNodeIds).toEqual([3, 5, 7]);
   });
 
   it("branchIndex_minus_one", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.branchIndex).toBe(-1);
   });
 });
@@ -393,8 +393,8 @@ describe("PNP", () => {
   });
 
   it("pnp_isNonlinear_true", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const element = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj as unknown as PropertyBag);
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const element = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 });
@@ -435,7 +435,7 @@ describe("Definitions", () => {
   });
 
   it("npn_analogFactory_creates_element", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
     const el = withNodeIds(NpnBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
@@ -443,7 +443,7 @@ describe("Definitions", () => {
   });
 
   it("pnp_analogFactory_creates_element", () => {
-    const propsObj = { _modelParams: { ...NPN_DEFAULT_PARAMS } } as unknown as PropertyBag;
+    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
     // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
     const el = withNodeIds(PnpBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
@@ -494,8 +494,8 @@ describe("Integration", () => {
     const rb = makeResistor(3, 2, 100_000);  // Rb=100kΩ from Vbb to base
 
     // BJT: C=node1, B=node2, E=gnd(0)
-    const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag), [2, 1, 0]);
+    const bjtProps = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps), [2, 1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -559,8 +559,8 @@ describe("Integration", () => {
 
     // BJT: B=gnd, C=node1, E=gnd → base=0=ground, emitter=0=ground
     // createBjtElement pin order: [B, C, E]
-    const bjtProps = { _modelParams: { ...NPN_DEFAULT_PARAMS } };
-    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps as unknown as PropertyBag), [0, 1, 0]);
+    const bjtProps = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps), [0, 1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

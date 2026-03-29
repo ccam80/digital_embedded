@@ -80,6 +80,11 @@ export class BridgeOutputAdapter implements AnalogElement {
     this._pinModel.setHighZ(hiZ);
   }
 
+  /** Hot-update a single electrical parameter on the underlying pin model. */
+  setParam(key: string, value: number): void {
+    this._pinModel.setParam(key, value);
+  }
+
   /**
    * Stamp the linear Norton equivalent into the MNA matrix.
    *
@@ -229,6 +234,11 @@ export class BridgeInputAdapter implements AnalogElement {
   stamp(solver: SparseSolver): void {
     this._solver = solver;
     this._pinModel.stamp(solver);
+  }
+
+  /** Hot-update a single electrical parameter on the underlying pin model. */
+  setParam(key: string, value: number): void {
+    this._pinModel.setParam(key, value);
   }
 
   /**

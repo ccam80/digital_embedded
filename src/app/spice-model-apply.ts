@@ -12,8 +12,8 @@ import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-regis
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 /** The result produced by the .MODEL import dialog. */
 export interface SpiceImportResult {
-  /** Serialized JSON of parsed params — stored as _spiceModelOverrides. */
-  overridesJson: string;
+  /** Parsed params object — stored as _spiceModelOverrides. */
+  overrides: Record<string, number>;
   /** Display name — stored as _spiceModelName. */
   modelName: string;
   /** Parsed device type for library-level storage. */
@@ -34,9 +34,9 @@ export function applySpiceImportResult(
   if (!circuit.metadata.namedParameterSets) circuit.metadata.namedParameterSets = {};
   circuit.metadata.namedParameterSets[result.modelName] = {
     deviceType: result.deviceType,
-    params: JSON.parse(result.overridesJson) as Record<string, number>,
+    params: { ...result.overrides },
   };
-  element.getProperties().set('_spiceModelOverrides', result.overridesJson);
+  element.getProperties().set('_spiceModelOverrides', result.overrides);
   element.getProperties().set('_spiceModelName', result.modelName);
 }
 

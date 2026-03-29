@@ -47,7 +47,7 @@ export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
  * same coefficients as the Phase 1 capacitor companion model.
  */
 export class DigitalOutputPinModel {
-  private readonly _spec: ResolvedPinElectrical;
+  private _spec: ResolvedPinElectrical;
 
   /** Node this pin drives. Set by init(). */
   private _nodeId = -1;
@@ -90,6 +90,13 @@ export class DigitalOutputPinModel {
    */
   setHighZ(hiZ: boolean): void {
     this._hiZ = hiZ;
+  }
+
+  /** Hot-update a single electrical parameter on this pin model. */
+  setParam(key: string, value: number): void {
+    if (key in this._spec) {
+      (this._spec as Record<string, number>)[key] = value;
+    }
   }
 
   /**
@@ -206,7 +213,7 @@ export class DigitalOutputPinModel {
  * companion model for C_in. Provides threshold detection via readLogicLevel().
  */
 export class DigitalInputPinModel {
-  private readonly _spec: ResolvedPinElectrical;
+  private _spec: ResolvedPinElectrical;
 
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
@@ -228,6 +235,13 @@ export class DigitalInputPinModel {
    */
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
+  }
+
+  /** Hot-update a single electrical parameter on this pin model. */
+  setParam(key: string, value: number): void {
+    if (key in this._spec) {
+      (this._spec as Record<string, number>)[key] = value;
+    }
   }
 
   /**

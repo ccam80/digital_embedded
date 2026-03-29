@@ -5,6 +5,8 @@ export interface SubcircuitElement {
   modelRef?: string;
   /** Element-level parameter overrides. String values reference subcircuit params by name. */
   params?: Record<string, number | string>;
+  /** Number of MNA branch rows this element contributes (voltage sources, inductors = 1; MOSFETs, BJTs, resistors = 0). Defaults to 0. */
+  branchCount?: number;
 }
 
 export interface MnaSubcircuitNetlist {

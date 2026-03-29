@@ -142,11 +142,7 @@ function compileSubcircuitToMnaModel(
 ): MnaModel {
   let totalBranches = 0;
   for (const subEl of netlist.elements) {
-    const factory = getAnalogFactory(subEl.typeId);
-    if (factory) {
-      const testCore = factory([], -1, new PropertyBag(), () => 0);
-      if (testCore.branchIndex >= 0) totalBranches++;
-    }
+    totalBranches += subEl.branchCount ?? 0;
   }
 
   return {
@@ -1101,6 +1097,7 @@ export function compileAnalogPartition(
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
+  const elementBridgeAdapters = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
 
   type ElementTopologyInfo = {
     nodeIds: number[];
@@ -1198,11 +1195,17 @@ export function compileAnalogPartition(
 
         const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
         const componentOverride = def.pinElectrical;
-        let userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
+        const userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
         if (props.has("_pinElectricalOverrides")) {
-          try {
-            userBridgeOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
-          } catch { /* ignore malformed JSON */ }
+          const flatOverrides = props.get<Record<string, number>>("_pinElectricalOverrides");
+          for (const [compositeKey, val] of Object.entries(flatOverrides)) {
+            const dotIdx = compositeKey.indexOf('.');
+            if (dotIdx === -1) continue;
+            const pinLabel = compositeKey.slice(0, dotIdx);
+            const field = compositeKey.slice(dotIdx + 1);
+            if (!userBridgeOverrides[pinLabel]) userBridgeOverrides[pinLabel] = {};
+            (userBridgeOverrides[pinLabel] as Record<string, number>)[field] = val;
+          }
         }
         const userPinOverride = userBridgeOverrides[pinDecl.label];
         const mergedPinOverride = userPinOverride
@@ -1220,6 +1223,11 @@ export function compileAnalogPartition(
           adapter.label = `${elLabel}:${pinDecl.label}`;
           outputAdapters.push(adapter);
           outputPinNetIds.push(innerNetId);
+          const adapterIdx = analogElements.length;
+          if (!elementToCircuitElement.has(adapterIdx)) elementToCircuitElement.set(adapterIdx, el);
+          const adapterList = elementBridgeAdapters.get(adapterIdx) ?? [];
+          adapterList.push(adapter);
+          elementBridgeAdapters.set(adapterIdx, adapterList);
           analogElements.push(adapter);
           topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
         } else {
@@ -1227,6 +1235,11 @@ export function compileAnalogPartition(
           adapter.label = `${elLabel}:${pinDecl.label}`;
           inputAdapters.push(adapter);
           inputPinNetIds.push(innerNetId);
+          const adapterIdx = analogElements.length;
+          if (!elementToCircuitElement.has(adapterIdx)) elementToCircuitElement.set(adapterIdx, el);
+          const adapterList = elementBridgeAdapters.get(adapterIdx) ?? [];
+          adapterList.push(adapter);
+          elementBridgeAdapters.set(adapterIdx, adapterList);
           analogElements.push(adapter);
           topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
         }
@@ -1249,12 +1262,13 @@ export function compileAnalogPartition(
     const activeModel = route.model;
 
     // Resolve pin → node ID bindings
+    const livePins = el.getPins();
     const pinVertices: Array<{ x: number; y: number } | null> = new Array(
-      def.pinLayout.length,
+      livePins.length,
     ).fill(null);
     const pinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, pinVertices, positionToNodeId);
 
-    const pinLabelList = def.pinLayout.map((pd) => pd.label);
+    const pinLabelList = livePins.map((p) => p.label);
     let hasUnconnectedPin = false;
     for (let pi = 0; pi < pinNodeIds.length; pi++) {
       if (pinNodeIds[pi] < 0) {
@@ -1307,11 +1321,18 @@ export function compileAnalogPartition(
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
     if (def.models?.digital !== undefined && activeModel.factory !== undefined) {
-      let userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
-      if (props.has("_pinElectricalOverrides")) {
-        try {
-          userOverrides = JSON.parse(props.get("_pinElectricalOverrides") as string);
-        } catch { /* ignore malformed JSON */ }
+      const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
+        ? props.get<Record<string, number>>("_pinElectricalOverrides")
+        : {};
+      // Build per-pin overrides from flat composite keys (e.g. "A.rOut" → { A: { rOut: ... } })
+      const userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
+      for (const [compositeKey, val] of Object.entries(flatOverrides)) {
+        const dotIdx = compositeKey.indexOf('.');
+        if (dotIdx === -1) continue;
+        const pinLabel = compositeKey.slice(0, dotIdx);
+        const field = compositeKey.slice(dotIdx + 1);
+        if (!userOverrides[pinLabel]) userOverrides[pinLabel] = {};
+        (userOverrides[pinLabel] as Record<string, number>)[field] = val;
       }
 
       const pinLabelsForElec = def.pinLayout.map((pd) => pd.label);
@@ -1351,19 +1372,8 @@ export function compileAnalogPartition(
         finalParams = { ...baseParams, ...namedModel.params };
       }
       if (props.has("_spiceModelOverrides")) {
-        try {
-          const overrides = JSON.parse(props.get("_spiceModelOverrides") as string) as Record<string, number>;
-          finalParams = { ...finalParams, ...overrides };
-        } catch {
-          const label = props.has("label") ? props.get<string>("label") : el.typeId;
-          diagnostics.push({
-            code: "INVALID_SPICE_OVERRIDES",
-            severity: "warning",
-            summary: `Malformed _spiceModelOverrides JSON on component "${label}"`,
-            explanation: `The _spiceModelOverrides property on "${label}" is not valid JSON. The override was ignored and default model parameters were used instead.`,
-            suggestions: [{ text: `Open the SPICE Model Parameters panel for "${label}" and re-enter the desired overrides.`, automatable: false }],
-          });
-        }
+        const overrides = props.get<Record<string, number>>("_spiceModelOverrides");
+        finalParams = { ...finalParams, ...overrides };
       }
       props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
@@ -1384,13 +1394,13 @@ export function compileAnalogPartition(
     {
       const resolvedPinsOut: ResolvedPin[] = [];
       const elPins = el.getPins();
-      for (let pi = 0; pi < def.pinLayout.length; pi++) {
-        const decl = def.pinLayout[pi];
+      for (let pi = 0; pi < elPins.length; pi++) {
         const pin = elPins[pi];
-        if (!decl || !pin) continue;
+        if (!pin) continue;
+        const decl = def.pinLayout[pi];
         resolvedPinsOut.push({
-          label: decl.label,
-          direction: decl.direction,
+          label: pin.label,
+          direction: decl?.direction ?? pin.direction,
           localPosition: pin.position,
           worldPosition: pinWorldPosition(el, pin),
           wireVertex: pinVertices[pi] ?? null,
@@ -1486,6 +1496,7 @@ export function compileAnalogPartition(
     elementPinVertices,
     elementResolvedPins,
     groupToNodeId,
+    elementBridgeAdapters,
     diagnostics,
     bridges,
     timeRef,

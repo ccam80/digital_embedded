@@ -52,7 +52,7 @@ function makePin(x: number, y: number, label: string): Pin {
 function makeCircuitElement(
   typeId: string,
   pins: Array<{ x: number; y: number; label: string }>,
-  propsEntries: Array<[string, string | number | boolean]> = [],
+  propsEntries: Array<[string, string | number | boolean | Record<string, number>]> = [],
 ): CircuitElement {
   const instanceId = `${typeId}-spice-${++_spiceBuilderCounter}`;
   const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label));
@@ -132,7 +132,7 @@ function buildModelOverrides(
   modelName: string | undefined,
   inlineModels: ParsedModel[],
   elementParams?: Record<string, number>,
-): string | undefined {
+): Record<string, number> | undefined {
   const base: Record<string, number> = {};
 
   // Merge element-level params (e.g. W/L for MOSFETs)
@@ -153,7 +153,7 @@ function buildModelOverrides(
   }
 
   if (Object.keys(base).length === 0) return undefined;
-  return JSON.stringify(base);
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,10 +175,10 @@ function buildElement(
   yRow: number,
   models: ParsedModel[],
 ): CircuitElement {
-  const props: Array<[string, string | number | boolean]> = [];
-  const overridesJson = buildModelOverrides(el.modelName, models, el.params);
-  if (overridesJson !== undefined) {
-    props.push(["_spiceModelOverrides", overridesJson]);
+  const props: Array<[string, string | number | boolean | Record<string, number>]> = [];
+  const overrides = buildModelOverrides(el.modelName, models, el.params);
+  if (overrides !== undefined) {
+    props.push(["_spiceModelOverrides", overrides]);
   }
 
   switch (el.type) {

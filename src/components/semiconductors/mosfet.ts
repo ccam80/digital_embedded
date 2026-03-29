@@ -84,10 +84,9 @@ function resolveParams(
   propsW: number | undefined,
   propsL: number | undefined,
 ): MosfetParams {
-  const hasFn = typeof props.has === "function";
-  const modelParams = hasFn
-    ? (props.has("_modelParams") ? props.get<Record<string, number>>("_modelParams") : undefined)
-    : (props as unknown as Record<string, unknown>)["_modelParams"] as Record<string, number> | undefined;
+  const modelParams = props.has("_modelParams")
+    ? props.get<Record<string, number>>("_modelParams")
+    : undefined;
   const mp = modelParams ?? defaults;
 
   return {
@@ -483,6 +482,10 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
+  setParam(key: string, value: number): void {
+    if (key in this._p) (this._p as unknown as Record<string, number>)[key] = value;
+  }
+
   override stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     // Gate overlap capacitances (Cgs, Cgd) via base class
     super.stampCompanion(dt, method, voltages);
@@ -813,8 +816,8 @@ const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

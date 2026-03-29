@@ -491,8 +491,10 @@ function makeAnalogElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makeAnalogPin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makeAnalogPin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
 
   const serialized: SerializedElement = {
@@ -544,23 +546,27 @@ describe("runner_integration", () => {
     const vs = makeAnalogElement("DcVoltageSource", "vs1",
       [{ x: 30, y: 0, label: "neg" }, { x: 10, y: 0, label: "pos" }],
       new Map<string, PropertyValue>([["voltage", 5]]),
+      registry,
     );
     // R1: 1kΩ from node_top (10,0) to node_mid (20,0)
     const r1 = makeAnalogElement("Resistor", "r1",
       [{ x: 10, y: 0 }, { x: 20, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
+      registry,
     );
     // R2: 1kΩ from node_mid (20,0) to node_gnd (30,0)
     const r2 = makeAnalogElement("Resistor", "r2",
       [{ x: 20, y: 0 }, { x: 30, y: 0 }],
       new Map<string, PropertyValue>([["resistance", 1000]]),
+      registry,
     );
     // Ground at (30,0)
-    const gnd = makeAnalogElement("Ground", "gnd1", [{ x: 30, y: 0 }]);
+    const gnd = makeAnalogElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
     // Probe at node_mid (20,0) labeled "V_mid"
     const probe = makeAnalogElement("Probe", "probe1",
       [{ x: 20, y: 0 }],
       new Map<string, PropertyValue>([["label", "V_mid"]]),
+      registry,
     );
 
     circuit.addElement(vs);

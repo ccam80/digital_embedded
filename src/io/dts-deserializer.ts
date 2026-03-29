@@ -46,6 +46,9 @@ function restorePropertyValue(raw: unknown): PropertyValue {
     }
     return raw;
   }
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    return raw as Record<string, number>;
+  }
   return raw as PropertyValue;
 }
 

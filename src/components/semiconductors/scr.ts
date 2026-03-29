@@ -257,6 +257,10 @@ export function createScrElement(
       return [iA, iK, iG];
     },
 
+    setParam(_key: string, _value: number): void {
+      // SCR params are component properties, not SPICE model params
+    },
+
     get label(): string | undefined {
       return props.getOrDefault<string>("label", "");
     },
@@ -443,8 +447,8 @@ const SCR_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "_spiceModelOverrides",
     type: PropertyType.STRING,
     label: "SPICE Model Overrides",
-    defaultValue: "",
-    description: "JSON string of user-supplied SPICE parameter overrides",
+    defaultValue: {} as Record<string, number>,
+    description: "User-supplied SPICE parameter overrides",
     hidden: true,
   },
 ];

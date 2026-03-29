@@ -48,8 +48,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
   const serialized: SerializedElement = {
     typeId,
@@ -103,7 +105,7 @@ describe("spice-import-dialog: parse and apply", () => {
     expect(typeof result.message).toBe("string");
   });
 
-  it("applySpiceImportResult stores _spiceModelOverrides as JSON string", () => {
+  it("applySpiceImportResult stores _spiceModelOverrides as Record<string, number>", () => {
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
       { x: 0, y: 0, label: "B" },
@@ -112,16 +114,15 @@ describe("spice-import-dialog: parse and apply", () => {
     const circuit = new Circuit();
 
     applySpiceImportResult(element, {
-      overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }),
+      overrides: { IS: 1e-14, BF: 200 },
       modelName: "2N2222",
       deviceType: "NPN",
     }, circuit);
 
-    const stored = element.getProperties().get("_spiceModelOverrides");
-    expect(typeof stored).toBe("string");
-    const parsed = JSON.parse(stored as string) as Record<string, number>;
-    expect(parsed["IS"]).toBe(1e-14);
-    expect(parsed["BF"]).toBe(200);
+    const stored = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
+    expect(typeof stored).toBe("object");
+    expect(stored["IS"]).toBe(1e-14);
+    expect(stored["BF"]).toBe(200);
   });
 
   it("applySpiceImportResult stores _spiceModelName for display", () => {
@@ -133,7 +134,7 @@ describe("spice-import-dialog: parse and apply", () => {
     const circuit = new Circuit();
 
     applySpiceImportResult(element, {
-      overridesJson: JSON.stringify({ IS: 2e-14 }),
+      overrides: { IS: 2e-14 },
       modelName: "BC547",
       deviceType: "NPN",
     }, circuit);
@@ -144,7 +145,7 @@ describe("spice-import-dialog: parse and apply", () => {
   it("applySpiceImportResult overwrites previously stored model name and overrides", () => {
     const propsMap = new Map<string, PropertyValue>([
       ["_spiceModelName", "OLD_MODEL"],
-      ["_spiceModelOverrides", JSON.stringify({ IS: 1e-10 })],
+      ["_spiceModelOverrides", { IS: 1e-10 }],
     ]);
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -154,13 +155,13 @@ describe("spice-import-dialog: parse and apply", () => {
     const circuit = new Circuit();
 
     applySpiceImportResult(element, {
-      overridesJson: JSON.stringify({ IS: 5e-15, BF: 300 }),
+      overrides: { IS: 5e-15, BF: 300 },
       modelName: "2SC1815",
       deviceType: "NPN",
     }, circuit);
 
     expect(element.getProperties().get("_spiceModelName")).toBe("2SC1815");
-    const overrides = JSON.parse(element.getProperties().get("_spiceModelOverrides") as string) as Record<string, number>;
+    const overrides = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBe(5e-15);
     expect(overrides["BF"]).toBe(300);
   });
@@ -174,7 +175,7 @@ describe("spice-import-dialog: parse and apply", () => {
     const circuit = new Circuit();
 
     applySpiceImportResult(element, {
-      overridesJson: JSON.stringify({ IS: 1e-14, BF: 200 }),
+      overrides: { IS: 1e-14, BF: 200 },
       modelName: "2N2222",
       deviceType: "NPN",
     }, circuit);
@@ -191,7 +192,7 @@ describe("spice-import-dialog: parse and apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("spice-import-dialog: compile integration", () => {
-  function buildRegistryAndCircuit(spiceModelOverrides?: string): {
+  function buildRegistryAndCircuit(spiceModelOverrides?: Record<string, number>): {
     capturedModelParams: Record<string, number> | undefined;
     diagnostics: Array<{ code: string; severity: string; summary?: string }>;
   } {
@@ -256,7 +257,7 @@ describe("spice-import-dialog: compile integration", () => {
     }
 
     const circuit = new Circuit();
-    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }]);
+    const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
     const npn = makeElement(
       "NpnStub",
       "q1",
@@ -266,6 +267,7 @@ describe("spice-import-dialog: compile integration", () => {
         { x: 0, y: 0, label: "E" },
       ],
       propsMap,
+      registry,
     );
 
     circuit.addElement(gnd);
@@ -285,8 +287,7 @@ describe("spice-import-dialog: compile integration", () => {
     expect("message" in parsed).toBe(false);
     if ("message" in parsed) return;
 
-    const overridesJson = JSON.stringify(parsed.params);
-    const { capturedModelParams, diagnostics } = buildRegistryAndCircuit(overridesJson);
+    const { capturedModelParams, diagnostics } = buildRegistryAndCircuit(parsed.params);
 
     const errors = diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(0);
@@ -310,13 +311,13 @@ describe("spice-import-dialog: compile integration", () => {
 
     const circuit = new Circuit();
     applySpiceImportResult(element, {
-      overridesJson: JSON.stringify(parsed.params),
+      overrides: parsed.params,
       modelName: parsed.name,
       deviceType: parsed.deviceType,
     }, circuit);
 
     expect(element.getProperties().get("_spiceModelName")).toBe("BC547");
-    const overrides = JSON.parse(element.getProperties().get("_spiceModelOverrides") as string) as Record<string, number>;
+    const overrides = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
     expect(overrides["IS"]).toBe(6e-15);
     expect(overrides["BF"]).toBe(110);
   });
@@ -328,7 +329,7 @@ describe("spice-import-dialog: compile integration", () => {
     expect("message" in parsed).toBe(false);
     if ("message" in parsed) return;
 
-    const { capturedModelParams } = buildRegistryAndCircuit(JSON.stringify(parsed.params));
+    const { capturedModelParams } = buildRegistryAndCircuit(parsed.params);
 
     expect(capturedModelParams!["IS"]).toBe(2e-15);
     expect(capturedModelParams!["BF"]).toBe(BJT_NPN_DEFAULTS["BF"]);
@@ -354,7 +355,7 @@ describe("spice-import-dialog: compile integration", () => {
     expect(parsed.params["IS"]).toBeCloseTo(6.734e-15, 20);
     expect(parsed.params["BF"]).toBeCloseTo(416.4, 5);
 
-    const { capturedModelParams } = buildRegistryAndCircuit(JSON.stringify(parsed.params));
+    const { capturedModelParams } = buildRegistryAndCircuit(parsed.params);
 
     expect(capturedModelParams!["IS"]).toBeCloseTo(6.734e-15, 20);
     expect(capturedModelParams!["BF"]).toBeCloseTo(416.4, 5);

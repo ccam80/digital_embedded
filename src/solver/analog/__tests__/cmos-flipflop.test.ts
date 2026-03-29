@@ -78,8 +78,10 @@ function makeElement(
   instanceId: string,
   pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label ?? ""));
+  const def = registry?.get(typeId);
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
   const serialized: SerializedElement = {
     typeId,
@@ -124,10 +126,10 @@ function buildRegistry(): ComponentRegistry {
 
 // DcVoltageSourceDefinition pinLayout order: [neg, pos]
 // analogFactory: makeDcVoltageSource(nodeIds[1]=pos, nodeIds[0]=neg, ...)
-function voltSrc(circuit: Circuit, id: string, xPos: number, xNeg: number, y: number, voltage: number): void {
+function voltSrc(circuit: Circuit, id: string, xPos: number, xNeg: number, y: number, voltage: number, registry?: ComponentRegistry): void {
   circuit.addElement(makeElement("DcVoltageSource", id,
     [{ x: xNeg, y }, { x: xPos, y }],
-    new Map<string, PropertyValue>([["voltage", voltage]])));
+    new Map<string, PropertyValue>([["voltage", voltage]]), registry));
 }
 
 /**
@@ -176,8 +178,8 @@ function nmosEl(circuit: Circuit, id: string, xD: number, xG: number, xS: number
     new Map<string, PropertyValue>([["W", W]])));
 }
 
-function gnd(circuit: Circuit, xG: number): void {
-  circuit.addElement(makeElement("Ground", `gnd-${xG}`, [{ x: xG, y: 0 }]));
+function gnd(circuit: Circuit, xG: number, registry?: ComponentRegistry): void {
+  circuit.addElement(makeElement("Ground", `gnd-${xG}`, [{ x: xG, y: 0 }], new Map(), registry));
 }
 
 // ---------------------------------------------------------------------------
@@ -236,10 +238,10 @@ function buildDffDc(vD: number, vClk: number, vdd = 3.3): DffCircuit {
   const registry = buildRegistry();
   const X_VDD = 5, X_D = 10, X_CLK = 20, X_GND = 30;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "vd_src", X_D, X_GND, 0, vD);
-  voltSrc(circuit, "vclk_src", X_CLK, X_GND, 0, vClk);
-  gnd(circuit, X_GND);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "vd_src", X_D, X_GND, 0, vD, registry);
+  voltSrc(circuit, "vclk_src", X_CLK, X_GND, 0, vClk, registry);
+  gnd(circuit, X_GND, registry);
 
   addDffMosfets(circuit, X_VDD, X_D, X_CLK, X_GND);
   addDffWires(circuit, X_VDD, X_D, X_CLK, X_GND);
@@ -256,10 +258,10 @@ function buildDffRamp(vD: number, tStartNs: number, vdd = 3.3): DffCircuit {
   const registry = buildRegistry();
   const X_VDD = 5, X_D = 10, X_CLK = 20, X_GND = 30;
 
-  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd);
-  voltSrc(circuit, "vd_src", X_D, X_GND, 0, vD);
+  voltSrc(circuit, "vdd_src", X_VDD, X_GND, 0, vdd, registry);
+  voltSrc(circuit, "vd_src", X_D, X_GND, 0, vD, registry);
   rampSrc(circuit, "vclk_src", X_CLK, X_GND, 0, tStartNs, 2, vdd);
-  gnd(circuit, X_GND);
+  gnd(circuit, X_GND, registry);
 
   addDffMosfets(circuit, X_VDD, X_D, X_CLK, X_GND);
   addDffWires(circuit, X_VDD, X_D, X_CLK, X_GND);

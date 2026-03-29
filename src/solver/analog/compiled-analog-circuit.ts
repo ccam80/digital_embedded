@@ -12,6 +12,7 @@ import type { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
 import type { BridgeInstance } from "./bridge-instance.js";
+import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { ResolvedPin } from "../../core/pin.js";
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  for zero-wire groups where components connect via pin overlap). */
   readonly groupToNodeId: Map<number, number>;
 
+  /** Maps element index → bridge adapters owned by that element. Used by the
+   *  coordinator to route composite pin-param keys (e.g. "A.rOut") to the
+   *  correct bridge adapter at runtime without re-scanning all elements. */
+  readonly elementBridgeAdapters: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
@@ -121,6 +127,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
     elementResolvedPins?: Map<number, ResolvedPin[]>;
     groupToNodeId?: Map<number, number>;
+    elementBridgeAdapters?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: SolverDiagnostic[];
     bridges?: BridgeInstance[];
     timeRef?: { value: number };
@@ -136,6 +143,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.elementPinVertices = params.elementPinVertices ?? new Map();
     this.elementResolvedPins = params.elementResolvedPins ?? new Map();
     this.groupToNodeId = params.groupToNodeId ?? new Map();
+    this.elementBridgeAdapters = params.elementBridgeAdapters ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.bridges = params.bridges ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };

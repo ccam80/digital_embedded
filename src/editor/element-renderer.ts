@@ -23,8 +23,11 @@ const PIN_CIRCLE_RADIUS = 0.15;
 /** Font size for pin loading indicator symbols (grid units). */
 const PIN_LOADING_FONT_SIZE = 0.45;
 
-/** Offset from pin center to loading indicator center (grid units). */
-const PIN_LOADING_OFFSET = 0.4;
+/** Horizontal offset from pin toward wire side (grid units). */
+const PIN_LOADING_OUTBOARD = 0.2;
+
+/** Vertical offset above the pin connection (grid units, screen-up = -Y). */
+const PIN_LOADING_ABOVE = 0.2;
 
 /**
  * Radius of the unfilled negation bubble (grid units).
@@ -202,7 +205,8 @@ export class ElementRenderer {
 
   /**
    * Draw a small ∞ (ideal/no loading) or Z (loaded) symbol on the wire side
-   * of the pin, offset outward from the component body along the pin axis.
+   * of the pin.  Positioned 0.2 grid units outboard (away from body) and
+   * 0.2 grid units above (screen-up) the pin connection point.
    */
   private _renderPinLoadingIndicator(
     ctx: RenderContext,
@@ -212,23 +216,32 @@ export class ElementRenderer {
   ): void {
     const wp = pinWorldPosition(element, pin);
 
-    // Outward direction: element center → pin position (local space)
-    const px = pin.position.x;
-    const py = pin.position.y;
-    const len = Math.sqrt(px * px + py * py);
-    if (len < 0.01) return;
-    const localDir = { x: px / len, y: py / len };
-    if (element.mirror) localDir.y = -localDir.y;
-    const worldDir = rotatePoint(localDir, element.rotation as Rotation);
+    // Determine outboard direction: snap to the dominant axis from
+    // bounding-box center → pin, so the offset is a clean horizontal shift.
+    // getBoundingBox() returns world coords — convert center to local space.
+    const bb = element.getBoundingBox();
+    const cx = bb.x + bb.width / 2 - element.position.x;
+    const cy = bb.y + bb.height / 2 - element.position.y;
+    const rawDx = pin.position.x - cx;
+    const rawDy = pin.position.y - cy;
+    // Snap to dominant axis: purely horizontal or purely vertical
+    let lx: number, ly: number;
+    if (Math.abs(rawDx) >= Math.abs(rawDy)) {
+      lx = rawDx >= 0 ? 1 : -1; ly = 0;
+    } else {
+      lx = 0; ly = rawDy >= 0 ? 1 : -1;
+    }
+    if (element.mirror) ly = -ly;
+    const outboard = rotatePoint({ x: lx, y: ly }, element.rotation as Rotation);
 
     const symbol = loading === 'ideal' ? '\u221E' : 'Z';
     ctx.setColor('COMPONENT');
     ctx.setFont({ family: 'sans-serif', size: PIN_LOADING_FONT_SIZE });
     ctx.drawText(
       symbol,
-      wp.x + worldDir.x * PIN_LOADING_OFFSET,
-      wp.y + worldDir.y * PIN_LOADING_OFFSET,
-      { horizontal: 'center', vertical: 'middle' },
+      wp.x + outboard.x * PIN_LOADING_OUTBOARD,
+      wp.y + outboard.y * PIN_LOADING_OUTBOARD - PIN_LOADING_ABOVE,
+      { horizontal: 'center', vertical: 'bottom' },
     );
     ctx.setColor('PIN');
   }
