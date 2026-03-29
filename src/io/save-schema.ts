@@ -21,8 +21,21 @@ export interface SavedMetadata {
   measurementOrdering: string[];
   /** Whether this is a generic (parameterised) circuit. */
   isGeneric: boolean;
-  /** Simulation engine type. Absent in older files; defaults to "digital". */
-  engineType?: string;
+  /**
+   * Controls where analog/digital bridge adapters are placed.
+   * Absent = "cross-domain" default.
+   */
+  digitalPinLoading?: "cross-domain" | "all" | "none";
+  /**
+   * Per-net overrides for digital pin loading mode.
+   * Each entry identifies a net by anchor and overrides the circuit-level setting.
+   */
+  digitalPinLoadingOverrides?: Array<{
+    anchor:
+      | { type: "label"; label: string }
+      | { type: "pin"; instanceId: string; pinLabel: string };
+    loading: "loaded" | "ideal";
+  }>;
 }
 
 /**

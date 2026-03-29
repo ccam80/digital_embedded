@@ -29,10 +29,14 @@ const WIRE_WIDTH_ANALOG = 2;
 /** Line width for bus wires (width > 1). */
 const WIRE_WIDTH_BUS = 3;
 
+/** Size of the override indicator tick mark (in grid units). */
+const OVERRIDE_TICK_SIZE = 0.25;
+
 export class WireRenderer {
   private _colorScheme: ColorScheme = defaultColorScheme;
   private _voltageTracker: VoltageRangeTracker | null = null;
   private _junctionCountMap = new Map<string, number>();
+  private _overrideWires: ReadonlySet<Wire> = new Set();
 
   /**
    * Set the active color scheme. Used to resolve voltage gradient endpoint colors.
@@ -51,6 +55,16 @@ export class WireRenderer {
    */
   setVoltageTracker(tracker: VoltageRangeTracker | null): void {
     this._voltageTracker = tracker;
+  }
+
+  /**
+   * Set the wires that have a per-net digitalPinLoading override.
+   * These wires receive a small tick mark at their midpoint during rendering.
+   *
+   * @param wires - Set of wires that belong to a net with an active override.
+   */
+  setOverrideIndicators(wires: ReadonlySet<Wire>): void {
+    this._overrideWires = wires;
   }
 
   /**
@@ -194,6 +208,42 @@ export class WireRenderer {
       const midY = (wire.start.y + wire.end.y) / 2;
       const label = `0x${value.raw.toString(16)}`;
       ctx.drawText(label, midX, midY, { horizontal: "center", vertical: "bottom" });
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Draw a small perpendicular tick mark at the midpoint of each wire that
+   * has a per-net pin-loading override. Uses the WIRE_ANALOG color so the
+   * indicator is distinct from the wire's signal color.
+   */
+  renderOverrideIndicators(ctx: RenderContext, wires: readonly Wire[]): void {
+    if (this._overrideWires.size === 0) return;
+
+    ctx.save();
+    ctx.setColor('WIRE_ANALOG');
+    ctx.setLineWidth(2);
+
+    for (const wire of wires) {
+      if (!this._overrideWires.has(wire)) continue;
+
+      const mx = (wire.start.x + wire.end.x) / 2;
+      const my = (wire.start.y + wire.end.y) / 2;
+      const dx = wire.end.x - wire.start.x;
+      const dy = wire.end.y - wire.start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.01) continue;
+
+      const nx = -dy / len;
+      const ny = dx / len;
+
+      ctx.drawLine(
+        mx - nx * OVERRIDE_TICK_SIZE,
+        my - ny * OVERRIDE_TICK_SIZE,
+        mx + nx * OVERRIDE_TICK_SIZE,
+        my + ny * OVERRIDE_TICK_SIZE,
+      );
     }
 
     ctx.restore();

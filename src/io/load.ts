@@ -36,12 +36,28 @@ const SavedPropertyValueSchema = z.union([
   z.array(z.number()),
 ]);
 
+const DigitalPinLoadingAnchorSchema = z.union([
+  z.object({ type: z.literal("label"), label: z.string() }),
+  z.object({ type: z.literal("pin"), instanceId: z.string(), pinLabel: z.string() }),
+]);
+
+const DigitalPinLoadingOverrideSchema = z.object({
+  anchor: DigitalPinLoadingAnchorSchema,
+  loading: z.union([z.literal("loaded"), z.literal("ideal")]),
+});
+
 const SavedMetadataSchema = z.object({
   name: z.string(),
   description: z.string(),
   measurementOrdering: z.array(z.string()),
   isGeneric: z.boolean(),
   engineType: z.string().optional(),
+  digitalPinLoading: z.union([
+    z.literal("cross-domain"),
+    z.literal("all"),
+    z.literal("none"),
+  ]).optional(),
+  digitalPinLoadingOverrides: z.array(DigitalPinLoadingOverrideSchema).optional(),
 });
 
 const SavedElementSchema = z.object({
@@ -149,6 +165,12 @@ export function deserializeCircuit(
     measurementOrdering: migrated.metadata.measurementOrdering,
     isGeneric: migrated.metadata.isGeneric,
   };
+  if (migrated.metadata.digitalPinLoading !== undefined) {
+    metadata.digitalPinLoading = migrated.metadata.digitalPinLoading;
+  }
+  if (migrated.metadata.digitalPinLoadingOverrides !== undefined) {
+    metadata.digitalPinLoadingOverrides = migrated.metadata.digitalPinLoadingOverrides;
+  }
 
   const circuit = new Circuit(metadata);
 

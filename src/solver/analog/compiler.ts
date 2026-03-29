@@ -494,16 +494,33 @@ function resolveLogicFamily(
 }
 
 /**
- * Populate a ModelLibrary from a circuit's `metadata.models` Map.
+ * Populate a ModelLibrary from a circuit's metadata.
  *
- * Converts `DeviceModel` entries (which may use `Map<string,number>` for
- * params) into the flat `Record<string,number>` format the library expects.
- * No-ops when the metadata has no `models` key or it is not a Map.
+ * Reads from `metadata.namedParameterSets` (the typed DTS/JSON field) and
+ * from the legacy `metadata.models` Map (older .dig/.json format).
+ * No-ops when neither source is present.
  */
 function populateModelLibrary(
   modelLibrary: ModelLibrary,
   metadataSource: Record<string, unknown>,
 ): void {
+  const namedParameterSets = metadataSource["namedParameterSets"];
+  if (
+    namedParameterSets !== null &&
+    typeof namedParameterSets === 'object' &&
+    !Array.isArray(namedParameterSets)
+  ) {
+    const sets = namedParameterSets as Record<string, { deviceType: string; params: Record<string, number> }>;
+    for (const [name, entry] of Object.entries(sets)) {
+      modelLibrary.add({
+        name,
+        type: entry.deviceType as import("./model-parser.js").DeviceType,
+        level: 1,
+        params: entry.params,
+      });
+    }
+  }
+
   if (!(metadataSource["models"] instanceof Map)) return;
   const circuitModels = metadataSource["models"] as Map<string, DeviceModel>;
   for (const model of circuitModels.values()) {

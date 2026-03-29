@@ -464,3 +464,102 @@ What's already done:
 - **Files created**: none
 - **Files modified**: none (already implemented in prior waves)
 - **Tests**: 0/0 (verified by inspection — canvas-popup.ts already uses getActiveModelKey and modelKeyToDomain for panel switching at lines 85-96; implementation matches spec exactly)
+
+## Task W12.1: Add `modelDefinitions` and `namedParameterSets` to DTS schema
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/io/dts-schema.ts, src/io/dts-serializer.ts, src/io/dts-deserializer.ts, src/io/__tests__/dts-schema.test.ts
+- **Tests**: 26/26 passing (12 new tests added)
+- **Summary**:
+  - Added `modelDefinitions` and `namedParameterSets` to `DtsDocument` interface in dts-schema.ts
+  - Added validation for both fields in `validateDtsDocument()`
+  - Updated `serializeCircuit()` and `serializeWithSubcircuits()` in dts-serializer.ts to emit both fields when present on CircuitMetadata; modelDefinitions stored as DtsCircuit with ports/elementCount in attributes
+  - Updated `deserializeDts()` in dts-deserializer.ts to restore both fields into circuit.metadata on load
+
+## Task W9.1: Add `digitalPinLoading` + per-net overrides to save schema, serializer, deserializer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/__tests__/save-load-pin-loading.test.ts
+- **Files modified**: src/io/save-schema.ts, src/io/save.ts, src/io/load.ts, src/io/dts-serializer.ts, src/io/dts-deserializer.ts
+- **Tests**: 18/18 passing
+- **Summary**:
+  - `SavedMetadata`: removed `engineType?`, added `digitalPinLoading?` and `digitalPinLoadingOverrides?`
+  - `save.ts` `serializeMetadata()`: writes `digitalPinLoading` and `digitalPinLoadingOverrides` when present
+  - `load.ts` Zod schema: added `digitalPinLoading` and `digitalPinLoadingOverrides` schemas; `engineType` remains in Zod schema for parse tolerance but is never written to `CircuitMetadata` (stripped on load); deserializer populates `digitalPinLoading` and `digitalPinLoadingOverrides` from parsed metadata
+  - `dts-serializer.ts` `circuitToDtsCircuit()`: writes `digitalPinLoading` as `attributes.digitalPinLoading` string and `digitalPinLoadingOverrides` as `attributes.digitalPinLoadingOverrides` JSON string when present
+  - `dts-deserializer.ts` `deserializeDtsCircuit()`: reads `attributes.digitalPinLoading` and `attributes.digitalPinLoadingOverrides` (JSON.parse) into `CircuitMetadata`
+  - All 458 io tests pass; 16 failures in other modules are pre-existing from parallel agent waves (W6/W10), not regressions
+
+## Task W12.2: Serialize/deserialize: populate ModelLibrary and TransistorModelRegistry on load
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/io/dts-serializer.ts, src/io/dts-deserializer.ts, src/solver/analog/compiler.ts
+- **Tests**: 26/26 passing (existing dts-schema tests unchanged), 10070/10086 vitest passing (16 pre-existing failures)
+- **Summary**:
+  - dts-serializer.ts: Added `TransistorModelRegistry` import; updated `buildModelFields()` to accept optional registry and serialize full DtsCircuit topology when available; updated `serializeCircuit()` and `serializeWithSubcircuits()` signatures to accept optional `transistorModels` parameter
+  - dts-deserializer.ts: Added `ModelLibrary` and `TransistorModelRegistry` imports; added `DtsDeserializeOptions` interface; updated `deserializeDts()` to accept optional options; on load, adds entries to `modelLibrary` from `namedParameterSets` and deserializes + registers model circuits in `transistorModelRegistry` when options are provided
+  - compiler.ts: Updated `populateModelLibrary()` to read from `circuit.metadata.namedParameterSets` in addition to the legacy `metadata.models` Map
+
+## Task W9.2: Strip `engineType` from `SavedMetadata` on load
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: (none — handled by W9.1)
+- **Tests**: 2/2 passing (covered by W9.1 test file: "strips engineType field present in old files", "old file with engineType still loads name and description correctly")
+- **Implementation**: `engineType` was removed from `SavedMetadata` interface in W9.1. The Zod schema in `load.ts` retains `engineType: z.string().optional()` for parse tolerance (old files don't fail validation), but the deserialization code uses explicit field copies so `engineType` is never propagated to `CircuitMetadata`. No additional code needed.
+
+## Task W9.3: Tests: round-trip, orphaned override diagnostic
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/__tests__/save-load-pin-loading-compile.test.ts
+- **Files modified**: (none)
+- **Tests**: 9/9 passing
+- **Summary**:
+  - Round-trip compile tests (JSON + DTS): save circuit with digitalPinLoading set → load → compileUnified → verify zero compile errors and metadata preserved
+  - Orphaned label anchor test (JSON + DTS): save circuit with override referencing non-existent label "CLK"/"MISSING_NET" → load → compile → verify orphaned-pin-loading-override warning with net name in message
+  - Orphaned pin anchor test (JSON + DTS): build circuit without the referenced element, add override with that instanceId → save → load → compile → verify orphaned-pin-loading-override warning with instanceId in message
+  - Note: JSON deserializer does not restore instanceId (factory generates new UUID); tests construct the "deleted element" scenario directly rather than relying on instanceId round-trip via JSON
+
+## Task W12.3: Tests: round-trip save/load with imported models
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/__tests__/dts-model-roundtrip.test.ts
+- **Files modified**: src/io/dts-serializer.ts (bugfix: ports attribute now added to full DtsCircuit when serialized from registry)
+- **Tests**: 18/18 passing (all new tests in dts-model-roundtrip.test.ts)
+- **Summary**:
+  - 5 tests for namedParameterSets round-trip: metadata preserved, ModelLibrary populated on load, absent case handled, serialized JSON has key
+  - 4 tests for modelDefinitions round-trip: ports/elementCount preserved, absent case, full circuit registered in TransistorModelRegistry when topology available, stub metadata when no topology
+  - 2 tests for both fields together
+  - 4 tests for serializeCircuit with transistorModels param: full topology serialization, stub fallback
+  - Fixed bug in buildModelFields: when serializing full circuit topology from registry, ports attribute was missing from DtsCircuit; added it from CircuitMetadata.modelDefinitions entry
+
+## Task W8.1: Pin loading menu in Simulation menu (cross-domain/all/none)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/__tests__/pin-loading-menu.test.ts
+- **Files modified**: src/app/menu-toolbar.ts, simulator.html
+- **Tests**: 7/7 passing
+- **Summary**: Added `buildSimulationPinLoadingMenu()` function to menu-toolbar.ts that wires up three menu items (Cross-Domain, All Pins, None) in the Simulation menu. Each item mutates `circuit.metadata.digitalPinLoading` via an `EditCommand` pushed to the `undoStack` (fully undoable). Checkmarks are updated on each click. Added three menu items + separator to the Simulation dropdown in simulator.html. Wrote 7 headless tests verifying digitalPinLoading affects bridge adapter synthesis (all > cross-domain >= none).
+
+## Task W8.2: Per-net override context menu + visual indicators on wires
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/__tests__/pin-loading-overrides.test.ts
+- **Files modified**: src/app/menu-toolbar.ts, src/editor/wire-renderer.ts, src/app/render-pipeline.ts
+- **Tests**: 8/8 passing
+- **Summary**:
+  - Added `stableNetIdToAnchor()` helper and `refreshOverrideIndicators()` function in menu-toolbar.ts to convert stableNetId strings to PinLoadingOverride anchors and update the wireRenderer override set
+  - Added "Pin Loading: Loaded", "Pin Loading: Ideal", "Pin Loading: Default" items to the wire right-click context menu. Each click creates an EditCommand pushed to the undoStack that adds/removes entries from `circuit.metadata.digitalPinLoadingOverrides`
+  - Added `setOverrideIndicators(wires)` and `renderOverrideIndicators()` to WireRenderer that draws a perpendicular tick at wire midpoints for overridden nets (WIRE_ANALOG color)
+  - Called `renderOverrideIndicators` from the render pipeline after `renderBusWidthMarkers`
+  - 8 headless tests covering stableNetId format, resolveLoadingOverrides (label/pin anchors, orphaned overrides, multiple overrides), and wire group membership
+
+## Task W8.3: E2E tests — right-click wire override, checkmark indicator, persistence
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: e2e/gui/pin-loading-wire-override.spec.ts
+- **Files modified**: (none — file was created in prior session, rewritten to use UICircuitBuilder)
+- **Tests**: 5/5 passing
+- **Notes**: Initial version used raw grid-coordinate clicks which failed to trigger wire-drawing mode and could not find circuit via bridge. Rewrote to use UICircuitBuilder.placeLabeled + drawWire + getPinPagePosition to correctly place components, draw the wire, and compute the wire midpoint for right-click. All 5 tests pass.

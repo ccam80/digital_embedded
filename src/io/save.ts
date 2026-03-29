@@ -138,6 +138,14 @@ function serializeMetadata(circuit: Circuit): SavedMetadata {
     measurementOrdering: [...circuit.metadata.measurementOrdering],
     isGeneric: circuit.metadata.isGeneric,
   };
+  if (circuit.metadata.digitalPinLoading !== undefined) {
+    meta.digitalPinLoading = circuit.metadata.digitalPinLoading;
+  }
+  if (circuit.metadata.digitalPinLoadingOverrides !== undefined && circuit.metadata.digitalPinLoadingOverrides.length > 0) {
+    meta.digitalPinLoadingOverrides = circuit.metadata.digitalPinLoadingOverrides.map(
+      (o) => ({ anchor: { ...o.anchor } as typeof o.anchor, loading: o.loading }),
+    );
+  }
   return meta;
 }
 

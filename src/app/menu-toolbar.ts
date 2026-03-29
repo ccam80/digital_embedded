@@ -23,6 +23,8 @@ import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { Circuit, Wire } from '../core/circuit.js';
+import { resolveModelAssignments, extractConnectivityGroups, stableNetId } from '../compile/extract-connectivity.js';
+import type { PinLoadingOverride } from '../compile/extract-connectivity.js';
 import { getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
@@ -497,6 +499,92 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
               ctx.invalidateCompiled();
             }, enabled: true,
           });
+        }
+      }
+
+      if (!locked) {
+        const modelAssignments = resolveModelAssignments(ctx.circuit.elements, registry);
+        const [groups] = extractConnectivityGroups(
+          ctx.circuit.elements,
+          ctx.circuit.wires,
+          registry,
+          modelAssignments,
+        );
+
+        const hitGroup = groups.find(g => g.wires.includes(wireHit));
+        if (hitGroup !== undefined) {
+          const netId = stableNetId(hitGroup, ctx.circuit.elements);
+          const anchor = stableNetIdToAnchor(netId);
+          const currentOverrides = ctx.circuit.metadata.digitalPinLoadingOverrides ?? [];
+          const existing = currentOverrides.find(o => {
+            if (o.anchor.type !== anchor.type) return false;
+            if (o.anchor.type === 'label' && anchor.type === 'label') return o.anchor.label === anchor.label;
+            if (o.anchor.type === 'pin' && anchor.type === 'pin') {
+              return o.anchor.instanceId === anchor.instanceId && o.anchor.pinLabel === anchor.pinLabel;
+            }
+            return false;
+          });
+          const currentMode: 'loaded' | 'ideal' | 'default' = existing?.loading ?? 'default';
+
+          const makeOverrideCmd = (newMode: 'loaded' | 'ideal' | 'default') => {
+            const prevOverrides = [...currentOverrides];
+            const nextOverrides = newMode === 'default'
+              ? prevOverrides.filter(o => {
+                if (o.anchor.type !== anchor.type) return true;
+                if (o.anchor.type === 'label' && anchor.type === 'label') return o.anchor.label !== anchor.label;
+                if (o.anchor.type === 'pin' && anchor.type === 'pin') {
+                  return !(o.anchor.instanceId === anchor.instanceId && o.anchor.pinLabel === anchor.pinLabel);
+                }
+                return true;
+              })
+              : [
+                ...prevOverrides.filter(o => {
+                  if (o.anchor.type !== anchor.type) return true;
+                  if (o.anchor.type === 'label' && anchor.type === 'label') return o.anchor.label !== anchor.label;
+                  if (o.anchor.type === 'pin' && anchor.type === 'pin') {
+                    return !(o.anchor.instanceId === anchor.instanceId && o.anchor.pinLabel === anchor.pinLabel);
+                  }
+                  return true;
+                }),
+                { anchor, loading: newMode as 'loaded' | 'ideal' },
+              ];
+            return {
+              description: `Set wire pin loading to ${newMode}`,
+              execute() {
+                if (nextOverrides.length > 0) {
+                  ctx.circuit.metadata.digitalPinLoadingOverrides = nextOverrides;
+                } else {
+                  delete ctx.circuit.metadata.digitalPinLoadingOverrides;
+                }
+                refreshOverrideIndicators(ctx);
+                simController.invalidateCompiled();
+                ctx.scheduleRender();
+              },
+              undo() {
+                if (prevOverrides.length > 0) {
+                  ctx.circuit.metadata.digitalPinLoadingOverrides = prevOverrides;
+                } else {
+                  delete ctx.circuit.metadata.digitalPinLoadingOverrides;
+                }
+                refreshOverrideIndicators(ctx);
+                simController.invalidateCompiled();
+                ctx.scheduleRender();
+              },
+            };
+          };
+
+          if (items.length > 0) items.push(separator());
+          items.push(
+            { label: `${currentMode === 'loaded' ? '\u2713 ' : ''}Pin Loading: Loaded`, action: () => {
+              if (currentMode !== 'loaded') undoStack.push(makeOverrideCmd('loaded'));
+            }, enabled: true },
+            { label: `${currentMode === 'ideal' ? '\u2713 ' : ''}Pin Loading: Ideal`, action: () => {
+              if (currentMode !== 'ideal') undoStack.push(makeOverrideCmd('ideal'));
+            }, enabled: true },
+            { label: `${currentMode === 'default' ? '\u2713 ' : ''}Pin Loading: Default`, action: () => {
+              if (currentMode !== 'default') undoStack.push(makeOverrideCmd('default'));
+            }, enabled: true },
+          );
         }
       }
 
@@ -1361,6 +1449,116 @@ function buildPanelResizeHandles(_ctx: AppContext, deps: MTDeps): void {
 }
 
 // ---------------------------------------------------------------------------
+// Pin loading override helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a stableNetId string into a PinLoadingOverride anchor.
+ * Strings have the form "label:<label>" or "pin:<instanceId>:<pinLabel>".
+ */
+function stableNetIdToAnchor(id: string): PinLoadingOverride['anchor'] {
+  if (id.startsWith('label:')) {
+    return { type: 'label', label: id.slice('label:'.length) };
+  }
+  const pinPrefix = 'pin:';
+  const rest = id.slice(pinPrefix.length);
+  const lastColon = rest.lastIndexOf(':');
+  return {
+    type: 'pin',
+    instanceId: rest.slice(0, lastColon),
+    pinLabel: rest.slice(lastColon + 1),
+  };
+}
+
+/**
+ * Recompute which wires belong to nets with per-net overrides and push the
+ * result to the wireRenderer's override indicator set. Called after any
+ * change to circuit.metadata.digitalPinLoadingOverrides.
+ */
+function refreshOverrideIndicators(ctx: AppContext): void {
+  const overrides = ctx.circuit.metadata.digitalPinLoadingOverrides;
+  if (!overrides || overrides.length === 0) {
+    ctx.wireRenderer.setOverrideIndicators(new Set());
+    return;
+  }
+
+  const modelAssignments = resolveModelAssignments(ctx.circuit.elements, ctx.palette.getRegistry());
+  const [groups] = extractConnectivityGroups(
+    ctx.circuit.elements,
+    ctx.circuit.wires,
+    ctx.palette.getRegistry(),
+    modelAssignments,
+  );
+
+  const overrideNetIdSet = new Set<string>(overrides.map(o => {
+    if (o.anchor.type === 'label') return `label:${o.anchor.label}`;
+    return `pin:${o.anchor.instanceId}:${o.anchor.pinLabel}`;
+  }));
+
+  const overrideWires = new Set<Wire>();
+  for (const group of groups) {
+    const netId = stableNetId(group, ctx.circuit.elements);
+    if (!overrideNetIdSet.has(netId)) continue;
+    for (const wire of group.wires) {
+      overrideWires.add(wire);
+    }
+  }
+
+  ctx.wireRenderer.setOverrideIndicators(overrideWires);
+}
+
+// ---------------------------------------------------------------------------
+// buildSimulationPinLoadingMenu
+// ---------------------------------------------------------------------------
+
+function buildSimulationPinLoadingMenu(ctx: AppContext, deps: MTDeps): void {
+  const { simController } = deps;
+  const { undoStack } = ctx;
+
+  const MODES: Array<{ id: string; checkId: string; value: "cross-domain" | "all" | "none" }> = [
+    { id: 'btn-pin-loading-cross-domain', checkId: 'pin-loading-check-cross-domain', value: 'cross-domain' },
+    { id: 'btn-pin-loading-all',          checkId: 'pin-loading-check-all',          value: 'all'          },
+    { id: 'btn-pin-loading-none',         checkId: 'pin-loading-check-none',         value: 'none'         },
+  ];
+
+  function updateCheckmarks(): void {
+    const current = ctx.circuit.metadata.digitalPinLoading ?? 'cross-domain';
+    for (const mode of MODES) {
+      const check = document.getElementById(mode.checkId);
+      if (check) check.textContent = current === mode.value ? '\u2713' : '';
+    }
+  }
+
+  for (const mode of MODES) {
+    document.getElementById(mode.id)?.addEventListener('click', () => {
+      const prev = ctx.circuit.metadata.digitalPinLoading ?? 'cross-domain';
+      if (prev === mode.value) return;
+      const next = mode.value;
+      const cmd = {
+        description: `Set pin loading to ${next}`,
+        execute() {
+          ctx.circuit.metadata.digitalPinLoading = next;
+          updateCheckmarks();
+          simController.invalidateCompiled();
+        },
+        undo() {
+          if (prev === 'cross-domain') {
+            delete ctx.circuit.metadata.digitalPinLoading;
+          } else {
+            ctx.circuit.metadata.digitalPinLoading = prev;
+          }
+          updateCheckmarks();
+          simController.invalidateCompiled();
+        },
+      };
+      undoStack.push(cmd);
+    });
+  }
+
+  updateCheckmarks();
+}
+
+// ---------------------------------------------------------------------------
 // buildSpiceModelLibrary
 // ---------------------------------------------------------------------------
 
@@ -1407,6 +1605,7 @@ export function initMenuAndToolbar(
   const openSearchBar = buildSearchBar(ctx, deps);
   buildPaletteToggle(ctx, deps);
   buildPanelResizeHandles(ctx, deps);
+  buildSimulationPinLoadingMenu(ctx, deps);
   buildSpiceModelLibrary(ctx, deps);
 
   return {

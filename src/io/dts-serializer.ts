@@ -8,6 +8,7 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
+import type { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
 import type {
   DtsDocument,
   DtsCircuit,
@@ -115,6 +116,26 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
     result.isGeneric = circuit.metadata.isGeneric;
   }
 
+  if (
+    circuit.metadata.digitalPinLoading !== undefined ||
+    (circuit.metadata.digitalPinLoadingOverrides !== undefined &&
+      circuit.metadata.digitalPinLoadingOverrides.length > 0)
+  ) {
+    const attrs: Record<string, string> = {};
+    if (circuit.metadata.digitalPinLoading !== undefined) {
+      attrs['digitalPinLoading'] = circuit.metadata.digitalPinLoading;
+    }
+    if (
+      circuit.metadata.digitalPinLoadingOverrides !== undefined &&
+      circuit.metadata.digitalPinLoadingOverrides.length > 0
+    ) {
+      attrs['digitalPinLoadingOverrides'] = JSON.stringify(
+        circuit.metadata.digitalPinLoadingOverrides,
+      );
+    }
+    result.attributes = attrs;
+  }
+
   return result;
 }
 
@@ -123,18 +144,71 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 // ---------------------------------------------------------------------------
 
 /**
+ * Build the model-related fields of a DtsDocument from circuit metadata.
+ *
+ * When a `TransistorModelRegistry` is provided, model definition circuits are
+ * serialized in full from the registry. Without the registry, only the metadata
+ * stub (ports + elementCount in attributes) is stored.
+ */
+function buildModelFields(
+  circuit: Circuit,
+  transistorModels?: TransistorModelRegistry,
+): Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets'> {
+  const result: Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets'> = {};
+
+  if (circuit.metadata.modelDefinitions !== undefined) {
+    const modelDefinitions: Record<string, DtsCircuit> = {};
+    for (const [name, def] of Object.entries(circuit.metadata.modelDefinitions)) {
+      const fullCircuit = transistorModels?.get(name);
+      if (fullCircuit !== undefined) {
+        const dtsFull = circuitToDtsCircuit(fullCircuit);
+        dtsFull.attributes = {
+          ...(dtsFull.attributes ?? {}),
+          ports: JSON.stringify(def.ports),
+        };
+        modelDefinitions[name] = dtsFull;
+      } else {
+        modelDefinitions[name] = {
+          name,
+          elements: [],
+          wires: [],
+          attributes: {
+            elementCount: String(def.elementCount),
+            ports: JSON.stringify(def.ports),
+          },
+        };
+      }
+    }
+    result.modelDefinitions = modelDefinitions;
+  }
+
+  if (circuit.metadata.namedParameterSets !== undefined) {
+    result.namedParameterSets = circuit.metadata.namedParameterSets;
+  }
+
+  return result;
+}
+
+/**
  * Serialize a Circuit to a .dts JSON string.
  *
  * Produces a self-contained document with `format: "dts"`, `version: 1`,
  * and no `subcircuitDefinitions` key (standalone circuit).
  *
+ * When `transistorModels` is provided, model definition circuits are serialized
+ * in full topology from the registry.
+ *
  * Output is deterministic: same circuit always produces byte-identical JSON.
  */
-export function serializeCircuit(circuit: Circuit): string {
+export function serializeCircuit(
+  circuit: Circuit,
+  transistorModels?: TransistorModelRegistry,
+): string {
   const doc: DtsDocument = {
     format: 'dts',
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
+    ...buildModelFields(circuit, transistorModels),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);
@@ -147,10 +221,14 @@ export function serializeCircuit(circuit: Circuit): string {
  * The main circuit is placed under `circuit`; each subcircuit in the map is
  * placed under `subcircuitDefinitions` keyed by its name. The result is a
  * fully self-contained document — no external files are required to load it.
+ *
+ * When `transistorModels` is provided, model definition circuits are serialized
+ * in full topology from the registry.
  */
 export function serializeWithSubcircuits(
   circuit: Circuit,
   subcircuits: Map<string, Circuit>,
+  transistorModels?: TransistorModelRegistry,
 ): string {
   const subcircuitDefinitions: Record<string, DtsCircuit> = {};
   for (const [name, sub] of subcircuits) {
@@ -162,6 +240,7 @@ export function serializeWithSubcircuits(
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
     subcircuitDefinitions,
+    ...buildModelFields(circuit, transistorModels),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);

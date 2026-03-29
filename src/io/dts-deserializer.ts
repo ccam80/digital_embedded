@@ -11,6 +11,8 @@ import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { Rotation } from '../core/pin.js';
+import type { ModelLibrary } from '../solver/analog/model-library.js';
+import type { TransistorModelRegistry } from '../solver/analog/transistor-model-registry.js';
 import { validateDtsDocument } from './dts-schema.js';
 import type { DtsCircuit, DtsElement, DtsWire } from './dts-schema.js';
 
@@ -87,6 +89,22 @@ function deserializeDtsCircuit(
     metadata.isGeneric = dtsCircuit.isGeneric;
   }
 
+  if (dtsCircuit.attributes !== undefined) {
+    const attrs = dtsCircuit.attributes;
+    const loadingRaw = attrs['digitalPinLoading'];
+    if (
+      loadingRaw === 'cross-domain' ||
+      loadingRaw === 'all' ||
+      loadingRaw === 'none'
+    ) {
+      metadata.digitalPinLoading = loadingRaw;
+    }
+    const overridesRaw = attrs['digitalPinLoadingOverrides'];
+    if (overridesRaw !== undefined) {
+      metadata.digitalPinLoadingOverrides = JSON.parse(overridesRaw) as CircuitMetadata['digitalPinLoadingOverrides'];
+    }
+  }
+
   const circuit = new Circuit(metadata);
 
   for (const savedEl of dtsCircuit.elements) {
@@ -146,11 +164,31 @@ function createWire(savedWire: DtsWire): Wire {
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for populating runtime registries during DTS deserialization.
+ */
+export interface DtsDeserializeOptions {
+  /**
+   * When provided, named parameter sets from the document are added to this
+   * library so they are available at compile time.
+   */
+  modelLibrary?: ModelLibrary;
+  /**
+   * When provided, model definition circuits from the document are
+   * deserialized and registered here so they can be expanded at compile time.
+   */
+  transistorModelRegistry?: TransistorModelRegistry;
+}
+
+/**
  * Parse a .dts JSON string back to Circuit objects.
  *
  * Returns the main circuit and a map of subcircuit names to Circuit objects.
  * The subcircuits map is empty when the document has no `subcircuitDefinitions`.
  * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
+ *
+ * When `options.modelLibrary` is provided, named parameter sets are added to
+ * it. When `options.transistorModelRegistry` is provided, model definition
+ * circuits are registered in it.
  *
  * @throws Error if the JSON is malformed or the document fails validation.
  * @throws Error if any component type is not found in the registry.
@@ -158,6 +196,7 @@ function createWire(savedWire: DtsWire): Wire {
 export function deserializeDts(
   json: string,
   registry: ComponentRegistry,
+  options?: DtsDeserializeOptions,
 ): { circuit: Circuit; subcircuits: Map<string, Circuit> } {
   const raw = JSON.parse(json) as unknown;
   const doc = validateDtsDocument(raw);
@@ -169,6 +208,49 @@ export function deserializeDts(
     for (const [name, subDef] of Object.entries(doc.subcircuitDefinitions)) {
       subcircuits.set(name, deserializeDtsCircuit(subDef, registry));
     }
+  }
+
+  if (doc.namedParameterSets !== undefined) {
+    circuit.metadata.namedParameterSets = doc.namedParameterSets;
+    if (options?.modelLibrary !== undefined) {
+      for (const [name, entry] of Object.entries(doc.namedParameterSets)) {
+        options.modelLibrary.add({
+          name,
+          type: entry.deviceType as import('../solver/analog/model-parser.js').DeviceType,
+          level: 1,
+          params: entry.params,
+        });
+      }
+    }
+  }
+
+  if (doc.modelDefinitions !== undefined) {
+    const modelDefinitions: Record<string, { ports: string[]; elementCount: number }> = {};
+    for (const [name, dtsDef] of Object.entries(doc.modelDefinitions)) {
+      const attrs = dtsDef.attributes ?? {};
+      const hasTopology = dtsDef.elements.length > 0 || dtsDef.wires.length > 0;
+      let ports: string[];
+      let elementCount: number;
+      if (hasTopology) {
+        const modelCircuit = deserializeDtsCircuit(dtsDef, registry);
+        elementCount = modelCircuit.elements.length;
+        ports = attrs['ports'] !== undefined
+          ? (JSON.parse(attrs['ports']) as string[])
+          : [];
+        if (options?.transistorModelRegistry !== undefined) {
+          options.transistorModelRegistry.register(name, modelCircuit);
+        }
+      } else {
+        ports = attrs['ports'] !== undefined
+          ? (JSON.parse(attrs['ports']) as string[])
+          : [];
+        elementCount = attrs['elementCount'] !== undefined
+          ? parseInt(attrs['elementCount'], 10)
+          : 0;
+      }
+      modelDefinitions[name] = { ports, elementCount };
+    }
+    circuit.metadata.modelDefinitions = modelDefinitions;
   }
 
   return { circuit, subcircuits };

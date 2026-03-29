@@ -84,6 +84,20 @@ export interface DtsDocument {
    */
   subcircuitDefinitions?: Record<string, DtsCircuit>;
   /**
+   * Model subcircuit definitions keyed by model name (e.g. "CmosAnd2",
+   * "user_opamp_741"). Expanded inline by the compiler; not instantiated
+   * as subcircuit elements.
+   */
+  modelDefinitions?: Record<string, DtsCircuit>;
+  /**
+   * Named SPICE .MODEL parameter sets keyed by model name (e.g. "1N4148",
+   * "2N2222"). Populated on load into the ModelLibrary.
+   */
+  namedParameterSets?: Record<string, {
+    deviceType: string;
+    params: Record<string, number>;
+  }>;
+  /**
    * Embedded FSM (finite state machine) definition.
    * Present when the document contains an FSM editor state.
    */
@@ -146,6 +160,70 @@ export function validateDtsDocument(data: unknown): DtsDocument {
       doc['subcircuitDefinitions'] as Record<string, unknown>,
     )) {
       validateDtsCircuit(value, `subcircuitDefinitions["${key}"]`);
+    }
+  }
+
+  if ('modelDefinitions' in doc && doc['modelDefinitions'] !== undefined) {
+    if (
+      typeof doc['modelDefinitions'] !== 'object' ||
+      doc['modelDefinitions'] === null ||
+      Array.isArray(doc['modelDefinitions'])
+    ) {
+      throw new Error(
+        'Invalid .dts document: "modelDefinitions" must be an object',
+      );
+    }
+    for (const [key, value] of Object.entries(
+      doc['modelDefinitions'] as Record<string, unknown>,
+    )) {
+      validateDtsCircuit(value, `modelDefinitions["${key}"]`);
+    }
+  }
+
+  if ('namedParameterSets' in doc && doc['namedParameterSets'] !== undefined) {
+    if (
+      typeof doc['namedParameterSets'] !== 'object' ||
+      doc['namedParameterSets'] === null ||
+      Array.isArray(doc['namedParameterSets'])
+    ) {
+      throw new Error(
+        'Invalid .dts document: "namedParameterSets" must be an object',
+      );
+    }
+    for (const [key, entry] of Object.entries(
+      doc['namedParameterSets'] as Record<string, unknown>,
+    )) {
+      if (
+        entry === null ||
+        typeof entry !== 'object' ||
+        Array.isArray(entry)
+      ) {
+        throw new Error(
+          `Invalid .dts document: "namedParameterSets["${key}"]" must be an object`,
+        );
+      }
+      const e = entry as Record<string, unknown>;
+      if (typeof e['deviceType'] !== 'string') {
+        throw new Error(
+          `Invalid .dts document: "namedParameterSets["${key}"].deviceType" must be a string`,
+        );
+      }
+      if (
+        typeof e['params'] !== 'object' ||
+        e['params'] === null ||
+        Array.isArray(e['params'])
+      ) {
+        throw new Error(
+          `Invalid .dts document: "namedParameterSets["${key}"].params" must be an object`,
+        );
+      }
+      for (const [pk, pv] of Object.entries(e['params'] as Record<string, unknown>)) {
+        if (typeof pv !== 'number') {
+          throw new Error(
+            `Invalid .dts document: "namedParameterSets["${key}"].params["${pk}"]" must be a number`,
+          );
+        }
+      }
     }
   }
 

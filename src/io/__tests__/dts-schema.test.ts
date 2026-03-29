@@ -225,3 +225,172 @@ describe('Serialization', () => {
     expect(restored.wires).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// namedParameterSets in DtsDocument
+// ---------------------------------------------------------------------------
+
+describe('namedParameterSets', () => {
+  it('schema_accepts_namedParameterSets', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      namedParameterSets: {
+        '1N4148': { deviceType: 'D', params: { IS: 2.52e-9, N: 1.752 } },
+        '2N2222': { deviceType: 'NPN', params: { IS: 1.4e-14, BF: 300 } },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
+    expect(result.namedParameterSets).toBeDefined();
+    expect(result.namedParameterSets!['1N4148'].deviceType).toBe('D');
+    expect(result.namedParameterSets!['2N2222'].params['BF']).toBe(300);
+  });
+
+  it('schema_rejects_namedParameterSets_not_object', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      namedParameterSets: 'invalid',
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/"namedParameterSets" must be an object/);
+  });
+
+  it('schema_rejects_entry_missing_deviceType', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      namedParameterSets: {
+        '1N4148': { params: { IS: 2.52e-9 } },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/deviceType.*must be a string/);
+  });
+
+  it('schema_rejects_params_value_not_number', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      namedParameterSets: {
+        '1N4148': { deviceType: 'D', params: { IS: 'not-a-number' } },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/params\["IS"\].*must be a number/);
+  });
+
+  it('roundtrip_namedParameterSets', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'SPICE' });
+    circuit.metadata.namedParameterSets = {
+      '1N4148': { deviceType: 'D', params: { IS: 2.52e-9, N: 1.752 } },
+    };
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(parsed['namedParameterSets']).toBeDefined();
+
+    const { circuit: restored } = deserializeDts(json, registry);
+    expect(restored.metadata.namedParameterSets).toBeDefined();
+    expect(restored.metadata.namedParameterSets!['1N4148'].deviceType).toBe('D');
+    expect(restored.metadata.namedParameterSets!['1N4148'].params['IS']).toBe(2.52e-9);
+    expect(restored.metadata.namedParameterSets!['1N4148'].params['N']).toBe(1.752);
+  });
+
+  it('absent_namedParameterSets_not_serialized', () => {
+    const circuit = new Circuit({ name: 'NoModels' });
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect('namedParameterSets' in parsed).toBe(false);
+
+    const registry = makeRegistry();
+    const { circuit: restored } = deserializeDts(json, registry);
+    expect(restored.metadata.namedParameterSets).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// modelDefinitions in DtsDocument
+// ---------------------------------------------------------------------------
+
+describe('modelDefinitions', () => {
+  it('schema_accepts_modelDefinitions', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      modelDefinitions: {
+        MYOPAMP: {
+          name: 'MYOPAMP',
+          elements: [],
+          wires: [],
+          attributes: { ports: '["INP","INN","OUT"]', elementCount: '5' },
+        },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).not.toThrow();
+    const result = validateDtsDocument(doc);
+    expect(result.modelDefinitions).toBeDefined();
+    expect(result.modelDefinitions!['MYOPAMP'].name).toBe('MYOPAMP');
+  });
+
+  it('schema_rejects_modelDefinitions_not_object', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      modelDefinitions: 42,
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/"modelDefinitions" must be an object/);
+  });
+
+  it('roundtrip_modelDefinitions', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'WithModel' });
+    circuit.metadata.modelDefinitions = {
+      MYOPAMP: { ports: ['INP', 'INN', 'OUT'], elementCount: 5 },
+    };
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(parsed['modelDefinitions']).toBeDefined();
+
+    const { circuit: restored } = deserializeDts(json, registry);
+    expect(restored.metadata.modelDefinitions).toBeDefined();
+    const def = restored.metadata.modelDefinitions!['MYOPAMP'];
+    expect(def.ports).toEqual(['INP', 'INN', 'OUT']);
+    expect(def.elementCount).toBe(5);
+  });
+
+  it('absent_modelDefinitions_not_serialized', () => {
+    const circuit = new Circuit({ name: 'NoModels' });
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect('modelDefinitions' in parsed).toBe(false);
+
+    const registry = makeRegistry();
+    const { circuit: restored } = deserializeDts(json, registry);
+    expect(restored.metadata.modelDefinitions).toBeUndefined();
+  });
+
+  it('roundtrip_both_fields_together', () => {
+    const registry = makeRegistry('In');
+    const circuit = new Circuit({ name: 'BothFields' });
+    circuit.metadata.namedParameterSets = {
+      '2N2222': { deviceType: 'NPN', params: { BF: 200 } },
+    };
+    circuit.metadata.modelDefinitions = {
+      RDIV: { ports: ['A', 'B'], elementCount: 2 },
+    };
+
+    const json = serializeCircuit(circuit);
+    const { circuit: restored } = deserializeDts(json, registry);
+
+    expect(restored.metadata.namedParameterSets!['2N2222'].params['BF']).toBe(200);
+    expect(restored.metadata.modelDefinitions!['RDIV'].ports).toEqual(['A', 'B']);
+    expect(restored.metadata.modelDefinitions!['RDIV'].elementCount).toBe(2);
+  });
+});
