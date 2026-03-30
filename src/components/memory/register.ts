@@ -4,8 +4,6 @@
  * On rising clock edge, if en=1: capture D input into stored value.
  * Output Q always reflects the stored value.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/memory/Register.java
- *
  * Input layout:  [D=0, C=1, en=2]
  * Output layout: [Q=0]
  * State layout:  [storedVal=0, prevClock=1]
@@ -235,11 +233,6 @@ export const RegisterDefinition: ComponentDefinition = {
       outputSchema: ["Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralRegisterAnalogFactory(),
-    },
     },
   },
   modelRegistry: {

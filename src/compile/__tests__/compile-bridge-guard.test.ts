@@ -22,6 +22,7 @@ import { compileAnalogPartition } from '../../solver/analog/compiler.js';
 import type { SolverPartition, ConnectivityGroup, BridgeStub, BridgeDescriptor } from '../types.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
+import { MNAEngine } from '../../solver/analog/analog-engine.js';
 
 
 
@@ -118,6 +119,27 @@ describe('compile-bridge-guard: pure-digital circuit in "cross-domain" mode', ()
     const result = compileUnified(circuit, registry);
 
     expect(result.analog).toBeNull();
+  });
+});
+
+describe('compile-bridge-guard: pure-digital circuit in "all" mode produces finite voltages', () => {
+  it('DC operating point has all-finite node voltages (ground synthesis produces solvable matrix)', () => {
+    const { circuit, registry } = buildPureDigitalCircuit();
+    circuit.metadata = { ...circuit.metadata, digitalPinLoading: 'all' };
+
+    const result = compileUnified(circuit, registry);
+    const analogPartition = result.analog as ConcreteCompiledAnalogCircuit;
+    expect(analogPartition).not.toBeNull();
+
+    const engine = new MNAEngine();
+    engine.init(analogPartition);
+    const dcResult = engine.dcOperatingPoint();
+
+    // If ground synthesis is fake (no real ground node), MNA produces NaN
+    expect(dcResult.converged).toBe(true);
+    for (let i = 0; i < dcResult.nodeVoltages.length; i++) {
+      expect(Number.isFinite(dcResult.nodeVoltages[i])).toBe(true);
+    }
   });
 });
 

@@ -11,9 +11,6 @@
  *   Bidirectional: D (drain), S (source)
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/FGNFET.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

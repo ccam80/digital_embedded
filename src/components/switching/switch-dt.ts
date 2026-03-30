@@ -375,6 +375,8 @@ function createSwitchDTAnalogElement(
       const iAC = GAC * (vA - vC);
       return [iAB + iAC, -iAB, -iAC];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -413,11 +415,6 @@ export const SwitchDTDefinition: ComponentDefinition = {
       stateSlotCount: 1,
       switchPins: [0, 1],
       defaultDelay: 0,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: createSwitchDTAnalogElement,
-    },
     },
   },
   modelRegistry: {

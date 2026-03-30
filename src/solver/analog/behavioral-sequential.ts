@@ -225,6 +225,8 @@ export class BehavioralCounterElement implements AnalogElementCore {
   get vOH(): number {
     return this._outBitPins[0]?.currentVoltage ?? FALLBACK_SPEC.vOH;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +375,8 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   get storedValue(): number {
     return this._storedValue;
   }
+
+  setParam(_key: string, _value: number): void {}
 
   getPinCurrents(voltages: Float64Array): number[] {
     // Pin layout order: D (bus input), C (clock input), en (enable input), Q (bus output)
@@ -691,6 +695,8 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   get count(): number {
     return this._count;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------

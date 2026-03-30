@@ -226,8 +226,10 @@ class AnalogProbeElement implements AnalogElementCore {
     return voltages[this.pinNodeIds[0]];
   }
 
+  setParam(_key: string, _value: number): void {}
+
   getPinCurrents(_voltages: Float64Array): number[] {
-    // Probe stamps nothing � it is a pure voltage measurement with no loading.
+    // Probe stamps nothing� it is a pure voltage measurement with no loading.
     // Return zero current for the single input pin.
     return [0];
   }
@@ -267,9 +269,6 @@ export const ProbeDefinition: ComponentDefinition = {
     "Display format is configurable: binary, decimal, hexadecimal, or octal.",
   models: {
     digital: { executeFn: executeProbe, inputSchema: ["in"], outputSchema: [] },
-    mnaModels: {
-      behavioral: { factory: probeAnalogFactory },
-    },
   },
   modelRegistry: {
     behavioral: {

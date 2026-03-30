@@ -300,29 +300,6 @@ export function createMemristorElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const rOn = props.getOrDefault<number>("rOn", 100);
-  const rOff = props.getOrDefault<number>("rOff", 16000);
-  const initialState = props.getOrDefault<number>("initialState", 0.5);
-  const mobility = props.getOrDefault<number>("mobility", 1e-14);
-  const deviceLength = props.getOrDefault<number>("deviceLength", 10e-9);
-  const windowOrder = props.getOrDefault<number>("windowOrder", 1);
-
-  return new MemristorElement(
-    rOn,
-    rOff,
-    initialState,
-    mobility,
-    deviceLength,
-    windowOrder,
-  );
-}
-
-function createMemristorElementFromModelParams(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
   const rOn = props.getModelParam<number>("rOn");
   const rOff = props.getModelParam<number>("rOff");
   const initialState = props.getModelParam<number>("initialState");
@@ -437,17 +414,11 @@ export const MemristorDefinition: ComponentDefinition = {
   helpText:
     "Memristor — Joglekar window function model.\n" +
     "Resistance depends on charge history (state variable w, 0–1).",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createMemristorElement,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createMemristorElementFromModelParams,
+      factory: createMemristorElement,
       paramDefs: MEMRISTOR_PARAM_DEFS,
       params: MEMRISTOR_DEFAULTS,
     },

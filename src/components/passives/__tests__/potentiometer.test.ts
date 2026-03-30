@@ -54,10 +54,10 @@ describe("Potentiometer", () => {
   describe("stamps_two_conductance_pairs", () => {
     it("stamps 8 conductance entries for position 0.5", () => {
       const props = new PropertyBag();
-      props.set("resistance", 10000);
-      props.set("position", 0.5);
+      props.setModelParam("resistance", 10000);
+      props.setModelParam("position", 0.5);
 
-      const analogElement = PotentiometerDefinition.models!.mnaModels!.behavioral!.factory(
+      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -83,10 +83,10 @@ describe("Potentiometer", () => {
   describe("position_0_gives_full_resistance_on_bottom", () => {
     it("position=0 clamps R_top to minimum and R_bottom to full", () => {
       const props = new PropertyBag();
-      props.set("resistance", 10000);
-      props.set("position", 0);
+      props.setModelParam("resistance", 10000);
+      props.setModelParam("position", 0);
 
-      const analogElement = PotentiometerDefinition.models!.mnaModels!.behavioral!.factory(
+      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -110,10 +110,10 @@ describe("Potentiometer", () => {
   describe("position_1_gives_full_resistance_on_top", () => {
     it("position=1 clamps R_bottom to minimum and R_top to full", () => {
       const props = new PropertyBag();
-      props.set("resistance", 10000);
-      props.set("position", 1);
+      props.setModelParam("resistance", 10000);
+      props.setModelParam("position", 1);
 
-      const analogElement = PotentiometerDefinition.models!.mnaModels!.behavioral!.factory(
+      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -140,11 +140,11 @@ describe("Potentiometer", () => {
     });
 
     it("PotentiometerDefinition has analog model", () => {
-      expect(PotentiometerDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(PotentiometerDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("PotentiometerDefinition has analogFactory", () => {
-      expect(PotentiometerDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(PotentiometerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
     });
 
     it("PotentiometerDefinition category is PASSIVES", () => {

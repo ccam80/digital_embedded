@@ -37,7 +37,8 @@ function makePin(x: number, y: number, label = ""): Pin {
     position: { x, y },
     label,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
+    kind: "signal" as const,
     isClock: false,
     bitWidth: 1,
   };
@@ -73,6 +74,7 @@ function makeElement(
     draw(_ctx: RenderContext) { },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 
@@ -297,7 +299,8 @@ describe("spice-import-dialog: compile integration", () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "Ground",
-      models: { mnaModels: { behavioral: {} } },
+      models: {},
+      modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
     } as unknown as ComponentDefinition);
 
     registry.register({

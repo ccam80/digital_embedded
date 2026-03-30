@@ -221,6 +221,8 @@ export class BehavioralGateElement implements AnalogElementCore {
     const vOut = readMnaVoltage(this._output.nodeId, voltages);
     this._output.updateCompanion(dt, method, vOut);
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------

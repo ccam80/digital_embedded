@@ -28,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeNotAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
@@ -286,11 +285,6 @@ export const NotDefinition: ComponentDefinition = {
       executeFn: executeNot,
       inputSchema: ["in"],
       outputSchema: ["out"],
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeNotAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

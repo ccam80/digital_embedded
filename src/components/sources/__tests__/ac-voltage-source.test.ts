@@ -62,16 +62,16 @@ function makeAcElement(
   time = 0,
 ): AcVoltageSourceAnalogElement {
   const props = new PropertyBag();
-  props.set("amplitude", overrides.amplitude ?? 5);
-  props.set("frequency", overrides.frequency ?? 1000);
-  props.set("phase", overrides.phase ?? 0);
-  props.set("dcOffset", overrides.dcOffset ?? 0);
+  props.setModelParam("amplitude", overrides.amplitude ?? 5);
+  props.setModelParam("frequency", overrides.frequency ?? 1000);
+  props.setModelParam("phase", overrides.phase ?? 0);
+  props.setModelParam("dcOffset", overrides.dcOffset ?? 0);
   props.set("waveform", overrides.waveform ?? "sine");
 
   let simTime = time;
   const getTime = () => simTime;
 
-  const el = AcVoltageSourceDefinition.models!.mnaModels!.behavioral!.factory(
+  const el = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
     [],
     branchIdx,
@@ -226,16 +226,16 @@ describe("Integration", () => {
     // Elements: AcSource(1,0,branch=2), R=1kΩ(1,2), C=1µF(2,0)
 
     const props = new PropertyBag();
-    props.set("amplitude", 5);
-    props.set("frequency", 1000);
-    props.set("phase", 0);
-    props.set("dcOffset", 0);
+    props.setModelParam("amplitude", 5);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", 0);
+    props.setModelParam("dcOffset", 0);
     props.set("waveform", "sine");
 
     let simTime = 0;
     const getTime = () => simTime;
 
-    const acSrc = AcVoltageSourceDefinition.models!.mnaModels!.behavioral!.factory(
+    const acSrc = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
       new Map([["pos", 1], ["neg", 0]]),
       [],
       2,
@@ -296,15 +296,15 @@ function makeExprElement(
   time = 0,
 ): AcVoltageSourceAnalogElement {
   const props = new PropertyBag();
-  props.set("amplitude", 5);
-  props.set("frequency", 1000);
-  props.set("phase", 0);
-  props.set("dcOffset", 0);
+  props.setModelParam("amplitude", 5);
+  props.setModelParam("frequency", 1000);
+  props.setModelParam("phase", 0);
+  props.setModelParam("dcOffset", 0);
   props.set("waveform", "expression");
   props.set("expression", exprText);
 
   let simTime = time;
-  const el = AcVoltageSourceDefinition.models!.mnaModels!.behavioral!.factory(
+  const el = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
     new Map([["pos", 1], ["neg", 0]]),
     [],
     2,

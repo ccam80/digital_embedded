@@ -198,16 +198,6 @@ function createCapacitorElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const C = props.getOrDefault<number>("capacitance", 1e-6);
-  return new AnalogCapacitorElement(C);
-}
-
-function createCapacitorElementFromModelParams(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
   const C = props.getModelParam<number>("capacitance");
   return new AnalogCapacitorElement(C);
 }
@@ -271,17 +261,11 @@ export const CapacitorDefinition: ComponentDefinition = {
   helpText:
     "Capacitor — reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createCapacitorElement,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createCapacitorElementFromModelParams,
+      factory: createCapacitorElement,
       paramDefs: CAPACITOR_PARAM_DEFS,
       params: CAPACITOR_DEFAULTS,
     },

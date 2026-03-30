@@ -8,7 +8,7 @@
  */
 
 // Core analog types are defined in core/analog-types.ts to avoid solver→core
-// circular dependency. Re-exported here for backward compatibility.
+// circular dependency.
 export type {
   AnalogElementCore,
   ComplexSparseSolver,

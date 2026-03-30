@@ -7,8 +7,6 @@
  *   J=0, K=1 → reset (Q=0)
  *   J=1, K=1 → toggle (Q=~Q)
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopJK.java
- *
  * Input layout:  [J=0, C=1, K=2]
  * Output layout: [Q=0, ~Q=1]
  * State layout:  [storedQ=0, prevClock=1]
@@ -30,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeJKFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -293,11 +290,6 @@ export const JKDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeJKFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

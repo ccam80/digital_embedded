@@ -92,6 +92,7 @@ export class AnalogFuseElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
+  setParam(_key: string, _value: number): void {}
 
   private readonly _rCold: number;
   private readonly _rBlown: number;
@@ -277,22 +278,6 @@ function buildAnalogFuseElement(
 }
 
 export function createAnalogFuseElement(
-  pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-  _getTime: () => number,
-): AnalogElementCore {
-  return buildAnalogFuseElement(
-    pinNodes,
-    props,
-    props.getOrDefault<number>("rCold", 0.01),
-    props.getOrDefault<number>("rBlown", 1e9),
-    props.getOrDefault<number>("i2tRating", 1e-4),
-  );
-}
-
-export function createAnalogFuseElementFromModelParams(
   pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
   _branchIdx: number,

@@ -207,12 +207,9 @@ function makeAnalogDef(
     helpText: "",
     pinElectrical: {},
     defaultModel: 'behavioral',
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes),
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
 }
@@ -237,20 +234,17 @@ function makeGroundDef(): ComponentDefinition {
     helpText: "",
     pinElectrical: {},
     defaultModel: 'behavioral',
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory: (_pinNodes: ReadonlyMap<string, number>) => ({
-            pinNodeIds: [],
-            allNodeIds: [],
-            branchIndex: -1,
-            isNonlinear: false,
-            isReactive: false,
-            stamp(_s: SparseSolver) {},
-            getPinCurrents(_v: Float64Array) { return [0]; },
-          }),
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+        pinNodeIds: [],
+        allNodeIds: [],
+        branchIndex: -1,
+        isNonlinear: false,
+        isReactive: false,
+        stamp(_s: SparseSolver) {},
+        getPinCurrents(_v: Float64Array) { return [0]; },
+      }), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
 }

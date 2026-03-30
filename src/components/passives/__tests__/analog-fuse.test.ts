@@ -252,9 +252,9 @@ describe("AnalogFuseElement", () => {
 
     it("createAnalogFuseElement writes blown and _thermalRatio into props", () => {
       const props = new PropertyBag();
-      props.set("rCold", 0.01);
-      props.set("rBlown", 1e9);
-      props.set("i2tRating", 0.001);
+      props.setModelParam("rCold", 0.01);
+      props.setModelParam("rBlown", 1e9);
+      props.setModelParam("i2tRating", 0.001);
 
       const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), [], -1, props, () => 0) as AnalogFuseElement;
 
@@ -341,12 +341,12 @@ describe("AnalogFuseElement", () => {
 
   describe("unified FuseDefinition", () => {
     it("FuseDefinition has both digital and analog models", () => {
-      expect(FuseDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(FuseDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("FuseDefinition has analogFactory", () => {
-      expect(FuseDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-      expect(typeof FuseDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
+      expect(FuseDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect(typeof FuseDefinition.modelRegistry?.behavioral?.factory).toBe("function");
     });
 
     it("FuseDefinition has switchPins for bus resolver", () => {
@@ -368,9 +368,9 @@ describe("AnalogFuseElement", () => {
 
     it("createAnalogFuseElement factory creates AnalogFuseElement", () => {
       const props = new PropertyBag();
-      props.set("rCold", 0.01);
-      props.set("rBlown", 1e9);
-      props.set("i2tRating", 1e-4);
+      props.setModelParam("rCold", 0.01);
+      props.setModelParam("rBlown", 1e9);
+      props.setModelParam("i2tRating", 1e-4);
       const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), [], -1, props, () => 0);
       expect(el).toBeInstanceOf(AnalogFuseElement);
       expect(el.isNonlinear).toBe(true);

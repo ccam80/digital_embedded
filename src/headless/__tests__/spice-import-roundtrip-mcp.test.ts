@@ -203,6 +203,63 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test suite 2b: IS parameter change produces different DC operating point
+// ---------------------------------------------------------------------------
+
+describe('spice-import round-trip MCP surface -- IS override changes DC operating point', () => {
+  it('applySpiceImportResult stores IS override in metadata.models and element props', () => {
+    const { circuit } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
+    applySpiceImportResult(q1, { overrides: { IS: 1e-20 }, modelName: 'Q_CUTOFF', deviceType: 'NPN' }, circuit, registry);
+    expect(circuit.metadata.models?.['NpnBJT']?.['Q_CUTOFF']?.params?.['IS']).toBe(1e-20);
+    expect(q1.getProperties().get('model')).toBe('Q_CUTOFF');
+    expect(q1.getProperties().getModelParam('IS')).toBe(1e-20);
+  });
+
+  it('compile with default IS vs IS=1e-20 produces different collector voltage', () => {
+    // Build two circuits:
+    //   Default: IS=1e-14 (standard NPN). At Vb=0.7V, Ic is large → BJT saturates,
+    //            collector voltage drops well below Vcc.
+    //   Override: IS=1e-20 (tiny). At Vb=0.7V, Ic ≈ 0 → BJT in cutoff,
+    //            collector voltage stays near Vcc (5V).
+    // The difference in collector voltage must exceed 1V.
+
+    const { circuit: circuitDefault, facade: facadeDefault } = buildBjtCircuit();
+    facadeDefault.compile(circuitDefault);
+    const dcDefault = facadeDefault.getDcOpResult();
+    expect(dcDefault).not.toBeNull();
+    expect(dcDefault!.converged).toBe(true);
+
+    const { circuit: circuitOverride, facade: facadeOverride } = buildBjtCircuit();
+    const q1Override = circuitOverride.elements.find(
+      el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1'
+    )!;
+    applySpiceImportResult(
+      q1Override,
+      { overrides: { IS: 1e-20 }, modelName: 'Q_CUTOFF', deviceType: 'NPN' },
+      circuitOverride,
+      registry,
+    );
+    facadeOverride.compile(circuitOverride);
+    const dcOverride = facadeOverride.getDcOpResult();
+    expect(dcOverride).not.toBeNull();
+    expect(dcOverride!.converged).toBe(true);
+
+    // Both circuits must have the same number of nodes
+    expect(dcOverride!.nodeVoltages.length).toBe(dcDefault!.nodeVoltages.length);
+
+    // IS=1e-20 → cutoff → Vc near 5V. IS=1e-14 → active/saturation → Vc much lower.
+    // At least one node voltage must differ by more than 1V.
+    const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
+    const voltagesOverride = Array.from(dcOverride!.nodeVoltages);
+    const maxDiff = Math.max(
+      ...voltagesDefault.map((v, i) => Math.abs(v - voltagesOverride[i]!))
+    );
+    expect(maxDiff).toBeGreaterThan(1.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test suite 3: serialize -> deserialize preserves circuit.metadata.models
 // ---------------------------------------------------------------------------
 

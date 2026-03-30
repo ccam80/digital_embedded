@@ -231,11 +231,6 @@ export const DriverInvSelDefinition: ComponentDefinition = {
       inputSchema: ["in", "sel"],
       outputSchema: ["out"],
     },
-    mnaModels: {
-      behavioral: {
-      factory: createDriverInvAnalogElement,
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

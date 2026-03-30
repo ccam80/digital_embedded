@@ -118,9 +118,11 @@ function createGroundAnalogElement(
       // Ground constraint is handled by the compiler's node mapping.
     },
 
+    setParam(_key: string, _value: number) {},
+
     getPinCurrents(_voltages: Float64Array): number[] {
       // Ground constraint is enforced by node mapping (pin node = MNA node 0).
-      // No current flows through the element stamp � return zero for the one pin.
+      // No current flows through the element stamp� return zero for the one pin.
       return [0];
     },
   };
@@ -175,9 +177,6 @@ export const GroundDefinition: ComponentDefinition = {
     "Ground — outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
   models: {
     digital: { executeFn: executeGround, inputSchema: [], outputSchema: ["out"] },
-    mnaModels: {
-      behavioral: { factory: createGroundAnalogElement },
-    },
   },
   modelRegistry: {
     behavioral: {

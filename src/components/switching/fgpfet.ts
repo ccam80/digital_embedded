@@ -10,9 +10,6 @@
  *   Bidirectional: S (source), D (drain)
  *
  * internalStateCount: 2 (closedFlag=0, blownFlag=1)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/FGPFET.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

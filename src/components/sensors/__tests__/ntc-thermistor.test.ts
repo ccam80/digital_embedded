@@ -15,6 +15,7 @@ import {
   NTCThermistorElement,
   NTCThermistorDefinition,
   createNTCThermistorElement,
+  NTC_DEFAULTS,
 } from "../ntc-thermistor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
@@ -219,7 +220,7 @@ describe("NTC", () => {
 
   describe("definition", () => {
     it("NTCThermistorDefinition has correct engine type", () => {
-      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(NTCThermistorDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("NTCThermistorDefinition has correct category", () => {
@@ -233,14 +234,15 @@ describe("NTC", () => {
     });
 
     it("analogFactory creates an NTCThermistorElement", () => {
-      const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
+      const props = new PropertyBag();
+      props.replaceModelParams(NTC_DEFAULTS);
       const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(NTCThermistorElement);
       expect(element.isNonlinear).toBe(true);
     });
 
     it("branchCount is false", () => {
-      expect(NTCThermistorDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
+      expect(NTCThermistorDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

@@ -211,6 +211,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private C: number;
   private G_esr: number;
@@ -391,22 +392,6 @@ function createPolarizedCapElement(
   props: PropertyBag,
 ): AnalogElementCore {
   const p = {
-    capacitance:    props.getOrDefault<number>("capacitance", 100e-6),
-    esr:            props.getOrDefault<number>("esr", 0.1),
-    leakageCurrent: props.getOrDefault<number>("leakageCurrent", 1e-6),
-    voltageRating:  props.getOrDefault<number>("voltageRating", 25),
-    reverseMax:     props.getOrDefault<number>("reverseMax", 1.0),
-  };
-  return buildPolarizedCapFromParams(pinNodes, internalNodeIds, p);
-}
-
-function createPolarizedCapElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  const p = {
     capacitance:    props.getModelParam<number>("capacitance"),
     esr:            props.getModelParam<number>("esr"),
     leakageCurrent: props.getModelParam<number>("leakageCurrent"),
@@ -531,14 +516,7 @@ export const PolarizedCapDefinition: ComponentDefinition = {
   helpText:
     "Polarized electrolytic capacitor — extends the standard capacitor with ESR,\n" +
     "leakage current, and reverse-bias polarity enforcement.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createPolarizedCapElement,
-      getInternalNodeCount: () => 1,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",

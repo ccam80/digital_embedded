@@ -769,14 +769,14 @@ function makeSpstProps(overrides: {
 describe("AnalogSwitch", () => {
   it("definition_has_engine_type_both", () => {
     expect(SwitchDefinition.models?.digital).toBeDefined();
-    expect(SwitchDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(SwitchDefinition.modelRegistry?.behavioral).toBeDefined();
     expect(SwitchDTDefinition.models?.digital).toBeDefined();
-    expect(SwitchDTDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(SwitchDTDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("closed_stamps_ron", () => {
     const props = makeSpstProps({ closed: true, Ron: 1 });
-    const el = SwitchDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -795,7 +795,7 @@ describe("AnalogSwitch", () => {
 
   it("open_stamps_roff", () => {
     const props = makeSpstProps({ closed: false, Roff: 1e9 });
-    const el = SwitchDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -813,7 +813,7 @@ describe("AnalogSwitch", () => {
 
   it("toggle_changes_conductance", () => {
     const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const el = SwitchDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -843,7 +843,7 @@ describe("AnalogSwitch", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -868,7 +868,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDTDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -894,7 +894,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = SwitchDTDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -925,7 +925,7 @@ describe("Integration", () => {
     // Open switch: V across R ≈ 0V
 
     const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const swEl = SwitchDefinition.models!.mnaModels!.behavioral!.factory(
+    const swEl = SwitchDefinition.modelRegistry!.behavioral!.factory(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,

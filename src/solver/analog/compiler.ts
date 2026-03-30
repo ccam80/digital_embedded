@@ -66,7 +66,7 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
   if (entry.kind === "inline") {
     return {
       factory: entry.factory,
-      branchCount: 0,
+      branchCount: entry.branchCount ?? 0,
     };
   }
   // Netlist entries are resolved separately by resolveSubcircuitModels

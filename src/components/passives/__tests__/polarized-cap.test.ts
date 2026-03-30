@@ -14,6 +14,7 @@ import {
   PolarizedCapElement,
   PolarizedCapDefinition,
   AnalogPolarizedCapElement,
+  POLARIZED_CAP_MODEL_DEFAULTS,
 } from "../polarized-cap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -293,34 +294,34 @@ describe("PolarizedCap", () => {
     });
 
     it("PolarizedCapDefinition has analog model", () => {
-      expect(PolarizedCapDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(PolarizedCapDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("PolarizedCapDefinition has analogFactory", () => {
-      expect(PolarizedCapDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(PolarizedCapDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
     });
 
-    it("PolarizedCapDefinition getInternalNodeCount returns 1", () => {
-      const props = new PropertyBag();
-      expect(PolarizedCapDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(1);
+    it("PolarizedCapDefinition has behavioral model entry", () => {
+      expect(PolarizedCapDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("PolarizedCapDefinition isReactive", () => {
       const props = new PropertyBag();
-      props.set("capacitance", 100e-6);
-      const el = PolarizedCapDefinition.models!.mnaModels!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      props.replaceModelParams({ ...POLARIZED_CAP_MODEL_DEFAULTS, capacitance: 100e-6 });
+      const el = PolarizedCapDefinition.modelRegistry!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
     it("PolarizedCapDefinition isNonlinear", () => {
       const props = new PropertyBag();
-      const el = PolarizedCapDefinition.models!.mnaModels!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      props.replaceModelParams(POLARIZED_CAP_MODEL_DEFAULTS);
+      const el = PolarizedCapDefinition.modelRegistry!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isNonlinear).toBe(true);
     });
 
     it("PolarizedCapElement can be instantiated", () => {
       const props = new PropertyBag();
-      props.set("capacitance", 100e-6);
+      props.setModelParam("capacitance", 100e-6);
       const el = new PolarizedCapElement(
         "test-id",
         { x: 0, y: 0 },

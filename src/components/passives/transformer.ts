@@ -195,6 +195,7 @@ export class AnalogTransformerElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private _pair: CoupledInductorPair;
   private readonly _branch2: number;
@@ -425,23 +426,6 @@ function createTransformerElement(
   return buildTransformerElement(
     pinNodes,
     branchIdx,
-    props.getOrDefault<number>("primaryInductance", 10e-3),
-    props.getOrDefault<number>("turnsRatio", 1.0),
-    props.getOrDefault<number>("couplingCoefficient", 0.99),
-    props.getOrDefault<number>("primaryResistance", 1.0),
-    props.getOrDefault<number>("secondaryResistance", 1.0),
-  );
-}
-
-function createTransformerElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  return buildTransformerElement(
-    pinNodes,
-    branchIdx,
     props.getModelParam<number>("primaryInductance"),
     props.getModelParam<number>("turnsRatio"),
     props.getModelParam<number>("couplingCoefficient"),
@@ -556,20 +540,14 @@ export const TransformerDefinition: ComponentDefinition = {
   helpText:
     "Two-winding transformer using coupled inductor companion model.\n" +
     "Specify turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createTransformerElement,
-      branchCount: 1,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createTransformerElementFromModelParams,
+      factory: createTransformerElement,
       paramDefs: TRANSFORMER_PARAM_DEFS,
       params: TRANSFORMER_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

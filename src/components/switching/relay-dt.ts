@@ -17,9 +17,6 @@
  *     R{n} — rest (normally closed, connects when coil de-energised)
  *
  * internalStateCount: 1 (energised flag, read by bus resolver)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/RelayDT.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -291,11 +288,6 @@ export const RelayDTDefinition: ComponentDefinition = {
       stateSlotCount: 1,
       switchPins: [2, 3],
       defaultDelay: 0,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: createRelayDTAnalogElement,
-    },
     },
   },
   modelRegistry: {

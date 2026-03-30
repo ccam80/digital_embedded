@@ -58,7 +58,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const el = InductorDefinition.models!.mnaModels!.behavioral!.factory(pinNodes, [], branchIdx, props, () => 0);
+  const el = InductorDefinition.modelRegistry!.behavioral!.factory(pinNodes, [], branchIdx, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -71,7 +71,7 @@ describe("Inductor", () => {
   describe("stamps_branch_equation", () => {
     it("stamps branch incidence and conductance entries", () => {
       const props = new PropertyBag();
-      props.set("inductance", 0.01);
+      props.setModelParam("inductance", 0.01);
 
       // Use non-ground nodes [1, 2] with branchIdx=2 (absolute solver row)
       // Node 1 → solver idx 0, Node 2 → solver idx 1, branch → solver row 2
@@ -100,7 +100,7 @@ describe("Inductor", () => {
   describe("updateCompanion_trapezoidal", () => {
     it("computes correct geq for trapezoidal method", () => {
       const props = new PropertyBag();
-      props.set("inductance", 0.01);
+      props.setModelParam("inductance", 0.01);
 
       // [1, 2] with branchIdx=2. Solver: node1→idx0, node2→idx1, branch→idx2
       const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
@@ -123,7 +123,7 @@ describe("Inductor", () => {
   describe("updateCompanion_bdf1", () => {
     it("computes correct geq for BDF-1 method", () => {
       const props = new PropertyBag();
-      props.set("inductance", 0.01);
+      props.setModelParam("inductance", 0.01);
 
       const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
@@ -143,6 +143,7 @@ describe("Inductor", () => {
   describe("is_reactive_true", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
+      props.setModelParam("inductance", 1e-3);
       const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       expect(analogElement.isReactive).toBe(true);
@@ -155,15 +156,15 @@ describe("Inductor", () => {
     });
 
     it("InductorDefinition has analog model", () => {
-      expect(InductorDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(InductorDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("InductorDefinition has analogFactory", () => {
-      expect(InductorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(InductorDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
     });
 
     it("InductorDefinition branchCount is 1", () => {
-      expect(InductorDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
+      expect(InductorDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
     });
 
     it("InductorDefinition category is PASSIVES", () => {

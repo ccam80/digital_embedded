@@ -5,8 +5,6 @@
  * On rising clock edge, if we=1: write Din to register[Rw].
  * Read ports Da and Db always reflect register[Ra] and register[Rb] combinationally.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/memory/RegisterFile.java
- *
  * Input layout:  [Din=0, we=1, Rw=2, C=3, Ra=4, Rb=5]
  * Output layout: [Da=0, Db=1]
  * State layout:  [prevClock=0, reg[0]..reg[N-1]=1..N]

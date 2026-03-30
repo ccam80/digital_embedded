@@ -200,6 +200,7 @@ export class AnalogCrystalElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   // Series resistance
   private G_s: number;
@@ -391,21 +392,6 @@ export function createCrystalElement(
   props: PropertyBag,
 ): AnalogElementCore {
   const p = {
-    frequency:           props.getOrDefault<number>("frequency", 32768),
-    qualityFactor:       props.getOrDefault<number>("qualityFactor", 50000),
-    motionalCapacitance: props.getOrDefault<number>("motionalCapacitance", 12.5e-15),
-    shuntCapacitance:    props.getOrDefault<number>("shuntCapacitance", 3e-12),
-  };
-  return buildCrystalElementFromParams(pinNodes, internalNodeIds, branchIdx, p);
-}
-
-function createCrystalElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  const p = {
     frequency:           props.getModelParam<number>("frequency"),
     qualityFactor:       props.getModelParam<number>("qualityFactor"),
     motionalCapacitance: props.getModelParam<number>("motionalCapacitance"),
@@ -514,21 +500,14 @@ export const CrystalDefinition: ComponentDefinition = {
   helpText:
     "Quartz crystal — Butterworth-Van Dyke equivalent circuit model.\n" +
     "Series RLC motional arm in parallel with shunt electrode capacitance.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createCrystalElement,
-      branchCount: 1,
-      getInternalNodeCount: () => 2,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createCrystalElementFromModelParams,
+      factory: createCrystalElement,
       paramDefs: CRYSTAL_PARAM_DEFS,
       params: CRYSTAL_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

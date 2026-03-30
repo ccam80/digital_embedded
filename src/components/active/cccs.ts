@@ -410,6 +410,7 @@ export const CCCSDefinition: ComponentDefinition = {
       },
       paramDefs: CCCS_PARAM_DEFS,
       params: CCCS_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

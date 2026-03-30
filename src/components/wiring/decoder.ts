@@ -235,11 +235,6 @@ export const DecoderDefinition: ComponentDefinition = {
         return Array.from({ length: outCount }, (_, i) => `out_${i}`);
       },
     },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralDecoderAnalogFactory(1),
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

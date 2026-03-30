@@ -348,6 +348,8 @@ function createSwitchAnalogElement(
       const I = G * (vA - vB);
       return [I, -I];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -386,11 +388,6 @@ export const SwitchDefinition: ComponentDefinition = {
       stateSlotCount: 1,
       switchPins: [0, 1],
       defaultDelay: 0,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: createSwitchAnalogElement,
-    },
     },
   },
   modelRegistry: {

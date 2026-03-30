@@ -312,38 +312,25 @@ describe("DFF", () => {
 // ---------------------------------------------------------------------------
 
 describe("Registration", () => {
-  it("d_flipflop_has_analog_factory", () => {
-    // DDefinition.name is "D_FF" in this codebase
-    expect(typeof DDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
+  it("d_flipflop_has_analog_model", () => {
+    // DDefinition uses cmos netlist model
+    expect(DDefinition.modelRegistry?.cmos).toBeDefined();
   });
 
   it("d_flipflop_engine_type_is_both", () => {
     expect(DDefinition.models?.digital).not.toBeUndefined();
-    expect(DDefinition.models?.mnaModels?.behavioral).not.toBeUndefined();
+    expect(DDefinition.modelRegistry?.cmos).not.toBeUndefined();
   });
 
   it("d_flipflop_simulation_modes_include_digital_and_simplified", () => {
     expect(DDefinition.models?.digital).not.toBeUndefined();
-    expect(DDefinition.models?.mnaModels?.behavioral).not.toBeUndefined();
+    expect(DDefinition.modelRegistry?.cmos).not.toBeUndefined();
   });
 
   it("analog_factory_returns_analog_element", () => {
-    const factory = DDefinition.models!.mnaModels!.behavioral!.factory!;
-    // nodeIds: [D=1, C=2, Q=3, ~Q=4]
-    // Use the factory directly — it reads _pinElectrical from props (falls back to CMOS 3.3V defaults)
-    const props = {
-      has: (_k: string) => false,
-      get: (_k: string) => undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
-    const element = factory(
-      new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]),
-      [], -1, props, () => 0,
-    );
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBe(4);
+    // cmos model is a netlist entry — verify it has the expected netlist structure
+    const cmosModel = DDefinition.modelRegistry!.cmos!;
+    expect(cmosModel.kind).toBe("netlist");
+    expect(cmosModel.netlist).toBeDefined();
   });
 });

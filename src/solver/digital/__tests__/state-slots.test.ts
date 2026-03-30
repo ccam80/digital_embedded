@@ -61,8 +61,6 @@ function dynamicPins(): PinDeclaration[] {
 // ExecuteFn stubs
 // ---------------------------------------------------------------------------
 
-const noopExecFn: ExecuteFunction = () => {};
-
 const executeAnd: ExecuteFunction = (index, state, _highZs, layout) => {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);

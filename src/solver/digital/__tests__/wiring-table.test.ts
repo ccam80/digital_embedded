@@ -19,6 +19,7 @@ import { PinDirection } from "@/core/pin";
 import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test CircuitElement implementation
@@ -73,9 +74,6 @@ const executeXor: ExecuteFunction = (index, state, _highZs, layout) => {
   state[wt[outBase]!] = (state[wt[inBase]!]! ^ state[wt[inBase + 1]!]!) >>> 0;
 };
 
-const executeIn: ExecuteFunction = () => {};
-
-const executeOut: ExecuteFunction = () => {};
 
 const executeDFF: ExecuteFunction = (index, state, _highZs, layout) => {
   const wt = layout.wiringTable;
@@ -148,11 +146,11 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
     registry.register(makeDef("Out", [
       { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeOut));
+    ], noopExecFn));
 
     const circuit = new Circuit();
     const in0 = createTestElementFromDecls("In", "in0", [
@@ -201,7 +199,7 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
 
     const circuit = new Circuit();
@@ -240,7 +238,7 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("DFF", dffPins(), executeDFF, { stateSlotCount: 2 }));
 
     const circuit = new Circuit();
@@ -290,12 +288,12 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("Xor", twoInputOneOutput(), executeXor));
     registry.register(makeDef("And", twoInputOneOutput(), executeAnd));
     registry.register(makeDef("Out", [
       { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeOut));
+    ], noopExecFn));
 
     const circuit = new Circuit();
     // Place components with enough spacing to avoid pin collisions
@@ -371,7 +369,7 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("Or", twoInputOneOutput(), executeOr));
 
     const circuit = new Circuit();
@@ -409,7 +407,7 @@ describe("WiringIndirection", () => {
     const registry = new ComponentRegistry();
     registry.register(makeDef("In", [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    ], executeIn));
+    ], noopExecFn));
     registry.register(makeDef("DFF", dffPins(), executeDFF, { stateSlotCount: 2 }));
 
     const circuit = new Circuit();

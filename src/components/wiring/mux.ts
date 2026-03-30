@@ -300,11 +300,6 @@ export const MuxDefinition: ComponentDefinition = {
       },
       outputSchema: ["out"],
     },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralMuxAnalogFactory(1),
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

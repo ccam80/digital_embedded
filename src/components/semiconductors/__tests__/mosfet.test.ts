@@ -569,3 +569,91 @@ describe("Integration", () => {
     expect(vDrain).toBeLessThan(3.5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// setParam behavioral verification — reads mutable params object, not captured locals
+// ---------------------------------------------------------------------------
+
+describe("setParam mutates params object (not captured locals)", () => {
+  it("setParam('VTO', newValue) changes conductance stamps on next stampNonlinear", () => {
+    // Drive NMOS into saturation: Vgs=3V > VTO=0.7V, Vds=5V
+    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // Raise VTO to 2.5V: device becomes weakly on (Vgst = 3-2.5 = 0.5V vs 3-0.7=2.3V before)
+    element.setParam("VTO", 2.5);
+
+    // Re-drive to same voltages so updateOperatingPoint reads new VTO from params
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;  // Vds (node1=D)
+    voltages[1] = 3;  // Vgs (node2=G)
+    voltages[2] = 0;  // Vs  (node3=S)
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 5;
+      voltages[1] = 3;
+      voltages[2] = 0;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // VTO change must cause at least one stamp or RHS entry to differ
+    const stampsDiffer = stampsBefore.some(
+      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
+    );
+    const rhsDiffer = rhsBefore.some(
+      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
+    );
+    expect(stampsDiffer || rhsDiffer).toBe(true);
+  });
+
+  it("setParam('KP', newValue) changes drain current Norton stamps on next stampNonlinear", () => {
+    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // Double KP: Id doubles in saturation (Id = KP/2 * W/L * Vgst²)
+    element.setParam("KP", NMOS_DEFAULTS.KP * 2);
+
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;
+    voltages[1] = 3;
+    voltages[2] = 0;
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 5;
+      voltages[1] = 3;
+      voltages[2] = 0;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    const anyDiffers = rhsBefore.some(
+      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
+    );
+    expect(anyDiffers).toBe(true);
+  });
+});

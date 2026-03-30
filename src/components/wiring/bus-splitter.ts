@@ -296,11 +296,6 @@ export const BusSplitterDefinition: ComponentDefinition = {
         return labels;
       },
     },
-    mnaModels: {
-      behavioral: {
-      factory: createSplitterAnalogElement,
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

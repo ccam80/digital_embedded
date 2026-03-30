@@ -295,11 +295,6 @@ export const DemuxDefinition: ComponentDefinition = {
         return Array.from({ length: outputCount }, (_, i) => `out_${i}`);
       },
     },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralDemuxAnalogFactory(1),
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

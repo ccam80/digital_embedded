@@ -5,8 +5,6 @@
  * After timerDelay ticks, Q returns to low.
  * R (reset) input immediately forces Q=0 and resets the counter.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/Monoflop.java
- *
  * Input layout:  [C=0, R=1]
  * Output layout: [Q=0, ~Q=1]
  * State layout:  [storedQ=0, prevClock=1, counter=2]

@@ -591,6 +591,7 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
       },
       paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: AC_VOLTAGE_SOURCE_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

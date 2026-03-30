@@ -56,7 +56,8 @@ function makeAnalogDef(name: string): ComponentDefinition {
     category: "PASSIVES" as never,
     helpText: "",
     pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-    models: { mnaModels: { behavioral: ANALOG_MODEL } },
+    models: {},
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error("not used"); }, paramDefs: [], params: {} } },
   };
 }
 
@@ -71,7 +72,8 @@ function makeBothDef(name: string): ComponentDefinition {
     category: "SEMICONDUCTORS" as never,
     helpText: "",
     pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-    models: { digital: DIGITAL_MODEL, mnaModels: { behavioral: ANALOG_MODEL } },
+    models: { digital: DIGITAL_MODEL },
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error("not used"); }, paramDefs: [], params: {} } },
   };
 }
 
@@ -444,7 +446,8 @@ describe("partitionByDomain", () => {
         category: "PASSIVES" as never,
         helpText: "",
         pinElectrical: { vOH: 5.0, vOL: 0.1, rOut: 100 },
-        models: { mnaModels: { behavioral: analogModel } },
+        models: {},
+        modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error(); }, paramDefs: [], params: {} } },
       };
       const el0 = makeElement("And", 0);
       const el1 = makeElement("SpecResistor", 1);

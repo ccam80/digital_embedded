@@ -21,9 +21,6 @@
  *   Bidirectional (contact): A1..An, B1..Bn (one pair per pole)
  *
  * internalStateCount: 1 (closed flag, read by bus resolver)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/Relay.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -304,11 +301,6 @@ export const RelayDefinition: ComponentDefinition = {
       stateSlotCount: 1,
       switchPins: [2, 3],
       defaultDelay: 0,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: createRelayAnalogElement,
-    },
     },
   },
   modelRegistry: {

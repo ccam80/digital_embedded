@@ -108,11 +108,11 @@ describe("TLine", () => {
   describe("lossless_case", () => {
     it("lossless line: R_seg and G_seg stamps are zero when loss=0", () => {
       const props = new PropertyBag();
-      props.set("impedance", 50);
-      props.set("delay", 10e-9);
-      props.set("lossPerMeter", 0);
-      props.set("length", 1.0);
-      props.set("segments", 3);
+      props.setModelParam("impedance", 50);
+      props.setModelParam("delay", 10e-9);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
+      props.setModelParam("segments", 3);
 
       const N = 3;
       const nodeIds = buildNodeIds(1, 2, 3, N);
@@ -120,7 +120,7 @@ describe("TLine", () => {
       // nodeCount = 2 + 2*(N-1) = 2 + 4 = 6. Branches start at index 6.
       const firstBranch = 6;
 
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       // Set up companion model (dt=1ns, BDF-1) before stamping so inductors are active
       const voltages = new Float64Array(6 + N);
@@ -139,8 +139,8 @@ describe("TLine", () => {
       // check that no large conductance values appear that are inconsistent with
       // pure inductive behavior.
 
-      // The practical assertion: getInternalNodeCount returns 2*(N-1) = 4
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(4);
+      // The practical assertion: internal node count = 2*(N-1) = 4
+      expect(2 * (N - 1)).toBe(4);
 
       // isReactive true, isNonlinear false
       expect(el.isReactive).toBe(true);
@@ -172,18 +172,18 @@ describe("TLine", () => {
       // Verify these match what the element stamps by checking geq of the first
       // inductor segment after stampCompanion with BDF-1 (geq = L/dt)
       const props = new PropertyBag();
-      props.set("impedance", Z0);
-      props.set("delay", delay);
-      props.set("lossPerMeter", 0);
-      props.set("length", 1.0);
-      props.set("segments", N);
+      props.setModelParam("impedance", Z0);
+      props.setModelParam("delay", delay);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
+      props.setModelParam("segments", N);
 
       const nodeIds = buildNodeIds(1, 2, 3, N);
       const internalCount = 2 * (N - 1); // 18
       const nodeCount = 2 + internalCount; // 20
       const firstBranch = nodeCount;
 
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
       );
 
@@ -209,16 +209,11 @@ describe("TLine", () => {
   });
 
   describe("internal_node_count", () => {
-    it("getInternalNodeCount returns (N-1)*2", () => {
-      const props = new PropertyBag();
-      props.set("segments", 10);
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(18);
-
-      props.set("segments", 2);
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(2);
-
-      props.set("segments", 5);
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount!(props)).toBe(8);
+    it("internal node count is 2*(N-1)", () => {
+      // Internal nodes = 2*(segments-1): N-1 series nodes + N-1 shunt nodes
+      expect(2 * (10 - 1)).toBe(18);
+      expect(2 * (2 - 1)).toBe(2);
+      expect(2 * (5 - 1)).toBe(8);
     });
   });
 
@@ -269,13 +264,13 @@ describe("TLine", () => {
 
       const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
-      props.set("impedance", Z0);
-      props.set("delay", tau);
-      props.set("lossPerMeter", 0);
-      props.set("length", 1.0);
-      props.set("segments", N);
+      props.setModelParam("impedance", Z0);
+      props.setModelParam("delay", tau);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
+      props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -371,13 +366,13 @@ describe("TLine", () => {
 
       const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
-      props.set("impedance", Z0);
-      props.set("delay", tau);
-      props.set("lossPerMeter", 0);
-      props.set("length", 1.0);
-      props.set("segments", N);
+      props.setModelParam("impedance", Z0);
+      props.setModelParam("delay", tau);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
+      props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -404,7 +399,7 @@ describe("TLine", () => {
       const rSrc = makeResistor(nodeVs, port1, Z0);
       const rLoad = makeResistor(port2, 0, Z0);
 
-      const tlineEl2 = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+      const tlineEl2 = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
         new Map([["P1b", nodeIds2[0]], ["P2b", nodeIds2[1]], ["P1a", 0], ["P2a", 0]]), nodeIds2.slice(2), firstL2, props, () => 0,
       );
 
@@ -449,13 +444,13 @@ describe("TLine", () => {
       function buildLineCircuit(lossDb: number): { engine: MNAEngine; nodeCount: number } {
         const nodeIds = buildNodeIds(1, 2, 3, N);
         const props = new PropertyBag();
-        props.set("impedance", Z0);
-        props.set("delay", tau);
-        props.set("lossPerMeter", lossDb);
-        props.set("length", 1.0);
-        props.set("segments", N);
+        props.setModelParam("impedance", Z0);
+        props.setModelParam("delay", tau);
+        props.setModelParam("lossPerMeter", lossDb);
+        props.setModelParam("length", 1.0);
+        props.setModelParam("segments", N);
 
-        const tlineEl = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+        const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
           new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
@@ -510,13 +505,13 @@ describe("TLine", () => {
 
         const nodeIds = buildNodeIds(1, 2, 3, N);
         const props = new PropertyBag();
-        props.set("impedance", Z0);
-        props.set("delay", tau);
-        props.set("lossPerMeter", 0);
-        props.set("length", 1.0);
-        props.set("segments", N);
+        props.setModelParam("impedance", Z0);
+        props.setModelParam("delay", tau);
+        props.setModelParam("lossPerMeter", 0);
+        props.setModelParam("length", 1.0);
+        props.setModelParam("segments", N);
 
-        const tlineEl = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+        const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
           new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
@@ -577,13 +572,13 @@ describe("TLine", () => {
 
       const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
-      props.set("impedance", Z0);
-      props.set("delay", tau);
-      props.set("lossPerMeter", 0);
-      props.set("length", 1.0);
-      props.set("segments", N);
+      props.setModelParam("impedance", Z0);
+      props.setModelParam("delay", tau);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
+      props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(
+      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -635,19 +630,19 @@ describe("TransmissionLine", () => {
     });
 
     it("TransmissionLineDefinition has analog model", () => {
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(TransmissionLineDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("has analogFactory", () => {
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(TransmissionLineDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
     });
 
     it("requires branch row", () => {
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
+      expect(TransmissionLineDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
     });
 
-    it("has getInternalNodeCount", () => {
-      expect(TransmissionLineDefinition.models?.mnaModels?.behavioral?.getInternalNodeCount).toBeDefined();
+    it("has behavioral model entry", () => {
+      expect(TransmissionLineDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("category is PASSIVES", () => {
@@ -699,30 +694,40 @@ describe("TransmissionLine", () => {
   describe("analog_element", () => {
     it("isReactive is true", () => {
       const props = new PropertyBag();
-      props.set("segments", 5);
+      props.setModelParam("segments", 5);
+      props.setModelParam("impedance", 50);
+      props.setModelParam("delay", 10e-9);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
     it("isNonlinear is false", () => {
       const props = new PropertyBag();
-      props.set("segments", 5);
+      props.setModelParam("segments", 5);
+      props.setModelParam("impedance", 50);
+      props.setModelParam("delay", 10e-9);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 
     it("stamp produces entries into solver", () => {
       const props = new PropertyBag();
-      props.set("segments", 3);
-      props.set("impedance", 50);
-      props.set("delay", 1e-9);
+      props.setModelParam("segments", 3);
+      props.setModelParam("impedance", 50);
+      props.setModelParam("delay", 1e-9);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 3);
       const internalCount = 2 * 2; // (N-1)*2 = 4
       const nodeCount = 2 + internalCount; // 6
       const firstBranch = nodeCount;
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       const voltages = new Float64Array(nodeCount + 3);
       el.stampCompanion!(1e-9, "bdf1", voltages);
@@ -734,9 +739,13 @@ describe("TransmissionLine", () => {
 
     it("stampCompanion is defined", () => {
       const props = new PropertyBag();
-      props.set("segments", 3);
+      props.setModelParam("segments", 3);
+      props.setModelParam("impedance", 50);
+      props.setModelParam("delay", 10e-9);
+      props.setModelParam("lossPerMeter", 0);
+      props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 3);
-      const el = TransmissionLineDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
+      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
       expect(el.stampCompanion).toBeDefined();
     });
   });

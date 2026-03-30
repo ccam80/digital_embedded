@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { LDRElement, LDRDefinition, createLDRElement } from "../ldr.js";
+import { LDRElement, LDRDefinition, createLDRElement, LDR_DEFAULTS } from "../ldr.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 
@@ -164,7 +164,7 @@ describe("LDR", () => {
 
   describe("definition", () => {
     it("LDRDefinition has engine type analog", () => {
-      expect(LDRDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(LDRDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("LDRDefinition has correct category", () => {
@@ -178,7 +178,8 @@ describe("LDR", () => {
     });
 
     it("analogFactory creates an LDRElement", () => {
-      const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
+      const props = new PropertyBag();
+      props.replaceModelParams(LDR_DEFAULTS);
       const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(LDRElement);
       expect(element.isNonlinear).toBe(true);
@@ -186,7 +187,7 @@ describe("LDR", () => {
     });
 
     it("branchCount is false", () => {
-      expect(LDRDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
+      expect(LDRDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

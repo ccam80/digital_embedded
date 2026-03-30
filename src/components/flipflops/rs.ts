@@ -7,8 +7,6 @@
  *   S=0, R=1 → reset (Q=0)
  *   S=1, R=1 → undefined (random — per Digital's implementation)
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopRS.java
- *
  * Input layout:  [S=0, C=1, R=2]
  * Output layout: [Q=0, ~Q=1]
  * State layout:  [storedQ=0, prevClock=1]
@@ -30,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeRSFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -228,11 +225,6 @@ export const RSDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeRSFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

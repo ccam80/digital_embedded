@@ -367,6 +367,7 @@ export const VCVSDefinition: ComponentDefinition = {
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

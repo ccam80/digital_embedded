@@ -21,10 +21,6 @@
  *
  * autoReload flag causes the ROM to reload its contents from the
  * last-loaded data file whenever the simulation is reset.
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/memory/ROM.java
- *   ref/Digital/src/main/java/de/neemann/digital/core/memory/ROMDualPort.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

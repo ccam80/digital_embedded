@@ -4,8 +4,6 @@
  * JK logic on rising clock edge, with async Set/Clear inputs taking priority.
  * Set (active-high) forces Q=1. Clear (active-high) forces Q=0.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopJKAsync.java
- *
  * Input layout:  [Set=0, J=1, C=2, K=3, Clr=4]
  * Output layout: [Q=0, ~Q=1]
  * State layout:  [storedQ=0, prevClock=1]
@@ -27,7 +25,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeJKAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -327,11 +324,6 @@ export const JKAsyncDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeJKAsyncFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

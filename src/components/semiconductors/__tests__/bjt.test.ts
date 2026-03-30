@@ -652,3 +652,87 @@ describe("Integration", () => {
     expect(vCollector).toBeLessThan(5.0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// setParam behavioral verification — reads mutable params object, not captured locals
+// ---------------------------------------------------------------------------
+
+describe("setParam mutates params object (not captured locals)", () => {
+  it("setParam('BF', newValue) changes RHS Norton current on next stampNonlinear", () => {
+    // Drive BJT into active region at Vbe=0.7V, Vce=5V
+    const vbe = 0.7;
+    const vbc = vbe - 5;
+    const element = makeBjtAtOp(1, vbe, vbc);
+
+    // Capture RHS before setParam
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // Change BF: higher BF means lower base current → different Norton currents
+    element.setParam("BF", 50); // was ~200 in defaults
+
+    // Re-drive operating point so internal state updates use new BF
+    const voltages = new Float64Array(3);
+    voltages[0] = vbe - 5; // Vc
+    voltages[1] = vbe;     // Vb
+    voltages[2] = 0;       // Ve
+    for (let i = 0; i < 100; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = vbe - 5;
+      voltages[1] = vbe;
+      voltages[2] = 0;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // At least one RHS entry must differ — BF change alters Ib Norton current
+    const anyDiffers = rhsBefore.some(
+      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-12
+    );
+    expect(anyDiffers).toBe(true);
+  });
+
+  it("setParam('IS', newValue) changes conductance stamps on next stampNonlinear", () => {
+    const vbe = 0.7;
+    const vbc = vbe - 5;
+    const element = makeBjtAtOp(1, vbe, vbc);
+
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+
+    // Change IS by 100×: conductances gm, gpi, gmu all scale with IS
+    element.setParam("IS", BJT_NPN_DEFAULTS.IS * 100);
+
+    const voltages = new Float64Array(3);
+    voltages[0] = vbe - 5;
+    voltages[1] = vbe;
+    voltages[2] = 0;
+    for (let i = 0; i < 100; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = vbe - 5;
+      voltages[1] = vbe;
+      voltages[2] = 0;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+
+    const anyDiffers = stampsBefore.some(
+      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
+    );
+    expect(anyDiffers).toBe(true);
+  });
+});

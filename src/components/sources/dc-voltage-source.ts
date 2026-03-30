@@ -251,6 +251,7 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
       },
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

@@ -352,15 +352,15 @@ describe("TappedTransformerDefinition", () => {
   });
 
   it("TappedTransformerDefinition has analog model", () => {
-    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(TappedTransformerDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("has analogFactory", () => {
-    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(TappedTransformerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
   });
 
   it("branchCount is 1", () => {
-    expect(TappedTransformerDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
+    expect(TappedTransformerDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
   });
 
   it("category is PASSIVES", () => {
@@ -379,13 +379,13 @@ describe("TappedTransformerDefinition", () => {
 
   it("analogFactory creates element with correct branch indices", () => {
     const props = new PropertyBag();
-    props.set("turnsRatio", 2.0);
-    props.set("primaryInductance", 100e-3);
-    props.set("couplingCoefficient", 0.99);
-    props.set("primaryResistance", 0);
-    props.set("secondaryResistance", 0);
+    props.setModelParam("turnsRatio", 2.0);
+    props.setModelParam("primaryInductance", 100e-3);
+    props.setModelParam("couplingCoefficient", 0.99);
+    props.setModelParam("primaryResistance", 0);
+    props.setModelParam("secondaryResistance", 0);
 
-    const el = TappedTransformerDefinition.models!.mnaModels!.behavioral!.factory(
+    const el = TappedTransformerDefinition.modelRegistry!.behavioral!.factory(
       new Map([["P1", 1], ["P2", 0], ["S1", 2], ["CT", 3], ["S2", 4]]),
       [],
       10,

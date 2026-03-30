@@ -6,8 +6,6 @@
  *   - If clr=1: reset counter to 0 (takes priority over increment)
  * Output ovf=1 when counter==maxValue AND enable=1.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/memory/Counter.java
- *
  * Input layout:  [en=0, C=1, clr=2]
  * Output layout: [out=0, ovf=1]
  * State layout:  [counter=0, prevClock=1]
@@ -274,11 +272,6 @@ export const CounterDefinition: ComponentDefinition = {
       outputSchema: ["out", "ovf"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralCounterAnalogFactory(),
-    },
     },
   },
   modelRegistry: {

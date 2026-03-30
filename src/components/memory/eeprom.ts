@@ -22,10 +22,6 @@
  *
  * Both declare backingStoreType: 'datafield'. The Phase 3 engine populates
  * the backing store registry before calling executeFn.
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/memory/EEPROM.java
- *   ref/Digital/src/main/java/de/neemann/digital/core/memory/EEPROMDualPort.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

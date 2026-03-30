@@ -7,8 +7,6 @@
  *   S=0, R=1 → Q=0, ~Q=1
  *   S=1, R=1 → forbidden (Q=0, ~Q=0 per Digital's implementation)
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopRSAsync.java
- *
  * Input layout:  [S=0, R=1]
  * Output layout: [Q=0, ~Q=1]
  * State layout:  [storedQ=0, storedQn=1]
@@ -30,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeRSAsyncLatchAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -211,11 +208,6 @@ export const RSAsyncDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeRSAsyncLatchAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

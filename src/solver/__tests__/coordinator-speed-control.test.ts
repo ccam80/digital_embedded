@@ -96,14 +96,15 @@ function makeGroundDef(): ComponentDefinition {
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
-    models: { mnaModels: { behavioral: {
-      factory: (_pinNodes) => ({
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
         pinNodeIds: [], allNodeIds: [], branchIndex: -1,
         isNonlinear: false, isReactive: false,
         stamp(_s: SparseSolver) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
-      }),
-    } } },
+      }), paramDefs: [], params: {} },
+    },
   } as unknown as ComponentDefinition;
 }
 
@@ -118,9 +119,10 @@ function makeResistorDef(): ComponentDefinition {
     propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
-    models: { mnaModels: { behavioral: {
-      factory: (pinNodes) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000),
-    } } },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (pinNodes) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000), paramDefs: [], params: {} },
+    },
   } as unknown as ComponentDefinition;
 }
 

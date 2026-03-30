@@ -97,19 +97,16 @@ function buildRegistry(
     category: ComponentCategory.MISC,
     helpText: "",
     defaultModel: "behavioral",
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory: () => ({
-            pinNodeIds: [],
-            allNodeIds: [],
-            branchIndex: -1,
-            isNonlinear: false,
-            isReactive: false,
-            stamp() {},
-          }),
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: () => ({
+        pinNodeIds: [],
+        allNodeIds: [],
+        branchIndex: -1,
+        isNonlinear: false,
+        isReactive: false,
+        stamp() {},
+      }), paramDefs: [], params: {} },
     },
   });
 
@@ -186,12 +183,9 @@ function buildRegistry(
     category: ComponentCategory.PASSIVE,
     helpText: "",
     defaultModel: "behavioral",
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory: (pinNodes) => makeStubAnalogElement(pinNodes),
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (pinNodes) => makeStubAnalogElement(pinNodes), paramDefs: [], params: {} },
     },
   });
 
@@ -215,11 +209,9 @@ function buildRegistry(
     helpText: "",
     models: {
       digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction },
-      mnaModels: {
-        behavioral: {
-          factory: (analogFactory ?? makeStubAnalogElement) as unknown as import("../../core/registry.js").MnaModel["factory"],
-        },
-      },
+    },
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (analogFactory ?? makeStubAnalogElement) as import("../../core/registry.js").AnalogFactory, paramDefs: [], params: {} },
     },
   });
 

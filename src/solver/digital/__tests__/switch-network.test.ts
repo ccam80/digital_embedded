@@ -94,8 +94,6 @@ function nfetPins(): PinDeclaration[] {
   ];
 }
 
-const noopExecFn: ExecuteFunction = () => {};
-
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],

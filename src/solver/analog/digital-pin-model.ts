@@ -113,7 +113,6 @@ export class DigitalOutputPinModel {
    *   If loaded: stamp(nodeIdx, nodeIdx, 1/rHiZ)
    *
    * When branchIdx < 0 (not assigned), this method is a no-op.
-   * Behavioral elements that need a conductance+current-source stamp use stampOutput().
    */
   stamp(solver: SparseSolver): void {
     const node = this._nodeId;

@@ -19,9 +19,6 @@
  *   Bidirectional: out1, out2
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/Fuse.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -38,7 +35,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
-import { createAnalogFuseElement, createAnalogFuseElementFromModelParams, ANALOG_FUSE_PARAM_DEFS, ANALOG_FUSE_DEFAULTS } from "../passives/analog-fuse.js";
+import { createAnalogFuseElement, ANALOG_FUSE_PARAM_DEFS, ANALOG_FUSE_DEFAULTS } from "../passives/analog-fuse.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -431,16 +428,11 @@ export const FuseDefinition: ComponentDefinition = {
       switchPins: [0, 1],
       defaultDelay: 0,
     },
-    mnaModels: {
-      behavioral: {
-      factory: createAnalogFuseElement,
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createAnalogFuseElementFromModelParams,
+      factory: createAnalogFuseElement,
       paramDefs: ANALOG_FUSE_PARAM_DEFS,
       params: ANALOG_FUSE_DEFAULTS,
     },

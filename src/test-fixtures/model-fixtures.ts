@@ -18,6 +18,7 @@ export const STUB_ANALOG_FACTORY: AnalogFactory = (
   isNonlinear: false,
   isReactive: false,
   getPinCurrents: () => [],
+  setParam: (_key: string, _value: number) => {},
 });
 
 /**

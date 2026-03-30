@@ -493,11 +493,6 @@ export const SplitterDefinition: ComponentDefinition = {
         return parsePorts(outputSplitting).map((p) => p.name);
       },
     },
-    mnaModels: {
-      behavioral: {
-      factory: createSplitterAnalogElement,
-    },
-    },
   },
   modelRegistry: {
     "behavioral": {

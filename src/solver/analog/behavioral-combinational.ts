@@ -190,6 +190,8 @@ export class BehavioralMuxElement implements AnalogElementCore {
     }
     return result;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +324,8 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     }
     return result;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +447,8 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     }
     return result;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------

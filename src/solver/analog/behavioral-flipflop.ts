@@ -289,6 +289,8 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
 
     return result;
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------

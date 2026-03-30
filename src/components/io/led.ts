@@ -230,6 +230,8 @@ function createLedAnalogElement(
 
       return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -305,9 +307,6 @@ export const LedDefinition: ComponentDefinition = {
     "Color is configurable. Label is shown above the component.",
   models: {
     digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
-    mnaModels: {
-      behavioral: { factory: createLedAnalogElement },
-    },
   },
   modelRegistry: {
     behavioral: {

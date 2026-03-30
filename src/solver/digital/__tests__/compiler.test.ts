@@ -71,8 +71,6 @@ function outputOnlyPin(label: string, position: { x: number; y: number }): PinDe
 // Helpers: build minimal ComponentDefinition
 // ---------------------------------------------------------------------------
 
-const noopExecFn: ExecuteFunction = (_index, _state, _layout) => {};
-
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],

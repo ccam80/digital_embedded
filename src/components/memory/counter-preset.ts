@@ -9,8 +9,6 @@
  *   - Else if ld=1: load preset value from 'in' input
  * ovf output: when counting up, ovf=1 at maxValue; when counting down, ovf=1 at 0.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/memory/CounterPreset.java
- *
  * Input layout:  [en=0, C=1, dir=2, in=3, ld=4, clr=5]
  * Output layout: [out=0, ovf=1]
  * State layout:  [counter=0, prevClock=1]
@@ -362,11 +360,6 @@ export const CounterPresetDefinition: ComponentDefinition = {
       outputSchema: ["out", "ovf"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeBehavioralCounterPresetAnalogFactory(),
-    },
     },
   },
   modelRegistry: {

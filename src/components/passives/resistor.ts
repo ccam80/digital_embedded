@@ -145,7 +145,7 @@ export class ResistorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// createResistorElement — AnalogElement factory
+// AnalogElement factory
 // ---------------------------------------------------------------------------
 
 
@@ -187,15 +187,6 @@ function buildResistorElement(
 }
 
 function createResistorElement(
-  pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  return buildResistorElement(pinNodes, props.getOrDefault<number>("resistance", 1000));
-}
-
-function createResistorElementFromModelParams(
   pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
   _branchIdx: number,
@@ -263,17 +254,11 @@ export const ResistorDefinition: ComponentDefinition = {
   helpText:
     "Resistor — stamps conductance G=1/R into the MNA matrix.\n" +
     "Minimum resistance is clamped to 1e-9 Ω.",
-  models: {
-    mnaModels: {
-      behavioral: {
-        factory: createResistorElement,
-      },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createResistorElementFromModelParams,
+      factory: createResistorElement,
       paramDefs: RESISTOR_PARAM_DEFS,
       params: RESISTOR_DEFAULTS,
     },

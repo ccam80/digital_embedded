@@ -398,6 +398,7 @@ export const CCVSDefinition: ComponentDefinition = {
       },
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,
+      branchCount: 2,
     },
   },
   defaultModel: "behavioral",

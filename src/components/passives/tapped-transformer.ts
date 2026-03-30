@@ -203,6 +203,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private readonly _b2: number;
   private readonly _b3: number;
@@ -510,23 +511,6 @@ function createTappedTransformerElement(
   return buildTappedTransformerElement(
     pinNodes,
     branchIdx,
-    props.getOrDefault<number>("primaryInductance", 10e-3),
-    props.getOrDefault<number>("turnsRatio", 2.0),
-    props.getOrDefault<number>("couplingCoefficient", 0.99),
-    props.getOrDefault<number>("primaryResistance", 0.0),
-    props.getOrDefault<number>("secondaryResistance", 0.0),
-  );
-}
-
-function createTappedTransformerElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  return buildTappedTransformerElement(
-    pinNodes,
-    branchIdx,
     props.getModelParam<number>("primaryInductance"),
     props.getModelParam<number>("turnsRatio"),
     props.getModelParam<number>("couplingCoefficient"),
@@ -641,20 +625,14 @@ export const TappedTransformerDefinition: ComponentDefinition = {
   helpText:
     "Center-tapped three-winding transformer using 3×3 coupled inductor companion model.\n" +
     "Specify total turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createTappedTransformerElement,
-      branchCount: 1,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createTappedTransformerElementFromModelParams,
+      factory: createTappedTransformerElement,
       paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS,
       params: TAPPED_TRANSFORMER_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

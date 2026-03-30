@@ -278,6 +278,7 @@ export const VariableRailDefinition: ComponentDefinition = {
       },
       paramDefs: VARIABLE_RAIL_PARAM_DEFS,
       params: VARIABLE_RAIL_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

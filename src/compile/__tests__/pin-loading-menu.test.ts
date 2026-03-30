@@ -149,17 +149,13 @@ function buildMixedRegistry(): ComponentRegistry {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models: {
-      mnaModels: {
-        behavioral: {
-          branchCount: 0,
-          factory: (pinNodes: ReadonlyMap<string, number>) => {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeResistorElement(n0 ?? 0, n1 ?? 0);
-          },
-        },
-      },
-    } as ComponentModels,
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, branchCount: 0, factory: (pinNodes: ReadonlyMap<string, number>) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      }, paramDefs: [], params: {} },
+    },
   } as ComponentDefinition);
 
   // Ground (neutral)
@@ -172,7 +168,8 @@ function buildMixedRegistry(): ComponentRegistry {
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models: { mnaModels: { behavioral: {} } } as ComponentModels,
+    models: {},
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
   } as ComponentDefinition);
 
   // Dual-model component: digital model + MNA model
@@ -192,16 +189,13 @@ function buildMixedRegistry(): ComponentRegistry {
     helpText: '',
     models: {
       digital: { executeFn: noopExecFn },
-      mnaModels: {
-        behavioral: {
-          branchCount: 0,
-          factory: (pinNodes: ReadonlyMap<string, number>) => {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeResistorElement(n0 ?? 0, n1 ?? 0);
-          },
-        },
-      },
-    } as ComponentModels,
+    },
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, branchCount: 0, factory: (pinNodes: ReadonlyMap<string, number>) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      }, paramDefs: [], params: {} },
+    },
   } as ComponentDefinition);
 
   return r;

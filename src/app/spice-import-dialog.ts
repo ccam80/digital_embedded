@@ -38,19 +38,6 @@ function detectFormat(text: string): "subckt" | "model" {
 }
 
 // ---------------------------------------------------------------------------
-// Local validation helper (returns an array of diagnostic summaries)
-// ---------------------------------------------------------------------------
-
-function validateModel(_model: {
-  name: string;
-  type: string;
-  level: number;
-  params: Record<string, number>;
-}): Array<{ summary: string }> {
-  return [];
-}
-
-// ---------------------------------------------------------------------------
 // openSpiceImportDialog
 // ---------------------------------------------------------------------------
 
@@ -214,14 +201,7 @@ export function openSpiceImportDialog(
 
       // .MODEL path
       const parsed = parseModelCard(trimmed);
-      const warnings: string[] = [];
-      if (!('message' in parsed)) {
-        const diags = validateModel({ name: parsed.name, type: parsed.deviceType, level: parsed.level, params: parsed.params });
-        for (const d of diags) {
-          warnings.push(d.summary);
-        }
-      }
-      return { kind: "model", parsed, warnings };
+      return { kind: "model", parsed, warnings: [] };
     }
 
     function updatePreview(): void {

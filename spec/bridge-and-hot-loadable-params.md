@@ -645,11 +645,20 @@ Per-net overrides:
   - Model dropdown with runtime entries (E2E)
   - Model switch in property panel (E2E)
   - Delta serialization round-trip (headless + MCP + E2E)
+    - `sim-get-circuit` must preserve `modelParamDeltas` in export — migrate export path if needed
+    - E2E round-trip: export circuit with param deltas → reimport → verify deltas survive
   - Bridge behavior in all three modes (headless + MCP + E2E)
-  - Hot-loading pin electrical params via setParam (headless)
-  - Hot-loading model params via setParam (headless)
+    - E2E: UI context menu to switch pin loading mode → verify simulation output changes
+  - Hot-loading pin electrical params via setParam (headless + E2E)
+    - E2E: click component → change pin electrical param in property popup → verify simulation output changes
+  - Hot-loading model params via setParam (headless + E2E)
+    - E2E: click component → change model param in property popup → verify simulation output changes
 - **Acceptance criteria**:
   - Every user-facing feature tested across headless API, MCP tool, and E2E surfaces
+  - Hot-loading params verified end-to-end through property popup UI, not just headless API
   - All E2E tests pass
+- **Compile-time diagnostic to add**:
+  - Detect two voltage constraints driving the same net (e.g. voltage source into BJT base that also has a voltage source)
+  - Surface plain-language error: "Two competing voltage sources are driving the net that connects to {component} — the circuit design needs to be fixed"
 
 **POST-WAVE CHECK:** `npm run test:q` — zero failures. Full E2E suite passes. All grep verification conditions satisfied.

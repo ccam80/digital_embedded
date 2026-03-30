@@ -57,7 +57,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
-  const el = CapacitorDefinition.models!.mnaModels!.behavioral!.factory(pinNodes, [], -1, props, () => 0);
+  const el = CapacitorDefinition.modelRegistry!.behavioral!.factory(pinNodes, [], -1, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -70,7 +70,7 @@ describe("Capacitor", () => {
   describe("updateCompanion_trapezoidal", () => {
     it("computes correct geq and ieq for trapezoidal method", () => {
       const props = new PropertyBag();
-      props.set("capacitance", 1e-6);
+      props.setModelParam("capacitance", 1e-6);
 
       // Node IDs are 1-based (ground=0). Use [1, 2] so both are non-ground.
       // Solver indices: node1→idx0, node2→idx1
@@ -93,7 +93,7 @@ describe("Capacitor", () => {
   describe("updateCompanion_bdf1", () => {
     it("computes correct geq for BDF-1 method", () => {
       const props = new PropertyBag();
-      props.set("capacitance", 1e-6);
+      props.setModelParam("capacitance", 1e-6);
 
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
@@ -112,7 +112,7 @@ describe("Capacitor", () => {
   describe("updateCompanion_bdf2", () => {
     it("computes correct geq for BDF-2 method and uses vPrevPrev", () => {
       const props = new PropertyBag();
-      props.set("capacitance", 1e-6);
+      props.setModelParam("capacitance", 1e-6);
 
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
@@ -131,6 +131,7 @@ describe("Capacitor", () => {
   describe("is_reactive_true", () => {
     it("declares isReactive === true", () => {
       const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       expect(analogElement.isReactive).toBe(true);
@@ -143,11 +144,11 @@ describe("Capacitor", () => {
     });
 
     it("CapacitorDefinition has analog model", () => {
-      expect(CapacitorDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(CapacitorDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
     it("CapacitorDefinition has analogFactory", () => {
-      expect(CapacitorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+      expect(CapacitorDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
     });
 
     it("CapacitorDefinition category is PASSIVES", () => {

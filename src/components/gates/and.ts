@@ -19,7 +19,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeAndAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   compWidth,
@@ -199,11 +198,6 @@ export const AndDefinition: ComponentDefinition = {
         return Array.from({ length: n }, (_, i) => `In_${i + 1}`);
       },
       outputSchema: ["out"],
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeAndAnalogFactory(0),
-    },
     },
   },
   defaultModel: "digital",

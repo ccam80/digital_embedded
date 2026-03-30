@@ -10,9 +10,6 @@
  *   Bidirectional: S (source), D (drain)
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/switching/PFET.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

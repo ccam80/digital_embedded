@@ -9,9 +9,6 @@
  *
  * Backing store: datafield (table[addr] = output value).
  * internalStateCount: 0 (fully combinational).
- *
- * Ported from:
- *   ref/Digital/src/main/java/de/neemann/digital/core/memory/LookUpTable.java
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

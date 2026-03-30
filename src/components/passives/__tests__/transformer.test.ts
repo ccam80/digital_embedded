@@ -567,15 +567,15 @@ describe("TransformerDefinition", () => {
   });
 
   it("TransformerDefinition has analog model", () => {
-    expect(TransformerDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(TransformerDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("has analogFactory", () => {
-    expect(TransformerDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(TransformerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
   });
 
   it("branchCount is 1", () => {
-    expect(TransformerDefinition.models?.mnaModels?.behavioral?.branchCount).toBe(1);
+    expect(TransformerDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
   });
 
   it("category is PASSIVES", () => {
@@ -593,13 +593,13 @@ describe("TransformerDefinition", () => {
 
   it("analogFactory creates element with correct branch indices", () => {
     const props = new PropertyBag();
-    props.set("turnsRatio", 10);
-    props.set("primaryInductance", 10e-3);
-    props.set("couplingCoefficient", 0.99);
-    props.set("primaryResistance", 0);
-    props.set("secondaryResistance", 0);
+    props.setModelParam("turnsRatio", 10);
+    props.setModelParam("primaryInductance", 10e-3);
+    props.setModelParam("couplingCoefficient", 0.99);
+    props.setModelParam("primaryResistance", 0);
+    props.setModelParam("secondaryResistance", 0);
 
-    const el = TransformerDefinition.models!.mnaModels!.behavioral!.factory(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
+    const el = TransformerDefinition.modelRegistry!.behavioral!.factory(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
     expect(el.branchIndex).toBe(5);
     expect(el.branch2).toBe(6);
   });

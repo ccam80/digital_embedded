@@ -4,8 +4,6 @@
  * Stores D on rising clock edge. Async Set (active-high) forces Q=1.
  * Async Clear (active-high) forces Q=0. Set/Clear take priority over clock.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopDAsync.java
- *
  * Input pin order: [Set, D, C, Clr]
  * Output pin order: [Q, ~Q]
  * State slots: [storedQ, prevClock]
@@ -27,7 +25,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeDAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -297,11 +294,6 @@ export const DAsyncDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeDAsyncFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

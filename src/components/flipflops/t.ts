@@ -8,8 +8,6 @@
  * Without T input (withEnable=false):
  *   Toggles Q on every rising clock edge.
  *
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopT.java
- *
  * Input layout (withEnable=false): [C=0]
  * Input layout (withEnable=true):  [T=0, C=1]
  * Output layout: [Q=0, ~Q=1]
@@ -32,7 +30,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeTFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop-variants.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -285,11 +282,6 @@ export const TDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeTFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

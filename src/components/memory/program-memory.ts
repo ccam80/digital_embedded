@@ -18,8 +18,6 @@
  * Input layout:  [A=0, ld=1, C=2]
  * Output layout: [D=0]
  * State layout:  [addrReg=0, prevClock=1]
- *
- * Ported from the ProgramMemory concept in Digital's memory package.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { MemristorElement, MemristorDefinition, createMemristorElement } from "../memristor.js";
+import { MemristorElement, MemristorDefinition, createMemristorElement, MEMRISTOR_DEFAULTS } from "../memristor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 
@@ -284,7 +284,7 @@ describe("Memristor", () => {
 
   describe("definition", () => {
     it("MemristorDefinition has correct engine type and category", () => {
-      expect(MemristorDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(MemristorDefinition.modelRegistry?.behavioral).toBeDefined();
       expect(MemristorDefinition.category).toBe(ComponentCategory.PASSIVES);
     });
 
@@ -301,8 +301,8 @@ describe("Memristor", () => {
     });
 
     it("analogFactory creates a MemristorElement", () => {
-      const propsMap = new Map<string, import("../../../core/properties.js").PropertyValue>();
-      const props = new PropertyBag(propsMap.entries());
+      const props = new PropertyBag();
+      props.replaceModelParams(MEMRISTOR_DEFAULTS);
       const element = createMemristorElement(new Map([["A", 1], ["B", 2]]), [], -1, props);
       expect(element).toBeInstanceOf(MemristorElement);
       expect(element.isNonlinear).toBe(true);
@@ -310,7 +310,7 @@ describe("Memristor", () => {
     });
 
     it("branchCount is false", () => {
-      expect(MemristorDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
+      expect(MemristorDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
     });
   });
 });

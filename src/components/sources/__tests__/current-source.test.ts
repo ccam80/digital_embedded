@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { makeCurrentSource, CurrentSourceDefinition } from "../current-source.js";
+import { makeCurrentSource, CurrentSourceDefinition, CURRENT_SOURCE_DEFAULTS } from "../current-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
@@ -90,16 +90,17 @@ describe("CurrentSource", () => {
   });
 
   it("definition_engine_type_analog", () => {
-    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(CurrentSourceDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("definition_does_not_require_branch_row", () => {
-    expect(CurrentSourceDefinition.models?.mnaModels?.behavioral?.branchCount).toBeFalsy();
+    expect(CurrentSourceDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
   });
 
   it("default_current_from_analog_factory", () => {
     const props = new PropertyBag();
-    const el = CurrentSourceDefinition.models!.mnaModels!.behavioral!.factory(
+    props.replaceModelParams(CURRENT_SOURCE_DEFAULTS);
+    const el = CurrentSourceDefinition.modelRegistry!.behavioral!.factory(
       new Map([["pos", 1], ["neg", 2]]),
       [],
       -1,

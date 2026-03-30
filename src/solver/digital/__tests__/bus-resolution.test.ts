@@ -427,8 +427,6 @@ function twoInputOneOutputPins(): PinDeclaration[] {
   ];
 }
 
-const noopExecFn: ExecuteFunction = (_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout) => {};
-
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],

@@ -411,6 +411,6 @@ export const SparkGapDefinition: ComponentDefinition = {
       params: SPARK_GAP_DEFAULTS,
     },
   },
-  models: { mnaModels: { behavioral: { factory: createSparkGapElement } } },
+  models: {},
   defaultModel: "behavioral",
 };

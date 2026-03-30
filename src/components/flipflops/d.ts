@@ -2,7 +2,6 @@
  * D Flip-Flop component — edge-triggered data storage.
  *
  * Stores D input on rising clock edge. Q and ~Q outputs are complementary.
- * Ported from ref/Digital/src/main/java/de/neemann/digital/core/flipflops/FlipflopD.java
  *
  * Internal state layout (stateOffset):
  *   slot 0: stored Q value (0 or 1)
@@ -29,7 +28,6 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
@@ -366,11 +364,6 @@ export const DDefinition: ComponentDefinition = {
       outputSchema: ["Q", "~Q"],
       stateSlotCount: 2,
       defaultDelay: 10,
-    },
-    mnaModels: {
-      behavioral: {
-      factory: makeDFlipflopAnalogFactory(),
-    },
     },
   },
   defaultModel: "digital",

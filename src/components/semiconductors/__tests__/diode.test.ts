@@ -312,3 +312,77 @@ describe("Integration", () => {
     expect(iDiode).toBeLessThan(0.00440);
   });
 });
+
+// ---------------------------------------------------------------------------
+// setParam behavioral verification — reads mutable params object, not captured locals
+// ---------------------------------------------------------------------------
+
+describe("setParam mutates params object (not captured locals)", () => {
+  it("setParam('IS', newValue) changes conductance stamps on next stampNonlinear", () => {
+    // Forward-biased diode at Vd=0.7V — include all required params to satisfy getModelParam
+    const element = makeDiodeAtVd(0.7, { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, BV: Infinity, IBV: 1e-3 });
+
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    // Collect all conductance stamp values at (0,0) — diagonal anode entry
+    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+
+    // Multiply IS by 1000: geq = IS*exp(Vd/nVt)/nVt changes proportionally
+    element.setParam("IS", 1e-11);
+
+    // Re-converge to same Vd with new IS so internal op is updated
+    const voltages = new Float64Array(2);
+    voltages[0] = 0.7;
+    voltages[1] = 0;
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 0.7;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[2] as number
+    );
+
+    // IS changed by 1000×: at least one stamp must differ
+    const anyDiffers = stampsBefore.some(
+      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
+    );
+    expect(anyDiffers).toBe(true);
+  });
+
+  it("setParam('N', newValue) changes RHS Norton current on next stampNonlinear", () => {
+    const element = makeDiodeAtVd(0.7, { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, BV: Infinity, IBV: 1e-3 });
+
+    const solverBefore = makeMockSolver();
+    element.stampNonlinear!(solverBefore);
+    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    // Change emission coefficient N: changes nVt denominator in exp
+    element.setParam("N", 2);
+
+    const voltages = new Float64Array(2);
+    voltages[0] = 0.7;
+    voltages[1] = 0;
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 0.7;
+    }
+
+    const solverAfter = makeMockSolver();
+    element.stampNonlinear!(solverAfter);
+    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[1] as number
+    );
+
+    const anyDiffers = rhsBefore.some(
+      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
+    );
+    expect(anyDiffers).toBe(true);
+  });
+});

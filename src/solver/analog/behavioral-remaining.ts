@@ -184,6 +184,8 @@ export function createDriverAnalogElement(
 
       return [iIn, iSel, iOut];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -289,6 +291,8 @@ export function createDriverInvAnalogElement(
 
       return [iIn, iSel, iOut];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -408,6 +412,8 @@ export function createSplitterAnalogElement(
         p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
       }
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -534,6 +540,8 @@ export function createSevenSegAnalogElement(
       // Each segment pin: current into anode = geq*(Va - Vc) - ieq (Vc = ground = 0)
       return segDiodes.map((d) => d.anodeCurrent(voltages));
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -677,6 +685,8 @@ export function createRelayAnalogElement(
       const iContact = contactG() * (vA - vB);
       return [iCoil, -iCoil, iContact, -iContact];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -784,6 +794,8 @@ export function createRelayDTAnalogElement(
       const iRest = gRest() * (vCom - vRst);
       return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -848,6 +860,8 @@ export function createButtonLEDAnalogElement(
       const iLed = (ledDiode as SegmentDiodeElement).anodeCurrent(voltages);
       return [iOut, iLed];
     },
+
+    setParam(_key: string, _value: number) {},
   };
 }
 

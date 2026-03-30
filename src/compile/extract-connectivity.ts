@@ -40,7 +40,7 @@ export interface ModelAssignment {
   model: import('../core/registry.js').DigitalModel | null;
   /**
    * True when the component has both a digital model and at least one analog
-   * model (via modelRegistry or mnaModels). Dual-model components with
+   * model (via modelRegistry). Dual-model components with
    * modelKey="digital" contribute both "digital" and "analog" domain tags to
    * their connectivity groups, creating boundary groups for bridge synthesis.
    */
@@ -83,15 +83,9 @@ export function resolveModelAssignments(
 
     // Collect all available model keys for this component.
     // modelRegistry is the canonical source for analog models.
-    // Legacy: some definitions attach mnaModels directly on def.models (test-only pattern).
     // Runtime models from circuit.metadata.models are also valid keys.
     const hasDigital = Boolean(def.models?.digital);
-    const registryKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
-    const mnaModelsObj = def.models ? (def.models as Record<string, unknown>)['mnaModels'] : undefined;
-    const staticKeys =
-      registryKeys.length > 0
-        ? registryKeys
-        : (mnaModelsObj && typeof mnaModelsObj === 'object' ? Object.keys(mnaModelsObj) : []);
+    const staticKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
     const hasAnalogModel = mnaKeys.length > 0;

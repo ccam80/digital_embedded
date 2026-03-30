@@ -293,9 +293,6 @@ export const SevenSegDefinition: ComponentDefinition = {
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
   models: {
     digital: { executeFn: executeSevenSeg, inputSchema: ["a", "b", "c", "d", "e", "f", "g", "dp"], outputSchema: [] },
-    mnaModels: {
-      behavioral: { factory: createSevenSegAnalogElement },
-    },
   },
   modelRegistry: {
     behavioral: {

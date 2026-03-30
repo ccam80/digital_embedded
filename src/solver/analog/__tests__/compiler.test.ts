@@ -53,6 +53,12 @@ function makeElement(
     entries() { return Array.from(propsMap.entries()); },
     clone() { return this; },
     size: propsMap.size,
+    getModelParam<T>(_k: string): T { return undefined as unknown as T; },
+    setModelParam(_k: string, _v: PropertyValue) { /* no-op */ },
+    hasModelParam(_k: string): boolean { return false; },
+    getModelParamKeys(): string[] { return []; },
+    replaceModelParams(_p: Record<string, number>) { /* no-op */ },
+    getOrDefault<T>(_k: string, d: T): T { return propsMap.has(_k) ? propsMap.get(_k) as T : d; },
   } as unknown as PropertyBag;
 
   const serialized: SerializedElement = {
@@ -143,83 +149,66 @@ function buildTestRegistry(): ComponentRegistry {
 
   registry.register({
     ...makeBaseDef("AnalogVs"),
-    models: {
-      mnaModels: {
-        behavioral: {
-          branchCount: 1,
-          factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
-          },
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, branchCount: 1, factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      }, paramDefs: [], params: {} },
     },
   });
 
   registry.register({
     ...makeBaseDef("AnalogR"),
-    models: {
-      mnaModels: {
-        behavioral: {
-          branchCount: 0,
-          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
-          },
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, branchCount: 0, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+      }, paramDefs: [], params: {} },
     },
   });
 
   registry.register({
     ...makeBaseDef("AnalogL"),
     defaultModel: 'behavioral',
-    models: {
-      mnaModels: {
-        behavioral: {
-          branchCount: 1,
-          factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
-            const [n0, n1] = [...pinNodes.values()];
-            return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
-          },
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, branchCount: 1, factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      }, paramDefs: [], params: {} },
     },
   });
 
   registry.register({
     ...makeBaseDef("Ground"),
     defaultModel: 'behavioral',
-    models: { mnaModels: { behavioral: {} } },
+    models: {},
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
   });
 
   registry.register({
     ...makeBaseDef("In"),
     defaultModel: 'behavioral',
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-            const [n0] = [...pinNodes.values()];
-            return makeTestResistorElement(n0 ?? 0, 0);
-          },
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+        const [n0] = [...pinNodes.values()];
+        return makeTestResistorElement(n0 ?? 0, 0);
+      }, paramDefs: [], params: {} },
     },
   });
 
   registry.register({
     ...makeBaseDef("Out"),
     defaultModel: 'behavioral',
-    models: {
-      mnaModels: {
-        behavioral: {
-          factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
-            const [n0] = [...pinNodes.values()];
-            return makeTestResistorElement(n0 ?? 0, 0);
-          },
-        },
-      },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+        const [n0] = [...pinNodes.values()];
+        return makeTestResistorElement(n0 ?? 0, 0);
+      }, paramDefs: [], params: {} },
     },
   });
 
@@ -424,20 +413,17 @@ describe("AnalogCompiler", () => {
         { label: "neg", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       ],
       defaultModel: 'behavioral',
-      models: {
-        mnaModels: {
-          behavioral: {
-            branchCount: 1,
-            factory: factorySpy,
-          },
-        },
+      models: {},
+      modelRegistry: {
+        behavioral: { kind: 'inline' as const, branchCount: 1, factory: factorySpy, paramDefs: [], params: {} },
       },
     });
 
     registry.register({
       ...makeBaseDef("Ground"),
       defaultModel: 'behavioral',
-      models: { mnaModels: { behavioral: {} } },
+      models: {},
+      modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
     });
 
     // Vs: pos at (10,0), neg at (0,0) = ground

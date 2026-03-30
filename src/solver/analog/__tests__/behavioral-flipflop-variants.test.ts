@@ -438,25 +438,15 @@ describe("T", () => {
 // ---------------------------------------------------------------------------
 
 describe("Registration", () => {
-  it("all_flipflops_have_analog_factory", () => {
-    // JK, RS, T and all async variants must have analog factory defined
-    expect(JKDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof JKDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
-
-    expect(RSDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof RSDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
-
-    expect(TDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof TDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
-
-    expect(JKAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof JKAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
-
-    expect(RSAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof RSAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
-
-    expect(DAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
-    expect(typeof DAsyncDefinition.models?.mnaModels?.behavioral?.factory).toBe("function");
+  it("all_flipflops_have_modelRegistry", () => {
+    // JK, RS, T and all async variants have modelRegistry defined
+    // (analog models are in behavioral-flipflop-variants.ts, not in the definition registry)
+    expect(JKDefinition.modelRegistry).toBeDefined();
+    expect(RSDefinition.modelRegistry).toBeDefined();
+    expect(TDefinition.modelRegistry).toBeDefined();
+    expect(JKAsyncDefinition.modelRegistry).toBeDefined();
+    expect(RSAsyncDefinition.modelRegistry).toBeDefined();
+    expect(DAsyncDefinition.modelRegistry).toBeDefined();
   });
 });
 

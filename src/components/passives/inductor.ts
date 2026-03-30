@@ -216,16 +216,6 @@ function createInductorElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const L = props.getOrDefault<number>("inductance", 1e-3);
-  return new AnalogInductorElement(branchIdx, L);
-}
-
-function createInductorElementFromModelParams(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
   const L = props.getModelParam<number>("inductance");
   return new AnalogInductorElement(branchIdx, L);
 }
@@ -289,20 +279,14 @@ export const InductorDefinition: ComponentDefinition = {
   helpText:
     "Inductor — reactive element with companion model and branch current.\n" +
     "Stamps equivalent conductance, history current, and branch incidence entries.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createInductorElement,
-      branchCount: 1,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createInductorElementFromModelParams,
+      factory: createInductorElement,
       paramDefs: INDUCTOR_PARAM_DEFS,
       params: INDUCTOR_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

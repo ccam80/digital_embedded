@@ -464,6 +464,7 @@ export class TransmissionLineElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
   /** Branch index of the last segment's CombinedRL element. */
@@ -634,24 +635,6 @@ function createTransmissionLineElement(
     pinNodes,
     internalNodeIds,
     branchIdx,
-    props.getOrDefault<number>("impedance", 50),
-    props.getOrDefault<number>("delay", 1e-9),
-    props.getOrDefault<number>("lossPerMeter", 0),
-    props.getOrDefault<number>("length", 1.0),
-    props.getOrDefault<number>("segments", 10),
-  );
-}
-
-function createTransmissionLineElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
-  return buildTransmissionLineElement(
-    pinNodes,
-    internalNodeIds,
-    branchIdx,
     props.getModelParam<number>("impedance"),
     props.getModelParam<number>("delay"),
     props.getModelParam<number>("lossPerMeter"),
@@ -779,24 +762,14 @@ export const TransmissionLineDefinition: ComponentDefinition = {
     "Lossy Transmission Line — lumped RLCG model.\n" +
     "N cascaded segments with series RL and shunt GC. " +
     "Parameterised by Z\u2080, propagation delay, loss, and segment count.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createTransmissionLineElement,
-      branchCount: 1,
-      getInternalNodeCount: (props: PropertyBag): number => {
-        const N = props.getOrDefault<number>("segments", 10);
-        return (N - 1) * 2;
-      },
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createTransmissionLineElementFromModelParams,
+      factory: createTransmissionLineElement,
       paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
       params: TRANSMISSION_LINE_DEFAULTS,
+      branchCount: 1,
     },
   },
   defaultModel: "behavioral",

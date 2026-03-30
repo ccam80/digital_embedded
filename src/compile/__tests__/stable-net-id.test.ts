@@ -82,7 +82,7 @@ function buildMixedRegistry(): ComponentRegistry {
   r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Resistor', { mnaModels: { behavioral: {} } }) as ComponentDefinition);
+  r.register({ ...makeBaseDef('Resistor', {}), modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } } } as ComponentDefinition);
   r.register(makeBaseDef('Tunnel',   { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Port',     {} ) as ComponentDefinition);
   return r;

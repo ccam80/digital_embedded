@@ -30,7 +30,7 @@ import { createDriverAnalogElement } from "../../solver/analog/behavioral-remain
 // ---------------------------------------------------------------------------
 
 /**
- * Driver dimensions in grid units, ported from Java DriverShape.
+ * Driver dimensions in grid units.
  *
  * Java SIZE = 20px = 1 grid unit.  SIZE2 = 10px = 0.5 grid units.
  * Pin layout: input at (-1, 0), sel at (0, ±1), output at (1, 0).
@@ -275,11 +275,6 @@ export const DriverDefinition: ComponentDefinition = {
       executeFn: executeDriver,
       inputSchema: ["in", "sel"],
       outputSchema: ["out"],
-    },
-    mnaModels: {
-      behavioral: {
-      factory: createDriverAnalogElement,
-    },
     },
   },
   modelRegistry: {

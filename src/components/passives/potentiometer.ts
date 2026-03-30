@@ -312,21 +312,6 @@ function createPotentiometerElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const R = props.getOrDefault<number>("resistance", 10000);
-  const position = props.getOrDefault<number>("position", 0.5);
-  return new AnalogPotentiometerElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!],
-    R,
-    position,
-  );
-}
-
-function createPotentiometerElementFromModelParams(
-  pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
-): AnalogElementCore {
   const R = props.getModelParam<number>("resistance");
   const position = props.getModelParam<number>("position");
   return new AnalogPotentiometerElement(
@@ -409,17 +394,11 @@ export const PotentiometerDefinition: ComponentDefinition = {
   helpText:
     "Potentiometer — voltage divider with 3 terminals (A, wiper, B).\n" +
     "Position determines the voltage division between top and bottom resistances.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createPotentiometerElement,
-    },
-    },
-  },
+  models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createPotentiometerElementFromModelParams,
+      factory: createPotentiometerElement,
       paramDefs: POTENTIOMETER_PARAM_DEFS,
       params: POTENTIOMETER_DEFAULTS,
     },
