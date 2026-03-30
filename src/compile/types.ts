@@ -8,7 +8,7 @@ import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
-import type { ComponentDefinition, DigitalModel, MnaModel } from "../core/registry.js";
+import type { ComponentDefinition, DigitalModel, AnalogFactory } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
@@ -66,10 +66,34 @@ export interface Diagnostic {
 }
 
 // ---------------------------------------------------------------------------
+// MnaModel — compiler-internal analog model representation
+// ---------------------------------------------------------------------------
+
+import type { PropertyBag } from "../core/properties.js";
+import type { AnalogElementCore } from "../core/analog-types.js";
+
+/**
+ * Compiler-internal representation of an analog model that can be stamped
+ * into the MNA matrix. The compiler resolves ModelEntry (from modelRegistry)
+ * into this shape before the stamp loop.
+ */
+export interface MnaModel {
+  factory: (
+    pinNodes: ReadonlyMap<string, number>,
+    internalNodeIds: readonly number[],
+    branchIdx: number,
+    props: PropertyBag,
+    getTime: () => number,
+  ) => AnalogElementCore;
+  getInternalNodeCount?: (props: PropertyBag) => number;
+  branchCount?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Re-export imported types for downstream consumers of this module
 // ---------------------------------------------------------------------------
 
-export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, MnaModel };
+export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, AnalogFactory };
 export type { PinElectricalSpec, CrossEngineBoundary };
 export type { CompiledDigitalDomain, CompiledAnalogDomain };
 

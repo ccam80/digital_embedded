@@ -389,7 +389,10 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
       };
     });
 
-    const models = def.models ? Object.keys(def.models) : [];
+    const models = [
+      ...(def.modelRegistry ? Object.keys(def.modelRegistry) : []),
+      ...(def.models?.digital ? ['digital'] : []),
+    ];
     const activeModelAttr = el.getAttribute('model');
     const activeModel = typeof activeModelAttr === 'string' ? activeModelAttr : undefined;
 

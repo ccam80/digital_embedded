@@ -7,7 +7,8 @@
  *   - Saturation region: both junctions forward biased
  *   - Voltage limiting via pnjlim on both B-E and B-C junctions
  *   - PNP polarity reversal
- *   - Component definition fields
+ *   - Component definition fields (modelRegistry)
+ *   - Model param access via getModelParam/setModelParam
  *   - Integration: common-emitter amplifier DC operating point
  */
 
@@ -16,6 +17,8 @@ import {
   createBjtElement,
   NpnBjtDefinition,
   PnpBjtDefinition,
+  BJT_NPN_DEFAULTS,
+  BJT_PARAM_DEFS,
 } from "../bjt.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -26,6 +29,7 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants (match bjt.ts)
@@ -35,22 +39,18 @@ const VT = 0.02585;
 const GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
-// Default NPN model parameters (match BJT_NPN_DEFAULTS)
+// Helper: create a PropertyBag with model params populated
 // ---------------------------------------------------------------------------
 
-const NPN_DEFAULT_PARAMS = {
-  IS: 1e-16,
-  BF: 100,
-  NF: 1.0,
-  BR: 1,
-  NR: 1.0,
-  ISE: 0,
-  ISC: 0,
-  VAF: Number.POSITIVE_INFINITY,
-  VAR: Number.POSITIVE_INFINITY,
-  IKF: Number.POSITIVE_INFINITY,
-  IKR: Number.POSITIVE_INFINITY,
-};
+function makeBjtProps(modelParams?: Record<string, number>): PropertyBag {
+  const props = createTestPropertyBag();
+  const defaults = { ...BJT_NPN_DEFAULTS };
+  if (modelParams) {
+    Object.assign(defaults, modelParams);
+  }
+  props.replaceModelParams(defaults);
+  return props;
+}
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver
@@ -76,25 +76,19 @@ function makeBjtAtOp(
   vbc_target: number,
   modelParams?: Record<string, number>,
 ): AnalogElement {
-  const params = { ...NPN_DEFAULT_PARAMS, ...modelParams };
-  const propsObj = new PropertyBag([["_modelParams", params]]);
+  const propsObj = makeBjtProps(modelParams);
   const element = createBjtElement(polarity, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
 
-  // Drive to operating point iteratively using updateOperatingPoint.
-  // nodeC=1, nodeB=2, nodeE=3 → voltages[0]=Vc, voltages[1]=Vb, voltages[2]=Ve
-  // For NPN: vbe = vB - vE, vbc = vB - vC
-  // Set Ve=0, then Vb = vbe_target, Vc = Vb - vbc_target
   const voltages = new Float64Array(3);
 
   for (let i = 0; i < 100; i++) {
     const vE = 0;
-    const vB = polarity * vbe_target; // so polarity*(vB - vE) = vbe_target
-    const vC = vB - polarity * vbc_target; // so polarity*(vB - vC) = vbc_target
+    const vB = polarity * vbe_target;
+    const vC = vB - polarity * vbc_target;
     voltages[0] = vC;
     voltages[1] = vB;
     voltages[2] = vE;
     element.updateOperatingPoint!(voltages);
-    // Restore target voltages after pnjlim may have modified them
     voltages[0] = vC;
     voltages[1] = vB;
     voltages[2] = vE;
@@ -133,7 +127,7 @@ function makeResistor(nodeA: number, nodeB: number, R: number): AnalogElement {
 function computeExpectedOp(
   vbe: number,
   vbc: number,
-  p: typeof NPN_DEFAULT_PARAMS,
+  p: Record<string, number>,
 ): { ic: number; ib: number; gm: number; go: number; gpi: number; gmu: number } {
   const nfVt = p.NF * VT;
   const nrVt = p.NR * VT;
@@ -185,11 +179,11 @@ describe("NPN", () => {
     // IS=1e-16, BF=100. At Vbe=0.7V, Ic = IS*(exp(0.7/VT)-1) ≈ 57.6µA.
     // The spec target Ic≈2.2mA, Ib≈22µA requires Vbe≈0.794V with IS=1e-16.
     // Use Vbe=0.794V to hit the spec-stated operating point.
-    const vbe = VT * Math.log(2.2e-3 / NPN_DEFAULT_PARAMS.IS + 1);
+    const vbe = VT * Math.log(2.2e-3 / BJT_NPN_DEFAULTS.IS + 1);
     const vbc = vbe - 5; // Vce=5V → Vbc = Vbe - Vce
     const element = makeBjtAtOp(1, vbe, vbc);
 
-    const exp = computeExpectedOp(vbe, vbc, NPN_DEFAULT_PARAMS);
+    const exp = computeExpectedOp(vbe, vbc, BJT_NPN_DEFAULTS);
 
     // Ic ≈ 2.2mA ± 5%, Ib ≈ 22µA ± 5%, Ic/Ib ≈ BF=100 within 5%
     expect(exp.ic).toBeGreaterThan(0.0020);
@@ -223,7 +217,7 @@ describe("NPN", () => {
     // Vbe=0V, Vce=5V: both junctions reverse biased → Ic ≈ 0
     const vbe = 0;
     const vbc = -5;
-    const exp = computeExpectedOp(vbe, vbc, NPN_DEFAULT_PARAMS);
+    const exp = computeExpectedOp(vbe, vbc, BJT_NPN_DEFAULTS);
 
     // At Vbe=0: If = IS*(exp(0)-1) = 0, Ic = -Ir/qb ≈ 0
     // Collector current should be negligible (leakage only)
@@ -235,12 +229,12 @@ describe("NPN", () => {
     // Vbe=0.8V, Vce=0.2V → Vbc=0.6V: both junctions forward biased
     const vbe = 0.8;
     const vbc = 0.6;
-    const exp = computeExpectedOp(vbe, vbc, NPN_DEFAULT_PARAMS);
+    const exp = computeExpectedOp(vbe, vbc, BJT_NPN_DEFAULTS);
 
     // Both If and Ir are significant, limiting Ic below BF*Ib
     const nfVt = VT;
-    const If = NPN_DEFAULT_PARAMS.IS * (Math.exp(vbe / nfVt) - 1);
-    const Ir = NPN_DEFAULT_PARAMS.IS * (Math.exp(vbc / nfVt) - 1);
+    const If = BJT_NPN_DEFAULTS.IS * (Math.exp(vbe / nfVt) - 1);
+    const Ir = BJT_NPN_DEFAULTS.IS * (Math.exp(vbc / nfVt) - 1);
 
     // Forward current exists (both junction forward biased means If and Ir both large)
     expect(If).toBeGreaterThan(0);
@@ -256,7 +250,7 @@ describe("NPN", () => {
 
   it("voltage_limiting_both_junctions", () => {
     // Start at a moderate Vbe operating point
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
 
     const voltages = new Float64Array(3);
@@ -321,25 +315,25 @@ describe("NPN", () => {
   });
 
   it("isNonlinear_true", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("pinNodeIds_correct", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj), [3, 5, 7]);
     expect(element.pinNodeIds).toEqual([3, 5, 7]);
   });
 
   it("branchIndex_minus_one", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.branchIndex).toBe(-1);
   });
@@ -352,7 +346,7 @@ describe("NPN", () => {
 describe("PNP", () => {
   it("polarity_reversed", () => {
     // For PNP: polarity = -1. Use the same Vbe that gives ~2.2mA so signals are non-trivial.
-    const vbe_pnp = VT * Math.log(2.2e-3 / NPN_DEFAULT_PARAMS.IS + 1);
+    const vbe_pnp = VT * Math.log(2.2e-3 / BJT_NPN_DEFAULTS.IS + 1);
     const vbc_pnp = vbe_pnp - 5; // Vce=5V
 
     const npnEl = makeBjtAtOp(1, vbe_pnp, vbc_pnp);
@@ -383,9 +377,9 @@ describe("PNP", () => {
   it("pnp_active_region_currents_positive", () => {
     // PNP active region: Veb≈0.794V (same IS=1e-16 physics as NPN active region test)
     // Use the same Vbe that gives Ic≈2.2mA so magnitudes match the NPN case.
-    const vbe = VT * Math.log(2.2e-3 / NPN_DEFAULT_PARAMS.IS + 1);
+    const vbe = VT * Math.log(2.2e-3 / BJT_NPN_DEFAULTS.IS + 1);
     const vbc = vbe - 5;
-    const exp = computeExpectedOp(vbe, vbc, NPN_DEFAULT_PARAMS);
+    const exp = computeExpectedOp(vbe, vbc, BJT_NPN_DEFAULTS);
 
     // The computed Ic magnitude should match NPN at same bias (only polarity differs in stamp)
     expect(exp.ic).toBeGreaterThan(0.0020);
@@ -393,7 +387,7 @@ describe("PNP", () => {
   });
 
   it("pnp_isNonlinear_true", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const propsObj = makeBjtProps();
     const element = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
@@ -406,17 +400,20 @@ describe("PNP", () => {
 describe("Definitions", () => {
   it("npn_definition_fields", () => {
     expect(NpnBjtDefinition.name).toBe("NpnBJT");
-    expect(NpnBjtDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(NpnBjtDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("NPN");
-    expect(NpnBjtDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(NpnBjtDefinition.modelRegistry).toBeDefined();
+    expect(NpnBjtDefinition.modelRegistry!["behavioral"]).toBeDefined();
+    expect(NpnBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
+    expect(NpnBjtDefinition.modelRegistry!["behavioral"].paramDefs).toBe(BJT_PARAM_DEFS);
+    expect(NpnBjtDefinition.defaultModel).toBe("behavioral");
     expect(NpnBjtDefinition.pinLayout).toHaveLength(3);
   });
 
   it("pnp_definition_fields", () => {
     expect(PnpBjtDefinition.name).toBe("PnpBJT");
-    expect(PnpBjtDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(PnpBjtDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("PNP");
-    expect(PnpBjtDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(PnpBjtDefinition.modelRegistry).toBeDefined();
+    expect(PnpBjtDefinition.modelRegistry!["behavioral"]).toBeDefined();
+    expect(PnpBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
+    expect(PnpBjtDefinition.defaultModel).toBe("behavioral");
     expect(PnpBjtDefinition.pinLayout).toHaveLength(3);
   });
 
@@ -434,20 +431,97 @@ describe("Definitions", () => {
     expect(labels).toContain("E");
   });
 
-  it("npn_analogFactory_creates_element", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
-    // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = withNodeIds(NpnBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+  it("npn_modelRegistry_factory_creates_element", () => {
+    const propsObj = makeBjtProps();
+    const entry = NpnBjtDefinition.modelRegistry!["behavioral"];
+    if (entry.kind !== "inline") throw new Error("expected inline");
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
 
-  it("pnp_analogFactory_creates_element", () => {
-    const propsObj = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
-    // analogFactory receives [B, C, E] pin order; pinNodeIds stores [B, C, E] (pinLayout order)
-    const el = withNodeIds(PnpBjtDefinition.models!.mnaModels!.behavioral!.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+  it("pnp_modelRegistry_factory_creates_element", () => {
+    const propsObj = makeBjtProps();
+    const entry = PnpBjtDefinition.modelRegistry!["behavioral"];
+    if (entry.kind !== "inline") throw new Error("expected inline");
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Model param partition tests
+// ---------------------------------------------------------------------------
+
+describe("ModelParams", () => {
+  it("getModelParam_BF_returns_default_value", () => {
+    const propsObj = makeBjtProps();
+    expect(propsObj.getModelParam<number>("BF")).toBe(100);
+  });
+
+  it("getModelParam_IS_returns_default_value", () => {
+    const propsObj = makeBjtProps();
+    expect(propsObj.getModelParam<number>("IS")).toBe(1e-14);
+  });
+
+  it("setModelParam_BF_200_recompile_produces_different_results", () => {
+    const props100 = makeBjtProps();
+    const el100 = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, props100);
+
+    const props200 = makeBjtProps({ BF: 200 });
+    expect(props200.getModelParam<number>("BF")).toBe(200);
+    const el200 = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, props200);
+
+    const voltages100 = new Float64Array(3);
+    const voltages200 = new Float64Array(3);
+    voltages100[0] = 5; voltages100[1] = 0.7; voltages100[2] = 0;
+    voltages200[0] = 5; voltages200[1] = 0.7; voltages200[2] = 0;
+
+    for (let i = 0; i < 50; i++) {
+      el100.updateOperatingPoint!(voltages100);
+      voltages100[0] = 5; voltages100[1] = 0.7; voltages100[2] = 0;
+      el200.updateOperatingPoint!(voltages200);
+      voltages200[0] = 5; voltages200[1] = 0.7; voltages200[2] = 0;
+    }
+
+    const currents100 = el100.getPinCurrents!(voltages100);
+    const currents200 = el200.getPinCurrents!(voltages200);
+
+    // With higher BF, base current should be smaller for same collector current
+    const ib100 = Math.abs(currents100[0]);
+    const ib200 = Math.abs(currents200[0]);
+    expect(ib200).toBeLessThan(ib100);
+  });
+
+  it("all_11_params_defined_in_paramDefs", () => {
+    const paramKeys = BJT_PARAM_DEFS.map(pd => pd.key);
+    expect(paramKeys).toContain("BF");
+    expect(paramKeys).toContain("IS");
+    expect(paramKeys).toContain("NF");
+    expect(paramKeys).toContain("BR");
+    expect(paramKeys).toContain("VAF");
+    expect(paramKeys).toContain("IKF");
+    expect(paramKeys).toContain("IKR");
+    expect(paramKeys).toContain("ISE");
+    expect(paramKeys).toContain("ISC");
+    expect(paramKeys).toContain("NR");
+    expect(paramKeys).toContain("VAR");
+    expect(paramKeys).toHaveLength(11);
+  });
+
+  it("primary_params_have_rank_primary", () => {
+    const bf = BJT_PARAM_DEFS.find(pd => pd.key === "BF")!;
+    const is_ = BJT_PARAM_DEFS.find(pd => pd.key === "IS")!;
+    expect(bf.rank).toBe("primary");
+    expect(is_.rank).toBe("primary");
+  });
+
+  it("secondary_params_have_rank_secondary", () => {
+    const nf = BJT_PARAM_DEFS.find(pd => pd.key === "NF")!;
+    const vaf = BJT_PARAM_DEFS.find(pd => pd.key === "VAF")!;
+    expect(nf.rank).toBe("secondary");
+    expect(vaf.rank).toBe("secondary");
   });
 });
 
@@ -464,8 +538,8 @@ describe("Definitions", () => {
 // MNA matrix size = 5 nodes + 2 branch rows = 5
 // (nodes 1..4, branchRows 4 and 5 → 0-indexed as matrix rows 3 and 4)
 //
-// SPICE reference (ngspice, IS=1e-16, BF=100):
-//   Ib ≈ 22µA, Ic ≈ 2.2mA, Vce ≈ 5 - 2.2mA × 1kΩ = 2.8V
+// SPICE reference (ngspice, IS=1e-14, BF=100):
+//   Ib ≈ 43µA, Ic ≈ 4.3mA, Vce ≈ 5 - 4.3mA × 1kΩ = 0.7V
 // ---------------------------------------------------------------------------
 
 describe("Integration", () => {
@@ -494,7 +568,7 @@ describe("Integration", () => {
     const rb = makeResistor(3, 2, 100_000);  // Rb=100kΩ from Vbb to base
 
     // BJT: C=node1, B=node2, E=gnd(0)
-    const bjtProps = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const bjtProps = makeBjtProps();
     const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps), [2, 1, 0]);
 
     const solver = new SparseSolver();
@@ -559,7 +633,7 @@ describe("Integration", () => {
 
     // BJT: B=gnd, C=node1, E=gnd → base=0=ground, emitter=0=ground
     // createBjtElement pin order: [B, C, E]
-    const bjtProps = new PropertyBag([["_modelParams", { ...NPN_DEFAULT_PARAMS }]]);
+    const bjtProps = makeBjtProps();
     const bjt = withNodeIds(createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps), [0, 1, 0]);
 
     const solver = new SparseSolver();

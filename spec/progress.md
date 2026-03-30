@@ -904,3 +904,22 @@ What's already done:
   - subcircuitRefs: 11 files (component definitions — Wave 2/3)
   - availableModels: 5 files (netlist API field name, not deleted function — API contract)
   - spice-subckt-dialog: 1 file (e2e CSS selector, not import — Wave 4 rebuilt)
+
+## Task T3: Compiler — ModelEntry resolution
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/compiler.ts (rewrote model resolution to use modelRegistry via resolveModelEntry/modelEntryToMnaModel; updated resolveComponentRoute to read modelRegistry only; updated compileSubcircuitToMnaModel to use registry-based leaf factory lookup instead of deleted getAnalogFactory; added model param population via replaceModelParams before factory invocation; passed registry to resolveSubcircuitModels)
+  - src/compile/types.ts (defined MnaModel as compiler-internal interface; replaced MnaModel import from core/registry with local definition; added AnalogFactory import)
+- **Tests**: N/A (T3 has no standalone tests — verified through T4 BJT tests)
+
+## Task T4: BJT reference implementation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/semiconductors/bjt.ts (declared modelRegistry with "behavioral" entry on NpnBjtDefinition and PnpBjtDefinition; used defineModelParams() for all 11 BJT params; factory reads props.getModelParam() per param with fallback to defaults; removed _spiceModelOverrides from propertyDefs; removed import of deleted model-defaults.ts)
+  - src/components/semiconductors/__tests__/bjt.test.ts (updated all tests to use model param partition via makeBjtProps helper instead of _modelParams; updated definition tests to verify modelRegistry instead of models.mnaModels; added 6 new ModelParams tests: getModelParam BF/IS defaults, setModelParam BF=200 produces different results, all 11 params in paramDefs, primary/secondary rank checks)
+- **Tests**: 27/27 passing
+- **Full suite**: 7616/7789 passing (173 failing — expected: unmigrated components without modelRegistry)

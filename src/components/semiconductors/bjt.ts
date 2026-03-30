@@ -29,11 +29,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { BJT_NPN_DEFAULTS, BJT_PNP_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -44,6 +44,46 @@ const VT = 0.02585;
 
 /** Minimum conductance for numerical stability. */
 const GMIN = 1e-12;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineModelParams({
+  primary: {
+    BF:  { default: 100,    description: "Forward current gain" },
+    IS:  { default: 1e-14,  unit: "A", description: "Saturation current" },
+  },
+  secondary: {
+    NF:  { default: 1,      description: "Forward emission coefficient" },
+    BR:  { default: 1,      description: "Reverse current gain" },
+    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
+    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
+    ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
+    NR:  { default: 1,      description: "Reverse emission coefficient" },
+    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+  },
+});
+
+export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
+  primary: {
+    BF:  { default: 100,    description: "Forward current gain" },
+    IS:  { default: 1e-14,  unit: "A", description: "Saturation current" },
+  },
+  secondary: {
+    NF:  { default: 1,      description: "Forward emission coefficient" },
+    BR:  { default: 1,      description: "Reverse current gain" },
+    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
+    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
+    ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
+    NR:  { default: 1,      description: "Reverse emission coefficient" },
+    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -169,25 +209,20 @@ export function createBjtElement(
   const nodeC = pinNodes.get("C")!; // collector
   const nodeE = pinNodes.get("E")!; // emitter
 
-  // Resolve model parameters
-  const modelParams = props.has("_modelParams")
-    ? props.get<Record<string, number>>("_modelParams")
-    : undefined;
-  const defaults = polarity === 1 ? BJT_NPN_DEFAULTS : BJT_PNP_DEFAULTS;
-  const mp = modelParams ?? defaults;
-
+  // Read model parameters from the PropertyBag model param partition.
+  // Guaranteed populated by compiler via replaceModelParams() before factory invocation.
   const params: Record<string, number> = {
-    IS: mp["IS"] ?? defaults["IS"],
-    BF: mp["BF"] ?? defaults["BF"],
-    NF: mp["NF"] ?? defaults["NF"],
-    BR: mp["BR"] ?? defaults["BR"],
-    NR: mp["NR"] ?? defaults["NR"],
-    ISE: mp["ISE"] ?? defaults["ISE"],
-    ISC: mp["ISC"] ?? defaults["ISC"],
-    VAF: mp["VAF"] ?? defaults["VAF"],
-    VAR: mp["VAR"] ?? defaults["VAR"],
-    IKF: mp["IKF"] ?? defaults["IKF"],
-    IKR: mp["IKR"] ?? defaults["IKR"],
+    IS: props.getModelParam<number>("IS"),
+    BF: props.getModelParam<number>("BF"),
+    NF: props.getModelParam<number>("NF"),
+    BR: props.getModelParam<number>("BR"),
+    NR: props.getModelParam<number>("NR"),
+    ISE: props.getModelParam<number>("ISE"),
+    ISC: props.getModelParam<number>("ISC"),
+    VAF: props.getModelParam<number>("VAF"),
+    VAR: props.getModelParam<number>("VAR"),
+    IKF: props.getModelParam<number>("IKF"),
+    IKR: props.getModelParam<number>("IKR"),
   };
 
   // Operating point state (initialized to zero = all junctions at 0V)
@@ -548,18 +583,10 @@ const BJT_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "model",
     type: PropertyType.STRING,
     label: "Model",
-    defaultValue: "",
-    description: "SPICE model name (blank = use built-in defaults)",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -603,13 +630,14 @@ export const NpnBjtDefinition: ComponentDefinition = {
     "NPN BJT — Gummel-Poon Level 2 bipolar junction transistor.\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(1, pinNodes, branchIdx, props),
-      deviceType: "NPN",
-    },
+      paramDefs: BJT_PARAM_DEFS,
+      params: BJT_NPN_DEFAULTS,
     },
   },
   defaultModel: "behavioral",
@@ -627,13 +655,14 @@ export const PnpBjtDefinition: ComponentDefinition = {
     "PNP BJT — Gummel-Poon Level 2 bipolar junction transistor (PNP polarity).\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(-1, pinNodes, branchIdx, props),
-      deviceType: "PNP",
-    },
+      paramDefs: BJT_PARAM_DEFS,
+      params: BJT_PNP_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

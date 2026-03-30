@@ -37,7 +37,8 @@ import type { BridgeInstance } from "./bridge-instance.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
-import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel, DigitalModel } from "../../compile/types.js";
+import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
+import type { ModelEntry } from "../../core/registry.js";
 
 function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
   return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
@@ -48,32 +49,64 @@ function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistr
 // ---------------------------------------------------------------------------
 
 type ComponentRoute =
-  | { kind: 'stamp';  model: MnaModel }
+  | { kind: 'stamp';  model: MnaModel; entry: ModelEntry | null }
   | { kind: 'bridge' }
   | { kind: 'skip' };
+
+/**
+ * Resolve a ModelEntry from the component's modelRegistry.
+ * Returns null if no entry found for the given key.
+ */
+function resolveModelEntry(
+  def: ComponentDefinition,
+  modelKey: string,
+): ModelEntry | null {
+  if (!def.modelRegistry) return null;
+  return def.modelRegistry[modelKey] ?? null;
+}
+
+/**
+ * Convert a ModelEntry to the compiler-internal MnaModel representation.
+ */
+function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
+  if (entry.kind === "inline") {
+    return {
+      factory: entry.factory,
+      branchCount: 0,
+    };
+  }
+  // Netlist entries are resolved separately by resolveSubcircuitModels
+  return null;
+}
 
 function resolveComponentRoute(
   def: ComponentDefinition,
   pc: PartitionedComponent,
   digitalPinLoading: "cross-domain" | "all" | "none",
 ): ComponentRoute {
-  const hasAnalogModels = def.modelRegistry !== undefined
-    && Object.keys(def.modelRegistry).length > 0;
+  const hasAnalogModels = def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0;
 
-  if (pc.model === null) return { kind: 'skip' };
-
-  const isDigitalModel = 'executeFn' in pc.model;
-
-  if (isDigitalModel) {
-    if (digitalPinLoading === "all" && hasAnalogModels) {
+  if (pc.modelKey === "digital" || pc.modelKey === "neutral") {
+    if (pc.modelKey === "digital" && digitalPinLoading === "all" && hasAnalogModels) {
       return { kind: 'bridge' };
     }
     return { kind: 'skip' };
   }
 
-  const mnaModel = pc.model as MnaModel;
-  return { kind: 'stamp', model: mnaModel };
+  const entry = resolveModelEntry(def, pc.modelKey);
+  if (!entry) return { kind: 'skip' };
+
+  if (entry.kind === "netlist") {
+    // Netlist entries are resolved by resolveSubcircuitModels into pc.model
+    if (pc.model === null) return { kind: 'skip' };
+    return { kind: 'stamp', model: pc.model as MnaModel, entry };
+  }
+
+  const mnaModel = modelEntryToMnaModel(entry);
+  if (!mnaModel) return { kind: 'skip' };
+  return { kind: 'stamp', model: mnaModel, entry };
 }
+
 
 // ---------------------------------------------------------------------------
 // Subcircuit model resolution — post-partition step (W4.1)
@@ -90,6 +123,7 @@ function resolveComponentRoute(
 function resolveSubcircuitModels(
   partition: SolverPartition,
   runtimeModels: Record<string, MnaSubcircuitNetlist>,
+  registry: ComponentRegistry,
   diagnostics: import("../../core/analog-engine-interface.js").SolverDiagnostic[],
 ): void {
   for (const pc of partition.components) {
@@ -118,7 +152,7 @@ function resolveSubcircuitModels(
       continue;
     }
 
-    pc.model = compileSubcircuitToMnaModel(netlist, pc);
+    pc.model = compileSubcircuitToMnaModel(netlist, pc, registry);
   }
 }
 
@@ -132,6 +166,7 @@ function resolveSubcircuitModels(
 function compileSubcircuitToMnaModel(
   netlist: MnaSubcircuitNetlist,
   _pc: PartitionedComponent,
+  registry: ComponentRegistry,
 ): MnaModel {
   let totalBranches = 0;
   for (const subEl of netlist.elements) {
@@ -181,18 +216,28 @@ function compileSubcircuitToMnaModel(
         const connectivity = netlist.netlist[elIdx];
         const remappedNodes = connectivity.map(remapNet);
 
-        const factory = getAnalogFactory(subEl.typeId);
-        if (!factory) continue;
+        const leafDef = registry.get(subEl.typeId);
+        const leafEntry = leafDef ? resolveModelEntry(leafDef, "behavioral") : null;
+        if (!leafEntry || leafEntry.kind !== "inline") continue;
+        const leafFactory = leafEntry.factory;
 
         const subProps = new PropertyBag();
         if (subEl.params) {
           for (const [k, v] of Object.entries(subEl.params)) {
-            if (typeof v === "number") subProps.set(k, v);
+            if (typeof v === "number") subProps.setModelParam(k, v);
+          }
+        }
+
+        // Build pin-label-keyed Map from positional connectivity array
+        const subPinNodes = new Map<string, number>();
+        if (leafDef) {
+          for (let pi = 0; pi < leafDef.pinLayout.length && pi < remappedNodes.length; pi++) {
+            subPinNodes.set(leafDef.pinLayout[pi]!.label, remappedNodes[pi]);
           }
         }
 
         const subBranchIdx = branchIdx >= 0 ? branchIdx + subBranchOffset : -1;
-        const core = factory(remappedNodes, subBranchIdx, subProps, getTime);
+        const core = leafFactory(subPinNodes, [], subBranchIdx, subProps, getTime);
         if (core.branchIndex >= 0) subBranchOffset++;
         subElements.push(core);
       }
@@ -1044,7 +1089,7 @@ export function compileAnalogPartition(
   const runtimeModels: Record<string, MnaSubcircuitNetlist> = outerCircuit !== undefined
     ? extractRuntimeModels(outerCircuit.metadata as Record<string, unknown>)
     : {};
-  resolveSubcircuitModels(partition, runtimeModels, diagnostics);
+  resolveSubcircuitModels(partition, runtimeModels, registry, diagnostics);
 
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
   const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);
@@ -1323,6 +1368,18 @@ export function compileAnalogPartition(
         );
       }
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
+    }
+
+    // Populate model params from ModelEntry defaults, then overlay user deltas
+    const modelEntry = route.entry;
+    if (modelEntry && Object.keys(modelEntry.params).length > 0) {
+      props.replaceModelParams(modelEntry.params);
+      // Overlay user-set deltas: model params the user explicitly changed
+      for (const key of modelEntry.paramDefs.map(pd => pd.key)) {
+        if (props.has(`_mp_${key}`)) {
+          props.setModelParam(key, props.get<number>(`_mp_${key}`));
+        }
+      }
     }
 
     const analogFactory = activeModel.factory;

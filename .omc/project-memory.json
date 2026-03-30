@@ -253,14 +253,14 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 680,
-      "lastAccessed": 1774842543559,
+      "accessCount": 730,
+      "lastAccessed": 1774844972337,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 389,
-      "lastAccessed": 1774843579147,
+      "accessCount": 393,
+      "lastAccessed": 1774844949190,
       "type": "directory"
     },
     {
@@ -271,14 +271,14 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 168,
-      "lastAccessed": 1774843331908,
+      "accessCount": 172,
+      "lastAccessed": 1774843783794,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 166,
-      "lastAccessed": 1774836490106,
+      "accessCount": 167,
+      "lastAccessed": 1774843726072,
       "type": "directory"
     },
     {
@@ -307,8 +307,8 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 92,
-      "lastAccessed": 1774841936900,
+      "accessCount": 93,
+      "lastAccessed": 1774843665811,
       "type": "file"
     },
     {
@@ -324,6 +324,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 68,
+      "lastAccessed": 1774844990706,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
       "accessCount": 65,
       "lastAccessed": 1774817056956,
@@ -336,15 +342,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 53,
-      "lastAccessed": 1774835639986,
-      "type": "file"
-    },
-    {
       "path": "spec\\test-baseline.md",
-      "accessCount": 47,
-      "lastAccessed": 1774839923589,
+      "accessCount": 48,
+      "lastAccessed": 1774843667006,
       "type": "file"
     },
     {
@@ -361,8 +361,8 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 40,
-      "lastAccessed": 1774841936948,
+      "accessCount": 41,
+      "lastAccessed": 1774843666212,
       "type": "file"
     },
     {
@@ -403,8 +403,8 @@
     },
     {
       "path": "src\\core\\properties.ts",
-      "accessCount": 31,
-      "lastAccessed": 1774843049494,
+      "accessCount": 33,
+      "lastAccessed": 1774843715156,
       "type": "file"
     },
     {
@@ -417,6 +417,12 @@
       "path": "src\\components\\semiconductors\\schottky.ts",
       "accessCount": 26,
       "lastAccessed": 1774816969994,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774844398718,
       "type": "file"
     },
     {
@@ -495,12 +501,6 @@
       "path": "src\\components\\semiconductors\\scr.ts",
       "accessCount": 10,
       "lastAccessed": 1774816971224,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774816981525,
       "type": "file"
     },
     {
